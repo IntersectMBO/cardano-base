@@ -32,7 +32,7 @@ library
                        Cardano.Binary.Class.Primitive
                        Cardano.Binary.Class.Annotated
 
-  build-depends:     base
+  build-depends:       base
                      , aeson
                      , bytestring
                      , cardano-prelude
@@ -74,7 +74,7 @@ test-suite test
 
   build-depends:       base
                      , bytestring
-                     , cardano-binary
+                     , cardano-base
                      , cardano-prelude
                      , cardano-prelude-test
                      , cborg
