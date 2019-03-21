@@ -1,4 +1,4 @@
-name:                cardano-base
+name:                cardano-binary
 version:             1.5.0
 synopsis:            Code used throughout the Cardano ecosystem
 description:         This package includes the binary serialization format for Cardano
@@ -74,7 +74,7 @@ test-suite test
 
   build-depends:       base
                      , bytestring
-                     , cardano-base
+                     , cardano-binary
                      , cardano-prelude
                      , cardano-prelude-test
                      , cborg
