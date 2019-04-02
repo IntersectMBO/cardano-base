@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 
 -- | Golden and round-trip testing of 'Bi' instances
 
@@ -29,6 +30,9 @@ import Hedgehog.Internal.Show
 
 import Cardano.Binary.Class
   ( Bi
+  , label
+  , encode
+  , decode
   , DecoderError
   , Encoding
   , decodeFull
@@ -83,14 +87,13 @@ failHexDumpDiff x y = case hexDumpDiff x y of
 -- - The encoded data should coincide with the contents of the @fp@.
 -- - Decoding @fp@ should give as a result @x@
 --
-goldenTestBi :: (Bi a, Eq a, Show a, HasCallStack) => a -> FilePath -> Property
-goldenTestBi x path = withFrozenCallStack $ do
-  let bs' = encodeWithIndex . serialize $ x
-  withTests 1 . property $ do
-    bs <- liftIO $ BS.readFile path
-    let target = decodeBase16 bs
-    compareHexDump bs bs'
-    fmap decodeFull target === Just (Right x)
+goldenTestBi
+  :: forall a
+   . (Bi a, Eq a, Show a, HasCallStack)
+  => a
+  -> FilePath
+  -> Property
+goldenTestBi = goldenTestCBOR (label $ Proxy @a) encode decode
 
 -- | Variant of 'goldenTestBi' using custom encode and decode functions.
 --
@@ -108,7 +111,7 @@ goldenTestCBOR
   -> a
   -> FilePath
   -> Property
-goldenTestCBOR label enc dec x path = withFrozenCallStack $ do
+goldenTestCBOR eLabel enc dec x path = withFrozenCallStack $ do
   let bs' = encodeWithIndex . serializeEncoding . enc $ x
   withTests 1 . property $ do
     bs <- liftIO $ BS.readFile path
@@ -116,7 +119,7 @@ goldenTestCBOR label enc dec x path = withFrozenCallStack $ do
     compareHexDump bs bs'
     let
       fullDecoder :: BS.ByteString -> Either DecoderError a
-      fullDecoder = decodeFullDecoder label dec
+      fullDecoder = decodeFullDecoder eLabel dec
     fmap fullDecoder target === Just (Right x)
 
 -- | Round trip test a value (any instance of both the 'Bi' and 'Show' classes)
