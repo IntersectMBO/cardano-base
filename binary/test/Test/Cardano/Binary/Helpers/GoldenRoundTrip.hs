@@ -1,9 +1,11 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Golden and round-trip testing of 'Bi' instances
 
 module Test.Cardano.Binary.Helpers.GoldenRoundTrip
   ( goldenTestBi
+  , goldenTestCBOR
   , roundTripsBiShow
   , roundTripsBiBuildable
   , compareHexDump
@@ -15,6 +17,7 @@ import Cardano.Prelude
 import Test.Cardano.Prelude
 
 import qualified Codec.CBOR.Decoding as D
+import Codec.CBOR.Decoding (Decoder)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Formatting.Buildable (Buildable(..))
@@ -24,7 +27,15 @@ import Hedgehog.Internal.Property (failWith)
 import Hedgehog.Internal.Show
   (LineDiff, lineDiff, mkValue, renderLineDiff, showPretty)
 
-import Cardano.Binary.Class (Bi(..), decodeFull, decodeFullDecoder, serialize)
+import Cardano.Binary.Class
+  ( Bi
+  , DecoderError
+  , Encoding
+  , decodeFull
+  , decodeFullDecoder
+  , serialize
+  , serializeEncoding
+  )
 import qualified Prelude
 import Text.Show.Pretty (Value(..))
 
@@ -65,6 +76,13 @@ failHexDumpDiff x y = case hexDumpDiff x y of
     ["━━━ Not Equal ━━━", showPretty x, showPretty y]
   Just dif -> withFrozenCallStack $ failWith Nothing $ renderHexDumpDiff dif
 
+-- | Check that the 'encode' and 'decode' function of the 'Bi' instances work as
+-- expected w.r.t. the give reference data, this is, given a value @x::a@, and
+-- a file path @fp@:
+--
+-- - The encoded data should coincide with the contents of the @fp@.
+-- - Decoding @fp@ should give as a result @x@
+--
 goldenTestBi :: (Bi a, Eq a, Show a, HasCallStack) => a -> FilePath -> Property
 goldenTestBi x path = withFrozenCallStack $ do
   let bs' = encodeWithIndex . serialize $ x
@@ -74,6 +92,32 @@ goldenTestBi x path = withFrozenCallStack $ do
     compareHexDump bs bs'
     fmap decodeFull target === Just (Right x)
 
+-- | Variant of 'goldenTestBi' using custom encode and decode functions.
+--
+-- This is required for the encode/decode golden-tests for types that do no
+-- have a 'Bi' instance.
+--
+goldenTestCBOR
+  :: forall a
+  . (Eq a, Show a, HasCallStack)
+  => Text
+  -- ^ Label for error reporting when decoding.
+  -> (a -> Encoding)
+  -- ^
+  -> (forall s . Decoder s a)
+  -> a
+  -> FilePath
+  -> Property
+goldenTestCBOR label enc dec x path = withFrozenCallStack $ do
+  let bs' = encodeWithIndex . serializeEncoding . enc $ x
+  withTests 1 . property $ do
+    bs <- liftIO $ BS.readFile path
+    let target = decodeBase16 bs
+    compareHexDump bs bs'
+    let
+      fullDecoder :: BS.ByteString -> Either DecoderError a
+      fullDecoder = decodeFullDecoder label dec
+    fmap fullDecoder target === Just (Right x)
 
 -- | Round trip test a value (any instance of both the 'Bi' and 'Show' classes)
 --   by serializing it to a ByteString and back again and that also has a 'Show'
