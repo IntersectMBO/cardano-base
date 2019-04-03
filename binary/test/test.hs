@@ -1,11 +1,11 @@
 import Cardano.Prelude
 import Test.Cardano.Prelude
 
-import qualified Test.Cardano.Binary.Bi
-import qualified Test.Cardano.Binary.BiSizeBounds
+import qualified Test.Cardano.Binary.RoundTrip
+import qualified Test.Cardano.Binary.SizeBounds
 
 
 -- | Main testing action
 main :: IO ()
 main = runTests
-  [Test.Cardano.Binary.Bi.tests, Test.Cardano.Binary.BiSizeBounds.tests]
+  [Test.Cardano.Binary.RoundTrip.tests, Test.Cardano.Binary.SizeBounds.tests]

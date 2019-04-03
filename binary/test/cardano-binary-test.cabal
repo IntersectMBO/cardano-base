@@ -1,7 +1,7 @@
 name:                cardano-binary-test
 version:             1.3.0
-synopsis:            Test helpers from cardano-base exposed to other packages
-description:         Test helpers from cardano-base exposed to other packages
+synopsis:            Test helpers from cardano-binary exposed to other packages
+description:         Test helpers from cardano-binary exposed to other packages
 license:             MIT
 license-file:        LICENSE
 author:              IOHK
@@ -27,14 +27,10 @@ library
                      , cardano-prelude
                      , cardano-prelude-test
                      , cborg
-                     , cereal
                      , containers
-                     , cryptonite
                      , formatting
-                     , half
                      , hedgehog
                      , hspec
-                     , mtl
                      , pretty-show
                      , QuickCheck
                      , quickcheck-instances

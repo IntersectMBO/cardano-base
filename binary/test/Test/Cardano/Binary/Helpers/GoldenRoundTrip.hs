@@ -2,13 +2,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 
--- | Golden and round-trip testing of 'Bi' instances
+-- | Golden and round-trip testing of 'FromCBOR' and 'ToCBOR' instances
 
 module Test.Cardano.Binary.Helpers.GoldenRoundTrip
-  ( goldenTestBi
-  , goldenTestCBOR
-  , roundTripsBiShow
-  , roundTripsBiBuildable
+  ( goldenTestCBOR
+  , goldenTestCBORExplicit
+  , roundTripsCBORShow
+  , roundTripsCBORBuildable
   , compareHexDump
   , deprecatedGoldenDecode
   )
@@ -18,7 +18,6 @@ import Cardano.Prelude
 import Test.Cardano.Prelude
 
 import qualified Codec.CBOR.Decoding as D
-import Codec.CBOR.Decoding (Decoder)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Formatting.Buildable (Buildable(..))
@@ -28,13 +27,12 @@ import Hedgehog.Internal.Property (failWith)
 import Hedgehog.Internal.Show
   (LineDiff, lineDiff, mkValue, renderLineDiff, showPretty)
 
-import Cardano.Binary.Class
-  ( Bi
-  , label
-  , encode
-  , decode
+import Cardano.Binary
+  ( Decoder
   , DecoderError
   , Encoding
+  , FromCBOR(..)
+  , ToCBOR(..)
   , decodeFull
   , decodeFullDecoder
   , serialize
@@ -87,52 +85,54 @@ failHexDumpDiff x y = case hexDumpDiff x y of
 -- - The encoded data should coincide with the contents of the @fp@.
 -- - Decoding @fp@ should give as a result @x@
 --
-goldenTestBi
+goldenTestCBOR
   :: forall a
-   . (Bi a, Eq a, Show a, HasCallStack)
+  . (FromCBOR a, ToCBOR a, Eq a, Show a, HasCallStack)
   => a
   -> FilePath
   -> Property
-goldenTestBi = goldenTestCBOR (label $ Proxy @a) encode decode
+goldenTestCBOR = goldenTestCBORExplicit (label $ Proxy @a) toCBOR fromCBOR
 
 -- | Variant of 'goldenTestBi' using custom encode and decode functions.
 --
 -- This is required for the encode/decode golden-tests for types that do no
 -- have a 'Bi' instance.
 --
-goldenTestCBOR
+goldenTestCBORExplicit
   :: forall a
   . (Eq a, Show a, HasCallStack)
   => Text
   -- ^ Label for error reporting when decoding.
   -> (a -> Encoding)
-  -- ^
   -> (forall s . Decoder s a)
   -> a
   -> FilePath
   -> Property
-goldenTestCBOR eLabel enc dec x path = withFrozenCallStack $ do
+goldenTestCBORExplicit eLabel enc dec x path = withFrozenCallStack $ do
   let bs' = encodeWithIndex . serializeEncoding . enc $ x
   withTests 1 . property $ do
     bs <- liftIO $ BS.readFile path
     let target = decodeBase16 bs
     compareHexDump bs bs'
     let
-      fullDecoder :: BS.ByteString -> Either DecoderError a
+      fullDecoder :: LByteString -> Either DecoderError a
       fullDecoder = decodeFullDecoder eLabel dec
     fmap fullDecoder target === Just (Right x)
 
--- | Round trip test a value (any instance of both the 'Bi' and 'Show' classes)
---   by serializing it to a ByteString and back again and that also has a 'Show'
---   instance. If the 'a' type has both 'Show' and 'Buildable' instances, it's
---   best to use this version.
-roundTripsBiShow :: (Bi a, Eq a, MonadTest m, Show a) => a -> m ()
-roundTripsBiShow x = tripping x serialize decodeFull
 
--- | Round trip (via ByteString) any instance of the 'Bi' class
---   that also has a 'Buildable' instance.
-roundTripsBiBuildable :: (Bi a, Eq a, MonadTest m, Buildable a) => a -> m ()
-roundTripsBiBuildable a = trippingBuildable a serialize decodeFull
+-- | Round trip test a value (any instance of 'FromCBOR', 'ToCBOR', and 'Show'
+--   classes) by serializing it to a ByteString and back again and that also has
+--   a 'Show' instance. If the 'a' type has both 'Show' and 'Buildable'
+--   instances, it's best to use this version.
+roundTripsCBORShow
+  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Show a) => a -> m ()
+roundTripsCBORShow x = tripping x serialize decodeFull
+
+-- | Round trip (via ByteString) any instance of the 'FromCBOR' and 'ToCBOR'
+--   class that also has a 'Buildable' instance.
+roundTripsCBORBuildable
+  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Buildable a) => a -> m ()
+roundTripsCBORBuildable a = trippingBuildable a serialize decodeFull
 
 deprecatedGoldenDecode
   :: HasCallStack => Text -> (forall s . D.Decoder s ()) -> FilePath -> Property

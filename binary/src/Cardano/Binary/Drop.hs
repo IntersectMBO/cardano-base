@@ -4,7 +4,7 @@
 --   example when we have deprecated some part of the serialised blockchain, but
 --   still need to decode old blocks.
 
-module Cardano.Binary.Class.Drop
+module Cardano.Binary.Drop
   ( Dropper
   , dropBytes
   , dropInt32
