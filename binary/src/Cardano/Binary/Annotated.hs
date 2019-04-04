@@ -6,31 +6,33 @@
 {-# LANGUAGE Rank2Types         #-}
 {-# LANGUAGE TypeFamilies       #-}
 
-module Cardano.Binary.Class.Annotated
+module Cardano.Binary.Annotated
   ( Annotated(..)
   , ByteSpan(..)
   , Decoded(..)
   , annotatedDecoder
   , slice
-  , decodeAnnotated
+  , fromCBORAnnotated
   , decodeFullAnnotatedBytes
   )
 where
 
-import qualified Codec.CBOR.Decoding as D
+import Cardano.Prelude
+
 import Codec.CBOR.Read (ByteOffset)
 import Data.Aeson (FromJSON(..), ToJSON(..))
 import qualified Data.ByteString.Lazy as BSL
 import Data.Kind (Type)
 
-import Cardano.Binary.Class.Core (Bi(..), DecoderError)
-import Cardano.Binary.Class.Primitive (decodeFullDecoder)
-import Cardano.Prelude
+import Cardano.Binary.Deserialize (decodeFullDecoder)
+import Cardano.Binary.FromCBOR
+  (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan)
+
 
 -- | Extract a substring of a given ByteString corresponding to the offsets.
-slice :: BSL.ByteString -> ByteSpan -> BSL.ByteString
+slice :: BSL.ByteString -> ByteSpan -> LByteString
 slice bytes (ByteSpan start end) =
-  BSL.take (end - start) $ BSL.drop start $ bytes
+  BSL.take (end - start) $ BSL.drop start bytes
 
 -- | A pair of offsets delimiting the beginning and end of a substring of a ByteString
 data ByteSpan = ByteSpan !ByteOffset !ByteOffset
@@ -54,26 +56,25 @@ instance FromJSON b => FromJSON (Annotated b ()) where
 
 -- | A decoder for a value paired with an annotation specifying the start and end
 -- of the consumed bytes.
-annotatedDecoder :: D.Decoder s a -> D.Decoder s (Annotated a ByteSpan)
-annotatedDecoder d = D.decodeWithByteSpan d
+annotatedDecoder :: Decoder s a -> Decoder s (Annotated a ByteSpan)
+annotatedDecoder d = decodeWithByteSpan d
   <&> \(x, start, end) -> Annotated x (ByteSpan start end)
 
 -- | A decoder for a value paired with an annotation specifying the start and end
 -- of the consumed bytes.
-decodeAnnotated :: (Bi a) => D.Decoder s (Annotated a ByteSpan)
-decodeAnnotated = annotatedDecoder decode
+fromCBORAnnotated :: FromCBOR a => Decoder s (Annotated a ByteSpan)
+fromCBORAnnotated = annotatedDecoder fromCBOR
 
 -- | Decodes a value from a ByteString, requiring that the full ByteString is consumed, and
 -- replaces ByteSpan annotations with the corresponding substrings of the input string.
 decodeFullAnnotatedBytes
-  :: (Functor f)
+  :: Functor f
   => Text
-  -> (forall s . D.Decoder s (f ByteSpan))
-  -> BSL.ByteString
+  -> (forall s . Decoder s (f ByteSpan))
+  -> LByteString
   -> Either DecoderError (f ByteString)
 decodeFullAnnotatedBytes lbl decoder bytes =
-  (fmap . fmap) (BSL.toStrict . slice bytes)
-    $ decodeFullDecoder lbl decoder bytes
+  fmap (BSL.toStrict . slice bytes) <$> decodeFullDecoder lbl decoder bytes
 
 class Decoded t where
   type BaseType t :: Type

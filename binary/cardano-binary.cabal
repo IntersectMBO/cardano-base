@@ -1,6 +1,6 @@
 name:                cardano-binary
 version:             1.5.0
-synopsis:            Code used throughout the Cardano ecosystem
+synopsis:            Binary serialization for Cardano
 description:         This package includes the binary serialization format for Cardano
 license:             MIT
 license-file:        LICENSE
@@ -20,17 +20,19 @@ flag development
 library
   hs-source-dirs:      src
   exposed-modules:
-                       Cardano.Binary.Class
-                       Cardano.Binary.Limit
-                       Cardano.Binary.ToCBOR
-                       Cardano.Binary.FromCBOR
-                       Cardano.Binary.EvilInstances
+                       Cardano.Binary
 
   other-modules:
-                       Cardano.Binary.Class.Core
-                       Cardano.Binary.Class.Drop
-                       Cardano.Binary.Class.Primitive
-                       Cardano.Binary.Class.Annotated
+                       Cardano.Binary.Annotated
+                       Cardano.Binary.Drop
+                       Cardano.Binary.Limit
+                       Cardano.Binary.Raw
+
+                       Cardano.Binary.ToCBOR
+                       Cardano.Binary.FromCBOR
+
+                       Cardano.Binary.Serialize
+                       Cardano.Binary.Deserialize
 
   build-depends:       base
                      , aeson
@@ -40,9 +42,7 @@ library
                      , containers
                      , digest
                      , formatting
-                     , lens
                      , recursion-schemes
-                     , mtl
                      , safe-exceptions
                      , tagged
                      , text
@@ -67,10 +67,10 @@ test-suite test
   type:                exitcode-stdio-1.0
 
   other-modules:
-                       Test.Cardano.Binary.Bi
-                       Test.Cardano.Binary.BiSizeBounds
+                       Test.Cardano.Binary.SizeBounds
                        Test.Cardano.Binary.Helpers
                        Test.Cardano.Binary.Helpers.GoldenRoundTrip
+                       Test.Cardano.Binary.RoundTrip
 
   build-depends:       base
                      , bytestring
@@ -78,13 +78,10 @@ test-suite test
                      , cardano-prelude
                      , cardano-prelude-test
                      , cborg
-                     , cereal
                      , containers
                      , formatting
-                     , half
                      , hedgehog
                      , hspec
-                     , mtl
                      , pretty-show
                      , QuickCheck
                      , quickcheck-instances

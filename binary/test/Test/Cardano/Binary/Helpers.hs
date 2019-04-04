@@ -1,34 +1,25 @@
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TypeApplications           #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Test.Cardano.Binary.Helpers
-  ( IdTestingRequiredClassesAlmost
-
-       -- * From/to
-  , binaryEncodeDecode
-  , binaryTest
-  , showReadId
-  , showReadTest
-  , identityTest
-
-       -- * Binary test helpers
-  , U
+  (
+  -- * Binary test helpers
+    U
   , U24
   , extensionProperty
+  , cborFlatTermValid
 
-       -- * Message length
+  -- * Message length
   , msgLenLimitedTest
 
-       -- * Static size estimates
+  -- * Static size estimates
   , SizeTestConfig(..)
   , cfg
   , scfg
@@ -37,7 +28,6 @@ module Test.Cardano.Binary.Helpers
 where
 
 import Cardano.Prelude
-import Test.Cardano.Prelude
 
 import Codec.CBOR.FlatTerm (toFlatTerm, validFlatTerm)
 import qualified Data.ByteString as BS
@@ -52,7 +42,6 @@ import Formatting (Buildable, bprint, build, formatToString, int)
 import Hedgehog (annotate, failure, forAllWith, success)
 import qualified Hedgehog as HH
 import qualified Hedgehog.Gen as HH.Gen
-import Prelude (read)
 import Test.Hspec (Spec, describe)
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck
@@ -72,11 +61,13 @@ import Test.QuickCheck
   )
 import Test.QuickCheck.Instances ()
 
-import Cardano.Binary.Class
-  ( Bi(..)
+import Cardano.Binary
+  ( FromCBOR(..)
+  , Limit(..)
   , Range(..)
   , Size
   , SizeOverride(..)
+  , ToCBOR(..)
   , decodeListLenOf
   , decodeUnknownCborDataItem
   , encodeListLen
@@ -85,44 +76,17 @@ import Cardano.Binary.Class
   , serialize'
   , szSimplify
   , szWithCtx
-  , toLazyByteString
   , unsafeDeserialize
   )
-import Cardano.Binary.Limit (Limit(..))
 
 
 --------------------------------------------------------------------------------
 -- From/to tests
 --------------------------------------------------------------------------------
 
--- | Basic binary serialization/deserialization identity.
-binaryEncodeDecode :: (Show a, Eq a, Bi a) => a -> Property
-binaryEncodeDecode a = (unsafeDeserialize . serialize $ a) === a
-
 -- | Machinery to test we perform "flat" encoding.
-cborFlatTermValid :: Bi a => a -> Property
-cborFlatTermValid = property . validFlatTerm . toFlatTerm . encode
-
-showReadId :: (Show a, Eq a, Read a) => a -> Property
-showReadId a = read (show a) === a
-
-type IdTestingRequiredClassesAlmost a = (Eq a, Show a, Arbitrary a, Typeable a)
-
-type IdTestingRequiredClasses f a = (Eq a, Show a, Arbitrary a, Typeable a, f a)
-
-identityTest
-  :: forall a . (IdTestingRequiredClassesAlmost a) => (a -> Property) -> Spec
-identityTest = prop typeName
- where
-  typeName :: String
-  typeName = show $ typeRep (Proxy @a)
-
-binaryTest :: forall a . IdTestingRequiredClasses Bi a => Spec
-binaryTest =
-  identityTest @a $ \x -> binaryEncodeDecode x .&&. cborFlatTermValid x
-
-showReadTest :: forall a . IdTestingRequiredClasses Read a => Spec
-showReadTest = identityTest @a showReadId
+cborFlatTermValid :: ToCBOR a => a -> Property
+cborFlatTermValid = property . validFlatTerm . toFlatTerm . toCBOR
 
 --------------------------------------------------------------------------------
 
@@ -132,13 +96,16 @@ showReadTest = identityTest @a showReadId
 -- Check the `extensionProperty` for more details.
 data U = U Word8 BS.ByteString deriving (Show, Eq)
 
-instance Bi U where
-  encode (U word8 bs) =
-    encodeListLen 2 <> encode (word8 :: Word8) <> encodeUnknownCborDataItem
+instance ToCBOR U where
+  toCBOR (U word8 bs) =
+    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeUnknownCborDataItem
       (LBS.fromStrict bs)
-  decode = do
+
+
+instance FromCBOR U where
+  fromCBOR = do
     decodeListLenOf 2
-    U <$> decode <*> decodeUnknownCborDataItem
+    U <$> fromCBOR <*> decodeUnknownCborDataItem
 
 instance Arbitrary U where
   arbitrary = U <$> choose (0, 255) <*> arbitrary
@@ -146,19 +113,23 @@ instance Arbitrary U where
 -- | Like `U`, but we expect to read back the Cbor Data Item when decoding.
 data U24 = U24 Word8 BS.ByteString deriving (Show, Eq)
 
-instance Bi U24 where
-  encode (U24 word8 bs) =
-    encodeListLen 2 <> encode (word8 :: Word8) <> encodeUnknownCborDataItem
-      (LBS.fromStrict bs)
-  decode = do
+instance FromCBOR U24 where
+  fromCBOR = do
     decodeListLenOf 2
-    U24 <$> decode <*> decodeUnknownCborDataItem
+    U24 <$> fromCBOR <*> decodeUnknownCborDataItem
+
+instance ToCBOR U24 where
+  toCBOR (U24 word8 bs) =
+    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeUnknownCborDataItem
+      (LBS.fromStrict bs)
+
 
 -- | Given a data type which can be extended, verify we can indeed do so
 -- without breaking anything. This should work with every time which adopted
 -- the schema of having at least one constructor of the form:
 -- .... | Unknown Word8 ByteString
-extensionProperty :: forall a . (Arbitrary a, Eq a, Show a, Bi a) => Property
+extensionProperty
+  :: forall a . (Arbitrary a, Eq a, Show a, FromCBOR a, ToCBOR a) => Property
 extensionProperty = forAll @a (arbitrary :: Gen a) $ \input ->
 {- This function works as follows:
 
@@ -212,7 +183,7 @@ extensionProperty = forAll @a (arbitrary :: Gen a) $ \input ->
 -- Message length
 --------------------------------------------------------------------------------
 
-msgLenLimitedCheck :: Bi a => Limit a -> a -> Property
+msgLenLimitedCheck :: ToCBOR a => Limit a -> a -> Property
 msgLenLimitedCheck limit msg = if sz <= fromIntegral limit
   then property True
   else flip counterexample False $ formatToString
@@ -223,7 +194,7 @@ msgLenLimitedCheck limit msg = if sz <= fromIntegral limit
 
 msgLenLimitedTest'
   :: forall a
-   . IdTestingRequiredClasses Bi a
+   . (Show a, Arbitrary a, FromCBOR a, ToCBOR a)
   => Limit a
   -> String
   -> (a -> Bool)
@@ -232,9 +203,12 @@ msgLenLimitedTest' limit desc whetherTest =
   -- instead of checking for `arbitrary` values, we'd better generate
   -- many values and find maximal message size - it allows user to get
   -- correct limit on the spot, if needed.
-  addDesc $ modifyMaxSuccess (const 1) $ identityTest @a $ \_ ->
+  addDesc $ modifyMaxSuccess (const 1) $ prop typeName $ \(_ :: a) ->
     findLargestCheck .&&. listsCheck
  where
+  typeName :: String
+  typeName = show $ typeRep (Proxy @a)
+
   addDesc :: Spec -> Spec
   addDesc act = if null desc then act else describe desc act
 
@@ -259,19 +233,17 @@ msgLenLimitedTest' limit desc whetherTest =
         counterexample desc
           $ counterexample "Potentially unlimited size!"
           $ msgLenLimitedCheck limit a
-    in 
+    in
        -- Increase lists length gradually to avoid hanging.
        conjoin $ doCheck <$> [1 .. 13 :: Int]
 
 msgLenLimitedTest
-  :: forall a . (IdTestingRequiredClasses Bi a) => Limit a -> Spec
+  :: forall a
+   . (Show a, Arbitrary a, ToCBOR a, FromCBOR a)
+  => Limit a
+  -> Spec
 msgLenLimitedTest lim = msgLenLimitedTest' @a lim "" (const True)
 
---------------------------------------------------------------------------------
--- Orphans
---------------------------------------------------------------------------------
-
-deriving instance Bi bi => Bi (SmallGenerator bi)
 
 --------------------------------------------------------------------------------
 -- Static size estimates
@@ -311,7 +283,7 @@ scfg = SizeTestConfig
   }
 
 -- | Create a test case from the given test configuration.
-sizeTest :: forall a . Bi a => SizeTestConfig a -> HH.Property
+sizeTest :: forall a . ToCBOR a => SizeTestConfig a -> HH.Property
 sizeTest SizeTestConfig {..} = HH.property $ do
   x <- forAllWith debug gen
 
@@ -325,9 +297,9 @@ sizeTest SizeTestConfig {..} = HH.property $ do
       annotate ("Value: " <> debug x)
 
   case szVerify ctx x of
-    Exact -> success
+    Exact                          -> success
     WithinBounds _ _ | not precise -> success
-    WithinBounds sz bounds -> do
+    WithinBounds sz bounds         -> do
       badBounds sz bounds
       annotate "Bounds were not exact."
       failure
@@ -347,9 +319,9 @@ data ComparisonResult
     | BoundsAreSymbolic Size         -- ^ The bounds could not be reduced to a numerical range.
     | OutOfBounds Natural (Range Natural)  -- ^ The size fell outside of the bounds.
 
--- | For a given value @x :: a@ with @Bi a@, check that the encoded size
+-- | For a given value @x :: a@ with @ToCBOR a@, check that the encoded size
 --   of @x@ falls within the statically-computed size range for @a@.
-szVerify :: Bi a => Map TypeRep SizeOverride -> a -> ComparisonResult
+szVerify :: ToCBOR a => Map TypeRep SizeOverride -> a -> ComparisonResult
 szVerify ctx x = case szSimplify (szWithCtx ctx (pure x)) of
   Left bounds -> BoundsAreSymbolic bounds
   Right range | lo range <= sz && sz <= hi range ->
@@ -357,4 +329,4 @@ szVerify ctx x = case szSimplify (szWithCtx ctx (pure x)) of
   Right range -> OutOfBounds sz range
  where
   sz :: Natural
-  sz = fromIntegral $ LBS.length $ toLazyByteString $ encode x
+  sz = fromIntegral $ LBS.length $ serialize x

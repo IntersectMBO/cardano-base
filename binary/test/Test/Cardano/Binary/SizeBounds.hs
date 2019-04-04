@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 
-module Test.Cardano.Binary.BiSizeBounds
+module Test.Cardano.Binary.SizeBounds
   ( tests
   )
 where
@@ -11,85 +11,28 @@ import Cardano.Prelude
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
-import Data.String (String)
 import Data.Tagged (Tagged(..))
 import qualified Data.Text as T
-
 import Data.Typeable (typeRep)
-import Hedgehog (Gen, Group(..), checkParallel, withTests)
+
+import Cardano.Binary
+
+import Hedgehog (Gen, Group(..), checkParallel)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Cardano.Binary.Class
-
 import Test.Cardano.Binary.Helpers
+
 
 tests :: IO Bool
 tests
   = let
       listOf :: Gen a -> Gen [a]
       listOf = Gen.list (Range.linear 0 300)
-      longListOf :: Gen a -> Gen [a]
-      longListOf = Gen.list (Range.linear 0 100000)
     in checkParallel $ Group
       "Encoded size bounds for core types."
-      [ ("()", sizeTest $ scfg { gen = pure (), precise = True })
-      , ("Bool", sizeTest $ cfg { gen = Gen.bool, precise = True })
-      , ("Char"  , sizeTest $ cfg { gen = Gen.unicode })
-      , ("Char 2", sizeTest $ cfg { gen = Gen.latin1 })
-      , ( "String"
-        , sizeTest $ cfg
-          { gen         = listOf Gen.unicode
-          , computedCtx = \str -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf String))
-              , SizeConstant $ fromIntegral $ length str
-              )
-            ]
-          }
-        )
-      , ( "String 2"
-        , sizeTest $ cfg
-          { gen         = listOf Gen.latin1
-          , computedCtx = \str -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf String))
-              , SizeConstant $ fromIntegral $ length str
-              )
-            ]
-          }
-        )
-      , ( "String 3"
-        , sizeTest $ cfg
-          { gen         = listOf Gen.alpha
-          , addlCtx     = M.fromList
-            [(typeRep (Proxy @String), SelectCases ["minChar"])]
-          , computedCtx = \str -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf String))
-              , SizeConstant $ fromIntegral $ length str
-              )
-            ]
-          , precise     = True
-          }
-        )
-      , ( "String 4"
-        , withTests 20 $ sizeTest $ cfg
-          { gen         = longListOf Gen.alpha
-          , addlCtx     = M.fromList
-            [(typeRep (Proxy @String), SelectCases ["minChar"])]
-          , computedCtx = \str -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf String))
-              , SizeConstant $ fromIntegral $ length str
-              )
-            ]
-          , precise     = True
-          }
-        )
-      , ( "Char 3"
-        , sizeTest $ cfg
-          { gen     = Gen.alpha
-          , addlCtx = M.fromList [(typeRep (Proxy @Char), SizeConstant 2)]
-          , precise = True
-          }
-        )
+      [ ("()"    , sizeTest $ scfg { gen = pure (), precise = True })
+      , ("Bool"  , sizeTest $ cfg { gen = Gen.bool, precise = True })
       , ("Word"  , sizeTest $ cfg { gen = Gen.word Range.exponentialBounded })
       , ("Word8" , sizeTest $ cfg { gen = Gen.word8 Range.exponentialBounded })
       , ("Word16", sizeTest $ cfg { gen = Gen.word16 Range.exponentialBounded })
@@ -162,7 +105,7 @@ tests
         , sizeTest $ cfg
           { gen         = Gen.text (Range.linear 0 1000) Gen.latin1
           , computedCtx = \bs -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf String))
+            [ ( typeRep (Proxy @(LengthOf Text))
               , SizeConstant $ fromIntegral $ T.length bs
               )
             ]
@@ -172,7 +115,7 @@ tests
         , sizeTest $ cfg
           { gen         = Gen.text (Range.linear 0 1000) Gen.unicode
           , computedCtx = \bs -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf String))
+            [ ( typeRep (Proxy @(LengthOf Text))
               , SizeConstant $ fromIntegral $ T.length bs
               )
             ]
