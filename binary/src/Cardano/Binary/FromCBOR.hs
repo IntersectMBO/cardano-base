@@ -40,7 +40,7 @@ import qualified Formatting.Buildable as B (Buildable(..))
 class Typeable a => FromCBOR a where
   fromCBOR :: D.Decoder s a
 
-  label :: proxy a -> Text
+  label :: Proxy a -> Text
   label = show . typeRep
 
 
