@@ -91,7 +91,8 @@ goldenTestCBOR
   => a
   -> FilePath
   -> Property
-goldenTestCBOR = goldenTestCBORExplicit (label $ Proxy @a) toCBOR fromCBOR
+goldenTestCBOR = withFrozenCallStack
+  $ goldenTestCBORExplicit (label $ Proxy @a) toCBOR fromCBOR
 
 -- | Variant of 'goldenTestBi' using custom encode and decode functions.
 --
@@ -125,14 +126,19 @@ goldenTestCBORExplicit eLabel enc dec x path = withFrozenCallStack $ do
 --   a 'Show' instance. If the 'a' type has both 'Show' and 'Buildable'
 --   instances, it's best to use this version.
 roundTripsCBORShow
-  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Show a) => a -> m ()
-roundTripsCBORShow x = tripping x serialize decodeFull
+  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Show a, HasCallStack)
+  => a
+  -> m ()
+roundTripsCBORShow x = withFrozenCallStack $ tripping x serialize decodeFull
 
 -- | Round trip (via ByteString) any instance of the 'FromCBOR' and 'ToCBOR'
 --   class that also has a 'Buildable' instance.
 roundTripsCBORBuildable
-  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Buildable a) => a -> m ()
-roundTripsCBORBuildable a = trippingBuildable a serialize decodeFull
+  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Buildable a, HasCallStack)
+  => a
+  -> m ()
+roundTripsCBORBuildable a =
+  withFrozenCallStack $ trippingBuildable a serialize decodeFull
 
 deprecatedGoldenDecode
   :: HasCallStack => Text -> (forall s . D.Decoder s ()) -> FilePath -> Property
