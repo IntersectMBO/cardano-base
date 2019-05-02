@@ -20,6 +20,8 @@ library
   exposed-modules:
                        Test.Cardano.Binary.Helpers
                        Test.Cardano.Binary.Helpers.GoldenRoundTrip
+                       Test.Cardano.Binary.Serialization
+                       Test.Cardano.Binary.Drop
 
   build-depends:       base
                      , bytestring
@@ -35,6 +37,7 @@ library
                      , QuickCheck
                      , quickcheck-instances
                      , text
+                     , vector
 
   default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude
