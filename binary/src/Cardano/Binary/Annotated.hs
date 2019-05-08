@@ -14,6 +14,7 @@ module Cardano.Binary.Annotated
   , slice
   , fromCBORAnnotated
   , decodeFullAnnotatedBytes
+  , reAnnotate
   )
 where
 
@@ -27,6 +28,9 @@ import Data.Kind (Type)
 import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR
   (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan)
+import Cardano.Binary.ToCBOR 
+  (ToCBOR)
+import Cardano.Binary.Serialize (serialize')
 
 
 -- | Extract a substring of a given ByteString corresponding to the offsets.
@@ -75,6 +79,10 @@ decodeFullAnnotatedBytes
   -> Either DecoderError (f ByteString)
 decodeFullAnnotatedBytes lbl decoder bytes =
   fmap (BSL.toStrict . slice bytes) <$> decodeFullDecoder lbl decoder bytes
+
+-- | Reconstruct an annotation by re-serialising the payload to a ByteString.
+reAnnotate :: ToCBOR a => Annotated a b -> Annotated a ByteString
+reAnnotate (Annotated x _) = Annotated x (serialize' x)
 
 class Decoded t where
   type BaseType t :: Type
