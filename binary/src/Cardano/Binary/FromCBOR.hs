@@ -20,6 +20,7 @@ import Cardano.Prelude
 
 import Codec.CBOR.Decoding as D
 import qualified Codec.CBOR.Read as CBOR.Read
+import Control.Exception (Exception)
 import qualified Data.ByteString.Lazy as BS.Lazy
 import Data.Fixed (Fixed(..), Nano, Pico)
 import qualified Data.Map as M
@@ -60,6 +61,8 @@ data DecoderError
   | DecoderErrorUnknownTag Text Word8
   | DecoderErrorVoid
   deriving (Eq, Show)
+
+instance Exception DecoderError
 
 instance B.Buildable DecoderError where
   build = \case
