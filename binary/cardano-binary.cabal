@@ -71,6 +71,8 @@ test-suite test
                        Test.Cardano.Binary.Helpers
                        Test.Cardano.Binary.Helpers.GoldenRoundTrip
                        Test.Cardano.Binary.RoundTrip
+                       Test.Cardano.Binary.Serialization
+                       Test.Cardano.Binary.Drop
 
   build-depends:       base
                      , bytestring
@@ -87,6 +89,7 @@ test-suite test
                      , quickcheck-instances
                      , tagged
                      , text
+                     , vector
 
   default-language:    Haskell2010
   default-extensions:  NoImplicitPrelude
