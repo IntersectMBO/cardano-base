@@ -3,7 +3,7 @@ let
   # Path of nix-tools jobs that we want to evict from release.nix:
   disabled = [
     # FIXME: those tests freeze on darwin hydra agents:
-    ["nix-tools" "tests" "cardano-binary" "cardano-binary-test" "x86_64-darwin"]
+    ["nix-tools" "tests" "cardano-binary" "test" "x86_64-darwin"]
   ];
 in
 { cardano-binary ? { outPath = ./.; rev = "abcdef"; } ,... }@args:
@@ -52,11 +52,11 @@ localLib.pkgs.lib.mapAttrsRecursiveCond
 
     jobs.nix-tools.libs.cardano-binary.x86_64-darwin
     jobs.nix-tools.libs.cardano-binary.x86_64-linux
-    jobs.nix-tools.tests.cardano-binary.cardano-binary-test.x86_64-linux
+    jobs.nix-tools.tests.cardano-binary.test.x86_64-linux
 
     # windows cross compilation targets
     jobs.nix-tools.libs.x86_64-pc-mingw32-cardano-binary.x86_64-linux
-    jobs.nix-tools.tests.x86_64-pc-mingw32-cardano-binary.cardano-binary-test.x86_64-linux
+    jobs.nix-tools.tests.x86_64-pc-mingw32-cardano-binary.test.x86_64-linux
   ];
 
 } (builtins.removeAttrs args ["cardano-binary"]))

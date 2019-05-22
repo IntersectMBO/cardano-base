@@ -26,7 +26,7 @@ buildStep testArgs = do
   echo "+++ Build and test"
   run "stack" $ cfg ++ ["build", "--fast"] ++ buildArgs
  where
-  cfg = ["--dump-logs", "--color", "always"]
+  cfg = ["--dump-logs", "--color", "always", "--nix"]
   buildArgs =
     [ "--bench"
       , "--no-run-benchmarks"
@@ -49,7 +49,7 @@ coverageUploadStep = do
     Just repoToken -> do
       result <- proc
         "shc"
-        ["--repo-token", repoToken, "combined", "all"]
+        ["--repo-token", repoToken, "cardano-binary", "test"]
         empty
       case result of
         ExitSuccess   -> printf "Coverage information upload successful.\n"
