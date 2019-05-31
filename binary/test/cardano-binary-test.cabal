@@ -22,6 +22,7 @@ library
                        Test.Cardano.Binary.Helpers.GoldenRoundTrip
                        Test.Cardano.Binary.Serialization
                        Test.Cardano.Binary.Drop
+                       Test.Cardano.Binary.Failure
 
   build-depends:       base
                      , bytestring

@@ -73,6 +73,7 @@ test-suite test
                        Test.Cardano.Binary.RoundTrip
                        Test.Cardano.Binary.Serialization
                        Test.Cardano.Binary.Drop
+                       Test.Cardano.Binary.Failure
 
   build-depends:       base
                      , bytestring
