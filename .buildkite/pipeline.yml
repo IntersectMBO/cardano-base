@@ -21,7 +21,7 @@ steps:
     agents:
       system: x86_64-linux
 
-  - label: 'release.nix'
-    command: 'scripts/buildkite/check-hydra.sh'
+  - label: release.nix
+    command: 'nix-build -A _lib.check-hydra && ./result'
     agents:
       system: x86_64-linux
