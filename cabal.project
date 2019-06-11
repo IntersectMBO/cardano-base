@@ -2,15 +2,21 @@ packages:
   binary
   binary/test
 
+
 source-repository-package
   type: git
-  location: https://github.com/input-output-hk/cardano-prelude
-  tag: f540d9148f909e7a6043455e791751de12e7b2d4
+  location: http://github.com/well-typed/canonical-json
+  tag: ddfe3593b80b5ceb88842bb7a6f2268df75d2c2f
 
 source-repository-package
   type: git
   location: https://github.com/input-output-hk/cardano-prelude
-  tag: f540d9148f909e7a6043455e791751de12e7b2d4
+  tag: ab1c4a09d6b0c8b44a4e2382ea68ddc67bc3c274
+
+source-repository-package
+  type: git
+  location: https://github.com/input-output-hk/cardano-prelude
+  tag: ab1c4a09d6b0c8b44a4e2382ea68ddc67bc3c274
   subdir: test
 
 source-repository-package

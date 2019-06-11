@@ -18,6 +18,6 @@ fail_nix_tools_check() {
 }
 
 THIS="${BASH_SOURCE[0]%/*}"
-exec "${THIS}/../../nix/regenerate.sh"
+"${THIS}/../../nix/regenerate.sh"
 
 git diff -w --text --exit-code || fail_nix_tools_check
