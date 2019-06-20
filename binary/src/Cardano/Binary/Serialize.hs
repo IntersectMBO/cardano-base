@@ -13,9 +13,6 @@ module Cardano.Binary.Serialize
   , serializeBuilder
   , serializeEncoding
 
-  -- * Temporary functions
-  , biSize
-
   -- * CBOR in CBOR
   , encodeKnownCborDataItem
   , encodeUnknownCborDataItem
@@ -72,17 +69,6 @@ serializeEncoding =
     -- buffers. Chosen because they seem to give good performance. They are not
     -- sacred.
         strategy = Builder.safeStrategy 1024 4096
-
-
---------------------------------------------------------------------------------
--- Helper functions
---------------------------------------------------------------------------------
-
--- | Compute size of something serializable in bytes.
-biSize :: ToCBOR a => a -> Natural
-biSize = fromIntegral . BSL.length . serialize
-{-# INLINE biSize #-}
-
 
 --------------------------------------------------------------------------------
 -- CBORDataItem
