@@ -45,7 +45,7 @@ data TestStruct = TestStruct
   , tsNonEmptyBool          :: !(NonEmpty Bool)
   , tsMaybeBool             :: !(Maybe Bool)
   , tsMapBoolBool           :: !(Map Bool Bool)
-  , tsMapSetBool            :: !(Set Bool)
+  , tsSetBool               :: !(Set Bool)
   , tsRaw                   :: !Raw
   , tsVectorBool            :: !(V.Vector Bool)
   , tsLByteString           :: BS.Lazy.ByteString
@@ -105,7 +105,7 @@ instance ToCBOR TestStruct where
     <> toCBOR ( tsNonEmptyBool          ts) 
     <> toCBOR ( tsMaybeBool             ts) 
     <> toCBOR ( tsMapBoolBool           ts) 
-    <> toCBOR ( tsMapSetBool            ts) 
+    <> toCBOR ( tsSetBool               ts) 
     <> toCBOR ( tsRaw                   ts)
     <> toCBOR ( tsVectorBool            ts)
     <> toCBOR ( tsLByteString           ts)
@@ -157,3 +157,14 @@ prop_roundTripKnownCBORData = property $ do
   ts <- forAll genTestStruct
   let encoded = serializeEncoding . encodeKnownCborDataItem $ ts
   decodeFullDecoder "" decodeKnownCborDataItem encoded === Right ts
+
+prop_decodeContainerSkelWithReplicate :: Property
+prop_decodeContainerSkelWithReplicate = property $
+  assert $ case decode vec of
+    Right _ -> True
+    _       -> False
+  where
+    decode :: Encoding -> Either DecoderError (V.Vector ())
+    decode enc = decodeFull (serializeEncoding enc)
+
+    vec = encodeListLen 4097 <> mconcat (replicate 4097 encodeNull)
