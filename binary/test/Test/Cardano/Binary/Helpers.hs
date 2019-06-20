@@ -16,9 +16,6 @@ module Test.Cardano.Binary.Helpers
   , extensionProperty
   , cborFlatTermValid
 
-  -- * Message length
-  , msgLenLimitedTest
-
   -- * Static size estimates
   , SizeTestConfig(..)
   , cfg
@@ -37,33 +34,26 @@ import qualified Data.Map as M
 import Data.String (String)
 import Data.Text.Lazy (unpack)
 import Data.Text.Lazy.Builder (toLazyText)
-import Data.Typeable (TypeRep, typeRep)
-import Formatting (Buildable, bprint, build, formatToString, int)
+import Data.Typeable (TypeRep)
+import Formatting (Buildable, bprint, build)
 import Hedgehog (annotate, failure, forAllWith, success)
 import qualified Hedgehog as HH
 import qualified Hedgehog.Gen as HH.Gen
-import Test.Hspec (Spec, describe)
-import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
+import Test.Hspec ()
+import Test.Hspec.QuickCheck ()
 import Test.QuickCheck
   ( Arbitrary(arbitrary)
   , Gen
   , Property
   , choose
-  , conjoin
-  , counterexample
   , forAll
   , property
-  , resize
-  , suchThat
-  , vectorOf
-  , (.&&.)
   , (===)
   )
 import Test.QuickCheck.Instances ()
 
 import Cardano.Binary
   ( FromCBOR(..)
-  , Limit(..)
   , Range(..)
   , Size
   , SizeOverride(..)
@@ -73,7 +63,6 @@ import Cardano.Binary
   , encodeListLen
   , encodeUnknownCborDataItem
   , serialize
-  , serialize'
   , szSimplify
   , szWithCtx
   , unsafeDeserialize
@@ -178,72 +167,6 @@ extensionProperty = forAll @a (arbitrary :: Gen a) $ \input ->
     (u :: U      ) = unsafeDeserialize serialized      -- Step 2
     (encoded :: a) = unsafeDeserialize (serialize u)   -- Step 3
   in encoded === input
-
---------------------------------------------------------------------------------
--- Message length
---------------------------------------------------------------------------------
-
-msgLenLimitedCheck :: ToCBOR a => Limit a -> a -> Property
-msgLenLimitedCheck limit msg = if sz <= fromIntegral limit
-  then property True
-  else flip counterexample False $ formatToString
-    ("Message size (max found " . int . ") exceeds limit (" . int . ")")
-    sz
-    limit
-  where sz = BS.length . serialize' $ msg
-
-msgLenLimitedTest'
-  :: forall a
-   . (Show a, Arbitrary a, FromCBOR a, ToCBOR a)
-  => Limit a
-  -> String
-  -> (a -> Bool)
-  -> Spec
-msgLenLimitedTest' limit desc whetherTest =
-  -- instead of checking for `arbitrary` values, we'd better generate
-  -- many values and find maximal message size - it allows user to get
-  -- correct limit on the spot, if needed.
-  addDesc $ modifyMaxSuccess (const 1) $ prop typeName $ \(_ :: a) ->
-    findLargestCheck .&&. listsCheck
- where
-  typeName :: String
-  typeName = show $ typeRep (Proxy @a)
-
-  addDesc :: Spec -> Spec
-  addDesc act = if null desc then act else describe desc act
-
-  genNice          = arbitrary `suchThat` whetherTest
-
-  findLargestCheck = forAll (resize 1 $ vectorOf 50 genNice) $ \samples ->
-    counterexample desc $ msgLenLimitedCheck limit $ maximumBy
-      (comparing $ BS.length . serialize')
-      samples
-
-  -- In this test we increase length of lists, maps, etc. generated
-  -- by `arbitrary` (by default lists sizes are bounded by 100).
-  --
-  -- Motivation: if your structure contains lists, you should ensure
-  -- their lengths are limited in practise. If you did, use `MaxSize`
-  -- wrapper to generate `arbitrary` objects of that type with lists of
-  -- exactly maximal possible size.
-  listsCheck =
-    let
-      doCheck :: Int -> Property
-      doCheck power = forAll (resize (2 ^ power) genNice) $ \a ->
-        counterexample desc
-          $ counterexample "Potentially unlimited size!"
-          $ msgLenLimitedCheck limit a
-    in
-       -- Increase lists length gradually to avoid hanging.
-       conjoin $ doCheck <$> [1 .. 13 :: Int]
-
-msgLenLimitedTest
-  :: forall a
-   . (Show a, Arbitrary a, ToCBOR a, FromCBOR a)
-  => Limit a
-  -> Spec
-msgLenLimitedTest lim = msgLenLimitedTest' @a lim "" (const True)
-
 
 --------------------------------------------------------------------------------
 -- Static size estimates

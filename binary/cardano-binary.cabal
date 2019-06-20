@@ -25,7 +25,6 @@ library
   other-modules:
                        Cardano.Binary.Annotated
                        Cardano.Binary.Drop
-                       Cardano.Binary.Limit
                        Cardano.Binary.Raw
 
                        Cardano.Binary.ToCBOR
