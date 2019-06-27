@@ -175,6 +175,9 @@ instance FromCBOR Int32 where
 instance FromCBOR Int64 where
   fromCBOR = D.decodeInt64
 
+instance (Integral a, FromCBOR a) => FromCBOR (Ratio a) where
+  fromCBOR = (%) <$ enforceSize "Ratio" 2 <*> fromCBOR <*> fromCBOR
+
 instance FromCBOR Nano where
   fromCBOR = MkFixed <$> fromCBOR
 
@@ -228,6 +231,41 @@ instance (FromCBOR a, FromCBOR b, FromCBOR c, FromCBOR d) => FromCBOR (a,b,c,d) 
     !c <- fromCBOR
     !d <- fromCBOR
     return (a, b, c, d)
+
+instance
+  (FromCBOR a, FromCBOR b, FromCBOR c, FromCBOR d, FromCBOR e)
+  => FromCBOR (a, b, c, d, e)
+ where
+  fromCBOR = do
+    D.decodeListLenOf 5
+    !a <- fromCBOR
+    !b <- fromCBOR
+    !c <- fromCBOR
+    !d <- fromCBOR
+    !e <- fromCBOR
+    return (a, b, c, d, e)
+
+instance
+  ( FromCBOR a
+  , FromCBOR b
+  , FromCBOR c
+  , FromCBOR d
+  , FromCBOR e
+  , FromCBOR f
+  , FromCBOR g
+  )
+  => FromCBOR (a, b, c, d, e, f, g)
+  where
+  fromCBOR = do
+    D.decodeListLenOf 7
+    !a <- fromCBOR
+    !b <- fromCBOR
+    !c <- fromCBOR
+    !d <- fromCBOR
+    !e <- fromCBOR
+    !f <- fromCBOR
+    !g <- fromCBOR
+    return (a, b, c, d, e, f, g)
 
 instance FromCBOR ByteString where
   fromCBOR = D.decodeBytes

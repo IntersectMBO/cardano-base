@@ -448,6 +448,10 @@ instance ToCBOR Int64 where
   toCBOR = E.encodeInt64
   encodedSizeExpr _ = encodedSizeRange
 
+instance ToCBOR a => ToCBOR (Ratio a) where
+  toCBOR r = E.encodeListLen 2 <> toCBOR (numerator r) <> toCBOR (denominator r)
+  encodedSizeExpr size _ = 1 + size (Proxy @a) + size (Proxy @a)
+
 instance ToCBOR Nano where
   toCBOR (MkFixed nanoseconds) = toCBOR nanoseconds
 
@@ -499,6 +503,50 @@ instance (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d) => ToCBOR (a,b,c,d) where
 
   encodedSizeExpr size _ =
     1 + size (Proxy @a) + size (Proxy @b) + size (Proxy @c) + size (Proxy @d)
+
+instance
+  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e)
+  => ToCBOR (a, b, c, d, e)
+ where
+  toCBOR (a, b, c, d, e) =
+    E.encodeListLen 5
+      <> toCBOR a
+      <> toCBOR b
+      <> toCBOR c
+      <> toCBOR d
+      <> toCBOR e
+
+  encodedSizeExpr size _ =
+    1
+      + size (Proxy @a)
+      + size (Proxy @b)
+      + size (Proxy @c)
+      + size (Proxy @d)
+      + size (Proxy @e)
+
+instance
+  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f, ToCBOR g)
+  => ToCBOR (a, b, c, d, e, f, g)
+  where
+  toCBOR (a, b, c, d, e, f, g) =
+    E.encodeListLen 7
+      <> toCBOR a
+      <> toCBOR b
+      <> toCBOR c
+      <> toCBOR d
+      <> toCBOR e
+      <> toCBOR f
+      <> toCBOR g
+
+  encodedSizeExpr size _ =
+    1
+    + size (Proxy @a)
+    + size (Proxy @b)
+    + size (Proxy @c)
+    + size (Proxy @d)
+    + size (Proxy @e)
+    + size (Proxy @f)
+    + size (Proxy @g)
 
 instance ToCBOR ByteString where
   toCBOR = E.encodeBytes

@@ -12,6 +12,7 @@ module Cardano.Binary.Serialize
   , serialize'
   , serializeBuilder
   , serializeEncoding
+  , serializeEncoding'
 
   -- * CBOR in CBOR
   , encodeKnownCborDataItem
@@ -69,6 +70,11 @@ serializeEncoding =
     -- buffers. Chosen because they seem to give good performance. They are not
     -- sacred.
         strategy = Builder.safeStrategy 1024 4096
+
+-- | A strict version of 'serializeEncoding'
+serializeEncoding' :: Encoding -> ByteString
+serializeEncoding' = BSL.toStrict . serializeEncoding
+
 
 --------------------------------------------------------------------------------
 -- CBORDataItem

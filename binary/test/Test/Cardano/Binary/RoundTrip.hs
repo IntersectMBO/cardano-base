@@ -71,6 +71,16 @@ roundTripInt64Bi :: Property
 roundTripInt64Bi =
   eachOf 1000 (Gen.int64 Range.constantBounded) roundTripsCBORBuildable
 
+roundTripRatioBi :: Property
+roundTripRatioBi =
+  eachOf
+    1000
+    ((%)
+      <$> Gen.int Range.constantBounded
+      <*> Gen.int Range.constantBounded
+    )
+    roundTripsCBORBuildable
+
 roundTripNanoBi :: Property
 roundTripNanoBi = eachOf
   1000
