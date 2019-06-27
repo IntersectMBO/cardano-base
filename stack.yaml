@@ -3,6 +3,7 @@ resolver: https://raw.githubusercontent.com/input-output-hk/cardano-prelude/ab1c
 packages:
   - binary
   - binary/test
+  - cardano-crypto-class
 
 extra-deps:
   - git: https://github.com/input-output-hk/cardano-prelude

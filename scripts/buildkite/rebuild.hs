@@ -13,7 +13,7 @@ import Turtle
 -- | Run build and upload coverage information when successful
 main :: IO ()
 main = do
-  buildResult <- buildStep (Just ["--scenario=ContinuousIntegration"])
+  buildResult <- buildStep Nothing
 
   when (buildResult == ExitSuccess) coverageUploadStep
 
