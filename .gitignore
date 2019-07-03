@@ -1,6 +1,7 @@
 # Cabal & Stack
 .stack-work*/
 **/dist
+dist-newstyle/
 
 # Editors
 TAGS
@@ -13,6 +14,7 @@ auto/
 
 # Nix artifacts
 result
+.stack-to-nix.cache
 
 # Profiler and profiteur artifacts
 *.aux
