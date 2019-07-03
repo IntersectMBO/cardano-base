@@ -14,6 +14,7 @@ auto/
 
 # Nix artifacts
 result
+.stack-to-nix.cache
 
 # Profiler and profiteur artifacts
 *.aux
