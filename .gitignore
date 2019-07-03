@@ -1,6 +1,7 @@
 # Cabal & Stack
 .stack-work*/
 **/dist
+dist-newstyle/
 
 # Editors
 TAGS
