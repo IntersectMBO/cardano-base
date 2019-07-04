@@ -1,6 +1,7 @@
 packages:
   binary
   binary/test
+  cardano-crypto-class
 
 
 source-repository-package
