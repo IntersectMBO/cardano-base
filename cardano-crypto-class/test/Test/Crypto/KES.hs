@@ -23,7 +23,6 @@ import Cardano.Binary (FromCBOR, ToCBOR(..), encodeListLen)
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.KES
 import qualified Cardano.Crypto.KES as KES
-import Cardano.Crypto.Util (Empty)
 
 import Test.Crypto.Orphans.Arbitrary ()
 import Test.Crypto.Util
@@ -53,7 +52,7 @@ testKESAlgorithm
      , FromCBOR (SignKeyKES v)
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
-     , KES.Signable v ~ Empty
+     , KES.Signable v ~ ToCBOR
      )
   => proxy v
   -> String
@@ -86,7 +85,7 @@ prop_KES_serialise_SignKey _ (Duration_Seed_SK _ _ sk _) = prop_cbor sk
 
 prop_KES_serialise_Sig
   :: ( KESAlgorithm v
-     , KES.Signable v ~ Empty
+     , KES.Signable v ~ ToCBOR
      , FromCBOR (SigKES v)
      , ToCBOR (SigKES v)
      )
@@ -99,7 +98,7 @@ prop_KES_serialise_Sig _ d seed = case withSeed seed $ trySign d of
   Right xs -> conjoin [ prop_cbor sig | (_, _, sig) <- xs ]
 
 prop_KES_verify_pos
-  :: (KESAlgorithm v, KES.Signable v ~ Empty)
+  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR)
   => proxy v
   -> Duration_Seed_SK_Times v [Int]
   -> Seed
@@ -110,10 +109,10 @@ prop_KES_verify_pos _ d seed =
     case withSeed seed $ trySign d of
       Left e -> counterexample e False
       Right xs ->
-        conjoin [ verifyKES toCBOR vk j a sig === Right () | (j, a, sig) <- xs ]
+        conjoin [ verifyKES vk j a sig === Right () | (j, a, sig) <- xs ]
 
 prop_KES_verify_neg_key
-  :: (KESAlgorithm v, KES.Signable v ~ Empty)
+  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR)
   => proxy v
   -> Duration_Seed_SK_Times v Int
   -> Seed
@@ -122,12 +121,12 @@ prop_KES_verify_neg_key _ d seed =
   getDuration d > 0 ==> case withSeed seed $ trySign d of
     Left  e  -> counterexample e False
     Right xs -> conjoin
-      [ verifyKES toCBOR (getSecondVerKey d) j a sig =/= Right ()
+      [ verifyKES (getSecondVerKey d) j a sig =/= Right ()
       | (j, a, sig) <- xs
       ]
 
 prop_KES_verify_neg_msg
-  :: (KESAlgorithm v, KES.Signable v ~ Empty)
+  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR)
   => proxy v
   -> Duration_Seed_SK_Times v Float
   -> Float
@@ -139,12 +138,12 @@ prop_KES_verify_neg_msg _ d a seed =
     case withSeed seed $ trySign d of
       Left  e  -> counterexample e False
       Right xs -> conjoin
-        [ a /= a' ==> verifyKES toCBOR vk j a sig =/= Right ()
+        [ a /= a' ==> verifyKES vk j a sig =/= Right ()
         | (j, a', sig) <- xs
         ]
 
 prop_KES_verify_neg_time
-  :: (KESAlgorithm v, KES.Signable v ~ Empty)
+  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR)
   => proxy v
   -> Duration_Seed_SK_Times v Float
   -> Integer
@@ -157,7 +156,7 @@ prop_KES_verify_neg_time _ d i =
   in case withSeed seed $ trySign d of
     Left  e  -> counterexample e False
     Right xs -> conjoin
-      [ t /= j ==> verifyKES toCBOR vk t a sig =/= Right ()
+      [ t /= j ==> verifyKES vk t a sig =/= Right ()
       | (j, a, sig) <- xs
       ]
 
@@ -177,7 +176,7 @@ trySign
   :: forall m v a
    . ( MonadRandom m
      , KESAlgorithm v
-     , KES.Signable v ~ Empty
+     , KES.Signable v ~ ToCBOR
      , ToCBOR a
      , Show a
      )
@@ -191,7 +190,7 @@ trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
     -> m (Either String [(Natural, a, SigKES v)])
   go _   [] = return $ Right []
   go sk' ((j, a) : xs) = do
-    m <- signKES toCBOR j a sk'
+    m <- signKES j a sk'
     case m of
       Nothing ->
         return

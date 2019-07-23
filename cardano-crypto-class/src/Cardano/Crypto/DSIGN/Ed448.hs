@@ -16,19 +16,22 @@ import Cardano.Binary
   , Encoding
   , FromCBOR (..)
   , ToCBOR (..)
-  , serializeEncoding'
+  , serialize
   )
 import Cardano.Crypto.DSIGN.Class
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed448
 import Data.ByteArray (ByteArrayAccess, convert)
 import Data.ByteString (ByteString)
+import Data.ByteString.Lazy (toStrict)
 import Data.Function (on)
 import GHC.Generics (Generic)
 
 data Ed448DSIGN
 
 instance DSIGNAlgorithm Ed448DSIGN where
+
+    type Signable Ed448DSIGN = ToCBOR
 
     newtype VerKeyDSIGN Ed448DSIGN = VerKeyEd448DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
@@ -51,13 +54,13 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
     deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
 
-    signDSIGN toEnc a (SignKeyEd448DSIGN sk) = do
+    signDSIGN a (SignKeyEd448DSIGN sk) = do
         let vk = toPublic sk
-            bs = serializeEncoding' $ toEnc a
+            bs = toStrict $ serialize a
         return $ SigEd448DSIGN $ sign sk vk bs
 
-    verifyDSIGN toEnc (VerKeyEd448DSIGN vk) a (SigEd448DSIGN sig) =
-        if verify vk (serializeEncoding' $ toEnc a) sig
+    verifyDSIGN (VerKeyEd448DSIGN vk) a (SigEd448DSIGN sig) =
+        if verify vk (toStrict $ serialize a) sig
           then Right ()
           else Left "Verification failed"
 

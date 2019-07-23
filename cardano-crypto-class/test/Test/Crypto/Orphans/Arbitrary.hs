@@ -41,12 +41,13 @@ instance DSIGNAlgorithm v => Arbitrary (VerKeyDSIGN v) where
   arbitrary = deriveVerKeyDSIGN <$> arbitrary
   shrink = const []
 
-instance (Signable v Int, DSIGNAlgorithm v) => Arbitrary (SigDSIGN v) where
+instance (Cardano.Crypto.DSIGN.Signable v Int, DSIGNAlgorithm v) 
+  => Arbitrary (SigDSIGN v) where
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
     seed <- arbitrary
-    return $ withSeed seed $ signDSIGN toCBOR a sk
+    return $ withSeed seed $ signDSIGN a sk
   shrink = const []
 
 instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
@@ -59,10 +60,11 @@ instance VRFAlgorithm v => Arbitrary (VerKeyVRF v) where
   arbitrary = deriveVerKeyVRF <$> arbitrary
   shrink = const []
 
-instance VRFAlgorithm v => Arbitrary (CertVRF v) where
+instance (Cardano.Crypto.VRF.Signable v Int, VRFAlgorithm v) 
+  => Arbitrary (CertVRF v) where
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
     seed <- arbitrary
-    return $ withSeed seed $ fmap snd $ evalVRF toCBOR a sk
+    return $ withSeed seed $ fmap snd $ evalVRF a sk
   shrink = const []

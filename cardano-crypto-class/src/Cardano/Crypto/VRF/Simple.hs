@@ -88,6 +88,9 @@ getR :: MonadRandom m => m Integer
 getR = generateBetween 0 (q - 1)
 
 instance VRFAlgorithm SimpleVRF where
+
+  type Signable SimpleVRF = ToCBOR
+
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
     deriving (Show, Eq, Ord, Generic, ToCBOR, FromCBOR)
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
@@ -103,25 +106,25 @@ instance VRFAlgorithm SimpleVRF where
   genKeyVRF = SignKeySimpleVRF <$> C.scalarGenerate curve
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
-  evalVRF toEnc a sk@(SignKeySimpleVRF k) = do
-    let u = h' (toEnc a) k
-        y = h $ toEnc a <> toCBOR u
+  evalVRF a sk@(SignKeySimpleVRF k) = do
+    let u = h' (toCBOR a) k
+        y = h $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
     r <- getR
-    let c = h $ toEnc a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toEnc a) r)
+    let c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
         s = mod (r + k * fromIntegral c) q
     return (y, CertSimpleVRF u c s)
-  verifyVRF toEnc (VerKeySimpleVRF v) a (y, cert) =
+  verifyVRF (VerKeySimpleVRF v) a (y, cert) =
     let u = certU cert
         c = certC cert
         c' = -fromIntegral c
         s = certS cert
-        b1 = y == h (toEnc a <> toCBOR u)
+        b1 = y == h (toCBOR a <> toCBOR u)
         rhs =
-          h $ toEnc a <>
+          h $ toCBOR a <>
             toCBOR v <>
             toCBOR (pow s <> pow' v c') <>
-            toCBOR (h' (toEnc a) s <> pow' u c')
+            toCBOR (h' (toCBOR a) s <> pow' u c')
     in b1 && c == rhs
 
 instance ToCBOR (CertVRF SimpleVRF) where

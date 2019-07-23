@@ -26,6 +26,8 @@ type H = MD5
 
 instance KESAlgorithm MockKES where
 
+    type Signable MockKES = ToCBOR
+
     newtype VerKeyKES MockKES = VerKeyMockKES Int
         deriving (Show, Eq, Ord, Generic, ToCBOR, FromCBOR)
 
@@ -49,17 +51,17 @@ instance KESAlgorithm MockKES where
 
     deriveVerKeyKES (SignKeyMockKES (vk, _, _)) = vk
 
-    signKES toEnc j a (SignKeyMockKES (vk, k, t))
+    signKES j a (SignKeyMockKES (vk, k, t))
         | j >= k && j < t = return $ Just
-            ( SigMockKES (fromHash $ hashWithSerialiser @H toEnc a) (SignKeyMockKES (vk, j, t))
+            ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES (vk, j, t))
             , SignKeyMockKES (vk, j + 1, t)
             )
         | otherwise       = return Nothing
 
-    verifyKES toEnc vk j a (SigMockKES h (SignKeyMockKES (vk', j', _))) =
+    verifyKES vk j a (SigMockKES h (SignKeyMockKES (vk', j', _))) =
         if    j  == j'
            && vk == vk'
-           && fromHash (hashWithSerialiser @H toEnc a) == h
+           && fromHash (hash @H a) == h
           then Right ()
           else Left "KES verification failed"
 

@@ -61,18 +61,18 @@ testDSIGNAlgorithm _ n =
     ]
 
 prop_dsign_verify_pos
-  :: forall a v. (ToCBOR a, DSIGNAlgorithm v, Signable v a)
+  :: forall a v. (DSIGNAlgorithm v, Signable v a)
   => Seed
   -> a
   -> SignKeyDSIGN v
   -> Property
 prop_dsign_verify_pos seed a sk =
-  let sig = withSeed seed $ signDSIGN toCBOR a sk
+  let sig = withSeed seed $ signDSIGN a sk
       vk = deriveVerKeyDSIGN sk
-  in verifyDSIGN toCBOR vk a sig === Right ()
+  in verifyDSIGN vk a sig === Right ()
 
 prop_dsign_verify_neg_key
-  :: forall a v. (ToCBOR a, DSIGNAlgorithm v, Signable v a)
+  :: forall a v. (DSIGNAlgorithm v, Signable v a)
   => Seed
   -> a
   -> SignKeyDSIGN v
@@ -80,12 +80,12 @@ prop_dsign_verify_neg_key
   -> Property
 prop_dsign_verify_neg_key seed a sk sk' =
   sk /= sk' ==>
-    let sig = withSeed seed $ signDSIGN toCBOR a sk'
+    let sig = withSeed seed $ signDSIGN a sk'
         vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN toCBOR vk a sig =/= Right ()
+    in verifyDSIGN vk a sig =/= Right ()
 
 prop_dsign_verify_neg_msg
-  :: forall a v. (ToCBOR a, Eq a, DSIGNAlgorithm v, Signable v a)
+  :: forall a v. (Eq a, DSIGNAlgorithm v, Signable v a)
   => Seed
   -> a
   -> a
@@ -93,6 +93,6 @@ prop_dsign_verify_neg_msg
   -> Property
 prop_dsign_verify_neg_msg seed a a' sk =
   a /= a' ==>
-    let sig = withSeed seed $ signDSIGN toCBOR a sk
+    let sig = withSeed seed $ signDSIGN a sk
         vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN toCBOR vk a' sig =/= Right ()
+    in verifyDSIGN vk a' sig =/= Right ()

@@ -64,15 +64,13 @@ class ( Typeable v
 
   signDSIGN
     :: (MonadRandom m, Signable v a, HasCallStack)
-    => (a -> Encoding)
-    -> a
+    => a
     -> SignKeyDSIGN v
     -> m (SigDSIGN v)
 
   verifyDSIGN
     :: (Signable v a, HasCallStack)
-    => (a -> Encoding)
-    -> VerKeyDSIGN v
+    => VerKeyDSIGN v
     -> a
     -> SigDSIGN v
     -> Either String ()
@@ -88,20 +86,18 @@ deriving instance DSIGNAlgorithm v => Ord (SignedDSIGN v a)
 
 signedDSIGN
   :: (DSIGNAlgorithm v, MonadRandom m, Signable v a)
-  => (a -> Encoding)
-  -> a
+  => a
   -> SignKeyDSIGN v
   -> m (SignedDSIGN v a)
-signedDSIGN encoder a key = SignedDSIGN <$> signDSIGN encoder a key
+signedDSIGN a key = SignedDSIGN <$> signDSIGN a key
 
 verifySignedDSIGN
   :: (DSIGNAlgorithm v, Signable v a, HasCallStack)
-  => (a -> Encoding)
-  -> VerKeyDSIGN v
+  => VerKeyDSIGN v
   -> a
   -> SignedDSIGN v a
   -> Either String ()
-verifySignedDSIGN encoder key a (SignedDSIGN s) = verifyDSIGN encoder key a s
+verifySignedDSIGN key a (SignedDSIGN s) = verifyDSIGN key a s
 
 encodeSignedDSIGN :: DSIGNAlgorithm v => SignedDSIGN v a -> Encoding
 encodeSignedDSIGN (SignedDSIGN s) = encodeSigDSIGN s
