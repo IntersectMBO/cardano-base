@@ -65,16 +65,16 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
 
     deriveVerKeyKES (SignKeySimpleKES (vks, _)) = VerKeySimpleKES $ fromList vks
 
-    signKES toEnc j a (SignKeySimpleKES (vks, xs)) = case dropWhile (\(k, _) -> k < j) xs of
+    signKES j a (SignKeySimpleKES (vks, xs)) = case dropWhile (\(k, _) -> k < j) xs of
         []           -> return Nothing
         (_, sk) : ys -> do
-            sig <- signDSIGN toEnc a sk
+            sig <- signDSIGN a sk
             return $ Just (SigSimpleKES sig, SignKeySimpleKES (vks, ys))
 
-    verifyKES toEnc (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
+    verifyKES (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
         case vks !? fromIntegral j of
             Nothing -> Left "KES verification failed: out of range"
-            Just vk -> verifyDSIGN toEnc vk a sig
+            Just vk -> verifyDSIGN vk a sig
 
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d))
 

@@ -16,15 +16,16 @@ module Cardano.Crypto.VRF.Class
 where
 
 import Cardano.Binary
-  ( Encoding
-  , FromCBOR (..)
+  ( FromCBOR (..)
   , ToCBOR (..)
   , encodeListLen
   , enforceSize
   )
+import Cardano.Crypto.Util (Empty)
 import Crypto.Random (MonadRandom)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
+import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
 import Numeric.Natural
@@ -41,6 +42,10 @@ class ( Typeable v
       )
       => VRFAlgorithm v where
 
+  type Signable v :: Type -> Constraint
+
+  type Signable c = Empty
+
   data VerKeyVRF v :: Type
 
   data SignKeyVRF v :: Type
@@ -54,16 +59,14 @@ class ( Typeable v
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
 
   evalVRF
-    :: (MonadRandom m, HasCallStack)
-    => (a -> Encoding)
-    -> a
+    :: (MonadRandom m, HasCallStack, Signable v a)
+    => a
     -> SignKeyVRF v
     -> m (Natural, CertVRF v)
 
   verifyVRF
-    :: HasCallStack
-    => (a -> Encoding)
-    -> VerKeyVRF v
+    :: (HasCallStack, Signable v a)
+    =>  VerKeyVRF v
     -> a
     -> (Natural, CertVRF v)
     -> Bool
@@ -95,18 +98,16 @@ instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
       fromCBOR
 
 evalCertified
-  :: (VRFAlgorithm v, MonadRandom m)
-  => (a -> Encoding)
-  -> a
+  :: (VRFAlgorithm v, MonadRandom m, Signable v a)
+  => a
   -> SignKeyVRF v
   -> m (CertifiedVRF v a)
-evalCertified toEnc a key = uncurry CertifiedVRF <$> evalVRF toEnc a key
+evalCertified a key = uncurry CertifiedVRF <$> evalVRF a key
 
 verifyCertified
-  :: (VRFAlgorithm v)
-  => (a -> Encoding)
-  -> VerKeyVRF v
+  :: (VRFAlgorithm v, Signable v a)
+  => VerKeyVRF v
   -> a
   -> CertifiedVRF v a
   -> Bool
-verifyCertified toEnc vk a CertifiedVRF {..} = verifyVRF toEnc vk a (certifiedNatural, certifiedProof)
+verifyCertified vk a CertifiedVRF {..} = verifyVRF vk a (certifiedNatural, certifiedProof)

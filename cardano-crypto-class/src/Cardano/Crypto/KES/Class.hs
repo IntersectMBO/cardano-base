@@ -64,16 +64,14 @@ class ( Typeable v
 
   signKES
     :: (MonadRandom m, Signable v a, HasCallStack)
-    => (a -> Encoding)
-    -> Natural
+    => Natural
     -> a
     -> SignKeyKES v
     -> m (Maybe (SigKES v, SignKeyKES v))
 
   verifyKES
     :: (Signable v a, HasCallStack)
-    => (a -> Encoding)
-    -> VerKeyKES v
+    => VerKeyKES v
     -> Natural
     -> a
     -> SigKES v
@@ -90,26 +88,24 @@ deriving instance KESAlgorithm v => Ord (SignedKES v a)
 
 signedKES
   :: (KESAlgorithm v, MonadRandom m, Signable v a)
-  => (a -> Encoding)
-  -> Natural
+  => Natural
   -> a
   -> SignKeyKES v
   -> m (Maybe (SignedKES v a, SignKeyKES v))
-signedKES toEnc time a key = do
-  m <- signKES toEnc time a key
+signedKES time a key = do
+  m <- signKES time a key
   return $ case m of
     Nothing -> Nothing
     Just (sig, key') -> Just (SignedKES sig, key')
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)
-  => (a -> Encoding)
-  -> VerKeyKES v
+  => VerKeyKES v
   -> Natural
   -> a
   -> SignedKES v a
   -> Either String ()
-verifySignedKES toEnc vk j a (SignedKES sig) = verifyKES toEnc vk j a sig
+verifySignedKES vk j a (SignedKES sig) = verifyKES vk j a sig
 
 encodeSignedKES :: KESAlgorithm v => SignedKES v a -> Encoding
 encodeSignedKES (SignedKES s) = encodeSigKES s

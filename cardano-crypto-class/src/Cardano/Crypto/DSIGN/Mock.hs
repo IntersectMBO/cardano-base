@@ -17,8 +17,7 @@ module Cardano.Crypto.DSIGN.Mock
 where
 
 import Cardano.Binary
-  ( Encoding
-  , FromCBOR (..)
+  ( FromCBOR (..)
   , ToCBOR (..)
   , decodeListLen
   , encodeListLen
@@ -32,6 +31,8 @@ import GHC.Stack
 data MockDSIGN
 
 instance DSIGNAlgorithm MockDSIGN where
+
+    type Signable MockDSIGN = ToCBOR
 
     newtype VerKeyDSIGN MockDSIGN = VerKeyMockDSIGN Int
         deriving (Show, Eq, Ord, Generic, Num, ToCBOR, FromCBOR)
@@ -54,10 +55,10 @@ instance DSIGNAlgorithm MockDSIGN where
 
     deriveVerKeyDSIGN (SignKeyMockDSIGN n) = VerKeyMockDSIGN n
 
-    signDSIGN toEnc a sk = return $ mockSign toEnc a sk
+    signDSIGN a sk = return $ mockSign a sk
 
-    verifyDSIGN toEnc (VerKeyMockDSIGN n) a s =
-      if s == mockSign toEnc a (SignKeyMockDSIGN n)
+    verifyDSIGN (VerKeyMockDSIGN n) a s =
+      if s == mockSign a (SignKeyMockDSIGN n)
         then Right ()
         else Left $ show $ MockVerificationFailure {
                  vErrVerKey    = VerKeyMockDSIGN n
@@ -77,8 +78,8 @@ data VerificationFailure
       }
   deriving Show
 
-mockSign :: (a -> Encoding) -> a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
-mockSign toEnc a (SignKeyMockDSIGN n) = SigMockDSIGN (getHash $ hashWithSerialiser @ShortHash toEnc a) n
+mockSign :: ToCBOR a => a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
+mockSign a (SignKeyMockDSIGN n) = SigMockDSIGN (getHash $ hash @ShortHash a) n
 
 instance ToCBOR (SigDSIGN MockDSIGN) where
   toCBOR (SigMockDSIGN b i) = encodeListLen 2 <> toCBOR b <> toCBOR i

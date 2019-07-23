@@ -31,6 +31,7 @@ testVRFAlgorithm
                      , FromCBOR (VerKeyVRF v)
                      , ToCBOR (SignKeyVRF v)
                      , FromCBOR (SignKeyVRF v)
+                     , Signable v Int
                      )
   => proxy v
   -> String
@@ -47,29 +48,29 @@ testVRFAlgorithm _ n =
     ]
 
 prop_vrf_max
-  :: forall a v. (ToCBOR a, VRFAlgorithm v)
+  :: forall a v. (Signable v a, VRFAlgorithm v)
   => Seed
   -> a
   -> SignKeyVRF v
   -> Property
 prop_vrf_max seed a sk =
-  let (y, _) = withSeed seed $ evalVRF toCBOR a sk
+  let (y, _) = withSeed seed $ evalVRF a sk
       m = maxVRF (Proxy :: Proxy v)
   in counterexample ("expected " ++ show y ++ " <= " ++ show m) $ y <= m
 
 prop_vrf_verify_pos
-  :: forall a v. (ToCBOR a, VRFAlgorithm v)
+  :: forall a v. (Signable v a, VRFAlgorithm v)
   => Seed
   -> a
   -> SignKeyVRF v
   -> Bool
 prop_vrf_verify_pos seed a sk =
-  let (y, c) = withSeed seed $ evalVRF toCBOR a sk
+  let (y, c) = withSeed seed $ evalVRF a sk
       vk = deriveVerKeyVRF sk
-  in verifyVRF toCBOR vk a (y, c)
+  in verifyVRF vk a (y, c)
 
 prop_vrf_verify_neg
-  :: forall a v. (ToCBOR a, VRFAlgorithm v)
+  :: forall a v. (Signable v a, VRFAlgorithm v)
   => Seed
   -> a
   -> SignKeyVRF v
@@ -78,6 +79,6 @@ prop_vrf_verify_neg
 prop_vrf_verify_neg seed a sk sk' =
   sk /=
     sk' ==>
-    let (y, c) = withSeed seed $ evalVRF toCBOR a sk'
+    let (y, c) = withSeed seed $ evalVRF a sk'
         vk = deriveVerKeyVRF sk
-    in not $ verifyVRF toCBOR vk a (y, c)
+    in not $ verifyVRF vk a (y, c)

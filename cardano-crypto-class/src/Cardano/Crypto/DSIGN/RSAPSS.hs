@@ -10,11 +10,12 @@ module Cardano.Crypto.DSIGN.RSAPSS
   )
 where
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..), serializeEncoding')
+import Cardano.Binary (FromCBOR (..), ToCBOR (..), serialize)
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Hash
 import Crypto.PubKey.RSA
 import Crypto.PubKey.RSA.PSS
+import Data.ByteString.Lazy (toStrict)
 import Data.Function (on)
 import GHC.Generics (Generic)
 
@@ -27,6 +28,8 @@ byteSize :: Int
 byteSize = 100
 
 instance DSIGNAlgorithm RSAPSSDSIGN where
+
+    type Signable RSAPSSDSIGN = ToCBOR
 
     newtype VerKeyDSIGN RSAPSSDSIGN = VerKeyRSAPSSDSIGN PublicKey
         deriving (Show, Eq, Generic)
@@ -51,14 +54,14 @@ instance DSIGNAlgorithm RSAPSSDSIGN where
 
     deriveVerKeyDSIGN (SignKeyRSAPSSDSIGN sk) = VerKeyRSAPSSDSIGN $ private_pub sk
 
-    signDSIGN toEnc a (SignKeyRSAPSSDSIGN sk) = do
-        esig <- signSafer defaultPSSParamsSHA1 sk (serializeEncoding' $ toEnc a)
+    signDSIGN a (SignKeyRSAPSSDSIGN sk) = do
+        esig <- signSafer defaultPSSParamsSHA1 sk (toStrict $ serialize a)
         case esig of
             Left err  -> error $ "signDSIGN: " ++ show err
             Right sig -> return $ SigRSAPSSDSIGN sig
 
-    verifyDSIGN toEnc (VerKeyRSAPSSDSIGN vk) a (SigRSAPSSDSIGN sig) =
-        if verify defaultPSSParamsSHA1 vk (serializeEncoding' $ toEnc a) sig
+    verifyDSIGN (VerKeyRSAPSSDSIGN vk) a (SigRSAPSSDSIGN sig) =
+        if verify defaultPSSParamsSHA1 vk (toStrict $ serialize a) sig
           then Right ()
           else Left "Verification failed"
 
