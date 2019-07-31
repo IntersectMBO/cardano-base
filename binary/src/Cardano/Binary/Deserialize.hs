@@ -21,11 +21,8 @@ module Cardano.Binary.Deserialize
   , decodeFullDecoder
 
   -- * CBOR in CBOR
-  , decodeKnownCborDataItem
-  , decodeUnknownCborDataItem
-
-  -- * Cyclic redundancy check
-  , decodeCrcProtected
+  , decodeNestedCbor
+  , decodeNestedCborBytes
   )
 where
 
@@ -39,11 +36,8 @@ import Control.Monad.ST (ST, runST)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Internal as BSL
-import Data.Digest.CRC32 (CRC32(..))
-import Data.Typeable (typeOf)
-import Formatting (Format, sformat, shown)
 
-import Cardano.Binary.FromCBOR (DecoderError(..), FromCBOR(..), enforceSize)
+import Cardano.Binary.FromCBOR (DecoderError(..), FromCBOR(..))
 
 
 -- | Deserialize a Haskell value from the external binary representation
@@ -106,55 +100,38 @@ supplyAllInput _ (Read.Fail bs _ exn) = return (Left (exn, bs))
 
 
 --------------------------------------------------------------------------------
--- CBORDataItem
+-- Nested CBOR-in-CBOR
 -- https://tools.ietf.org/html/rfc7049#section-2.4.4.1
 --------------------------------------------------------------------------------
 
 -- | Remove the the semantic tag 24 from the enclosed CBOR data item,
 -- failing if the tag cannot be found.
-decodeCborDataItemTag :: D.Decoder s ()
-decodeCborDataItemTag = do
+decodeNestedCborTag :: D.Decoder s ()
+decodeNestedCborTag = do
   t <- D.decodeTag
   when (t /= 24) $ cborError $ DecoderErrorUnknownTag
-    "decodeCborDataItem"
+    "decodeNestedCborTag"
     (fromIntegral t)
 
 -- | Remove the the semantic tag 24 from the enclosed CBOR data item,
 -- decoding back the inner `ByteString` as a proper Haskell type.
 -- Consume its input in full.
-decodeKnownCborDataItem :: FromCBOR a => D.Decoder s a
-decodeKnownCborDataItem = do
-  bs <- decodeUnknownCborDataItem
+decodeNestedCbor :: FromCBOR a => D.Decoder s a
+decodeNestedCbor = do
+  bs <- decodeNestedCborBytes
   toCborError $ decodeFull' bs
 
 -- | Like `decodeKnownCborDataItem`, but assumes nothing about the Haskell
 -- type we want to deserialise back, therefore it yields the `ByteString`
 -- Tag 24 surrounded (stripping such tag away).
+--
 -- In CBOR notation, if the data was serialised as:
+--
 -- >>> 24(h'DEADBEEF')
--- then `decodeUnknownCborDataItem` yields the inner 'DEADBEEF', unchanged.
-decodeUnknownCborDataItem :: D.Decoder s ByteString
-decodeUnknownCborDataItem = do
-  decodeCborDataItemTag
+--
+-- then `decodeNestedCborBytes` yields the inner 'DEADBEEF', unchanged.
+decodeNestedCborBytes :: D.Decoder s ByteString
+decodeNestedCborBytes = do
+  decodeNestedCborTag
   D.decodeBytes
 
--- | Decodes a CBOR blob into a type `a`, checking the serialised CRC
---   corresponds to the computed one
-decodeCrcProtected :: forall s a . FromCBOR a => D.Decoder s a
-decodeCrcProtected = do
-  enforceSize ("decodeCrcProtected: " <> show (typeOf (Proxy @a))) 2
-  body        <- decodeUnknownCborDataItem
-  expectedCrc <- fromCBOR
-  let
-    actualCrc :: Word32
-    actualCrc = crc32 body
-  let
-    crcErrorFmt :: Format r (Word32 -> Word32 -> r)
-    crcErrorFmt =
-      "decodeCrcProtected, expected CRC "
-        . shown
-        . " was not the computed one, which was "
-        . shown
-  when (actualCrc /= expectedCrc)
-    $ cborError (sformat crcErrorFmt expectedCrc actualCrc)
-  toCborError $ decodeFull' body
