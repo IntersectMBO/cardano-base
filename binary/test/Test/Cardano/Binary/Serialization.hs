@@ -146,17 +146,11 @@ prop_roundTripSerialize' = property $ do
   ts <- forAll genTestStruct
   (unsafeDeserialize' . serialize' $ ts) === ts
 
-prop_roundTripCrcProtected :: Property
-prop_roundTripCrcProtected = property $ do
+prop_roundTripEncodeNestedCbor :: Property
+prop_roundTripEncodeNestedCbor = property $ do
   ts <- forAll genTestStruct
-  let crcEncodedBS = serializeEncoding . encodeCrcProtected $ ts
-  decodeFullDecoder "" decodeCrcProtected crcEncodedBS === Right ts
-
-prop_roundTripKnownCBORData :: Property
-prop_roundTripKnownCBORData = property $ do
-  ts <- forAll genTestStruct
-  let encoded = serializeEncoding . encodeKnownCborDataItem $ ts
-  decodeFullDecoder "" decodeKnownCborDataItem encoded === Right ts
+  let encoded = serializeEncoding . encodeNestedCbor $ ts
+  decodeFullDecoder "" decodeNestedCbor encoded === Right ts
 
 prop_decodeContainerSkelWithReplicate :: Property
 prop_decodeContainerSkelWithReplicate = property $

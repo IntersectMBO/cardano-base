@@ -59,9 +59,9 @@ import Cardano.Binary
   , SizeOverride(..)
   , ToCBOR(..)
   , decodeListLenOf
-  , decodeUnknownCborDataItem
+  , decodeNestedCborBytes
   , encodeListLen
-  , encodeUnknownCborDataItem
+  , encodeNestedCborBytes
   , serialize
   , szSimplify
   , szWithCtx
@@ -87,14 +87,14 @@ data U = U Word8 BS.ByteString deriving (Show, Eq)
 
 instance ToCBOR U where
   toCBOR (U word8 bs) =
-    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeUnknownCborDataItem
+    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeNestedCborBytes
       (LBS.fromStrict bs)
 
 
 instance FromCBOR U where
   fromCBOR = do
     decodeListLenOf 2
-    U <$> fromCBOR <*> decodeUnknownCborDataItem
+    U <$> fromCBOR <*> decodeNestedCborBytes
 
 instance Arbitrary U where
   arbitrary = U <$> choose (0, 255) <*> arbitrary
@@ -105,11 +105,11 @@ data U24 = U24 Word8 BS.ByteString deriving (Show, Eq)
 instance FromCBOR U24 where
   fromCBOR = do
     decodeListLenOf 2
-    U24 <$> fromCBOR <*> decodeUnknownCborDataItem
+    U24 <$> fromCBOR <*> decodeNestedCborBytes
 
 instance ToCBOR U24 where
   toCBOR (U24 word8 bs) =
-    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeUnknownCborDataItem
+    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeNestedCborBytes
       (LBS.fromStrict bs)
 
 
@@ -131,9 +131,9 @@ extensionProperty = forAll @a (arbitrary :: Gen a) $ \input ->
 
       Such type will be encoded, roughly, like this:
 
-      encode (Constructor1 a b) = encodeWord 0 <> encodeKnownCborDataItem (a,b)
-      encode (Constructor2 a b) = encodeWord 1 <> encodeKnownCborDataItem a
-      encode (UnknownConstructor tag bs) = encodeWord tag <> encodeUnknownCborDataItem bs
+      encode (Constructor1 a b) = encodeWord 0 <> encodeNestedCbor (a,b)
+      encode (Constructor2 a b) = encodeWord 1 <> encodeNestedCbor a
+      encode (UnknownConstructor tag bs) = encodeWord tag <> encodeNestedCborBytes bs
 
       In CBOR terms, we would produce something like this:
 

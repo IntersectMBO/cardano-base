@@ -15,14 +15,10 @@ module Cardano.Binary.Serialize
   , serializeEncoding'
 
   -- * CBOR in CBOR
-  , encodeKnownCborDataItem
-  , encodeUnknownCborDataItem
-  , knownCborDataItemSizeExpr
-  , unknownCborDataItemSizeExpr
-
-  -- * Cyclic redundancy check
-  , encodeCrcProtected
-  , encodedCrcProtectedSizeExpr
+  , encodeNestedCbor
+  , encodeNestedCborBytes
+  , nestedCborSizeExpr
+  , nestedCborBytesSizeExpr
   )
 where
 
@@ -32,10 +28,9 @@ import qualified Codec.CBOR.Write as CBOR.Write
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder.Extra as Builder
 import qualified Data.ByteString.Lazy as BSL
-import Data.Digest.CRC32 (CRC32(..))
 
 import Cardano.Binary.ToCBOR
-  (Encoding, Size, ToCBOR(..), apMono, encodeListLen, encodeTag, withWordSize)
+  (Encoding, Size, ToCBOR(..), apMono, encodeTag, withWordSize)
 
 
 -- | Serialize a Haskell value with a 'ToCBOR' instance to an external binary
@@ -77,42 +72,26 @@ serializeEncoding' = BSL.toStrict . serializeEncoding
 
 
 --------------------------------------------------------------------------------
--- CBORDataItem
+-- Nested CBOR-in-CBOR
 -- https://tools.ietf.org/html/rfc7049#section-2.4.4.1
 --------------------------------------------------------------------------------
 
 -- | Encode and serialise the given `a` and sorround it with the semantic tag 24
 --   In CBOR diagnostic notation:
 --   >>> 24(h'DEADBEEF')
-encodeKnownCborDataItem :: ToCBOR a => a -> Encoding
-encodeKnownCborDataItem = encodeUnknownCborDataItem . serialize
+encodeNestedCbor :: ToCBOR a => a -> Encoding
+encodeNestedCbor = encodeNestedCborBytes . serialize
 
--- | Like `encodeKnownCborDataItem`, but assumes nothing about the shape of
+-- | Like `encodeNestedCbor`, but assumes nothing about the shape of
 --   input object, so that it must be passed as a binary `ByteString` blob. It's
 --   the caller responsibility to ensure the input `ByteString` correspond
 --   indeed to valid, previously-serialised CBOR data.
-encodeUnknownCborDataItem :: LByteString -> Encoding
-encodeUnknownCborDataItem x = encodeTag 24 <> toCBOR x
+encodeNestedCborBytes :: LByteString -> Encoding
+encodeNestedCborBytes x = encodeTag 24 <> toCBOR x
 
-knownCborDataItemSizeExpr :: Size -> Size
-knownCborDataItemSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
+nestedCborSizeExpr :: Size -> Size
+nestedCborSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
 
-unknownCborDataItemSizeExpr :: Size -> Size
-unknownCborDataItemSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
+nestedCborBytesSizeExpr :: Size -> Size
+nestedCborBytesSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
 
--- | Encodes a type `a` , protecting it from
---   tampering/network-transport-alteration by protecting it with a CRC.
-encodeCrcProtected :: ToCBOR a => a -> Encoding
-encodeCrcProtected x =
-  encodeListLen 2 <> encodeUnknownCborDataItem body <> toCBOR (crc32 body)
-  where body = serialize x
-
-encodedCrcProtectedSizeExpr
-  :: forall a
-   . ToCBOR a
-  => (forall t . ToCBOR t => Proxy t -> Size)
-  -> Proxy a
-  -> Size
-encodedCrcProtectedSizeExpr size pxy =
-  2 + unknownCborDataItemSizeExpr (size pxy) + size
-    (pure $ crc32 (serialize (panic "unused" :: a)))
