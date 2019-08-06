@@ -37,7 +37,7 @@ library
                      , aeson
                      , bytestring
                      , cardano-prelude
-                     , cborg
+                     , cborg              >= 0.2.2 && < 0.3
                      , containers
                      , digest
                      , formatting
