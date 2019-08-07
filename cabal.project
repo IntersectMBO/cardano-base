@@ -3,12 +3,6 @@ packages:
   binary/test
   cardano-crypto-class
 
-
-source-repository-package
-  type: git
-  location: http://github.com/well-typed/canonical-json
-  tag: ddfe3593b80b5ceb88842bb7a6f2268df75d2c2f
-
 source-repository-package
   type: git
   location: https://github.com/input-output-hk/cardano-prelude
@@ -19,12 +13,6 @@ source-repository-package
   location: https://github.com/input-output-hk/cardano-prelude
   tag: 8273fe5f00ac03b0c66ef3841c8e957139ee18f2
   subdir: test
-
-source-repository-package
-  type: git
-  location: https://github.com/well-typed/cborg
-  tag: 80fbe0ee5e67a5622e2cb9eaa9d8594a2214322d
-  subdir: cborg
 
 source-repository-package
   type: git
