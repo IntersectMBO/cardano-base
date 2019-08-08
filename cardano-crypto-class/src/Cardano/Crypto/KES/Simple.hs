@@ -10,6 +10,7 @@
 module Cardano.Crypto.KES.Simple
   ( SimpleKES
   , SigKES (..)
+  , SignKeyKES (..)
   )
 where
 

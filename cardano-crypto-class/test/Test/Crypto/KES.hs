@@ -1,10 +1,13 @@
 {-# LANGUAGE DeriveAnyClass       #-}
 {-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Crypto.KES
   ( tests
@@ -44,12 +47,19 @@ tests =
   , testKESAlgorithm (Proxy :: Proxy (SimpleKES Ed448DSIGN)) "SimpleKES (with Ed448)"
   ]
 
+-- We normally ensure that we avoid naively comparing signing keys by not
+-- providing instances, but for tests it is fine, so we provide the orphan
+-- instance here.
+deriving instance (DSIGNAlgorithm d, Eq (SignKeyDSIGN d))
+               => Eq (SignKeyKES (SimpleKES d))
+
 testKESAlgorithm
   :: ( KESAlgorithm v
      , ToCBOR (VerKeyKES v)
      , FromCBOR (VerKeyKES v)
      , ToCBOR (SignKeyKES v)
      , FromCBOR (SignKeyKES v)
+     , Eq (SignKeyKES v)   -- no Eq for signing keys normally
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
      , KES.Signable v ~ ToCBOR
@@ -77,7 +87,11 @@ prop_KES_serialise_VerKey _ (Duration_Seed_SK _ _ sk _) =
   prop_cbor (deriveVerKeyKES sk)
 
 prop_KES_serialise_SignKey
-  :: (KESAlgorithm v, FromCBOR (SignKeyKES v), ToCBOR (SignKeyKES v))
+  :: ( KESAlgorithm v
+     , FromCBOR (SignKeyKES v)
+     , ToCBOR (SignKeyKES v)
+     , Eq (SignKeyKES v)
+     )
   => proxy v
   -> Duration_Seed_SK v
   -> Property
@@ -211,7 +225,8 @@ data Duration_Seed_SK v = Duration_Seed_SK Natural Seed (SignKeyKES v) (VerKeyKE
     deriving Generic
 
 deriving instance KESAlgorithm v => Show (Duration_Seed_SK v)
-deriving instance KESAlgorithm v => Eq (Duration_Seed_SK v)
+deriving instance (KESAlgorithm v, Eq (SignKeyKES v)) => Eq (Duration_Seed_SK v)
+
 instance
   (KESAlgorithm v, ToCBOR (SignKeyKES v), ToCBOR (VerKeyKES v))
   => ToCBOR (Duration_Seed_SK v)
@@ -247,7 +262,8 @@ instance (KESAlgorithm v, Arbitrary a) => Arbitrary (Duration_Seed_SK_Times v a)
         return $ Duration_Seed_SK_Times d' s' sk' vk' ts'
 
 deriving instance (KESAlgorithm v, Show a) => Show (Duration_Seed_SK_Times v a)
-deriving instance (KESAlgorithm v, Eq a) => Eq (Duration_Seed_SK_Times v a)
+deriving instance (KESAlgorithm v, Eq (SignKeyKES v), Eq a) => Eq (Duration_Seed_SK_Times v a)
+
 instance
   (KESAlgorithm v, ToCBOR a, ToCBOR (SignKeyKES v), ToCBOR (VerKeyKES v))
   => ToCBOR (Duration_Seed_SK_Times v a)
