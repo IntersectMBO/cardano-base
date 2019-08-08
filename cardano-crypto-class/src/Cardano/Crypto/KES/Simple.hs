@@ -10,6 +10,7 @@
 module Cardano.Crypto.KES.Simple
   ( SimpleKES
   , SigKES (..)
+  , SignKeyKES (..)
   )
 where
 
@@ -80,8 +81,6 @@ deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d))
 
 deriving instance DSIGNAlgorithm d => Eq (VerKeyKES (SimpleKES d))
 
-deriving instance DSIGNAlgorithm d => Ord (VerKeyKES (SimpleKES d))
-
 instance (DSIGNAlgorithm d, Typeable d) => ToCBOR (VerKeyKES (SimpleKES d)) where
   toCBOR (VerKeySimpleKES vvks) =
     encodeListLen (fromIntegral $ Vec.length vvks) <>
@@ -94,10 +93,6 @@ instance (DSIGNAlgorithm d, Typeable d) => FromCBOR (VerKeyKES (SimpleKES d)) wh
       Vec.fromList <$> replicateM len decodeVerKeyDSIGN
 
 deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SimpleKES d))
-
-deriving instance DSIGNAlgorithm d => Eq (SignKeyKES (SimpleKES d))
-
-deriving instance DSIGNAlgorithm d => Ord (SignKeyKES (SimpleKES d))
 
 instance (DSIGNAlgorithm d, Typeable d) => ToCBOR (SignKeyKES (SimpleKES d)) where
   toCBOR (SignKeySimpleKES (vks, stuff)) =
@@ -133,8 +128,6 @@ instance (DSIGNAlgorithm d, Typeable d) => FromCBOR (SignKeyKES (SimpleKES d)) w
 deriving instance DSIGNAlgorithm d => Show (SigKES (SimpleKES d))
 
 deriving instance DSIGNAlgorithm d => Eq (SigKES (SimpleKES d))
-
-deriving instance DSIGNAlgorithm d => Ord (SigKES (SimpleKES d))
 
 instance (DSIGNAlgorithm d, Typeable d) => ToCBOR (SigKES (SimpleKES d)) where
   toCBOR (SigSimpleKES d) = encodeSigDSIGN d

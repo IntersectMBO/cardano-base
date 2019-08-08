@@ -43,6 +43,7 @@ testDSIGNAlgorithm
                      , FromCBOR (VerKeyDSIGN v)
                      , ToCBOR (SignKeyDSIGN v)
                      , FromCBOR (SignKeyDSIGN v)
+                     , Eq (SignKeyDSIGN v)   -- no Eq for signing keys normally
                      , ToCBOR (SigDSIGN v)
                      , FromCBOR (SigDSIGN v)
                      , Signable v Int
@@ -72,7 +73,7 @@ prop_dsign_verify_pos seed a sk =
   in verifyDSIGN vk a sig === Right ()
 
 prop_dsign_verify_neg_key
-  :: forall a v. (DSIGNAlgorithm v, Signable v a)
+  :: forall a v. (DSIGNAlgorithm v, Eq (SignKeyDSIGN v), Signable v a)
   => Seed
   -> a
   -> SignKeyDSIGN v

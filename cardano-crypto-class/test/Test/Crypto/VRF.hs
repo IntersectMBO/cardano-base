@@ -31,6 +31,7 @@ testVRFAlgorithm
                      , FromCBOR (VerKeyVRF v)
                      , ToCBOR (SignKeyVRF v)
                      , FromCBOR (SignKeyVRF v)
+                     , Eq (SignKeyVRF v)     -- no Eq for signing keys normally
                      , Signable v Int
                      )
   => proxy v
@@ -70,7 +71,7 @@ prop_vrf_verify_pos seed a sk =
   in verifyVRF vk a (y, c)
 
 prop_vrf_verify_neg
-  :: forall a v. (Signable v a, VRFAlgorithm v)
+  :: forall a v. (Signable v a, VRFAlgorithm v, Eq (SignKeyVRF v))
   => Seed
   -> a
   -> SignKeyVRF v

@@ -28,11 +28,10 @@ import Numeric.Natural (Natural)
 
 class ( Typeable v
       , Show (VerKeyKES v)
-      , Ord (VerKeyKES v)
+      , Eq (VerKeyKES v)
       , Show (SignKeyKES v)
-      , Ord (SignKeyKES v)
       , Show (SigKES v)
-      , Ord (SigKES v)
+      , Eq (SigKES v)
       )
       => KESAlgorithm v where
 
@@ -83,8 +82,6 @@ newtype SignedKES v a = SignedKES {getSig :: SigKES v}
 deriving instance KESAlgorithm v => Show (SignedKES v a)
 
 deriving instance KESAlgorithm v => Eq (SignedKES v a)
-
-deriving instance KESAlgorithm v => Ord (SignedKES v a)
 
 signedKES
   :: (KESAlgorithm v, MonadRandom m, Signable v a)

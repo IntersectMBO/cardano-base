@@ -28,11 +28,10 @@ import GHC.Stack
 
 class ( Typeable v
       , Show (VerKeyDSIGN v)
-      , Ord (VerKeyDSIGN v)
+      , Eq (VerKeyDSIGN v)
       , Show (SignKeyDSIGN v)
-      , Ord (SignKeyDSIGN v)
       , Show (SigDSIGN v)
-      , Ord (SigDSIGN v)
+      , Eq (SigDSIGN v)
       )
       => DSIGNAlgorithm v where
 
@@ -81,8 +80,6 @@ newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
 deriving instance DSIGNAlgorithm v => Show (SignedDSIGN v a)
 
 deriving instance DSIGNAlgorithm v => Eq (SignedDSIGN v a)
-
-deriving instance DSIGNAlgorithm v => Ord (SignedDSIGN v a)
 
 signedDSIGN
   :: (DSIGNAlgorithm v, MonadRandom m, Signable v a)
