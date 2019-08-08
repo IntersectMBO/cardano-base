@@ -32,11 +32,10 @@ import Numeric.Natural
 
 class ( Typeable v
       , Show (VerKeyVRF v)
-      , Ord (VerKeyVRF v)
+      , Eq (VerKeyVRF v)
       , Show (SignKeyVRF v)
-      , Ord (SignKeyVRF v)
       , Show (CertVRF v)
-      , Ord (CertVRF v)
+      , Eq (CertVRF v)
       , FromCBOR (CertVRF v)
       , ToCBOR (CertVRF v)
       )
@@ -81,8 +80,6 @@ data CertifiedVRF v a
 deriving instance VRFAlgorithm v => Show (CertifiedVRF v a)
 
 deriving instance VRFAlgorithm v => Eq (CertifiedVRF v a)
-
-deriving instance VRFAlgorithm v => Ord (CertifiedVRF v a)
 
 instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
   toCBOR cvrf =
