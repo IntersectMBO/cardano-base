@@ -14,6 +14,7 @@ module Cardano.Binary.ToCBOR
   ( ToCBOR(..)
   , withWordSize
   , module E
+  , toCBORMaybe
 
     -- * Size of expressions
   , Range(..)
@@ -584,12 +585,15 @@ instance ToCBOR a => ToCBOR (NonEmpty a) where
   encodedSizeExpr size _ = size (Proxy @[a]) -- MN TODO make 0 count impossible
 
 instance ToCBOR a => ToCBOR (Maybe a) where
-  toCBOR Nothing  = E.encodeListLen 0
-  toCBOR (Just x) = E.encodeListLen 1 <> toCBOR x
+  toCBOR = toCBORMaybe toCBOR
 
   encodedSizeExpr size _ =
     szCases [Case "Nothing" 1, Case "Just" (1 + size (Proxy @a))]
 
+toCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+toCBORMaybe encodeA = \case
+  Nothing -> E.encodeListLen 0
+  Just x  -> E.encodeListLen 1 <> encodeA x
 
 encodeContainerSkel
   :: (Word -> E.Encoding)

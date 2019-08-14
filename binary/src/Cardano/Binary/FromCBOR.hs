@@ -13,6 +13,7 @@ module Cardano.Binary.FromCBOR
   , enforceSize
   , matchSize
   , module D
+  , fromCBORMaybe
   )
 where
 
@@ -298,15 +299,15 @@ instance FromCBOR a => FromCBOR (NonEmpty a) where
     Just xs -> Right xs
 
 instance FromCBOR a => FromCBOR (Maybe a) where
-  fromCBOR = decodeMaybe fromCBOR
+  fromCBOR = fromCBORMaybe fromCBOR
 
-decodeMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
-decodeMaybe decoder = do
+fromCBORMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
+fromCBORMaybe fromCBORA = do
   n <- D.decodeListLen
   case n of
     0 -> return Nothing
     1 -> do
-      !x <- decoder
+      !x <- fromCBORA
       return (Just x)
     _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral n)
 
