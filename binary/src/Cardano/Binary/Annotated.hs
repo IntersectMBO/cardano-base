@@ -5,6 +5,8 @@
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE Rank2Types         #-}
 {-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE TypeApplications   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Cardano.Binary.Annotated
   ( Annotated(..)
@@ -15,6 +17,14 @@ module Cardano.Binary.Annotated
   , fromCBORAnnotated
   , decodeFullAnnotatedBytes
   , reAnnotate
+  , AnnotatedDecoder
+  , FromCBORAnnotated (..)
+  , decodeAnnotated
+  , withSlice
+  , withSlice'
+  , liftByteSpanDecoder
+  , decodeAnnotatedDecoder
+  , fromCBOREmptyAnnotation
   )
 where
 
@@ -27,10 +37,11 @@ import Data.Kind (Type)
 
 import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR
-  (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan)
+  (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan, decodeListWith, fromCBORMaybe)
 import Cardano.Binary.ToCBOR
   (ToCBOR)
 import Cardano.Binary.Serialize (serialize')
+
 
 
 -- | Extract a substring of a given ByteString corresponding to the offsets.
@@ -91,3 +102,53 @@ class Decoded t where
 instance Decoded (Annotated b ByteString) where
   type BaseType (Annotated b ByteString) = b
   recoverBytes = annotation
+
+-------------------------------------------------------------------------
+-- Annotated Decoder
+-------------------------------------------------------------------------
+
+
+-- | An AnnotatedDecoder produces a value which needs a reference to the original ByteString to be
+-- constructed.
+type AnnotatedDecoder s a = ReaderT LByteString (Decoder s) a
+
+decodeAnnotated :: forall a. (Typeable a , FromCBORAnnotated a)
+  => LByteString
+  -> Either DecoderError a
+decodeAnnotated = decodeAnnotatedDecoder (show . typeRep $ Proxy @a) fromCBORAnnotated'
+
+decodeAnnotatedDecoder :: Text -> (forall s. AnnotatedDecoder s a) -> LByteString -> Either DecoderError a
+decodeAnnotatedDecoder label' decoder bytes =
+  decodeFullDecoder label' (runReaderT decoder bytes) bytes
+
+liftByteSpanDecoder :: Functor f => Decoder s (f ByteSpan) -> AnnotatedDecoder s (f ByteString)
+liftByteSpanDecoder decoder = ReaderT $ \bytes ->
+  decoder <&> \fbs -> BSL.toStrict . slice bytes <$> fbs
+
+-- | Inserts the decoded segment
+withSlice :: AnnotatedDecoder s (LByteString -> a) -> AnnotatedDecoder s a
+withSlice decoder = ReaderT $ \bytes -> do
+  (x, start, end) <- decodeWithByteSpan $ runReaderT decoder bytes
+  pure $ x $ sliceOffsets start end bytes
+  where
+  sliceOffsets :: ByteOffset -> ByteOffset -> LByteString -> LByteString
+  sliceOffsets start end = BSL.take (end - start) . BSL.drop start
+
+-- | Equivalent to withSlice for strict ByteStrings
+withSlice' :: AnnotatedDecoder s (ByteString -> a) -> AnnotatedDecoder s a
+withSlice' = withSlice . fmap (. BSL.toStrict)
+
+fromCBOREmptyAnnotation :: FromCBORAnnotated a => Decoder s a
+fromCBOREmptyAnnotation = runReaderT fromCBORAnnotated' mempty
+
+class FromCBORAnnotated a where
+  fromCBORAnnotated' :: AnnotatedDecoder s a
+
+instance (FromCBOR a) => FromCBORAnnotated (Annotated a ByteString) where
+  fromCBORAnnotated' = withSlice' $ Annotated <$> lift fromCBOR
+
+instance FromCBORAnnotated a => FromCBORAnnotated [a] where
+  fromCBORAnnotated' = ReaderT $ \bytes -> decodeListWith (runReaderT fromCBORAnnotated' bytes)
+
+instance FromCBORAnnotated a => FromCBORAnnotated (Maybe a) where
+  fromCBORAnnotated' = ReaderT $ \bytes -> fromCBORMaybe (runReaderT fromCBORAnnotated' bytes)
