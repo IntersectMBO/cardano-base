@@ -1,5 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -25,6 +27,7 @@ import Cardano.Binary
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Util (nonNegIntR)
+import Cardano.Prelude (NoUnexpectedThunks)
 import GHC.Generics (Generic)
 import GHC.Stack
 
@@ -35,13 +38,16 @@ instance DSIGNAlgorithm MockDSIGN where
     type Signable MockDSIGN = ToCBOR
 
     newtype VerKeyDSIGN MockDSIGN = VerKeyMockDSIGN Int
-        deriving (Show, Eq, Ord, Generic, Num, ToCBOR, FromCBOR)
+        deriving stock   (Show, Eq, Ord, Generic)
+        deriving newtype (Num, ToCBOR, FromCBOR, NoUnexpectedThunks)
 
     newtype SignKeyDSIGN MockDSIGN = SignKeyMockDSIGN Int
-        deriving (Show, Eq, Ord, Generic, Num, ToCBOR, FromCBOR)
+        deriving stock   (Show, Eq, Ord, Generic)
+        deriving newtype (Num, ToCBOR, FromCBOR)
 
     data SigDSIGN MockDSIGN = SigMockDSIGN ByteString Int
-        deriving (Show, Eq, Ord, Generic)
+        deriving stock    (Show, Eq, Ord, Generic)
+        deriving anyclass (NoUnexpectedThunks)
 
     encodeVerKeyDSIGN  = toCBOR
     encodeSignKeyDSIGN = toCBOR

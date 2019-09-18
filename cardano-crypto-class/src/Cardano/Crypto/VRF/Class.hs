@@ -22,6 +22,7 @@ import Cardano.Binary
   , enforceSize
   )
 import Cardano.Crypto.Util (Empty)
+import Cardano.Prelude (NoUnexpectedThunks)
 import Crypto.Random (MonadRandom)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
@@ -38,6 +39,7 @@ class ( Typeable v
       , Eq (CertVRF v)
       , FromCBOR (CertVRF v)
       , ToCBOR (CertVRF v)
+      , NoUnexpectedThunks (CertVRF v)
       )
       => VRFAlgorithm v where
 
@@ -78,8 +80,10 @@ data CertifiedVRF v a
   deriving Generic
 
 deriving instance VRFAlgorithm v => Show (CertifiedVRF v a)
+deriving instance VRFAlgorithm v => Eq   (CertifiedVRF v a)
 
-deriving instance VRFAlgorithm v => Eq (CertifiedVRF v a)
+instance (VRFAlgorithm v, Typeable a) => NoUnexpectedThunks (CertifiedVRF v a)
+  -- use generic instance
 
 instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
   toCBOR cvrf =

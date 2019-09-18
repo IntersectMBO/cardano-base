@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -28,6 +29,7 @@ import Cardano.Binary
 import Cardano.Crypto.DSIGN
 import qualified Cardano.Crypto.DSIGN as DSIGN
 import Cardano.Crypto.KES.Class
+import Cardano.Prelude (NoUnexpectedThunks)
 import Control.Monad (replicateM)
 import Data.Typeable (Typeable)
 import Data.Vector ((!?), Vector, fromList)
@@ -47,7 +49,7 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
         deriving Generic
 
     newtype SigKES (SimpleKES d) = SigSimpleKES (SigDSIGN d)
-        deriving Generic
+        deriving (Generic)
 
     type Signable (SimpleKES d) = DSIGN.Signable d
 
@@ -126,8 +128,10 @@ instance (DSIGNAlgorithm d, Typeable d) => FromCBOR (SignKeyKES (SimpleKES d)) w
         return (n, sks)
 
 deriving instance DSIGNAlgorithm d => Show (SigKES (SimpleKES d))
+deriving instance DSIGNAlgorithm d => Eq   (SigKES (SimpleKES d))
 
-deriving instance DSIGNAlgorithm d => Eq (SigKES (SimpleKES d))
+instance DSIGNAlgorithm d => NoUnexpectedThunks (SigKES (SimpleKES d)) 
+  -- use generic instance
 
 instance (DSIGNAlgorithm d, Typeable d) => ToCBOR (SigKES (SimpleKES d)) where
   toCBOR (SigSimpleKES d) = encodeSigDSIGN d

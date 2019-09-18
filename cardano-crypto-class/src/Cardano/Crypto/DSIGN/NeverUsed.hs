@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 module Cardano.Crypto.DSIGN.NeverUsed
@@ -8,8 +10,11 @@ module Cardano.Crypto.DSIGN.NeverUsed
   )
 where
 
+import GHC.Generics (Generic)
+
 import Cardano.Binary
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Prelude (NoUnexpectedThunks)
 
 -- | DSIGN never used
 --
@@ -18,9 +23,9 @@ import Cardano.Crypto.DSIGN.Class
 data NeverDSIGN
 
 instance DSIGNAlgorithm NeverDSIGN where
-  data VerKeyDSIGN  NeverDSIGN = NeverUsedVerKeyDSIGN  deriving (Show, Eq, Ord)
-  data SignKeyDSIGN NeverDSIGN = NeverUsedSignKeyDSIGN deriving (Show, Eq, Ord)
-  data SigDSIGN     NeverDSIGN = NeverUsedSigDSIGN     deriving (Show, Eq, Ord)
+  data VerKeyDSIGN  NeverDSIGN = NeverUsedVerKeyDSIGN  deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+  data SignKeyDSIGN NeverDSIGN = NeverUsedSignKeyDSIGN deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+  data SigDSIGN     NeverDSIGN = NeverUsedSigDSIGN     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
   encodeVerKeyDSIGN  _ = toCBOR ()
   encodeSignKeyDSIGN _ = toCBOR ()

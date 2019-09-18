@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 module Cardano.Crypto.KES.NeverUsed
@@ -8,8 +10,11 @@ module Cardano.Crypto.KES.NeverUsed
   )
 where
 
+import GHC.Generics (Generic)
+
 import Cardano.Binary (toCBOR)
 import Cardano.Crypto.KES.Class
+import Cardano.Prelude (NoUnexpectedThunks)
 
 -- | KES never used
 --
@@ -18,9 +23,9 @@ import Cardano.Crypto.KES.Class
 data NeverKES
 
 instance KESAlgorithm NeverKES where
-  data VerKeyKES  NeverKES = NeverUsedVerKeyKES  deriving (Show, Eq, Ord)
-  data SignKeyKES NeverKES = NeverUsedSignKeyKES deriving (Show, Eq, Ord)
-  data SigKES     NeverKES = NeverUsedSigKES     deriving (Show, Eq, Ord)
+  data VerKeyKES  NeverKES = NeverUsedVerKeyKES  deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+  data SignKeyKES NeverKES = NeverUsedSignKeyKES deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+  data SigKES     NeverKES = NeverUsedSigKES     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
   encodeVerKeyKES  _ = toCBOR ()
   encodeSignKeyKES _ = toCBOR ()

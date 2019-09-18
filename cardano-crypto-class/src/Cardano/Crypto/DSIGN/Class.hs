@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -19,6 +18,7 @@ where
 
 import Cardano.Binary (Decoder, Encoding)
 import Cardano.Crypto.Util (Empty)
+import Cardano.Prelude (NoUnexpectedThunks)
 import Crypto.Random (MonadRandom)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
@@ -32,6 +32,8 @@ class ( Typeable v
       , Show (SignKeyDSIGN v)
       , Show (SigDSIGN v)
       , Eq (SigDSIGN v)
+      , NoUnexpectedThunks (SigDSIGN v)
+      , NoUnexpectedThunks (VerKeyDSIGN v)
       )
       => DSIGNAlgorithm v where
 
@@ -78,8 +80,10 @@ newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
   deriving Generic
 
 deriving instance DSIGNAlgorithm v => Show (SignedDSIGN v a)
+deriving instance DSIGNAlgorithm v => Eq   (SignedDSIGN v a)
 
-deriving instance DSIGNAlgorithm v => Eq (SignedDSIGN v a)
+instance (DSIGNAlgorithm v, Typeable a) => NoUnexpectedThunks (SignedDSIGN v a)
+  -- use generic instance
 
 signedDSIGN
   :: (DSIGNAlgorithm v, MonadRandom m, Signable v a)

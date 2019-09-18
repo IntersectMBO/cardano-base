@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -19,6 +21,7 @@ import Cardano.Binary
   , serialize
   )
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed448
 import Data.ByteArray (ByteArrayAccess, convert)
@@ -35,12 +38,14 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
     newtype VerKeyDSIGN Ed448DSIGN = VerKeyEd448DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
+        deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
 
     newtype SignKeyDSIGN Ed448DSIGN = SignKeyEd448DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
 
     newtype SigDSIGN Ed448DSIGN = SigEd448DSIGN Signature
         deriving (Show, Eq, Generic, ByteArrayAccess)
+        deriving NoUnexpectedThunks via UseIsNormalForm Signature
 
     encodeVerKeyDSIGN = toCBOR
     encodeSignKeyDSIGN = toCBOR
