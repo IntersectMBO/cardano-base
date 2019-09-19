@@ -35,6 +35,7 @@ instance VRFAlgorithm MockVRF where
   maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy MD5)) - 1
   genKeyVRF = SignKeyMockVRF <$> nonNegIntR
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
+  encodeVerKeyVRF = toCBOR
   evalVRF a sk = return $ evalVRF' a sk
   verifyVRF (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
