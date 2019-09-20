@@ -1,5 +1,8 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -23,6 +26,7 @@ import Cardano.Binary
   )
 import Cardano.Crypto.Hash
 import Cardano.Crypto.VRF.Class
+import Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
 import Crypto.Number.Generate (generateBetween)
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
@@ -44,6 +48,7 @@ q = C.ecc_n $ C.common_curve curve
 
 newtype Point = Point C.Point
   deriving (Eq, Generic)
+  deriving NoUnexpectedThunks via UseIsNormalForm C.Point
 
 instance Show Point where
   show (Point p) = show p
@@ -92,16 +97,22 @@ instance VRFAlgorithm SimpleVRF where
   type Signable SimpleVRF = ToCBOR
 
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
-    deriving (Show, Eq, Ord, Generic, ToCBOR, FromCBOR)
+    deriving stock   (Show, Eq, Ord, Generic)
+    deriving newtype (ToCBOR, FromCBOR)
+
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
-    deriving (Show, Eq, Ord, Generic, ToCBOR, FromCBOR)
+    deriving stock   (Show, Eq, Ord, Generic)
+    deriving newtype (ToCBOR, FromCBOR)
+
   data CertVRF SimpleVRF
     = CertSimpleVRF
         { certU :: Point
         , certC :: Natural
         , certS :: Integer
         }
-    deriving (Show, Eq, Ord, Generic)
+    deriving stock    (Show, Eq, Ord, Generic)
+    deriving anyclass (NoUnexpectedThunks)
+
   maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy H)) - 1
   genKeyVRF = SignKeySimpleVRF <$> C.scalarGenerate curve
   deriveVerKeyVRF (SignKeySimpleVRF k) =

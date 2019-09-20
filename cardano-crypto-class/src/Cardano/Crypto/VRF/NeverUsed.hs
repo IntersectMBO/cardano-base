@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 module Cardano.Crypto.VRF.NeverUsed
@@ -8,8 +10,11 @@ module Cardano.Crypto.VRF.NeverUsed
   )
 where
 
+import GHC.Generics (Generic)
+
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.VRF.Class
+import Cardano.Prelude (NoUnexpectedThunks)
 
 -- | VRF not available
 --
@@ -19,11 +24,11 @@ data NeverVRF
 
 instance VRFAlgorithm NeverVRF where
   data VerKeyVRF NeverVRF = NeverUsedVerKeyVRF
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
   data SignKeyVRF NeverVRF = NeverUsedSignKeyVRF
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
   data CertVRF NeverVRF = NeverUsedCertVRF
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
   genKeyVRF = return NeverUsedSignKeyVRF
   deriveVerKeyVRF _ = NeverUsedVerKeyVRF
   maxVRF _ = 0

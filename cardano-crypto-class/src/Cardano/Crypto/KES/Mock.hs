@@ -1,4 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -17,6 +19,7 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..), decodeListLen, encodeListLen)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util (nonNegIntR)
+import Cardano.Prelude (NoUnexpectedThunks)
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
 
@@ -29,13 +32,16 @@ instance KESAlgorithm MockKES where
     type Signable MockKES = ToCBOR
 
     newtype VerKeyKES MockKES = VerKeyMockKES Int
-        deriving (Show, Eq, Ord, Generic, ToCBOR, FromCBOR)
+        deriving stock   (Show, Eq, Ord, Generic)
+        deriving newtype (NoUnexpectedThunks, ToCBOR, FromCBOR)
 
     newtype SignKeyKES MockKES = SignKeyMockKES (VerKeyKES MockKES, Natural, Natural)
-        deriving (Show, Eq, Ord, Generic, ToCBOR, FromCBOR)
+        deriving stock   (Show, Eq, Ord, Generic)
+        deriving newtype (NoUnexpectedThunks, ToCBOR, FromCBOR)
 
     data SigKES MockKES = SigMockKES Natural (SignKeyKES MockKES)
-        deriving (Show, Eq, Ord, Generic)
+        deriving stock    (Show, Eq, Ord, Generic)
+        deriving anyclass (NoUnexpectedThunks)
 
     encodeVerKeyKES = toCBOR
     encodeSignKeyKES = toCBOR

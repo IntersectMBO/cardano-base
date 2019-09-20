@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,6 +15,7 @@ where
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), serialize)
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Hash
+import Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
 import Crypto.PubKey.RSA
 import Crypto.PubKey.RSA.PSS
 import Data.ByteString.Lazy (toStrict)
@@ -33,12 +36,13 @@ instance DSIGNAlgorithm RSAPSSDSIGN where
 
     newtype VerKeyDSIGN RSAPSSDSIGN = VerKeyRSAPSSDSIGN PublicKey
         deriving (Show, Eq, Generic)
+        deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
 
     newtype SignKeyDSIGN RSAPSSDSIGN = SignKeyRSAPSSDSIGN PrivateKey
         deriving (Show, Eq, Generic)
 
     newtype SigDSIGN RSAPSSDSIGN = SigRSAPSSDSIGN ByteString
-        deriving (Show, Eq, Ord, Generic, ToCBOR, FromCBOR)
+        deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
 
     encodeVerKeyDSIGN = toCBOR
     encodeSignKeyDSIGN = toCBOR

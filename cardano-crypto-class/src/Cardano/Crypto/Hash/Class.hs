@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
@@ -33,6 +34,8 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import Numeric.Natural
 
+import Cardano.Prelude (NoUnexpectedThunks)
+
 class Typeable h => HashAlgorithm h where
 
   byteCount :: proxy h -> Natural
@@ -40,7 +43,7 @@ class Typeable h => HashAlgorithm h where
   digest :: HasCallStack => proxy h -> ByteString -> ByteString
 
 newtype Hash h a = Hash {getHash :: ByteString}
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, NoUnexpectedThunks)
 
 instance Show (Hash h a) where
   show = SB8.unpack . B16.encode . getHash

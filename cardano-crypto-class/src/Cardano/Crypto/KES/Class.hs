@@ -18,6 +18,7 @@ where
 
 import Cardano.Binary (Decoder, Encoding)
 import Cardano.Crypto.Util (Empty)
+import Cardano.Prelude (NoUnexpectedThunks)
 import Crypto.Random (MonadRandom)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
@@ -32,6 +33,7 @@ class ( Typeable v
       , Show (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
+      , NoUnexpectedThunks (SigKES v)
       )
       => KESAlgorithm v where
 
@@ -80,8 +82,10 @@ newtype SignedKES v a = SignedKES {getSig :: SigKES v}
   deriving Generic
 
 deriving instance KESAlgorithm v => Show (SignedKES v a)
+deriving instance KESAlgorithm v => Eq   (SignedKES v a)
 
-deriving instance KESAlgorithm v => Eq (SignedKES v a)
+instance (KESAlgorithm v, Typeable a) => NoUnexpectedThunks (SignedKES v a)
+  -- use generic instance
 
 signedKES
   :: (KESAlgorithm v, MonadRandom m, Signable v a)
@@ -92,7 +96,7 @@ signedKES
 signedKES time a key = do
   m <- signKES time a key
   return $ case m of
-    Nothing -> Nothing
+    Nothing          -> Nothing
     Just (sig, key') -> Just (SignedKES sig, key')
 
 verifySignedKES
