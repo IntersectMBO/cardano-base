@@ -21,6 +21,7 @@
           (hsPkgs.base16-bytestring)
           (hsPkgs.bytestring)
           (hsPkgs.cardano-binary)
+          (hsPkgs.cardano-prelude)
           (hsPkgs.cryptonite)
           (hsPkgs.memory)
           (hsPkgs.reflection)
