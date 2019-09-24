@@ -28,7 +28,7 @@ import Data.Kind (Type)
 import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR
   (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan)
-import Cardano.Binary.ToCBOR 
+import Cardano.Binary.ToCBOR
   (ToCBOR)
 import Cardano.Binary.Serialize (serialize')
 
@@ -43,7 +43,7 @@ data ByteSpan = ByteSpan !ByteOffset !ByteOffset
 
 data Annotated b a = Annotated { unAnnotated :: !b, annotation :: !a }
   deriving (Eq, Show, Functor, Generic)
-  deriving anyclass NFData
+  deriving anyclass (NFData, NoUnexpectedThunks)
 
 instance Bifunctor Annotated where
   first f (Annotated b a) = Annotated (f b) a
