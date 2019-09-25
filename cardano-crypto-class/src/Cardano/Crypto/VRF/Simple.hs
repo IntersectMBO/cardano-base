@@ -117,6 +117,7 @@ instance VRFAlgorithm SimpleVRF where
   genKeyVRF = SignKeySimpleVRF <$> C.scalarGenerate curve
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
+  encodeVerKeyVRF = toCBOR
   evalVRF a sk@(SignKeySimpleVRF k) = do
     let u = h' (toCBOR a) k
         y = h $ toCBOR a <> toCBOR u

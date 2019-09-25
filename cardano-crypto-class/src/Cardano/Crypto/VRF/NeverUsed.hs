@@ -32,6 +32,7 @@ instance VRFAlgorithm NeverVRF where
   genKeyVRF = return NeverUsedSignKeyVRF
   deriveVerKeyVRF _ = NeverUsedVerKeyVRF
   maxVRF _ = 0
+  encodeVerKeyVRF _ = error "VRF unavailable"
   evalVRF = error "VRF unavailable"
   verifyVRF = error "VRF unavailable"
 
