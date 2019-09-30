@@ -55,6 +55,7 @@ library
                      , cardano-binary
                      , cardano-prelude
                      , cryptonite
+                     , deepseq
                      , memory
                      , reflection
                      , vector

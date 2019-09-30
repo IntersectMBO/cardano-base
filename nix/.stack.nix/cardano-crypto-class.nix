@@ -23,6 +23,7 @@
           (hsPkgs.cardano-binary)
           (hsPkgs.cardano-prelude)
           (hsPkgs.cryptonite)
+          (hsPkgs.deepseq)
           (hsPkgs.memory)
           (hsPkgs.reflection)
           (hsPkgs.vector)
