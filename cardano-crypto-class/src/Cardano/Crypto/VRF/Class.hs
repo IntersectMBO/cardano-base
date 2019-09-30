@@ -85,7 +85,7 @@ data CertifiedVRF v a
 deriving instance VRFAlgorithm v => Show (CertifiedVRF v a)
 deriving instance VRFAlgorithm v => Eq   (CertifiedVRF v a)
 
-instance (VRFAlgorithm v, Typeable a) => NoUnexpectedThunks (CertifiedVRF v a)
+instance VRFAlgorithm v => NoUnexpectedThunks (CertifiedVRF v a)
   -- use generic instance
 
 instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where

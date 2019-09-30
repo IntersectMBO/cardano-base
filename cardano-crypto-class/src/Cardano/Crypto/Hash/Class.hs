@@ -21,6 +21,7 @@ import Cardano.Binary
   , decodeBytes
   , serializeEncoding'
   )
+import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Base16 as B16
@@ -43,7 +44,7 @@ class Typeable h => HashAlgorithm h where
   digest :: HasCallStack => proxy h -> ByteString -> ByteString
 
 newtype Hash h a = Hash {getHash :: ByteString}
-  deriving (Eq, Ord, Generic, NoUnexpectedThunks)
+  deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
 
 instance Show (Hash h a) where
   show = SB8.unpack . B16.encode . getHash

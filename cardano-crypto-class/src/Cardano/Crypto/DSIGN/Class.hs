@@ -82,7 +82,7 @@ newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
 deriving instance DSIGNAlgorithm v => Show (SignedDSIGN v a)
 deriving instance DSIGNAlgorithm v => Eq   (SignedDSIGN v a)
 
-instance (DSIGNAlgorithm v, Typeable a) => NoUnexpectedThunks (SignedDSIGN v a)
+instance DSIGNAlgorithm v => NoUnexpectedThunks (SignedDSIGN v a)
   -- use generic instance
 
 signedDSIGN

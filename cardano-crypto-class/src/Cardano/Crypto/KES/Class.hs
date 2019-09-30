@@ -84,7 +84,7 @@ newtype SignedKES v a = SignedKES {getSig :: SigKES v}
 deriving instance KESAlgorithm v => Show (SignedKES v a)
 deriving instance KESAlgorithm v => Eq   (SignedKES v a)
 
-instance (KESAlgorithm v, Typeable a) => NoUnexpectedThunks (SignedKES v a)
+instance KESAlgorithm v => NoUnexpectedThunks (SignedKES v a)
   -- use generic instance
 
 signedKES
