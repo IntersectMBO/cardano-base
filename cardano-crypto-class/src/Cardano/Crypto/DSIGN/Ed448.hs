@@ -42,6 +42,7 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
     newtype SignKeyDSIGN Ed448DSIGN = SignKeyEd448DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
+        deriving NoUnexpectedThunks via UseIsNormalForm SecretKey
 
     newtype SigDSIGN Ed448DSIGN = SigEd448DSIGN Signature
         deriving (Show, Eq, Generic, ByteArrayAccess)

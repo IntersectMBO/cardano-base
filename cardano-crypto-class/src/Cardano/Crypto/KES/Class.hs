@@ -33,7 +33,9 @@ class ( Typeable v
       , Show (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
-      , NoUnexpectedThunks (SigKES v)
+      , NoUnexpectedThunks (SigKES     v)
+      , NoUnexpectedThunks (SignKeyKES v)
+      , NoUnexpectedThunks (VerKeyKES  v)
       )
       => KESAlgorithm v where
 

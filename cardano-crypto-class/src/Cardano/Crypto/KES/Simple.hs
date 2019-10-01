@@ -130,8 +130,9 @@ instance (DSIGNAlgorithm d, Typeable d) => FromCBOR (SignKeyKES (SimpleKES d)) w
 deriving instance DSIGNAlgorithm d => Show (SigKES (SimpleKES d))
 deriving instance DSIGNAlgorithm d => Eq   (SigKES (SimpleKES d))
 
-instance DSIGNAlgorithm d => NoUnexpectedThunks (SigKES (SimpleKES d)) 
-  -- use generic instance
+instance DSIGNAlgorithm d => NoUnexpectedThunks (SigKES     (SimpleKES d))
+instance DSIGNAlgorithm d => NoUnexpectedThunks (SignKeyKES (SimpleKES d))
+instance DSIGNAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SimpleKES d))
 
 instance (DSIGNAlgorithm d, Typeable d) => ToCBOR (SigKES (SimpleKES d)) where
   toCBOR (SigSimpleKES d) = encodeSigDSIGN d

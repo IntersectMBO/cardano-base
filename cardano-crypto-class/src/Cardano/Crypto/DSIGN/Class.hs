@@ -32,8 +32,9 @@ class ( Typeable v
       , Show (SignKeyDSIGN v)
       , Show (SigDSIGN v)
       , Eq (SigDSIGN v)
-      , NoUnexpectedThunks (SigDSIGN v)
-      , NoUnexpectedThunks (VerKeyDSIGN v)
+      , NoUnexpectedThunks (SigDSIGN     v)
+      , NoUnexpectedThunks (SignKeyDSIGN v)
+      , NoUnexpectedThunks (VerKeyDSIGN  v)
       )
       => DSIGNAlgorithm v where
 

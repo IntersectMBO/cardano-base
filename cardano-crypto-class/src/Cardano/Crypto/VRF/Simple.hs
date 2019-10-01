@@ -98,11 +98,12 @@ instance VRFAlgorithm SimpleVRF where
 
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
     deriving stock   (Show, Eq, Ord, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
+    deriving newtype (ToCBOR, FromCBOR, NoUnexpectedThunks)
 
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
     deriving stock   (Show, Eq, Ord, Generic)
     deriving newtype (ToCBOR, FromCBOR)
+    deriving NoUnexpectedThunks via UseIsNormalForm C.PrivateNumber
 
   data CertVRF SimpleVRF
     = CertSimpleVRF

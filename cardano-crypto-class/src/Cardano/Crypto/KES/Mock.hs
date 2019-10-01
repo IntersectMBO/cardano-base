@@ -35,11 +35,11 @@ instance KESAlgorithm MockKES where
         deriving stock   (Show, Eq, Ord, Generic)
         deriving newtype (NoUnexpectedThunks, ToCBOR, FromCBOR)
 
-    newtype SignKeyKES MockKES = SignKeyMockKES (VerKeyKES MockKES, Natural, Natural)
-        deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (NoUnexpectedThunks, ToCBOR, FromCBOR)
+    data SignKeyKES MockKES = SignKeyMockKES !(VerKeyKES MockKES) !Natural !Natural
+        deriving stock    (Show, Eq, Ord, Generic)
+        deriving anyclass (NoUnexpectedThunks)
 
-    data SigKES MockKES = SigMockKES Natural (SignKeyKES MockKES)
+    data SigKES MockKES = SigMockKES !Natural !(SignKeyKES MockKES)
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
@@ -53,18 +53,18 @@ instance KESAlgorithm MockKES where
 
     genKeyKES duration = do
         vk <- VerKeyMockKES <$> nonNegIntR
-        return $ SignKeyMockKES (vk, 0, duration)
+        return $ SignKeyMockKES vk 0 duration
 
-    deriveVerKeyKES (SignKeyMockKES (vk, _, _)) = vk
+    deriveVerKeyKES (SignKeyMockKES vk _ _) = vk
 
-    signKES j a (SignKeyMockKES (vk, k, t))
+    signKES j a (SignKeyMockKES vk k t)
         | j >= k && j < t = return $ Just
-            ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES (vk, j, t))
-            , SignKeyMockKES (vk, j + 1, t)
+            ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j t)
+            , SignKeyMockKES vk (j + 1) t
             )
         | otherwise       = return Nothing
 
-    verifyKES vk j a (SigMockKES h (SignKeyMockKES (vk', j', _))) =
+    verifyKES vk j a (SigMockKES h (SignKeyMockKES vk' j' _)) =
         if    j  == j'
            && vk == vk'
            && fromHash (hash @H a) == h
@@ -81,5 +81,20 @@ instance FromCBOR (SigKES MockKES) where
   fromCBOR =
     SigMockKES <$
       decodeListLen <*>
+      fromCBOR <*>
+      fromCBOR
+
+instance ToCBOR (SignKeyKES MockKES) where
+  toCBOR (SignKeyMockKES vk k t) =
+    encodeListLen 3 <>
+      toCBOR vk <>
+      toCBOR k <>
+      toCBOR t
+
+instance FromCBOR (SignKeyKES MockKES) where
+  fromCBOR =
+    SignKeyMockKES <$
+      decodeListLen <*>
+      fromCBOR <*>
       fromCBOR <*>
       fromCBOR

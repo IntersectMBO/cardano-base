@@ -40,6 +40,7 @@ instance DSIGNAlgorithm RSAPSSDSIGN where
 
     newtype SignKeyDSIGN RSAPSSDSIGN = SignKeyRSAPSSDSIGN PrivateKey
         deriving (Show, Eq, Generic)
+        deriving NoUnexpectedThunks via UseIsNormalForm PrivateKey
 
     newtype SigDSIGN RSAPSSDSIGN = SigRSAPSSDSIGN ByteString
         deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
