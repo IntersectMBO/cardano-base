@@ -40,7 +40,9 @@ class ( Typeable v
       , Eq (CertVRF v)
       , FromCBOR (CertVRF v)
       , ToCBOR (CertVRF v)
-      , NoUnexpectedThunks (CertVRF v)
+      , NoUnexpectedThunks (CertVRF    v)
+      , NoUnexpectedThunks (VerKeyVRF  v)
+      , NoUnexpectedThunks (SignKeyVRF v)
       )
       => VRFAlgorithm v where
 

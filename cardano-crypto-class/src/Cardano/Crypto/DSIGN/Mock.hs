@@ -43,7 +43,7 @@ instance DSIGNAlgorithm MockDSIGN where
 
     newtype SignKeyDSIGN MockDSIGN = SignKeyMockDSIGN Int
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (Num, ToCBOR, FromCBOR)
+        deriving newtype (Num, ToCBOR, FromCBOR, NoUnexpectedThunks)
 
     data SigDSIGN MockDSIGN = SigMockDSIGN ByteString Int
         deriving stock    (Show, Eq, Ord, Generic)
