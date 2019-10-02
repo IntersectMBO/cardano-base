@@ -11,6 +11,7 @@ module Cardano.Crypto.Hash.Class
   , hash
   , hashWithSerialiser
   , fromHash
+  , xor
   )
 where
 
@@ -22,6 +23,7 @@ import Cardano.Binary
   , serializeEncoding'
   )
 import Control.DeepSeq (NFData)
+import qualified Data.Bits as Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Base16 as B16
@@ -76,3 +78,9 @@ fromHash = foldl' f 0 . SB.unpack . getHash
   where
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b
+
+-- | XOR two hashes together
+--
+--   This functionality is required for VRF calculation.
+xor :: Hash h a -> Hash h a -> Hash h a
+xor (Hash x) (Hash y) = Hash $ SB.pack $ SB.zipWith Bits.xor x y
