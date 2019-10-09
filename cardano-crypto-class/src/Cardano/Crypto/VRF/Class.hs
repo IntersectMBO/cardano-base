@@ -16,7 +16,8 @@ module Cardano.Crypto.VRF.Class
 where
 
 import Cardano.Binary
-  ( Encoding
+  ( Decoder
+  , Encoding
   , FromCBOR (..)
   , ToCBOR (..)
   , encodeListLen
@@ -61,6 +62,8 @@ class ( Typeable v
   genKeyVRF :: MonadRandom m => m (SignKeyVRF v)
 
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
+
+  decodeVerKeyVRF :: Decoder s (VerKeyVRF v)
 
   encodeVerKeyVRF :: VerKeyVRF v -> Encoding
 
