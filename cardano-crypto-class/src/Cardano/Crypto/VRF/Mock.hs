@@ -12,7 +12,7 @@ module Cardano.Crypto.VRF.Mock
   )
 where
 
-import Cardano.Binary (FromCBOR, ToCBOR (..))
+import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Util (nonNegIntR)
 import Cardano.Crypto.VRF.Class
@@ -38,6 +38,7 @@ instance VRFAlgorithm MockVRF where
   genKeyVRF = SignKeyMockVRF <$> nonNegIntR
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
   encodeVerKeyVRF = toCBOR
+  decodeVerKeyVRF = fromCBOR
   evalVRF a sk = return $ evalVRF' a sk
   verifyVRF (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
