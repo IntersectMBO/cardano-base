@@ -1,4 +1,5 @@
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies         #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.Crypto.Orphans.Arbitrary
@@ -41,13 +42,13 @@ instance DSIGNAlgorithm v => Arbitrary (VerKeyDSIGN v) where
   arbitrary = deriveVerKeyDSIGN <$> arbitrary
   shrink = const []
 
-instance (Cardano.Crypto.DSIGN.Signable v Int, DSIGNAlgorithm v) 
+instance (Cardano.Crypto.DSIGN.Signable v Int, DSIGNAlgorithm v, ContextDSIGN v ~ ())
   => Arbitrary (SigDSIGN v) where
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
     seed <- arbitrary
-    return $ withSeed seed $ signDSIGN a sk
+    return $ withSeed seed $ signDSIGN () a sk
   shrink = const []
 
 instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
@@ -60,11 +61,11 @@ instance VRFAlgorithm v => Arbitrary (VerKeyVRF v) where
   arbitrary = deriveVerKeyVRF <$> arbitrary
   shrink = const []
 
-instance (Cardano.Crypto.VRF.Signable v Int, VRFAlgorithm v) 
+instance (Cardano.Crypto.VRF.Signable v Int, VRFAlgorithm v, ContextVRF v ~ ())
   => Arbitrary (CertVRF v) where
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
     seed <- arbitrary
-    return $ withSeed seed $ fmap snd $ evalVRF a sk
+    return $ withSeed seed $ fmap snd $ evalVRF () a sk
   shrink = const []

@@ -51,7 +51,8 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
     newtype SigKES (SimpleKES d) = SigSimpleKES (SigDSIGN d)
         deriving (Generic)
 
-    type Signable (SimpleKES d) = DSIGN.Signable d
+    type Signable   (SimpleKES d) = DSIGN.Signable     d
+    type ContextKES (SimpleKES d) = DSIGN.ContextDSIGN d
 
     encodeVerKeyKES = toCBOR
     encodeSignKeyKES = toCBOR
@@ -68,16 +69,16 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
 
     deriveVerKeyKES (SignKeySimpleKES (vks, _)) = VerKeySimpleKES $ fromList vks
 
-    signKES j a (SignKeySimpleKES (vks, xs)) = case dropWhile (\(k, _) -> k < j) xs of
+    signKES ctxt j a (SignKeySimpleKES (vks, xs)) = case dropWhile (\(k, _) -> k < j) xs of
         []           -> return Nothing
         (_, sk) : ys -> do
-            sig <- signDSIGN a sk
+            sig <- signDSIGN ctxt a sk
             return $ Just (SigSimpleKES sig, SignKeySimpleKES (vks, ys))
 
-    verifyKES (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
+    verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
         case vks !? fromIntegral j of
             Nothing -> Left "KES verification failed: out of range"
-            Just vk -> verifyDSIGN vk a sig
+            Just vk -> verifyDSIGN ctxt vk a sig
 
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d))
 

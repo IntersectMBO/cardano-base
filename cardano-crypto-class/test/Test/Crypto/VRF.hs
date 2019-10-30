@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 module Test.Crypto.VRF
   ( tests
   )
@@ -33,6 +34,7 @@ testVRFAlgorithm
                      , FromCBOR (SignKeyVRF v)
                      , Eq (SignKeyVRF v)     -- no Eq for signing keys normally
                      , Signable v Int
+                     , ContextVRF v ~ ()
                      )
   => proxy v
   -> String
@@ -49,29 +51,29 @@ testVRFAlgorithm _ n =
     ]
 
 prop_vrf_max
-  :: forall a v. (Signable v a, VRFAlgorithm v)
+  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
   => Seed
   -> a
   -> SignKeyVRF v
   -> Property
 prop_vrf_max seed a sk =
-  let (y, _) = withSeed seed $ evalVRF a sk
+  let (y, _) = withSeed seed $ evalVRF () a sk
       m = maxVRF (Proxy :: Proxy v)
   in counterexample ("expected " ++ show y ++ " <= " ++ show m) $ y <= m
 
 prop_vrf_verify_pos
-  :: forall a v. (Signable v a, VRFAlgorithm v)
+  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
   => Seed
   -> a
   -> SignKeyVRF v
   -> Bool
 prop_vrf_verify_pos seed a sk =
-  let (y, c) = withSeed seed $ evalVRF a sk
+  let (y, c) = withSeed seed $ evalVRF () a sk
       vk = deriveVerKeyVRF sk
-  in verifyVRF vk a (y, c)
+  in verifyVRF () vk a (y, c)
 
 prop_vrf_verify_neg
-  :: forall a v. (Signable v a, VRFAlgorithm v, Eq (SignKeyVRF v))
+  :: forall a v. (Signable v a, VRFAlgorithm v, Eq (SignKeyVRF v), ContextVRF v ~ ())
   => Seed
   -> a
   -> SignKeyVRF v
@@ -80,6 +82,6 @@ prop_vrf_verify_neg
 prop_vrf_verify_neg seed a sk sk' =
   sk /=
     sk' ==>
-    let (y, c) = withSeed seed $ evalVRF a sk'
+    let (y, c) = withSeed seed $ evalVRF () a sk'
         vk = deriveVerKeyVRF sk
-    in not $ verifyVRF vk a (y, c)
+    in not $ verifyVRF () vk a (y, c)
