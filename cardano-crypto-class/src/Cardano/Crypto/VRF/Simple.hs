@@ -120,7 +120,7 @@ instance VRFAlgorithm SimpleVRF where
     VerKeySimpleVRF $ pow k
   decodeVerKeyVRF = fromCBOR
   encodeVerKeyVRF = toCBOR
-  evalVRF a sk@(SignKeySimpleVRF k) = do
+  evalVRF () a sk@(SignKeySimpleVRF k) = do
     let u = h' (toCBOR a) k
         y = h $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
@@ -128,7 +128,7 @@ instance VRFAlgorithm SimpleVRF where
     let c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
         s = mod (r + k * fromIntegral c) q
     return (y, CertSimpleVRF u c s)
-  verifyVRF (VerKeySimpleVRF v) a (y, cert) =
+  verifyVRF () (VerKeySimpleVRF v) a (y, cert) =
     let u = certU cert
         c = certC cert
         c' = -fromIntegral c

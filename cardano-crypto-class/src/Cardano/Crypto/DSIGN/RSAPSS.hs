@@ -59,13 +59,13 @@ instance DSIGNAlgorithm RSAPSSDSIGN where
 
     deriveVerKeyDSIGN (SignKeyRSAPSSDSIGN sk) = VerKeyRSAPSSDSIGN $ private_pub sk
 
-    signDSIGN a (SignKeyRSAPSSDSIGN sk) = do
+    signDSIGN () a (SignKeyRSAPSSDSIGN sk) = do
         esig <- signSafer defaultPSSParamsSHA1 sk (toStrict $ serialize a)
         case esig of
             Left err  -> error $ "signDSIGN: " ++ show err
             Right sig -> return $ SigRSAPSSDSIGN sig
 
-    verifyDSIGN (VerKeyRSAPSSDSIGN vk) a (SigRSAPSSDSIGN sig) =
+    verifyDSIGN () (VerKeyRSAPSSDSIGN vk) a (SigRSAPSSDSIGN sig) =
         if verify defaultPSSParamsSHA1 vk (toStrict $ serialize a) sig
           then Right ()
           else Left "Verification failed"

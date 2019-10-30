@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 module Test.Crypto.DSIGN
   ( tests
   )
@@ -47,6 +48,7 @@ testDSIGNAlgorithm
                      , ToCBOR (SigDSIGN v)
                      , FromCBOR (SigDSIGN v)
                      , Signable v Int
+                     , ContextDSIGN v ~ ()
                      )
   => proxy v
   -> String
@@ -62,18 +64,18 @@ testDSIGNAlgorithm _ n =
     ]
 
 prop_dsign_verify_pos
-  :: forall a v. (DSIGNAlgorithm v, Signable v a)
+  :: forall a v. (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
   => Seed
   -> a
   -> SignKeyDSIGN v
   -> Property
 prop_dsign_verify_pos seed a sk =
-  let sig = withSeed seed $ signDSIGN a sk
+  let sig = withSeed seed $ signDSIGN () a sk
       vk = deriveVerKeyDSIGN sk
-  in verifyDSIGN vk a sig === Right ()
+  in verifyDSIGN () vk a sig === Right ()
 
 prop_dsign_verify_neg_key
-  :: forall a v. (DSIGNAlgorithm v, Eq (SignKeyDSIGN v), Signable v a)
+  :: forall a v. (DSIGNAlgorithm v, Eq (SignKeyDSIGN v), Signable v a, ContextDSIGN v ~ ())
   => Seed
   -> a
   -> SignKeyDSIGN v
@@ -81,12 +83,12 @@ prop_dsign_verify_neg_key
   -> Property
 prop_dsign_verify_neg_key seed a sk sk' =
   sk /= sk' ==>
-    let sig = withSeed seed $ signDSIGN a sk'
+    let sig = withSeed seed $ signDSIGN () a sk'
         vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN vk a sig =/= Right ()
+    in verifyDSIGN () vk a sig =/= Right ()
 
 prop_dsign_verify_neg_msg
-  :: forall a v. (Eq a, DSIGNAlgorithm v, Signable v a)
+  :: forall a v. (Eq a, DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
   => Seed
   -> a
   -> a
@@ -94,6 +96,6 @@ prop_dsign_verify_neg_msg
   -> Property
 prop_dsign_verify_neg_msg seed a a' sk =
   a /= a' ==>
-    let sig = withSeed seed $ signDSIGN a sk
+    let sig = withSeed seed $ signDSIGN () a sk
         vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN vk a' sig =/= Right ()
+    in verifyDSIGN () vk a' sig =/= Right ()

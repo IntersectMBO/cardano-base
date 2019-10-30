@@ -45,8 +45,13 @@ class ( Typeable v
   data SigDSIGN v :: Type
 
   type Signable v :: Type -> Constraint
+  type Signable v = Empty
 
-  type Signable c = Empty
+  -- | Context required to run the DSIGN algorithm
+  --
+  -- Unit by default (no context required)
+  type ContextDSIGN v :: Type
+  type ContextDSIGN v = ()
 
   encodeVerKeyDSIGN :: VerKeyDSIGN v -> Encoding
 
@@ -66,13 +71,15 @@ class ( Typeable v
 
   signDSIGN
     :: (MonadRandom m, Signable v a, HasCallStack)
-    => a
+    => ContextDSIGN v
+    -> a
     -> SignKeyDSIGN v
     -> m (SigDSIGN v)
 
   verifyDSIGN
     :: (Signable v a, HasCallStack)
-    => VerKeyDSIGN v
+    => ContextDSIGN v
+    -> VerKeyDSIGN v
     -> a
     -> SigDSIGN v
     -> Either String ()
@@ -88,18 +95,20 @@ instance DSIGNAlgorithm v => NoUnexpectedThunks (SignedDSIGN v a)
 
 signedDSIGN
   :: (DSIGNAlgorithm v, MonadRandom m, Signable v a)
-  => a
+  => ContextDSIGN v
+  -> a
   -> SignKeyDSIGN v
   -> m (SignedDSIGN v a)
-signedDSIGN a key = SignedDSIGN <$> signDSIGN a key
+signedDSIGN ctxt a key = SignedDSIGN <$> signDSIGN ctxt a key
 
 verifySignedDSIGN
   :: (DSIGNAlgorithm v, Signable v a, HasCallStack)
-  => VerKeyDSIGN v
+  => ContextDSIGN v
+  -> VerKeyDSIGN v
   -> a
   -> SignedDSIGN v a
   -> Either String ()
-verifySignedDSIGN key a (SignedDSIGN s) = verifyDSIGN key a s
+verifySignedDSIGN ctxt key a (SignedDSIGN s) = verifyDSIGN ctxt key a s
 
 encodeSignedDSIGN :: DSIGNAlgorithm v => SignedDSIGN v a -> Encoding
 encodeSignedDSIGN (SignedDSIGN s) = encodeSigDSIGN s

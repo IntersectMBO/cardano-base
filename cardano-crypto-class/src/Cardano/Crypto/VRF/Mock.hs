@@ -39,8 +39,8 @@ instance VRFAlgorithm MockVRF where
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
   encodeVerKeyVRF = toCBOR
   decodeVerKeyVRF = fromCBOR
-  evalVRF a sk = return $ evalVRF' a sk
-  verifyVRF (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
+  evalVRF () a sk = return $ evalVRF' a sk
+  verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
 evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (Natural, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
