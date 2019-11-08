@@ -46,8 +46,13 @@ class ( Typeable v
   data SigKES v :: Type
 
   type Signable v :: Type -> Constraint
+  type Signable v = Empty
 
-  type Signable c = Empty
+  -- | Context required to run the KES algorithm
+  --
+  -- Unit by default (no context required)
+  type ContextKES v :: Type
+  type ContextKES v = ()
 
   encodeVerKeyKES :: VerKeyKES v -> Encoding
 
@@ -67,14 +72,16 @@ class ( Typeable v
 
   signKES
     :: (MonadRandom m, Signable v a, HasCallStack)
-    => Natural
+    => ContextKES v
+    -> Natural
     -> a
     -> SignKeyKES v
     -> m (Maybe (SigKES v, SignKeyKES v))
 
   verifyKES
     :: (Signable v a, HasCallStack)
-    => VerKeyKES v
+    => ContextKES v
+    -> VerKeyKES v
     -> Natural
     -> a
     -> SigKES v
@@ -91,24 +98,26 @@ instance KESAlgorithm v => NoUnexpectedThunks (SignedKES v a)
 
 signedKES
   :: (KESAlgorithm v, MonadRandom m, Signable v a)
-  => Natural
+  => ContextKES v
+  -> Natural
   -> a
   -> SignKeyKES v
   -> m (Maybe (SignedKES v a, SignKeyKES v))
-signedKES time a key = do
-  m <- signKES time a key
+signedKES ctxt time a key = do
+  m <- signKES ctxt time a key
   return $ case m of
     Nothing          -> Nothing
     Just (sig, key') -> Just (SignedKES sig, key')
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)
-  => VerKeyKES v
+  => ContextKES v
+  -> VerKeyKES v
   -> Natural
   -> a
   -> SignedKES v a
   -> Either String ()
-verifySignedKES vk j a (SignedKES sig) = verifyKES vk j a sig
+verifySignedKES ctxt vk j a (SignedKES sig) = verifyKES ctxt vk j a sig
 
 encodeSignedKES :: KESAlgorithm v => SignedKES v a -> Encoding
 encodeSignedKES (SignedKES s) = encodeSigKES s

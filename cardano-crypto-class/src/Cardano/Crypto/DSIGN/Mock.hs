@@ -61,9 +61,9 @@ instance DSIGNAlgorithm MockDSIGN where
 
     deriveVerKeyDSIGN (SignKeyMockDSIGN n) = VerKeyMockDSIGN n
 
-    signDSIGN a sk = return $ mockSign a sk
+    signDSIGN () a sk = return $ mockSign a sk
 
-    verifyDSIGN (VerKeyMockDSIGN n) a s =
+    verifyDSIGN () (VerKeyMockDSIGN n) a s =
       if s == mockSign a (SignKeyMockDSIGN n)
         then Right ()
         else Left $ show $ MockVerificationFailure {

@@ -48,8 +48,13 @@ class ( Typeable v
       => VRFAlgorithm v where
 
   type Signable v :: Type -> Constraint
-
   type Signable c = Empty
+
+  -- | Context required to run the VRF algorithm
+  --
+  -- Unit by default (no context required)
+  type ContextVRF v :: Type
+  type ContextVRF v = ()
 
   data VerKeyVRF v :: Type
 
@@ -69,13 +74,15 @@ class ( Typeable v
 
   evalVRF
     :: (MonadRandom m, HasCallStack, Signable v a)
-    => a
+    => ContextVRF v
+    -> a
     -> SignKeyVRF v
     -> m (Natural, CertVRF v)
 
   verifyVRF
     :: (HasCallStack, Signable v a)
-    =>  VerKeyVRF v
+    => ContextVRF v
+    -> VerKeyVRF v
     -> a
     -> (Natural, CertVRF v)
     -> Bool
@@ -108,15 +115,17 @@ instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
 
 evalCertified
   :: (VRFAlgorithm v, MonadRandom m, Signable v a)
-  => a
+  => ContextVRF v
+  -> a
   -> SignKeyVRF v
   -> m (CertifiedVRF v a)
-evalCertified a key = uncurry CertifiedVRF <$> evalVRF a key
+evalCertified ctxt a key = uncurry CertifiedVRF <$> evalVRF ctxt a key
 
 verifyCertified
   :: (VRFAlgorithm v, Signable v a)
-  => VerKeyVRF v
+  => ContextVRF v
+  -> VerKeyVRF v
   -> a
   -> CertifiedVRF v a
   -> Bool
-verifyCertified vk a CertifiedVRF {..} = verifyVRF vk a (certifiedNatural, certifiedProof)
+verifyCertified ctxt vk a CertifiedVRF {..} = verifyVRF ctxt vk a (certifiedNatural, certifiedProof)
