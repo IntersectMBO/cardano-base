@@ -15,6 +15,7 @@ module Cardano.Crypto.DSIGN.Mock
   , SigDSIGN (..)
   , verKeyIdFromSigned
   , mockSign
+  , mockSigned
   )
 where
 
@@ -86,6 +87,9 @@ data VerificationFailure
 
 mockSign :: ToCBOR a => a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
 mockSign a (SignKeyMockDSIGN n) = SigMockDSIGN (getHash $ hash @ShortHash a) n
+
+mockSigned :: ToCBOR a => a -> SignKeyDSIGN MockDSIGN -> SignedDSIGN MockDSIGN a
+mockSigned a k = SignedDSIGN (mockSign a k)
 
 instance ToCBOR (SigDSIGN MockDSIGN) where
   toCBOR (SigMockDSIGN b i) = encodeListLen 2 <> toCBOR b <> toCBOR i
