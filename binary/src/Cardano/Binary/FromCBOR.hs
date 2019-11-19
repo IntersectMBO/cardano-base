@@ -14,6 +14,7 @@ module Cardano.Binary.FromCBOR
   , matchSize
   , module D
   , fromCBORMaybe
+  , decodeListWith
   )
 where
 
