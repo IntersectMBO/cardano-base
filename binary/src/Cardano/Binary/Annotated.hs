@@ -108,8 +108,24 @@ instance Decoded (Annotated b ByteString) where
 -------------------------------------------------------------------------
 
 
--- | An AnnotatedDecoder produces a value which needs a reference to the original ByteString to be
--- constructed.
+-- | An AnnotatedDecoder produces a value which needs a reference to the
+-- original ByteString to be constructed. For example, consider
+--
+-- `data Foo = Foo Int ByteString`
+--
+-- where the ByteString is expected to be the serialized form of Foo.
+-- A `Decoder` for Foo would need to duplicate the bytes as it read them
+-- in order to populate the ByteString. With an AnnotatedDecoder we instead
+-- fill the ByteString using the reader.
+--
+-- decodeFooAnnotated = withSlice $ do
+--   int <- lift decodeInt
+--   bytes <- get
+--   pure (Foo int bytes)
+--
+-- This assumes that the ByteString passed into the reader will be the same
+-- as the ByteString passed to the decoder.
+
 type AnnotatedDecoder s a = ReaderT LByteString (Decoder s) a
 
 decodeAnnotated :: forall a. (Typeable a , FromCBORAnnotated a)
