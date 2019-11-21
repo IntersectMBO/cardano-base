@@ -27,7 +27,6 @@ import Crypto.PubKey.Ed448
 import Data.ByteArray (ByteArrayAccess, convert)
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy (toStrict)
-import Data.Function (on)
 import GHC.Generics (Generic)
 
 data Ed448DSIGN
@@ -69,15 +68,6 @@ instance DSIGNAlgorithm Ed448DSIGN where
         if verify vk (toStrict $ serialize a) sig
           then Right ()
           else Left "Verification failed"
-
-instance Ord (VerKeyDSIGN Ed448DSIGN) where
-  compare = compare `on` show
-
-instance Ord (SignKeyDSIGN Ed448DSIGN) where
-  compare = compare `on` show
-
-instance Ord (SigDSIGN Ed448DSIGN) where
-  compare = compare `on` show
 
 instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
   toCBOR = encodeBA

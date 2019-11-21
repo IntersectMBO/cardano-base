@@ -31,7 +31,6 @@ import Crypto.Number.Generate (generateBetween)
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
 import Crypto.Random (MonadRandom (..))
-import Data.Function (on)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
@@ -52,9 +51,6 @@ newtype Point = Point C.Point
 
 instance Show Point where
   show (Point p) = show p
-
-instance Ord Point where
-  compare = compare `on` show
 
 instance ToCBOR Point where
   toCBOR (Point p) = toCBOR $ pointToMaybe p
@@ -97,11 +93,11 @@ instance VRFAlgorithm SimpleVRF where
   type Signable SimpleVRF = ToCBOR
 
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
-    deriving stock   (Show, Eq, Ord, Generic)
+    deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR, NoUnexpectedThunks)
 
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
-    deriving stock   (Show, Eq, Ord, Generic)
+    deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
     deriving NoUnexpectedThunks via UseIsNormalForm C.PrivateNumber
 
@@ -111,7 +107,7 @@ instance VRFAlgorithm SimpleVRF where
         , certC :: Natural
         , certS :: Integer
         }
-    deriving stock    (Show, Eq, Ord, Generic)
+    deriving stock    (Show, Eq, Generic)
     deriving anyclass (NoUnexpectedThunks)
 
   maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy H)) - 1
