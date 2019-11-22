@@ -4,10 +4,11 @@ packages:
   - binary
   - binary/test
   - cardano-crypto-class
+  - slotting
 
 extra-deps:
   - git: https://github.com/input-output-hk/cardano-prelude
-    commit: 3c40edcf5bdba8721d3430d0aaaeea8770ce9bec
+    commit: e0faf2d37272d69838f3f1c86a6c10d5a0430dc1
     subdirs:
       - .
       - test
