@@ -21,7 +21,6 @@ library
                         Cardano.Slotting.SlotBounded
                         Cardano.Slotting.EpochInfo
                         Cardano.Slotting.EpochInfo.API
-                        Cardano.Slotting.EpochInfo.CumulEpochSizes
                         Cardano.Slotting.EpochInfo.Impl
   build-depends:        base
                       , cardano-prelude

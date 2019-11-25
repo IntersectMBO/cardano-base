@@ -7,7 +7,6 @@ module Cardano.Slotting.EpochInfo.Impl
 where
 
 import Cardano.Slotting.EpochInfo.API
-import Cardano.Slotting.EpochInfo.CumulEpochSizes as CES
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
 import Data.List (maximumBy)
 import Data.Ord (comparing)
