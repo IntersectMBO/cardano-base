@@ -39,18 +39,18 @@ let
       '';
 in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
   {
-    flags = { development = false; };
+    flags = {};
     package = {
       specVersion = "1.10";
-      identifier = { name = "cardano-prelude-test"; version = "0.1.0.0"; };
-      license = "MIT";
-      copyright = "2018 IOHK";
-      maintainer = "operations@iohk.io";
-      author = "IOHK";
+      identifier = { name = "cardano-slotting"; version = "0.1.0.0"; };
+      license = "NONE";
+      copyright = "IOHK";
+      maintainer = "formal.methods@iohk.io";
+      author = "IOHK Formal Methods Team";
       homepage = "";
       url = "";
-      synopsis = "Utility types and functions for testing Cardano";
-      description = "Utility types and functions for testing Cardano";
+      synopsis = "Key slotting types for cardano libraries";
+      description = "";
       buildType = "Simple";
       isLocal = true;
       };
@@ -58,33 +58,16 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
       "library" = {
         depends = [
           (hsPkgs."base" or (buildDepError "base"))
-          (hsPkgs."aeson" or (buildDepError "aeson"))
-          (hsPkgs."aeson-pretty" or (buildDepError "aeson-pretty"))
-          (hsPkgs."attoparsec" or (buildDepError "attoparsec"))
-          (hsPkgs."base16-bytestring" or (buildDepError "base16-bytestring"))
-          (hsPkgs."bytestring" or (buildDepError "bytestring"))
-          (hsPkgs."canonical-json" or (buildDepError "canonical-json"))
           (hsPkgs."cardano-prelude" or (buildDepError "cardano-prelude"))
+          (hsPkgs."cardano-binary" or (buildDepError "cardano-binary"))
+          (hsPkgs."cborg" or (buildDepError "cborg"))
           (hsPkgs."containers" or (buildDepError "containers"))
-          (hsPkgs."cryptonite" or (buildDepError "cryptonite"))
-          (hsPkgs."formatting" or (buildDepError "formatting"))
-          (hsPkgs."hedgehog" or (buildDepError "hedgehog"))
-          (hsPkgs."hspec" or (buildDepError "hspec"))
-          (hsPkgs."pretty-show" or (buildDepError "pretty-show"))
-          (hsPkgs."QuickCheck" or (buildDepError "QuickCheck"))
-          (hsPkgs."quickcheck-instances" or (buildDepError "quickcheck-instances"))
-          (hsPkgs."text" or (buildDepError "text"))
-          (hsPkgs."template-haskell" or (buildDepError "template-haskell"))
-          (hsPkgs."time" or (buildDepError "time"))
+          (hsPkgs."mmorph" or (buildDepError "mmorph"))
+          (hsPkgs."mtl" or (buildDepError "mtl"))
+          (hsPkgs."serialise" or (buildDepError "serialise"))
+          (hsPkgs."transformers" or (buildDepError "transformers"))
           ];
         buildable = true;
         };
       };
-    } // {
-    src = (pkgs.lib).mkDefault (pkgs.fetchgit {
-      url = "https://github.com/input-output-hk/cardano-prelude";
-      rev = "e0faf2d37272d69838f3f1c86a6c10d5a0430dc1";
-      sha256 = "0bpz0cx6d88d2vqgszldsrj8q3ffyjliq1qqmzscsxwdhj1ps707";
-      });
-    postUnpack = "sourceRoot+=/test; echo source root reset to \$sourceRoot";
-    }
+    } // rec { src = (pkgs.lib).mkDefault ../.././slotting; }

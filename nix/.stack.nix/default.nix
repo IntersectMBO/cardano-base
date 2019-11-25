@@ -11,6 +11,7 @@
         cardano-binary = ./cardano-binary.nix;
         cardano-binary-test = ./cardano-binary-test.nix;
         cardano-crypto-class = ./cardano-crypto-class.nix;
+        cardano-slotting = ./cardano-slotting.nix;
         cardano-prelude = ./cardano-prelude.nix;
         cardano-prelude-test = ./cardano-prelude-test.nix;
         cardano-crypto = ./cardano-crypto.nix;

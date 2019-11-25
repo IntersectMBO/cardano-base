@@ -1,0 +1,42 @@
+cabal-version:       >=1.10
+
+name:                cardano-slotting
+version:             0.1.0.0
+synopsis:            Key slotting types for cardano libraries
+-- description:
+-- bug-reports:
+-- license:
+license-file:        LICENSE
+author:              IOHK Formal Methods Team
+maintainer:          formal.methods@iohk.io
+copyright:           IOHK
+-- category:
+build-type:          Simple
+
+library
+  default-language:     Haskell2010
+  hs-source-dirs:       src
+  ghc-options:
+    -Wall
+    -Wcompat
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wredundant-constraints
+  if (!flag(development))
+    ghc-options:
+      -Werror
+  exposed-modules:      Cardano.Slotting.Block
+                        Cardano.Slotting.Slot
+                        Cardano.Slotting.SlotBounded
+                        Cardano.Slotting.EpochInfo
+                        Cardano.Slotting.EpochInfo.API
+                        Cardano.Slotting.EpochInfo.Impl
+  build-depends:        base
+                      , cardano-prelude
+                      , cardano-binary
+                      , cborg
+                      , containers
+                      , mmorph
+                      , mtl
+                      , serialise
+                      , transformers
