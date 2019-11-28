@@ -101,7 +101,7 @@ goldenTestCBOR = withFrozenCallStack
   $ goldenTestCBORExplicit (label $ Proxy @a) toCBOR fromCBOR
 
 
--- | Check that the 'encode' and 'fromCBORAnnotated' functions work as
+-- | Check that the 'encode' and 'fromCBORAnnotated functions work as
 -- expected w.r.t. the give reference data, this is, given a value @x::a@, and
 -- a file path @fp@:
 --

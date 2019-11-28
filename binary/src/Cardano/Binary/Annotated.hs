@@ -1,30 +1,33 @@
+{-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveFunctor      #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia        #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE InstanceSigs       #-}
+{-# LANGUAGE PatternSynonyms    #-}
 {-# LANGUAGE Rank2Types         #-}
 {-# LANGUAGE TypeFamilies       #-}
 {-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Cardano.Binary.Annotated
   ( Annotated(..)
-  , ByteSpan(..)
   , Decoded(..)
-  , annotatedDecoder
-  , slice
-  , fromCBORAnnotated
-  , decodeFullAnnotatedBytes
   , reAnnotate
   , AnnotatedDecoder
+    ( unwrapAnn )
+  , pattern AnnotatedDecoder
+  , withAnnotation
+  , withAnnotation'
   , FromCBORAnnotated (..)
   , decodeAnnotated
-  , withSlice
-  , withSlice'
-  , liftByteSpanDecoder
   , decodeAnnotatedDecoder
   , fromCBOREmptyAnnotation
+  , WrappedDecoder(..)
+  , decodeWrapped
   )
 where
 
@@ -42,16 +45,9 @@ import Cardano.Binary.ToCBOR
   (ToCBOR)
 import Cardano.Binary.Serialize (serialize')
 
-
-
--- | Extract a substring of a given ByteString corresponding to the offsets.
-slice :: BSL.ByteString -> ByteSpan -> LByteString
-slice bytes (ByteSpan start end) =
-  BSL.take (end - start) $ BSL.drop start bytes
-
--- | A pair of offsets delimiting the beginning and end of a substring of a ByteString
-data ByteSpan = ByteSpan !ByteOffset !ByteOffset
-
+-------------------------------------------------------------------------
+-- Annotated Wrapper
+-------------------------------------------------------------------------
 data Annotated b a = Annotated { unAnnotated :: !b, annotation :: !a }
   deriving (Eq, Show, Functor, Generic)
   deriving anyclass (NFData, NoUnexpectedThunks)
@@ -69,28 +65,6 @@ instance ToJSON b => ToJSON (Annotated b a) where
 instance FromJSON b => FromJSON (Annotated b ()) where
   parseJSON j = flip Annotated () <$> parseJSON j
 
--- | A decoder for a value paired with an annotation specifying the start and end
--- of the consumed bytes.
-annotatedDecoder :: Decoder s a -> Decoder s (Annotated a ByteSpan)
-annotatedDecoder d = decodeWithByteSpan d
-  <&> \(x, start, end) -> Annotated x (ByteSpan start end)
-
--- | A decoder for a value paired with an annotation specifying the start and end
--- of the consumed bytes.
-fromCBORAnnotated :: FromCBOR a => Decoder s (Annotated a ByteSpan)
-fromCBORAnnotated = annotatedDecoder fromCBOR
-
--- | Decodes a value from a ByteString, requiring that the full ByteString is consumed, and
--- replaces ByteSpan annotations with the corresponding substrings of the input string.
-decodeFullAnnotatedBytes
-  :: Functor f
-  => Text
-  -> (forall s . Decoder s (f ByteSpan))
-  -> LByteString
-  -> Either DecoderError (f ByteString)
-decodeFullAnnotatedBytes lbl decoder bytes =
-  fmap (BSL.toStrict . slice bytes) <$> decodeFullDecoder lbl decoder bytes
-
 -- | Reconstruct an annotation by re-serialising the payload to a ByteString.
 reAnnotate :: ToCBOR a => Annotated a b -> Annotated a ByteString
 reAnnotate (Annotated x _) = Annotated x (serialize' x)
@@ -107,64 +81,92 @@ instance Decoded (Annotated b ByteString) where
 -- Annotated Decoder
 -------------------------------------------------------------------------
 
-
 -- | An AnnotatedDecoder produces a value which needs a reference to the
 -- original ByteString to be constructed. For example, consider
 --
 -- `data Foo = Foo Int ByteString`
 --
 -- where the ByteString is expected to be the serialized form of Foo.
--- A `Decoder` for Foo would need to duplicate the bytes as it read them
--- in order to populate the ByteString. With an AnnotatedDecoder we instead
--- fill the ByteString using the reader.
 --
--- decodeFooAnnotated = withSlice $ do
---   int <- lift decodeInt
---   bytes <- get
---   pure (Foo int bytes)
---
--- This assumes that the ByteString passed into the reader will be the same
--- as the ByteString passed to the decoder.
+-- The pattern `AnnotatedDecoder` takes care that the bytes provided are the
+-- correct ones.
+newtype AnnotatedDecoder s a
+  = UnsafeAnnotatedDecoder (Decoder s (LByteString -> a))
+  deriving (Functor)
 
-type AnnotatedDecoder s a = ReaderT LByteString (Decoder s) a
+{-# COMPLETE AnnotatedDecoder #-}
+pattern AnnotatedDecoder
+  :: forall a s. Decoder s (LByteString -> a)
+  -> AnnotatedDecoder s a
+pattern AnnotatedDecoder { unwrapAnn }
+  <- UnsafeAnnotatedDecoder unwrapAnn
+  where
+    AnnotatedDecoder dec =
+      let
+        sliceOffsets :: ByteOffset -> ByteOffset -> LByteString -> LByteString
+        sliceOffsets start end = BSL.take (end - start) . BSL.drop start
+        decoderWithSlice = do
+          (x, start, end) <- decodeWithByteSpan dec
+          return $ x . sliceOffsets start end
+      in UnsafeAnnotatedDecoder decoderWithSlice
 
 decodeAnnotated :: forall a. (Typeable a , FromCBORAnnotated a)
   => LByteString
   -> Either DecoderError a
-decodeAnnotated = decodeAnnotatedDecoder (show . typeRep $ Proxy @a) fromCBORAnnotated'
+decodeAnnotated = decodeAnnotatedDecoder (show . typeRep $ Proxy @a) fromCBORAnnotated
 
 decodeAnnotatedDecoder :: Text -> (forall s. AnnotatedDecoder s a) -> LByteString -> Either DecoderError a
 decodeAnnotatedDecoder label' decoder bytes =
-  decodeFullDecoder label' (runReaderT decoder bytes) bytes
+  (\x -> x bytes) <$> decodeFullDecoder label' (unwrapAnn decoder) bytes
 
-liftByteSpanDecoder :: Functor f => Decoder s (f ByteSpan) -> AnnotatedDecoder s (f ByteString)
-liftByteSpanDecoder decoder = ReaderT $ \bytes ->
-  decoder <&> \fbs -> BSL.toStrict . slice bytes <$> fbs
+-- | Wrap a plain decoder into an annotated one.
+withAnnotation :: forall s a. Decoder s (LByteString -> a) -> AnnotatedDecoder s a
+withAnnotation = AnnotatedDecoder
 
--- | Inserts the decoded segment
-withSlice :: AnnotatedDecoder s (LByteString -> a) -> AnnotatedDecoder s a
-withSlice decoder = ReaderT $ \bytes -> do
-  (x, start, end) <- decodeWithByteSpan $ runReaderT decoder bytes
-  pure $ x $ sliceOffsets start end bytes
+-- | Strict variant of 'withAnnotation'.
+withAnnotation' :: forall s a. Decoder s (ByteString -> a) -> AnnotatedDecoder s a
+withAnnotation' dec = withAnnotation dec'
   where
-  sliceOffsets :: ByteOffset -> ByteOffset -> LByteString -> LByteString
-  sliceOffsets start end = BSL.take (end - start) . BSL.drop start
-
--- | Equivalent to withSlice for strict ByteStrings
-withSlice' :: AnnotatedDecoder s (ByteString -> a) -> AnnotatedDecoder s a
-withSlice' = withSlice . fmap (. BSL.toStrict)
-
-fromCBOREmptyAnnotation :: FromCBORAnnotated a => Decoder s a
-fromCBOREmptyAnnotation = runReaderT fromCBORAnnotated' mempty
+    dec' = do
+      res <- dec
+      return $ \bytes -> res (BSL.toStrict bytes)
 
 class FromCBORAnnotated a where
-  fromCBORAnnotated' :: AnnotatedDecoder s a
+  fromCBORAnnotated :: forall s. AnnotatedDecoder s a
 
 instance (FromCBOR a) => FromCBORAnnotated (Annotated a ByteString) where
-  fromCBORAnnotated' = withSlice' $ Annotated <$> lift fromCBOR
+  fromCBORAnnotated = withAnnotation' $ Annotated <$> fromCBOR
 
 instance FromCBORAnnotated a => FromCBORAnnotated [a] where
-  fromCBORAnnotated' = ReaderT $ \bytes -> decodeListWith (runReaderT fromCBORAnnotated' bytes)
+  fromCBORAnnotated = withAnnotation $ do
+    xs <- decodeListWith (unwrapAnn fromCBORAnnotated)
+    return $ \bytes -> fmap (\x -> x bytes) xs
 
 instance FromCBORAnnotated a => FromCBORAnnotated (Maybe a) where
-  fromCBORAnnotated' = ReaderT $ \bytes -> fromCBORMaybe (runReaderT fromCBORAnnotated' bytes)
+  fromCBORAnnotated = withAnnotation $ do
+    xs <- fromCBORMaybe (unwrapAnn fromCBORAnnotated)
+    return $ \bytes -> fmap (\x -> x bytes) xs
+
+fromCBOREmptyAnnotation :: FromCBORAnnotated a => Decoder s a
+fromCBOREmptyAnnotation = (\x -> x mempty) <$> unwrapAnn fromCBORAnnotated
+-------------------------------------------------------------------------
+-- Wrapped Decoder
+-------------------------------------------------------------------------
+
+-- | Wrap both annotated and plain decoders
+data WrappedDecoder a =
+    Ann !(forall s. AnnotatedDecoder s a)
+  | Plain !(forall s. Decoder s a)
+  deriving Functor
+
+deriving via OnlyCheckIsWHNF "WrappedDecoder" (WrappedDecoder a)
+  instance NoUnexpectedThunks (WrappedDecoder a)
+
+decodeWrapped
+  :: forall a
+  . (Typeable a)
+  => WrappedDecoder a
+  -> BSL.ByteString
+  -> Either DecoderError a
+decodeWrapped (Ann ad) = decodeAnnotatedDecoder (show . typeRep $ Proxy @a) ad
+decodeWrapped (Plain d) = decodeFullDecoder (show . typeRep $ Proxy @a) d
