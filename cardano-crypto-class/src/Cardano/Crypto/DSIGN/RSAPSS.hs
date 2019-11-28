@@ -19,7 +19,6 @@ import Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
 import Crypto.PubKey.RSA
 import Crypto.PubKey.RSA.PSS
 import Data.ByteString.Lazy (toStrict)
-import Data.Function (on)
 import GHC.Generics (Generic)
 
 data RSAPSSDSIGN
@@ -43,7 +42,7 @@ instance DSIGNAlgorithm RSAPSSDSIGN where
         deriving NoUnexpectedThunks via UseIsNormalForm PrivateKey
 
     newtype SigDSIGN RSAPSSDSIGN = SigRSAPSSDSIGN ByteString
-        deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+        deriving (Show, Eq, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
 
     encodeVerKeyDSIGN = toCBOR
     encodeSignKeyDSIGN = toCBOR
@@ -69,12 +68,6 @@ instance DSIGNAlgorithm RSAPSSDSIGN where
         if verify defaultPSSParamsSHA1 vk (toStrict $ serialize a) sig
           then Right ()
           else Left "Verification failed"
-
-instance Ord (VerKeyDSIGN RSAPSSDSIGN) where
-  compare = compare `on` show
-
-instance Ord (SignKeyDSIGN RSAPSSDSIGN) where
-  compare = compare `on` show
 
 instance ToCBOR (VerKeyDSIGN RSAPSSDSIGN) where
   toCBOR (VerKeyRSAPSSDSIGN vk) = toCBOR $ vkToTuple vk
