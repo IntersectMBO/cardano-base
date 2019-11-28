@@ -20,8 +20,10 @@ module Cardano.Binary.Annotated
   , AnnotatedDecoder
     ( unwrapAnn )
   , pattern AnnotatedDecoder
+  , liftAnn
   , withAnnotation
   , withAnnotation'
+  , withSlice'
   , FromCBORAnnotated (..)
   , decodeAnnotated
   , decodeAnnotatedDecoder
@@ -42,7 +44,7 @@ import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR
   (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan, decodeListWith, fromCBORMaybe)
 import Cardano.Binary.ToCBOR
-  (ToCBOR)
+  (ToCBOR(..), encodePreEncoded)
 import Cardano.Binary.Serialize (serialize')
 
 -------------------------------------------------------------------------
@@ -64,6 +66,9 @@ instance ToJSON b => ToJSON (Annotated b a) where
 
 instance FromJSON b => FromJSON (Annotated b ()) where
   parseJSON j = flip Annotated () <$> parseJSON j
+
+instance Typeable b => ToCBOR (Annotated b ByteString) where
+  toCBOR = encodePreEncoded . annotation
 
 -- | Reconstruct an annotation by re-serialising the payload to a ByteString.
 reAnnotate :: ToCBOR a => Annotated a b -> Annotated a ByteString
@@ -94,6 +99,14 @@ newtype AnnotatedDecoder s a
   = UnsafeAnnotatedDecoder (Decoder s (LByteString -> a))
   deriving (Functor)
 
+liftAnn :: Decoder s a -> AnnotatedDecoder s a
+liftAnn dec = withAnnotation $ const <$> dec
+
+instance Applicative (AnnotatedDecoder s) where
+  pure x = withAnnotation $ const <$> pure x
+  (AnnotatedDecoder a) <*> (AnnotatedDecoder b) =
+    withAnnotation $ (<*>) <$> a <*> b
+
 {-# COMPLETE AnnotatedDecoder #-}
 pattern AnnotatedDecoder
   :: forall a s. Decoder s (LByteString -> a)
@@ -119,17 +132,20 @@ decodeAnnotatedDecoder :: Text -> (forall s. AnnotatedDecoder s a) -> LByteStrin
 decodeAnnotatedDecoder label' decoder bytes =
   (\x -> x bytes) <$> decodeFullDecoder label' (unwrapAnn decoder) bytes
 
+withSlice' :: forall s a. AnnotatedDecoder s (ByteString -> a) -> AnnotatedDecoder s a
+withSlice' (AnnotatedDecoder d) = withAnnotation $ do
+  d1 <- d
+  return $ \bytes -> d1 bytes (BSL.toStrict bytes)
+
 -- | Wrap a plain decoder into an annotated one.
 withAnnotation :: forall s a. Decoder s (LByteString -> a) -> AnnotatedDecoder s a
 withAnnotation = AnnotatedDecoder
 
 -- | Strict variant of 'withAnnotation'.
 withAnnotation' :: forall s a. Decoder s (ByteString -> a) -> AnnotatedDecoder s a
-withAnnotation' dec = withAnnotation dec'
-  where
-    dec' = do
-      res <- dec
-      return $ \bytes -> res (BSL.toStrict bytes)
+withAnnotation' dec = withAnnotation $ do
+  res <- dec
+  return $ \bytes -> res (BSL.toStrict bytes)
 
 class FromCBORAnnotated a where
   fromCBORAnnotated :: forall s. AnnotatedDecoder s a
@@ -149,6 +165,7 @@ instance FromCBORAnnotated a => FromCBORAnnotated (Maybe a) where
 
 fromCBOREmptyAnnotation :: FromCBORAnnotated a => Decoder s a
 fromCBOREmptyAnnotation = (\x -> x mempty) <$> unwrapAnn fromCBORAnnotated
+
 -------------------------------------------------------------------------
 -- Wrapped Decoder
 -------------------------------------------------------------------------
