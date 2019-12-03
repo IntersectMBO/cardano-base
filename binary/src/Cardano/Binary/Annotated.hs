@@ -19,10 +19,10 @@ module Cardano.Binary.Annotated
   , reAnnotate
   , AnnotatedDecoder
     ( unwrapAnn )
-  , pattern AnnotatedDecoder
   , liftAnn
-  , withAnnotation
-  , withAnnotation'
+  , withAnnotationSlice
+  , withAnnotationSlice'
+  , withSlice
   , withSlice'
   , FromCBORAnnotated (..)
   , decodeAnnotated
@@ -96,32 +96,13 @@ instance Decoded (Annotated b ByteString) where
 -- The pattern `AnnotatedDecoder` takes care that the bytes provided are the
 -- correct ones.
 newtype AnnotatedDecoder s a
-  = UnsafeAnnotatedDecoder (Decoder s (LByteString -> a))
+  = AnnotatedDecoder { unwrapAnn :: (Decoder s (LByteString -> a)) }
   deriving (Functor)
 
-liftAnn :: Decoder s a -> AnnotatedDecoder s a
-liftAnn dec = withAnnotation $ const <$> dec
-
 instance Applicative (AnnotatedDecoder s) where
-  pure x = withAnnotation $ const <$> pure x
+  pure x = AnnotatedDecoder $ const <$> pure x
   (AnnotatedDecoder a) <*> (AnnotatedDecoder b) =
-    withAnnotation $ (<*>) <$> a <*> b
-
-{-# COMPLETE AnnotatedDecoder #-}
-pattern AnnotatedDecoder
-  :: forall a s. Decoder s (LByteString -> a)
-  -> AnnotatedDecoder s a
-pattern AnnotatedDecoder { unwrapAnn }
-  <- UnsafeAnnotatedDecoder unwrapAnn
-  where
-    AnnotatedDecoder dec =
-      let
-        sliceOffsets :: ByteOffset -> ByteOffset -> LByteString -> LByteString
-        sliceOffsets start end = BSL.take (end - start) . BSL.drop start
-        decoderWithSlice = do
-          (x, start, end) <- decodeWithByteSpan dec
-          return $ x . sliceOffsets start end
-      in UnsafeAnnotatedDecoder decoderWithSlice
+    AnnotatedDecoder $ (<*>) <$> a <*> b
 
 decodeAnnotated :: forall a. (Typeable a , FromCBORAnnotated a)
   => LByteString
@@ -132,34 +113,42 @@ decodeAnnotatedDecoder :: Text -> (forall s. AnnotatedDecoder s a) -> LByteStrin
 decodeAnnotatedDecoder label' decoder bytes =
   (\x -> x bytes) <$> decodeFullDecoder label' (unwrapAnn decoder) bytes
 
+withSlice :: AnnotatedDecoder s (LByteString -> a) -> AnnotatedDecoder s a
+withSlice (AnnotatedDecoder dec) = AnnotatedDecoder $ do
+  (k, start, end) <- decodeWithByteSpan dec
+  return $ \bytes -> k bytes (sliceOffsets start end bytes)
+  where
+  sliceOffsets :: ByteOffset -> ByteOffset -> LByteString -> LByteString
+  sliceOffsets start end = (BSL.take (end - start) . BSL.drop start)
+
 withSlice' :: forall s a. AnnotatedDecoder s (ByteString -> a) -> AnnotatedDecoder s a
-withSlice' (AnnotatedDecoder d) = withAnnotation $ do
-  d1 <- d
-  return $ \bytes -> d1 bytes (BSL.toStrict bytes)
+withSlice' = withSlice . fmap (. BSL.toStrict)
 
 -- | Wrap a plain decoder into an annotated one.
-withAnnotation :: forall s a. Decoder s (LByteString -> a) -> AnnotatedDecoder s a
-withAnnotation = AnnotatedDecoder
+liftAnn :: Decoder s a -> AnnotatedDecoder s a
+liftAnn dec = AnnotatedDecoder $ const <$> dec
 
--- | Strict variant of 'withAnnotation'.
-withAnnotation' :: forall s a. Decoder s (ByteString -> a) -> AnnotatedDecoder s a
-withAnnotation' dec = withAnnotation $ do
-  res <- dec
-  return $ \bytes -> res (BSL.toStrict bytes)
+-- | Wrap a plain decoder into an annotated one that populates the ByteString with a slice.
+withAnnotationSlice :: forall s a. Decoder s (LByteString -> a) -> AnnotatedDecoder s a
+withAnnotationSlice = withSlice . liftAnn
+
+-- | Strict version of withAnnotationSlice
+withAnnotationSlice' :: forall s a. Decoder s (ByteString -> a) -> AnnotatedDecoder s a
+withAnnotationSlice' = withSlice' . liftAnn
 
 class FromCBORAnnotated a where
   fromCBORAnnotated :: forall s. AnnotatedDecoder s a
 
 instance (FromCBOR a) => FromCBORAnnotated (Annotated a ByteString) where
-  fromCBORAnnotated = withAnnotation' $ Annotated <$> fromCBOR
+  fromCBORAnnotated = withAnnotationSlice' $ Annotated <$> fromCBOR
 
 instance FromCBORAnnotated a => FromCBORAnnotated [a] where
-  fromCBORAnnotated = withAnnotation $ do
+  fromCBORAnnotated = AnnotatedDecoder $ do
     xs <- decodeListWith (unwrapAnn fromCBORAnnotated)
     return $ \bytes -> fmap (\x -> x bytes) xs
 
 instance FromCBORAnnotated a => FromCBORAnnotated (Maybe a) where
-  fromCBORAnnotated = withAnnotation $ do
+  fromCBORAnnotated = AnnotatedDecoder $ do
     xs <- fromCBORMaybe (unwrapAnn fromCBORAnnotated)
     return $ \bytes -> fmap (\x -> x bytes) xs
 
