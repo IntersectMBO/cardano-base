@@ -42,10 +42,10 @@ data Bounds
 class InBounds (bounds :: Bounds) where
   inBounds :: proxy bounds -> SlotNo -> (SlotNo, SlotNo) -> Bool
 
-instance InBounds II where
+instance InBounds 'II where
   inBounds _ x (lo, hi) = lo <= x && x <= hi
 
-instance InBounds IX where
+instance InBounds 'IX where
   inBounds _ x (lo, hi) = lo <= x && x < hi
 
 {-------------------------------------------------------------------------------
