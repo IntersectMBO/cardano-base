@@ -8,7 +8,6 @@ module Cardano.Slotting.Block
   )
 where
 
-import Cardano.Binary (ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
 import Data.Word (Word64)

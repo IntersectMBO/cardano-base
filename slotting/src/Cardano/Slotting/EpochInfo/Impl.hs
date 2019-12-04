@@ -8,8 +8,6 @@ where
 
 import Cardano.Slotting.EpochInfo.API
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
-import Data.List (maximumBy)
-import Data.Ord (comparing)
 
 fixedSizeEpochInfo :: Monad m => EpochSize -> EpochInfo m
 fixedSizeEpochInfo (EpochSize size) = EpochInfo
