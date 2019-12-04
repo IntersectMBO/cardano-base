@@ -17,8 +17,7 @@ module Cardano.Binary.Annotated
   ( Annotated(..)
   , Decoded(..)
   , reAnnotate
-  , AnnotatedDecoder
-    ( unwrapAnn )
+  , AnnotatedDecoder (..)
   , liftAnn
   , withAnnotationSlice
   , withAnnotationSlice'
