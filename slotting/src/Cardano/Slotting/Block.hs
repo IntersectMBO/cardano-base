@@ -8,6 +8,7 @@ module Cardano.Slotting.Block
   )
 where
 
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
 import Data.Word (Word64)
@@ -22,6 +23,9 @@ newtype BlockNo = BlockNo {unBlockNo :: Word64}
 
 instance ToCBOR BlockNo where
   toCBOR = encode
+
+instance FromCBOR BlockNo where
+  fromCBOR = decode
 
 genesisBlockNo :: BlockNo
 genesisBlockNo = BlockNo 0
