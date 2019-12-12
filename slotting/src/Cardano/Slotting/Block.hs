@@ -20,5 +20,8 @@ newtype BlockNo = BlockNo {unBlockNo :: Word64}
   deriving stock (Show, Eq, Ord, Generic)
   deriving newtype (Enum, Bounded, Num, Serialise, NoUnexpectedThunks)
 
+instance ToCBOR BlockNo where
+  toCBOR = encode
+
 genesisBlockNo :: BlockNo
 genesisBlockNo = BlockNo 0
