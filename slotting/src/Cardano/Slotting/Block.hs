@@ -8,6 +8,7 @@ module Cardano.Slotting.Block
   )
 where
 
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
 import Data.Word (Word64)
@@ -19,6 +20,12 @@ import GHC.Generics (Generic)
 newtype BlockNo = BlockNo {unBlockNo :: Word64}
   deriving stock (Show, Eq, Ord, Generic)
   deriving newtype (Enum, Bounded, Num, Serialise, NoUnexpectedThunks)
+
+instance ToCBOR BlockNo where
+  toCBOR = encode
+
+instance FromCBOR BlockNo where
+  fromCBOR = decode
 
 genesisBlockNo :: BlockNo
 genesisBlockNo = BlockNo 0

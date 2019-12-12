@@ -21,7 +21,7 @@ module Cardano.Slotting.Slot
   )
 where
 
-import Cardano.Binary (ToCBOR (..))
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
 import Data.Word (Word64)
@@ -34,6 +34,9 @@ newtype SlotNo = SlotNo {unSlotNo :: Word64}
 
 instance ToCBOR SlotNo where
   toCBOR = encode
+
+instance FromCBOR SlotNo where
+  fromCBOR = decode
 
 genesisSlotNo :: SlotNo
 genesisSlotNo = SlotNo 0
