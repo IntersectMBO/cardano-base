@@ -46,7 +46,17 @@ genesisSlotNo = SlotNo 0
 -------------------------------------------------------------------------------}
 
 data WithOrigin t = Origin | At !t
-  deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable, NoUnexpectedThunks)
+  deriving
+    ( Eq,
+      Ord,
+      Show,
+      Generic,
+      Functor,
+      Foldable,
+      Traversable,
+      Serialise,
+      NoUnexpectedThunks
+    )
 
 at :: t -> WithOrigin t
 at = At
