@@ -9,6 +9,7 @@ module Cardano.Crypto.Hash.Class
   , Hash
   , getHash
   , hash
+  , hashPair
   , hashWithSerialiser
   , fromHash
   , xor
@@ -84,3 +85,6 @@ fromHash = foldl' f 0 . SB.unpack . getHash
 --   This functionality is required for VRF calculation.
 xor :: Hash h a -> Hash h a -> Hash h a
 xor (Hash x) (Hash y) = Hash $ SB.pack $ SB.zipWith Bits.xor x y
+
+hashPair :: forall h a b c. HashAlgorithm h => Hash h a -> Hash h b -> Hash h c
+hashPair (Hash a) (Hash b) = Hash $ digest (Proxy :: Proxy h) $ a <> b
