@@ -41,6 +41,7 @@ library
                       , cardano-binary
                       , cborg
                       , containers
+                      , hashable
                       , mmorph
                       , mtl
                       , serialise

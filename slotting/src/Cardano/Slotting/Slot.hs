@@ -24,6 +24,7 @@ where
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
+import Data.Hashable (Hashable)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
 
@@ -87,8 +88,8 @@ withOriginFromMaybe (Just t) = At t
 -- | An epoch, i.e. the number of the epoch.
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Num, Serialise, ToCBOR, NoUnexpectedThunks)
+  deriving newtype (Enum, Hashable, Num, Serialise, ToCBOR, NoUnexpectedThunks)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Num, Real, Integral, NoUnexpectedThunks)
+  deriving newtype (Enum, Hashable, Num, Real, Integral, NoUnexpectedThunks)
