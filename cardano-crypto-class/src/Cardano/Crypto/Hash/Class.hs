@@ -6,8 +6,7 @@
 module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
   , ByteString
-  , Hash
-  , getHash
+  , Hash(..)
   , hash
   , hashPair
   , hashWithSerialiser
@@ -46,14 +45,14 @@ class Typeable h => HashAlgorithm h where
 
   digest :: HasCallStack => proxy h -> ByteString -> ByteString
 
-newtype Hash h a = Hash {getHash :: ByteString}
+newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
 
 instance Show (Hash h a) where
   show = SB8.unpack . B16.encode . getHash
 
 instance IsString (Hash h a) where
-  fromString = Hash . fst . B16.decode . SB8.pack
+  fromString = UnsafeHash . fst . B16.decode . SB8.pack
 
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
   toCBOR = toCBOR . getHash
@@ -65,14 +64,15 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
         le :: Int
         le = fromIntegral $ byteCount (Proxy :: Proxy h)
     if la == le
-    then return $ Hash bs
+    then return $ UnsafeHash bs
     else fail $ "expected " ++ show le ++ " byte(s), but got " ++ show la
 
 hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
 hash = hashWithSerialiser toCBOR
 
 hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
-hashWithSerialiser toEnc = Hash . digest (Proxy :: Proxy h) . serializeEncoding' . toEnc
+hashWithSerialiser toEnc
+  = UnsafeHash . digest (Proxy :: Proxy h) . serializeEncoding' . toEnc
 
 fromHash :: Hash h a -> Natural
 fromHash = foldl' f 0 . SB.unpack . getHash
@@ -84,7 +84,7 @@ fromHash = foldl' f 0 . SB.unpack . getHash
 --
 --   This functionality is required for VRF calculation.
 xor :: Hash h a -> Hash h a -> Hash h a
-xor (Hash x) (Hash y) = Hash $ SB.pack $ SB.zipWith Bits.xor x y
+xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x y
 
 hashPair :: forall h a b c. HashAlgorithm h => Hash h a -> Hash h b -> Hash h c
-hashPair (Hash a) (Hash b) = Hash $ digest (Proxy :: Proxy h) $ a <> b
+hashPair (UnsafeHash a) (UnsafeHash b) = UnsafeHash $ digest (Proxy :: Proxy h) $ a <> b
