@@ -87,7 +87,7 @@ withOriginFromMaybe (Just t) = At t
 -- | An epoch, i.e. the number of the epoch.
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Num, Serialise, ToCBOR, NoUnexpectedThunks)
+  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoUnexpectedThunks)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Show, Generic)
