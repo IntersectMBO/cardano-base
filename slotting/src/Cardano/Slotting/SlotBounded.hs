@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -23,10 +24,14 @@ module Cardano.Slotting.SlotBounded
   )
 where
 
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Slotting.Slot (SlotNo)
+import qualified Codec.CBOR.Decoding as CBOR
+import qualified Codec.CBOR.Encoding as CBOR
 import Codec.Serialise (Serialise)
 import Data.Proxy
+import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 
 {-------------------------------------------------------------------------------
@@ -60,6 +65,23 @@ data SlotBounded (bounds :: Bounds) a
         sbContent :: !a
       }
   deriving (Eq, Functor, Show, Generic, Serialise, NoUnexpectedThunks)
+
+instance (FromCBOR a, Typeable b) => FromCBOR (SlotBounded b a) where
+  fromCBOR = do
+    CBOR.decodeListLenOf 3
+    SlotBounded
+      <$> fromCBOR
+      <*> fromCBOR
+      <*> fromCBOR
+
+instance (ToCBOR a, Typeable b) => ToCBOR (SlotBounded b a) where
+  toCBOR SlotBounded {sbLower, sbUpper, sbContent} =
+    mconcat
+      [ CBOR.encodeListLen 3,
+        toCBOR sbLower,
+        toCBOR sbUpper,
+        toCBOR sbContent
+      ]
 
 bounds :: SlotBounded bounds a -> (SlotNo, SlotNo)
 bounds (SlotBounded lo hi _) = (lo, hi)
