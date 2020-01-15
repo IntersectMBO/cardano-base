@@ -24,6 +24,7 @@ where
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
+import Data.Typeable (Typeable)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
 
@@ -57,6 +58,12 @@ data WithOrigin t = Origin | At !t
       Serialise,
       NoUnexpectedThunks
     )
+
+instance (Serialise t, Typeable t) => ToCBOR (WithOrigin t) where
+  toCBOR = encode
+
+instance (Serialise t, Typeable t) => FromCBOR (WithOrigin t) where
+  fromCBOR = decode
 
 at :: t -> WithOrigin t
 at = At
