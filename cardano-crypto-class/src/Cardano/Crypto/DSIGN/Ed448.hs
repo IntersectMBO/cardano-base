@@ -10,6 +10,8 @@
 module Cardano.Crypto.DSIGN.Ed448
   ( Ed448DSIGN
   , SigDSIGN (..)
+  , SignKeyDSIGN (..)
+  , VerKeyDSIGN (..)
   )
 where
 
