@@ -40,3 +40,6 @@ instance DSIGNAlgorithm NeverDSIGN where
 
   signDSIGN   = error "DSIGN not available"
   verifyDSIGN = error "DSIGN not available"
+
+  abstractSizeVKey _ = error "abstract size not available"
+  abstractSizeSig  _ = error "abstract size not available"

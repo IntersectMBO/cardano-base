@@ -69,6 +69,11 @@ instance DSIGNAlgorithm RSAPSSDSIGN where
           then Right ()
           else Left "Verification failed"
 
+    -- | The problem is that the integers are not bounded here, they could be
+    -- any bitsize.
+    abstractSizeVKey _ = error "RSA can use unbounded Integer"
+    abstractSizeSig  _ = error "RSA can use unbounded Integer"
+
 instance ToCBOR (VerKeyDSIGN RSAPSSDSIGN) where
   toCBOR (VerKeyRSAPSSDSIGN vk) = toCBOR $ vkToTuple vk
 

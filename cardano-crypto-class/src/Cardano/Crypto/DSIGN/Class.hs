@@ -25,6 +25,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
+import Numeric.Natural
 
 class ( Typeable v
       , Show (VerKeyDSIGN v)
@@ -46,6 +47,12 @@ class ( Typeable v
 
   type Signable v :: Type -> Constraint
   type Signable v = Empty
+
+
+  -- | Abstract sizes for verification keys and signatures, specifies an upper
+  -- bound on the real byte sizes.
+  abstractSizeVKey :: proxy v -> Natural
+  abstractSizeSig  :: proxy v -> Natural
 
   -- | Context required to run the DSIGN algorithm
   --

@@ -69,6 +69,10 @@ instance DSIGNAlgorithm Ed448DSIGN where
           then Right ()
           else Left "Verification failed"
 
+    -- | Goldilocks points are 448 bits long, so 64 byte is a good abstract size
+    abstractSizeVKey _ = 64
+    abstractSizeSig  _ = 64
+
 instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
   toCBOR = encodeBA
 
