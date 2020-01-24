@@ -28,7 +28,7 @@ import Cardano.Binary
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Util (nonNegIntR)
-import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Prelude (NoUnexpectedThunks, Proxy(..))
 import GHC.Generics (Generic)
 import GHC.Stack
 
@@ -72,6 +72,14 @@ instance DSIGNAlgorithm MockDSIGN where
                , vErrSignature = s
                , vErrCallStack = prettyCallStack callStack
                }
+
+    abstractSizeVKey _ = 8 -- for 64 bit Int
+    abstractSizeSig  _ = 1
+                       + (byteCount (Proxy :: Proxy ShortHash))
+                       + 8 -- length tag + length
+                                                        -- short hash + 64 bit
+                                                        -- Int
+
 
 -- | Debugging: provide information about the verification failure
 --
