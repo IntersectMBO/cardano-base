@@ -70,13 +70,19 @@ class ( Typeable v
 
   deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
+  updateKES
+    :: (MonadRandom m, HasCallStack)
+    => ContextKES v
+    -> SignKeyKES v
+    -> m (Maybe (SignKeyKES v))
+
   signKES
     :: (MonadRandom m, Signable v a, HasCallStack)
     => ContextKES v
     -> Natural
     -> a
     -> SignKeyKES v
-    -> m (Maybe (SigKES v, SignKeyKES v))
+    -> m (Maybe (SigKES v))
 
   verifyKES
     :: (Signable v a, HasCallStack)
@@ -86,6 +92,12 @@ class ( Typeable v
     -> a
     -> SigKES v
     -> Either String ()
+
+  iterationCountKES
+    :: HasCallStack
+    => ContextKES v
+    -> SignKeyKES v
+    -> Natural
 
 newtype SignedKES v a = SignedKES {getSig :: SigKES v}
   deriving Generic
@@ -102,12 +114,12 @@ signedKES
   -> Natural
   -> a
   -> SignKeyKES v
-  -> m (Maybe (SignedKES v a, SignKeyKES v))
+  -> m (Maybe (SignedKES v a))
 signedKES ctxt time a key = do
   m <- signKES ctxt time a key
   return $ case m of
     Nothing          -> Nothing
-    Just (sig, key') -> Just (SignedKES sig, key')
+    Just sig -> Just (SignedKES sig)
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)

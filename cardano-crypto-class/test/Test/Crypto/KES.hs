@@ -218,11 +218,15 @@ trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
           ++ show j
           ++ " with "
           ++ show sk
-      Just (sig, sk'') -> do
-        e <- go sk'' xs
-        return $ case e of
-          Right ys -> Right ((j, a, sig) : ys)
-          Left  _  -> e
+      Just sig -> do
+        sk'' <- updateKES () sk'
+        case sk'' of
+          Nothing -> pure $ Right [(j, a, sig)]
+          Just sk''' -> do
+            e <- go sk''' xs
+            return $ case e of
+              Right ys -> Right ((j, a, sig) : ys)
+              Left  _  -> e
 
 data Duration_Seed_SK v = Duration_Seed_SK Natural Seed (SignKeyKES v) (VerKeyKES v)
     deriving Generic
