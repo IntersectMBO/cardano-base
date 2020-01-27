@@ -57,6 +57,10 @@ instance KESAlgorithm MockKES where
 
     deriveVerKeyKES (SignKeyMockKES vk _ _) = vk
 
+    updateKES () (SignKeyMockKES vk k t)
+     | k + 1 < t = pure $ Just (SignKeyMockKES vk (k + 1) t)
+     | otherwise = pure Nothing
+
     signKES () j a (SignKeyMockKES vk k t)
         | j >= k && j < t = return $ Just
             ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j t)

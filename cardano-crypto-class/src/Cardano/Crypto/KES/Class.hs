@@ -70,6 +70,12 @@ class ( Typeable v
 
   deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
+  updateKES
+    :: (MonadRandom m, HasCallStack)
+    => ContextKES v
+    -> SignKeyKES v
+    -> m (Maybe (SignKeyKES v))
+
   signKES
     :: (MonadRandom m, Signable v a, HasCallStack)
     => ContextKES v
