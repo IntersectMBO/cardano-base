@@ -60,7 +60,6 @@ instance KESAlgorithm MockKES where
     signKES () j a (SignKeyMockKES vk k t)
         | j >= k && j < t = return $ Just
             ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j t)
-            , SignKeyMockKES vk (j + 1) t
             )
         | otherwise       = return Nothing
 

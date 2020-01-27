@@ -76,7 +76,7 @@ class ( Typeable v
     -> Natural
     -> a
     -> SignKeyKES v
-    -> m (Maybe (SigKES v, SignKeyKES v))
+    -> m (Maybe (SigKES v))
 
   verifyKES
     :: (Signable v a, HasCallStack)
@@ -102,12 +102,12 @@ signedKES
   -> Natural
   -> a
   -> SignKeyKES v
-  -> m (Maybe (SignedKES v a, SignKeyKES v))
+  -> m (Maybe (SignedKES v a))
 signedKES ctxt time a key = do
   m <- signKES ctxt time a key
   return $ case m of
     Nothing          -> Nothing
-    Just (sig, key') -> Just (SignedKES sig, key')
+    Just sig -> Just (SignedKES sig)
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)
