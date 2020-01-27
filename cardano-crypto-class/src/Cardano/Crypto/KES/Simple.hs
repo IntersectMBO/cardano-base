@@ -87,6 +87,9 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
           [] -> pure Nothing
           _  -> pure $ Just (SignKeySimpleKES (vks, sks'))
 
+    iterationCountKES _ (SignKeySimpleKES (_, [])) = error "no KES key available"
+    iterationCountKES _ (SignKeySimpleKES (_, (d, _) : _)) = d
+
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d))
 
 deriving instance DSIGNAlgorithm d => Eq (VerKeyKES (SimpleKES d))

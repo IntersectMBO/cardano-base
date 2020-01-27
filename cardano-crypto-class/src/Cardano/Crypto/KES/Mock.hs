@@ -74,6 +74,8 @@ instance KESAlgorithm MockKES where
           then Right ()
           else Left "KES verification failed"
 
+    iterationCountKES () (SignKeyMockKES _ k _) = k
+
 instance ToCBOR (SigKES MockKES) where
   toCBOR (SigMockKES evolution key) =
     encodeListLen 2 <>

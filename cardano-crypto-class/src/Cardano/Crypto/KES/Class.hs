@@ -93,6 +93,12 @@ class ( Typeable v
     -> SigKES v
     -> Either String ()
 
+  iterationCountKES
+    :: HasCallStack
+    => ContextKES v
+    -> SignKeyKES v
+    -> Natural
+
 newtype SignedKES v a = SignedKES {getSig :: SigKES v}
   deriving Generic
 
