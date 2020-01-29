@@ -62,9 +62,8 @@ instance KESAlgorithm MockKES where
      | otherwise = pure Nothing
 
     signKES () j a (SignKeyMockKES vk k t)
-        | j >= k && j < t = return $ Just
-            ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j t)
-            )
+        | j == k && j < t = return $ Just
+            ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j t))
         | otherwise       = return Nothing
 
     verifyKES () vk j a (SigMockKES h (SignKeyMockKES vk' j' _)) =
