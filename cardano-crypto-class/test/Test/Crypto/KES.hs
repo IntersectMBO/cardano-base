@@ -206,11 +206,21 @@ trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
     -> [(Natural, a)]
     -> m (Either String [(Natural, a, SigKES v)])
   go _   [] = return $ Right []
-  go sk' ((j, a) : xs) = do
-    m <- signKES () j a sk'
-    case m of
-      Nothing ->
-        return
+  go sk' l@((j, a) : xs) = do
+    if iterationCountKES () sk' < j
+      then do
+      sk'' <- updateKES () sk'
+      case sk'' of
+        Nothing -> return $
+          Left ("trySign: error evolution of " ++
+          show sk ++
+          " to KES period " ++ show j)
+        Just sk''' -> go sk''' l
+      else do
+      m <- signKES () j a sk'
+      case m of
+        Nothing ->
+          return
           $  Left
           $  "trySign: error signing "
           ++ show a
@@ -218,15 +228,15 @@ trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
           ++ show j
           ++ " with "
           ++ show sk
-      Just sig -> do
-        sk'' <- updateKES () sk'
-        case sk'' of
-          Nothing -> pure $ Right [(j, a, sig)]
-          Just sk''' -> do
-            e <- go sk''' xs
-            return $ case e of
-              Right ys -> Right ((j, a, sig) : ys)
-              Left  _  -> e
+        Just sig -> do
+          sk'' <- updateKES () sk'
+          case sk'' of
+            Nothing -> pure $ Right [(j, a, sig)]
+            Just sk''' -> do
+              e <- go sk''' xs
+              return $ case e of
+                Right ys -> Right ((j, a, sig) : ys)
+                Left  _  -> e
 
 data Duration_Seed_SK v = Duration_Seed_SK Natural Seed (SignKeyKES v) (VerKeyKES v)
     deriving Generic
