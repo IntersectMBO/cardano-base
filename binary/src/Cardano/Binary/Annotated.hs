@@ -12,6 +12,7 @@ module Cardano.Binary.Annotated
   ( Annotated(..)
   , ByteSpan(..)
   , Decoded(..)
+  , annotationBytes
   , annotatedDecoder
   , slice
   , fromCBORAnnotated
@@ -80,6 +81,9 @@ annotatedDecoder d = decodeWithByteSpan d
 fromCBORAnnotated :: FromCBOR a => Decoder s (Annotated a ByteSpan)
 fromCBORAnnotated = annotatedDecoder fromCBOR
 
+annotationBytes :: Functor f => LByteString -> f ByteSpan -> f ByteString
+annotationBytes bytes = fmap (BSL.toStrict . slice bytes)
+
 -- | Decodes a value from a ByteString, requiring that the full ByteString is consumed, and
 -- replaces ByteSpan annotations with the corresponding substrings of the input string.
 decodeFullAnnotatedBytes
@@ -89,7 +93,7 @@ decodeFullAnnotatedBytes
   -> LByteString
   -> Either DecoderError (f ByteString)
 decodeFullAnnotatedBytes lbl decoder bytes =
-  fmap (BSL.toStrict . slice bytes) <$> decodeFullDecoder lbl decoder bytes
+  annotationBytes bytes <$> decodeFullDecoder lbl decoder bytes
 
 -- | Reconstruct an annotation by re-serialising the payload to a ByteString.
 reAnnotate :: ToCBOR a => Annotated a b -> Annotated a ByteString
