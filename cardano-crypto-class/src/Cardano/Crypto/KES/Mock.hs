@@ -61,6 +61,8 @@ instance KESAlgorithm MockKES where
      | k + 1 < t = pure $ Just (SignKeyMockKES vk (k + 1) t)
      | otherwise = pure Nothing
 
+    -- | Produce valid signature only with correct key, i.e., same iteration and
+    -- allowed KES period.
     signKES () j a (SignKeyMockKES vk k t)
         | j == k && j < t = return $ Just
             ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j t))
