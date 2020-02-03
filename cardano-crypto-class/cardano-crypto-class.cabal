@@ -2,8 +2,10 @@ name:                cardano-crypto-class
 version:             2.0.0
 synopsis:            Type classes abstracting over cryptography primitives for Cardano
 description:         Type classes abstracting over cryptography primitives for Cardano
-license:             MIT
-license-file:        LICENSE
+license:             Apache-2.0
+license-files:        
+  LICENSE
+  NOTICE
 author:              IOHK
 maintainer:          operations@iohk.io
 copyright:           2019 IOHK

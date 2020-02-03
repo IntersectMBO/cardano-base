@@ -5,8 +5,10 @@ version:             0.1.0.0
 synopsis:            Key slotting types for cardano libraries
 -- description:
 -- bug-reports:
--- license:
-license-file:        LICENSE
+license:             Apache-2.0
+license-files:        
+  LICENSE
+  NOTICE
 author:              IOHK Formal Methods Team
 maintainer:          formal.methods@iohk.io
 copyright:           IOHK
