@@ -2,8 +2,10 @@ name:                cardano-binary
 version:             1.5.0
 synopsis:            Binary serialization for Cardano
 description:         This package includes the binary serialization format for Cardano
-license:             MIT
-license-file:        LICENSE
+license:             Apache-2.0
+license-files:        
+  LICENSE
+  NOTICE
 author:              IOHK
 maintainer:          operations@iohk.io
 copyright:           2019 IOHK

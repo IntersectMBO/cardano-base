@@ -43,7 +43,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
     package = {
       specVersion = "1.10";
       identifier = { name = "cardano-slotting"; version = "0.1.0.0"; };
-      license = "NONE";
+      license = "Apache-2.0";
       copyright = "IOHK";
       maintainer = "formal.methods@iohk.io";
       author = "IOHK Formal Methods Team";
