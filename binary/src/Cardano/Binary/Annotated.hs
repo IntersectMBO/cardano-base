@@ -52,6 +52,10 @@ slice bytes (ByteSpan start end) =
 
 -- | A pair of offsets delimiting the beginning and end of a substring of a ByteString
 data ByteSpan = ByteSpan !ByteOffset !ByteOffset
+  deriving (Generic, Show)
+
+-- Used for debugging purposes only.
+instance ToJSON ByteSpan where
 
 data Annotated b a = Annotated { unAnnotated :: !b, annotation :: !a }
   deriving (Eq, Show, Functor, Generic)
