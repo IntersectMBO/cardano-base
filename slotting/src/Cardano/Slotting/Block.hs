@@ -3,8 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Cardano.Slotting.Block
-  ( BlockNo (..),
-    genesisBlockNo,
+  ( BlockNo (..)
   )
 where
 
@@ -26,6 +25,3 @@ instance ToCBOR BlockNo where
 
 instance FromCBOR BlockNo where
   fromCBOR = decode
-
-genesisBlockNo :: BlockNo
-genesisBlockNo = BlockNo 0
