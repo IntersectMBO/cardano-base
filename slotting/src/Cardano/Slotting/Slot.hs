@@ -8,7 +8,6 @@
 
 module Cardano.Slotting.Slot
   ( SlotNo (..),
-    genesisSlotNo,
     WithOrigin (..),
     at,
     origin,
@@ -38,9 +37,6 @@ instance ToCBOR SlotNo where
 
 instance FromCBOR SlotNo where
   fromCBOR = decode
-
-genesisSlotNo :: SlotNo
-genesisSlotNo = SlotNo 0
 
 {-------------------------------------------------------------------------------
   WithOrigin

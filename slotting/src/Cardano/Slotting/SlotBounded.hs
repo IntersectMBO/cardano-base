@@ -26,7 +26,7 @@ where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
-import Cardano.Slotting.Slot (SlotNo)
+import Cardano.Slotting.Slot (SlotNo, WithOrigin(..))
 import qualified Codec.CBOR.Decoding as CBOR
 import qualified Codec.CBOR.Encoding as CBOR
 import Codec.Serialise (Serialise)
@@ -45,13 +45,15 @@ data Bounds
     IX
 
 class InBounds (bounds :: Bounds) where
-  inBounds :: proxy bounds -> SlotNo -> (SlotNo, SlotNo) -> Bool
+  inBounds :: proxy bounds
+           -> WithOrigin SlotNo
+           -> (WithOrigin SlotNo, SlotNo) -> Bool
 
 instance InBounds 'II where
-  inBounds _ x (lo, hi) = lo <= x && x <= hi
+  inBounds _ x (lo, hi) = lo <= x && x <= At hi
 
 instance InBounds 'IX where
-  inBounds _ x (lo, hi) = lo <= x && x < hi
+  inBounds _ x (lo, hi) = lo <= x && x < At hi
 
 {-------------------------------------------------------------------------------
   Slot-bounded values
@@ -60,8 +62,8 @@ instance InBounds 'IX where
 -- | An item bounded to be valid within particular slots
 data SlotBounded (bounds :: Bounds) a
   = SlotBounded
-      { sbLower :: !SlotNo,
-        sbUpper :: !SlotNo,
+      { sbLower   :: !(WithOrigin SlotNo),
+        sbUpper   :: !SlotNo,
         sbContent :: !a
       }
   deriving (Eq, Functor, Show, Generic, Serialise, NoUnexpectedThunks)
@@ -83,27 +85,27 @@ instance (ToCBOR a, Typeable b) => ToCBOR (SlotBounded b a) where
         toCBOR sbContent
       ]
 
-bounds :: SlotBounded bounds a -> (SlotNo, SlotNo)
+bounds :: SlotBounded bounds a -> (WithOrigin SlotNo, SlotNo)
 bounds (SlotBounded lo hi _) = (lo, hi)
 
 contains ::
   forall bounds a.
   InBounds bounds =>
   SlotBounded bounds a ->
-  SlotNo ->
+  WithOrigin SlotNo ->
   Bool
 sb `contains` slot = inBounds (Proxy @bounds) slot (bounds sb)
 
 -- | Construct a slot bounded item.
 --
 -- We choose not to validate that the slot bounds are reasonable here.
-bounded :: SlotNo -> SlotNo -> a -> SlotBounded bounds a
+bounded :: WithOrigin SlotNo -> SlotNo -> a -> SlotBounded bounds a
 bounded = SlotBounded
 
 maximal :: a -> SlotBounded bounds a
-maximal = SlotBounded minBound maxBound
+maximal = SlotBounded Origin maxBound
 
-at :: InBounds bounds => SlotBounded bounds a -> SlotNo -> Maybe a
+at :: InBounds bounds => SlotBounded bounds a -> WithOrigin SlotNo -> Maybe a
 sb `at` slot =
   if sb `contains` slot
     then Just $ sbContent sb
