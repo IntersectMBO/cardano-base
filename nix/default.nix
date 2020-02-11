@@ -1,39 +1,46 @@
-{ pkgs ? import <nixpkgs> {}
-, iohk-extras ? {}
-, iohk-module ? {}
-, haskell
-, ...
+{ system ? builtins.currentSystem
+, crossSystem ? null
+, config ? {}
+, sourcesOverride ? {}
 }:
 let
-  # our packages
-  stack-pkgs = import ./.stack.nix;
+  sources = import ./sources.nix { inherit pkgs; }
+    // sourcesOverride;
+  iohKNix = import sources.iohk-nix {};
+  haskellNix = import sources."haskell.nix";
+  # use our own nixpkgs if it exists in our sources,
+  # otherwise use iohkNix default nixpkgs.
+  nixpkgs = if (sources ? nixpkgs)
+    then (builtins.trace "Not using IOHK default nixpkgs (use 'niv drop nixpkgs' to use default for better sharing)"
+      sources.nixpkgs)
+    else (builtins.trace "Using IOHK default nixpkgs"
+      iohKNix.nixpkgs);
 
-  # Build the packageset with module support.
-  # We can essentially override anything in the modules
-  # section.
-  #
-  #  packages.cbors.patches = [ ./one.patch ];
-  #  packages.cbors.flags.optimize-gmp = false;
-  #
-  compiler = (stack-pkgs.extras {}).compiler.nix-name;
-  pkgSet = haskell.mkStackPkgSet {
-    inherit stack-pkgs;
-    # The overlay allows extension or restriction of the set of
-    # packages we are interested in. By using the stack-pkgs.overlay
-    # we restrict our package set to the ones provided in stack.yaml.
-    pkg-def-extras = [
-      stack-pkgs.extras
-      iohk-extras.${compiler}
+  # for inclusion in pkgs:
+  overlays =
+    # Haskell.nix (https://github.com/input-output-hk/haskell.nix)
+    haskellNix.overlays
+    # haskell-nix.haskellLib.extra: some useful extra utility functions for haskell.nix
+    ++ iohKNix.overlays.haskell-nix-extra
+    # iohkNix: nix utilities and niv:
+    ++ iohKNix.overlays.iohkNix
+    # our own overlays:
+    ++ [
+      (pkgs: _: with pkgs; {
+
+        # commonLib: mix pkgs.lib with iohk-nix utils and our own:
+        commonLib = lib // iohkNix
+          // import ./util.nix { inherit haskell-nix; }
+          # also expose our sources and overlays
+          // { inherit overlays sources; };
+      })
+      # And, of course, our haskell-nix-ified cabal project:
+      (import ./pkgs.nix)
     ];
-    # package customizations
-    modules = [
-      # the iohk-module will supply us with the necessary
-      # cross compilation plumbing to make Template Haskell
-      # work when cross compiling.  For now we need to
-      # list the packages that require template haskell
-      # explicity here.
-      iohk-module
-    ];
+
+  pkgs = import nixpkgs {
+    inherit system crossSystem overlays;
+    config = haskellNix.config // config;
   };
-in
-pkgSet.config.hsPkgs // { _config = pkgSet.config; }
+
+in pkgs
