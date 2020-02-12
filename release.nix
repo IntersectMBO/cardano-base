@@ -1,62 +1,68 @@
+############################################################################
+#
+# Hydra release jobset.
+#
+# The purpose of this file is to select jobs defined in default.nix and map
+# them to all supported build platforms.
+#
+############################################################################
+
+# The project sources
+{ cardano-base ? { outPath = ./.; rev = "abcdef"; }
+
+# Function arguments to pass to the project
+, projectArgs ? {
+    config = { allowUnfree = false; inHydra = true; };
+    gitrev = cardano-base.rev;
+  }
+
+# The systems that the jobset will be built for.
+, supportedSystems ? [ "x86_64-linux" "x86_64-darwin" ]
+
+# The systems used for cross-compiling
+, supportedCrossSystems ? [ "x86_64-linux" ]
+
+# A Hydra option
+, scrubJobs ? true
+
+# Dependencies overrides
+, sourcesOverride ? {}
+
+# Import pkgs, including IOHK common nix lib
+, pkgs ? import ./nix { inherit sourcesOverride; }
+
+}:
+
+with (import pkgs.iohkNix.release-lib) {
+  inherit pkgs;
+  inherit supportedSystems supportedCrossSystems scrubJobs projectArgs;
+  packageSet = import cardano-base;
+  gitrev = cardano-base.rev;
+};
+
+with pkgs.lib;
+
 let
-  localLib = import ./lib.nix;
-  # Path of nix-tools jobs that we want to evict from release.nix:
-  disabled = [
-    # FIXME: those tests freeze on darwin hydra agents:
-    ["nix-tools" "tests" "cardano-binary" "test" "x86_64-darwin"]
-  ];
-in
-{ cardano-binary ? { outPath = ./.; rev = "abcdef"; } ,... }@args:
-localLib.pkgs.lib.mapAttrsRecursiveCond
-(as: !(as ? "type" && as.type == "derivation"))
-(path: v: if (builtins.elem path disabled) then null else v)
-(localLib.nix-tools.release-nix {
-  _this = cardano-binary;
-  package-set-path = ./.;
+  testsSupportedSystems = [ "x86_64-linux" "x86_64-darwin" ];
+  # Recurse through an attrset, returning all test derivations in a list.
+  collectTests' = ds: filter (d: elem d.system testsSupportedSystems) (collect isDerivation ds);
+  # Adds the package name to the test derivations for windows-testing-bundle.nix
+  # (passthru.identifier.name does not survive mapTestOn)
+  collectTests = ds: concatLists (
+    mapAttrsToList (packageName: package:
+      map (drv: drv // { inherit packageName; }) (collectTests' package)
+    ) ds);
 
-  # packages from our stack.yaml or plan file (via nix/pkgs.nix) we
-  # are intereted in building on CI via nix-tools.
-  packages = [ "cardano-binary" ];
+  inherit (systems.examples) mingwW64 musl64;
 
-  # The set of jobs we consider crutial for each CI run.
-  # if a single one of these fails, the build will be marked
-  # as failed.
-  #
-  # The names can be looked up on hydra when in doubt.
-  #
-  # custom jobs will follow their name as set forth in
-  # other-packages.
-  #
-  # nix-tools packages withh be prefixed with nix-tools and
-  # follow the following naming convention:
-  #
-  #   namespace                      optional cross compilation prefix                  build machine
-  #   .-------.                              .-----------------.                 .--------------------------.
-  #   nix-tools.{libs,exes,tests,benchmarks}.{x86_64-pc-mingw-,}.$pkg.$component.{x86_64-linux,x86_64-darwin}
-  #             '--------------------------'                     '-------------'
-  #                 component type                           cabal pkg and component*
-  #
-  # * note that for libs, $component is empty, as cabal only
-  # provides a single library for packages right now.
-  #
-  # Example:
-  #
-  #   libs.cardano-binary.x86_64-darwin -- will build the cardano-binary library on and for macOS
-  #   libs.cardano-binary.x86_64-linux -- will build the cardano-binary library on and for linux
-  #   libs.x86_64-pc-mingw32-cardano-binary.x86_64-linux -- will build the cardano-binary library on linux for windows.
-  #   tests.cs-ledger.ledger-delegation-test.x86_64-linux -- will build and run the ledger-delegation-test from the
-  #                                                          cs-ledger package on linux.
-  #
-  required-name = "cardano-binary-required-checks";
-  required-targets = jobs: [
+  jobs = {
+    native = mapTestOn (__trace (__toJSON (packagePlatforms project)) (packagePlatforms project));
+    "${mingwW64.config}" = mapTestOnCross mingwW64 (packagePlatformsCross project);
+    # TODO: fix broken evals
+    #musl64 = mapTestOnCross musl64 (packagePlatformsCross project);
+  } // (mkRequiredJob (
+      collectTests jobs.native.checks ++
+      collectTests jobs.native.benchmarks
+      ));
 
-    jobs.nix-tools.libs.cardano-binary.x86_64-darwin
-    jobs.nix-tools.libs.cardano-binary.x86_64-linux
-    jobs.nix-tools.tests.cardano-binary.test.x86_64-linux
-
-    # windows cross compilation targets
-    # jobs.nix-tools.libs.x86_64-pc-mingw32-cardano-binary.x86_64-linux
-    # jobs.nix-tools.tests.x86_64-pc-mingw32-cardano-binary.test.x86_64-linux
-  ];
-
-} (builtins.removeAttrs args ["cardano-binary"]))
+in jobs
