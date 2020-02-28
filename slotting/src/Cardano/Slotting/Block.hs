@@ -22,6 +22,7 @@ newtype BlockNo = BlockNo {unBlockNo :: Word64}
 
 instance ToCBOR BlockNo where
   toCBOR = encode
+  encodedSizeExpr size = encodedSizeExpr size . fmap unBlockNo
 
 instance FromCBOR BlockNo where
   fromCBOR = decode

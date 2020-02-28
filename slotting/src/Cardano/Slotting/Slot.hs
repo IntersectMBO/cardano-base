@@ -34,6 +34,7 @@ newtype SlotNo = SlotNo {unSlotNo :: Word64}
 
 instance ToCBOR SlotNo where
   toCBOR = encode
+  encodedSizeExpr size = encodedSizeExpr size . fmap unSlotNo
 
 instance FromCBOR SlotNo where
   fromCBOR = decode
