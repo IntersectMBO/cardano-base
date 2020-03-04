@@ -41,4 +41,4 @@ instance KESAlgorithm NeverKES where
   signKES   = error "KES not available"
   verifyKES = error "KES not available"
   updateKES = error "KES not available"
-  iterationCountKES = error "KES not available"
+  currentPeriodKES = error "KES not available"

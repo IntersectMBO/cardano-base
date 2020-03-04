@@ -72,8 +72,12 @@ class ( Typeable v
 
   -- | Update the KES signature key to the specified period. The intended
   -- behavior is to return `Nothing` in the case that the key cannot be evolved
-  -- that far. In case the target KES period is in the past, we consider this a
-  -- bug, causing an error.
+  -- that far.
+  --
+  -- The precondition is that the current KES period of the input key is before
+  -- the target period.
+  -- The postcondition is that in case a key is returned, its current KES period
+  -- corresponds to the target KES period.
   updateKES
     :: (MonadRandom m, HasCallStack)
     => ContextKES v
@@ -98,8 +102,8 @@ class ( Typeable v
     -> SigKES v
     -> Either String ()
 
-  -- | Return the number of times a KES signature key has been updated.
-  iterationCountKES
+  -- | Return the current KES period of a KES signing key.
+  currentPeriodKES
     :: HasCallStack
     => ContextKES v
     -> SignKeyKES v
