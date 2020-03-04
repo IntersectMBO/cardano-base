@@ -93,6 +93,7 @@ class ( Typeable v
     -> SigKES v
     -> Either String ()
 
+  -- | Return the number of times a KES signature key has been updated.
   iterationCountKES
     :: HasCallStack
     => ContextKES v
