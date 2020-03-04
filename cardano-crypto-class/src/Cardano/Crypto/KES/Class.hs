@@ -70,10 +70,19 @@ class ( Typeable v
 
   deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
+  -- | Update the KES signature key to the specified period. The intended
+  -- behavior is to return `Nothing` in the case that the key cannot be evolved
+  -- that far.
+  --
+  -- The precondition is that the current KES period of the input key is before
+  -- the target period.
+  -- The postcondition is that in case a key is returned, its current KES period
+  -- corresponds to the target KES period.
   updateKES
     :: (MonadRandom m, HasCallStack)
     => ContextKES v
     -> SignKeyKES v
+    -> Natural
     -> m (Maybe (SignKeyKES v))
 
   signKES
@@ -93,7 +102,8 @@ class ( Typeable v
     -> SigKES v
     -> Either String ()
 
-  iterationCountKES
+  -- | Return the current KES period of a KES signing key.
+  currentPeriodKES
     :: HasCallStack
     => ContextKES v
     -> SignKeyKES v

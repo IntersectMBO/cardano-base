@@ -26,6 +26,7 @@ import Cardano.Binary
   , encodeListLen
   , encodeWord
   )
+
 import Cardano.Crypto.DSIGN
 import qualified Cardano.Crypto.DSIGN as DSIGN
 import Cardano.Crypto.KES.Class
@@ -36,6 +37,7 @@ import Data.Vector ((!?), Vector, fromList)
 import qualified Data.Vector as Vec
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
+import Control.Exception (assert)
 
 data SimpleKES d
 
@@ -80,15 +82,16 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
             Nothing -> Left "KES verification failed: out of range"
             Just vk -> verifyDSIGN ctxt vk a sig
 
-    updateKES _ (SignKeySimpleKES (_, [])) = pure Nothing
-    updateKES _ (SignKeySimpleKES (vks, (d, _):sks)) =
-      let sks' = dropWhile (\(d', _) -> d >= d') sks in
+    updateKES _ (SignKeySimpleKES (_, [])) _ = pure Nothing
+    updateKES ctx s@(SignKeySimpleKES (vks, sks)) to =
+      assert (to >= currentPeriodKES ctx s) $
+      let sks' = dropWhile (\(d', _) -> to /= d') sks in
         case sks' of
           [] -> pure Nothing
           _  -> pure $ Just (SignKeySimpleKES (vks, sks'))
 
-    iterationCountKES _ (SignKeySimpleKES (_, [])) = error "no KES key available"
-    iterationCountKES _ (SignKeySimpleKES (_, (d, _) : _)) = d
+    currentPeriodKES _ (SignKeySimpleKES (_, [])) = error "no KES key available"
+    currentPeriodKES _ (SignKeySimpleKES (_, (d, _) : _)) = d
 
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d))
 

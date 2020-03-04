@@ -22,6 +22,7 @@ import Cardano.Crypto.Util (nonNegIntR)
 import Cardano.Prelude (NoUnexpectedThunks)
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
+import Control.Exception (assert)
 
 data MockKES
 
@@ -57,9 +58,10 @@ instance KESAlgorithm MockKES where
 
     deriveVerKeyKES (SignKeyMockKES vk _ _) = vk
 
-    updateKES () (SignKeyMockKES vk k t)
-     | k + 1 < t = pure $ Just (SignKeyMockKES vk (k + 1) t)
-     | otherwise = pure Nothing
+    updateKES () (SignKeyMockKES vk k t) to =
+      assert (to >= k) $
+         if to < t then (pure $ Just (SignKeyMockKES vk to t))
+         else pure Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
     -- allowed KES period.
@@ -75,7 +77,7 @@ instance KESAlgorithm MockKES where
           then Right ()
           else Left "KES verification failed"
 
-    iterationCountKES () (SignKeyMockKES _ k _) = k
+    currentPeriodKES () (SignKeyMockKES _ k _) = k
 
 instance ToCBOR (SigKES MockKES) where
   toCBOR (SigMockKES evolution key) =

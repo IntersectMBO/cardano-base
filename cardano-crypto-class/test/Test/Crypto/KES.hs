@@ -207,9 +207,9 @@ trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
     -> m (Either String [(Natural, a, SigKES v)])
   go _   [] = return $ Right []
   go sk' l@((j, a) : xs) = do
-    if iterationCountKES () sk' < j
+    if currentPeriodKES () sk' < j
       then do
-      sk'' <- updateKES () sk'
+      sk'' <- updateKES () sk' j
       case sk'' of
         Nothing -> return $
           Left ("trySign: error evolution of " ++
@@ -229,7 +229,7 @@ trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
           ++ " with "
           ++ show sk
         Just sig -> do
-          sk'' <- updateKES () sk'
+          sk'' <- updateKES () sk' (1 + currentPeriodKES () sk')
           case sk'' of
             Nothing -> pure $ Right [(j, a, sig)]
             Just sk''' -> do
