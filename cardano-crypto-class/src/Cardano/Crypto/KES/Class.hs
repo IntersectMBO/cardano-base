@@ -70,10 +70,15 @@ class ( Typeable v
 
   deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
+  -- | Update the KES signature key to the specified period. The intended
+  -- behavior is to return `Nothing` in the case that the key cannot be evolved
+  -- that far. In case the target KES period is in the past, we consider this a
+  -- bug, causing an error.
   updateKES
     :: (MonadRandom m, HasCallStack)
     => ContextKES v
     -> SignKeyKES v
+    -> Natural
     -> m (Maybe (SignKeyKES v))
 
   signKES

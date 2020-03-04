@@ -80,9 +80,9 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
             Nothing -> Left "KES verification failed: out of range"
             Just vk -> verifyDSIGN ctxt vk a sig
 
-    updateKES _ (SignKeySimpleKES (_, [])) = pure Nothing
-    updateKES _ (SignKeySimpleKES (vks, (d, _):sks)) =
-      let sks' = dropWhile (\(d', _) -> d >= d') sks in
+    updateKES _ (SignKeySimpleKES (_, [])) _ = pure Nothing
+    updateKES _ (SignKeySimpleKES (vks, sks)) to =
+      let sks' = dropWhile (\(d', _) -> to /= d') sks in
         case sks' of
           [] -> pure Nothing
           _  -> pure $ Just (SignKeySimpleKES (vks, sks'))

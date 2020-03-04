@@ -57,8 +57,9 @@ instance KESAlgorithm MockKES where
 
     deriveVerKeyKES (SignKeyMockKES vk _ _) = vk
 
-    updateKES () (SignKeyMockKES vk k t)
-     | k + 1 < t = pure $ Just (SignKeyMockKES vk (k + 1) t)
+    updateKES () (SignKeyMockKES vk k t) to
+     | to < k    = error "cannot update to earlier period"
+     | to < t = pure $ Just (SignKeyMockKES vk to t)
      | otherwise = pure Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
