@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -46,7 +47,7 @@ instance DSIGNAlgorithm MockDSIGN where
         deriving stock   (Show, Eq, Ord, Generic)
         deriving newtype (Num, ToCBOR, FromCBOR, NoUnexpectedThunks)
 
-    data SigDSIGN MockDSIGN = SigMockDSIGN ByteString Int
+    data SigDSIGN MockDSIGN = SigMockDSIGN !ByteString !Int
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
