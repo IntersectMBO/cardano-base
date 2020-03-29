@@ -21,9 +21,13 @@ where
 import Cardano.Prelude
 
 import Codec.CBOR.Decoding as D
+import Codec.CBOR.ByteArray as BA
 import qualified Codec.CBOR.Read as CBOR.Read
 import Control.Exception (Exception)
 import qualified Data.ByteString.Lazy as BS.Lazy
+import qualified Data.ByteString.Short as SBS
+import qualified Data.ByteString.Short.Internal as SBS
+import qualified Data.Primitive.ByteArray as Prim
 import Data.Fixed (Fixed(..), Nano, Pico)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -277,6 +281,11 @@ instance FromCBOR Text where
 
 instance FromCBOR LByteString where
   fromCBOR = BS.Lazy.fromStrict <$> fromCBOR
+
+instance FromCBOR SBS.ShortByteString where
+  fromCBOR = do
+    BA.BA (Prim.ByteArray ba) <- D.decodeByteArray
+    return $ SBS.SBS ba
 
 instance FromCBOR a => FromCBOR [a] where
   fromCBOR = decodeListWith fromCBOR
