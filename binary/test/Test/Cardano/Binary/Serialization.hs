@@ -12,6 +12,7 @@ import Codec.CBOR.Decoding as D
 
 import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy as BS.Lazy
+import qualified Data.ByteString.Short as BS.Short
 
 import Cardano.Prelude
 
@@ -49,6 +50,7 @@ data TestStruct = TestStruct
   , tsRaw                   :: !Raw
   , tsVectorBool            :: !(V.Vector Bool)
   , tsLByteString           :: BS.Lazy.ByteString
+  , tsSByteString           :: BS.Short.ShortByteString
   }
   deriving (Show, Eq)
 
@@ -80,6 +82,7 @@ genTestStruct = TestStruct
     <*> (Raw <$> ( Gen.bytes (Range.linear 0 20)))
     <*> (V.fromList <$> ( Gen.list (Range.constant 0 10) Gen.bool))
     <*> (BS.Lazy.fromStrict <$> Gen.bytes (Range.linear 0 20))
+    <*> (BS.Short.toShort <$> Gen.bytes (Range.linear 0 20))
 
 instance ToCBOR TestStruct where
   toCBOR ts = E.encodeListLen 1 
@@ -109,12 +112,14 @@ instance ToCBOR TestStruct where
     <> toCBOR ( tsRaw                   ts)
     <> toCBOR ( tsVectorBool            ts)
     <> toCBOR ( tsLByteString           ts)
+    <> toCBOR ( tsSByteString           ts)
 
 instance FromCBOR TestStruct where
   fromCBOR = do
     D.decodeListLenOf 1 
     TestStruct 
       <$> fromCBOR
+      <*> fromCBOR
       <*> fromCBOR
       <*> fromCBOR
       <*> fromCBOR

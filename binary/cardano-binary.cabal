@@ -43,6 +43,7 @@ library
                      , containers
                      , digest
                      , formatting
+                     , primitive
                      , recursion-schemes
                      , safe-exceptions
                      , tagged

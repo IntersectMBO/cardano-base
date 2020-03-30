@@ -38,7 +38,11 @@ where
 
 
 import Codec.CBOR.Encoding as E
+import Codec.CBOR.ByteArray.Sliced as BAS
 import qualified Data.ByteString.Lazy as BS.Lazy
+import qualified Data.ByteString.Short as SBS
+import qualified Data.ByteString.Short.Internal as SBS
+import qualified Data.Primitive.ByteArray as Prim
 import Data.Fixed (E12, Fixed(..), Nano, Pico, resolution)
 import Data.Functor.Foldable (Fix(..), cata, unfix)
 import qualified Data.Map as M
@@ -562,6 +566,14 @@ instance ToCBOR Text.Text where
       bsLength = size (Proxy @(LengthOf Text))
         * szCases [Case "minChar" 1, Case "maxChar" 4]
     in bsLength + apMono "withWordSize" withWordSize bsLength
+
+instance ToCBOR SBS.ShortByteString where
+  toCBOR sbs@(SBS.SBS ba) =
+    E.encodeByteArray $ BAS.SBA (Prim.ByteArray ba) 0 (SBS.length sbs)
+
+  encodedSizeExpr size _ =
+    let len = size (Proxy @(LengthOf SBS.ShortByteString))
+    in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
 
 instance ToCBOR BS.Lazy.ByteString where
   toCBOR = toCBOR . BS.Lazy.toStrict
