@@ -43,6 +43,7 @@ library
                       , cardano-binary
                       , cborg
                       , containers
+                      , deepseq
                       , mmorph
                       , mtl
                       , serialise

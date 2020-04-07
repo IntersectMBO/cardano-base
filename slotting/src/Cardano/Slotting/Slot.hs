@@ -20,6 +20,7 @@ module Cardano.Slotting.Slot
   )
 where
 
+import Control.DeepSeq (NFData (..))
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
@@ -30,7 +31,7 @@ import GHC.Generics (Generic)
 -- | The 0-based index for the Ourboros time slot.
 newtype SlotNo = SlotNo {unSlotNo :: Word64}
   deriving stock (Show, Eq, Ord, Generic)
-  deriving newtype (Enum, Bounded, Num, Serialise, NoUnexpectedThunks)
+  deriving newtype (Enum, Bounded, Num, Serialise, NoUnexpectedThunks, NFData)
 
 instance ToCBOR SlotNo where
   toCBOR = encode
