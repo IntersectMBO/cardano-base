@@ -6,13 +6,10 @@
 
 module Test.Cardano.Binary.Helpers.GoldenRoundTrip
   ( goldenTestCBOR
-  , goldenTestCBORAnnotated
   , goldenTestCBORExplicit
   , goldenTestExplicit
   , roundTripsCBORShow
-  , roundTripsCBORAnnotatedShow
   , roundTripsCBORBuildable
-  , roundTripsCBORAnnotatedBuildable
   , compareHexDump
   , deprecatedGoldenDecode
   )
@@ -36,9 +33,7 @@ import Cardano.Binary
   , DecoderError
   , Encoding
   , FromCBOR(..)
-  , FromCBORAnnotated (..)
   , ToCBOR(..)
-  , decodeAnnotated
   , decodeFull
   , decodeFullDecoder
   , serialize
@@ -101,23 +96,6 @@ goldenTestCBOR = withFrozenCallStack
   $ goldenTestCBORExplicit (label $ Proxy @a) toCBOR fromCBOR
 
 
--- | Check that the 'encode' and 'fromCBORAnnotated' functions work as
--- expected w.r.t. the give reference data, this is, given a value @x::a@, and
--- a file path @fp@:
---
--- - The encoded data should coincide with the contents of the @fp@.
--- - Decoding @fp@ should give as a result @x@
---
-goldenTestCBORAnnotated
-  :: forall a
-  . (FromCBORAnnotated a, ToCBOR a, Eq a, Show a, HasCallStack)
-  => a
-  -> FilePath
-  -> Property
-goldenTestCBORAnnotated = withFrozenCallStack
-  $ goldenTestExplicit serialize decodeAnnotated
-
-
 -- | Variant of 'goldenTestBi' using custom encode and decode functions.
 --
 -- This is required for the encode/decode golden-tests for types that do no
@@ -165,12 +143,6 @@ roundTripsCBORShow
   -> m ()
 roundTripsCBORShow x = withFrozenCallStack $ tripping x serialize decodeFull
 
-roundTripsCBORAnnotatedShow
-  :: (FromCBORAnnotated a, ToCBOR a, Eq a, MonadTest m, Show a, HasCallStack)
-  => a
-  -> m ()
-roundTripsCBORAnnotatedShow x = withFrozenCallStack $ tripping x serialize decodeAnnotated
-
 -- | Round trip (via ByteString) any instance of the 'FromCBOR' and 'ToCBOR'
 --   class that also has a 'Buildable' instance.
 roundTripsCBORBuildable
@@ -179,13 +151,6 @@ roundTripsCBORBuildable
   -> m ()
 roundTripsCBORBuildable a =
   withFrozenCallStack $ trippingBuildable a serialize decodeFull
-
-roundTripsCBORAnnotatedBuildable
-  :: (FromCBORAnnotated a, ToCBOR a, Eq a, MonadTest m, Buildable a, HasCallStack)
-  => a
-  -> m ()
-roundTripsCBORAnnotatedBuildable a =
-  withFrozenCallStack $ trippingBuildable a serialize decodeAnnotated
 
 deprecatedGoldenDecode
   :: HasCallStack => Text -> (forall s . D.Decoder s ()) -> FilePath -> Property
