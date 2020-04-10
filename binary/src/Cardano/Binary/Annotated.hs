@@ -22,6 +22,7 @@ module Cardano.Binary.Annotated
   , Annotator (..)
   , annotatorSlice
   , decodeAnnotator
+  , withSlice
   , FullByteString (..)
   )
 where
@@ -125,8 +126,14 @@ newtype Annotator a = Annotator { runAnnotator :: FullByteString -> a }
 -- | were decoded. This function constructs and supplies the relevant piece.
 annotatorSlice :: Decoder s (Annotator (LByteString -> a)) -> Decoder s (Annotator a)
 annotatorSlice dec = do
-  (k, start, end) <- decodeWithByteSpan dec
-  return $ Annotator $ \bytes -> runAnnotator k bytes (sliceOffsets start end bytes)
+  (k,bytes) <- withSlice dec
+  pure $ k <*> bytes
+
+-- | Pairs the decoder result with an annotator.
+withSlice :: Decoder s a -> Decoder s (a, Annotator LByteString)
+withSlice dec = do
+  (r, start, end) <- decodeWithByteSpan dec
+  return $ (r, Annotator $ sliceOffsets start end)
   where
   sliceOffsets :: ByteOffset -> ByteOffset -> FullByteString -> LByteString
   sliceOffsets start end (Full b) = (BSL.take (end - start) . BSL.drop start) b
