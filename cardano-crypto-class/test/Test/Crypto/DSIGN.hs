@@ -10,6 +10,7 @@ where
 import Cardano.Binary (FromCBOR, ToCBOR (..))
 import Cardano.Crypto.DSIGN
   ( DSIGNAlgorithm (..)
+  , Ed25519DSIGN
   , Ed448DSIGN
   , MockDSIGN
   , RSAPSSDSIGN
@@ -34,6 +35,7 @@ tests :: TestTree
 tests =
   testGroup "Crypto.DSIGN"
     [ testDSIGNAlgorithm (Proxy :: Proxy MockDSIGN) "MockDSIGN"
+    , testDSIGNAlgorithm (Proxy :: Proxy Ed25519DSIGN) "Ed25519DSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy Ed448DSIGN) "Ed448DSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy RSAPSSDSIGN) "RSAPSSDSIGN"
     ]

@@ -3,7 +3,7 @@ version:             2.0.0
 synopsis:            Type classes abstracting over cryptography primitives for Cardano
 description:         Type classes abstracting over cryptography primitives for Cardano
 license:             Apache-2.0
-license-files:        
+license-files:
   LICENSE
   NOTICE
 author:              IOHK
@@ -28,6 +28,7 @@ library
                        Cardano.Crypto.VRF
 
                        Cardano.Crypto.DSIGN.Class
+                       Cardano.Crypto.DSIGN.Ed25519
                        Cardano.Crypto.DSIGN.Ed448
                        Cardano.Crypto.DSIGN.Mock
                        Cardano.Crypto.DSIGN.NeverUsed
