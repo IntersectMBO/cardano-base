@@ -11,6 +11,9 @@ module Cardano.Crypto.Hash.Class
   , hashPair
   , hashWithSerialiser
   , fromHash
+  , hashFromBytes
+  , getHashBytesAsHex
+  , hashFromBytesAsHex
   , xor
   )
 where
@@ -49,10 +52,11 @@ newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
 
 instance Show (Hash h a) where
-  show = SB8.unpack . B16.encode . getHash
+  show = SB8.unpack . getHashBytesAsHex
 
 instance IsString (Hash h a) where
   fromString = UnsafeHash . fst . B16.decode . SB8.pack
+  --Ugg this does not check anything
 
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
   toCBOR = toCBOR . getHash
@@ -79,12 +83,37 @@ fromHash = foldl' f 0 . SB.unpack . getHash
   where
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b
+--TODO: make this efficient ^^
+
+
+-- | Convert the hash to hex encoding, as a ByteString.
+--
+getHashBytesAsHex :: Hash h a -> ByteString
+getHashBytesAsHex = B16.encode . getHash
+
+hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
+hashFromBytesAsHex hexrep
+  | (bytes, trailing) <- B16.decode hexrep
+  , SB.null trailing
+  = hashFromBytes bytes
+
+  | otherwise
+  = Nothing
+
+hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
+hashFromBytes bytes
+  | SB.length bytes == fromIntegral (byteCount (Proxy :: Proxy h))
+  = Just (UnsafeHash bytes)
+
+  | otherwise
+  = Nothing
 
 -- | XOR two hashes together
 --
 --   This functionality is required for VRF calculation.
 xor :: Hash h a -> Hash h a -> Hash h a
 xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x y
+--TODO: make this efficient ^^
 
 hashPair :: forall h a b c. HashAlgorithm h => Hash h a -> Hash h b -> Hash h c
 hashPair (UnsafeHash a) (UnsafeHash b) = UnsafeHash $ digest (Proxy :: Proxy h) $ a <> b
