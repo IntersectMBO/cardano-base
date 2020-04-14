@@ -28,6 +28,17 @@ data MockKES
 
 type H = MD5
 
+-- | Mock key evolving signatures.
+--
+-- What is the difference between Mock KES and Simple KES
+-- (@Cardano.Crypto.KES.Simple@), you may ask? Simple KES satisfies the outward
+-- appearance of a KES scheme through assembling a pre-generated list of keys
+-- and iterating through them. Mock KES, on the other hand, pretends to be KES
+-- but in fact does no key evolution whatsoever.
+--
+-- Simple KES is appropriate for testing, since it will for example reject old
+-- keys. Mock KES is more suitable for a basic testnet, since it doesn't suffer
+-- from the performance implications of shuffling a giant list of keys around
 instance KESAlgorithm MockKES where
 
     type Signable MockKES = ToCBOR
