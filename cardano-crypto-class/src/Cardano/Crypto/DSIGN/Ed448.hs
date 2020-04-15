@@ -23,7 +23,7 @@ import Cardano.Binary
   , serialize
   )
 import Cardano.Crypto.DSIGN.Class
-import Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
+import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed448
 import Data.ByteArray (ByteArrayAccess, convert)
@@ -39,10 +39,12 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
     newtype VerKeyDSIGN Ed448DSIGN = VerKeyEd448DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
+        deriving newtype NFData
         deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
 
     newtype SignKeyDSIGN Ed448DSIGN = SignKeyEd448DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
+        deriving newtype NFData
         deriving NoUnexpectedThunks via UseIsNormalForm SecretKey
 
     newtype SigDSIGN Ed448DSIGN = SigEd448DSIGN Signature
