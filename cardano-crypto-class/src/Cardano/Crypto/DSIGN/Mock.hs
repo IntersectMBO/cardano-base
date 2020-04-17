@@ -23,7 +23,7 @@ where
 import Cardano.Binary
   ( FromCBOR (..)
   , ToCBOR (..)
-  , decodeListLen
+  , decodeListLenOf
   , encodeListLen
   )
 import Cardano.Crypto.DSIGN.Class
@@ -104,7 +104,7 @@ instance ToCBOR (SigDSIGN MockDSIGN) where
   toCBOR (SigMockDSIGN b i) = encodeListLen 2 <> toCBOR b <> toCBOR i
 
 instance FromCBOR (SigDSIGN MockDSIGN) where
-  fromCBOR = SigMockDSIGN <$ decodeListLen <*> fromCBOR <*> fromCBOR
+  fromCBOR = SigMockDSIGN <$ decodeListLenOf 2 <*> fromCBOR <*> fromCBOR
 
 -- | Get the id of the signer from a signature. Used for testing.
 verKeyIdFromSigned :: SignedDSIGN MockDSIGN a -> Int
