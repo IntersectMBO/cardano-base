@@ -15,7 +15,7 @@ module Cardano.Crypto.KES.Mock
   )
 where
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..), decodeListLen, encodeListLen)
+import Cardano.Binary (FromCBOR (..), ToCBOR (..), decodeListLenOf, encodeListLen)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util (nonNegIntR)
@@ -88,7 +88,7 @@ instance ToCBOR (SigKES MockKES) where
 instance FromCBOR (SigKES MockKES) where
   fromCBOR =
     SigMockKES <$
-      decodeListLen <*>
+      decodeListLenOf 2 <*>
       fromCBOR <*>
       fromCBOR
 
@@ -102,7 +102,7 @@ instance ToCBOR (SignKeyKES MockKES) where
 instance FromCBOR (SignKeyKES MockKES) where
   fromCBOR =
     SignKeyMockKES <$
-      decodeListLen <*>
+      decodeListLenOf 3 <*>
       fromCBOR <*>
       fromCBOR <*>
       fromCBOR
