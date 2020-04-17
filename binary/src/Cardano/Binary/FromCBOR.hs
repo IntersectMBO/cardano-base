@@ -195,7 +195,11 @@ instance FromCBOR NominalDiffTime where
   fromCBOR = fromRational . (% 1e6) <$> fromCBOR
 
 instance FromCBOR Natural where
-  fromCBOR = fromInteger <$> fromCBOR
+  fromCBOR = do
+      !n <- fromCBOR
+      if n >= 0
+        then return $! fromInteger n
+        else cborError $ DecoderErrorCustom "Natural" "got a negative number"
 
 instance FromCBOR Void where
   fromCBOR = cborError DecoderErrorVoid

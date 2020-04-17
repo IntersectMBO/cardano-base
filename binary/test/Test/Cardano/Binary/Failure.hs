@@ -29,6 +29,10 @@ genInvalidEitherCBOR = do
   b <- Gen.bool
   pure (encodeListLen 2 <> encodeWord 3 <> toCBOR b)
 
+genNegativeInteger :: Gen Integer
+genNegativeInteger =
+  negate . toInteger <$> Gen.word64 (Range.exponential 1 maxBound)
+
 ----------------------------------------------------------------------
 -------------------------   Properties   -----------------------------
 
@@ -60,6 +64,11 @@ prop_shouldFailSet = property $ do
           <> encodeListLen (fromIntegral $ length ls + 2) 
           <> (mconcat $ toCBOR <$> (4: 3:ls))
   assertIsLeft (decode set :: Either DecoderError (Set Int))
+
+prop_shouldFailNegativeNatural :: Property
+prop_shouldFailNegativeNatural = property $ do
+  n <- forAll $ genNegativeInteger
+  assertIsLeft (decode (toCBOR n) :: Either DecoderError Natural)
 
 ---------------------------------------------------------------------
 ------------------------------- helpers -----------------------------
