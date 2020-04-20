@@ -4,6 +4,7 @@ module Cardano.Crypto.Hash
   )
 where
 
+import Cardano.Crypto.Hash.Blake2b as X
 import Cardano.Crypto.Hash.Class as X
 import Cardano.Crypto.Hash.MD5 as X
 import Cardano.Crypto.Hash.NeverUsed as X

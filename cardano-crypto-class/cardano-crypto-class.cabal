@@ -34,6 +34,7 @@ library
                        Cardano.Crypto.DSIGN.NeverUsed
                        Cardano.Crypto.DSIGN.RSAPSS
 
+                       Cardano.Crypto.Hash.Blake2b
                        Cardano.Crypto.Hash.Class
                        Cardano.Crypto.Hash.MD5
                        Cardano.Crypto.Hash.NeverUsed
