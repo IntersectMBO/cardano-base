@@ -31,6 +31,7 @@ class ( Typeable v
       , Show (VerKeyKES v)
       , Eq (VerKeyKES v)
       , Show (SignKeyKES v)
+      , Eq (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
       , NoUnexpectedThunks (SigKES     v)

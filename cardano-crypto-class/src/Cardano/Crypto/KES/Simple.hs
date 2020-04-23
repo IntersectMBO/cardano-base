@@ -110,6 +110,8 @@ instance (DSIGNAlgorithm d, Typeable d) => FromCBOR (VerKeyKES (SimpleKES d)) wh
 
 deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SimpleKES d))
 
+deriving instance DSIGNAlgorithm d => Eq (SignKeyKES (SimpleKES d))
+
 instance (DSIGNAlgorithm d, Typeable d) => ToCBOR (SignKeyKES (SimpleKES d)) where
   toCBOR (SignKeySimpleKES (vks, stuff)) =
     encodeListLen 2 <>

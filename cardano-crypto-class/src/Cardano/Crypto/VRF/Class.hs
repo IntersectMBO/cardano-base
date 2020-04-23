@@ -37,6 +37,7 @@ class ( Typeable v
       , Show (VerKeyVRF v)
       , Eq (VerKeyVRF v)
       , Show (SignKeyVRF v)
+      , Eq (SignKeyVRF v)
       , Show (CertVRF v)
       , Eq (CertVRF v)
       , FromCBOR (CertVRF v)

@@ -31,6 +31,7 @@ class ( Typeable v
       , Show (VerKeyDSIGN v)
       , Eq (VerKeyDSIGN v)
       , Show (SignKeyDSIGN v)
+      , Eq (SignKeyDSIGN v)
       , Show (SigDSIGN v)
       , Eq (SigDSIGN v)
       , NoUnexpectedThunks (SigDSIGN     v)
