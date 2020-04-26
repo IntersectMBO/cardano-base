@@ -47,8 +47,7 @@ instance (Cardano.Crypto.DSIGN.Signable v Int, DSIGNAlgorithm v, ContextDSIGN v 
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
-    seed <- arbitrary
-    return $ withSeed seed $ signDSIGN () a sk
+    return $ signDSIGN () a sk
   shrink = const []
 
 instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where

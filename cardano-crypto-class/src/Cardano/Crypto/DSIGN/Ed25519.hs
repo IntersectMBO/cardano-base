@@ -63,10 +63,10 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
     deriveVerKeyDSIGN (SignKeyEd25519DSIGN sk) = VerKeyEd25519DSIGN $ toPublic sk
 
-    signDSIGN () a (SignKeyEd25519DSIGN sk) = do
+    signDSIGN () a (SignKeyEd25519DSIGN sk) =
         let vk = toPublic sk
             bs = toStrict $ serialize a
-        return $ SigEd25519DSIGN $ sign sk vk bs
+         in SigEd25519DSIGN $ sign sk vk bs
 
     verifyDSIGN () (VerKeyEd25519DSIGN vk) a (SigEd25519DSIGN sig) =
         if verify vk (toStrict $ serialize a) sig

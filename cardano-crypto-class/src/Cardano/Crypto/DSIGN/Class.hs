@@ -77,11 +77,11 @@ class ( Typeable v
   deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
 
   signDSIGN
-    :: (MonadRandom m, Signable v a, HasCallStack)
+    :: (Signable v a, HasCallStack)
     => ContextDSIGN v
     -> a
     -> SignKeyDSIGN v
-    -> m (SigDSIGN v)
+    -> SigDSIGN v
 
   verifyDSIGN
     :: (Signable v a, HasCallStack)
@@ -101,12 +101,12 @@ instance DSIGNAlgorithm v => NoUnexpectedThunks (SignedDSIGN v a)
   -- use generic instance
 
 signedDSIGN
-  :: (DSIGNAlgorithm v, MonadRandom m, Signable v a)
+  :: (DSIGNAlgorithm v, Signable v a)
   => ContextDSIGN v
   -> a
   -> SignKeyDSIGN v
-  -> m (SignedDSIGN v a)
-signedDSIGN ctxt a key = SignedDSIGN <$> signDSIGN ctxt a key
+  -> SignedDSIGN v a
+signedDSIGN ctxt a key = SignedDSIGN (signDSIGN ctxt a key)
 
 verifySignedDSIGN
   :: (DSIGNAlgorithm v, Signable v a, HasCallStack)

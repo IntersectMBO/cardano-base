@@ -16,7 +16,7 @@ import Cardano.Crypto.DSIGN
   )
 import Data.Proxy (Proxy (..))
 import Test.Crypto.Orphans.Arbitrary ()
-import Test.Crypto.Util (Seed, prop_cbor, withSeed)
+import Test.Crypto.Util (prop_cbor)
 import Test.QuickCheck ((=/=), (===), (==>), Property)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
@@ -65,37 +65,34 @@ testDSIGNAlgorithm _ n =
 
 prop_dsign_verify_pos
   :: forall a v. (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
-  => Seed
-  -> a
+  => a
   -> SignKeyDSIGN v
   -> Property
-prop_dsign_verify_pos seed a sk =
-  let sig = withSeed seed $ signDSIGN () a sk
+prop_dsign_verify_pos a sk =
+  let sig = signDSIGN () a sk
       vk = deriveVerKeyDSIGN sk
   in verifyDSIGN () vk a sig === Right ()
 
 prop_dsign_verify_neg_key
   :: forall a v. (DSIGNAlgorithm v, Eq (SignKeyDSIGN v), Signable v a, ContextDSIGN v ~ ())
-  => Seed
-  -> a
+  => a
   -> SignKeyDSIGN v
   -> SignKeyDSIGN v
   -> Property
-prop_dsign_verify_neg_key seed a sk sk' =
+prop_dsign_verify_neg_key a sk sk' =
   sk /= sk' ==>
-    let sig = withSeed seed $ signDSIGN () a sk'
+    let sig = signDSIGN () a sk'
         vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk a sig =/= Right ()
 
 prop_dsign_verify_neg_msg
   :: forall a v. (Eq a, DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
-  => Seed
-  -> a
+  => a
   -> a
   -> SignKeyDSIGN v
   -> Property
-prop_dsign_verify_neg_msg seed a a' sk =
+prop_dsign_verify_neg_msg a a' sk =
   a /= a' ==>
-    let sig = withSeed seed $ signDSIGN () a sk
+    let sig = signDSIGN () a sk
         vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk a' sig =/= Right ()
