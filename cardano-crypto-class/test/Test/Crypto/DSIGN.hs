@@ -13,7 +13,6 @@ import Cardano.Crypto.DSIGN
   , Ed25519DSIGN
   , Ed448DSIGN
   , MockDSIGN
-  , RSAPSSDSIGN
   )
 import Data.Proxy (Proxy (..))
 import Test.Crypto.Orphans.Arbitrary ()
@@ -37,7 +36,6 @@ tests =
     [ testDSIGNAlgorithm (Proxy :: Proxy MockDSIGN) "MockDSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy Ed25519DSIGN) "Ed25519DSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy Ed448DSIGN) "Ed448DSIGN"
-    , testDSIGNAlgorithm (Proxy :: Proxy RSAPSSDSIGN) "RSAPSSDSIGN"
     ]
 
 testDSIGNAlgorithm
