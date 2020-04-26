@@ -11,7 +11,7 @@ import Cardano.Binary (FromCBOR, ToCBOR (..))
 import Cardano.Crypto.VRF
 import Data.Proxy (Proxy (..))
 import Test.Crypto.Orphans.Arbitrary ()
-import Test.Crypto.Util (Seed, prop_cbor, withSeed)
+import Test.Crypto.Util (TestSeed, prop_cbor, withTestSeed)
 import Test.QuickCheck ((==>), Property, counterexample)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
@@ -52,29 +52,29 @@ testVRFAlgorithm _ n =
 
 prop_vrf_max
   :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => Seed
+  => TestSeed
   -> a
   -> SignKeyVRF v
   -> Property
 prop_vrf_max seed a sk =
-  let (y, _) = withSeed seed $ evalVRF () a sk
+  let (y, _) = withTestSeed seed $ evalVRF () a sk
       m = maxVRF (Proxy :: Proxy v)
   in counterexample ("expected " ++ show y ++ " <= " ++ show m) $ y <= m
 
 prop_vrf_verify_pos
   :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => Seed
+  => TestSeed
   -> a
   -> SignKeyVRF v
   -> Bool
 prop_vrf_verify_pos seed a sk =
-  let (y, c) = withSeed seed $ evalVRF () a sk
+  let (y, c) = withTestSeed seed $ evalVRF () a sk
       vk = deriveVerKeyVRF sk
   in verifyVRF () vk a (y, c)
 
 prop_vrf_verify_neg
   :: forall a v. (Signable v a, VRFAlgorithm v, Eq (SignKeyVRF v), ContextVRF v ~ ())
-  => Seed
+  => TestSeed
   -> a
   -> SignKeyVRF v
   -> SignKeyVRF v
@@ -82,6 +82,6 @@ prop_vrf_verify_neg
 prop_vrf_verify_neg seed a sk sk' =
   sk /=
     sk' ==>
-    let (y, c) = withSeed seed $ evalVRF () a sk'
+    let (y, c) = withTestSeed seed $ evalVRF () a sk'
         vk = deriveVerKeyVRF sk
     in not $ verifyVRF () vk a (y, c)

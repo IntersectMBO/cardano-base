@@ -29,12 +29,12 @@ import qualified Cardano.Crypto.KES as KES
 
 import Test.Crypto.Orphans.Arbitrary ()
 import Test.Crypto.Util
-  ( Seed(..)
+  ( TestSeed(..)
   , genNat
   , genNatBetween
   , prop_cbor
   , shrinkNat
-  , withSeed
+  , withTestSeed
   )
 
 --
@@ -82,9 +82,9 @@ testKESAlgorithm p n =
 prop_KES_serialise_VerKey
   :: (KESAlgorithm v, FromCBOR (VerKeyKES v), ToCBOR (VerKeyKES v))
   => proxy v
-  -> Duration_Seed_SK v
+  -> Duration_TestSeed_SK v
   -> Property
-prop_KES_serialise_VerKey _ (Duration_Seed_SK _ _ sk _) =
+prop_KES_serialise_VerKey _ (Duration_TestSeed_SK _ _ sk _) =
   prop_cbor (deriveVerKeyKES sk)
 
 prop_KES_serialise_SignKey
@@ -94,9 +94,9 @@ prop_KES_serialise_SignKey
      , Eq (SignKeyKES v)
      )
   => proxy v
-  -> Duration_Seed_SK v
+  -> Duration_TestSeed_SK v
   -> Property
-prop_KES_serialise_SignKey _ (Duration_Seed_SK _ _ sk _) = prop_cbor sk
+prop_KES_serialise_SignKey _ (Duration_TestSeed_SK _ _ sk _) = prop_cbor sk
 
 prop_KES_serialise_Sig
   :: ( KESAlgorithm v
@@ -106,23 +106,23 @@ prop_KES_serialise_Sig
      , ToCBOR (SigKES v)
      )
   => proxy v
-  -> Duration_Seed_SK_Times v [Int]
-  -> Seed
+  -> Duration_TestSeed_SK_Times v [Int]
+  -> TestSeed
   -> Property
-prop_KES_serialise_Sig _ d seed = case withSeed seed $ trySign d of
+prop_KES_serialise_Sig _ d seed = case withTestSeed seed $ trySign d of
   Left  e  -> counterexample e False
   Right xs -> conjoin [ prop_cbor sig | (_, _, sig) <- xs ]
 
 prop_KES_verify_pos
   :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
   => proxy v
-  -> Duration_Seed_SK_Times v [Int]
-  -> Seed
+  -> Duration_TestSeed_SK_Times v [Int]
+  -> TestSeed
   -> Property
 prop_KES_verify_pos _ d seed =
   let vk = getFirstVerKey d
   in
-    case withSeed seed $ trySign d of
+    case withTestSeed seed $ trySign d of
       Left e -> counterexample e False
       Right xs ->
         conjoin [ verifyKES () vk j a sig === Right () | (j, a, sig) <- xs ]
@@ -130,11 +130,11 @@ prop_KES_verify_pos _ d seed =
 prop_KES_verify_neg_key
   :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
   => proxy v
-  -> Duration_Seed_SK_Times v Int
-  -> Seed
+  -> Duration_TestSeed_SK_Times v Int
+  -> TestSeed
   -> Property
 prop_KES_verify_neg_key _ d seed =
-  getDuration d > 0 ==> case withSeed seed $ trySign d of
+  getDuration d > 0 ==> case withTestSeed seed $ trySign d of
     Left  e  -> counterexample e False
     Right xs -> conjoin
       [ verifyKES () (getSecondVerKey d) j a sig =/= Right ()
@@ -144,14 +144,14 @@ prop_KES_verify_neg_key _ d seed =
 prop_KES_verify_neg_msg
   :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
   => proxy v
-  -> Duration_Seed_SK_Times v Float
+  -> Duration_TestSeed_SK_Times v Float
   -> Float
-  -> Seed
+  -> TestSeed
   -> Property
 prop_KES_verify_neg_msg _ d a seed =
   let vk = getFirstVerKey d
   in
-    case withSeed seed $ trySign d of
+    case withTestSeed seed $ trySign d of
       Left  e  -> counterexample e False
       Right xs -> conjoin
         [ a /= a' ==> verifyKES () vk j a sig =/= Right ()
@@ -161,32 +161,32 @@ prop_KES_verify_neg_msg _ d a seed =
 prop_KES_verify_neg_time
   :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
   => proxy v
-  -> Duration_Seed_SK_Times v Float
+  -> Duration_TestSeed_SK_Times v Float
   -> Integer
   -> Property
 prop_KES_verify_neg_time _ d i =
   let
-    seed = Seed (1, 0, 2, 0, 1)
+    seed = TestSeed (1, 0, 2, 0, 1)
     vk   = getFirstVerKey d
     t    = fromIntegral $ abs i
-  in case withSeed seed $ trySign d of
+  in case withTestSeed seed $ trySign d of
     Left  e  -> counterexample e False
     Right xs -> conjoin
       [ t /= j ==> verifyKES () vk t a sig =/= Right ()
       | (j, a, sig) <- xs
       ]
 
-getDuration :: Duration_Seed_SK_Times v a -> Natural
+getDuration :: Duration_TestSeed_SK_Times v a -> Natural
 getDuration d = case d of
-  (Duration_Seed_SK_Times duration _ _ _ _) -> duration
+  (Duration_TestSeed_SK_Times duration _ _ _ _) -> duration
 
-getFirstVerKey :: KESAlgorithm v => Duration_Seed_SK_Times v a -> VerKeyKES v
+getFirstVerKey :: KESAlgorithm v => Duration_TestSeed_SK_Times v a -> VerKeyKES v
 getFirstVerKey d = case d of
-  (Duration_Seed_SK_Times _ _ sk _ _) -> deriveVerKeyKES sk
+  (Duration_TestSeed_SK_Times _ _ sk _ _) -> deriveVerKeyKES sk
 
-getSecondVerKey :: Duration_Seed_SK_Times v a -> VerKeyKES v
+getSecondVerKey :: Duration_TestSeed_SK_Times v a -> VerKeyKES v
 getSecondVerKey d = case d of
-  (Duration_Seed_SK_Times _ _ _ vk _) -> vk
+  (Duration_TestSeed_SK_Times _ _ _ vk _) -> vk
 
 trySign
   :: forall m v a
@@ -197,9 +197,9 @@ trySign
      , ToCBOR a
      , Show a
      )
-  => Duration_Seed_SK_Times v a
+  => Duration_TestSeed_SK_Times v a
   -> m (Either String [(Natural, a, SigKES v)])
-trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
+trySign (Duration_TestSeed_SK_Times _ _ sk _ ts) = go sk ts
  where
   go
     :: SignKeyKES v
@@ -238,54 +238,54 @@ trySign (Duration_Seed_SK_Times _ _ sk _ ts) = go sk ts
                 Right ys -> Right ((j, a, sig) : ys)
                 Left  _  -> e
 
-data Duration_Seed_SK v = Duration_Seed_SK Natural Seed (SignKeyKES v) (VerKeyKES v)
+data Duration_TestSeed_SK v = Duration_TestSeed_SK Natural TestSeed (SignKeyKES v) (VerKeyKES v)
     deriving Generic
 
-deriving instance KESAlgorithm v => Show (Duration_Seed_SK v)
-deriving instance (KESAlgorithm v, Eq (SignKeyKES v)) => Eq (Duration_Seed_SK v)
+deriving instance KESAlgorithm v => Show (Duration_TestSeed_SK v)
+deriving instance (KESAlgorithm v, Eq (SignKeyKES v)) => Eq (Duration_TestSeed_SK v)
 
 instance
   (KESAlgorithm v, ToCBOR (SignKeyKES v), ToCBOR (VerKeyKES v))
-  => ToCBOR (Duration_Seed_SK v)
+  => ToCBOR (Duration_TestSeed_SK v)
  where
-  toCBOR (Duration_Seed_SK n s sk vk) =
+  toCBOR (Duration_TestSeed_SK n s sk vk) =
     encodeListLen 4
       <> toCBOR n
       <> toCBOR s
       <> toCBOR sk
       <> toCBOR vk
 
-instance KESAlgorithm v => Arbitrary (Duration_Seed_SK v) where
+instance KESAlgorithm v => Arbitrary (Duration_TestSeed_SK v) where
 
     arbitrary = do
         duration <- genNat
         seed <- arbitrary
-        return $ duration_Seed_SK duration seed
+        return $ duration_TestSeed_SK duration seed
 
-    shrink (Duration_Seed_SK duration seed _ _) =
-        [duration_Seed_SK d seed | d <- shrinkNat duration]
+    shrink (Duration_TestSeed_SK duration seed _ _) =
+        [duration_TestSeed_SK d seed | d <- shrinkNat duration]
 
-data Duration_Seed_SK_Times v a =
-    Duration_Seed_SK_Times Natural Seed (SignKeyKES v) (VerKeyKES v) [(Natural, a)]
+data Duration_TestSeed_SK_Times v a =
+    Duration_TestSeed_SK_Times Natural TestSeed (SignKeyKES v) (VerKeyKES v) [(Natural, a)]
     deriving Generic
 
-instance (KESAlgorithm v, Arbitrary a) => Arbitrary (Duration_Seed_SK_Times v a) where
+instance (KESAlgorithm v, Arbitrary a) => Arbitrary (Duration_TestSeed_SK_Times v a) where
 
-    arbitrary = arbitrary >>= gen_Duration_Seed_SK_Times
+    arbitrary = arbitrary >>= gen_Duration_TestSeed_SK_Times
 
-    shrink (Duration_Seed_SK_Times d s sk vk ts) = do
-        Duration_Seed_SK d' s' sk' vk' <- shrink $ Duration_Seed_SK d s sk vk
+    shrink (Duration_TestSeed_SK_Times d s sk vk ts) = do
+        Duration_TestSeed_SK d' s' sk' vk' <- shrink $ Duration_TestSeed_SK d s sk vk
         let ts' = filter ((< d') . fst) ts
-        return $ Duration_Seed_SK_Times d' s' sk' vk' ts'
+        return $ Duration_TestSeed_SK_Times d' s' sk' vk' ts'
 
-deriving instance (KESAlgorithm v, Show a) => Show (Duration_Seed_SK_Times v a)
-deriving instance (KESAlgorithm v, Eq (SignKeyKES v), Eq a) => Eq (Duration_Seed_SK_Times v a)
+deriving instance (KESAlgorithm v, Show a) => Show (Duration_TestSeed_SK_Times v a)
+deriving instance (KESAlgorithm v, Eq (SignKeyKES v), Eq a) => Eq (Duration_TestSeed_SK_Times v a)
 
 instance
   (KESAlgorithm v, ToCBOR a, ToCBOR (SignKeyKES v), ToCBOR (VerKeyKES v))
-  => ToCBOR (Duration_Seed_SK_Times v a)
+  => ToCBOR (Duration_TestSeed_SK_Times v a)
  where
-  toCBOR (Duration_Seed_SK_Times d s sk vk ts) =
+  toCBOR (Duration_TestSeed_SK_Times d s sk vk ts) =
     encodeListLen 5
       <> toCBOR d
       <> toCBOR s
@@ -293,9 +293,9 @@ instance
       <> toCBOR vk
       <> toCBOR ts
 
-duration_Seed_SK :: KESAlgorithm v => Natural -> Seed -> Duration_Seed_SK v
-duration_Seed_SK duration seed =
-  let (sk, vk) = withSeed seed go in Duration_Seed_SK duration seed sk vk
+duration_TestSeed_SK :: KESAlgorithm v => Natural -> TestSeed -> Duration_TestSeed_SK v
+duration_TestSeed_SK duration seed =
+  let (sk, vk) = withTestSeed seed go in Duration_TestSeed_SK duration seed sk vk
  where
   go = do
     sk  <- genKeyKES duration
@@ -303,11 +303,11 @@ duration_Seed_SK duration seed =
     let vk = deriveVerKeyKES sk'
     if duration > 0 && deriveVerKeyKES sk == vk then go else return (sk, vk)
 
-gen_Duration_Seed_SK_Times
-  :: Arbitrary a => Duration_Seed_SK v -> Gen (Duration_Seed_SK_Times v a)
-gen_Duration_Seed_SK_Times (Duration_Seed_SK duration seed sk vk) = do
+gen_Duration_TestSeed_SK_Times
+  :: Arbitrary a => Duration_TestSeed_SK v -> Gen (Duration_TestSeed_SK_Times v a)
+gen_Duration_TestSeed_SK_Times (Duration_TestSeed_SK duration seed sk vk) = do
   ts <- genTimes 0
-  return $ Duration_Seed_SK_Times duration seed sk vk ts
+  return $ Duration_TestSeed_SK_Times duration seed sk vk ts
  where
   genTimes :: Arbitrary a => Natural -> Gen [(Natural, a)]
   genTimes j

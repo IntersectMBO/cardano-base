@@ -12,12 +12,12 @@ import Cardano.Crypto.DSIGN (DSIGNAlgorithm (..))
 import Cardano.Crypto.Hash (Hash, HashAlgorithm (..), hash)
 import Cardano.Crypto.VRF (VRFAlgorithm (..))
 import Data.Word (Word64)
-import Test.Crypto.Util (Seed (..), withSeed)
+import Test.Crypto.Util (TestSeed (..), withTestSeed)
 import Test.QuickCheck (Arbitrary (..), Gen, arbitraryBoundedIntegral)
 
-instance Arbitrary Seed where
+instance Arbitrary TestSeed where
   arbitrary =
-    (\w1 w2 w3 w4 w5 -> Seed (w1, w2, w3, w4, w5)) <$>
+    (\w1 w2 w3 w4 w5 -> TestSeed (w1, w2, w3, w4, w5)) <$>
       gen <*>
       gen <*>
       gen <*>
@@ -31,7 +31,7 @@ instance Arbitrary Seed where
 instance DSIGNAlgorithm v => Arbitrary (SignKeyDSIGN v) where
   arbitrary = do
     seed <- arbitrary
-    return $ withSeed seed genKeyDSIGN
+    return $ withTestSeed seed genKeyDSIGN
   shrink = const []
 
 instance (ToCBOR a, Arbitrary a, HashAlgorithm h) => Arbitrary (Hash h a) where
@@ -53,7 +53,7 @@ instance (Cardano.Crypto.DSIGN.Signable v Int, DSIGNAlgorithm v, ContextDSIGN v 
 instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
   arbitrary = do
     seed <- arbitrary
-    return $ withSeed seed genKeyVRF
+    return $ withTestSeed seed genKeyVRF
   shrink = const []
 
 instance VRFAlgorithm v => Arbitrary (VerKeyVRF v) where
@@ -66,5 +66,5 @@ instance (Cardano.Crypto.VRF.Signable v Int, VRFAlgorithm v, ContextVRF v ~ ())
     a <- arbitrary :: Gen Int
     sk <- arbitrary
     seed <- arbitrary
-    return $ withSeed seed $ fmap snd $ evalVRF () a sk
+    return $ withTestSeed seed $ fmap snd $ evalVRF () a sk
   shrink = const []
