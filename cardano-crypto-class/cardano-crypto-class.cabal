@@ -45,6 +45,7 @@ library
                        Cardano.Crypto.KES.NeverUsed
                        Cardano.Crypto.KES.Simple
 
+                       Cardano.Crypto.Seed
                        Cardano.Crypto.Util
 
                        Cardano.Crypto.VRF.Class
@@ -60,6 +61,7 @@ library
                      , cryptonite
                      , deepseq
                      , memory
+                     , transformers
                      , vector
 
   default-language:    Haskell2010
