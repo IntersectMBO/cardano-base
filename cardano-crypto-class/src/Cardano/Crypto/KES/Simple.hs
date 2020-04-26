@@ -72,10 +72,9 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
     deriveVerKeyKES (SignKeySimpleKES (vks, _)) = VerKeySimpleKES $ fromList vks
 
     signKES ctxt j a (SignKeySimpleKES (_, xs)) = case dropWhile (\(k, _) -> k < j) xs of
-        []           -> return Nothing
-        (_, sk) : _ -> do
-            sig <- signDSIGN ctxt a sk
-            return $ Just (SigSimpleKES sig)
+        []          -> return Nothing
+        (_, sk) : _ -> return $ Just (SigSimpleKES sig)
+                         where sig = signDSIGN ctxt a sk
 
     verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
         case vks !? fromIntegral j of

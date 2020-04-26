@@ -63,10 +63,10 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
     deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
 
-    signDSIGN () a (SignKeyEd448DSIGN sk) = do
+    signDSIGN () a (SignKeyEd448DSIGN sk) =
         let vk = toPublic sk
             bs = toStrict $ serialize a
-        return $ SigEd448DSIGN $ sign sk vk bs
+         in SigEd448DSIGN $ sign sk vk bs
 
     verifyDSIGN () (VerKeyEd448DSIGN vk) a (SigEd448DSIGN sig) =
         if verify vk (toStrict $ serialize a) sig
