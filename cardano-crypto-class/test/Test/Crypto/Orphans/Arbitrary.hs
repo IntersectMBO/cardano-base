@@ -1,5 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.Crypto.Orphans.Arbitrary
@@ -11,9 +12,12 @@ import Cardano.Binary (ToCBOR (..))
 import Cardano.Crypto.DSIGN (DSIGNAlgorithm (..))
 import Cardano.Crypto.Hash (Hash, HashAlgorithm (..), hash)
 import Cardano.Crypto.VRF (VRFAlgorithm (..))
+import Cardano.Crypto.Seed
+import Data.ByteString as BS (pack)
+import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
 import Test.Crypto.Util (TestSeed (..), withTestSeed)
-import Test.QuickCheck (Arbitrary (..), Gen, arbitraryBoundedIntegral)
+import Test.QuickCheck (Arbitrary (..), Gen, arbitraryBoundedIntegral, vector)
 
 instance Arbitrary TestSeed where
   arbitrary =
@@ -28,10 +32,14 @@ instance Arbitrary TestSeed where
       gen = arbitraryBoundedIntegral
   shrink = const []
 
+arbitrarySeedOfSize :: Int -> Gen Seed
+arbitrarySeedOfSize sz =
+  (mkSeedFromBytes . BS.pack) <$> vector sz
+
 instance DSIGNAlgorithm v => Arbitrary (SignKeyDSIGN v) where
-  arbitrary = do
-    seed <- arbitrary
-    return $ withTestSeed seed genKeyDSIGN
+  arbitrary = genKeyDSIGN <$> arbitrarySeedOfSize seedSize
+    where
+      seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy v))
   shrink = const []
 
 instance (ToCBOR a, Arbitrary a, HashAlgorithm h) => Arbitrary (Hash h a) where

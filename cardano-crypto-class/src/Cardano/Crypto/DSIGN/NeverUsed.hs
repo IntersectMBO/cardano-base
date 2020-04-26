@@ -35,7 +35,8 @@ instance DSIGNAlgorithm NeverDSIGN where
   decodeSignKeyDSIGN = return NeverUsedSignKeyDSIGN
   decodeSigDSIGN     = return NeverUsedSigDSIGN
 
-  genKeyDSIGN         = return NeverUsedSignKeyDSIGN
+  seedSizeDSIGN     _ = 0
+  genKeyDSIGN       _ = NeverUsedSignKeyDSIGN
   deriveVerKeyDSIGN _ = NeverUsedVerKeyDSIGN
 
   signDSIGN   = error "DSIGN not available"
