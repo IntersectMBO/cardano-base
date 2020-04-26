@@ -6,11 +6,11 @@ module Test.Crypto.Util
   , prop_cbor
   , prop_cbor_valid
   , prop_cbor_roundtrip
-  , -- * Seed
-    Seed (..)
-  , withSeed
-  , seedToChaCha
-  , nullSeed
+  , -- * Test Seed
+    TestSeed (..)
+  , withTestSeed
+  , testSeedToChaCha
+  , nullTestSeed
   , -- * Natural Numbers
     genNat
   , genNatBetween
@@ -44,20 +44,20 @@ import Test.QuickCheck
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
 --------------------------------------------------------------------------------
-newtype Seed
-  = Seed
-      { getSeed :: (Word64, Word64, Word64, Word64, Word64)
+newtype TestSeed
+  = TestSeed
+      { getTestSeed :: (Word64, Word64, Word64, Word64, Word64)
       }
   deriving (Show, Eq, Ord, FromCBOR, ToCBOR)
 
-withSeed :: Seed -> MonadPseudoRandom ChaChaDRG a -> a
-withSeed s = fst . withDRG (drgNewTest $ getSeed s)
+withTestSeed :: TestSeed -> MonadPseudoRandom ChaChaDRG a -> a
+withTestSeed s = fst . withDRG (drgNewTest $ getTestSeed s)
 
-seedToChaCha :: Seed -> ChaChaDRG
-seedToChaCha = drgNewTest . getSeed
+testSeedToChaCha :: TestSeed -> ChaChaDRG
+testSeedToChaCha = drgNewTest . getTestSeed
 
-nullSeed :: Seed
-nullSeed = Seed (0, 0, 0, 0, 0)
+nullTestSeed :: TestSeed
+nullTestSeed = TestSeed (0, 0, 0, 0, 0)
 
 -- Class properties
 --
