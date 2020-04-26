@@ -23,9 +23,10 @@ import Cardano.Binary
   , serialize
   )
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.Seed
 import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
 import Crypto.Error (CryptoFailable (..))
-import Crypto.PubKey.Ed448
+import Crypto.PubKey.Ed448 as Ed448
 import Data.ByteArray (ByteArrayAccess, convert)
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy (toStrict)
@@ -59,7 +60,10 @@ instance DSIGNAlgorithm Ed448DSIGN where
     decodeSignKeyDSIGN = fromCBOR
     decodeSigDSIGN = fromCBOR
 
-    genKeyDSIGN = SignKeyEd448DSIGN <$> generateSecretKey
+    seedSizeDSIGN _  = 57
+    genKeyDSIGN seed =
+        let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
+         in SignKeyEd448DSIGN sk
 
     deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
 

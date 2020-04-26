@@ -27,6 +27,7 @@ import Cardano.Binary
   , encodeListLen
   )
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.Seed
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Util (nonNegIntR)
 import Cardano.Prelude (NoUnexpectedThunks, Proxy(..))
@@ -59,7 +60,9 @@ instance DSIGNAlgorithm MockDSIGN where
     decodeSignKeyDSIGN = fromCBOR
     decodeSigDSIGN     = fromCBOR
 
-    genKeyDSIGN = SignKeyMockDSIGN <$> nonNegIntR
+    seedSizeDSIGN _    = 4
+    genKeyDSIGN seed   =
+      SignKeyMockDSIGN (runMonadRandomWithSeed seed nonNegIntR)
 
     deriveVerKeyDSIGN (SignKeyMockDSIGN n) = VerKeyMockDSIGN n
 

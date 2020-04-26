@@ -30,8 +30,11 @@ import Cardano.Binary
 import Cardano.Crypto.DSIGN
 import qualified Cardano.Crypto.DSIGN as DSIGN
 import Cardano.Crypto.KES.Class
+import Cardano.Crypto.Seed
 import Cardano.Prelude (NoUnexpectedThunks)
 import Control.Monad (replicateM)
+import Crypto.Random (MonadRandom(getRandomBytes))
+import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import Data.Vector ((!?), Vector, fromList)
 import qualified Data.Vector as Vec
@@ -65,7 +68,10 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
     decodeSigKES = fromCBOR
 
     genKeyKES duration = do
-        sks <- replicateM (fromIntegral duration) genKeyDSIGN
+        let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
+        seeds <- replicateM (fromIntegral duration)
+                            (mkSeedFromBytes <$> getRandomBytes seedSize)
+        let sks = map genKeyDSIGN seeds
         let vks = map deriveVerKeyDSIGN sks
         return $ SignKeySimpleKES (vks, zip [0..] sks)
 

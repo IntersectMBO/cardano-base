@@ -13,13 +13,14 @@ module Cardano.Crypto.DSIGN.Class
   , verifySignedDSIGN
   , encodeSignedDSIGN
   , decodeSignedDSIGN
+  , Seed
   )
 where
 
 import Cardano.Binary (Decoder, Encoding)
 import Cardano.Crypto.Util (Empty)
 import Cardano.Prelude (NoUnexpectedThunks)
-import Crypto.Random (MonadRandom)
+import Cardano.Crypto.Seed
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
@@ -72,7 +73,10 @@ class ( Typeable v
 
   decodeSigDSIGN :: Decoder s (SigDSIGN v)
 
-  genKeyDSIGN :: MonadRandom m => m (SignKeyDSIGN v)
+  genKeyDSIGN :: Seed -> SignKeyDSIGN v
+
+  -- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
+  seedSizeDSIGN :: proxy v -> Natural
 
   deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
 
