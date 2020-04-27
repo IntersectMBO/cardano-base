@@ -33,7 +33,7 @@ import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Seed
 import Cardano.Prelude (NoUnexpectedThunks)
 import Control.Monad (replicateM)
-import Crypto.Random (MonadRandom(getRandomBytes))
+import Data.List (unfoldr)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import Data.Vector ((!?), Vector, fromList)
@@ -67,19 +67,24 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
     decodeVerKeyKES = fromCBOR
     decodeSigKES = fromCBOR
 
-    genKeyKES duration = do
+    seedSizeKES _ duration =
+        let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+         in duration * seedSize
+
+    genKeyKES seed duration =
         let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
-        seeds <- replicateM (fromIntegral duration)
-                            (mkSeedFromBytes <$> getRandomBytes seedSize)
-        let sks = map genKeyDSIGN seeds
-        let vks = map deriveVerKeyDSIGN sks
-        return $ SignKeySimpleKES (vks, zip [0..] sks)
+            seeds = take (fromIntegral duration)
+                  . map mkSeedFromBytes
+                  $ unfoldr (getBytesFromSeed seedSize) seed
+            sks = map genKeyDSIGN seeds
+            vks = map deriveVerKeyDSIGN sks
+         in SignKeySimpleKES (vks, zip [0..] sks)
 
     deriveVerKeyKES (SignKeySimpleKES (vks, _)) = VerKeySimpleKES $ fromList vks
 
     signKES ctxt j a (SignKeySimpleKES (_, xs)) = case dropWhile (\(k, _) -> k < j) xs of
-        []          -> return Nothing
-        (_, sk) : _ -> return $ Just (SigSimpleKES sig)
+        []          -> Nothing
+        (_, sk) : _ -> Just (SigSimpleKES sig)
                          where sig = signDSIGN ctxt a sk
 
     verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
@@ -87,13 +92,13 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SimpleKES d) where
             Nothing -> Left "KES verification failed: out of range"
             Just vk -> verifyDSIGN ctxt vk a sig
 
-    updateKES _ (SignKeySimpleKES (_, [])) _ = pure Nothing
+    updateKES _ (SignKeySimpleKES (_, [])) _ = Nothing
     updateKES ctx s@(SignKeySimpleKES (vks, sks)) to =
       assert (to >= currentPeriodKES ctx s) $
       let sks' = dropWhile (\(d', _) -> to /= d') sks in
         case sks' of
-          [] -> pure Nothing
-          _  -> pure $ Just (SignKeySimpleKES (vks, sks'))
+          [] -> Nothing
+          _  -> Just (SignKeySimpleKES (vks, sks'))
 
     currentPeriodKES _ (SignKeySimpleKES (_, [])) = error "no KES key available"
     currentPeriodKES _ (SignKeySimpleKES (_, (d, _) : _)) = d

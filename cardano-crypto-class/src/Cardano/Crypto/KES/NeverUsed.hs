@@ -35,7 +35,8 @@ instance KESAlgorithm NeverKES where
   decodeSignKeyKES = return NeverUsedSignKeyKES
   decodeSigKES     = return NeverUsedSigKES
 
-  genKeyKES       _ = return NeverUsedSignKeyKES
+  seedSizeKES   _ _ = 0
+  genKeyKES     _ _ = NeverUsedSignKeyKES
   deriveVerKeyKES _ = NeverUsedVerKeyKES
 
   signKES   = error "KES not available"

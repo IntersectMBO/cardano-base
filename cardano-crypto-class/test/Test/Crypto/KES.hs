@@ -14,7 +14,7 @@ module Test.Crypto.KES
   )
 where
 
-import Crypto.Random (MonadRandom)
+import Crypto.Random (MonadRandom(getRandomBytes))
 import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import Numeric.Natural (Natural)
@@ -25,6 +25,7 @@ import Test.Tasty.QuickCheck (testProperty)
 import Cardano.Binary (FromCBOR, ToCBOR(..), encodeListLen)
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.KES
+import Cardano.Crypto.Seed
 import qualified Cardano.Crypto.KES as KES
 
 import Test.Crypto.Orphans.Arbitrary ()
@@ -107,9 +108,8 @@ prop_KES_serialise_Sig
      )
   => proxy v
   -> Duration_TestSeed_SK_Times v [Int]
-  -> TestSeed
   -> Property
-prop_KES_serialise_Sig _ d seed = case withTestSeed seed $ trySign d of
+prop_KES_serialise_Sig _ d = case trySign d of
   Left  e  -> counterexample e False
   Right xs -> conjoin [ prop_cbor sig | (_, _, sig) <- xs ]
 
@@ -117,12 +117,11 @@ prop_KES_verify_pos
   :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
   => proxy v
   -> Duration_TestSeed_SK_Times v [Int]
-  -> TestSeed
   -> Property
-prop_KES_verify_pos _ d seed =
+prop_KES_verify_pos _ d =
   let vk = getFirstVerKey d
   in
-    case withTestSeed seed $ trySign d of
+    case trySign d of
       Left e -> counterexample e False
       Right xs ->
         conjoin [ verifyKES () vk j a sig === Right () | (j, a, sig) <- xs ]
@@ -131,10 +130,9 @@ prop_KES_verify_neg_key
   :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
   => proxy v
   -> Duration_TestSeed_SK_Times v Int
-  -> TestSeed
   -> Property
-prop_KES_verify_neg_key _ d seed =
-  getDuration d > 0 ==> case withTestSeed seed $ trySign d of
+prop_KES_verify_neg_key _ d =
+  getDuration d > 0 ==> case trySign d of
     Left  e  -> counterexample e False
     Right xs -> conjoin
       [ verifyKES () (getSecondVerKey d) j a sig =/= Right ()
@@ -146,12 +144,11 @@ prop_KES_verify_neg_msg
   => proxy v
   -> Duration_TestSeed_SK_Times v Float
   -> Float
-  -> TestSeed
   -> Property
-prop_KES_verify_neg_msg _ d a seed =
+prop_KES_verify_neg_msg _ d a =
   let vk = getFirstVerKey d
   in
-    case withTestSeed seed $ trySign d of
+    case trySign d of
       Left  e  -> counterexample e False
       Right xs -> conjoin
         [ a /= a' ==> verifyKES () vk j a sig =/= Right ()
@@ -166,10 +163,9 @@ prop_KES_verify_neg_time
   -> Property
 prop_KES_verify_neg_time _ d i =
   let
-    seed = TestSeed (1, 0, 2, 0, 1)
     vk   = getFirstVerKey d
     t    = fromIntegral $ abs i
-  in case withTestSeed seed $ trySign d of
+  in case trySign d of
     Left  e  -> counterexample e False
     Right xs -> conjoin
       [ t /= j ==> verifyKES () vk t a sig =/= Right ()
@@ -189,54 +185,41 @@ getSecondVerKey d = case d of
   (Duration_TestSeed_SK_Times _ _ _ vk _) -> vk
 
 trySign
-  :: forall m v a
-   . ( MonadRandom m
-     , KESAlgorithm v
+  :: forall v a
+   . ( KESAlgorithm v
      , KES.Signable v ~ ToCBOR
      , ContextKES v ~ ()
      , ToCBOR a
      , Show a
      )
   => Duration_TestSeed_SK_Times v a
-  -> m (Either String [(Natural, a, SigKES v)])
-trySign (Duration_TestSeed_SK_Times _ _ sk _ ts) = go sk ts
- where
-  go
-    :: SignKeyKES v
-    -> [(Natural, a)]
-    -> m (Either String [(Natural, a, SigKES v)])
-  go _   [] = return $ Right []
-  go sk' l@((j, a) : xs) = do
-    if currentPeriodKES () sk' < j
-      then do
-      sk'' <- updateKES () sk' j
-      case sk'' of
-        Nothing -> return $
-          Left ("trySign: error evolution of " ++
-          show sk ++
-          " to KES period " ++ show j)
-        Just sk''' -> go sk''' l
-      else do
-      m <- signKES () j a sk'
-      case m of
-        Nothing ->
-          return
-          $  Left
-          $  "trySign: error signing "
-          ++ show a
-          ++ " at "
-          ++ show j
-          ++ " with "
-          ++ show sk
-        Just sig -> do
-          sk'' <- updateKES () sk' (1 + currentPeriodKES () sk')
-          case sk'' of
-            Nothing -> pure $ Right [(j, a, sig)]
-            Just sk''' -> do
-              e <- go sk''' xs
-              return $ case e of
-                Right ys -> Right ((j, a, sig) : ys)
-                Left  _  -> e
+  -> Either String [(Natural, a, SigKES v)]
+trySign (Duration_TestSeed_SK_Times _ _ sk _ ts) =
+    go sk ts
+  where
+    go :: SignKeyKES v
+       -> [(Natural, a)]
+       -> Either String [(Natural, a, SigKES v)]
+    go _   [] = Right []
+    go sk' l@((j, a) : xs)
+      | currentPeriodKES () sk' < j =
+        case updateKES () sk' j of
+          Nothing   -> Left $ "trySign: error evolution of " ++ show sk
+                           ++ " to KES period " ++ show j
+          Just sk'' -> go sk'' l
+
+      | otherwise =
+        case signKES () j a sk' of
+          Nothing   -> Left $ "trySign: error signing" ++ show a
+                           ++ " at " ++ show j
+                           ++ " with " ++ show sk
+          Just sig  ->
+            case updateKES () sk' (1 + currentPeriodKES () sk') of
+              Nothing    -> Right [(j, a, sig)]
+              Just sk'' ->
+                case go sk'' xs of
+                  Right ys -> Right ((j, a, sig) : ys)
+                  e@Left{} -> e
 
 data Duration_TestSeed_SK v = Duration_TestSeed_SK Natural TestSeed (SignKeyKES v) (VerKeyKES v)
     deriving Generic
@@ -293,15 +276,20 @@ instance
       <> toCBOR vk
       <> toCBOR ts
 
-duration_TestSeed_SK :: KESAlgorithm v => Natural -> TestSeed -> Duration_TestSeed_SK v
+duration_TestSeed_SK :: forall v. KESAlgorithm v
+                     => Natural -> TestSeed -> Duration_TestSeed_SK v
 duration_TestSeed_SK duration seed =
   let (sk, vk) = withTestSeed seed go in Duration_TestSeed_SK duration seed sk vk
  where
   go = do
-    sk  <- genKeyKES duration
-    sk' <- genKeyKES duration
+    kseed  <- mkSeedFromBytes <$> getRandomBytes (fromIntegral seedSize)
+    kseed' <- mkSeedFromBytes <$> getRandomBytes (fromIntegral seedSize)
+    let sk  = genKeyKES kseed  duration
+    let sk' = genKeyKES kseed' duration
     let vk = deriveVerKeyKES sk'
     if duration > 0 && deriveVerKeyKES sk == vk then go else return (sk, vk)
+
+  seedSize = seedSizeKES (Proxy :: Proxy v) duration
 
 gen_Duration_TestSeed_SK_Times
   :: Arbitrary a => Duration_TestSeed_SK v -> Gen (Duration_TestSeed_SK_Times v a)
