@@ -4,7 +4,7 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.Crypto.Orphans.Arbitrary
-  (
+  ( arbitrarySeedOfSize
   )
 where
 
@@ -15,6 +15,7 @@ import Cardano.Crypto.VRF (VRFAlgorithm (..))
 import Cardano.Crypto.Seed
 import Data.ByteString as BS (pack)
 import Data.Proxy (Proxy (..))
+import Numeric.Natural (Natural)
 import Data.Word (Word64)
 import Test.Crypto.Util (TestSeed (..), withTestSeed)
 import Test.QuickCheck (Arbitrary (..), Gen, arbitraryBoundedIntegral, vector)
@@ -32,14 +33,14 @@ instance Arbitrary TestSeed where
       gen = arbitraryBoundedIntegral
   shrink = const []
 
-arbitrarySeedOfSize :: Int -> Gen Seed
+arbitrarySeedOfSize :: Natural -> Gen Seed
 arbitrarySeedOfSize sz =
-  (mkSeedFromBytes . BS.pack) <$> vector sz
+  (mkSeedFromBytes . BS.pack) <$> vector (fromIntegral sz)
 
 instance DSIGNAlgorithm v => Arbitrary (SignKeyDSIGN v) where
   arbitrary = genKeyDSIGN <$> arbitrarySeedOfSize seedSize
     where
-      seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy v))
+      seedSize = seedSizeDSIGN (Proxy :: Proxy v)
   shrink = const []
 
 instance (ToCBOR a, Arbitrary a, HashAlgorithm h) => Arbitrary (Hash h a) where

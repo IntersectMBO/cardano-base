@@ -9,6 +9,7 @@ module Cardano.Crypto.Seed
     -- * Constructing seeds
   , mkSeedFromBytes
   , readSeedFromSystemEntropy
+  , splitSeed
     -- * Using seeds
   , getBytesFromSeed
   , runMonadRandomWithSeed
@@ -54,6 +55,18 @@ mkSeedFromBytes = Seed
 getBytesFromSeed :: Int -> Seed -> Maybe (ByteString, Seed)
 getBytesFromSeed n (Seed s)
   | BS.length b == n = Just (b, Seed s')
+  | otherwise        = Nothing
+  where
+    (b, s') = BS.splitAt n s
+
+-- | Split a seed into two smaller seeds, the first of which is the given
+-- number of bytes large, and the second is the remaining. This will fail if
+-- not enough bytes are available. This can be chained multiple times provided
+-- the seed is big enough to cover each use.
+--
+splitSeed :: Int -> Seed -> Maybe (Seed, Seed)
+splitSeed n (Seed s)
+  | BS.length b == n = Just (Seed b, Seed s')
   | otherwise        = Nothing
   where
     (b, s') = BS.splitAt n s
