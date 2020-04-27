@@ -22,7 +22,7 @@ import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
-import Cardano.Binary (FromCBOR, ToCBOR(..), encodeListLen)
+import Cardano.Binary (FromCBOR, ToCBOR(..))
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.KES
 import Cardano.Crypto.Seed
@@ -227,17 +227,6 @@ data Duration_TestSeed_SK v = Duration_TestSeed_SK Natural TestSeed (SignKeyKES 
 deriving instance KESAlgorithm v => Show (Duration_TestSeed_SK v)
 deriving instance (KESAlgorithm v, Eq (SignKeyKES v)) => Eq (Duration_TestSeed_SK v)
 
-instance
-  (KESAlgorithm v, ToCBOR (SignKeyKES v), ToCBOR (VerKeyKES v))
-  => ToCBOR (Duration_TestSeed_SK v)
- where
-  toCBOR (Duration_TestSeed_SK n s sk vk) =
-    encodeListLen 4
-      <> toCBOR n
-      <> toCBOR s
-      <> toCBOR sk
-      <> toCBOR vk
-
 instance KESAlgorithm v => Arbitrary (Duration_TestSeed_SK v) where
 
     arbitrary = do
@@ -263,18 +252,6 @@ instance (KESAlgorithm v, Arbitrary a) => Arbitrary (Duration_TestSeed_SK_Times 
 
 deriving instance (KESAlgorithm v, Show a) => Show (Duration_TestSeed_SK_Times v a)
 deriving instance (KESAlgorithm v, Eq (SignKeyKES v), Eq a) => Eq (Duration_TestSeed_SK_Times v a)
-
-instance
-  (KESAlgorithm v, ToCBOR a, ToCBOR (SignKeyKES v), ToCBOR (VerKeyKES v))
-  => ToCBOR (Duration_TestSeed_SK_Times v a)
- where
-  toCBOR (Duration_TestSeed_SK_Times d s sk vk ts) =
-    encodeListLen 5
-      <> toCBOR d
-      <> toCBOR s
-      <> toCBOR sk
-      <> toCBOR vk
-      <> toCBOR ts
 
 duration_TestSeed_SK :: forall v. KESAlgorithm v
                      => Natural -> TestSeed -> Duration_TestSeed_SK v
