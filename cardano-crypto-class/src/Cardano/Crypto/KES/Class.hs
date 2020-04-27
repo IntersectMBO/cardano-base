@@ -66,10 +66,10 @@ class ( Typeable v
 
   decodeSigKES :: Decoder s (SigKES v)
 
-  genKeyKES :: Seed -> Natural -> SignKeyKES v
+  genKeyKES :: Seed -> SignKeyKES v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
-  seedSizeKES :: proxy v -> Natural -> Natural
+  seedSizeKES :: proxy v -> Natural
 
   deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
@@ -111,6 +111,11 @@ class ( Typeable v
     => ContextKES v
     -> SignKeyKES v
     -> Natural
+
+  -- | Return the current KES period of a KES signing key.
+  totalPeriodsKES
+    :: proxy v -> Natural
+
 
 newtype SignedKES v a = SignedKES {getSig :: SigKES v}
   deriving Generic

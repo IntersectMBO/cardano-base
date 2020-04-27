@@ -35,11 +35,12 @@ instance KESAlgorithm NeverKES where
   decodeSignKeyKES = return NeverUsedSignKeyKES
   decodeSigKES     = return NeverUsedSigKES
 
-  seedSizeKES   _ _ = 0
-  genKeyKES     _ _ = NeverUsedSignKeyKES
+  seedSizeKES     _ = 0
+  genKeyKES       _ = NeverUsedSignKeyKES
   deriveVerKeyKES _ = NeverUsedVerKeyKES
 
   signKES   = error "KES not available"
   verifyKES = error "KES not available"
   updateKES = error "KES not available"
-  currentPeriodKES = error "KES not available"
+  currentPeriodKES  = error "KES not available"
+  totalPeriodsKES _ = 0
