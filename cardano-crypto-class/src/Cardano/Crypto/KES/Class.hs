@@ -17,9 +17,9 @@ module Cardano.Crypto.KES.Class
 where
 
 import Cardano.Binary (Decoder, Encoding)
+import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 import Cardano.Prelude (NoUnexpectedThunks)
-import Crypto.Random (MonadRandom)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
@@ -66,7 +66,10 @@ class ( Typeable v
 
   decodeSigKES :: Decoder s (SigKES v)
 
-  genKeyKES :: MonadRandom m => Natural -> m (SignKeyKES v)
+  genKeyKES :: Seed -> Natural -> SignKeyKES v
+
+  -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
+  seedSizeKES :: proxy v -> Natural -> Natural
 
   deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
@@ -79,19 +82,19 @@ class ( Typeable v
   -- The postcondition is that in case a key is returned, its current KES period
   -- corresponds to the target KES period.
   updateKES
-    :: (MonadRandom m, HasCallStack)
+    :: HasCallStack
     => ContextKES v
     -> SignKeyKES v
     -> Natural
-    -> m (Maybe (SignKeyKES v))
+    -> Maybe (SignKeyKES v)
 
   signKES
-    :: (MonadRandom m, Signable v a, HasCallStack)
+    :: (Signable v a, HasCallStack)
     => ContextKES v
     -> Natural
     -> a
     -> SignKeyKES v
-    -> m (Maybe (SigKES v))
+    -> Maybe (SigKES v)
 
   verifyKES
     :: (Signable v a, HasCallStack)
@@ -119,17 +122,13 @@ instance KESAlgorithm v => NoUnexpectedThunks (SignedKES v a)
   -- use generic instance
 
 signedKES
-  :: (KESAlgorithm v, MonadRandom m, Signable v a)
+  :: (KESAlgorithm v, Signable v a)
   => ContextKES v
   -> Natural
   -> a
   -> SignKeyKES v
-  -> m (Maybe (SignedKES v a))
-signedKES ctxt time a key = do
-  m <- signKES ctxt time a key
-  return $ case m of
-    Nothing          -> Nothing
-    Just sig -> Just (SignedKES sig)
+  -> Maybe (SignedKES v a)
+signedKES ctxt time a key = SignedKES <$> signKES ctxt time a key
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)

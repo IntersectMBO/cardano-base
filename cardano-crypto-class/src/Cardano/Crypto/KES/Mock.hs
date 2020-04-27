@@ -17,6 +17,7 @@ where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), decodeListLenOf, encodeListLen)
 import Cardano.Crypto.Hash
+import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util (nonNegIntR)
 import Cardano.Prelude (NoUnexpectedThunks)
@@ -63,23 +64,25 @@ instance KESAlgorithm MockKES where
     decodeVerKeyKES = fromCBOR
     decodeSigKES = fromCBOR
 
-    genKeyKES duration = do
-        vk <- VerKeyMockKES <$> nonNegIntR
-        return $ SignKeyMockKES vk 0 duration
+    seedSizeKES _ _ = 4
+    genKeyKES seed duration =
+        let vk = VerKeyMockKES (runMonadRandomWithSeed seed nonNegIntR)
+         in SignKeyMockKES vk 0 duration
 
     deriveVerKeyKES (SignKeyMockKES vk _ _) = vk
 
     updateKES () (SignKeyMockKES vk k t) to =
       assert (to >= k) $
-         if to < t then (pure $ Just (SignKeyMockKES vk to t))
-         else pure Nothing
+         if to < t
+           then Just (SignKeyMockKES vk to t)
+           else Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
     -- allowed KES period.
     signKES () j a (SignKeyMockKES vk k t)
-        | j == k && j < t = return $ Just
-            ( SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j t))
-        | otherwise       = return Nothing
+        | j == k && j < t = Just (SigMockKES (fromHash $ hash @H a)
+                                             (SignKeyMockKES vk j t))
+        | otherwise       = Nothing
 
     verifyKES () vk j a (SigMockKES h (SignKeyMockKES vk' j' _)) =
         if    j  == j'
