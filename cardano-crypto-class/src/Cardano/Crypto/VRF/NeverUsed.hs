@@ -29,12 +29,20 @@ instance VRFAlgorithm NeverVRF where
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
   data CertVRF NeverVRF = NeverUsedCertVRF
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
-  genKeyVRF = return NeverUsedSignKeyVRF
+
+  genKeyVRF _ = NeverUsedSignKeyVRF
+  seedSizeVRF _ = 0
+
   deriveVerKeyVRF _ = NeverUsedVerKeyVRF
+
   maxVRF _ = 0
+
   decodeVerKeyVRF = error "VRF unavailable"
+
   encodeVerKeyVRF _ = error "VRF unavailable"
+
   evalVRF = error "VRF unavailable"
+
   verifyVRF = error "VRF unavailable"
 
 instance ToCBOR (CertVRF NeverVRF) where

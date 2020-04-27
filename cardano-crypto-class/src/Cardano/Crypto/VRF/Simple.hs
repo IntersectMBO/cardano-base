@@ -25,6 +25,7 @@ import Cardano.Binary
   , enforceSize
   )
 import Cardano.Crypto.Hash
+import Cardano.Crypto.Seed
 import Cardano.Crypto.VRF.Class
 import Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
 import Crypto.Number.Generate (generateBetween)
@@ -111,11 +112,19 @@ instance VRFAlgorithm SimpleVRF where
     deriving anyclass (NoUnexpectedThunks)
 
   maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy H)) - 1
-  genKeyVRF = SignKeySimpleVRF <$> C.scalarGenerate curve
+
+  genKeyVRF seed = SignKeySimpleVRF
+                     (runMonadRandomWithSeed seed (C.scalarGenerate curve))
+
+  seedSizeVRF _  = 16 * 10 -- size of SEC_t113r1 * up to 10 iterations
+
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
+
   decodeVerKeyVRF = fromCBOR
+
   encodeVerKeyVRF = toCBOR
+
   evalVRF () a sk@(SignKeySimpleVRF k) = do
     let u = h' (toCBOR a) k
         y = h $ toCBOR a <> toCBOR u
@@ -124,6 +133,7 @@ instance VRFAlgorithm SimpleVRF where
     let c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
         s = mod (r + k * fromIntegral c) q
     return (y, CertSimpleVRF u c s)
+
   verifyVRF () (VerKeySimpleVRF v) a (y, cert) =
     let u = certU cert
         c = certC cert

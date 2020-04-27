@@ -60,9 +60,9 @@ instance (Cardano.Crypto.DSIGN.Signable v Int, DSIGNAlgorithm v, ContextDSIGN v 
   shrink = const []
 
 instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
-  arbitrary = do
-    seed <- arbitrary
-    return $ withTestSeed seed genKeyVRF
+  arbitrary = genKeyVRF <$> arbitrarySeedOfSize seedSize
+    where
+      seedSize = seedSizeVRF (Proxy :: Proxy v)
   shrink = const []
 
 instance VRFAlgorithm v => Arbitrary (VerKeyVRF v) where
