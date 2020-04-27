@@ -24,6 +24,7 @@ import Cardano.Binary
   , enforceSize
   )
 import Cardano.Crypto.Util (Empty)
+import Cardano.Crypto.Seed (Seed)
 import Cardano.Prelude (NoUnexpectedThunks)
 import Crypto.Random (MonadRandom)
 import Data.Kind (Type)
@@ -64,7 +65,10 @@ class ( Typeable v
 
   maxVRF :: proxy v -> Natural
 
-  genKeyVRF :: MonadRandom m => m (SignKeyVRF v)
+  genKeyVRF :: Seed -> SignKeyVRF v
+
+  -- | The upper bound on the 'Seed' size needed by 'genKeyVRF'
+  seedSizeVRF :: proxy v -> Natural
 
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
 

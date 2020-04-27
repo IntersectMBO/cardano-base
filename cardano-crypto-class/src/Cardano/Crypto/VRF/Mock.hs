@@ -15,6 +15,7 @@ where
 import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Util (nonNegIntR)
+import Cardano.Crypto.Seed
 import Cardano.Crypto.VRF.Class
 import Cardano.Prelude (NoUnexpectedThunks)
 import Data.Proxy (Proxy (..))
@@ -35,11 +36,21 @@ instance VRFAlgorithm MockVRF where
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
 
   maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy MD5)) - 1
-  genKeyVRF = SignKeyMockVRF <$> nonNegIntR
+
+  genKeyVRF seed = SignKeyMockVRF sk
+    where
+      sk = runMonadRandomWithSeed seed nonNegIntR
+
+  seedSizeVRF _ = 4
+
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
+
   encodeVerKeyVRF = toCBOR
+
   decodeVerKeyVRF = fromCBOR
+
   evalVRF () a sk = return $ evalVRF' a sk
+
   verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
 evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (Natural, CertVRF MockVRF)
