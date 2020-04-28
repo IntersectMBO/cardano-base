@@ -23,19 +23,26 @@ import Cardano.Prelude (NoUnexpectedThunks)
 data NeverVRF
 
 instance VRFAlgorithm NeverVRF where
+
   data VerKeyVRF NeverVRF = NeverUsedVerKeyVRF
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+
   data SignKeyVRF NeverVRF = NeverUsedSignKeyVRF
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+
   data CertVRF NeverVRF = NeverUsedCertVRF
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
-  genKeyVRF _ = NeverUsedSignKeyVRF
-  seedSizeVRF _ = 0
-
   deriveVerKeyVRF _ = NeverUsedVerKeyVRF
 
+  evalVRF = error "VRF unavailable"
+
+  verifyVRF = error "VRF unavailable"
+
   maxVRF _ = 0
+
+  genKeyVRF _ = NeverUsedSignKeyVRF
+  seedSizeVRF _ = 0
 
   encodeVerKeyVRF  _ = error "VRF unavailable"
   decodeVerKeyVRF    = error "VRF unavailable"
@@ -43,10 +50,6 @@ instance VRFAlgorithm NeverVRF where
   decodeSignKeyVRF   = error "VRF unavailable"
   encodeCertVRF    _ = error "VRF unavailable"
   decodeCertVRF      = error "VRF unavailable"
-
-  evalVRF = error "VRF unavailable"
-
-  verifyVRF = error "VRF unavailable"
 
 instance ToCBOR (CertVRF NeverVRF) where
   toCBOR _ = toCBOR ()

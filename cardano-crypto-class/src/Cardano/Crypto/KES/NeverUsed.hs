@@ -23,9 +23,27 @@ import Cardano.Prelude (NoUnexpectedThunks)
 data NeverKES
 
 instance KESAlgorithm NeverKES where
-  data VerKeyKES  NeverKES = NeverUsedVerKeyKES  deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
-  data SignKeyKES NeverKES = NeverUsedSignKeyKES deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
-  data SigKES     NeverKES = NeverUsedSigKES     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+
+  data VerKeyKES  NeverKES = NeverUsedVerKeyKES
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+
+  data SignKeyKES NeverKES = NeverUsedSignKeyKES
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+
+  data SigKES     NeverKES = NeverUsedSigKES
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+
+  deriveVerKeyKES _ = NeverUsedVerKeyKES
+
+  signKES   = error "KES not available"
+  verifyKES = error "KES not available"
+  updateKES = error "KES not available"
+
+  currentPeriodKES  = error "KES not available"
+  totalPeriodsKES _ = 0
+
+  seedSizeKES     _ = 0
+  genKeyKES       _ = NeverUsedSignKeyKES
 
   encodeVerKeyKES  _ = toCBOR ()
   encodeSignKeyKES _ = toCBOR ()
@@ -34,13 +52,3 @@ instance KESAlgorithm NeverKES where
   decodeVerKeyKES  = return NeverUsedVerKeyKES
   decodeSignKeyKES = return NeverUsedSignKeyKES
   decodeSigKES     = return NeverUsedSigKES
-
-  seedSizeKES     _ = 0
-  genKeyKES       _ = NeverUsedSignKeyKES
-  deriveVerKeyKES _ = NeverUsedVerKeyKES
-
-  signKES   = error "KES not available"
-  verifyKES = error "KES not available"
-  updateKES = error "KES not available"
-  currentPeriodKES  = error "KES not available"
-  totalPeriodsKES _ = 0

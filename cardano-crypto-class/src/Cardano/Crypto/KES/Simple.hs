@@ -50,6 +50,10 @@ data SimpleKES d (t :: Nat)
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
          KESAlgorithm (SimpleKES d t) where
 
+    --
+    -- Key and signature types
+    --
+
     newtype VerKeyKES (SimpleKES d t) =
               VerKeySimpleKES (Vector (VerKeyDSIGN d))
         deriving Generic
@@ -61,33 +65,18 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     newtype SigKES (SimpleKES d t) = SigSimpleKES (SigDSIGN d)
         deriving (Generic)
 
-    type Signable   (SimpleKES d t) = DSIGN.Signable     d
-    type ContextKES (SimpleKES d t) = DSIGN.ContextDSIGN d
-
-    encodeVerKeyKES = toCBOR
-    encodeSignKeyKES = toCBOR
-    encodeSigKES = toCBOR
-
-    decodeSignKeyKES = fromCBOR
-    decodeVerKeyKES = fromCBOR
-    decodeSigKES = fromCBOR
-
-    seedSizeKES _ =
-        let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
-            duration = natVal (Proxy @ t)
-         in duration * seedSize
-
-    genKeyKES seed =
-        let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
-            duration = natVal (Proxy @ t)
-            seeds = take (fromIntegral duration)
-                  . map mkSeedFromBytes
-                  $ unfoldr (getBytesFromSeed seedSize) seed
-            sks = map genKeyDSIGN seeds
-            vks = map deriveVerKeyDSIGN sks
-         in SignKeySimpleKES (vks, zip [0..] sks)
+    --
+    -- Metadata and basic key operations
+    --
 
     deriveVerKeyKES (SignKeySimpleKES (vks, _)) = VerKeySimpleKES $ fromList vks
+
+    --
+    -- Core algorithm operations
+    --
+
+    type ContextKES (SimpleKES d t) = DSIGN.ContextDSIGN d
+    type Signable   (SimpleKES d t) = DSIGN.Signable     d
 
     signKES ctxt j a (SignKeySimpleKES (_, xs)) = case dropWhile (\(k, _) -> k < j) xs of
         []          -> Nothing
@@ -111,6 +100,38 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     currentPeriodKES _ (SignKeySimpleKES (_, (d, _) : _)) = d
 
     totalPeriodsKES  _ = natVal (Proxy @ t)
+
+    --
+    -- Key generation
+    --
+
+    seedSizeKES _ =
+        let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+            duration = natVal (Proxy @ t)
+         in duration * seedSize
+
+    genKeyKES seed =
+        let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
+            duration = natVal (Proxy @ t)
+            seeds = take (fromIntegral duration)
+                  . map mkSeedFromBytes
+                  $ unfoldr (getBytesFromSeed seedSize) seed
+            sks = map genKeyDSIGN seeds
+            vks = map deriveVerKeyDSIGN sks
+         in SignKeySimpleKES (vks, zip [0..] sks)
+
+    --
+    -- CBOR encoding/decoding
+    --
+
+    encodeVerKeyKES = toCBOR
+    encodeSignKeyKES = toCBOR
+    encodeSigKES = toCBOR
+
+    decodeSignKeyKES = fromCBOR
+    decodeVerKeyKES = fromCBOR
+    decodeSigKES = fromCBOR
+
 
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d t))
 

@@ -36,7 +36,9 @@ data Ed25519DSIGN
 
 instance DSIGNAlgorithm Ed25519DSIGN where
 
-    type Signable Ed25519DSIGN = ToCBOR
+    --
+    -- Key and signature types
+    --
 
     newtype VerKeyDSIGN Ed25519DSIGN = VerKeyEd25519DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
@@ -52,31 +54,24 @@ instance DSIGNAlgorithm Ed25519DSIGN where
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving NoUnexpectedThunks via UseIsNormalForm Signature
 
-    rawSerialiseVerKeyDSIGN   = convert
-    rawSerialiseSignKeyDSIGN  = convert
-    rawSerialiseSigDSIGN      = convert
-
-    rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd25519DSIGN
-                               . cryptoFailableToMaybe . Ed25519.publicKey
-    rawDeserialiseSignKeyDSIGN = fmap SignKeyEd25519DSIGN
-                               . cryptoFailableToMaybe . Ed25519.secretKey
-    rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN
-                               . cryptoFailableToMaybe . Ed25519.signature
-
-    encodeVerKeyDSIGN = toCBOR
-    encodeSignKeyDSIGN = toCBOR
-    encodeSigDSIGN = toCBOR
-
-    decodeVerKeyDSIGN = fromCBOR
-    decodeSignKeyDSIGN = fromCBOR
-    decodeSigDSIGN = fromCBOR
-
-    seedSizeDSIGN _  = 32
-    genKeyDSIGN seed =
-        let sk = runMonadRandomWithSeed seed Ed25519.generateSecretKey
-         in SignKeyEd25519DSIGN sk
+    --
+    -- Metadata and basic key operations
+    --
 
     deriveVerKeyDSIGN (SignKeyEd25519DSIGN sk) = VerKeyEd25519DSIGN $ toPublic sk
+
+    -- | Ed25519 key size is 32 octets
+    -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
+    abstractSizeVKey _ = 32
+
+    -- | Ed25519 signature size is 64 octets
+    abstractSizeSig  _ = 64
+
+    --
+    -- Core algorithm operations
+    --
+
+    type Signable Ed25519DSIGN = ToCBOR
 
     signDSIGN () a (SignKeyEd25519DSIGN sk) =
         let vk = toPublic sk
@@ -88,10 +83,42 @@ instance DSIGNAlgorithm Ed25519DSIGN where
           then Right ()
           else Left "Verification failed"
 
-    -- | Ed25519 key size is 32 octets (per https://tools.ietf.org/html/rfc8032#section-5.1.6)
-    abstractSizeVKey _ = 32
-    -- | Ed25519 signature size is 64 octets
-    abstractSizeSig  _ = 64
+    --
+    -- Key generation
+    --
+
+    seedSizeDSIGN _  = 32
+    genKeyDSIGN seed =
+        let sk = runMonadRandomWithSeed seed Ed25519.generateSecretKey
+         in SignKeyEd25519DSIGN sk
+
+    --
+    -- raw serialise/deserialise
+    --
+
+    rawSerialiseVerKeyDSIGN   = convert
+    rawSerialiseSignKeyDSIGN  = convert
+    rawSerialiseSigDSIGN      = convert
+
+    rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd25519DSIGN
+                               . cryptoFailableToMaybe . Ed25519.publicKey
+    rawDeserialiseSignKeyDSIGN = fmap SignKeyEd25519DSIGN
+                               . cryptoFailableToMaybe . Ed25519.secretKey
+    rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN
+                               . cryptoFailableToMaybe . Ed25519.signature
+
+    --
+    -- CBOR encoding/decoding
+    --
+
+    encodeVerKeyDSIGN = toCBOR
+    encodeSignKeyDSIGN = toCBOR
+    encodeSigDSIGN = toCBOR
+
+    decodeVerKeyDSIGN = fromCBOR
+    decodeSignKeyDSIGN = fromCBOR
+    decodeSigDSIGN = fromCBOR
+
 
 instance ToCBOR (VerKeyDSIGN Ed25519DSIGN) where
   toCBOR = encodeBA
