@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -16,10 +17,13 @@ module Cardano.Crypto.KES.Class
   )
 where
 
-import Cardano.Binary (Decoder, Encoding)
+import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes,
+                       serializeEncoding', decodeFullDecoder)
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 import Cardano.Prelude (NoUnexpectedThunks)
+import Data.ByteString (ByteString)
+import Data.ByteString.Lazy as LBS (fromStrict)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
@@ -54,17 +58,74 @@ class ( Typeable v
   type ContextKES v :: Type
   type ContextKES v = ()
 
+  -- Raw no-overheads serialisation/(de)serialisation
+  -- with default implementations in terms of the CBOR encode/decode
+
+  rawSerialiseVerKeyKES :: VerKeyKES v -> ByteString
+  rawSerialiseVerKeyKES = serializeEncoding' . encodeVerKeyKES
+
+  rawSerialiseSignKeyKES :: SignKeyKES v -> ByteString
+  rawSerialiseSignKeyKES = serializeEncoding' . encodeSignKeyKES
+
+  rawSerialiseSigKES :: SigKES v -> ByteString
+  rawSerialiseSigKES = serializeEncoding' . encodeSigKES
+
+  rawDeserialiseVerKeyKES :: ByteString -> Maybe (VerKeyKES v)
+  rawDeserialiseVerKeyKES =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyKES"
+        decodeVerKeyKES
+    . LBS.fromStrict
+
+  rawDeserialiseSignKeyKES :: ByteString -> Maybe (SignKeyKES v)
+  rawDeserialiseSignKeyKES =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyKES"
+        decodeSignKeyKES
+    . LBS.fromStrict
+
+  rawDeserialiseSigKES :: ByteString -> Maybe (SigKES v)
+  rawDeserialiseSigKES =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyKES"
+        decodeSigKES
+    . LBS.fromStrict
+
+  -- Convenient CBOR encoding/decoding
+  -- with default implementations in terms of the raw (de)serialise
+
   encodeVerKeyKES :: VerKeyKES v -> Encoding
+  encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 
   encodeSignKeyKES :: SignKeyKES v -> Encoding
+  encodeSignKeyKES = encodeBytes . rawSerialiseSignKeyKES
 
   encodeSigKES :: SigKES v -> Encoding
+  encodeSigKES = encodeBytes . rawSerialiseSigKES
 
   decodeVerKeyKES :: Decoder s (VerKeyKES v)
+  decodeVerKeyKES = do
+    bs <- decodeBytes
+    case rawDeserialiseVerKeyKES bs of
+      Nothing -> fail "decodeVerKeyKES: cannot decode key"
+      Just vk -> return vk
 
   decodeSignKeyKES :: Decoder s (SignKeyKES v)
+  decodeSignKeyKES = do
+    bs <- decodeBytes
+    case rawDeserialiseSignKeyKES bs of
+      Nothing -> fail "decodeSignKeyKES: cannot decode key"
+      Just vk -> return vk
 
   decodeSigKES :: Decoder s (SigKES v)
+  decodeSigKES = do
+    bs <- decodeBytes
+    case rawDeserialiseSigKES bs of
+      Nothing -> fail "decodeSigKES: cannot decode key"
+      Just vk -> return vk
 
   genKeyKES :: Seed -> SignKeyKES v
 
@@ -115,6 +176,23 @@ class ( Typeable v
   -- | Return the current KES period of a KES signing key.
   totalPeriodsKES
     :: proxy v -> Natural
+
+  {-# MINIMAL
+        (rawSerialiseVerKeyKES    | encodeVerKeyKES)
+      , (rawSerialiseSignKeyKES   | encodeSignKeyKES)
+      , (rawSerialiseSigKES       | encodeSigKES)
+      , (rawDeserialiseVerKeyKES  | decodeVerKeyKES)
+      , (rawDeserialiseSignKeyKES | decodeSignKeyKES)
+      , (rawDeserialiseSigKES     | decodeSigKES)
+      , genKeyKES
+      , seedSizeKES
+      , deriveVerKeyKES
+      , updateKES
+      , signKES
+      , verifyKES
+      , currentPeriodKES
+      , totalPeriodsKES
+    #-}
 
 
 newtype SignedKES v a = SignedKES {getSig :: SigKES v}
