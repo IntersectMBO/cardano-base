@@ -45,9 +45,12 @@ instance VRFAlgorithm MockVRF where
 
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
 
-  encodeVerKeyVRF = toCBOR
-
-  decodeVerKeyVRF = fromCBOR
+  encodeVerKeyVRF  = toCBOR
+  decodeVerKeyVRF  = fromCBOR
+  encodeSignKeyVRF = toCBOR
+  decodeSignKeyVRF = fromCBOR
+  encodeCertVRF    = toCBOR
+  decodeCertVRF    = fromCBOR
 
   evalVRF () a sk = return $ evalVRF' a sk
 
