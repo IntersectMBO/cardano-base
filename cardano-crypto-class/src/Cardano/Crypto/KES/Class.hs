@@ -57,6 +57,8 @@ class ( Typeable v
   -- Metadata and basic key operations
   --
 
+  algorithmNameKES :: proxy v -> String
+
   deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
 
@@ -205,7 +207,8 @@ class ( Typeable v
 
 
   {-# MINIMAL
-        deriveVerKeyKES
+        algorithmNameKES
+      , deriveVerKeyKES
       , signKES
       , verifyKES
       , updateKES

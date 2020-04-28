@@ -33,6 +33,8 @@ instance DSIGNAlgorithm NeverDSIGN where
   data SigDSIGN     NeverDSIGN = NeverUsedSigDSIGN
      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
+  algorithmNameDSIGN _ = "never"
+
   deriveVerKeyDSIGN _ = NeverUsedVerKeyDSIGN
 
   abstractSizeVKey _ = error "abstract size not available"

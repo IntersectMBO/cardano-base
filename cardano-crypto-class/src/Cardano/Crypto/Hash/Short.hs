@@ -16,6 +16,7 @@ import qualified Data.ByteString as B
 data ShortHash
 
 instance HashAlgorithm ShortHash where
+  hashAlgorithmName _ = "md5_short"
   byteCount _ = 4
   digest p =
     B.take (fromIntegral $ byteCount p) .

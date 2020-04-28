@@ -58,6 +58,8 @@ instance DSIGNAlgorithm MockDSIGN where
     -- Metadata and basic key operations
     --
 
+    algorithmNameDSIGN _ = "mock"
+
     deriveVerKeyDSIGN (SignKeyMockDSIGN n) = VerKeyMockDSIGN n
 
     abstractSizeVKey _ = 8 -- for 64 bit Int

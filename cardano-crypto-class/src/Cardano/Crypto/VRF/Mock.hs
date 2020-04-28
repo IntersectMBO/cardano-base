@@ -43,6 +43,8 @@ instance VRFAlgorithm MockVRF where
   -- Metadata and basic key operations
   --
 
+  algorithmNameVRF _ = "mock"
+
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
 
   --

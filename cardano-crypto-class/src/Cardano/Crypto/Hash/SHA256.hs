@@ -13,6 +13,7 @@ import qualified Data.ByteArray as BA
 data SHA256
 
 instance HashAlgorithm SHA256 where
+  hashAlgorithmName _ = "sha256"
   byteCount _ = 32
   digest _ = convert . H.hash
 

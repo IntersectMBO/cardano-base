@@ -58,6 +58,8 @@ class ( Typeable v
   -- Metadata and basic key operations
   --
 
+  algorithmNameDSIGN :: proxy v -> String
+
   deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
 
   -- | Abstract sizes for verification keys and signatures, specifies an upper
@@ -183,7 +185,8 @@ class ( Typeable v
 
 
   {-# MINIMAL
-        deriveVerKeyDSIGN
+        algorithmNameDSIGN
+      , deriveVerKeyDSIGN
       , abstractSizeVKey
       , abstractSizeSig
       , signDSIGN

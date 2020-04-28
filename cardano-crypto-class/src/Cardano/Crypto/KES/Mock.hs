@@ -68,6 +68,8 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- Metadata and basic key operations
     --
 
+    algorithmNameKES proxy = "mock_" ++ show (totalPeriodsKES proxy)
+
     deriveVerKeyKES (SignKeyMockKES vk _) = vk
 
     --
