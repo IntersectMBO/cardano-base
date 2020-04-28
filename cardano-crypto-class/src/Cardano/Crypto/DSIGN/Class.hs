@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -17,10 +18,13 @@ module Cardano.Crypto.DSIGN.Class
   )
 where
 
-import Cardano.Binary (Decoder, Encoding)
+import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes,
+                       serializeEncoding', decodeFullDecoder)
 import Cardano.Crypto.Util (Empty)
 import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Crypto.Seed
+import Data.ByteString (ByteString)
+import Data.ByteString.Lazy as LBS (fromStrict)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
@@ -61,17 +65,75 @@ class ( Typeable v
   type ContextDSIGN v :: Type
   type ContextDSIGN v = ()
 
+  -- Raw no-overheads serialisation/(de)serialisation
+  -- with default implementations in terms of the CBOR encode/decode
+
+  rawSerialiseVerKeyDSIGN :: VerKeyDSIGN v -> ByteString
+  rawSerialiseVerKeyDSIGN = serializeEncoding' . encodeVerKeyDSIGN
+
+  rawSerialiseSignKeyDSIGN :: SignKeyDSIGN v -> ByteString
+  rawSerialiseSignKeyDSIGN = serializeEncoding' . encodeSignKeyDSIGN
+
+  rawSerialiseSigDSIGN :: SigDSIGN v -> ByteString
+  rawSerialiseSigDSIGN = serializeEncoding' . encodeSigDSIGN
+
+  rawDeserialiseVerKeyDSIGN :: ByteString -> Maybe (VerKeyDSIGN v)
+  rawDeserialiseVerKeyDSIGN =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyDSIGN"
+        decodeVerKeyDSIGN
+    . LBS.fromStrict
+
+  rawDeserialiseSignKeyDSIGN :: ByteString -> Maybe (SignKeyDSIGN v)
+  rawDeserialiseSignKeyDSIGN =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyDSIGN"
+        decodeSignKeyDSIGN
+    . LBS.fromStrict
+
+  rawDeserialiseSigDSIGN :: ByteString -> Maybe (SigDSIGN v)
+  rawDeserialiseSigDSIGN =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyDSIGN"
+        decodeSigDSIGN
+    . LBS.fromStrict
+
+  -- Convenient CBOR encoding/decoding
+  -- with default implementations in terms of the raw (de)serialise
+
   encodeVerKeyDSIGN :: VerKeyDSIGN v -> Encoding
+  encodeVerKeyDSIGN = encodeBytes . rawSerialiseVerKeyDSIGN
 
   encodeSignKeyDSIGN :: SignKeyDSIGN v -> Encoding
+  encodeSignKeyDSIGN = encodeBytes . rawSerialiseSignKeyDSIGN
 
   encodeSigDSIGN :: SigDSIGN v -> Encoding
+  encodeSigDSIGN = encodeBytes . rawSerialiseSigDSIGN
 
   decodeVerKeyDSIGN :: Decoder s (VerKeyDSIGN v)
+  decodeVerKeyDSIGN = do
+    bs <- decodeBytes
+    case rawDeserialiseVerKeyDSIGN bs of
+      Nothing -> fail "decodeVerKeyDSIGN: cannot decode key"
+      Just vk -> return vk
 
   decodeSignKeyDSIGN :: Decoder s (SignKeyDSIGN v)
+  decodeSignKeyDSIGN = do
+    bs <- decodeBytes
+    case rawDeserialiseSignKeyDSIGN bs of
+      Nothing -> fail "decodeSignKeyDSIGN: cannot decode key"
+      Just vk -> return vk
 
   decodeSigDSIGN :: Decoder s (SigDSIGN v)
+  decodeSigDSIGN = do
+    bs <- decodeBytes
+    case rawDeserialiseSigDSIGN bs of
+      Nothing -> fail "decodeSigDSIGN: cannot decode key"
+      Just vk -> return vk
+
 
   genKeyDSIGN :: Seed -> SignKeyDSIGN v
 
@@ -94,6 +156,22 @@ class ( Typeable v
     -> a
     -> SigDSIGN v
     -> Either String ()
+
+  {-# MINIMAL
+        abstractSizeVKey
+      , abstractSizeSig
+      , (rawSerialiseVerKeyDSIGN    | encodeVerKeyDSIGN)
+      , (rawSerialiseSignKeyDSIGN   | encodeSignKeyDSIGN)
+      , (rawSerialiseSigDSIGN       | encodeSigDSIGN)
+      , (rawDeserialiseVerKeyDSIGN  | decodeVerKeyDSIGN)
+      , (rawDeserialiseSignKeyDSIGN | decodeSignKeyDSIGN)
+      , (rawDeserialiseSigDSIGN     | decodeSigDSIGN)
+      , genKeyDSIGN
+      , seedSizeDSIGN
+      , deriveVerKeyDSIGN
+      , signDSIGN
+      , verifyDSIGN
+    #-}
 
 newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
   deriving Generic
