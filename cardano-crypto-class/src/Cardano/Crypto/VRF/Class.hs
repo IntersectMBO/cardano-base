@@ -29,6 +29,7 @@ import Cardano.Binary
   )
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Seed (Seed)
+import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
 import Cardano.Prelude (NoUnexpectedThunks)
 import Crypto.Random (MonadRandom)
 import Data.ByteString (ByteString)
@@ -39,6 +40,7 @@ import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
 import Numeric.Natural
+
 
 class ( Typeable v
       , Show (VerKeyVRF v)
@@ -69,6 +71,9 @@ class ( Typeable v
   algorithmNameVRF :: proxy v -> String
 
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
+
+  hashVerKeyVRF :: HashAlgorithm h => VerKeyVRF v -> Hash h (VerKeyVRF v)
+  hashVerKeyVRF = hashRaw rawSerialiseVerKeyVRF
 
 
   --

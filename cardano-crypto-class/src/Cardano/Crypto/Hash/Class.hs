@@ -8,6 +8,7 @@ module Cardano.Crypto.Hash.Class
   , ByteString
   , Hash(..)
   , hash
+  , hashRaw
   , hashPair
   , hashWithSerialiser
   , fromHash
@@ -79,6 +80,9 @@ hash = hashWithSerialiser toCBOR
 hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
 hashWithSerialiser toEnc
   = UnsafeHash . digest (Proxy :: Proxy h) . serializeEncoding' . toEnc
+
+hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
+hashRaw serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
 
 fromHash :: Hash h a -> Natural
 fromHash = foldl' f 0 . SB.unpack . getHash
