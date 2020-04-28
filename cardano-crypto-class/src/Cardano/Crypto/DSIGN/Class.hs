@@ -44,20 +44,31 @@ class ( Typeable v
       )
       => DSIGNAlgorithm v where
 
-  data VerKeyDSIGN v :: Type
 
+  --
+  -- Key and signature types
+  --
+
+  data VerKeyDSIGN  v :: Type
   data SignKeyDSIGN v :: Type
+  data SigDSIGN     v :: Type
 
-  data SigDSIGN v :: Type
 
-  type Signable v :: Type -> Constraint
-  type Signable v = Empty
+  --
+  -- Metadata and basic key operations
+  --
 
+  deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
 
   -- | Abstract sizes for verification keys and signatures, specifies an upper
   -- bound on the real byte sizes.
   abstractSizeVKey :: proxy v -> Natural
   abstractSizeSig  :: proxy v -> Natural
+
+
+  --
+  -- Core algorithm operations
+  --
 
   -- | Context required to run the DSIGN algorithm
   --
@@ -65,8 +76,40 @@ class ( Typeable v
   type ContextDSIGN v :: Type
   type ContextDSIGN v = ()
 
-  -- Raw no-overheads serialisation/(de)serialisation
-  -- with default implementations in terms of the CBOR encode/decode
+  type Signable v :: Type -> Constraint
+  type Signable v = Empty
+
+  signDSIGN
+    :: (Signable v a, HasCallStack)
+    => ContextDSIGN v
+    -> a
+    -> SignKeyDSIGN v
+    -> SigDSIGN v
+
+  verifyDSIGN
+    :: (Signable v a, HasCallStack)
+    => ContextDSIGN v
+    -> VerKeyDSIGN v
+    -> a
+    -> SigDSIGN v
+    -> Either String ()
+
+
+  --
+  -- Key generation
+  --
+
+  genKeyDSIGN :: Seed -> SignKeyDSIGN v
+
+  -- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
+  seedSizeDSIGN :: proxy v -> Natural
+
+
+  --
+  -- Serialisation/(de)serialisation in raw format, no extra tags
+  --
+  -- default implementations in terms of the CBOR encode/decode
+  --
 
   rawSerialiseVerKeyDSIGN :: VerKeyDSIGN v -> ByteString
   rawSerialiseVerKeyDSIGN = serializeEncoding' . encodeVerKeyDSIGN
@@ -101,8 +144,12 @@ class ( Typeable v
         decodeSigDSIGN
     . LBS.fromStrict
 
+
+  --
   -- Convenient CBOR encoding/decoding
-  -- with default implementations in terms of the raw (de)serialise
+  --
+  -- default implementations in terms of the raw (de)serialise
+  --
 
   encodeVerKeyDSIGN :: VerKeyDSIGN v -> Encoding
   encodeVerKeyDSIGN = encodeBytes . rawSerialiseVerKeyDSIGN
@@ -135,43 +182,22 @@ class ( Typeable v
       Just vk -> return vk
 
 
-  genKeyDSIGN :: Seed -> SignKeyDSIGN v
-
-  -- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
-  seedSizeDSIGN :: proxy v -> Natural
-
-  deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
-
-  signDSIGN
-    :: (Signable v a, HasCallStack)
-    => ContextDSIGN v
-    -> a
-    -> SignKeyDSIGN v
-    -> SigDSIGN v
-
-  verifyDSIGN
-    :: (Signable v a, HasCallStack)
-    => ContextDSIGN v
-    -> VerKeyDSIGN v
-    -> a
-    -> SigDSIGN v
-    -> Either String ()
-
   {-# MINIMAL
-        abstractSizeVKey
+        deriveVerKeyDSIGN
+      , abstractSizeVKey
       , abstractSizeSig
+      , signDSIGN
+      , verifyDSIGN
+      , genKeyDSIGN
+      , seedSizeDSIGN
       , (rawSerialiseVerKeyDSIGN    | encodeVerKeyDSIGN)
       , (rawSerialiseSignKeyDSIGN   | encodeSignKeyDSIGN)
       , (rawSerialiseSigDSIGN       | encodeSigDSIGN)
       , (rawDeserialiseVerKeyDSIGN  | decodeVerKeyDSIGN)
       , (rawDeserialiseSignKeyDSIGN | decodeSignKeyDSIGN)
       , (rawDeserialiseSigDSIGN     | decodeSigDSIGN)
-      , genKeyDSIGN
-      , seedSizeDSIGN
-      , deriveVerKeyDSIGN
-      , signDSIGN
-      , verifyDSIGN
     #-}
+
 
 newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
   deriving Generic

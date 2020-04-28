@@ -54,8 +54,26 @@ class ( Typeable v
       )
       => VRFAlgorithm v where
 
-  type Signable v :: Type -> Constraint
-  type Signable c = Empty
+
+  --
+  -- Key and signature types
+  --
+
+  data VerKeyVRF  v :: Type
+  data SignKeyVRF v :: Type
+  data CertVRF    v :: Type
+
+
+  --
+  -- Metadata and basic key operations
+  --
+
+  deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
+
+
+  --
+  -- Core algorithm operations
+  --
 
   -- | Context required to run the VRF algorithm
   --
@@ -63,23 +81,42 @@ class ( Typeable v
   type ContextVRF v :: Type
   type ContextVRF v = ()
 
-  data VerKeyVRF v :: Type
+  type Signable v :: Type -> Constraint
+  type Signable c = Empty
 
-  data SignKeyVRF v :: Type
+  evalVRF
+    :: (MonadRandom m, HasCallStack, Signable v a)
+    => ContextVRF v
+    -> a
+    -> SignKeyVRF v
+    -> m (Natural, CertVRF v)
 
-  data CertVRF v :: Type
+  verifyVRF
+    :: (HasCallStack, Signable v a)
+    => ContextVRF v
+    -> VerKeyVRF v
+    -> a
+    -> (Natural, CertVRF v)
+    -> Bool
 
   maxVRF :: proxy v -> Natural
+
+
+  --
+  -- Key generation
+  --
 
   genKeyVRF :: Seed -> SignKeyVRF v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyVRF'
   seedSizeVRF :: proxy v -> Natural
 
-  deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
 
-  -- Raw no-overheads serialisation/(de)serialisation
-  -- with default implementations in terms of the CBOR encode/decode
+  --
+  -- Serialisation/(de)serialisation in raw format, no extra tags
+  --
+  -- default implementations in terms of the CBOR encode/decode
+  --
 
   rawSerialiseVerKeyVRF :: VerKeyVRF v -> ByteString
   rawSerialiseVerKeyVRF = serializeEncoding' . encodeVerKeyVRF
@@ -114,8 +151,12 @@ class ( Typeable v
         decodeCertVRF
     . LBS.fromStrict
 
+
+  --
   -- Convenient CBOR encoding/decoding
-  -- with default implementations in terms of the raw (de)serialise
+  --
+  -- default implementations in terms of the raw (de)serialise
+  --
 
   encodeVerKeyVRF :: VerKeyVRF v -> Encoding
   encodeVerKeyVRF = encodeBytes . rawSerialiseVerKeyVRF
@@ -147,34 +188,20 @@ class ( Typeable v
       Nothing -> fail "decodeCertVRF: cannot decode key"
       Just vk -> return vk
 
-  evalVRF
-    :: (MonadRandom m, HasCallStack, Signable v a)
-    => ContextVRF v
-    -> a
-    -> SignKeyVRF v
-    -> m (Natural, CertVRF v)
-
-  verifyVRF
-    :: (HasCallStack, Signable v a)
-    => ContextVRF v
-    -> VerKeyVRF v
-    -> a
-    -> (Natural, CertVRF v)
-    -> Bool
 
   {-# MINIMAL
-        (rawSerialiseVerKeyVRF    | encodeVerKeyVRF)
+        deriveVerKeyVRF
+      , evalVRF
+      , verifyVRF
+      , maxVRF
+      , genKeyVRF
+      , seedSizeVRF
+      , (rawSerialiseVerKeyVRF    | encodeVerKeyVRF)
       , (rawSerialiseSignKeyVRF   | encodeSignKeyVRF)
       , (rawSerialiseCertVRF      | encodeCertVRF)
       , (rawDeserialiseVerKeyVRF  | decodeVerKeyVRF)
       , (rawDeserialiseSignKeyVRF | decodeSignKeyVRF)
       , (rawDeserialiseCertVRF    | decodeCertVRF)
-      , genKeyVRF
-      , seedSizeVRF
-      , deriveVerKeyVRF
-      , evalVRF
-      , verifyVRF
-      , maxVRF
     #-}
 
 
