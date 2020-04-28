@@ -26,24 +26,49 @@ data MockVRF
 
 instance VRFAlgorithm MockVRF where
 
-  type Signable MockVRF = ToCBOR
+  --
+  -- Key and signature types
+  --
 
   newtype VerKeyVRF MockVRF = VerKeyMockVRF Int
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+
   newtype SignKeyVRF MockVRF = SignKeyMockVRF Int
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+
   newtype CertVRF MockVRF = CertMockVRF Int
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+
+  --
+  -- Metadata and basic key operations
+  --
+
+  deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
+
+  --
+  -- Core algorithm operations
+  --
+
+  type Signable MockVRF = ToCBOR
+
+  evalVRF () a sk = return $ evalVRF' a sk
+
+  verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
   maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy MD5)) - 1
 
+  --
+  -- Key generation
+  --
+
+  seedSizeVRF _  = 4
   genKeyVRF seed = SignKeyMockVRF sk
     where
       sk = runMonadRandomWithSeed seed nonNegIntR
 
-  seedSizeVRF _ = 4
-
-  deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
+  --
+  -- CBOR encoding/decoding
+  --
 
   encodeVerKeyVRF  = toCBOR
   decodeVerKeyVRF  = fromCBOR
@@ -52,9 +77,6 @@ instance VRFAlgorithm MockVRF where
   encodeCertVRF    = toCBOR
   decodeCertVRF    = fromCBOR
 
-  evalVRF () a sk = return $ evalVRF' a sk
-
-  verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
 evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (Natural, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =

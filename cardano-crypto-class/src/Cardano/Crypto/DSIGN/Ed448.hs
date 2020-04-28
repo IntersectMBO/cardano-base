@@ -36,7 +36,9 @@ data Ed448DSIGN
 
 instance DSIGNAlgorithm Ed448DSIGN where
 
-    type Signable Ed448DSIGN = ToCBOR
+    --
+    -- Key and signature types
+    --
 
     newtype VerKeyDSIGN Ed448DSIGN = VerKeyEd448DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
@@ -52,31 +54,21 @@ instance DSIGNAlgorithm Ed448DSIGN where
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving NoUnexpectedThunks via UseIsNormalForm Signature
 
-    rawSerialiseVerKeyDSIGN   = convert
-    rawSerialiseSignKeyDSIGN  = convert
-    rawSerialiseSigDSIGN      = convert
-
-    rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd448DSIGN
-                               . cryptoFailableToMaybe . Ed448.publicKey
-    rawDeserialiseSignKeyDSIGN = fmap SignKeyEd448DSIGN
-                               . cryptoFailableToMaybe . Ed448.secretKey
-    rawDeserialiseSigDSIGN     = fmap SigEd448DSIGN
-                               . cryptoFailableToMaybe . Ed448.signature
-
-    encodeVerKeyDSIGN = toCBOR
-    encodeSignKeyDSIGN = toCBOR
-    encodeSigDSIGN = toCBOR
-
-    decodeVerKeyDSIGN = fromCBOR
-    decodeSignKeyDSIGN = fromCBOR
-    decodeSigDSIGN = fromCBOR
-
-    seedSizeDSIGN _  = 57
-    genKeyDSIGN seed =
-        let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
-         in SignKeyEd448DSIGN sk
+    --
+    -- Metadata and basic key operations
+    --
 
     deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
+
+    -- | Goldilocks points are 448 bits long, so 64 byte is a good abstract size
+    abstractSizeVKey _ = 64
+    abstractSizeSig  _ = 64
+
+    --
+    -- Core algorithm operations
+    --
+
+    type Signable Ed448DSIGN = ToCBOR
 
     signDSIGN () a (SignKeyEd448DSIGN sk) =
         let vk = toPublic sk
@@ -88,9 +80,42 @@ instance DSIGNAlgorithm Ed448DSIGN where
           then Right ()
           else Left "Verification failed"
 
-    -- | Goldilocks points are 448 bits long, so 64 byte is a good abstract size
-    abstractSizeVKey _ = 64
-    abstractSizeSig  _ = 64
+    --
+    -- Key generation
+    --
+
+    seedSizeDSIGN _  = 57
+    genKeyDSIGN seed =
+        let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
+         in SignKeyEd448DSIGN sk
+
+    --
+    -- raw serialise/deserialise
+    --
+
+    rawSerialiseVerKeyDSIGN   = convert
+    rawSerialiseSignKeyDSIGN  = convert
+    rawSerialiseSigDSIGN      = convert
+
+    rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd448DSIGN
+                               . cryptoFailableToMaybe . Ed448.publicKey
+    rawDeserialiseSignKeyDSIGN = fmap SignKeyEd448DSIGN
+                               . cryptoFailableToMaybe . Ed448.secretKey
+    rawDeserialiseSigDSIGN     = fmap SigEd448DSIGN
+                               . cryptoFailableToMaybe . Ed448.signature
+
+    --
+    -- CBOR encoding/decoding
+    --
+
+    encodeVerKeyDSIGN = toCBOR
+    encodeSignKeyDSIGN = toCBOR
+    encodeSigDSIGN = toCBOR
+
+    decodeVerKeyDSIGN = fromCBOR
+    decodeSignKeyDSIGN = fromCBOR
+    decodeSigDSIGN = fromCBOR
+
 
 instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
   toCBOR = encodeBA

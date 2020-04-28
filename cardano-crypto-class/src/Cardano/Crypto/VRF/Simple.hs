@@ -91,7 +91,9 @@ getR = generateBetween 0 (q - 1)
 
 instance VRFAlgorithm SimpleVRF where
 
-  type Signable SimpleVRF = ToCBOR
+  --
+  -- Key and signature types
+  --
 
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
     deriving stock   (Show, Eq, Generic)
@@ -111,22 +113,18 @@ instance VRFAlgorithm SimpleVRF where
     deriving stock    (Show, Eq, Generic)
     deriving anyclass (NoUnexpectedThunks)
 
-  maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy H)) - 1
-
-  genKeyVRF seed = SignKeySimpleVRF
-                     (runMonadRandomWithSeed seed (C.scalarGenerate curve))
-
-  seedSizeVRF _  = 16 * 10 -- size of SEC_t113r1 * up to 10 iterations
+  --
+  -- Metadata and basic key operations
+  --
 
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
 
-  encodeVerKeyVRF  = toCBOR
-  decodeVerKeyVRF  = fromCBOR
-  encodeSignKeyVRF = toCBOR
-  decodeSignKeyVRF = fromCBOR
-  encodeCertVRF    = toCBOR
-  decodeCertVRF    = fromCBOR
+  --
+  -- Core algorithm operations
+  --
+
+  type Signable SimpleVRF = ToCBOR
 
   evalVRF () a sk@(SignKeySimpleVRF k) = do
     let u = h' (toCBOR a) k
@@ -149,6 +147,28 @@ instance VRFAlgorithm SimpleVRF where
             toCBOR (pow s <> pow' v c') <>
             toCBOR (h' (toCBOR a) s <> pow' u c')
     in b1 && c == rhs
+
+  maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy H)) - 1
+
+  --
+  -- Key generation
+  --
+
+  seedSizeVRF _  = 16 * 10 -- size of SEC_t113r1 * up to 10 iterations
+  genKeyVRF seed = SignKeySimpleVRF
+                     (runMonadRandomWithSeed seed (C.scalarGenerate curve))
+
+  --
+  -- CBOR encoding/decoding
+  --
+
+  encodeVerKeyVRF  = toCBOR
+  decodeVerKeyVRF  = fromCBOR
+  encodeSignKeyVRF = toCBOR
+  decodeSignKeyVRF = fromCBOR
+  encodeCertVRF    = toCBOR
+  decodeCertVRF    = fromCBOR
+
 
 instance ToCBOR (CertVRF SimpleVRF) where
   toCBOR cvrf =

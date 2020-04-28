@@ -38,7 +38,9 @@ data MockDSIGN
 
 instance DSIGNAlgorithm MockDSIGN where
 
-    type Signable MockDSIGN = ToCBOR
+    --
+    -- Key and signature types
+    --
 
     newtype VerKeyDSIGN MockDSIGN = VerKeyMockDSIGN Int
         deriving stock   (Show, Eq, Ord, Generic)
@@ -52,19 +54,24 @@ instance DSIGNAlgorithm MockDSIGN where
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
-    encodeVerKeyDSIGN  = toCBOR
-    encodeSignKeyDSIGN = toCBOR
-    encodeSigDSIGN     = toCBOR
-
-    decodeVerKeyDSIGN  = fromCBOR
-    decodeSignKeyDSIGN = fromCBOR
-    decodeSigDSIGN     = fromCBOR
-
-    seedSizeDSIGN _    = 4
-    genKeyDSIGN seed   =
-      SignKeyMockDSIGN (runMonadRandomWithSeed seed nonNegIntR)
+    --
+    -- Metadata and basic key operations
+    --
 
     deriveVerKeyDSIGN (SignKeyMockDSIGN n) = VerKeyMockDSIGN n
+
+    abstractSizeVKey _ = 8 -- for 64 bit Int
+    abstractSizeSig  _ = 1
+                       + (byteCount (Proxy :: Proxy ShortHash))
+                       + 8 -- length tag + length
+                           -- short hash + 64 bit
+                           -- Int
+
+    --
+    -- Core algorithm operations
+    --
+
+    type Signable MockDSIGN = ToCBOR
 
     signDSIGN () a sk = mockSign a sk
 
@@ -77,12 +84,25 @@ instance DSIGNAlgorithm MockDSIGN where
                , vErrCallStack = prettyCallStack callStack
                }
 
-    abstractSizeVKey _ = 8 -- for 64 bit Int
-    abstractSizeSig  _ = 1
-                       + (byteCount (Proxy :: Proxy ShortHash))
-                       + 8 -- length tag + length
-                                                        -- short hash + 64 bit
-                                                        -- Int
+    --
+    -- Key generation
+    --
+
+    seedSizeDSIGN _    = 4
+    genKeyDSIGN seed   =
+      SignKeyMockDSIGN (runMonadRandomWithSeed seed nonNegIntR)
+
+    --
+    -- CBOR encoding/decoding
+    --
+
+    encodeVerKeyDSIGN  = toCBOR
+    encodeSignKeyDSIGN = toCBOR
+    encodeSigDSIGN     = toCBOR
+
+    decodeVerKeyDSIGN  = fromCBOR
+    decodeSignKeyDSIGN = fromCBOR
+    decodeSigDSIGN     = fromCBOR
 
 
 -- | Debugging: provide information about the verification failure

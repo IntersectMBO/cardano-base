@@ -46,7 +46,9 @@ type H = MD5
 -- from the performance implications of shuffling a giant list of keys around
 instance KnownNat t => KESAlgorithm (MockKES t) where
 
-    type Signable (MockKES t) = ToCBOR
+    --
+    -- Key and signature types
+    --
 
     newtype VerKeyKES (MockKES t) = VerKeyMockKES Int
         deriving stock   (Show, Eq, Ord, Generic)
@@ -62,20 +64,17 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
-    encodeVerKeyKES = toCBOR
-    encodeSignKeyKES = toCBOR
-    encodeSigKES = toCBOR
-
-    decodeSignKeyKES = fromCBOR
-    decodeVerKeyKES = fromCBOR
-    decodeSigKES = fromCBOR
-
-    seedSizeKES _ = 4
-    genKeyKES seed =
-        let vk = VerKeyMockKES (runMonadRandomWithSeed seed nonNegIntR)
-         in SignKeyMockKES vk 0
+    --
+    -- Metadata and basic key operations
+    --
 
     deriveVerKeyKES (SignKeyMockKES vk _) = vk
+
+    --
+    -- Core algorithm operations
+    --
+
+    type Signable (MockKES t) = ToCBOR
 
     updateKES () (SignKeyMockKES vk k) to =
       assert (to >= k) $
@@ -102,6 +101,29 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     currentPeriodKES () (SignKeyMockKES _ k) = k
     totalPeriodsKES  _ = natVal (Proxy @ t)
+
+    --
+    -- Key generation
+    --
+
+    seedSizeKES _ = 4
+    genKeyKES seed =
+        let vk = VerKeyMockKES (runMonadRandomWithSeed seed nonNegIntR)
+         in SignKeyMockKES vk 0
+
+
+    --
+    -- CBOR encoding/decoding
+    --
+
+    encodeVerKeyKES = toCBOR
+    encodeSignKeyKES = toCBOR
+    encodeSigKES = toCBOR
+
+    decodeSignKeyKES = fromCBOR
+    decodeVerKeyKES = fromCBOR
+    decodeSigKES = fromCBOR
+
 
 instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
   toCBOR (SigMockKES evolution key) =
