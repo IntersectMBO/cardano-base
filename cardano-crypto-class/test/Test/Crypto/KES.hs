@@ -45,7 +45,8 @@ deriving instance (DSIGNAlgorithm d, Eq (SignKeyDSIGN d))
                => Eq (SignKeyKES (SimpleKES d t))
 
 testKESAlgorithm
-  :: ( KESAlgorithm v
+  :: forall v proxy.
+     ( KESAlgorithm v
      , ToCBOR (VerKeyKES v)
      , FromCBOR (VerKeyKES v)
      , ToCBOR (SignKeyKES v)
@@ -61,33 +62,56 @@ testKESAlgorithm
   -> TestTree
 testKESAlgorithm p n =
   testGroup n
-    [ testProperty "serialise VerKey"                $ prop_KES_serialise_VerKey p
-    , testProperty "serialise SignKey"               $ prop_KES_serialise_SignKey p
-    , testProperty "serialise Sig"                   $ prop_KES_serialise_Sig p
-    , testProperty "verify positive"                 $ prop_KES_verify_pos p
-    , testProperty "verify negative (wrong key)"     $ prop_KES_verify_neg_key p
-    , testProperty "verify negative (wrong message)" $ prop_KES_verify_neg_msg p
-    , testProperty "verify negative (wrong time)"    $ prop_KES_verify_neg_time p
+    [ testGroup "serialisation"
+      [ testGroup "raw"
+        [ testProperty "VerKey"  $ prop_raw_serialise @(VerKeyKES v)
+                                                      rawSerialiseVerKeyKES
+                                                      rawDeserialiseVerKeyKES
+        , testProperty "SignKey" $ prop_raw_serialise @(SignKeyKES v)
+                                                      rawSerialiseSignKeyKES
+                                                      rawDeserialiseSignKeyKES
+        , testProperty "Sig"     $ prop_raw_serialise @(SigKES v)
+                                                      rawSerialiseSigKES
+                                                      rawDeserialiseSigKES
+        ]
+
+      , testGroup "direct CBOR"
+        [ testProperty "VerKey"  $ prop_cbor_with @(VerKeyKES v)
+                                                  encodeVerKeyKES
+                                                  decodeVerKeyKES
+        , testProperty "SignKey" $ prop_cbor_with @(SignKeyKES v)
+                                                  encodeSignKeyKES
+                                                  decodeSignKeyKES
+        , testProperty "Sig"     $ prop_cbor_with @(SigKES v)
+                                                  encodeSigKES
+                                                  decodeSigKES
+        ]
+
+      , testGroup "To/FromCBOR class"
+        [ testProperty "VerKey"  $ prop_cbor @(VerKeyKES v)
+        , testProperty "SignKey" $ prop_cbor @(SignKeyKES v)
+        , testProperty "Sig"     $ prop_cbor @(SigKES v)
+        ]
+
+      , testGroup "direct matches class"
+        [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyKES v)
+                                                             encodeVerKeyKES
+        , testProperty "SignKey" $ prop_cbor_direct_vs_class @(SignKeyKES v)
+                                                             encodeSignKeyKES
+        , testProperty "Sig"     $ prop_cbor_direct_vs_class @(SigKES v)
+                                                             encodeSigKES
+        ]
+
+      , testProperty "Sig multiple KES periods" $ prop_KES_serialise_Sig p
+      ]
+
+    , testGroup "verify"
+      [ testProperty "positive"                 $ prop_KES_verify_pos p
+      , testProperty "negative (wrong key)"     $ prop_KES_verify_neg_key p
+      , testProperty "negative (wrong message)" $ prop_KES_verify_neg_msg p
+      , testProperty "negative (wrong time)"    $ prop_KES_verify_neg_time p
+      ]
     ]
-
-prop_KES_serialise_VerKey
-  :: (KESAlgorithm v, FromCBOR (VerKeyKES v), ToCBOR (VerKeyKES v))
-  => proxy v
-  -> SK v
-  -> Property
-prop_KES_serialise_VerKey _ (SK sk _) =
-  prop_cbor (deriveVerKeyKES sk)
-
-prop_KES_serialise_SignKey
-  :: ( KESAlgorithm v
-     , FromCBOR (SignKeyKES v)
-     , ToCBOR (SignKeyKES v)
-     , Eq (SignKeyKES v)
-     )
-  => proxy v
-  -> SK v
-  -> Property
-prop_KES_serialise_SignKey _ (SK sk _) = prop_cbor sk
 
 prop_KES_serialise_Sig
   :: ( KESAlgorithm v
