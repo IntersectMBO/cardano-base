@@ -5,11 +5,11 @@ module Test.Crypto.Hash
   )
 where
 
+import Cardano.Binary (ToCBOR(..))
 import Cardano.Crypto.Hash
 import qualified Data.ByteString as SB
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
-import Test.Crypto.Orphans.Arbitrary ()
 import Test.Crypto.Util (prop_cbor)
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup)
@@ -51,3 +51,12 @@ prop_hash_correct_byteCount h =
 
 prop_hash_show_fromString :: Hash h a -> Property
 prop_hash_show_fromString h = h === fromString (show h)
+
+
+--
+-- Arbitrary instances
+--
+
+instance (ToCBOR a, Arbitrary a, HashAlgorithm h) => Arbitrary (Hash h a) where
+  arbitrary = hash <$> arbitrary
+  shrink = const []

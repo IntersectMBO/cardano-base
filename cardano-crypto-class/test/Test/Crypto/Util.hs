@@ -12,11 +12,16 @@ module Test.Crypto.Util
   , prop_cbor_roundtrip
   , prop_raw_serialise
   , prop_cbor_direct_vs_class
-  , -- * Test Seed
-    TestSeed (..)
+
+    -- * Test Seed
+  , TestSeed (..)
   , withTestSeed
   , testSeedToChaCha
   , nullTestSeed
+
+    -- * Seeds
+  , arbitrarySeedOfSize
+
   , -- * Natural Numbers
     genNat
   , genNatBetween
@@ -24,30 +29,35 @@ module Test.Crypto.Util
   )
 where
 
+
 import Cardano.Binary (FromCBOR (..), ToCBOR (..),
                        Encoding, Decoder,
                        decodeFullDecoder, serializeEncoding)
 import Codec.CBOR.FlatTerm
+import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
 import Crypto.Random
   ( ChaChaDRG
   , MonadPseudoRandom
   , drgNewTest
   , withDRG
   )
-import Data.ByteString (ByteString)
+import Data.ByteString as BS (ByteString, pack)
 import Data.Word (Word64)
 import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
   , (===)
+  , Arbitrary
   , Gen
   , NonNegative (..)
   , Property
   , arbitrary
+  , arbitraryBoundedIntegral
   , choose
   , counterexample
   , property
   , shrink
+  , vector
   )
 
 --------------------------------------------------------------------------------
@@ -68,6 +78,27 @@ testSeedToChaCha = drgNewTest . getTestSeed
 nullTestSeed :: TestSeed
 nullTestSeed = TestSeed (0, 0, 0, 0, 0)
 
+
+instance Arbitrary TestSeed where
+  arbitrary =
+    (\w1 w2 w3 w4 w5 -> TestSeed (w1, w2, w3, w4, w5)) <$>
+      gen <*>
+      gen <*>
+      gen <*>
+      gen <*>
+      gen
+    where
+      gen :: Gen Word64
+      gen = arbitraryBoundedIntegral
+  shrink = const []
+
+--------------------------------------------------------------------------------
+-- Seeds
+--------------------------------------------------------------------------------
+
+arbitrarySeedOfSize :: Natural -> Gen Seed
+arbitrarySeedOfSize sz =
+  (mkSeedFromBytes . BS.pack) <$> vector (fromIntegral sz)
 
 --------------------------------------------------------------------------------
 -- Serialisation properties

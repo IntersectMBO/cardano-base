@@ -2,6 +2,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module Test.Crypto.DSIGN
   ( tests
   )
@@ -15,9 +17,8 @@ import Cardano.Crypto.DSIGN
   , MockDSIGN
   )
 import Data.Proxy (Proxy (..))
-import Test.Crypto.Orphans.Arbitrary ()
 import Test.Crypto.Util
-import Test.QuickCheck ((=/=), (===), (==>), Property)
+import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -136,3 +137,27 @@ prop_dsign_verify_neg_msg a a' sk =
     let sig = signDSIGN () a sk
         vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk a' sig =/= Right ()
+
+
+--
+-- Arbitrary instances
+--
+
+instance DSIGNAlgorithm v => Arbitrary (VerKeyDSIGN v) where
+  arbitrary = deriveVerKeyDSIGN <$> arbitrary
+  shrink = const []
+
+instance DSIGNAlgorithm v => Arbitrary (SignKeyDSIGN v) where
+  arbitrary = genKeyDSIGN <$> arbitrarySeedOfSize seedSize
+    where
+      seedSize = seedSizeDSIGN (Proxy :: Proxy v)
+  shrink = const []
+
+instance (Signable v Int, DSIGNAlgorithm v, ContextDSIGN v ~ ())
+      => Arbitrary (SigDSIGN v) where
+  arbitrary = do
+    a <- arbitrary :: Gen Int
+    sk <- arbitrary
+    return $ signDSIGN () a sk
+  shrink = const []
+

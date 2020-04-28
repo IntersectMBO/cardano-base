@@ -2,6 +2,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Test.Crypto.VRF
   ( tests
   )
@@ -10,9 +14,8 @@ where
 import Cardano.Binary (FromCBOR, ToCBOR (..))
 import Cardano.Crypto.VRF
 import Data.Proxy (Proxy (..))
-import Test.Crypto.Orphans.Arbitrary ()
-import Test.Crypto.Util (TestSeed, prop_cbor, withTestSeed)
-import Test.QuickCheck ((==>), Property, counterexample)
+import Test.Crypto.Util
+import Test.QuickCheck ((==>), Arbitrary(..), Gen, Property, counterexample)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -85,3 +88,27 @@ prop_vrf_verify_neg seed a sk sk' =
     let (y, c) = withTestSeed seed $ evalVRF () a sk'
         vk = deriveVerKeyVRF sk
     in not $ verifyVRF () vk a (y, c)
+
+
+--
+-- Arbitrary instances
+--
+
+instance VRFAlgorithm v => Arbitrary (VerKeyVRF v) where
+  arbitrary = deriveVerKeyVRF <$> arbitrary
+  shrink = const []
+
+instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
+  arbitrary = genKeyVRF <$> arbitrarySeedOfSize seedSize
+    where
+      seedSize = seedSizeVRF (Proxy :: Proxy v)
+  shrink = const []
+
+instance (Signable v Int, VRFAlgorithm v, ContextVRF v ~ ())
+      => Arbitrary (CertVRF v) where
+  arbitrary = do
+    a <- arbitrary :: Gen Int
+    sk <- arbitrary
+    seed <- arbitrary
+    return $ withTestSeed seed $ fmap snd $ evalVRF () a sk
+  shrink = const []
