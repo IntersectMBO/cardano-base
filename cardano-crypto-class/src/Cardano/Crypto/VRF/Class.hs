@@ -46,8 +46,6 @@ class ( Typeable v
       , Show (SignKeyVRF v)
       , Show (CertVRF v)
       , Eq (CertVRF v)
-      , FromCBOR (CertVRF v)
-      , ToCBOR (CertVRF v)
       , NoUnexpectedThunks (CertVRF    v)
       , NoUnexpectedThunks (VerKeyVRF  v)
       , NoUnexpectedThunks (SignKeyVRF v)
@@ -222,14 +220,14 @@ instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
   toCBOR cvrf =
     encodeListLen 2 <>
       toCBOR (certifiedNatural cvrf) <>
-      toCBOR (certifiedProof cvrf)
+      encodeCertVRF (certifiedProof cvrf)
 
 instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
   fromCBOR =
     CertifiedVRF <$
       enforceSize "CertifiedVRF" 2 <*>
       fromCBOR <*>
-      fromCBOR
+      decodeCertVRF
 
 evalCertified
   :: (VRFAlgorithm v, MonadRandom m, Signable v a)
