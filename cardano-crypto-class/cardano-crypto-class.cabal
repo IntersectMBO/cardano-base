@@ -84,7 +84,6 @@ test-suite test-crypto
                        Test.Crypto.DSIGN
                        Test.Crypto.Hash
                        Test.Crypto.KES
-                       Test.Crypto.Orphans.Arbitrary
                        Test.Crypto.Util
                        Test.Crypto.VRF
 
@@ -101,6 +100,8 @@ test-suite test-crypto
   default-language:    Haskell2010
 
   ghc-options:         -Weverything
+                       -Wno-orphans
+                       -Wno-incomplete-uni-patterns
                        -fno-warn-all-missed-specialisations
                        -fno-warn-implicit-prelude
                        -fno-warn-missing-import-lists

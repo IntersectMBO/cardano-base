@@ -5,9 +5,8 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS_GHC -Wno-orphans -Wno-incomplete-uni-patterns #-}
 
 module Test.Crypto.KES
   ( tests
@@ -26,11 +25,8 @@ import Cardano.Crypto.KES
 import Cardano.Crypto.Seed
 import qualified Cardano.Crypto.KES as KES
 
-import Test.Crypto.Orphans.Arbitrary (arbitrarySeedOfSize)
 import Test.Crypto.Util
-  ( genNatBetween
-  , prop_cbor
-  )
+
 
 --
 -- The list of all tests
@@ -208,6 +204,33 @@ trySign (SK_Times sk _ ts) =
                 case go sk'' xs of
                   Right ys -> Right ((j, a, sig) : ys)
                   e@Left{} -> e
+
+
+
+--
+-- Arbitrary instances
+--
+
+instance KESAlgorithm v => Arbitrary (VerKeyKES v) where
+  arbitrary = deriveVerKeyKES <$> arbitrary
+  shrink = const []
+
+instance KESAlgorithm v => Arbitrary (SignKeyKES v) where
+  arbitrary = genKeyKES <$> arbitrarySeedOfSize seedSize
+    where
+      seedSize = seedSizeKES (Proxy :: Proxy v)
+  shrink = const []
+
+instance (KES.Signable v Int, KESAlgorithm v, ContextKES v ~ ())
+      => Arbitrary (SigKES v) where
+  arbitrary = do
+    a <- arbitrary :: Gen Int
+    sk <- arbitrary
+    let Just sig = signKES () 0 a sk
+    return sig
+  shrink = const []
+
+
 
 data SK v = SK (SignKeyKES v) (VerKeyKES v)
 
