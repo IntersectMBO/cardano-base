@@ -35,6 +35,8 @@ testVRFAlgorithm
                      , FromCBOR (VerKeyVRF v)
                      , ToCBOR (SignKeyVRF v)
                      , FromCBOR (SignKeyVRF v)
+                     , ToCBOR (CertVRF v)
+                     , FromCBOR (CertVRF v)
                      , Eq (SignKeyVRF v)     -- no Eq for signing keys normally
                      , Signable v Int
                      , ContextVRF v ~ ()
