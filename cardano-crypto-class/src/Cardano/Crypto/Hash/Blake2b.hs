@@ -16,9 +16,11 @@ data Blake2b_224
 data Blake2b_256
 
 instance HashAlgorithm Blake2b_224 where
+  hashAlgorithmName _ = "blake2b_224"
   byteCount _ = 28
   digest _ = BA.convert . H.hash @_ @H.Blake2b_224
 
 instance HashAlgorithm Blake2b_256 where
+  hashAlgorithmName _ = "blake2b_256"
   byteCount _ = 32
   digest _ = BA.convert . H.hash @_ @H.Blake2b_256

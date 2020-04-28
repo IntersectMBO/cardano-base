@@ -33,6 +33,8 @@ instance VRFAlgorithm NeverVRF where
   data CertVRF NeverVRF = NeverUsedCertVRF
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
+  algorithmNameVRF _ = "never"
+
   deriveVerKeyVRF _ = NeverUsedVerKeyVRF
 
   evalVRF = error "VRF unavailable"

@@ -33,6 +33,8 @@ instance KESAlgorithm NeverKES where
   data SigKES     NeverKES = NeverUsedSigKES
       deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
+  algorithmNameKES _ = "never"
+
   deriveVerKeyKES _ = NeverUsedVerKeyKES
 
   signKES   = error "KES not available"

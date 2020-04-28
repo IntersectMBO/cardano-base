@@ -117,6 +117,8 @@ instance VRFAlgorithm SimpleVRF where
   -- Metadata and basic key operations
   --
 
+  algorithmNameVRF _ = "simple"
+
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
 

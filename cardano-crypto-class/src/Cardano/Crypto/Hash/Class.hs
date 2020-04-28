@@ -44,6 +44,8 @@ import Cardano.Prelude (NoUnexpectedThunks)
 
 class Typeable h => HashAlgorithm h where
 
+  hashAlgorithmName :: proxy h -> String
+
   byteCount :: proxy h -> Natural
 
   digest :: HasCallStack => proxy h -> ByteString -> ByteString

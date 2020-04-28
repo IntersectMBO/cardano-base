@@ -66,6 +66,8 @@ class ( Typeable v
   -- Metadata and basic key operations
   --
 
+  algorithmNameVRF :: proxy v -> String
+
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
 
 
@@ -188,7 +190,8 @@ class ( Typeable v
 
 
   {-# MINIMAL
-        deriveVerKeyVRF
+        algorithmNameVRF
+      , deriveVerKeyVRF
       , evalVRF
       , verifyVRF
       , maxVRF

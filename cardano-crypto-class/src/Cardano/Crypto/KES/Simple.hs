@@ -69,6 +69,8 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     -- Metadata and basic key operations
     --
 
+    algorithmNameKES proxy = "simple_" ++ show (totalPeriodsKES proxy)
+
     deriveVerKeyKES (SignKeySimpleKES (vks, _)) = VerKeySimpleKES $ fromList vks
 
     --

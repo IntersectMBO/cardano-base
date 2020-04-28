@@ -58,6 +58,8 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     -- Metadata and basic key operations
     --
 
+    algorithmNameDSIGN _ = "ed25519"
+
     deriveVerKeyDSIGN (SignKeyEd25519DSIGN sk) = VerKeyEd25519DSIGN $ toPublic sk
 
     -- | Ed25519 key size is 32 octets
