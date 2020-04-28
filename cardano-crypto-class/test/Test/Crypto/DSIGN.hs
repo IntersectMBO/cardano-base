@@ -16,7 +16,7 @@ import Cardano.Crypto.DSIGN
   )
 import Data.Proxy (Proxy (..))
 import Test.Crypto.Orphans.Arbitrary ()
-import Test.Crypto.Util (prop_cbor)
+import Test.Crypto.Util
 import Test.QuickCheck ((=/=), (===), (==>), Property)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
@@ -55,12 +55,52 @@ testDSIGNAlgorithm
   -> TestTree
 testDSIGNAlgorithm _ n =
   testGroup n
-    [ testProperty "serialise VerKey" $ prop_cbor @(VerKeyDSIGN v)
-    , testProperty "serialise SignKey" $ prop_cbor @(SignKeyDSIGN v)
-    , testProperty "serialise Sig" $ prop_cbor @(SigDSIGN v)
-    , testProperty "verify positive" $ prop_dsign_verify_pos @Int @v
-    , testProperty "verify newgative (wrong key)" $ prop_dsign_verify_neg_key @Int @v
-    , testProperty "verify newgative (wrong message)" $ prop_dsign_verify_neg_msg @Int @v
+    [ testGroup "serialisation"
+      [ testGroup "raw"
+        [ testProperty "VerKey"  $ prop_raw_serialise @(VerKeyDSIGN v)
+                                                      rawSerialiseVerKeyDSIGN
+                                                      rawDeserialiseVerKeyDSIGN
+        , testProperty "SignKey" $ prop_raw_serialise @(SignKeyDSIGN v)
+                                                      rawSerialiseSignKeyDSIGN
+                                                      rawDeserialiseSignKeyDSIGN
+        , testProperty "Sig"     $ prop_raw_serialise @(SigDSIGN v)
+                                                      rawSerialiseSigDSIGN
+                                                      rawDeserialiseSigDSIGN
+        ]
+
+      , testGroup "direct CBOR"
+        [ testProperty "VerKey"  $ prop_cbor_with @(VerKeyDSIGN v)
+                                                  encodeVerKeyDSIGN
+                                                  decodeVerKeyDSIGN
+        , testProperty "SignKey" $ prop_cbor_with @(SignKeyDSIGN v)
+                                                  encodeSignKeyDSIGN
+                                                  decodeSignKeyDSIGN
+        , testProperty "Sig"     $ prop_cbor_with @(SigDSIGN v)
+                                                  encodeSigDSIGN
+                                                  decodeSigDSIGN
+        ]
+
+      , testGroup "To/FromCBOR class"
+        [ testProperty "VerKey"  $ prop_cbor @(VerKeyDSIGN v)
+        , testProperty "SignKey" $ prop_cbor @(SignKeyDSIGN v)
+        , testProperty "Sig"     $ prop_cbor @(SigDSIGN v)
+        ]
+
+      , testGroup "direct matches class"
+        [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyDSIGN v)
+                                                             encodeVerKeyDSIGN
+        , testProperty "SignKey" $ prop_cbor_direct_vs_class @(SignKeyDSIGN v)
+                                                             encodeSignKeyDSIGN
+        , testProperty "Sig"     $ prop_cbor_direct_vs_class @(SigDSIGN v)
+                                                             encodeSigDSIGN
+        ]
+      ]
+
+    , testGroup "verify"
+      [ testProperty "verify positive" $ prop_dsign_verify_pos @Int @v
+      , testProperty "verify newgative (wrong key)" $ prop_dsign_verify_neg_key @Int @v
+      , testProperty "verify newgative (wrong message)" $ prop_dsign_verify_neg_msg @Int @v
+      ]
     ]
 
 prop_dsign_verify_pos
