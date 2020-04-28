@@ -52,6 +52,17 @@ instance DSIGNAlgorithm Ed448DSIGN where
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving NoUnexpectedThunks via UseIsNormalForm Signature
 
+    rawSerialiseVerKeyDSIGN   = convert
+    rawSerialiseSignKeyDSIGN  = convert
+    rawSerialiseSigDSIGN      = convert
+
+    rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd448DSIGN
+                               . cryptoFailableToMaybe . Ed448.publicKey
+    rawDeserialiseSignKeyDSIGN = fmap SignKeyEd448DSIGN
+                               . cryptoFailableToMaybe . Ed448.secretKey
+    rawDeserialiseSigDSIGN     = fmap SigEd448DSIGN
+                               . cryptoFailableToMaybe . Ed448.signature
+
     encodeVerKeyDSIGN = toCBOR
     encodeSignKeyDSIGN = toCBOR
     encodeSigDSIGN = toCBOR
@@ -108,3 +119,9 @@ decodeBA f = do
   case f bs of
     CryptoPassed a -> return a
     CryptoFailed e -> fail $ "decodeBA: " ++ show e
+
+
+cryptoFailableToMaybe :: CryptoFailable a -> Maybe a
+cryptoFailableToMaybe (CryptoPassed a) = Just a
+cryptoFailableToMaybe (CryptoFailed _) = Nothing
+

@@ -52,6 +52,17 @@ instance DSIGNAlgorithm Ed25519DSIGN where
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving NoUnexpectedThunks via UseIsNormalForm Signature
 
+    rawSerialiseVerKeyDSIGN   = convert
+    rawSerialiseSignKeyDSIGN  = convert
+    rawSerialiseSigDSIGN      = convert
+
+    rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd25519DSIGN
+                               . cryptoFailableToMaybe . Ed25519.publicKey
+    rawDeserialiseSignKeyDSIGN = fmap SignKeyEd25519DSIGN
+                               . cryptoFailableToMaybe . Ed25519.secretKey
+    rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN
+                               . cryptoFailableToMaybe . Ed25519.signature
+
     encodeVerKeyDSIGN = toCBOR
     encodeSignKeyDSIGN = toCBOR
     encodeSigDSIGN = toCBOR
@@ -109,3 +120,7 @@ decodeBA f = do
   case f bs of
     CryptoPassed a -> return a
     CryptoFailed e -> fail $ "decodeBA: " ++ show e
+
+cryptoFailableToMaybe :: CryptoFailable a -> Maybe a
+cryptoFailableToMaybe (CryptoPassed a) = Just a
+cryptoFailableToMaybe (CryptoFailed _) = Nothing
