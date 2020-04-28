@@ -43,14 +43,53 @@ testVRFAlgorithm
   -> String
   -> TestTree
 testVRFAlgorithm _ n =
-  testGroup
-    n
-    [ testProperty "serialise VerKey" $ prop_cbor @(VerKeyVRF v)
-    , testProperty "serialise SignKey" $ prop_cbor @(SignKeyVRF v)
-    , testProperty "serialise Cert" $ prop_cbor @(CertVRF v)
-    , testProperty "max" $ prop_vrf_max @Int @v
-    , testProperty "verify positive" $ prop_vrf_verify_pos @Int @v
-    , testProperty "verify negative" $ prop_vrf_verify_neg @Int @v
+  testGroup n
+    [ testGroup "serialisation"
+      [ testGroup "raw"
+        [ testProperty "VerKey"  $ prop_raw_serialise @(VerKeyVRF v)
+                                                      rawSerialiseVerKeyVRF
+                                                      rawDeserialiseVerKeyVRF
+        , testProperty "SignKey" $ prop_raw_serialise @(SignKeyVRF v)
+                                                      rawSerialiseSignKeyVRF
+                                                      rawDeserialiseSignKeyVRF
+        , testProperty "Cert"    $ prop_raw_serialise @(CertVRF v)
+                                                      rawSerialiseCertVRF
+                                                      rawDeserialiseCertVRF
+        ]
+
+      , testGroup "direct CBOR"
+        [ testProperty "VerKey"  $ prop_cbor_with @(VerKeyVRF v)
+                                                  encodeVerKeyVRF
+                                                  decodeVerKeyVRF
+        , testProperty "SignKey" $ prop_cbor_with @(SignKeyVRF v)
+                                                  encodeSignKeyVRF
+                                                  decodeSignKeyVRF
+        , testProperty "Cert"    $ prop_cbor_with @(CertVRF v)
+                                                  encodeCertVRF
+                                                  decodeCertVRF
+        ]
+
+      , testGroup "To/FromCBOR class"
+        [ testProperty "VerKey"  $ prop_cbor @(VerKeyVRF v)
+        , testProperty "SignKey" $ prop_cbor @(SignKeyVRF v)
+        , testProperty "Cert"    $ prop_cbor @(CertVRF v)
+        ]
+
+      , testGroup "direct matches class"
+        [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyVRF v)
+                                                             encodeVerKeyVRF
+        , testProperty "SignKey" $ prop_cbor_direct_vs_class @(SignKeyVRF v)
+                                                             encodeSignKeyVRF
+        , testProperty "Cert"    $ prop_cbor_direct_vs_class @(CertVRF v)
+                                                             encodeCertVRF
+        ]
+      ]
+
+    , testGroup "verify"
+      [ testProperty "max" $ prop_vrf_max @Int @v
+      , testProperty "verify positive" $ prop_vrf_verify_pos @Int @v
+      , testProperty "verify negative" $ prop_vrf_verify_neg @Int @v
+      ]
     ]
 
 prop_vrf_max

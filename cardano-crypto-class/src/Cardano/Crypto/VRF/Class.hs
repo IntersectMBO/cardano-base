@@ -22,11 +22,17 @@ import Cardano.Binary
   , ToCBOR (..)
   , encodeListLen
   , enforceSize
+  , decodeBytes
+  , encodeBytes
+  , serializeEncoding'
+  , decodeFullDecoder
   )
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Seed (Seed)
 import Cardano.Prelude (NoUnexpectedThunks)
 import Crypto.Random (MonadRandom)
+import Data.ByteString (ByteString)
+import Data.ByteString.Lazy as LBS (fromStrict)
 import Data.Kind (Type)
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
@@ -72,9 +78,74 @@ class ( Typeable v
 
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
 
-  decodeVerKeyVRF :: Decoder s (VerKeyVRF v)
+  -- Raw no-overheads serialisation/(de)serialisation
+  -- with default implementations in terms of the CBOR encode/decode
+
+  rawSerialiseVerKeyVRF :: VerKeyVRF v -> ByteString
+  rawSerialiseVerKeyVRF = serializeEncoding' . encodeVerKeyVRF
+
+  rawSerialiseSignKeyVRF :: SignKeyVRF v -> ByteString
+  rawSerialiseSignKeyVRF = serializeEncoding' . encodeSignKeyVRF
+
+  rawSerialiseCertVRF :: CertVRF v -> ByteString
+  rawSerialiseCertVRF = serializeEncoding' . encodeCertVRF
+
+  rawDeserialiseVerKeyVRF :: ByteString -> Maybe (VerKeyVRF v)
+  rawDeserialiseVerKeyVRF =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyVRF"
+        decodeVerKeyVRF
+    . LBS.fromStrict
+
+  rawDeserialiseSignKeyVRF :: ByteString -> Maybe (SignKeyVRF v)
+  rawDeserialiseSignKeyVRF =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyVRF"
+        decodeSignKeyVRF
+    . LBS.fromStrict
+
+  rawDeserialiseCertVRF :: ByteString -> Maybe (CertVRF v)
+  rawDeserialiseCertVRF =
+      either (const Nothing) Just
+    . decodeFullDecoder
+        "rawDeserialiseVerKeyVRF"
+        decodeCertVRF
+    . LBS.fromStrict
+
+  -- Convenient CBOR encoding/decoding
+  -- with default implementations in terms of the raw (de)serialise
 
   encodeVerKeyVRF :: VerKeyVRF v -> Encoding
+  encodeVerKeyVRF = encodeBytes . rawSerialiseVerKeyVRF
+
+  encodeSignKeyVRF :: SignKeyVRF v -> Encoding
+  encodeSignKeyVRF = encodeBytes . rawSerialiseSignKeyVRF
+
+  encodeCertVRF :: CertVRF v -> Encoding
+  encodeCertVRF = encodeBytes . rawSerialiseCertVRF
+
+  decodeVerKeyVRF :: Decoder s (VerKeyVRF v)
+  decodeVerKeyVRF = do
+    bs <- decodeBytes
+    case rawDeserialiseVerKeyVRF bs of
+      Nothing -> fail "decodeVerKeyVRF: cannot decode key"
+      Just vk -> return vk
+
+  decodeSignKeyVRF :: Decoder s (SignKeyVRF v)
+  decodeSignKeyVRF = do
+    bs <- decodeBytes
+    case rawDeserialiseSignKeyVRF bs of
+      Nothing -> fail "decodeSignKeyVRF: cannot decode key"
+      Just vk -> return vk
+
+  decodeCertVRF :: Decoder s (CertVRF v)
+  decodeCertVRF = do
+    bs <- decodeBytes
+    case rawDeserialiseCertVRF bs of
+      Nothing -> fail "decodeCertVRF: cannot decode key"
+      Just vk -> return vk
 
   evalVRF
     :: (MonadRandom m, HasCallStack, Signable v a)
@@ -90,6 +161,22 @@ class ( Typeable v
     -> a
     -> (Natural, CertVRF v)
     -> Bool
+
+  {-# MINIMAL
+        (rawSerialiseVerKeyVRF    | encodeVerKeyVRF)
+      , (rawSerialiseSignKeyVRF   | encodeSignKeyVRF)
+      , (rawSerialiseCertVRF      | encodeCertVRF)
+      , (rawDeserialiseVerKeyVRF  | decodeVerKeyVRF)
+      , (rawDeserialiseSignKeyVRF | decodeSignKeyVRF)
+      , (rawDeserialiseCertVRF    | decodeCertVRF)
+      , genKeyVRF
+      , seedSizeVRF
+      , deriveVerKeyVRF
+      , evalVRF
+      , verifyVRF
+      , maxVRF
+    #-}
+
 
 data CertifiedVRF v a
   = CertifiedVRF

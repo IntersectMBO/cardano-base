@@ -121,9 +121,12 @@ instance VRFAlgorithm SimpleVRF where
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
 
-  decodeVerKeyVRF = fromCBOR
-
-  encodeVerKeyVRF = toCBOR
+  encodeVerKeyVRF  = toCBOR
+  decodeVerKeyVRF  = fromCBOR
+  encodeSignKeyVRF = toCBOR
+  decodeSignKeyVRF = fromCBOR
+  encodeCertVRF    = toCBOR
+  decodeCertVRF    = fromCBOR
 
   evalVRF () a sk@(SignKeySimpleVRF k) = do
     let u = h' (toCBOR a) k

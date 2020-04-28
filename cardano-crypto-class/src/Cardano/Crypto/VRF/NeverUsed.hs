@@ -37,9 +37,12 @@ instance VRFAlgorithm NeverVRF where
 
   maxVRF _ = 0
 
-  decodeVerKeyVRF = error "VRF unavailable"
-
-  encodeVerKeyVRF _ = error "VRF unavailable"
+  encodeVerKeyVRF  _ = error "VRF unavailable"
+  decodeVerKeyVRF    = error "VRF unavailable"
+  encodeSignKeyVRF _ = error "VRF unavailable"
+  decodeSignKeyVRF   = error "VRF unavailable"
+  encodeCertVRF    _ = error "VRF unavailable"
+  decodeCertVRF      = error "VRF unavailable"
 
   evalVRF = error "VRF unavailable"
 
