@@ -23,6 +23,7 @@ import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes,
 import Cardano.Crypto.Util (Empty)
 import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Crypto.Seed
+import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy as LBS (fromStrict)
 import Data.Kind (Type)
@@ -31,6 +32,7 @@ import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
 import Numeric.Natural
+
 
 class ( Typeable v
       , Show (VerKeyDSIGN v)
@@ -61,6 +63,9 @@ class ( Typeable v
   algorithmNameDSIGN :: proxy v -> String
 
   deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
+
+  hashVerKeyDSIGN :: HashAlgorithm h => VerKeyDSIGN v -> Hash h (VerKeyDSIGN v)
+  hashVerKeyDSIGN = hashRaw rawSerialiseVerKeyDSIGN
 
   -- | Abstract sizes for verification keys and signatures, specifies an upper
   -- bound on the real byte sizes.
