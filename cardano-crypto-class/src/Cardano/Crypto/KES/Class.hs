@@ -43,14 +43,26 @@ class ( Typeable v
       )
       => KESAlgorithm v where
 
-  data VerKeyKES v :: Type
 
+  --
+  -- Key and signature types
+  --
+
+  data VerKeyKES  v :: Type
   data SignKeyKES v :: Type
+  data SigKES     v :: Type
 
-  data SigKES v :: Type
 
-  type Signable v :: Type -> Constraint
-  type Signable v = Empty
+  --
+  -- Metadata and basic key operations
+  --
+
+  deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
+
+
+  --
+  -- Core algorithm operations
+  --
 
   -- | Context required to run the KES algorithm
   --
@@ -58,8 +70,68 @@ class ( Typeable v
   type ContextKES v :: Type
   type ContextKES v = ()
 
-  -- Raw no-overheads serialisation/(de)serialisation
-  -- with default implementations in terms of the CBOR encode/decode
+  type Signable v :: Type -> Constraint
+  type Signable v = Empty
+
+  signKES
+    :: (Signable v a, HasCallStack)
+    => ContextKES v
+    -> Natural
+    -> a
+    -> SignKeyKES v
+    -> Maybe (SigKES v)
+
+  verifyKES
+    :: (Signable v a, HasCallStack)
+    => ContextKES v
+    -> VerKeyKES v
+    -> Natural
+    -> a
+    -> SigKES v
+    -> Either String ()
+
+  -- | Update the KES signature key to the specified period. The intended
+  -- behavior is to return `Nothing` in the case that the key cannot be evolved
+  -- that far.
+  --
+  -- The precondition is that the current KES period of the input key is before
+  -- the target period.
+  -- The postcondition is that in case a key is returned, its current KES period
+  -- corresponds to the target KES period.
+  updateKES
+    :: HasCallStack
+    => ContextKES v
+    -> SignKeyKES v
+    -> Natural
+    -> Maybe (SignKeyKES v)
+
+  -- | Return the current KES period of a KES signing key.
+  currentPeriodKES
+    :: HasCallStack
+    => ContextKES v
+    -> SignKeyKES v
+    -> Natural
+
+  -- | Return the current KES period of a KES signing key.
+  totalPeriodsKES
+    :: proxy v -> Natural
+
+
+  --
+  -- Key generation
+  --
+
+  genKeyKES :: Seed -> SignKeyKES v
+
+  -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
+  seedSizeKES :: proxy v -> Natural
+
+
+  --
+  -- Serialisation/(de)serialisation in raw format, no extra tags
+  --
+  -- default implementations in terms of the CBOR encode/decode
+  --
 
   rawSerialiseVerKeyKES :: VerKeyKES v -> ByteString
   rawSerialiseVerKeyKES = serializeEncoding' . encodeVerKeyKES
@@ -94,8 +166,12 @@ class ( Typeable v
         decodeSigKES
     . LBS.fromStrict
 
+
+  --
   -- Convenient CBOR encoding/decoding
-  -- with default implementations in terms of the raw (de)serialise
+  --
+  -- default implementations in terms of the raw (de)serialise
+  --
 
   encodeVerKeyKES :: VerKeyKES v -> Encoding
   encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
@@ -127,71 +203,22 @@ class ( Typeable v
       Nothing -> fail "decodeSigKES: cannot decode key"
       Just vk -> return vk
 
-  genKeyKES :: Seed -> SignKeyKES v
-
-  -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
-  seedSizeKES :: proxy v -> Natural
-
-  deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
-
-  -- | Update the KES signature key to the specified period. The intended
-  -- behavior is to return `Nothing` in the case that the key cannot be evolved
-  -- that far.
-  --
-  -- The precondition is that the current KES period of the input key is before
-  -- the target period.
-  -- The postcondition is that in case a key is returned, its current KES period
-  -- corresponds to the target KES period.
-  updateKES
-    :: HasCallStack
-    => ContextKES v
-    -> SignKeyKES v
-    -> Natural
-    -> Maybe (SignKeyKES v)
-
-  signKES
-    :: (Signable v a, HasCallStack)
-    => ContextKES v
-    -> Natural
-    -> a
-    -> SignKeyKES v
-    -> Maybe (SigKES v)
-
-  verifyKES
-    :: (Signable v a, HasCallStack)
-    => ContextKES v
-    -> VerKeyKES v
-    -> Natural
-    -> a
-    -> SigKES v
-    -> Either String ()
-
-  -- | Return the current KES period of a KES signing key.
-  currentPeriodKES
-    :: HasCallStack
-    => ContextKES v
-    -> SignKeyKES v
-    -> Natural
-
-  -- | Return the current KES period of a KES signing key.
-  totalPeriodsKES
-    :: proxy v -> Natural
 
   {-# MINIMAL
-        (rawSerialiseVerKeyKES    | encodeVerKeyKES)
+        deriveVerKeyKES
+      , signKES
+      , verifyKES
+      , updateKES
+      , currentPeriodKES
+      , totalPeriodsKES
+      , genKeyKES
+      , seedSizeKES
+      , (rawSerialiseVerKeyKES    | encodeVerKeyKES)
       , (rawSerialiseSignKeyKES   | encodeSignKeyKES)
       , (rawSerialiseSigKES       | encodeSigKES)
       , (rawDeserialiseVerKeyKES  | decodeVerKeyKES)
       , (rawDeserialiseSignKeyKES | decodeSignKeyKES)
       , (rawDeserialiseSigKES     | decodeSigKES)
-      , genKeyKES
-      , seedSizeKES
-      , deriveVerKeyKES
-      , updateKES
-      , signKES
-      , verifyKES
-      , currentPeriodKES
-      , totalPeriodsKES
     #-}
 
 
