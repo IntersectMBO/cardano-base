@@ -29,7 +29,7 @@ import Cardano.Binary
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Hash
-import Cardano.Crypto.Util (nonNegIntR)
+import Cardano.Crypto.Util (mockNonNegIntR)
 import Cardano.Prelude (NoUnexpectedThunks, Proxy(..))
 import GHC.Generics (Generic)
 import GHC.Stack
@@ -90,9 +90,9 @@ instance DSIGNAlgorithm MockDSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _    = 4
+    seedSizeDSIGN _    = 8
     genKeyDSIGN seed   =
-      SignKeyMockDSIGN (runMonadRandomWithSeed seed nonNegIntR)
+      SignKeyMockDSIGN (runMonadRandomWithSeed seed mockNonNegIntR)
 
     --
     -- CBOR encoding/decoding
