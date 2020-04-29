@@ -14,7 +14,7 @@ where
 
 import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
 import Cardano.Crypto.Hash
-import Cardano.Crypto.Util (nonNegIntR)
+import Cardano.Crypto.Util (mockNonNegIntR)
 import Cardano.Crypto.Seed
 import Cardano.Crypto.VRF.Class
 import Cardano.Prelude (NoUnexpectedThunks)
@@ -63,10 +63,10 @@ instance VRFAlgorithm MockVRF where
   -- Key generation
   --
 
-  seedSizeVRF _  = 4
+  seedSizeVRF _  = 8
   genKeyVRF seed = SignKeyMockVRF sk
     where
-      sk = runMonadRandomWithSeed seed nonNegIntR
+      sk = runMonadRandomWithSeed seed mockNonNegIntR
 
   --
   -- CBOR encoding/decoding

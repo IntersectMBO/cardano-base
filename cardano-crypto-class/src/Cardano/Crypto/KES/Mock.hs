@@ -21,7 +21,7 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..), decodeListLenOf, encodeListLe
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
-import Cardano.Crypto.Util (nonNegIntR)
+import Cardano.Crypto.Util (mockNonNegIntR)
 import Cardano.Prelude (NoUnexpectedThunks)
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
@@ -108,9 +108,9 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- Key generation
     --
 
-    seedSizeKES _ = 4
+    seedSizeKES _ = 8
     genKeyKES seed =
-        let vk = VerKeyMockKES (runMonadRandomWithSeed seed nonNegIntR)
+        let vk = VerKeyMockKES (runMonadRandomWithSeed seed mockNonNegIntR)
          in SignKeyMockKES vk 0
 
 
