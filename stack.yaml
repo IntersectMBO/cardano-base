@@ -16,6 +16,8 @@ ghc-options:
 allow-newer: true
 
 extra-deps:
+  - quiet-0.2
+
   - git: https://github.com/input-output-hk/cardano-prelude
     commit: 91f357abae16099858193b999807323ca9a7c63c
     subdirs:

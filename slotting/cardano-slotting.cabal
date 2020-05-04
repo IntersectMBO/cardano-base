@@ -6,7 +6,7 @@ synopsis:            Key slotting types for cardano libraries
 -- description:
 -- bug-reports:
 license:             Apache-2.0
-license-files:        
+license-files:
   LICENSE
   NOTICE
 author:              IOHK Formal Methods Team
@@ -45,5 +45,6 @@ library
                       , containers
                       , mmorph
                       , mtl
+                      , quiet
                       , serialise
                       , transformers
