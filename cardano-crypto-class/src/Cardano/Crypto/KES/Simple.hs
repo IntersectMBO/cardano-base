@@ -17,38 +17,31 @@ module Cardano.Crypto.KES.Simple
   )
 where
 
-import Cardano.Binary
-  ( Decoder
-  , Encoding
-  , FromCBOR (..)
-  , ToCBOR (..)
-  , decodeListLen
-  , decodeListLenOf
-  , decodeWord
-  , encodeListLen
-  , encodeWord
-  )
-
-import Cardano.Crypto.DSIGN
-import qualified Cardano.Crypto.DSIGN as DSIGN
-import Cardano.Crypto.KES.Class
-import Cardano.Crypto.Seed
-import Cardano.Prelude (NoUnexpectedThunks)
-import Control.Monad (replicateM)
-import Data.List (unfoldr)
-import Data.Proxy (Proxy (..))
-import Data.Typeable (Typeable)
-import Data.Vector ((!?), Vector, fromList)
+import           Data.List (unfoldr)
+import           Data.Proxy (Proxy (..))
+import           Data.Typeable (Typeable)
+import           Data.Vector ((!?), Vector)
 import qualified Data.Vector as Vec
-import GHC.Generics (Generic)
-import GHC.TypeNats (Nat, KnownNat, natVal)
-import Numeric.Natural (Natural)
-import Control.Exception (assert)
+import           GHC.Generics (Generic)
+import           GHC.TypeNats (Nat, KnownNat, natVal)
+
+import           Control.Monad (replicateM)
+
+import           Cardano.Prelude (NoUnexpectedThunks)
+import           Cardano.Binary
+                   (FromCBOR (..), ToCBOR (..), decodeListLen, encodeListLen)
+
+import           Cardano.Crypto.DSIGN
+import qualified Cardano.Crypto.DSIGN as DSIGN
+import           Cardano.Crypto.KES.Class
+import           Cardano.Crypto.Seed
+
 
 data SimpleKES d (t :: Nat)
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
          KESAlgorithm (SimpleKES d t) where
+
 
     --
     -- Key and signature types
@@ -59,11 +52,13 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
         deriving Generic
 
     newtype SignKeyKES (SimpleKES d t) =
-        SignKeySimpleKES ([VerKeyDSIGN d], [(Natural, SignKeyDSIGN d)])
+              SignKeySimpleKES (Vector (SignKeyDSIGN d))
         deriving Generic
 
-    newtype SigKES (SimpleKES d t) = SigSimpleKES (SigDSIGN d)
-        deriving (Generic)
+    newtype SigKES (SimpleKES d t) =
+              SigSimpleKES (SigDSIGN d)
+        deriving Generic
+
 
     --
     -- Metadata and basic key operations
@@ -71,7 +66,9 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
 
     algorithmNameKES proxy = "simple_" ++ show (totalPeriodsKES proxy)
 
-    deriveVerKeyKES (SignKeySimpleKES (vks, _)) = VerKeySimpleKES $ fromList vks
+    deriveVerKeyKES (SignKeySimpleKES sks) =
+        VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)
+
 
     --
     -- Core algorithm operations
@@ -80,28 +77,24 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     type ContextKES (SimpleKES d t) = DSIGN.ContextDSIGN d
     type Signable   (SimpleKES d t) = DSIGN.Signable     d
 
-    signKES ctxt j a (SignKeySimpleKES (_, xs)) = case dropWhile (\(k, _) -> k < j) xs of
-        []          -> Nothing
-        (_, sk) : _ -> Just (SigSimpleKES sig)
-                         where sig = signDSIGN ctxt a sk
+    signKES ctxt j a (SignKeySimpleKES sks) =
+        case sks !? fromIntegral j of
+          Nothing -> Nothing
+          Just sk -> Just $ SigSimpleKES (signDSIGN ctxt a sk)
 
     verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
         case vks !? fromIntegral j of
-            Nothing -> Left "KES verification failed: out of range"
-            Just vk -> verifyDSIGN ctxt vk a sig
+          Nothing -> Left "KES verification failed: out of range"
+          Just vk -> verifyDSIGN ctxt vk a sig
 
-    updateKES _ (SignKeySimpleKES (_, [])) _ = Nothing
-    updateKES ctx s@(SignKeySimpleKES (vks, sks)) to =
-      assert (to >= currentPeriodKES ctx s) $
-      let sks' = dropWhile (\(d', _) -> to /= d') sks in
-        case sks' of
-          [] -> Nothing
-          _  -> Just (SignKeySimpleKES (vks, sks'))
+    updateKES _ sk to
+      | to >= natVal (Proxy @ t) = Nothing
+      | otherwise                = Just sk
 
-    currentPeriodKES _ (SignKeySimpleKES (_, [])) = error "no KES key available"
-    currentPeriodKES _ (SignKeySimpleKES (_, (d, _) : _)) = d
+    currentPeriodKES _ _ = error "TODO: remove currentPeriodKES"
 
     totalPeriodsKES  _ = natVal (Proxy @ t)
+
 
     --
     -- Key generation
@@ -115,12 +108,12 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     genKeyKES seed =
         let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
             duration = natVal (Proxy @ t)
-            seeds = take (fromIntegral duration)
-                  . map mkSeedFromBytes
-                  $ unfoldr (getBytesFromSeed seedSize) seed
-            sks = map genKeyDSIGN seeds
-            vks = map deriveVerKeyDSIGN sks
-         in SignKeySimpleKES (vks, zip [0..] sks)
+            seeds    = take (fromIntegral duration)
+                     . map mkSeedFromBytes
+                     $ unfoldr (getBytesFromSeed seedSize) seed
+            sks      = map genKeyDSIGN seeds
+         in SignKeySimpleKES (Vec.fromList sks)
+
 
     --
     -- CBOR encoding/decoding
@@ -141,9 +134,9 @@ deriving instance DSIGNAlgorithm d => Eq (VerKeyKES (SimpleKES d t))
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => ToCBOR (VerKeyKES (SimpleKES d t)) where
-  toCBOR (VerKeySimpleKES vvks) =
-    encodeListLen (fromIntegral $ Vec.length vvks) <>
-      Vec.foldl' (<>) mempty (fmap encodeVerKeyDSIGN vvks)
+  toCBOR (VerKeySimpleKES vks) =
+      encodeListLen (fromIntegral $ Vec.length vks)
+   <> foldr (\vk r -> encodeVerKeyDSIGN vk <> r) mempty vks
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => FromCBOR (VerKeyKES (SimpleKES d t)) where
@@ -156,36 +149,16 @@ deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SimpleKES d t))
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => ToCBOR (SignKeyKES (SimpleKES d t)) where
-  toCBOR (SignKeySimpleKES (vks, stuff)) =
-    encodeListLen 2 <>
-      encodeListLen (fromIntegral $ length vks) <>
-      mconcat (fmap encodeVerKeyDSIGN vks) <>
-      encodeListLen (fromIntegral $ length stuff) <>
-      mconcat (fmap encodeStuff stuff)
-    where
-      encodeStuff :: (Natural, SignKeyDSIGN d) -> Encoding
-      encodeStuff (n, skd) =
-        encodeListLen 2 <>
-          encodeWord (fromIntegral n) <>
-          encodeSignKeyDSIGN skd
+  toCBOR (SignKeySimpleKES sks) =
+      encodeListLen (fromIntegral (length sks))
+   <> foldr (\sk r -> encodeSignKeyDSIGN sk <> r) mempty sks
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => FromCBOR (SignKeyKES (SimpleKES d t)) where
   fromCBOR =
     SignKeySimpleKES <$> do
-      decodeListLenOf 2
-      vksLen <- decodeListLen
-      vks <- replicateM vksLen decodeVerKeyDSIGN
-      stuffLen <- decodeListLen
-      stuff <- replicateM stuffLen decodeStuff
-      return (vks, stuff)
-    where
-      decodeStuff :: Decoder s (Natural, SignKeyDSIGN d)
-      decodeStuff = do
-        decodeListLenOf 2
-        n <- fromIntegral <$> decodeWord
-        sks <- decodeSignKeyDSIGN
-        return (n, sks)
+      len <- decodeListLen
+      Vec.fromList <$> replicateM len decodeSignKeyDSIGN
 
 deriving instance DSIGNAlgorithm d => Show (SigKES (SimpleKES d t))
 deriving instance DSIGNAlgorithm d => Eq   (SigKES (SimpleKES d t))

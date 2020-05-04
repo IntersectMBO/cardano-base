@@ -41,8 +41,7 @@ tests =
 -- We normally ensure that we avoid naively comparing signing keys by not
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instance here.
-deriving instance (DSIGNAlgorithm d, Eq (SignKeyDSIGN d))
-               => Eq (SignKeyKES (SimpleKES d t))
+deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
 
 testKESAlgorithm
   :: forall v proxy.
