@@ -47,9 +47,14 @@ class Typeable h => HashAlgorithm h where
 
   hashAlgorithmName :: proxy h -> String
 
+  sizeHash :: proxy h -> Word
+
   byteCount :: proxy h -> Natural
+  byteCount = fromIntegral . sizeHash
 
   digest :: HasCallStack => proxy h -> ByteString -> ByteString
+
+{-# DEPRECATED byteCount "Use sizeHash" #-}
 
 newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)

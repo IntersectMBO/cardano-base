@@ -57,7 +57,7 @@ instance VRFAlgorithm MockVRF where
 
   verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
-  maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy MD5)) - 1
+  maxVRF _ = 2 ^ (8 * sizeHash (Proxy :: Proxy MD5)) - 1
 
   --
   -- Key generation

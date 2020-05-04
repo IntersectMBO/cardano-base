@@ -150,7 +150,7 @@ instance VRFAlgorithm SimpleVRF where
             toCBOR (h' (toCBOR a) s <> pow' u c')
     in b1 && c == rhs
 
-  maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy H)) - 1
+  maxVRF _ = 2 ^ (8 * sizeHash (Proxy :: Proxy H)) - 1
 
   --
   -- Key generation

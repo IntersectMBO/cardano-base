@@ -64,7 +64,7 @@ instance DSIGNAlgorithm MockDSIGN where
 
     abstractSizeVKey _ = 8 -- for 64 bit Int
     abstractSizeSig  _ = 1
-                       + (byteCount (Proxy :: Proxy ShortHash))
+                       + fromIntegral (sizeHash (Proxy :: Proxy ShortHash))
                        + 8 -- length tag + length
                            -- short hash + 64 bit
                            -- Int

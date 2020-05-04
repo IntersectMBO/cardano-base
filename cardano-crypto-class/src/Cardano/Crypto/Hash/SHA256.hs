@@ -14,7 +14,7 @@ data SHA256
 
 instance HashAlgorithm SHA256 where
   hashAlgorithmName _ = "sha256"
-  byteCount _ = 32
+  sizeHash _ = 32
   digest _ = convert . H.hash
 
 convert :: H.Digest H.SHA256 -> ByteString
