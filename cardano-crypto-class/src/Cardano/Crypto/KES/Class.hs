@@ -10,6 +10,7 @@
 module Cardano.Crypto.KES.Class
   ( KESAlgorithm (..)
   , SignedKES (..)
+  , Period
   , signedKES
   , verifySignedKES
   , encodeSignedKES
@@ -83,7 +84,7 @@ class ( Typeable v
   signKES
     :: (Signable v a, HasCallStack)
     => ContextKES v
-    -> Natural
+    -> Period
     -> a
     -> SignKeyKES v
     -> Maybe (SigKES v)
@@ -92,7 +93,7 @@ class ( Typeable v
     :: (Signable v a, HasCallStack)
     => ContextKES v
     -> VerKeyKES v
-    -> Natural
+    -> Period
     -> a
     -> SigKES v
     -> Either String ()
@@ -109,12 +110,12 @@ class ( Typeable v
     :: HasCallStack
     => ContextKES v
     -> SignKeyKES v
-    -> Natural
+    -> Period
     -> Maybe (SignKeyKES v)
 
   -- | Return the current KES period of a KES signing key.
   totalPeriodsKES
-    :: proxy v -> Natural
+    :: proxy v -> Period
 
 
   --
@@ -221,6 +222,9 @@ class ( Typeable v
       , (rawDeserialiseSigKES     | decodeSigKES)
     #-}
 
+-- | The KES period. The KES evolution index.
+--
+type Period = Natural
 
 newtype SignedKES v a = SignedKES {getSig :: SigKES v}
   deriving Generic
@@ -234,7 +238,7 @@ instance KESAlgorithm v => NoUnexpectedThunks (SignedKES v a)
 signedKES
   :: (KESAlgorithm v, Signable v a)
   => ContextKES v
-  -> Natural
+  -> Period
   -> a
   -> SignKeyKES v
   -> Maybe (SignedKES v a)
@@ -244,7 +248,7 @@ verifySignedKES
   :: (KESAlgorithm v, Signable v a)
   => ContextKES v
   -> VerKeyKES v
-  -> Natural
+  -> Period
   -> a
   -> SignedKES v a
   -> Either String ()
