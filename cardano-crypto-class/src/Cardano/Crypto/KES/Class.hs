@@ -113,13 +113,6 @@ class ( Typeable v
     -> Maybe (SignKeyKES v)
 
   -- | Return the current KES period of a KES signing key.
-  currentPeriodKES
-    :: HasCallStack
-    => ContextKES v
-    -> SignKeyKES v
-    -> Natural
-
-  -- | Return the current KES period of a KES signing key.
   totalPeriodsKES
     :: proxy v -> Natural
 
@@ -217,7 +210,6 @@ class ( Typeable v
       , signKES
       , verifyKES
       , updateKES
-      , currentPeriodKES
       , totalPeriodsKES
       , genKeyKES
       , seedSizeKES

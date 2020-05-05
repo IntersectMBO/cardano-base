@@ -41,7 +41,6 @@ instance KESAlgorithm NeverKES where
   verifyKES = error "KES not available"
   updateKES = error "KES not available"
 
-  currentPeriodKES  = error "KES not available"
   totalPeriodsKES _ = 0
 
   seedSizeKES     _ = 0

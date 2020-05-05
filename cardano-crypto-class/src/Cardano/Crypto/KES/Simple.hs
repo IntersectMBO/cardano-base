@@ -91,8 +91,6 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
       | to >= natVal (Proxy @ t) = Nothing
       | otherwise                = Just sk
 
-    currentPeriodKES _ _ = error "TODO: remove currentPeriodKES"
-
     totalPeriodsKES  _ = natVal (Proxy @ t)
 
 

@@ -101,7 +101,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
           then Right ()
           else Left "KES verification failed"
 
-    currentPeriodKES () (SignKeyMockKES _ k) = k
     totalPeriodsKES  _ = natVal (Proxy @ t)
 
     --
