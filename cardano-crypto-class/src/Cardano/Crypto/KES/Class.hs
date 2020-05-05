@@ -87,7 +87,7 @@ class ( Typeable v
     -> Period
     -> a
     -> SignKeyKES v
-    -> Maybe (SigKES v)
+    -> SigKES v
 
   verifyKES
     :: (Signable v a, HasCallStack)
@@ -241,8 +241,8 @@ signedKES
   -> Period
   -> a
   -> SignKeyKES v
-  -> Maybe (SignedKES v a)
-signedKES ctxt time a key = SignedKES <$> signKES ctxt time a key
+  -> SignedKES v a
+signedKES ctxt time a key = SignedKES (signKES ctxt time a key)
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)

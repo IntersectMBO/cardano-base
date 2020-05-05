@@ -176,7 +176,7 @@ prop_verifyKES_positive sk_0 xs =
               verifyKES () vk t x sig === Right ()
             | let vk = deriveVerKeyKES sk_0
             , (t, x, sk) <- zip3 [0..] xs (allUpdatesKES sk_0)
-            , let Just sig = signKES () t x sk
+            , let sig = signKES () t x sk
             ]
   where
     totalPeriods :: Int
@@ -198,7 +198,7 @@ prop_verifyKES_negative_key sk_0 sk'_0 x =
             | let sks = allUpdatesKES sk_0
                   vk' = deriveVerKeyKES sk'_0
             , (t, sk) <- zip [0..] sks
-            , let Just sig = signKES () t x sk
+            , let sig = signKES () t x sk
             ]
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
@@ -216,7 +216,7 @@ prop_verifyKES_negative_message sk_0 x x' =
             | let sks = allUpdatesKES sk_0
                   vk  = deriveVerKeyKES sk_0
             , (t, sk) <- zip [0..] sks
-            , let Just sig = signKES () t x sk
+            , let sig = signKES () t x sk
             ]
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
@@ -233,7 +233,7 @@ prop_verifyKES_negative_period sk_0 x =
             | let sks = allUpdatesKES sk_0
                   vk  = deriveVerKeyKES sk_0
             , (t, sk) <- zip [0..] sks
-            , let Just sig = signKES () t x sk
+            , let sig = signKES () t x sk
             , (t', _) <- zip [0..] sks
             , t /= t'
             ]
@@ -285,7 +285,7 @@ prop_serialise_SigKES sk_0 x =
        .&. prop_cbor_with encodeSigKES
                           decodeSigKES sig
       | (t, sk) <- zip [0..] (allUpdatesKES sk_0)
-      , let Just sig = signKES () t x sk
+      , let sig = signKES () t x sk
       ]
 
 
@@ -325,6 +325,6 @@ instance (KES.Signable v Int, KESAlgorithm v, ContextKES v ~ ())
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
-    let Just sig = signKES () 0 a sk
+    let sig = signKES () 0 a sk
     return sig
   shrink = const []

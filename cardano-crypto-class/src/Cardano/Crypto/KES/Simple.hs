@@ -79,8 +79,8 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
 
     signKES ctxt j a (SignKeySimpleKES sks) =
         case sks !? fromIntegral j of
-          Nothing -> Nothing
-          Just sk -> Just $ SigSimpleKES (signDSIGN ctxt a sk)
+          Nothing -> error ("SimpleKES.signKES: period out of range " ++ show j)
+          Just sk -> SigSimpleKES (signDSIGN ctxt a sk)
 
     verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
         case vks !? fromIntegral j of

@@ -89,10 +89,10 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     signKES () j a (SignKeyMockKES vk k)
         | j == k
         , j  < totalPeriodsKES (Proxy @ (MockKES t))
-        = Just (SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j))
+        = SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j)
 
         | otherwise
-        = Nothing
+        = error ("MockKES.signKES: wrong period " ++ show j)
 
     verifyKES () vk j a (SigMockKES h (SignKeyMockKES vk' j')) =
         if    j  == j'
