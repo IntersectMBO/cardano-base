@@ -24,8 +24,8 @@ import Cardano.Crypto.KES
 import qualified Cardano.Crypto.KES as KES
 
 import Test.QuickCheck
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck (testProperty)
+import Test.Tasty (TestTree, testGroup, adjustOption)
+import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
 import Test.Crypto.Util hiding (label)
 
@@ -36,8 +36,8 @@ import Test.Crypto.Util hiding (label)
 tests :: TestTree
 tests =
   testGroup "Crypto.KES"
-  [ testKESAlgorithm (Proxy :: Proxy (MockKES 42))              "MockKES"
-  , testKESAlgorithm (Proxy :: Proxy (SimpleKES Ed448DSIGN 42)) "SimpleKES (with Ed448)"
+  [ testKESAlgorithm (Proxy :: Proxy (MockKES 7))               "MockKES"
+  , testKESAlgorithm (Proxy :: Proxy (SimpleKES Ed448DSIGN 7))  "SimpleKES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
@@ -123,7 +123,8 @@ testKESAlgorithm _p n =
       [ testProperty "positive"           $ prop_verifyKES_positive         @v @Int
       , testProperty "negative (key)"     $ prop_verifyKES_negative_key     @v @Int
       , testProperty "negative (message)" $ prop_verifyKES_negative_message @v @Int
-      , testProperty "negative (period)"  $ prop_verifyKES_negative_period  @v @Int
+      , adjustOption (\(QuickCheckMaxSize sz) -> QuickCheckMaxSize (min sz 50)) $
+        testProperty "negative (period)"  $ prop_verifyKES_negative_period  @v @Int
       ]
 
     , testGroup "serialisation of all KES evolutions"
