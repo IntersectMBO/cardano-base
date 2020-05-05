@@ -17,7 +17,6 @@ where
 
 import Data.Proxy (Proxy(..))
 import Data.List (unfoldr)
-import Numeric.Natural (Natural)
 
 import Cardano.Binary (FromCBOR, ToCBOR(..))
 import Cardano.Crypto.DSIGN
@@ -298,8 +297,8 @@ allUpdatesKES :: forall v. (KESAlgorithm v, ContextKES v ~ ())
 allUpdatesKES sk_0 =
     sk_0 : unfoldr update (sk_0, 0)
   where
-    update :: (SignKeyKES v, Natural)
-           -> Maybe (SignKeyKES v, (SignKeyKES v, Natural))
+    update :: (SignKeyKES v, Period)
+           -> Maybe (SignKeyKES v, (SignKeyKES v, Period))
     update (sk, n) =
       case updateKES () sk (n+1) of
         Nothing  -> Nothing

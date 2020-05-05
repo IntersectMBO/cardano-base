@@ -19,7 +19,6 @@ module Cardano.Crypto.Seed
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.ByteArray as BA (convert)
-import           Numeric.Natural (Natural)
 
 import           Control.Exception (Exception(..), throw)
 
@@ -52,29 +51,29 @@ mkSeedFromBytes = Seed
 -- are available. This can be chained multiple times provided the seed is big
 -- enough to cover each use.
 --
-getBytesFromSeed :: Int -> Seed -> Maybe (ByteString, Seed)
+getBytesFromSeed :: Word -> Seed -> Maybe (ByteString, Seed)
 getBytesFromSeed n (Seed s)
-  | BS.length b == n = Just (b, Seed s')
-  | otherwise        = Nothing
+  | fromIntegral (BS.length b) == n = Just (b, Seed s')
+  | otherwise                       = Nothing
   where
-    (b, s') = BS.splitAt n s
+    (b, s') = BS.splitAt (fromIntegral n) s
 
 -- | Split a seed into two smaller seeds, the first of which is the given
 -- number of bytes large, and the second is the remaining. This will fail if
 -- not enough bytes are available. This can be chained multiple times provided
 -- the seed is big enough to cover each use.
 --
-splitSeed :: Int -> Seed -> Maybe (Seed, Seed)
+splitSeed :: Word -> Seed -> Maybe (Seed, Seed)
 splitSeed n (Seed s)
-  | BS.length b == n = Just (Seed b, Seed s')
-  | otherwise        = Nothing
+  | fromIntegral (BS.length b) == n = Just (Seed b, Seed s')
+  | otherwise                       = Nothing
   where
-    (b, s') = BS.splitAt n s
+    (b, s') = BS.splitAt (fromIntegral n) s
 
 
 -- | Obtain a 'Seed' by reading @n@ bytes of entropy from the operating system.
 --
-readSeedFromSystemEntropy :: Natural -> IO Seed
+readSeedFromSystemEntropy :: Word -> IO Seed
 readSeedFromSystemEntropy n = mkSeedFromBytes <$> getEntropy (fromIntegral n)
 
 --
@@ -112,7 +111,7 @@ getRandomBytesFromSeed n =
       StateT $ \s ->
         MaybeT $
           Identity $
-            getBytesFromSeed n s
+            getBytesFromSeed (fromIntegral n) s
 
 
 instance MonadRandom MonadRandomFromSeed where

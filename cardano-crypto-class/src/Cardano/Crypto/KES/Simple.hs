@@ -88,10 +88,10 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
           Just vk -> verifyDSIGN ctxt vk a sig
 
     updateKES _ sk to
-      | to >= natVal (Proxy @ t) = Nothing
-      | otherwise                = Just sk
+      | to >= fromIntegral (natVal (Proxy @ t)) = Nothing
+      | otherwise                               = Just sk
 
-    totalPeriodsKES  _ = natVal (Proxy @ t)
+    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
 
 
     --
@@ -100,13 +100,13 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
 
     seedSizeKES _ =
         let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
-            duration = natVal (Proxy @ t)
+            duration = fromIntegral (natVal (Proxy @ t))
          in duration * seedSize
 
     genKeyKES seed =
-        let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
-            duration = natVal (Proxy @ t)
-            seeds    = take (fromIntegral duration)
+        let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+            duration = fromIntegral (natVal (Proxy @ t))
+            seeds    = take duration
                      . map mkSeedFromBytes
                      $ unfoldr (getBytesFromSeed seedSize) seed
             sks      = map genKeyDSIGN seeds

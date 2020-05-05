@@ -109,7 +109,7 @@ class ( Typeable v
   genKeyDSIGN :: Seed -> SignKeyDSIGN v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
-  seedSizeDSIGN :: proxy v -> Natural
+  seedSizeDSIGN :: proxy v -> Word
 
 
   --

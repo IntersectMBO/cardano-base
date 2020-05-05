@@ -31,7 +31,6 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
-import Numeric.Natural (Natural)
 
 
 class ( Typeable v
@@ -125,7 +124,7 @@ class ( Typeable v
   genKeyKES :: Seed -> SignKeyKES v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
-  seedSizeKES :: proxy v -> Natural
+  seedSizeKES :: proxy v -> Word
 
 
   --
@@ -224,7 +223,7 @@ class ( Typeable v
 
 -- | The KES period. The KES evolution index.
 --
-type Period = Natural
+type Period = Word
 
 newtype SignedKES v a = SignedKES {getSig :: SigKES v}
   deriving Generic

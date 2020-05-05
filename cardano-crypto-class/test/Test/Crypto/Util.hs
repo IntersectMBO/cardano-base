@@ -21,11 +21,6 @@ module Test.Crypto.Util
 
     -- * Seeds
   , arbitrarySeedOfSize
-
-  , -- * Natural Numbers
-    genNat
-  , genNatBetween
-  , shrinkNat
   )
 where
 
@@ -43,17 +38,14 @@ import Crypto.Random
   )
 import Data.ByteString as BS (ByteString, pack)
 import Data.Word (Word64)
-import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
   , (===)
   , Arbitrary
   , Gen
-  , NonNegative (..)
   , Property
   , arbitrary
   , arbitraryBoundedIntegral
-  , choose
   , counterexample
   , property
   , shrink
@@ -96,7 +88,7 @@ instance Arbitrary TestSeed where
 -- Seeds
 --------------------------------------------------------------------------------
 
-arbitrarySeedOfSize :: Natural -> Gen Seed
+arbitrarySeedOfSize :: Word -> Gen Seed
 arbitrarySeedOfSize sz =
   (mkSeedFromBytes . BS.pack) <$> vector (fromIntegral sz)
 
@@ -159,19 +151,3 @@ prop_cbor_direct_vs_class :: ToCBOR a
 prop_cbor_direct_vs_class encoder x =
   toFlatTerm (encoder x) === toFlatTerm (toCBOR x)
 
-
---------------------------------------------------------------------------------
--- Natural numbers
---------------------------------------------------------------------------------
-genNatBetween :: Natural -> Natural -> Gen Natural
-genNatBetween from to = do
-  i <- choose (toInteger from, toInteger to)
-  return $ fromIntegral i
-
-genNat :: Gen Natural
-genNat = do
-  NonNegative i <- arbitrary :: Gen (NonNegative Integer)
-  return $ fromIntegral i
-
-shrinkNat :: Natural -> [Natural]
-shrinkNat = map fromIntegral . shrink . toInteger

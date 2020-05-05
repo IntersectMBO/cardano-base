@@ -55,7 +55,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
         deriving newtype (NoUnexpectedThunks, ToCBOR, FromCBOR)
 
     data SignKeyKES (MockKES t) =
-           SignKeyMockKES !(VerKeyKES (MockKES t)) !Natural
+           SignKeyMockKES !(VerKeyKES (MockKES t)) !Word
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
@@ -101,7 +101,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
           then Right ()
           else Left "KES verification failed"
 
-    totalPeriodsKES  _ = natVal (Proxy @ t)
+    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
 
     --
     -- Key generation

@@ -114,7 +114,7 @@ class ( Typeable v
   genKeyVRF :: Seed -> SignKeyVRF v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyVRF'
-  seedSizeVRF :: proxy v -> Natural
+  seedSizeVRF :: proxy v -> Word
 
 
   --
