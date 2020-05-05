@@ -104,6 +104,10 @@ testDSIGNAlgorithm _ n =
       ]
     ]
 
+
+-- | If we sign a message @a@ with the signing key, then we can verify the
+-- signature using the corresponding verification key.
+--
 prop_dsign_verify_pos
   :: forall a v. (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
   => a
@@ -114,6 +118,11 @@ prop_dsign_verify_pos a sk =
       vk = deriveVerKeyDSIGN sk
   in verifyDSIGN () vk a sig === Right ()
 
+
+-- | If we sign a message @a@ with one signing key, if we try to verify the
+-- signature (and message @a@) using a verification key corresponding to a
+-- different signing key, then the verification fails.
+--
 prop_dsign_verify_neg_key
   :: forall a v. (DSIGNAlgorithm v, Eq (SignKeyDSIGN v), Signable v a, ContextDSIGN v ~ ())
   => a
@@ -122,10 +131,14 @@ prop_dsign_verify_neg_key
   -> Property
 prop_dsign_verify_neg_key a sk sk' =
   sk /= sk' ==>
-    let sig = signDSIGN () a sk'
-        vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN () vk a sig =/= Right ()
+    let sig = signDSIGN () a sk
+        vk' = deriveVerKeyDSIGN sk'
+    in verifyDSIGN () vk' a sig =/= Right ()
 
+
+-- | If we sign a message @a@ with one signing key, if we try to verify the
+-- signature with a message other than @a@, then the verification fails.
+--
 prop_dsign_verify_neg_msg
   :: forall a v. (Eq a, DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
   => a
