@@ -64,10 +64,10 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
     -- | Ed25519 key size is 32 octets
     -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
-    abstractSizeVKey _ = 32
-
+    sizeVerKeyDSIGN  _ = 32
+    sizeSignKeyDSIGN _ = 32
     -- | Ed25519 signature size is 64 octets
-    abstractSizeSig  _ = 64
+    sizeSigDSIGN     _ = 64
 
     --
     -- Core algorithm operations

@@ -66,6 +66,10 @@ class ( Typeable v
   hashVerKeyKES :: HashAlgorithm h => VerKeyKES v -> Hash h (VerKeyKES v)
   hashVerKeyKES = hashRaw rawSerialiseVerKeyKES
 
+  sizeVerKeyKES  :: proxy v -> Word
+  sizeSignKeyKES :: proxy v -> Word
+  sizeSigKES     :: proxy v -> Word
+
 
   --
   -- Core algorithm operations
@@ -207,6 +211,9 @@ class ( Typeable v
   {-# MINIMAL
         algorithmNameKES
       , deriveVerKeyKES
+      , sizeVerKeyKES
+      , sizeSignKeyKES
+      , sizeSigKES
       , signKES
       , verifyKES
       , updateKES

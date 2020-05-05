@@ -20,6 +20,7 @@ where
 import           Data.List (unfoldr)
 import           Data.Proxy (Proxy (..))
 import           Data.Typeable (Typeable)
+import qualified Data.ByteString as BS
 import           Data.Vector ((!?), Vector)
 import qualified Data.Vector as Vec
 import           GHC.Generics (Generic)
@@ -35,6 +36,7 @@ import           Cardano.Crypto.DSIGN
 import qualified Cardano.Crypto.DSIGN as DSIGN
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Seed
+import           Cardano.Crypto.Util
 
 
 data SimpleKES d (t :: Nat)
@@ -68,6 +70,17 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
 
     deriveVerKeyKES (SignKeySimpleKES sks) =
         VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)
+
+
+    sizeVerKeyKES  _ = sizeVerKeyDSIGN  (Proxy :: Proxy d) * duration
+      where
+        duration = fromIntegral (natVal (Proxy @ t))
+
+    sizeSignKeyKES _ = sizeSignKeyDSIGN (Proxy :: Proxy d) * duration
+      where
+        duration = fromIntegral (natVal (Proxy @ t))
+
+    sizeSigKES     _ = sizeSigDSIGN     (Proxy :: Proxy d)
 
 
     --
@@ -111,6 +124,44 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
                      $ unfoldr (getBytesFromSeed seedSize) seed
             sks      = map genKeyDSIGN seeds
          in SignKeySimpleKES (Vec.fromList sks)
+
+
+    --
+    -- raw serialise/deserialise
+    --
+
+    rawSerialiseVerKeyKES (VerKeySimpleKES vks) =
+        BS.concat [ rawSerialiseVerKeyDSIGN vk | vk <- Vec.toList vks ]
+
+    rawSerialiseSignKeyKES (SignKeySimpleKES sks) =
+        BS.concat [ rawSerialiseSignKeyDSIGN sk | sk <- Vec.toList sks ]
+
+    rawSerialiseSigKES (SigSimpleKES sig) =
+        rawSerialiseSigDSIGN sig
+
+    rawDeserialiseVerKeyKES bs
+      | let duration = fromIntegral (natVal (Proxy :: Proxy t))
+            sizeKey  = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy d))
+      , vkbs     <- splitsAt (replicate duration sizeKey) bs
+      , length vkbs == duration
+      , Just vks <- mapM rawDeserialiseVerKeyDSIGN vkbs
+      = Just $! VerKeySimpleKES (Vec.fromList vks)
+
+      | otherwise
+      = Nothing
+
+    rawDeserialiseSignKeyKES bs
+      | let duration = fromIntegral (natVal (Proxy :: Proxy t))
+            sizeKey  = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
+      , skbs     <- splitsAt (replicate duration sizeKey) bs
+      , length skbs == duration
+      , Just sks <- mapM rawDeserialiseSignKeyDSIGN skbs
+      = Just $! SignKeySimpleKES (Vec.fromList sks)
+
+      | otherwise
+      = Nothing
+
+    rawDeserialiseSigKES = fmap SigSimpleKES . rawDeserialiseSigDSIGN
 
 
     --

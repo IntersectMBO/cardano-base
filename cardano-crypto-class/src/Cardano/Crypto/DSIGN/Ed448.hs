@@ -62,9 +62,11 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
     deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
 
-    -- | Goldilocks points are 448 bits long, so 64 byte is a good abstract size
-    abstractSizeVKey _ = 64
-    abstractSizeSig  _ = 64
+    -- | Goldilocks points are 448 bits long
+    sizeVerKeyDSIGN  _ = 57
+    sizeSignKeyDSIGN _ = 57
+    sizeSigDSIGN     _ = 114
+
 
     --
     -- Core algorithm operations

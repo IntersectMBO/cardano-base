@@ -11,6 +11,7 @@ module Test.Crypto.Util
   , prop_cbor_valid
   , prop_cbor_roundtrip
   , prop_raw_serialise
+  , prop_size_serialise
   , prop_cbor_direct_vs_class
 
     -- * Test Seed
@@ -36,7 +37,7 @@ import Crypto.Random
   , drgNewTest
   , withDRG
   )
-import Data.ByteString as BS (ByteString, pack)
+import Data.ByteString as BS (ByteString, pack, length)
 import Data.Word (Word64)
 import Test.QuickCheck
   ( (.&&.)
@@ -150,4 +151,9 @@ prop_cbor_direct_vs_class :: ToCBOR a
                           -> a -> Property
 prop_cbor_direct_vs_class encoder x =
   toFlatTerm (encoder x) === toFlatTerm (toCBOR x)
+
+
+prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
+prop_size_serialise serialise size x =
+    BS.length (serialise x) === fromIntegral size
 

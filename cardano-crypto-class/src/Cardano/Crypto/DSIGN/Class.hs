@@ -31,7 +31,6 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
-import Numeric.Natural
 
 
 class ( Typeable v
@@ -67,10 +66,9 @@ class ( Typeable v
   hashVerKeyDSIGN :: HashAlgorithm h => VerKeyDSIGN v -> Hash h (VerKeyDSIGN v)
   hashVerKeyDSIGN = hashRaw rawSerialiseVerKeyDSIGN
 
-  -- | Abstract sizes for verification keys and signatures, specifies an upper
-  -- bound on the real byte sizes.
-  abstractSizeVKey :: proxy v -> Natural
-  abstractSizeSig  :: proxy v -> Natural
+  sizeVerKeyDSIGN  :: proxy v -> Word
+  sizeSignKeyDSIGN :: proxy v -> Word
+  sizeSigDSIGN     :: proxy v -> Word
 
 
   --
@@ -192,8 +190,9 @@ class ( Typeable v
   {-# MINIMAL
         algorithmNameDSIGN
       , deriveVerKeyDSIGN
-      , abstractSizeVKey
-      , abstractSizeSig
+      , sizeVerKeyDSIGN
+      , sizeSignKeyDSIGN
+      , sizeSigDSIGN
       , signDSIGN
       , verifyDSIGN
       , genKeyDSIGN

@@ -37,6 +37,10 @@ instance KESAlgorithm NeverKES where
 
   deriveVerKeyKES _ = NeverUsedVerKeyKES
 
+  sizeVerKeyKES  _ = 0
+  sizeSignKeyKES _ = 0
+  sizeSigKES     _ = 0
+
   signKES   = error "KES not available"
   verifyKES = error "KES not available"
   updateKES = error "KES not available"

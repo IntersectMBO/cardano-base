@@ -59,6 +59,18 @@ testVRFAlgorithm _ n =
                                                       rawDeserialiseCertVRF
         ]
 
+      , testGroup "size"
+        [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyVRF v)
+                                                       rawSerialiseVerKeyVRF
+                                                       (sizeVerKeyVRF (Proxy @ v))
+        , testProperty "SignKey" $ prop_size_serialise @(SignKeyVRF v)
+                                                       rawSerialiseSignKeyVRF
+                                                       (sizeSignKeyVRF (Proxy @ v))
+        , testProperty "Cert"    $ prop_size_serialise @(CertVRF v)
+                                                       rawSerialiseCertVRF
+                                                       (sizeCertVRF (Proxy @ v))
+        ]
+
       , testGroup "direct CBOR"
         [ testProperty "VerKey"  $ prop_cbor_with @(VerKeyVRF v)
                                                   encodeVerKeyVRF

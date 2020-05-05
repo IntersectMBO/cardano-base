@@ -37,6 +37,10 @@ instance VRFAlgorithm NeverVRF where
 
   deriveVerKeyVRF _ = NeverUsedVerKeyVRF
 
+  sizeVerKeyVRF  _ = 0
+  sizeSignKeyVRF _ = 0
+  sizeCertVRF    _ = 0
+
   evalVRF = error "VRF unavailable"
 
   verifyVRF = error "VRF unavailable"

@@ -76,6 +76,18 @@ testKESAlgorithm _p n =
                                                       rawDeserialiseSigKES
         ]
 
+      , testGroup "size"
+        [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyKES v)
+                                                       rawSerialiseVerKeyKES
+                                                       (sizeVerKeyKES (Proxy @ v))
+        , testProperty "SignKey" $ prop_size_serialise @(SignKeyKES v)
+                                                       rawSerialiseSignKeyKES
+                                                       (sizeSignKeyKES (Proxy @ v))
+        , testProperty "Sig"     $ prop_size_serialise @(SigKES v)
+                                                       rawSerialiseSigKES
+                                                       (sizeSigKES (Proxy @ v))
+        ]
+
       , testGroup "direct CBOR"
         [ testProperty "VerKey"  $ prop_cbor_with @(VerKeyKES v)
                                                   encodeVerKeyKES
@@ -238,8 +250,8 @@ prop_verifyKES_negative_period sk_0 x =
             ]
 
 
--- | Check 'prop_raw_serialise' and 'prop_cbor_with' for 'VerKeyKES' on /all/
--- the KES key evolutions.
+-- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
+-- for 'VerKeyKES' on /all/ the KES key evolutions.
 --
 prop_serialise_VerKeyKES
   :: forall v.
@@ -251,11 +263,13 @@ prop_serialise_VerKeyKES sk_0 =
                               rawDeserialiseVerKeyKES vk
        .&. prop_cbor_with encodeVerKeyKES
                           decodeVerKeyKES vk
+       .&. prop_size_serialise rawSerialiseVerKeyKES
+                               (sizeVerKeyKES (Proxy @ v)) vk
       | vk <- map deriveVerKeyKES (allUpdatesKES sk_0) ]
 
 
--- | Check 'prop_raw_serialise' and 'prop_cbor_with' for 'SignKeyKES' on /all/
--- the KES key evolutions.
+-- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
+-- for 'SignKeyKES' on /all/ the KES key evolutions.
 --
 prop_serialise_SignKeyKES
   :: forall v.
@@ -267,11 +281,13 @@ prop_serialise_SignKeyKES sk_0 =
                               rawDeserialiseSignKeyKES sk
        .&. prop_cbor_with encodeSignKeyKES
                           decodeSignKeyKES sk
+       .&. prop_size_serialise rawSerialiseSignKeyKES
+                               (sizeSignKeyKES (Proxy @ v)) sk
       | sk <- allUpdatesKES sk_0 ]
 
 
--- | Check 'prop_raw_serialise' and 'prop_cbor_with' for 'SigKES' on /all/
--- the KES key evolutions.
+-- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
+-- for 'SigKES' on /all/ the KES key evolutions.
 --
 prop_serialise_SigKES
   :: forall v a.
@@ -283,6 +299,8 @@ prop_serialise_SigKES sk_0 x =
                               rawDeserialiseSigKES sig
        .&. prop_cbor_with encodeSigKES
                           decodeSigKES sig
+       .&. prop_size_serialise rawSerialiseSigKES
+                               (sizeSigKES (Proxy @ v)) sig
       | (t, sk) <- zip [0..] (allUpdatesKES sk_0)
       , let sig = signKES () t x sk
       ]

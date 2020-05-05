@@ -17,24 +17,25 @@ module Cardano.Crypto.VRF.Simple
   )
 where
 
-import Cardano.Binary
-  ( Encoding
-  , FromCBOR (..)
-  , ToCBOR (..)
-  , encodeListLen
-  , enforceSize
-  )
-import Cardano.Crypto.Hash
-import Cardano.Crypto.Seed
-import Cardano.Crypto.VRF.Class
-import Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
-import Crypto.Number.Generate (generateBetween)
+import           Data.Proxy (Proxy (..))
+import           GHC.Generics (Generic)
+import           Numeric.Natural (Natural)
+
+import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
+import           Cardano.Binary
+                   (Encoding, FromCBOR (..), ToCBOR (..),
+                    encodeListLen, enforceSize)
+
+import           Crypto.Number.Generate (generateBetween)
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
-import Crypto.Random (MonadRandom (..))
-import Data.Proxy (Proxy (..))
-import GHC.Generics (Generic)
-import Numeric.Natural (Natural)
+import           Crypto.Random (MonadRandom (..))
+
+import           Cardano.Crypto.Hash
+import           Cardano.Crypto.Seed
+import           Cardano.Crypto.Util
+import           Cardano.Crypto.VRF.Class
+
 
 data SimpleVRF
 
@@ -42,6 +43,7 @@ type H = MD5
 
 curve :: C.Curve
 curve = C.getCurveByName C.SEC_t113r1
+-- C.curveSizeBits curve = 113 bits, 15 bytes
 
 q :: Integer
 q = C.ecc_n $ C.common_curve curve
@@ -106,9 +108,9 @@ instance VRFAlgorithm SimpleVRF where
 
   data CertVRF SimpleVRF
     = CertSimpleVRF
-        { certU :: Point
-        , certC :: Natural
-        , certS :: Integer
+        { certU :: Point    -- 15 byte point numbers, round up to 16
+        , certC :: Natural  -- md5 hash, so 16 bytes
+        , certS :: Integer  -- at most q, so 15 bytes, round up to 16
         }
     deriving stock    (Show, Eq, Generic)
     deriving anyclass (NoUnexpectedThunks)
@@ -121,6 +123,11 @@ instance VRFAlgorithm SimpleVRF where
 
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
+
+  sizeVerKeyVRF  _ = 32
+  sizeSignKeyVRF _ = 16
+  sizeCertVRF    _ = 64
+
 
   --
   -- Core algorithm operations
@@ -152,6 +159,7 @@ instance VRFAlgorithm SimpleVRF where
 
   maxVRF _ = 2 ^ (8 * sizeHash (Proxy :: Proxy H)) - 1
 
+
   --
   -- Key generation
   --
@@ -159,6 +167,59 @@ instance VRFAlgorithm SimpleVRF where
   seedSizeVRF _  = 16 * 10 -- size of SEC_t113r1 * up to 10 iterations
   genKeyVRF seed = SignKeySimpleVRF
                      (runMonadRandomWithSeed seed (C.scalarGenerate curve))
+
+
+  --
+  -- raw serialise/deserialise
+  --
+
+  -- All the integers here are 15 or 16 bytes big, we round up to 16.
+
+  rawSerialiseVerKeyVRF (VerKeySimpleVRF (Point C.PointO)) =
+      error "rawSerialiseVerKeyVRF: Point at infinity"
+  rawSerialiseVerKeyVRF (VerKeySimpleVRF (Point (C.Point p1 p2))) =
+      writeBinaryNatural 16 (fromInteger p1)
+   <> writeBinaryNatural 16 (fromInteger p2)
+
+  rawSerialiseSignKeyVRF (SignKeySimpleVRF sk) =
+      writeBinaryNatural 16 (fromInteger sk)
+
+  rawSerialiseCertVRF (CertSimpleVRF (Point C.PointO) _ _) =
+      error "rawSerialiseCertVRF: Point at infinity"
+  rawSerialiseCertVRF (CertSimpleVRF (Point (C.Point p1 p2)) c s) =
+      writeBinaryNatural 16 (fromInteger p1)
+   <> writeBinaryNatural 16 (fromInteger p2)
+   <> writeBinaryNatural 16 c
+   <> writeBinaryNatural 16 (fromInteger s)
+
+  rawDeserialiseVerKeyVRF bs
+    | [p1b, p2b] <- splitsAt [16,16] bs
+    , let p1 = toInteger (readBinaryNatural p1b)
+          p2 = toInteger (readBinaryNatural p2b)
+    = Just $! VerKeySimpleVRF (Point (C.Point p1 p2))
+
+    | otherwise
+    = Nothing
+
+  rawDeserialiseSignKeyVRF bs
+    | [skb] <- splitsAt [16] bs
+    , let sk = toInteger (readBinaryNatural skb)
+    = Just $! SignKeySimpleVRF sk
+
+    | otherwise
+    = Nothing
+
+  rawDeserialiseCertVRF bs
+    | [p1b, p2b, cb, sb] <- splitsAt [16,16,16,16] bs
+    , let p1 = toInteger (readBinaryNatural p1b)
+          p2 = toInteger (readBinaryNatural p2b)
+          c  =            readBinaryNatural cb
+          s  = toInteger (readBinaryNatural sb)
+    = Just $! CertSimpleVRF (Point (C.Point p1 p2)) c s
+
+    | otherwise
+    = Nothing
+
 
   --
   -- CBOR encoding/decoding

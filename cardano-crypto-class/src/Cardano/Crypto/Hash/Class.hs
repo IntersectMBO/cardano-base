@@ -7,6 +7,7 @@ module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
   , ByteString
   , Hash(..)
+  , castHash
   , hash
   , hashRaw
   , hashPair
@@ -78,6 +79,9 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
     if la == le
     then return $ UnsafeHash bs
     else fail $ "expected " ++ show le ++ " byte(s), but got " ++ show la
+
+castHash :: Hash h a -> Hash h b
+castHash (UnsafeHash h) = UnsafeHash h
 
 hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
 hash = hashWithSerialiser toCBOR

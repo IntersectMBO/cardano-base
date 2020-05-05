@@ -12,15 +12,19 @@ module Cardano.Crypto.VRF.Mock
   )
 where
 
-import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
-import Cardano.Crypto.Hash
-import Cardano.Crypto.Util (mockNonNegIntR)
-import Cardano.Crypto.Seed
-import Cardano.Crypto.VRF.Class
-import Cardano.Prelude (NoUnexpectedThunks)
+import Data.Word (Word64)
+import Numeric.Natural (Natural)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
-import Numeric.Natural (Natural)
+
+import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
+
+import Cardano.Crypto.Hash
+import Cardano.Crypto.Util
+import Cardano.Crypto.Seed
+import Cardano.Crypto.VRF.Class
+
 
 data MockVRF
 
@@ -30,13 +34,13 @@ instance VRFAlgorithm MockVRF where
   -- Key and signature types
   --
 
-  newtype VerKeyVRF MockVRF = VerKeyMockVRF Int
+  newtype VerKeyVRF MockVRF = VerKeyMockVRF Word64
       deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
 
-  newtype SignKeyVRF MockVRF = SignKeyMockVRF Int
+  newtype SignKeyVRF MockVRF = SignKeyMockVRF Word64
       deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
 
-  newtype CertVRF MockVRF = CertMockVRF Int
+  newtype CertVRF MockVRF = CertMockVRF Word64
       deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
 
   --
@@ -46,6 +50,11 @@ instance VRFAlgorithm MockVRF where
   algorithmNameVRF _ = "mock"
 
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
+
+  sizeVerKeyVRF  _ = 8
+  sizeSignKeyVRF _ = 8
+  sizeCertVRF    _ = 8
+
 
   --
   -- Core algorithm operations
@@ -66,7 +75,41 @@ instance VRFAlgorithm MockVRF where
   seedSizeVRF _  = 8
   genKeyVRF seed = SignKeyMockVRF sk
     where
-      sk = runMonadRandomWithSeed seed mockNonNegIntR
+      sk = runMonadRandomWithSeed seed getRandomWord64
+
+
+  --
+  -- raw serialise/deserialise
+  --
+
+  rawSerialiseVerKeyVRF  (VerKeyMockVRF  k) = writeBinaryWord64 k
+  rawSerialiseSignKeyVRF (SignKeyMockVRF k) = writeBinaryWord64 k
+  rawSerialiseCertVRF    (CertMockVRF    k) = writeBinaryWord64 k
+
+  rawDeserialiseVerKeyVRF bs
+    | [kb] <- splitsAt [8] bs
+    , let k = readBinaryWord64 kb
+    = Just $! VerKeyMockVRF k
+
+    | otherwise
+    = Nothing
+
+  rawDeserialiseSignKeyVRF bs
+    | [kb] <- splitsAt [8] bs
+    , let k = readBinaryWord64 kb
+    = Just $! SignKeyMockVRF k
+
+    | otherwise
+    = Nothing
+
+  rawDeserialiseCertVRF bs
+    | [kb] <- splitsAt [8] bs
+    , let k = readBinaryWord64 kb
+    = Just $! CertMockVRF k
+
+    | otherwise
+    = Nothing
+
 
   --
   -- CBOR encoding/decoding

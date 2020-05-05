@@ -37,8 +37,9 @@ instance DSIGNAlgorithm NeverDSIGN where
 
   deriveVerKeyDSIGN _ = NeverUsedVerKeyDSIGN
 
-  abstractSizeVKey _ = error "abstract size not available"
-  abstractSizeSig  _ = error "abstract size not available"
+  sizeVerKeyDSIGN  _ = 0
+  sizeSignKeyDSIGN _ = 0
+  sizeSigDSIGN     _ = 0
 
   signDSIGN   = error "DSIGN not available"
   verifyDSIGN = error "DSIGN not available"
