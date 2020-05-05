@@ -100,9 +100,9 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
           Nothing -> Left "KES verification failed: out of range"
           Just vk -> verifyDSIGN ctxt vk a sig
 
-    updateKES _ sk to
-      | to >= fromIntegral (natVal (Proxy @ t)) = Nothing
-      | otherwise                               = Just sk
+    updateKES _ sk t
+      | t+1 < fromIntegral (natVal (Proxy @ t)) = Just sk
+      | otherwise                               = Nothing
 
     totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
 

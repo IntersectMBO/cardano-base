@@ -87,7 +87,7 @@ class ( Typeable v
   signKES
     :: (Signable v a, HasCallStack)
     => ContextKES v
-    -> Period
+    -> Period  -- ^ The /current/ period for the key
     -> a
     -> SignKeyKES v
     -> SigKES v
@@ -96,24 +96,32 @@ class ( Typeable v
     :: (Signable v a, HasCallStack)
     => ContextKES v
     -> VerKeyKES v
-    -> Period
+    -> Period  -- ^ The /current/ period for the key
     -> a
     -> SigKES v
     -> Either String ()
 
-  -- | Update the KES signature key to the specified period. The intended
-  -- behavior is to return `Nothing` in the case that the key cannot be evolved
-  -- that far.
+  -- | Update the KES signature key to the /next/ period, given the /current/
+  -- period.
   --
-  -- The precondition is that the current KES period of the input key is before
-  -- the target period.
-  -- The postcondition is that in case a key is returned, its current KES period
-  -- corresponds to the target KES period.
+  -- It returns 'Nothing' if the cannot be evolved any further.
+  --
+  -- The precondition (to get a 'Just' result) is that the current KES period
+  -- of the input key is not the last period. The given period must be the
+  -- current KES period of the input key (not the next or target).
+  --
+  -- The postcondition is that in case a key is returned, its current KES
+  -- period is incremented by one compared to before.
+  --
+  -- Note that you must track the current period separately, and to skip to a
+  -- later period requires repeated use of this function, since it only
+  -- increments one period at once.
+  --
   updateKES
     :: HasCallStack
     => ContextKES v
     -> SignKeyKES v
-    -> Period
+    -> Period  -- ^ The /current/ period for the key, not the target period.
     -> Maybe (SignKeyKES v)
 
   -- | Return the current KES period of a KES signing key.

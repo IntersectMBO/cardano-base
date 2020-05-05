@@ -259,13 +259,15 @@ prop_serialise_VerKeyKES
   => SignKeyKES v -> Property
 prop_serialise_VerKeyKES sk_0 =
     conjoin
-      [    prop_raw_serialise rawSerialiseVerKeyKES
+      [ counterexample ("period " ++ show (t :: Int)) $
+        counterexample ("vkey " ++ show vk) $
+           prop_raw_serialise rawSerialiseVerKeyKES
                               rawDeserialiseVerKeyKES vk
        .&. prop_cbor_with encodeVerKeyKES
                           decodeVerKeyKES vk
        .&. prop_size_serialise rawSerialiseVerKeyKES
                                (sizeVerKeyKES (Proxy @ v)) vk
-      | vk <- map deriveVerKeyKES (allUpdatesKES sk_0) ]
+      | (t, vk) <- zip [0..] (map deriveVerKeyKES (allUpdatesKES sk_0)) ]
 
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
@@ -277,13 +279,15 @@ prop_serialise_SignKeyKES
   => SignKeyKES v -> Property
 prop_serialise_SignKeyKES sk_0 =
     conjoin
-      [    prop_raw_serialise rawSerialiseSignKeyKES
+      [ counterexample ("period " ++ show (t :: Int)) $
+        counterexample ("skey " ++ show sk) $
+           prop_raw_serialise rawSerialiseSignKeyKES
                               rawDeserialiseSignKeyKES sk
        .&. prop_cbor_with encodeSignKeyKES
                           decodeSignKeyKES sk
        .&. prop_size_serialise rawSerialiseSignKeyKES
                                (sizeSignKeyKES (Proxy @ v)) sk
-      | sk <- allUpdatesKES sk_0 ]
+      | (t, sk) <- zip [0..] (allUpdatesKES sk_0) ]
 
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
@@ -295,7 +299,10 @@ prop_serialise_SigKES
   => SignKeyKES v -> a -> Property
 prop_serialise_SigKES sk_0 x =
     conjoin
-      [    prop_raw_serialise rawSerialiseSigKES
+      [ counterexample ("period " ++ show t) $
+        counterexample ("vkey "   ++ show sk) $
+        counterexample ("sig "    ++ show sig) $
+           prop_raw_serialise rawSerialiseSigKES
                               rawDeserialiseSigKES sig
        .&. prop_cbor_with encodeSigKES
                           decodeSigKES sig
@@ -317,10 +324,10 @@ allUpdatesKES sk_0 =
   where
     update :: (SignKeyKES v, Period)
            -> Maybe (SignKeyKES v, (SignKeyKES v, Period))
-    update (sk, n) =
-      case updateKES () sk (n+1) of
+    update (sk, t) =
+      case updateKES () sk t of
         Nothing  -> Nothing
-        Just sk' -> Just (sk', (sk', n+1))
+        Just sk' -> Just (sk', (sk', t+1))
 
 
 --

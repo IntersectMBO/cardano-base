@@ -84,30 +84,29 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     type Signable (MockKES t) = ToCBOR
 
-    updateKES () (SignKeyMockKES vk k) to =
-      assert (to >= k) $
-         if to < totalPeriodsKES (Proxy @ (MockKES t))
-           then Just (SignKeyMockKES vk to)
+    updateKES () (SignKeyMockKES vk t') t =
+        assert (t == t') $
+         if t+1 < totalPeriodsKES (Proxy @ (MockKES t))
+           then Just (SignKeyMockKES vk (t+1))
            else Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
     -- allowed KES period.
-    signKES () j a (SignKeyMockKES vk k)
-        | j == k
-        , j  < totalPeriodsKES (Proxy @ (MockKES t))
-        = SigMockKES (castHash (hash a)) (SignKeyMockKES vk j)
+    signKES () t a (SignKeyMockKES vk t') =
+        assert (t == t') $
+        SigMockKES (castHash (hash a)) (SignKeyMockKES vk t)
 
-        | otherwise
-        = error ("MockKES.signKES: wrong period " ++ show j)
+    verifyKES () vk t a (SigMockKES h (SignKeyMockKES vk' t'))
+      | t' == t
+      , vk == vk'
+      , castHash (hash a) == h
+      = Right ()
 
-    verifyKES () vk j a (SigMockKES h (SignKeyMockKES vk' j')) =
-        if    j  == j'
-           && vk == vk'
-           && castHash (hash a) == h
-          then Right ()
-          else Left "KES verification failed"
+      | otherwise
+      = Left "KES verification failed"
 
     totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
+
 
     --
     -- Key generation
