@@ -48,6 +48,7 @@ class Typeable h => HashAlgorithm h where
 
   hashAlgorithmName :: proxy h -> String
 
+  -- | The size in bytes of the output of 'digest'
   sizeHash :: proxy h -> Word
 
   byteCount :: proxy h -> Natural

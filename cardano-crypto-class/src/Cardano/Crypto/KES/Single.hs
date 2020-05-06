@@ -75,7 +75,7 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
     -- Metadata and basic key operations
     --
 
-    algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d)
+    algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
     deriveVerKeyKES (SignKeySingleKES sk) =
         VerKeySingleKES (deriveVerKeyDSIGN sk)

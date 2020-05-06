@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Crypto.KES
   ( tests
@@ -242,8 +242,9 @@ prop_verifyKES_negative_message sk_0 x x' =
             ]
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
--- try to verify the signature (and message @a@) using a verification key
--- corresponding to a different key period, then the verification fails.
+-- try to verify the signature (and message @a@) using the right verification
+-- key but at a different period than the key used for signing, then the
+-- verification fails.
 --
 prop_verifyKES_negative_period
   :: forall v a.

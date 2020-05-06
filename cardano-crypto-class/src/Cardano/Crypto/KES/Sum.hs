@@ -129,13 +129,16 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     -- Metadata and basic key operations
     --
 
-    algorithmNameKES _ = algorithmNameKES (Proxy :: Proxy d) ++ "x2"
+    algorithmNameKES _ = mungeName (algorithmNameKES (Proxy :: Proxy d))
 
     deriveVerKeyKES (SignKeySumKES _ _ vk_0 vk_1) =
         VerKeySumKES (hashPairOfVKeys (vk_0, vk_1))
 
     -- The verification key in this scheme is actually a hash already
-    -- But the hashVerKeyKES 
+    -- however the type of hashVerKeyKES says the caller gets to choose
+    -- the hash, not the implementation. So that's why we have to hash
+    -- the hash here. We could alternatively provide a "key identifier"
+    -- function and let the implementation choose what that is.
     hashVerKeyKES (VerKeySumKES vk) = castHash (hashRaw getHash vk)
 
 
@@ -281,6 +284,15 @@ zeroSeed p = mkSeedFromBytes (BS.replicate seedSize (0 :: Word8))
   where
     seedSize :: Int
     seedSize = fromIntegral (seedSizeKES p)
+
+mungeName :: String -> String
+mungeName basename
+  | (name, '^':nstr) <- span (/= '^') basename
+  , [(n, "")] <- reads nstr
+  = name ++ '^' : show (n+1 :: Word)
+
+  | otherwise
+  = basename ++ "_2^1"
 
 
 --

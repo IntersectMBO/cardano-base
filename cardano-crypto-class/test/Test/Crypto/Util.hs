@@ -74,12 +74,7 @@ nullTestSeed = TestSeed (0, 0, 0, 0, 0)
 
 instance Arbitrary TestSeed where
   arbitrary =
-    (\w1 w2 w3 w4 w5 -> TestSeed (w1, w2, w3, w4, w5)) <$>
-      gen <*>
-      gen <*>
-      gen <*>
-      gen <*>
-      gen
+      TestSeed <$> ((,,,,) <$> gen <*> gen <*> gen <*> gen <*> gen)
     where
       gen :: Gen Word64
       gen = arbitraryBoundedIntegral

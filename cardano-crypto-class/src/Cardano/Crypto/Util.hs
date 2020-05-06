@@ -1,7 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 module Cardano.Crypto.Util
   ( Empty
   , getRandomWord64
