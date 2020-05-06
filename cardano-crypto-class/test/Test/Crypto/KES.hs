@@ -20,6 +20,7 @@ import Data.List (unfoldr)
 
 import Cardano.Binary (FromCBOR, ToCBOR(..))
 import Cardano.Crypto.DSIGN
+import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
 import qualified Cardano.Crypto.KES as KES
 
@@ -38,12 +39,21 @@ tests =
   testGroup "Crypto.KES"
   [ testKESAlgorithm (Proxy :: Proxy (MockKES 7))               "MockKES"
   , testKESAlgorithm (Proxy :: Proxy (SimpleKES Ed448DSIGN 7))  "SimpleKES"
+  , testKESAlgorithm (Proxy :: Proxy (SingleKES Ed25519DSIGN))  "SingleKES"
+  , testKESAlgorithm (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
+  , testKESAlgorithm (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
+  , testKESAlgorithm (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instance here.
 deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
+
+deriving instance Eq (SignKeyDSIGN d)
+               => Eq (SignKeyKES (SingleKES d))
+deriving instance (KESAlgorithm d, Eq (SignKeyKES d))
+               => Eq (SignKeyKES (SumKES h d))
 
 testKESAlgorithm
   :: forall v proxy.

@@ -44,6 +44,8 @@ library
                        Cardano.Crypto.KES.Mock
                        Cardano.Crypto.KES.NeverUsed
                        Cardano.Crypto.KES.Simple
+                       Cardano.Crypto.KES.Single
+                       Cardano.Crypto.KES.Sum
 
                        Cardano.Crypto.Seed
                        Cardano.Crypto.Util

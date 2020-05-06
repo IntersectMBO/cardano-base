@@ -8,8 +8,10 @@ module Cardano.Crypto.Seed
   ( Seed
     -- * Constructing seeds
   , mkSeedFromBytes
+  , getSeedBytes
   , readSeedFromSystemEntropy
   , splitSeed
+  , expandSeed
     -- * Using seeds
   , getBytesFromSeed
   , runMonadRandomWithSeed
@@ -28,6 +30,7 @@ import           Control.Monad.Trans.State
 
 import           Crypto.Random (MonadRandom(..))
 import           Crypto.Random.Entropy (getEntropy)
+import           Cardano.Crypto.Hash.Class (HashAlgorithm(digest))
 
 import           Cardano.Prelude (NoUnexpectedThunks)
 
@@ -46,6 +49,9 @@ newtype Seed = Seed ByteString
 mkSeedFromBytes :: ByteString -> Seed
 mkSeedFromBytes = Seed
 
+
+getSeedBytes :: Seed -> ByteString
+getSeedBytes (Seed s) = s
 
 -- | Get a number of bytes from the seed. This will fail if not enough bytes
 -- are available. This can be chained multiple times provided the seed is big
@@ -69,6 +75,16 @@ splitSeed n (Seed s)
   | otherwise                       = Nothing
   where
     (b, s') = BS.splitAt (fromIntegral n) s
+
+-- | Expand a seed into a pair of seeds using a cryptographic hash function (in
+-- the role of a crypto PRNG). The whole input seed is consumed. The output
+-- seeds are the size of the hash output.
+--
+expandSeed :: HashAlgorithm h => proxy h -> Seed -> (Seed, Seed)
+expandSeed p (Seed s) =
+    ( Seed (digest p (BS.cons 1 s))
+    , Seed (digest p (BS.cons 2 s))
+    )
 
 
 -- | Obtain a 'Seed' by reading @n@ bytes of entropy from the operating system.
