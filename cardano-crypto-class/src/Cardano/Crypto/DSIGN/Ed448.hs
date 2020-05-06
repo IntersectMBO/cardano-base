@@ -15,22 +15,19 @@ module Cardano.Crypto.DSIGN.Ed448
   )
 where
 
-import Cardano.Binary
-  ( Decoder
-  , Encoding
-  , FromCBOR (..)
-  , ToCBOR (..)
-  , serialize
-  )
-import Cardano.Crypto.DSIGN.Class
-import Cardano.Crypto.Seed
+import Data.ByteString.Lazy (toStrict)
+import Data.ByteArray as BA (ByteArrayAccess, convert)
+import GHC.Generics (Generic)
+
 import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
+import Cardano.Binary (FromCBOR (..), ToCBOR (..), serialize)
+
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed448 as Ed448
-import Data.ByteArray (ByteArrayAccess, convert)
-import Data.ByteString (ByteString)
-import Data.ByteString.Lazy (toStrict)
-import GHC.Generics (Generic)
+
+import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.Seed
+
 
 data Ed448DSIGN
 
@@ -62,9 +59,6 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
     deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
 
-    -- | Goldilocks points are 448 bits long, so 64 byte is a good abstract size
-    abstractSizeVKey _ = 64
-    abstractSizeSig  _ = 64
 
     --
     -- Core algorithm operations
@@ -95,9 +89,14 @@ instance DSIGNAlgorithm Ed448DSIGN where
     -- raw serialise/deserialise
     --
 
-    rawSerialiseVerKeyDSIGN   = convert
-    rawSerialiseSignKeyDSIGN  = convert
-    rawSerialiseSigDSIGN      = convert
+    -- | Goldilocks points are 448 bits long
+    sizeVerKeyDSIGN  _ = 57
+    sizeSignKeyDSIGN _ = 57
+    sizeSigDSIGN     _ = 114
+
+    rawSerialiseVerKeyDSIGN   = BA.convert
+    rawSerialiseSignKeyDSIGN  = BA.convert
+    rawSerialiseSigDSIGN      = BA.convert
 
     rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd448DSIGN
                                . cryptoFailableToMaybe . Ed448.publicKey
@@ -106,46 +105,24 @@ instance DSIGNAlgorithm Ed448DSIGN where
     rawDeserialiseSigDSIGN     = fmap SigEd448DSIGN
                                . cryptoFailableToMaybe . Ed448.signature
 
-    --
-    -- CBOR encoding/decoding
-    --
-
-    encodeVerKeyDSIGN = toCBOR
-    encodeSignKeyDSIGN = toCBOR
-    encodeSigDSIGN = toCBOR
-
-    decodeVerKeyDSIGN = fromCBOR
-    decodeSignKeyDSIGN = fromCBOR
-    decodeSigDSIGN = fromCBOR
-
 
 instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
-  toCBOR = encodeBA
+  toCBOR = encodeVerKeyDSIGN
 
 instance FromCBOR (VerKeyDSIGN Ed448DSIGN) where
-  fromCBOR = VerKeyEd448DSIGN <$> decodeBA publicKey
+  fromCBOR = decodeVerKeyDSIGN
 
 instance ToCBOR (SignKeyDSIGN Ed448DSIGN) where
-  toCBOR = encodeBA
+  toCBOR = encodeSignKeyDSIGN
 
 instance FromCBOR (SignKeyDSIGN Ed448DSIGN) where
-  fromCBOR = SignKeyEd448DSIGN <$> decodeBA secretKey
+  fromCBOR = decodeSignKeyDSIGN
 
 instance ToCBOR (SigDSIGN Ed448DSIGN) where
-  toCBOR = encodeBA
+  toCBOR = encodeSigDSIGN
 
 instance FromCBOR (SigDSIGN Ed448DSIGN) where
-  fromCBOR = SigEd448DSIGN <$> decodeBA signature
-
-encodeBA :: ByteArrayAccess ba => ba -> Encoding
-encodeBA ba = let bs = convert ba :: ByteString in toCBOR bs
-
-decodeBA :: forall a s. (ByteString -> CryptoFailable a) -> Decoder s a
-decodeBA f = do
-  bs <- fromCBOR :: Decoder s ByteString
-  case f bs of
-    CryptoPassed a -> return a
-    CryptoFailed e -> fail $ "decodeBA: " ++ show e
+  fromCBOR = decodeSigDSIGN
 
 
 cryptoFailableToMaybe :: CryptoFailable a -> Maybe a

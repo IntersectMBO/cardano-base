@@ -7,6 +7,7 @@ module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
   , ByteString
   , Hash(..)
+  , castHash
   , hash
   , hashRaw
   , hashPair
@@ -47,9 +48,15 @@ class Typeable h => HashAlgorithm h where
 
   hashAlgorithmName :: proxy h -> String
 
+  -- | The size in bytes of the output of 'digest'
+  sizeHash :: proxy h -> Word
+
   byteCount :: proxy h -> Natural
+  byteCount = fromIntegral . sizeHash
 
   digest :: HasCallStack => proxy h -> ByteString -> ByteString
+
+{-# DEPRECATED byteCount "Use sizeHash" #-}
 
 newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
@@ -73,6 +80,9 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
     if la == le
     then return $ UnsafeHash bs
     else fail $ "expected " ++ show le ++ " byte(s), but got " ++ show la
+
+castHash :: Hash h a -> Hash h b
+castHash (UnsafeHash h) = UnsafeHash h
 
 hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
 hash = hashWithSerialiser toCBOR

@@ -14,7 +14,7 @@ data MD5
 
 instance HashAlgorithm MD5 where
   hashAlgorithmName _ = "md5"
-  byteCount _ = 16
+  sizeHash _ = 16
   digest _ = convert . H.hash
 
 convert :: H.Digest H.MD5 -> ByteString

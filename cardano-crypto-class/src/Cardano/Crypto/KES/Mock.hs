@@ -17,21 +17,23 @@ module Cardano.Crypto.KES.Mock
   )
 where
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..), decodeListLenOf, encodeListLen)
+import Data.Word (Word64)
+import Data.Proxy (Proxy(..))
+import GHC.Generics (Generic)
+import GHC.TypeNats (Nat, KnownNat, natVal)
+
+import Control.Exception (assert)
+
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Prelude (NoUnexpectedThunks)
+
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
-import Cardano.Crypto.Util (mockNonNegIntR)
-import Cardano.Prelude (NoUnexpectedThunks)
-import GHC.Generics (Generic)
-import GHC.TypeNats (Nat, KnownNat, natVal)
-import Data.Proxy (Proxy(..))
-import Numeric.Natural (Natural)
-import Control.Exception (assert)
+import Cardano.Crypto.Util
+
 
 data MockKES (t :: Nat)
-
-type H = MD5
 
 -- | Mock key evolving signatures.
 --
@@ -50,17 +52,17 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- Key and signature types
     --
 
-    newtype VerKeyKES (MockKES t) = VerKeyMockKES Int
+    newtype VerKeyKES (MockKES t) = VerKeyMockKES Word64
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (NoUnexpectedThunks, ToCBOR, FromCBOR)
+        deriving newtype (NoUnexpectedThunks)
 
     data SignKeyKES (MockKES t) =
-           SignKeyMockKES !(VerKeyKES (MockKES t)) !Natural
+           SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
     data SigKES (MockKES t) =
-           SigMockKES !Natural !(SignKeyKES (MockKES t))
+           SigMockKES !(Hash MD5 ()) !(SignKeyKES (MockKES t))
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
@@ -72,37 +74,40 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     deriveVerKeyKES (SignKeyMockKES vk _) = vk
 
+    sizeVerKeyKES  _ = 8
+    sizeSignKeyKES _ = 16
+    sizeSigKES     _ = 32
+
+
     --
     -- Core algorithm operations
     --
 
     type Signable (MockKES t) = ToCBOR
 
-    updateKES () (SignKeyMockKES vk k) to =
-      assert (to >= k) $
-         if to < totalPeriodsKES (Proxy @ (MockKES t))
-           then Just (SignKeyMockKES vk to)
+    updateKES () (SignKeyMockKES vk t') t =
+        assert (t == t') $
+         if t+1 < totalPeriodsKES (Proxy @ (MockKES t))
+           then Just (SignKeyMockKES vk (t+1))
            else Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
     -- allowed KES period.
-    signKES () j a (SignKeyMockKES vk k)
-        | j == k
-        , j  < totalPeriodsKES (Proxy @ (MockKES t))
-        = Just (SigMockKES (fromHash $ hash @H a) (SignKeyMockKES vk j))
+    signKES () t a (SignKeyMockKES vk t') =
+        assert (t == t') $
+        SigMockKES (castHash (hash a)) (SignKeyMockKES vk t)
 
-        | otherwise
-        = Nothing
+    verifyKES () vk t a (SigMockKES h (SignKeyMockKES vk' t'))
+      | t' == t
+      , vk == vk'
+      , castHash (hash a) == h
+      = Right ()
 
-    verifyKES () vk j a (SigMockKES h (SignKeyMockKES vk' j')) =
-        if    j  == j'
-           && vk == vk'
-           && fromHash (hash @H a) == h
-          then Right ()
-          else Left "KES verification failed"
+      | otherwise
+      = Left "KES verification failed"
 
-    currentPeriodKES () (SignKeyMockKES _ k) = k
-    totalPeriodsKES  _ = natVal (Proxy @ t)
+    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
+
 
     --
     -- Key generation
@@ -110,45 +115,68 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     seedSizeKES _ = 8
     genKeyKES seed =
-        let vk = VerKeyMockKES (runMonadRandomWithSeed seed mockNonNegIntR)
+        let vk = VerKeyMockKES (runMonadRandomWithSeed seed getRandomWord64)
          in SignKeyMockKES vk 0
 
 
     --
-    -- CBOR encoding/decoding
+    -- raw serialise/deserialise
     --
 
-    encodeVerKeyKES = toCBOR
-    encodeSignKeyKES = toCBOR
-    encodeSigKES = toCBOR
+    rawSerialiseVerKeyKES (VerKeyMockKES vk) =
+        writeBinaryWord64 vk
 
-    decodeSignKeyKES = fromCBOR
-    decodeVerKeyKES = fromCBOR
-    decodeSigKES = fromCBOR
+    rawSerialiseSignKeyKES (SignKeyMockKES vk t) =
+        rawSerialiseVerKeyKES vk
+     <> writeBinaryWord64 (fromIntegral t)
+
+    rawSerialiseSigKES (SigMockKES h sk) =
+        getHash h
+     <> rawSerialiseSignKeyKES sk
+
+    rawDeserialiseVerKeyKES bs
+      | [vkb] <- splitsAt [8] bs
+      , let vk = readBinaryWord64 vkb
+      = Just $! VerKeyMockKES vk
+
+      | otherwise
+      = Nothing
+
+    rawDeserialiseSignKeyKES bs
+      | [vkb, tb] <- splitsAt [8, 8] bs
+      , Just vk   <- rawDeserialiseVerKeyKES vkb
+      , let t      = fromIntegral (readBinaryWord64 tb)
+      = Just $! SignKeyMockKES vk t
+
+      | otherwise
+      = Nothing
+
+    rawDeserialiseSigKES bs
+      | [hb, skb] <- splitsAt [16, 16] bs
+      , Just h    <- hashFromBytes hb
+      , Just sk   <- rawDeserialiseSignKeyKES skb
+      = Just $! SigMockKES h sk
+
+      | otherwise
+      = Nothing
 
 
-instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
-  toCBOR (SigMockKES evolution key) =
-    encodeListLen 2 <>
-      toCBOR evolution <>
-      toCBOR key
 
-instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
-  fromCBOR =
-    SigMockKES <$
-      decodeListLenOf 2 <*>
-      fromCBOR <*>
-      fromCBOR
+instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
+  toCBOR = encodeVerKeyKES
+
+instance KnownNat t => FromCBOR (VerKeyKES (MockKES t)) where
+  fromCBOR = decodeVerKeyKES
 
 instance KnownNat t => ToCBOR (SignKeyKES (MockKES t)) where
-  toCBOR (SignKeyMockKES vk k) =
-    encodeListLen 2 <>
-      toCBOR vk <>
-      toCBOR k
+  toCBOR = encodeSignKeyKES
 
 instance KnownNat t => FromCBOR (SignKeyKES (MockKES t)) where
-  fromCBOR =
-    SignKeyMockKES <$
-      decodeListLenOf 2 <*>
-      fromCBOR <*>
-      fromCBOR
+  fromCBOR = decodeSignKeyKES
+
+instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
+  toCBOR = encodeSigKES
+
+instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
+  fromCBOR = decodeSigKES
+

@@ -7,25 +7,28 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module Test.Crypto.KES
   ( tests
   )
 where
 
 import Data.Proxy (Proxy(..))
-import Numeric.Natural (Natural)
-import Test.QuickCheck
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck (testProperty)
+import Data.List (unfoldr)
 
 import Cardano.Binary (FromCBOR, ToCBOR(..))
 import Cardano.Crypto.DSIGN
+import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
-import Cardano.Crypto.Seed
 import qualified Cardano.Crypto.KES as KES
 
-import Test.Crypto.Util
+import Test.QuickCheck
+import Test.Tasty (TestTree, testGroup, adjustOption)
+import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
+
+import Test.Crypto.Util hiding (label)
 
 
 --
@@ -34,15 +37,23 @@ import Test.Crypto.Util
 tests :: TestTree
 tests =
   testGroup "Crypto.KES"
-  [ testKESAlgorithm (Proxy :: Proxy (MockKES 42))              "MockKES"
-  , testKESAlgorithm (Proxy :: Proxy (SimpleKES Ed448DSIGN 42)) "SimpleKES (with Ed448)"
+  [ testKESAlgorithm (Proxy :: Proxy (MockKES 7))               "MockKES"
+  , testKESAlgorithm (Proxy :: Proxy (SimpleKES Ed448DSIGN 7))  "SimpleKES"
+  , testKESAlgorithm (Proxy :: Proxy (SingleKES Ed25519DSIGN))  "SingleKES"
+  , testKESAlgorithm (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
+  , testKESAlgorithm (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
+  , testKESAlgorithm (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instance here.
-deriving instance (DSIGNAlgorithm d, Eq (SignKeyDSIGN d))
-               => Eq (SignKeyKES (SimpleKES d t))
+deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
+
+deriving instance Eq (SignKeyDSIGN d)
+               => Eq (SignKeyKES (SingleKES d))
+deriving instance (KESAlgorithm d, Eq (SignKeyKES d))
+               => Eq (SignKeyKES (SumKES h d))
 
 testKESAlgorithm
   :: forall v proxy.
@@ -60,7 +71,7 @@ testKESAlgorithm
   => proxy v
   -> String
   -> TestTree
-testKESAlgorithm p n =
+testKESAlgorithm _p n =
   testGroup n
     [ testGroup "serialisation"
       [ testGroup "raw"
@@ -73,6 +84,18 @@ testKESAlgorithm p n =
         , testProperty "Sig"     $ prop_raw_serialise @(SigKES v)
                                                       rawSerialiseSigKES
                                                       rawDeserialiseSigKES
+        ]
+
+      , testGroup "size"
+        [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyKES v)
+                                                       rawSerialiseVerKeyKES
+                                                       (sizeVerKeyKES (Proxy @ v))
+        , testProperty "SignKey" $ prop_size_serialise @(SignKeyKES v)
+                                                       rawSerialiseSignKeyKES
+                                                       (sizeSignKeyKES (Proxy @ v))
+        , testProperty "Sig"     $ prop_size_serialise @(SigKES v)
+                                                       rawSerialiseSigKES
+                                                       (sizeSigKES (Proxy @ v))
         ]
 
       , testGroup "direct CBOR"
@@ -101,134 +124,222 @@ testKESAlgorithm p n =
         , testProperty "Sig"     $ prop_cbor_direct_vs_class @(SigKES v)
                                                              encodeSigKES
         ]
-
-      , testProperty "Sig multiple KES periods" $ prop_KES_serialise_Sig p
       ]
 
+    , testProperty "total periods" $ prop_totalPeriodsKES @v
+    , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
+
     , testGroup "verify"
-      [ testProperty "positive"                 $ prop_KES_verify_pos p
-      , testProperty "negative (wrong key)"     $ prop_KES_verify_neg_key p
-      , testProperty "negative (wrong message)" $ prop_KES_verify_neg_msg p
-      , testProperty "negative (wrong time)"    $ prop_KES_verify_neg_time p
+      [ testProperty "positive"           $ prop_verifyKES_positive         @v @Int
+      , testProperty "negative (key)"     $ prop_verifyKES_negative_key     @v @Int
+      , testProperty "negative (message)" $ prop_verifyKES_negative_message @v @Int
+      , adjustOption (\(QuickCheckMaxSize sz) -> QuickCheckMaxSize (min sz 50)) $
+        testProperty "negative (period)"  $ prop_verifyKES_negative_period  @v @Int
+      ]
+
+    , testGroup "serialisation of all KES evolutions"
+      [ testProperty "VerKey"  $ prop_serialise_VerKeyKES  @v
+      , testProperty "SignKey" $ prop_serialise_SignKeyKES @v
+      , testProperty "Sig"     $ prop_serialise_SigKES     @v @Int
       ]
     ]
 
-prop_KES_serialise_Sig
-  :: ( KESAlgorithm v
-     , KES.Signable v ~ ToCBOR
-     , ContextKES v ~ ()
-     , FromCBOR (SigKES v)
-     , ToCBOR (SigKES v)
-     )
-  => proxy v
-  -> SK_Times v [Int]
-  -> Property
-prop_KES_serialise_Sig _ d = case trySign d of
-  Left  e  -> counterexample e False
-  Right xs -> conjoin [ prop_cbor sig | (_, _, sig) <- xs ]
 
-prop_KES_verify_pos
-  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
-  => proxy v
-  -> SK_Times v [Int]
-  -> Property
-prop_KES_verify_pos _ d =
-  let vk = getFirstVerKey d
-  in
-    case trySign d of
-      Left e -> counterexample e False
-      Right xs ->
-        conjoin [ verifyKES () vk j a sig === Right () | (j, a, sig) <- xs ]
-
-prop_KES_verify_neg_key
-  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
-  => proxy v
-  -> SK_Times v Int
-  -> Property
-prop_KES_verify_neg_key _ d =
-  case trySign d of
-    Left  e  -> counterexample e False
-    Right xs -> conjoin
-      [ verifyKES () (getSecondVerKey d) j a sig =/= Right ()
-      | (j, a, sig) <- xs
-      ]
-
-prop_KES_verify_neg_msg
-  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
-  => proxy v
-  -> SK_Times v Float
-  -> Float
-  -> Property
-prop_KES_verify_neg_msg _ d a =
-  let vk = getFirstVerKey d
-  in
-    case trySign d of
-      Left  e  -> counterexample e False
-      Right xs -> conjoin
-        [ a /= a' ==> verifyKES () vk j a sig =/= Right ()
-        | (j, a', sig) <- xs
-        ]
-
-prop_KES_verify_neg_time
-  :: (KESAlgorithm v, KES.Signable v ~ ToCBOR, ContextKES v ~ ())
-  => proxy v
-  -> SK_Times v Float
-  -> Integer
-  -> Property
-prop_KES_verify_neg_time _ d i =
-  let
-    vk   = getFirstVerKey d
-    t    = fromIntegral $ abs i
-  in case trySign d of
-    Left  e  -> counterexample e False
-    Right xs -> conjoin
-      [ t /= j ==> verifyKES () vk t a sig =/= Right ()
-      | (j, a, sig) <- xs
-      ]
-
-getFirstVerKey :: KESAlgorithm v => SK_Times v a -> VerKeyKES v
-getFirstVerKey (SK_Times sk _ _) = deriveVerKeyKES sk
-
-getSecondVerKey :: SK_Times v a -> VerKeyKES v
-getSecondVerKey (SK_Times _ vk _) = vk
-
-trySign
-  :: forall v a
-   . ( KESAlgorithm v
-     , KES.Signable v ~ ToCBOR
-     , ContextKES v ~ ()
-     , ToCBOR a
-     , Show a
-     )
-  => SK_Times v a
-  -> Either String [(Natural, a, SigKES v)]
-trySign (SK_Times sk _ ts) =
-    go sk ts
+-- | If we start with a signing key, we can evolve it a number of times so that
+-- the total number of signing keys (including the initial one) equals the
+-- total number of periods for this algorithm.
+--
+prop_totalPeriodsKES
+  :: forall v. (KESAlgorithm v, ContextKES v ~ ())
+  => SignKeyKES v -> Property
+prop_totalPeriodsKES sk_0 =
+    totalPeriods > 0 ==>
+    counterexample (show totalPeriods) $
+    counterexample (show sks) $
+      length sks === totalPeriods
   where
-    go :: SignKeyKES v
-       -> [(Natural, a)]
-       -> Either String [(Natural, a, SigKES v)]
-    go _   [] = Right []
-    go sk' l@((j, a) : xs)
-      | currentPeriodKES () sk' < j =
-        case updateKES () sk' j of
-          Nothing   -> Left $ "trySign: error evolution of " ++ show sk
-                           ++ " to KES period " ++ show j
-          Just sk'' -> go sk'' l
+    totalPeriods :: Int
+    totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
 
-      | otherwise =
-        case signKES () j a sk' of
-          Nothing   -> Left $ "trySign: error signing" ++ show a
-                           ++ " at " ++ show j
-                           ++ " with " ++ show sk
-          Just sig  ->
-            case updateKES () sk' (1 + currentPeriodKES () sk') of
-              Nothing    -> Right [(j, a, sig)]
-              Just sk'' ->
-                case go sk'' xs of
-                  Right ys -> Right ((j, a, sig) : ys)
-                  e@Left{} -> e
+    sks :: [SignKeyKES v]
+    sks = allUpdatesKES sk_0
 
+
+-- | If we start with a signing key, and all its evolutions, the verification
+-- keys we derive from each one are the same.
+--
+prop_deriveVerKeyKES
+  :: forall v. (KESAlgorithm v, ContextKES v ~ ())
+  => SignKeyKES v -> Property
+prop_deriveVerKeyKES sk_0 =
+    counterexample (show vks) $
+      conjoin [ vk === vk_0 | vk <- vks ]
+  where
+    sks :: [SignKeyKES v]
+    sks = allUpdatesKES sk_0
+
+    vk_0 = deriveVerKeyKES sk_0
+
+    vks :: [VerKeyKES v]
+    vks = map deriveVerKeyKES sks
+
+
+-- | If we take an initial signing key, a sequence of messages to sign, and
+-- sign each one with an updated key, we can verify each one for the
+-- corresponding period.
+--
+prop_verifyKES_positive
+  :: forall v a.
+     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ ())
+  => SignKeyKES v -> [a] -> Property
+prop_verifyKES_positive sk_0 xs =
+    cover 1 (length xs >= totalPeriods) "covers total periods" $
+    conjoin [ counterexample ("period " ++ show t) $
+              verifyKES () vk t x sig === Right ()
+            | let vk = deriveVerKeyKES sk_0
+            , (t, x, sk) <- zip3 [0..] xs (allUpdatesKES sk_0)
+            , let sig = signKES () t x sk
+            ]
+  where
+    totalPeriods :: Int
+    totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
+
+
+-- | If we sign a message @a@ with one list of signing key evolutions, if we
+-- try to verify the signature (and message @a@) using a verification key
+-- corresponding to a different signing key, then the verification fails.
+--
+prop_verifyKES_negative_key
+  :: forall v a.
+     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ (), Eq (SignKeyKES v))
+  => SignKeyKES v -> SignKeyKES v -> a -> Property
+prop_verifyKES_negative_key sk_0 sk'_0 x =
+    sk_0 /= sk'_0 ==>
+    conjoin [ counterexample ("period " ++ show t) $
+              verifyKES () vk' t x sig =/= Right ()
+            | let sks = allUpdatesKES sk_0
+                  vk' = deriveVerKeyKES sk'_0
+            , (t, sk) <- zip [0..] sks
+            , let sig = signKES () t x sk
+            ]
+
+-- | If we sign a message @a@ with one list of signing key evolutions, if we
+-- try to verify the signature with a message other than @a@, then the
+-- verification fails.
+--
+prop_verifyKES_negative_message
+  :: forall v a.
+     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ (), Eq a)
+  => SignKeyKES v -> a -> a -> Property
+prop_verifyKES_negative_message sk_0 x x' =
+    x /= x' ==>
+    conjoin [ counterexample ("period " ++ show t) $
+              verifyKES () vk t x' sig =/= Right ()
+            | let sks = allUpdatesKES sk_0
+                  vk  = deriveVerKeyKES sk_0
+            , (t, sk) <- zip [0..] sks
+            , let sig = signKES () t x sk
+            ]
+
+-- | If we sign a message @a@ with one list of signing key evolutions, if we
+-- try to verify the signature (and message @a@) using the right verification
+-- key but at a different period than the key used for signing, then the
+-- verification fails.
+--
+prop_verifyKES_negative_period
+  :: forall v a.
+     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ ())
+  => SignKeyKES v -> a -> Property
+prop_verifyKES_negative_period sk_0 x =
+    conjoin [ counterexample ("periods " ++ show (t, t')) $
+              verifyKES () vk t' x sig =/= Right ()
+            | let sks = allUpdatesKES sk_0
+                  vk  = deriveVerKeyKES sk_0
+            , (t, sk) <- zip [0..] sks
+            , let sig = signKES () t x sk
+            , (t', _) <- zip [0..] sks
+            , t /= t'
+            ]
+
+
+-- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
+-- for 'VerKeyKES' on /all/ the KES key evolutions.
+--
+prop_serialise_VerKeyKES
+  :: forall v.
+     (KESAlgorithm v, ContextKES v ~ ())
+  => SignKeyKES v -> Property
+prop_serialise_VerKeyKES sk_0 =
+    conjoin
+      [ counterexample ("period " ++ show (t :: Int)) $
+        counterexample ("vkey " ++ show vk) $
+           prop_raw_serialise rawSerialiseVerKeyKES
+                              rawDeserialiseVerKeyKES vk
+       .&. prop_cbor_with encodeVerKeyKES
+                          decodeVerKeyKES vk
+       .&. prop_size_serialise rawSerialiseVerKeyKES
+                               (sizeVerKeyKES (Proxy @ v)) vk
+      | (t, vk) <- zip [0..] (map deriveVerKeyKES (allUpdatesKES sk_0)) ]
+
+
+-- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
+-- for 'SignKeyKES' on /all/ the KES key evolutions.
+--
+prop_serialise_SignKeyKES
+  :: forall v.
+     (KESAlgorithm v, ContextKES v ~ (), Eq (SignKeyKES v))
+  => SignKeyKES v -> Property
+prop_serialise_SignKeyKES sk_0 =
+    conjoin
+      [ counterexample ("period " ++ show (t :: Int)) $
+        counterexample ("skey " ++ show sk) $
+           prop_raw_serialise rawSerialiseSignKeyKES
+                              rawDeserialiseSignKeyKES sk
+       .&. prop_cbor_with encodeSignKeyKES
+                          decodeSignKeyKES sk
+       .&. prop_size_serialise rawSerialiseSignKeyKES
+                               (sizeSignKeyKES (Proxy @ v)) sk
+      | (t, sk) <- zip [0..] (allUpdatesKES sk_0) ]
+
+
+-- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
+-- for 'SigKES' on /all/ the KES key evolutions.
+--
+prop_serialise_SigKES
+  :: forall v a.
+     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ ())
+  => SignKeyKES v -> a -> Property
+prop_serialise_SigKES sk_0 x =
+    conjoin
+      [ counterexample ("period " ++ show t) $
+        counterexample ("vkey "   ++ show sk) $
+        counterexample ("sig "    ++ show sig) $
+           prop_raw_serialise rawSerialiseSigKES
+                              rawDeserialiseSigKES sig
+       .&. prop_cbor_with encodeSigKES
+                          decodeSigKES sig
+       .&. prop_size_serialise rawSerialiseSigKES
+                               (sizeSigKES (Proxy @ v)) sig
+      | (t, sk) <- zip [0..] (allUpdatesKES sk_0)
+      , let sig = signKES () t x sk
+      ]
+
+
+--
+-- KES test utils
+--
+
+allUpdatesKES :: forall v. (KESAlgorithm v, ContextKES v ~ ())
+              => SignKeyKES v -> [SignKeyKES v]
+allUpdatesKES sk_0 =
+    sk_0 : unfoldr update (sk_0, 0)
+  where
+    update :: (SignKeyKES v, Period)
+           -> Maybe (SignKeyKES v, (SignKeyKES v, Period))
+    update (sk, t) =
+      case updateKES () sk t of
+        Nothing  -> Nothing
+        Just sk' -> Just (sk', (sk', t+1))
 
 
 --
@@ -250,60 +361,6 @@ instance (KES.Signable v Int, KESAlgorithm v, ContextKES v ~ ())
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
-    let Just sig = signKES () 0 a sk
+    let sig = signKES () 0 a sk
     return sig
   shrink = const []
-
-
-
-data SK v = SK (SignKeyKES v) (VerKeyKES v)
-
-deriving instance KESAlgorithm v => Show (SK v)
-
-instance KESAlgorithm v => Arbitrary (SK v) where
-
-    arbitrary = do
-        (sk, _sk', _vk, vk') <- genKeys
-          -- For the simple/mock key types, it's possible to generate the same
-          -- key twice, since they're low entropy. So we filter those out.
-          `suchThat` (\(_sk, _sk', vk, vk') -> vk /= vk')
-
-        return (SK sk vk')
-      where
-        genKeys = do
-          let seedSize = seedSizeKES (Proxy :: Proxy v)
-          seed <- arbitrarySeedOfSize (seedSize * 2)
-          let Just (kseed, kseed') = splitSeed (fromIntegral seedSize) seed
-              sk  = genKeyKES kseed
-              sk' = genKeyKES kseed'
-              vk  = deriveVerKeyKES sk
-              vk' = deriveVerKeyKES sk'
-          return (sk, sk', vk, vk')
-
-    shrink _ = []
-
-data SK_Times v a =
-     SK_Times (SignKeyKES v) (VerKeyKES v) [(Natural, a)]
-
-deriving instance (KESAlgorithm v, Show a) => Show (SK_Times v a)
-
-instance (KESAlgorithm v, Arbitrary a) => Arbitrary (SK_Times v a) where
-
-    arbitrary = do
-        SK sk vk <- arbitrary
-        ts <- genTimes 0
-        return (SK_Times sk vk ts)
-      where
-        genTimes :: Natural -> Gen [(Natural, a)]
-        genTimes j
-          | j >= duration = return []
-          | otherwise = do
-            k  <- genNatBetween j (duration - 1)
-            a  <- arbitrary
-            ns <- genTimes (k + 1)
-            return ((k, a) : ns)
-          where
-            duration = totalPeriodsKES (Proxy :: Proxy v)
-
-    shrink _ = []
-

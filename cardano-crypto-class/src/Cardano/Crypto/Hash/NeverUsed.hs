@@ -9,5 +9,5 @@ data NeverHash
 
 instance HashAlgorithm NeverHash where
   hashAlgorithmName _ = "never"
-  byteCount _ = 0
+  sizeHash _ = 0
   digest = error "HASH not available"

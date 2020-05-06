@@ -12,9 +12,10 @@ where
 
 import GHC.Generics (Generic)
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
-import Cardano.Crypto.VRF.Class
 import Cardano.Prelude (NoUnexpectedThunks)
+
+import Cardano.Crypto.VRF.Class
+
 
 -- | VRF not available
 --
@@ -46,15 +47,14 @@ instance VRFAlgorithm NeverVRF where
   genKeyVRF _ = NeverUsedSignKeyVRF
   seedSizeVRF _ = 0
 
-  encodeVerKeyVRF  _ = error "VRF unavailable"
-  decodeVerKeyVRF    = error "VRF unavailable"
-  encodeSignKeyVRF _ = error "VRF unavailable"
-  decodeSignKeyVRF   = error "VRF unavailable"
-  encodeCertVRF    _ = error "VRF unavailable"
-  decodeCertVRF      = error "VRF unavailable"
+  sizeVerKeyVRF  _ = 0
+  sizeSignKeyVRF _ = 0
+  sizeCertVRF    _ = 0
 
-instance ToCBOR (CertVRF NeverVRF) where
-  toCBOR _ = toCBOR ()
+  rawSerialiseVerKeyVRF  _ = mempty
+  rawSerialiseSignKeyVRF _ = mempty
+  rawSerialiseCertVRF    _ = mempty
 
-instance FromCBOR (CertVRF NeverVRF) where
-  fromCBOR = (\() -> NeverUsedCertVRF) <$> fromCBOR
+  rawDeserialiseVerKeyVRF  _ = Just NeverUsedVerKeyVRF
+  rawDeserialiseSignKeyVRF _ = Just NeverUsedSignKeyVRF
+  rawDeserialiseCertVRF    _ = Just NeverUsedCertVRF

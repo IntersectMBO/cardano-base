@@ -12,9 +12,10 @@ where
 
 import GHC.Generics (Generic)
 
-import Cardano.Binary
-import Cardano.Crypto.DSIGN.Class
 import Cardano.Prelude (NoUnexpectedThunks)
+
+import Cardano.Crypto.DSIGN.Class
+
 
 -- | DSIGN never used
 --
@@ -37,8 +38,9 @@ instance DSIGNAlgorithm NeverDSIGN where
 
   deriveVerKeyDSIGN _ = NeverUsedVerKeyDSIGN
 
-  abstractSizeVKey _ = error "abstract size not available"
-  abstractSizeSig  _ = error "abstract size not available"
+  sizeVerKeyDSIGN  _ = 0
+  sizeSignKeyDSIGN _ = 0
+  sizeSigDSIGN     _ = 0
 
   signDSIGN   = error "DSIGN not available"
   verifyDSIGN = error "DSIGN not available"
@@ -46,11 +48,11 @@ instance DSIGNAlgorithm NeverDSIGN where
   seedSizeDSIGN     _ = 0
   genKeyDSIGN       _ = NeverUsedSignKeyDSIGN
 
-  encodeVerKeyDSIGN  _ = toCBOR ()
-  encodeSignKeyDSIGN _ = toCBOR ()
-  encodeSigDSIGN     _ = toCBOR ()
+  rawSerialiseVerKeyDSIGN  _ = mempty
+  rawSerialiseSignKeyDSIGN _ = mempty
+  rawSerialiseSigDSIGN     _ = mempty
 
-  decodeVerKeyDSIGN  = return NeverUsedVerKeyDSIGN
-  decodeSignKeyDSIGN = return NeverUsedSignKeyDSIGN
-  decodeSigDSIGN     = return NeverUsedSigDSIGN
+  rawDeserialiseVerKeyDSIGN  _ = Just NeverUsedVerKeyDSIGN
+  rawDeserialiseSignKeyDSIGN _ = Just NeverUsedSignKeyDSIGN
+  rawDeserialiseSigDSIGN     _ = Just NeverUsedSigDSIGN
 

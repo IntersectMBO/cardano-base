@@ -12,15 +12,19 @@ module Cardano.Crypto.VRF.Mock
   )
 where
 
-import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
-import Cardano.Crypto.Hash
-import Cardano.Crypto.Util (mockNonNegIntR)
-import Cardano.Crypto.Seed
-import Cardano.Crypto.VRF.Class
-import Cardano.Prelude (NoUnexpectedThunks)
+import Data.Word (Word64)
+import Numeric.Natural (Natural)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
-import Numeric.Natural (Natural)
+
+import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
+
+import Cardano.Crypto.Hash
+import Cardano.Crypto.Util
+import Cardano.Crypto.Seed
+import Cardano.Crypto.VRF.Class
+
 
 data MockVRF
 
@@ -30,14 +34,14 @@ instance VRFAlgorithm MockVRF where
   -- Key and signature types
   --
 
-  newtype VerKeyVRF MockVRF = VerKeyMockVRF Int
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+  newtype VerKeyVRF MockVRF = VerKeyMockVRF Word64
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
-  newtype SignKeyVRF MockVRF = SignKeyMockVRF Int
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+  newtype SignKeyVRF MockVRF = SignKeyMockVRF Word64
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
-  newtype CertVRF MockVRF = CertMockVRF Int
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+  newtype CertVRF MockVRF = CertMockVRF Word64
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
   --
   -- Metadata and basic key operations
@@ -46,6 +50,7 @@ instance VRFAlgorithm MockVRF where
   algorithmNameVRF _ = "mock"
 
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
+
 
   --
   -- Core algorithm operations
@@ -57,7 +62,7 @@ instance VRFAlgorithm MockVRF where
 
   verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
-  maxVRF _ = 2 ^ (8 * byteCount (Proxy :: Proxy MD5)) - 1
+  maxVRF _ = 2 ^ (8 * sizeHash (Proxy :: Proxy MD5)) - 1
 
   --
   -- Key generation
@@ -66,18 +71,63 @@ instance VRFAlgorithm MockVRF where
   seedSizeVRF _  = 8
   genKeyVRF seed = SignKeyMockVRF sk
     where
-      sk = runMonadRandomWithSeed seed mockNonNegIntR
+      sk = runMonadRandomWithSeed seed getRandomWord64
+
 
   --
-  -- CBOR encoding/decoding
+  -- raw serialise/deserialise
   --
 
-  encodeVerKeyVRF  = toCBOR
-  decodeVerKeyVRF  = fromCBOR
-  encodeSignKeyVRF = toCBOR
-  decodeSignKeyVRF = fromCBOR
-  encodeCertVRF    = toCBOR
-  decodeCertVRF    = fromCBOR
+  sizeVerKeyVRF  _ = 8
+  sizeSignKeyVRF _ = 8
+  sizeCertVRF    _ = 8
+
+  rawSerialiseVerKeyVRF  (VerKeyMockVRF  k) = writeBinaryWord64 k
+  rawSerialiseSignKeyVRF (SignKeyMockVRF k) = writeBinaryWord64 k
+  rawSerialiseCertVRF    (CertMockVRF    k) = writeBinaryWord64 k
+
+  rawDeserialiseVerKeyVRF bs
+    | [kb] <- splitsAt [8] bs
+    , let k = readBinaryWord64 kb
+    = Just $! VerKeyMockVRF k
+
+    | otherwise
+    = Nothing
+
+  rawDeserialiseSignKeyVRF bs
+    | [kb] <- splitsAt [8] bs
+    , let k = readBinaryWord64 kb
+    = Just $! SignKeyMockVRF k
+
+    | otherwise
+    = Nothing
+
+  rawDeserialiseCertVRF bs
+    | [kb] <- splitsAt [8] bs
+    , let k = readBinaryWord64 kb
+    = Just $! CertMockVRF k
+
+    | otherwise
+    = Nothing
+
+
+instance ToCBOR (VerKeyVRF MockVRF) where
+  toCBOR = encodeVerKeyVRF
+
+instance FromCBOR (VerKeyVRF MockVRF) where
+  fromCBOR = decodeVerKeyVRF
+
+instance ToCBOR (SignKeyVRF MockVRF) where
+  toCBOR = encodeSignKeyVRF
+
+instance FromCBOR (SignKeyVRF MockVRF) where
+  fromCBOR = decodeSignKeyVRF
+
+instance ToCBOR (CertVRF MockVRF) where
+  toCBOR = encodeCertVRF
+
+instance FromCBOR (CertVRF MockVRF) where
+  fromCBOR = decodeCertVRF
 
 
 evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (Natural, CertVRF MockVRF)

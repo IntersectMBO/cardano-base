@@ -8,29 +8,43 @@
 
 -- | Abstract key evolving signatures.
 module Cardano.Crypto.KES.Class
-  ( KESAlgorithm (..)
+  (
+    -- * KES algorithm class
+    KESAlgorithm (..)
+  , Period
+
+    -- * 'SignedKES' wrapper
   , SignedKES (..)
   , signedKES
   , verifySignedKES
+
+    -- * CBOR encoding and decoding
+  , encodeVerKeyKES
+  , decodeVerKeyKES
+  , encodeSignKeyKES
+  , decodeSignKeyKES
+  , encodeSigKES
+  , decodeSigKES
   , encodeSignedKES
   , decodeSignedKES
   )
 where
 
-import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes,
-                       serializeEncoding', decodeFullDecoder)
-import Cardano.Crypto.Seed
-import Cardano.Crypto.Util (Empty)
-import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
-import Cardano.Prelude (NoUnexpectedThunks)
 import Data.ByteString (ByteString)
-import Data.ByteString.Lazy as LBS (fromStrict)
+import qualified Data.ByteString as BS
 import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
-import Numeric.Natural (Natural)
+
+import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes)
+
+import Cardano.Crypto.Seed
+import Cardano.Crypto.Util (Empty)
+import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
 
 
 class ( Typeable v
@@ -83,45 +97,46 @@ class ( Typeable v
   signKES
     :: (Signable v a, HasCallStack)
     => ContextKES v
-    -> Natural
+    -> Period  -- ^ The /current/ period for the key
     -> a
     -> SignKeyKES v
-    -> Maybe (SigKES v)
+    -> SigKES v
 
   verifyKES
     :: (Signable v a, HasCallStack)
     => ContextKES v
     -> VerKeyKES v
-    -> Natural
+    -> Period  -- ^ The /current/ period for the key
     -> a
     -> SigKES v
     -> Either String ()
 
-  -- | Update the KES signature key to the specified period. The intended
-  -- behavior is to return `Nothing` in the case that the key cannot be evolved
-  -- that far.
+  -- | Update the KES signature key to the /next/ period, given the /current/
+  -- period.
   --
-  -- The precondition is that the current KES period of the input key is before
-  -- the target period.
-  -- The postcondition is that in case a key is returned, its current KES period
-  -- corresponds to the target KES period.
+  -- It returns 'Nothing' if the cannot be evolved any further.
+  --
+  -- The precondition (to get a 'Just' result) is that the current KES period
+  -- of the input key is not the last period. The given period must be the
+  -- current KES period of the input key (not the next or target).
+  --
+  -- The postcondition is that in case a key is returned, its current KES
+  -- period is incremented by one compared to before.
+  --
+  -- Note that you must track the current period separately, and to skip to a
+  -- later period requires repeated use of this function, since it only
+  -- increments one period at once.
+  --
   updateKES
     :: HasCallStack
     => ContextKES v
     -> SignKeyKES v
-    -> Natural
+    -> Period  -- ^ The /current/ period for the key, not the target period.
     -> Maybe (SignKeyKES v)
 
   -- | Return the current KES period of a KES signing key.
-  currentPeriodKES
-    :: HasCallStack
-    => ContextKES v
-    -> SignKeyKES v
-    -> Natural
-
-  -- | Return the current KES period of a KES signing key.
   totalPeriodsKES
-    :: proxy v -> Natural
+    :: proxy v -> Period
 
 
   --
@@ -131,104 +146,87 @@ class ( Typeable v
   genKeyKES :: Seed -> SignKeyKES v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
-  seedSizeKES :: proxy v -> Natural
+  seedSizeKES :: proxy v -> Word
 
 
   --
-  -- Serialisation/(de)serialisation in raw format, no extra tags
-  --
-  -- default implementations in terms of the CBOR encode/decode
+  -- Serialisation/(de)serialisation in fixed-size raw format
   --
 
-  rawSerialiseVerKeyKES :: VerKeyKES v -> ByteString
-  rawSerialiseVerKeyKES = serializeEncoding' . encodeVerKeyKES
+  sizeVerKeyKES  :: proxy v -> Word
+  sizeSignKeyKES :: proxy v -> Word
+  sizeSigKES     :: proxy v -> Word
 
-  rawSerialiseSignKeyKES :: SignKeyKES v -> ByteString
-  rawSerialiseSignKeyKES = serializeEncoding' . encodeSignKeyKES
+  rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
+  rawSerialiseSignKeyKES   :: SignKeyKES v -> ByteString
+  rawSerialiseSigKES       :: SigKES     v -> ByteString
 
-  rawSerialiseSigKES :: SigKES v -> ByteString
-  rawSerialiseSigKES = serializeEncoding' . encodeSigKES
-
-  rawDeserialiseVerKeyKES :: ByteString -> Maybe (VerKeyKES v)
-  rawDeserialiseVerKeyKES =
-      either (const Nothing) Just
-    . decodeFullDecoder
-        "rawDeserialiseVerKeyKES"
-        decodeVerKeyKES
-    . LBS.fromStrict
-
+  rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
   rawDeserialiseSignKeyKES :: ByteString -> Maybe (SignKeyKES v)
-  rawDeserialiseSignKeyKES =
-      either (const Nothing) Just
-    . decodeFullDecoder
-        "rawDeserialiseVerKeyKES"
-        decodeSignKeyKES
-    . LBS.fromStrict
-
-  rawDeserialiseSigKES :: ByteString -> Maybe (SigKES v)
-  rawDeserialiseSigKES =
-      either (const Nothing) Just
-    . decodeFullDecoder
-        "rawDeserialiseVerKeyKES"
-        decodeSigKES
-    . LBS.fromStrict
+  rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
 
 
-  --
-  -- Convenient CBOR encoding/decoding
-  --
-  -- default implementations in terms of the raw (de)serialise
-  --
+--
+-- Convenient CBOR encoding/decoding
+--
+-- Implementations in terms of the raw (de)serialise
+--
 
-  encodeVerKeyKES :: VerKeyKES v -> Encoding
-  encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
+encodeVerKeyKES :: KESAlgorithm v => VerKeyKES v -> Encoding
+encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 
-  encodeSignKeyKES :: SignKeyKES v -> Encoding
-  encodeSignKeyKES = encodeBytes . rawSerialiseSignKeyKES
+encodeSignKeyKES :: KESAlgorithm v => SignKeyKES v -> Encoding
+encodeSignKeyKES = encodeBytes . rawSerialiseSignKeyKES
 
-  encodeSigKES :: SigKES v -> Encoding
-  encodeSigKES = encodeBytes . rawSerialiseSigKES
+encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
+encodeSigKES = encodeBytes . rawSerialiseSigKES
 
-  decodeVerKeyKES :: Decoder s (VerKeyKES v)
-  decodeVerKeyKES = do
+decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
+decodeVerKeyKES = do
     bs <- decodeBytes
     case rawDeserialiseVerKeyKES bs of
-      Nothing -> fail "decodeVerKeyKES: cannot decode key"
       Just vk -> return vk
+      Nothing
+        | actual /= expected
+                    -> fail ("decodeVerKeyKES: wrong length, expected " ++
+                             show expected ++ " bytes but got " ++ show actual)
+        | otherwise -> fail "decodeVerKeyKES: cannot decode key"
+        where
+          expected = fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
+          actual   = BS.length bs
 
-  decodeSignKeyKES :: Decoder s (SignKeyKES v)
-  decodeSignKeyKES = do
+decodeSignKeyKES :: forall v s. KESAlgorithm v => Decoder s (SignKeyKES v)
+decodeSignKeyKES = do
     bs <- decodeBytes
     case rawDeserialiseSignKeyKES bs of
-      Nothing -> fail "decodeSignKeyKES: cannot decode key"
-      Just vk -> return vk
+      Just sk -> return sk
+      Nothing
+        | actual /= expected
+                    -> fail ("decodeSignKeyKES: wrong length, expected " ++
+                             show expected ++ " bytes but got " ++ show actual)
+        | otherwise -> fail "decodeSignKeyKES: cannot decode key"
+        where
+          expected = fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
+          actual   = BS.length bs
 
-  decodeSigKES :: Decoder s (SigKES v)
-  decodeSigKES = do
+decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
+decodeSigKES = do
     bs <- decodeBytes
     case rawDeserialiseSigKES bs of
-      Nothing -> fail "decodeSigKES: cannot decode key"
-      Just vk -> return vk
+      Just sig -> return sig
+      Nothing
+        | actual /= expected
+                    -> fail ("decodeSigKES: wrong length, expected " ++
+                             show expected ++ " bytes but got " ++ show actual)
+        | otherwise -> fail "decodeSigKES: cannot decode key"
+        where
+          expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
+          actual   = BS.length bs
 
 
-  {-# MINIMAL
-        algorithmNameKES
-      , deriveVerKeyKES
-      , signKES
-      , verifyKES
-      , updateKES
-      , currentPeriodKES
-      , totalPeriodsKES
-      , genKeyKES
-      , seedSizeKES
-      , (rawSerialiseVerKeyKES    | encodeVerKeyKES)
-      , (rawSerialiseSignKeyKES   | encodeSignKeyKES)
-      , (rawSerialiseSigKES       | encodeSigKES)
-      , (rawDeserialiseVerKeyKES  | decodeVerKeyKES)
-      , (rawDeserialiseSignKeyKES | decodeSignKeyKES)
-      , (rawDeserialiseSigKES     | decodeSigKES)
-    #-}
-
+-- | The KES period. The KES evolution index.
+--
+type Period = Word
 
 newtype SignedKES v a = SignedKES {getSig :: SigKES v}
   deriving Generic
@@ -242,17 +240,17 @@ instance KESAlgorithm v => NoUnexpectedThunks (SignedKES v a)
 signedKES
   :: (KESAlgorithm v, Signable v a)
   => ContextKES v
-  -> Natural
+  -> Period
   -> a
   -> SignKeyKES v
-  -> Maybe (SignedKES v a)
-signedKES ctxt time a key = SignedKES <$> signKES ctxt time a key
+  -> SignedKES v a
+signedKES ctxt time a key = SignedKES (signKES ctxt time a key)
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)
   => ContextKES v
   -> VerKeyKES v
-  -> Natural
+  -> Period
   -> a
   -> SignedKES v a
   -> Either String ()

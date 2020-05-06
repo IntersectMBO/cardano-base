@@ -11,6 +11,7 @@ module Test.Crypto.Util
   , prop_cbor_valid
   , prop_cbor_roundtrip
   , prop_raw_serialise
+  , prop_size_serialise
   , prop_cbor_direct_vs_class
 
     -- * Test Seed
@@ -21,11 +22,6 @@ module Test.Crypto.Util
 
     -- * Seeds
   , arbitrarySeedOfSize
-
-  , -- * Natural Numbers
-    genNat
-  , genNatBetween
-  , shrinkNat
   )
 where
 
@@ -41,19 +37,16 @@ import Crypto.Random
   , drgNewTest
   , withDRG
   )
-import Data.ByteString as BS (ByteString, pack)
+import Data.ByteString as BS (ByteString, pack, length)
 import Data.Word (Word64)
-import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
   , (===)
   , Arbitrary
   , Gen
-  , NonNegative (..)
   , Property
   , arbitrary
   , arbitraryBoundedIntegral
-  , choose
   , counterexample
   , property
   , shrink
@@ -81,12 +74,7 @@ nullTestSeed = TestSeed (0, 0, 0, 0, 0)
 
 instance Arbitrary TestSeed where
   arbitrary =
-    (\w1 w2 w3 w4 w5 -> TestSeed (w1, w2, w3, w4, w5)) <$>
-      gen <*>
-      gen <*>
-      gen <*>
-      gen <*>
-      gen
+      TestSeed <$> ((,,,,) <$> gen <*> gen <*> gen <*> gen <*> gen)
     where
       gen :: Gen Word64
       gen = arbitraryBoundedIntegral
@@ -96,7 +84,7 @@ instance Arbitrary TestSeed where
 -- Seeds
 --------------------------------------------------------------------------------
 
-arbitrarySeedOfSize :: Natural -> Gen Seed
+arbitrarySeedOfSize :: Word -> Gen Seed
 arbitrarySeedOfSize sz =
   (mkSeedFromBytes . BS.pack) <$> vector (fromIntegral sz)
 
@@ -160,18 +148,7 @@ prop_cbor_direct_vs_class encoder x =
   toFlatTerm (encoder x) === toFlatTerm (toCBOR x)
 
 
---------------------------------------------------------------------------------
--- Natural numbers
---------------------------------------------------------------------------------
-genNatBetween :: Natural -> Natural -> Gen Natural
-genNatBetween from to = do
-  i <- choose (toInteger from, toInteger to)
-  return $ fromIntegral i
+prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
+prop_size_serialise serialise size x =
+    BS.length (serialise x) === fromIntegral size
 
-genNat :: Gen Natural
-genNat = do
-  NonNegative i <- arbitrary :: Gen (NonNegative Integer)
-  return $ fromIntegral i
-
-shrinkNat :: Natural -> [Natural]
-shrinkNat = map fromIntegral . shrink . toInteger

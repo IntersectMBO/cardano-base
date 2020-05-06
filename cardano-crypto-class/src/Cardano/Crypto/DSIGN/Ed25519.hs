@@ -15,22 +15,19 @@ module Cardano.Crypto.DSIGN.Ed25519
   )
 where
 
-import Cardano.Binary
-  ( Decoder
-  , Encoding
-  , FromCBOR (..)
-  , ToCBOR (..)
-  , serialize
-  )
-import Cardano.Crypto.DSIGN.Class
-import Cardano.Crypto.Seed
+import Data.ByteString.Lazy (toStrict)
+import Data.ByteArray as BA (ByteArrayAccess, convert)
+import GHC.Generics (Generic)
+
 import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
+import Cardano.Binary (FromCBOR (..), ToCBOR (..), serialize)
+
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 as Ed25519
-import Data.ByteArray (ByteArrayAccess, convert)
-import Data.ByteString (ByteString)
-import Data.ByteString.Lazy (toStrict)
-import GHC.Generics (Generic)
+
+import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.Seed
+
 
 data Ed25519DSIGN
 
@@ -62,12 +59,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
     deriveVerKeyDSIGN (SignKeyEd25519DSIGN sk) = VerKeyEd25519DSIGN $ toPublic sk
 
-    -- | Ed25519 key size is 32 octets
-    -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
-    abstractSizeVKey _ = 32
-
-    -- | Ed25519 signature size is 64 octets
-    abstractSizeSig  _ = 64
 
     --
     -- Core algorithm operations
@@ -98,9 +89,16 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     -- raw serialise/deserialise
     --
 
-    rawSerialiseVerKeyDSIGN   = convert
-    rawSerialiseSignKeyDSIGN  = convert
-    rawSerialiseSigDSIGN      = convert
+    -- | Ed25519 key size is 32 octets
+    -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
+    sizeVerKeyDSIGN  _ = 32
+    sizeSignKeyDSIGN _ = 32
+    -- | Ed25519 signature size is 64 octets
+    sizeSigDSIGN     _ = 64
+
+    rawSerialiseVerKeyDSIGN   = BA.convert
+    rawSerialiseSignKeyDSIGN  = BA.convert
+    rawSerialiseSigDSIGN      = BA.convert
 
     rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd25519DSIGN
                                . cryptoFailableToMaybe . Ed25519.publicKey
@@ -109,46 +107,25 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN
                                . cryptoFailableToMaybe . Ed25519.signature
 
-    --
-    -- CBOR encoding/decoding
-    --
-
-    encodeVerKeyDSIGN = toCBOR
-    encodeSignKeyDSIGN = toCBOR
-    encodeSigDSIGN = toCBOR
-
-    decodeVerKeyDSIGN = fromCBOR
-    decodeSignKeyDSIGN = fromCBOR
-    decodeSigDSIGN = fromCBOR
-
 
 instance ToCBOR (VerKeyDSIGN Ed25519DSIGN) where
-  toCBOR = encodeBA
+  toCBOR = encodeVerKeyDSIGN
 
 instance FromCBOR (VerKeyDSIGN Ed25519DSIGN) where
-  fromCBOR = VerKeyEd25519DSIGN <$> decodeBA publicKey
+  fromCBOR = decodeVerKeyDSIGN
 
 instance ToCBOR (SignKeyDSIGN Ed25519DSIGN) where
-  toCBOR = encodeBA
+  toCBOR = encodeSignKeyDSIGN
 
 instance FromCBOR (SignKeyDSIGN Ed25519DSIGN) where
-  fromCBOR = SignKeyEd25519DSIGN <$> decodeBA secretKey
+  fromCBOR = decodeSignKeyDSIGN
 
 instance ToCBOR (SigDSIGN Ed25519DSIGN) where
-  toCBOR = encodeBA
+  toCBOR = encodeSigDSIGN
 
 instance FromCBOR (SigDSIGN Ed25519DSIGN) where
-  fromCBOR = SigEd25519DSIGN <$> decodeBA signature
+  fromCBOR = decodeSigDSIGN
 
-encodeBA :: ByteArrayAccess ba => ba -> Encoding
-encodeBA ba = let bs = convert ba :: ByteString in toCBOR bs
-
-decodeBA :: forall a s. (ByteString -> CryptoFailable a) -> Decoder s a
-decodeBA f = do
-  bs <- fromCBOR :: Decoder s ByteString
-  case f bs of
-    CryptoPassed a -> return a
-    CryptoFailed e -> fail $ "decodeBA: " ++ show e
 
 cryptoFailableToMaybe :: CryptoFailable a -> Maybe a
 cryptoFailableToMaybe (CryptoPassed a) = Just a
