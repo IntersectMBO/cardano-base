@@ -8,29 +8,44 @@
 
 -- | Abstract digital signatures.
 module Cardano.Crypto.DSIGN.Class
-  ( DSIGNAlgorithm (..)
+  (
+    -- * DSIGN algorithm class
+    DSIGNAlgorithm (..)
+  , Seed
+
+    -- * 'SignedDSIGN' wrapper
   , SignedDSIGN (..)
   , signedDSIGN
   , verifySignedDSIGN
+
+    -- * CBOR encoding and decoding
+  , encodeVerKeyDSIGN
+  , decodeVerKeyDSIGN
+  , encodeSignKeyDSIGN
+  , decodeSignKeyDSIGN
+  , encodeSigDSIGN
+  , decodeSigDSIGN
   , encodeSignedDSIGN
   , decodeSignedDSIGN
-  , Seed
   )
 where
 
-import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes,
-                       serializeEncoding', decodeFullDecoder)
-import Cardano.Crypto.Util (Empty)
-import Cardano.Prelude (NoUnexpectedThunks)
-import Cardano.Crypto.Seed
-import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
+import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
-import Data.ByteString.Lazy as LBS (fromStrict)
 import Data.Kind (Type)
+import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
+
+import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes)
+
+import Cardano.Crypto.Util (Empty)
+import Cardano.Crypto.Seed
+import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
+
 
 
 class ( Typeable v
@@ -65,10 +80,6 @@ class ( Typeable v
 
   hashVerKeyDSIGN :: HashAlgorithm h => VerKeyDSIGN v -> Hash h (VerKeyDSIGN v)
   hashVerKeyDSIGN = hashRaw rawSerialiseVerKeyDSIGN
-
-  sizeVerKeyDSIGN  :: proxy v -> Word
-  sizeSignKeyDSIGN :: proxy v -> Word
-  sizeSigDSIGN     :: proxy v -> Word
 
 
   --
@@ -111,99 +122,78 @@ class ( Typeable v
 
 
   --
-  -- Serialisation/(de)serialisation in raw format, no extra tags
-  --
-  -- default implementations in terms of the CBOR encode/decode
+  -- Serialisation/(de)serialisation in fixed-size raw format
   --
 
-  rawSerialiseVerKeyDSIGN :: VerKeyDSIGN v -> ByteString
-  rawSerialiseVerKeyDSIGN = serializeEncoding' . encodeVerKeyDSIGN
+  sizeVerKeyDSIGN  :: proxy v -> Word
+  sizeSignKeyDSIGN :: proxy v -> Word
+  sizeSigDSIGN     :: proxy v -> Word
 
-  rawSerialiseSignKeyDSIGN :: SignKeyDSIGN v -> ByteString
-  rawSerialiseSignKeyDSIGN = serializeEncoding' . encodeSignKeyDSIGN
+  rawSerialiseVerKeyDSIGN    :: VerKeyDSIGN  v -> ByteString
+  rawSerialiseSignKeyDSIGN   :: SignKeyDSIGN v -> ByteString
+  rawSerialiseSigDSIGN       :: SigDSIGN     v -> ByteString
 
-  rawSerialiseSigDSIGN :: SigDSIGN v -> ByteString
-  rawSerialiseSigDSIGN = serializeEncoding' . encodeSigDSIGN
-
-  rawDeserialiseVerKeyDSIGN :: ByteString -> Maybe (VerKeyDSIGN v)
-  rawDeserialiseVerKeyDSIGN =
-      either (const Nothing) Just
-    . decodeFullDecoder
-        "rawDeserialiseVerKeyDSIGN"
-        decodeVerKeyDSIGN
-    . LBS.fromStrict
-
+  rawDeserialiseVerKeyDSIGN  :: ByteString -> Maybe (VerKeyDSIGN  v)
   rawDeserialiseSignKeyDSIGN :: ByteString -> Maybe (SignKeyDSIGN v)
-  rawDeserialiseSignKeyDSIGN =
-      either (const Nothing) Just
-    . decodeFullDecoder
-        "rawDeserialiseVerKeyDSIGN"
-        decodeSignKeyDSIGN
-    . LBS.fromStrict
-
-  rawDeserialiseSigDSIGN :: ByteString -> Maybe (SigDSIGN v)
-  rawDeserialiseSigDSIGN =
-      either (const Nothing) Just
-    . decodeFullDecoder
-        "rawDeserialiseVerKeyDSIGN"
-        decodeSigDSIGN
-    . LBS.fromStrict
+  rawDeserialiseSigDSIGN     :: ByteString -> Maybe (SigDSIGN     v)
 
 
-  --
-  -- Convenient CBOR encoding/decoding
-  --
-  -- default implementations in terms of the raw (de)serialise
-  --
+--
+-- Convenient CBOR encoding/decoding
+--
+-- Implementations in terms of the raw (de)serialise
+--
 
-  encodeVerKeyDSIGN :: VerKeyDSIGN v -> Encoding
-  encodeVerKeyDSIGN = encodeBytes . rawSerialiseVerKeyDSIGN
+encodeVerKeyDSIGN :: DSIGNAlgorithm v => VerKeyDSIGN v -> Encoding
+encodeVerKeyDSIGN = encodeBytes . rawSerialiseVerKeyDSIGN
 
-  encodeSignKeyDSIGN :: SignKeyDSIGN v -> Encoding
-  encodeSignKeyDSIGN = encodeBytes . rawSerialiseSignKeyDSIGN
+encodeSignKeyDSIGN :: DSIGNAlgorithm v => SignKeyDSIGN v -> Encoding
+encodeSignKeyDSIGN = encodeBytes . rawSerialiseSignKeyDSIGN
 
-  encodeSigDSIGN :: SigDSIGN v -> Encoding
-  encodeSigDSIGN = encodeBytes . rawSerialiseSigDSIGN
+encodeSigDSIGN :: DSIGNAlgorithm v => SigDSIGN v -> Encoding
+encodeSigDSIGN = encodeBytes . rawSerialiseSigDSIGN
 
-  decodeVerKeyDSIGN :: Decoder s (VerKeyDSIGN v)
-  decodeVerKeyDSIGN = do
+decodeVerKeyDSIGN :: forall v s. DSIGNAlgorithm v => Decoder s (VerKeyDSIGN v)
+decodeVerKeyDSIGN = do
     bs <- decodeBytes
     case rawDeserialiseVerKeyDSIGN bs of
-      Nothing -> fail "decodeVerKeyDSIGN: cannot decode key"
       Just vk -> return vk
+      Nothing
+        | actual /= expected
+                    -> fail ("decodeVerKeyDSIGN: wrong length, expected " ++
+                             show expected ++ " bytes but got " ++ show actual)
+        | otherwise -> fail "decodeVerKeyDSIGN: cannot decode key"
+        where
+          expected = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy v))
+          actual   = BS.length bs
 
-  decodeSignKeyDSIGN :: Decoder s (SignKeyDSIGN v)
-  decodeSignKeyDSIGN = do
+decodeSignKeyDSIGN :: forall v s. DSIGNAlgorithm v => Decoder s (SignKeyDSIGN v)
+decodeSignKeyDSIGN = do
     bs <- decodeBytes
     case rawDeserialiseSignKeyDSIGN bs of
-      Nothing -> fail "decodeSignKeyDSIGN: cannot decode key"
-      Just vk -> return vk
+      Just sk -> return sk
+      Nothing
+        | actual /= expected
+                    -> fail ("decodeSignKeyDSIGN: wrong length, expected " ++
+                             show expected ++ " bytes but got " ++ show actual)
+        | otherwise -> fail "decodeSignKeyDSIGN: cannot decode key"
+        where
+          expected = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v))
+          actual   = BS.length bs
 
-  decodeSigDSIGN :: Decoder s (SigDSIGN v)
-  decodeSigDSIGN = do
+decodeSigDSIGN :: forall v s. DSIGNAlgorithm v => Decoder s (SigDSIGN v)
+decodeSigDSIGN = do
     bs <- decodeBytes
     case rawDeserialiseSigDSIGN bs of
-      Nothing -> fail "decodeSigDSIGN: cannot decode key"
-      Just vk -> return vk
-
-
-  {-# MINIMAL
-        algorithmNameDSIGN
-      , deriveVerKeyDSIGN
-      , sizeVerKeyDSIGN
-      , sizeSignKeyDSIGN
-      , sizeSigDSIGN
-      , signDSIGN
-      , verifyDSIGN
-      , genKeyDSIGN
-      , seedSizeDSIGN
-      , (rawSerialiseVerKeyDSIGN    | encodeVerKeyDSIGN)
-      , (rawSerialiseSignKeyDSIGN   | encodeSignKeyDSIGN)
-      , (rawSerialiseSigDSIGN       | encodeSigDSIGN)
-      , (rawDeserialiseVerKeyDSIGN  | decodeVerKeyDSIGN)
-      , (rawDeserialiseSignKeyDSIGN | decodeSignKeyDSIGN)
-      , (rawDeserialiseSigDSIGN     | decodeSigDSIGN)
-    #-}
+      Just sig -> return sig
+      Nothing
+        | actual /= expected
+                    -> fail ("decodeSigDSIGN: wrong length, expected " ++
+                             show expected ++ " bytes but got " ++ show actual)
+        | otherwise -> fail "decodeSigDSIGN: cannot decode signature"
+        where
+          expected = fromIntegral (sizeSigDSIGN (Proxy :: Proxy v))
+          actual   = BS.length bs
 
 
 newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)

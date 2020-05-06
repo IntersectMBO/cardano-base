@@ -26,11 +26,8 @@ import qualified Data.Vector as Vec
 import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal)
 
-import           Control.Monad (replicateM)
-
 import           Cardano.Prelude (NoUnexpectedThunks)
-import           Cardano.Binary
-                   (FromCBOR (..), ToCBOR (..), decodeListLen, encodeListLen)
+import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.DSIGN
 import qualified Cardano.Crypto.DSIGN as DSIGN
@@ -70,17 +67,6 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
 
     deriveVerKeyKES (SignKeySimpleKES sks) =
         VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)
-
-
-    sizeVerKeyKES  _ = sizeVerKeyDSIGN  (Proxy :: Proxy d) * duration
-      where
-        duration = fromIntegral (natVal (Proxy @ t))
-
-    sizeSignKeyKES _ = sizeSignKeyDSIGN (Proxy :: Proxy d) * duration
-      where
-        duration = fromIntegral (natVal (Proxy @ t))
-
-    sizeSigKES     _ = sizeSigDSIGN     (Proxy :: Proxy d)
 
 
     --
@@ -130,6 +116,16 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     -- raw serialise/deserialise
     --
 
+    sizeVerKeyKES  _ = sizeVerKeyDSIGN  (Proxy :: Proxy d) * duration
+      where
+        duration = fromIntegral (natVal (Proxy @ t))
+
+    sizeSignKeyKES _ = sizeSignKeyDSIGN (Proxy :: Proxy d) * duration
+      where
+        duration = fromIntegral (natVal (Proxy @ t))
+
+    sizeSigKES     _ = sizeSigDSIGN     (Proxy :: Proxy d)
+
     rawSerialiseVerKeyKES (VerKeySimpleKES vks) =
         BS.concat [ rawSerialiseVerKeyDSIGN vk | vk <- Vec.toList vks ]
 
@@ -164,52 +160,11 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     rawDeserialiseSigKES = fmap SigSimpleKES . rawDeserialiseSigDSIGN
 
 
-    --
-    -- CBOR encoding/decoding
-    --
-
-    encodeVerKeyKES = toCBOR
-    encodeSignKeyKES = toCBOR
-    encodeSigKES = toCBOR
-
-    decodeSignKeyKES = fromCBOR
-    decodeVerKeyKES = fromCBOR
-    decodeSigKES = fromCBOR
-
-
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d t))
-
-deriving instance DSIGNAlgorithm d => Eq (VerKeyKES (SimpleKES d t))
-
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
-      => ToCBOR (VerKeyKES (SimpleKES d t)) where
-  toCBOR (VerKeySimpleKES vks) =
-      encodeListLen (fromIntegral $ Vec.length vks)
-   <> foldr (\vk r -> encodeVerKeyDSIGN vk <> r) mempty vks
-
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
-      => FromCBOR (VerKeyKES (SimpleKES d t)) where
-  fromCBOR =
-    VerKeySimpleKES <$> do
-      len <- decodeListLen
-      Vec.fromList <$> replicateM len decodeVerKeyDSIGN
-
 deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SimpleKES d t))
-
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
-      => ToCBOR (SignKeyKES (SimpleKES d t)) where
-  toCBOR (SignKeySimpleKES sks) =
-      encodeListLen (fromIntegral (length sks))
-   <> foldr (\sk r -> encodeSignKeyDSIGN sk <> r) mempty sks
-
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
-      => FromCBOR (SignKeyKES (SimpleKES d t)) where
-  fromCBOR =
-    SignKeySimpleKES <$> do
-      len <- decodeListLen
-      Vec.fromList <$> replicateM len decodeSignKeyDSIGN
-
 deriving instance DSIGNAlgorithm d => Show (SigKES (SimpleKES d t))
+
+deriving instance DSIGNAlgorithm d => Eq   (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNAlgorithm d => Eq   (SigKES (SimpleKES d t))
 
 instance DSIGNAlgorithm d => NoUnexpectedThunks (SigKES     (SimpleKES d t))
@@ -217,9 +172,27 @@ instance DSIGNAlgorithm d => NoUnexpectedThunks (SignKeyKES (SimpleKES d t))
 instance DSIGNAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SimpleKES d t))
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+      => ToCBOR (VerKeyKES (SimpleKES d t)) where
+  toCBOR = encodeVerKeyKES
+
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+      => FromCBOR (VerKeyKES (SimpleKES d t)) where
+  fromCBOR = decodeVerKeyKES
+
+
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+      => ToCBOR (SignKeyKES (SimpleKES d t)) where
+  toCBOR = encodeSignKeyKES
+
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+      => FromCBOR (SignKeyKES (SimpleKES d t)) where
+  fromCBOR = decodeSignKeyKES
+
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => ToCBOR (SigKES (SimpleKES d t)) where
-  toCBOR (SigSimpleKES d) = encodeSigDSIGN d
+  toCBOR = encodeSigKES
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => FromCBOR (SigKES (SimpleKES d t)) where
-  fromCBOR = SigSimpleKES <$> decodeSigDSIGN
+  fromCBOR = decodeSigKES
+

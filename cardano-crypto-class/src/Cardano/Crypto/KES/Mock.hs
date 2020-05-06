@@ -24,12 +24,13 @@ import GHC.TypeNats (Nat, KnownNat, natVal)
 
 import Control.Exception (assert)
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..), decodeListLenOf, encodeListLen)
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Prelude (NoUnexpectedThunks)
+
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Prelude (NoUnexpectedThunks)
 
 
 data MockKES (t :: Nat)
@@ -53,7 +54,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     newtype VerKeyKES (MockKES t) = VerKeyMockKES Word64
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (NoUnexpectedThunks, ToCBOR, FromCBOR)
+        deriving newtype (NoUnexpectedThunks)
 
     data SignKeyKES (MockKES t) =
            SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
@@ -160,41 +161,22 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       = Nothing
 
 
-    --
-    -- CBOR encoding/decoding
-    --
 
-    encodeVerKeyKES = toCBOR
-    encodeSignKeyKES = toCBOR
-    encodeSigKES = toCBOR
+instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
+  toCBOR = encodeVerKeyKES
 
-    decodeSignKeyKES = fromCBOR
-    decodeVerKeyKES = fromCBOR
-    decodeSigKES = fromCBOR
-
-
-instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
-  toCBOR (SigMockKES evolution key) =
-    encodeListLen 2 <>
-      toCBOR evolution <>
-      toCBOR key
-
-instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
-  fromCBOR =
-    SigMockKES <$
-      decodeListLenOf 2 <*>
-      fromCBOR <*>
-      fromCBOR
+instance KnownNat t => FromCBOR (VerKeyKES (MockKES t)) where
+  fromCBOR = decodeVerKeyKES
 
 instance KnownNat t => ToCBOR (SignKeyKES (MockKES t)) where
-  toCBOR (SignKeyMockKES vk k) =
-    encodeListLen 2 <>
-      toCBOR vk <>
-      toCBOR k
+  toCBOR = encodeSignKeyKES
 
 instance KnownNat t => FromCBOR (SignKeyKES (MockKES t)) where
-  fromCBOR =
-    SignKeyMockKES <$
-      decodeListLenOf 2 <*>
-      fromCBOR <*>
-      fromCBOR
+  fromCBOR = decodeSignKeyKES
+
+instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
+  toCBOR = encodeSigKES
+
+instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
+  fromCBOR = decodeSigKES
+

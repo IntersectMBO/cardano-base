@@ -12,9 +12,9 @@ where
 
 import GHC.Generics (Generic)
 
-import Cardano.Binary (toCBOR)
 import Cardano.Crypto.KES.Class
 import Cardano.Prelude (NoUnexpectedThunks)
+
 
 -- | KES never used
 --
@@ -37,10 +37,6 @@ instance KESAlgorithm NeverKES where
 
   deriveVerKeyKES _ = NeverUsedVerKeyKES
 
-  sizeVerKeyKES  _ = 0
-  sizeSignKeyKES _ = 0
-  sizeSigKES     _ = 0
-
   signKES   = error "KES not available"
   verifyKES = error "KES not available"
   updateKES = error "KES not available"
@@ -50,10 +46,15 @@ instance KESAlgorithm NeverKES where
   seedSizeKES     _ = 0
   genKeyKES       _ = NeverUsedSignKeyKES
 
-  encodeVerKeyKES  _ = toCBOR ()
-  encodeSignKeyKES _ = toCBOR ()
-  encodeSigKES     _ = toCBOR ()
+  sizeVerKeyKES  _ = 0
+  sizeSignKeyKES _ = 0
+  sizeSigKES     _ = 0
 
-  decodeVerKeyKES  = return NeverUsedVerKeyKES
-  decodeSignKeyKES = return NeverUsedSignKeyKES
-  decodeSigKES     = return NeverUsedSigKES
+  rawSerialiseVerKeyKES  _ = mempty
+  rawSerialiseSignKeyKES _ = mempty
+  rawSerialiseSigKES     _ = mempty
+
+  rawDeserialiseVerKeyKES  _ = Just NeverUsedVerKeyKES
+  rawDeserialiseSignKeyKES _ = Just NeverUsedSignKeyKES
+  rawDeserialiseSigKES     _ = Just NeverUsedSigKES
+

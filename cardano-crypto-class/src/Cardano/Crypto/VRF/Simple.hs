@@ -22,9 +22,7 @@ import           GHC.Generics (Generic)
 import           Numeric.Natural (Natural)
 
 import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
-import           Cardano.Binary
-                   (Encoding, FromCBOR (..), ToCBOR (..),
-                    encodeListLen, enforceSize)
+import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 
 import           Crypto.Number.Generate (generateBetween)
 import qualified Crypto.PubKey.ECC.Prim as C
@@ -99,11 +97,10 @@ instance VRFAlgorithm SimpleVRF where
 
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR, NoUnexpectedThunks)
+    deriving newtype (NoUnexpectedThunks)
 
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
     deriving NoUnexpectedThunks via UseIsNormalForm C.PrivateNumber
 
   data CertVRF SimpleVRF
@@ -221,29 +218,22 @@ instance VRFAlgorithm SimpleVRF where
     = Nothing
 
 
-  --
-  -- CBOR encoding/decoding
-  --
 
-  encodeVerKeyVRF  = toCBOR
-  decodeVerKeyVRF  = fromCBOR
-  encodeSignKeyVRF = toCBOR
-  decodeSignKeyVRF = fromCBOR
-  encodeCertVRF    = toCBOR
-  decodeCertVRF    = fromCBOR
+instance ToCBOR (VerKeyVRF SimpleVRF) where
+  toCBOR = encodeVerKeyVRF
 
+instance FromCBOR (VerKeyVRF SimpleVRF) where
+  fromCBOR = decodeVerKeyVRF
+
+instance ToCBOR (SignKeyVRF SimpleVRF) where
+  toCBOR = encodeSignKeyVRF
+
+instance FromCBOR (SignKeyVRF SimpleVRF) where
+  fromCBOR = decodeSignKeyVRF
 
 instance ToCBOR (CertVRF SimpleVRF) where
-  toCBOR cvrf =
-    encodeListLen 3 <>
-      toCBOR (certU cvrf) <>
-      toCBOR (certC cvrf) <>
-      toCBOR (certS cvrf)
+  toCBOR = encodeCertVRF
 
 instance FromCBOR (CertVRF SimpleVRF) where
-  fromCBOR =
-    CertSimpleVRF <$
-      enforceSize "CertVRF SimpleVRF" 3 <*>
-      fromCBOR <*>
-      fromCBOR <*>
-      fromCBOR
+  fromCBOR = decodeCertVRF
+

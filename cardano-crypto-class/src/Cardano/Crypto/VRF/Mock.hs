@@ -35,13 +35,13 @@ instance VRFAlgorithm MockVRF where
   --
 
   newtype VerKeyVRF MockVRF = VerKeyMockVRF Word64
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
   newtype SignKeyVRF MockVRF = SignKeyMockVRF Word64
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
   newtype CertVRF MockVRF = CertMockVRF Word64
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks, ToCBOR, FromCBOR)
+      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
 
   --
   -- Metadata and basic key operations
@@ -50,10 +50,6 @@ instance VRFAlgorithm MockVRF where
   algorithmNameVRF _ = "mock"
 
   deriveVerKeyVRF (SignKeyMockVRF n) = VerKeyMockVRF n
-
-  sizeVerKeyVRF  _ = 8
-  sizeSignKeyVRF _ = 8
-  sizeCertVRF    _ = 8
 
 
   --
@@ -81,6 +77,10 @@ instance VRFAlgorithm MockVRF where
   --
   -- raw serialise/deserialise
   --
+
+  sizeVerKeyVRF  _ = 8
+  sizeSignKeyVRF _ = 8
+  sizeCertVRF    _ = 8
 
   rawSerialiseVerKeyVRF  (VerKeyMockVRF  k) = writeBinaryWord64 k
   rawSerialiseSignKeyVRF (SignKeyMockVRF k) = writeBinaryWord64 k
@@ -111,16 +111,23 @@ instance VRFAlgorithm MockVRF where
     = Nothing
 
 
-  --
-  -- CBOR encoding/decoding
-  --
+instance ToCBOR (VerKeyVRF MockVRF) where
+  toCBOR = encodeVerKeyVRF
 
-  encodeVerKeyVRF  = toCBOR
-  decodeVerKeyVRF  = fromCBOR
-  encodeSignKeyVRF = toCBOR
-  decodeSignKeyVRF = fromCBOR
-  encodeCertVRF    = toCBOR
-  decodeCertVRF    = fromCBOR
+instance FromCBOR (VerKeyVRF MockVRF) where
+  fromCBOR = decodeVerKeyVRF
+
+instance ToCBOR (SignKeyVRF MockVRF) where
+  toCBOR = encodeSignKeyVRF
+
+instance FromCBOR (SignKeyVRF MockVRF) where
+  fromCBOR = decodeSignKeyVRF
+
+instance ToCBOR (CertVRF MockVRF) where
+  toCBOR = encodeCertVRF
+
+instance FromCBOR (CertVRF MockVRF) where
+  fromCBOR = decodeCertVRF
 
 
 evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (Natural, CertVRF MockVRF)

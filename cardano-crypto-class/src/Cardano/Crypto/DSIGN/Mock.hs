@@ -25,8 +25,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 
 import Cardano.Prelude (NoUnexpectedThunks, Proxy(..))
-import Cardano.Binary
-         (FromCBOR (..), ToCBOR (..), decodeListLenOf, encodeListLen)
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Seed
@@ -44,11 +43,11 @@ instance DSIGNAlgorithm MockDSIGN where
 
     newtype VerKeyDSIGN MockDSIGN = VerKeyMockDSIGN Word64
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (Num, ToCBOR, FromCBOR, NoUnexpectedThunks)
+        deriving newtype (Num, NoUnexpectedThunks)
 
     newtype SignKeyDSIGN MockDSIGN = SignKeyMockDSIGN Word64
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (Num, ToCBOR, FromCBOR, NoUnexpectedThunks)
+        deriving newtype (Num, NoUnexpectedThunks)
 
     data SigDSIGN MockDSIGN = SigMockDSIGN !(Hash ShortHash ()) !Word64
         deriving stock    (Show, Eq, Ord, Generic)
@@ -61,11 +60,6 @@ instance DSIGNAlgorithm MockDSIGN where
     algorithmNameDSIGN _ = "mock"
 
     deriveVerKeyDSIGN (SignKeyMockDSIGN n) = VerKeyMockDSIGN n
-
-    sizeVerKeyDSIGN  _ = 8 -- for 64 bit Int
-    sizeSignKeyDSIGN _ = 8
-    sizeSigDSIGN     _ = sizeHash (Proxy :: Proxy ShortHash)
-                       + 8
 
     --
     -- Core algorithm operations
@@ -96,6 +90,11 @@ instance DSIGNAlgorithm MockDSIGN where
     --
     -- raw serialise/deserialise
     --
+
+    sizeVerKeyDSIGN  _ = 8 -- for 64 bit Int
+    sizeSignKeyDSIGN _ = 8
+    sizeSigDSIGN     _ = sizeHash (Proxy :: Proxy ShortHash)
+                       + 8
 
     rawSerialiseVerKeyDSIGN  (VerKeyMockDSIGN  k) = writeBinaryWord64 k
     rawSerialiseSignKeyDSIGN (SignKeyMockDSIGN k) = writeBinaryWord64 k
@@ -128,17 +127,23 @@ instance DSIGNAlgorithm MockDSIGN where
       = Nothing
 
 
-    --
-    -- CBOR encoding/decoding
-    --
+instance ToCBOR (VerKeyDSIGN MockDSIGN) where
+  toCBOR = encodeVerKeyDSIGN
 
-    encodeVerKeyDSIGN  = toCBOR
-    encodeSignKeyDSIGN = toCBOR
-    encodeSigDSIGN     = toCBOR
+instance FromCBOR (VerKeyDSIGN MockDSIGN) where
+  fromCBOR = decodeVerKeyDSIGN
 
-    decodeVerKeyDSIGN  = fromCBOR
-    decodeSignKeyDSIGN = fromCBOR
-    decodeSigDSIGN     = fromCBOR
+instance ToCBOR (SignKeyDSIGN MockDSIGN) where
+  toCBOR = encodeSignKeyDSIGN
+
+instance FromCBOR (SignKeyDSIGN MockDSIGN) where
+  fromCBOR = decodeSignKeyDSIGN
+
+instance ToCBOR (SigDSIGN MockDSIGN) where
+  toCBOR = encodeSigDSIGN
+
+instance FromCBOR (SigDSIGN MockDSIGN) where
+  fromCBOR = decodeSigDSIGN
 
 
 -- | Debugging: provide information about the verification failure
@@ -158,12 +163,6 @@ mockSign a (SignKeyMockDSIGN n) = SigMockDSIGN (castHash (hash a)) n
 
 mockSigned :: ToCBOR a => a -> SignKeyDSIGN MockDSIGN -> SignedDSIGN MockDSIGN a
 mockSigned a k = SignedDSIGN (mockSign a k)
-
-instance ToCBOR (SigDSIGN MockDSIGN) where
-  toCBOR (SigMockDSIGN b i) = encodeListLen 2 <> toCBOR b <> toCBOR i
-
-instance FromCBOR (SigDSIGN MockDSIGN) where
-  fromCBOR = SigMockDSIGN <$ decodeListLenOf 2 <*> fromCBOR <*> fromCBOR
 
 -- | Get the id of the signer from a signature. Used for testing.
 verKeyIdFromSigned :: SignedDSIGN MockDSIGN a -> Word64

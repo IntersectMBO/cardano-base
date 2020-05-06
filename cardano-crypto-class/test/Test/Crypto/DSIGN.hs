@@ -9,24 +9,17 @@ module Test.Crypto.DSIGN
   )
 where
 
-import Cardano.Binary (FromCBOR, ToCBOR (..))
-import Cardano.Crypto.DSIGN
-  ( DSIGNAlgorithm (..)
-  , Ed25519DSIGN
-  , Ed448DSIGN
-  , MockDSIGN
-  )
 import Data.Proxy (Proxy (..))
+
+import Cardano.Binary (FromCBOR, ToCBOR (..))
+
+import Cardano.Crypto.DSIGN
+
 import Test.Crypto.Util
 import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
--- import           Ouroboros.Consensus.Util.Orphans ()
--- import           Ouroboros.Consensus.Util.Random (Seed, withSeed)
-
--- import           Ouroboros.Network.Testing.Serialise (Serialise(..), prop_cbor)
--- import           Test.Util.Orphans.Arbitrary ()
 
 --
 -- The list of all tests
