@@ -164,18 +164,21 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
 instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
   toCBOR = encodeVerKeyKES
+  encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance KnownNat t => FromCBOR (VerKeyKES (MockKES t)) where
   fromCBOR = decodeVerKeyKES
 
 instance KnownNat t => ToCBOR (SignKeyKES (MockKES t)) where
   toCBOR = encodeSignKeyKES
+  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
 instance KnownNat t => FromCBOR (SignKeyKES (MockKES t)) where
   fromCBOR = decodeSignKeyKES
 
 instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
   toCBOR = encodeSigKES
+  encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
   fromCBOR = decodeSigKES

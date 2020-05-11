@@ -174,6 +174,7 @@ instance DSIGNAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SimpleKES d t))
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => ToCBOR (VerKeyKES (SimpleKES d t)) where
   toCBOR = encodeVerKeyKES
+  encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => FromCBOR (VerKeyKES (SimpleKES d t)) where
@@ -183,6 +184,7 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => ToCBOR (SignKeyKES (SimpleKES d t)) where
   toCBOR = encodeSignKeyKES
+  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => FromCBOR (SignKeyKES (SimpleKES d t)) where
@@ -191,6 +193,7 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => ToCBOR (SigKES (SimpleKES d t)) where
   toCBOR = encodeSigKES
+  encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
       => FromCBOR (SigKES (SimpleKES d t)) where

@@ -27,6 +27,11 @@ module Cardano.Crypto.KES.Class
   , decodeSigKES
   , encodeSignedKES
   , decodeSignedKES
+
+    -- * Encoded 'Size' expressions
+  , encodedVerKeyKESSizeExpr
+  , encodedSignKeyKESSizeExpr
+  , encodedSigKESSizeExpr
   )
 where
 
@@ -40,7 +45,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 
 import Cardano.Prelude (NoUnexpectedThunks)
-import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes)
+import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
@@ -261,3 +266,37 @@ encodeSignedKES (SignedKES s) = encodeSigKES s
 
 decodeSignedKES :: KESAlgorithm v => Decoder s (SignedKES v a)
 decodeSignedKES = SignedKES <$> decodeSigKES
+
+--
+-- 'Size' expressions for 'ToCBOR' instances.
+--
+
+-- | 'Size' expression for 'VerKeyKES' which is using 'sizeVerKeyKES' encoded
+-- as 'Size'.
+--
+encodedVerKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (VerKeyKES v) -> Size
+encodedVerKeyKESSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyKES (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
+
+-- | 'Size' expression for 'SignKeyKES' which is using 'sizeSignKeyKES' encoded
+-- as 'Size'.
+--
+encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
+encodedSignKeyKESSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
+
+-- | 'Size' expression for 'SigKES' which is using 'sizeSigKES' encoded as
+-- 'Size'.
+--
+encodedSigKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SigKES v) -> Size
+encodedSigKESSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeSigKES (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeSigKES (Proxy :: Proxy v))
