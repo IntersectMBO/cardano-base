@@ -21,7 +21,8 @@ module Cardano.Slotting.Slot
 where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
-import Cardano.Prelude (NFData, NoUnexpectedThunks)
+import Cardano.Prelude (CanonicalExamples, NFData, NoUnexpectedThunks)
+import Cardano.Prelude.CanonicalExamples.Orphans ()
 import Codec.Serialise (Serialise (..))
 import Data.Typeable (Typeable)
 import Data.Word (Word64)
@@ -30,7 +31,7 @@ import GHC.Generics (Generic)
 -- | The 0-based index for the Ourboros time slot.
 newtype SlotNo = SlotNo {unSlotNo :: Word64}
   deriving stock (Show, Eq, Ord, Generic)
-  deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoUnexpectedThunks)
+  deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoUnexpectedThunks, CanonicalExamples)
 
 instance ToCBOR SlotNo where
   toCBOR = encode
@@ -53,7 +54,8 @@ data WithOrigin t = Origin | At !t
       Foldable,
       Traversable,
       Serialise,
-      NoUnexpectedThunks
+      NoUnexpectedThunks,
+      CanonicalExamples
     )
 
 instance (Serialise t, Typeable t) => ToCBOR (WithOrigin t) where
@@ -91,8 +93,8 @@ withOriginFromMaybe (Just t) = At t
 -- | An epoch, i.e. the number of the epoch.
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoUnexpectedThunks)
+  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoUnexpectedThunks, CanonicalExamples)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Show, Generic)
-  deriving newtype (Enum, Num, Real, Integral, NoUnexpectedThunks)
+  deriving newtype (Enum, Num, Real, Integral, NoUnexpectedThunks, CanonicalExamples)

@@ -19,7 +19,8 @@ import Data.ByteString.Lazy (toStrict)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
 
-import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
+import Cardano.Prelude (CanonicalExamples, NFData, NoUnexpectedThunks, UseIsNormalForm(..))
+import Cardano.Crypto.Orphans ()
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), serialize)
 
 import Crypto.Error (CryptoFailable (..))
@@ -41,15 +42,18 @@ instance DSIGNAlgorithm Ed448DSIGN where
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
         deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
+        deriving CanonicalExamples
 
     newtype SignKeyDSIGN Ed448DSIGN = SignKeyEd448DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
         deriving NoUnexpectedThunks via UseIsNormalForm SecretKey
+        deriving CanonicalExamples
 
     newtype SigDSIGN Ed448DSIGN = SigEd448DSIGN Signature
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving NoUnexpectedThunks via UseIsNormalForm Signature
+        deriving CanonicalExamples
 
     --
     -- Metadata and basic key operations

@@ -5,23 +5,13 @@ packages:
   binary/test
   cardano-crypto-class
   slotting
+  -- TODO(kde)
+  ../cardano-prelude
+  ../cardano-prelude/test
 
 -- Disable tests in a dependency (which are currently broken)
 package cardano-crypto
   tests: False
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/cardano-prelude
-  tag: 91f357abae16099858193b999807323ca9a7c63c
-  --sha256: 11ya7j7ga0axvjb583pkcyxdza1p5219857817mwga7djzm5gb0b
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/cardano-prelude
-  tag: 91f357abae16099858193b999807323ca9a7c63c
-  --sha256: 11ya7j7ga0axvjb583pkcyxdza1p5219857817mwga7djzm5gb0b
-  subdir: test
 
 source-repository-package
   type: git

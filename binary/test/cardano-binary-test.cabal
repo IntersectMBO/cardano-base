@@ -20,6 +20,7 @@ library
   exposed-modules:
                        Test.Cardano.Binary.Helpers
                        Test.Cardano.Binary.Helpers.GoldenRoundTrip
+                       Test.Cardano.Binary.Helpers.CanonicalTestable
                        Test.Cardano.Binary.Serialization
                        Test.Cardano.Binary.Drop
                        Test.Cardano.Binary.Failure

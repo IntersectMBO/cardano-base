@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns              #-}
+{-# LANGUAGE DeriveGeneric             #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE LambdaCase                #-}
@@ -6,6 +7,8 @@
 {-# LANGUAGE NumDecimals               #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE StandaloneDeriving        #-}
+{-# OPTIONS_GHC -fno-warn-orphans      #-}
 
 module Cardano.Binary.FromCBOR
   ( FromCBOR(..)
@@ -19,6 +22,7 @@ module Cardano.Binary.FromCBOR
 where
 
 import Cardano.Prelude
+import Cardano.Prelude.CanonicalExamples.Orphans ()
 
 import Codec.CBOR.Decoding as D
 import Codec.CBOR.ByteArray as BA
@@ -66,9 +70,15 @@ data DecoderError
   -- ^ A size mismatch @DecoderErrorSizeMismatch label expectedSize actualSize@
   | DecoderErrorUnknownTag Text Word8
   | DecoderErrorVoid
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 instance Exception DecoderError
+
+-- | TODO(kde) Better place for this?
+deriving instance Generic CBOR.Read.DeserialiseFailure
+instance CanonicalExamples CBOR.Read.DeserialiseFailure
+
+instance CanonicalExamples DecoderError
 
 instance B.Buildable DecoderError where
   build = \case

@@ -6,8 +6,11 @@
 
 module Test.Cardano.Binary.Helpers.GoldenRoundTrip
   ( goldenTestCBOR
+  , goldenTestCBORCanonical
+  , goldenTestCBORCanonicalExplicit
   , goldenTestCBORExplicit
   , goldenTestExplicit
+  , goldenTestCBORCanonicalAll
   , roundTripsCBORShow
   , roundTripsCBORBuildable
   , compareHexDump
@@ -19,12 +22,13 @@ import Cardano.Prelude
 import Test.Cardano.Prelude
 
 import qualified Codec.CBOR.Decoding as D
+import Codec.CBOR.FlatTerm (FlatTerm, toFlatTerm)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Formatting.Buildable (Buildable(..))
 import Hedgehog
   (MonadTest, Property, eval, property, success, tripping, withTests, (===))
-import Hedgehog.Internal.Property (failWith)
+import Hedgehog.Internal.Property (failDiff, failWith)
 import Hedgehog.Internal.Show
   (LineDiff, lineDiff, mkValue, renderLineDiff, showPretty)
 
@@ -40,8 +44,10 @@ import Cardano.Binary
   , serializeEncoding
   )
 import qualified Prelude
+import qualified System.IO as IO
 import Text.Show.Pretty (Value(..))
 
+import Test.Cardano.Binary.Helpers.CanonicalTestable
 
 type HexDump = LByteString
 
@@ -132,6 +138,55 @@ goldenTestExplicit encode decode x path = withFrozenCallStack $ do
     let target = decodeBase16 bs
     compareHexDump bs bs'
     fmap decode target === Just (Right x)
+
+goldenTestCBORCanonicalAll :: Maybe FilePath
+                           -> [CanonicalTestable]
+                           -> [TypeTerm]
+                           -> Property
+goldenTestCBORCanonicalAll path types expected =
+    withFrozenCallStack $ withTests 1 . property $
+      if termsLen > typesLen
+      then failWith Nothing $
+        "received " ++ show (termsLen - typesLen) ++ " more terms than types"
+      else withFrozenCallStack $ do
+        ok <- eval (actual == expected)
+        if ok then
+          success
+        else case (expected, path) of
+          ([], Nothing) ->
+            failWith Nothing $ Prelude.unlines
+              ["━━━ Copy Paste ━━━", showPretty actual]
+          ([], Just file) -> do
+            lift $ IO.withFile file ReadWriteMode $ \h ->
+              hPutStr h (showPretty actual)
+            failWith Nothing $ Prelude.unlines
+              ["failed: see file ", show file]
+          _ ->
+            failDiff actual expected
+  where
+    typesLen = length types
+    termsLen = length expected
+
+    actual   = fmap encodeCanonical types
+
+goldenTestCBORCanonical
+  :: forall a
+  . (ToCBOR a, CanonicalExamples a, HasCallStack)
+  => Proxy a
+  -> [FlatTerm]
+  -> Property
+goldenTestCBORCanonical _ terms = withFrozenCallStack $ withTests 1 . property $
+  fmap (toFlatTerm . toCBOR) (unsafeGetCanonicalExamples :: [a]) === terms
+
+goldenTestCBORCanonicalExplicit
+  :: forall a
+  . (CanonicalExamples a, HasCallStack)
+  => (a -> Encoding)
+  -> [FlatTerm]
+  -> Property
+goldenTestCBORCanonicalExplicit enc terms =
+  withFrozenCallStack $ withTests 1 . property $
+    fmap (toFlatTerm . enc) (unsafeGetCanonicalExamples :: [a]) === terms
 
 -- | Round trip test a value (any instance of 'FromCBOR', 'ToCBOR', and 'Show'
 --   classes) by serializing it to a ByteString and back again and that also has

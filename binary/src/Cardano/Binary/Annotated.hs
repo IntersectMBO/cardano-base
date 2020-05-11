@@ -66,6 +66,12 @@ instance Bifunctor Annotated where
 instance (Eq a, Ord b) => Ord (Annotated b a) where
   compare = compare `on` unAnnotated
 
+instance (Typeable a, CanonicalExamples a, Typeable b, CanonicalExamples b)
+    => CanonicalExamples (Annotated a b)
+
+instance (Typeable a, CanonicalExamplesSized a, Typeable b, CanonicalExamplesSized b)
+    => CanonicalExamplesSized (Annotated a b)
+
 instance ToJSON b => ToJSON (Annotated b a) where
   toJSON = toJSON . unAnnotated
 

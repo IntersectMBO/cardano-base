@@ -47,6 +47,7 @@ library
                        Cardano.Crypto.KES.Single
                        Cardano.Crypto.KES.Sum
 
+                       Cardano.Crypto.Orphans
                        Cardano.Crypto.Seed
                        Cardano.Crypto.Util
 

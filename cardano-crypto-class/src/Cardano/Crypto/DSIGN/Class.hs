@@ -39,7 +39,7 @@ import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
 
-import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Prelude (CanonicalExamples, NoUnexpectedThunks)
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes)
 
 import Cardano.Crypto.Util (Empty)
@@ -57,6 +57,9 @@ class ( Typeable v
       , NoUnexpectedThunks (SigDSIGN     v)
       , NoUnexpectedThunks (SignKeyDSIGN v)
       , NoUnexpectedThunks (VerKeyDSIGN  v)
+      , CanonicalExamples (SigDSIGN     v)
+      , CanonicalExamples (SignKeyDSIGN v)
+      , CanonicalExamples (VerKeyDSIGN  v)
       )
       => DSIGNAlgorithm v where
 

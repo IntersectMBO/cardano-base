@@ -42,7 +42,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import Numeric.Natural
 
-import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Prelude (CanonicalExamples, NoUnexpectedThunks)
 
 class Typeable h => HashAlgorithm h where
 
@@ -59,7 +59,7 @@ class Typeable h => HashAlgorithm h where
 {-# DEPRECATED byteCount "Use sizeHash" #-}
 
 newtype Hash h a = UnsafeHash {getHash :: ByteString}
-  deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
+  deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks, CanonicalExamples)
 
 instance Show (Hash h a) where
   show = SB8.unpack . getHashBytesAsHex

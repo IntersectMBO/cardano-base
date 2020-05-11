@@ -19,13 +19,15 @@ import Data.ByteString.Lazy (toStrict)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
 
-import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
+import Cardano.Prelude (CanonicalExamples, NFData, NoUnexpectedThunks,
+  UseIsNormalForm(..))
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), serialize)
 
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 as Ed25519
 
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.Orphans ()
 import Cardano.Crypto.Seed
 
 
@@ -39,16 +41,16 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
     newtype VerKeyDSIGN Ed25519DSIGN = VerKeyEd25519DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving newtype NFData
+        deriving newtype (NFData, CanonicalExamples)
         deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
 
     newtype SignKeyDSIGN Ed25519DSIGN = SignKeyEd25519DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving newtype NFData
+        deriving newtype (NFData, CanonicalExamples)
         deriving NoUnexpectedThunks via UseIsNormalForm SecretKey
 
     newtype SigDSIGN Ed25519DSIGN = SigEd25519DSIGN Signature
-        deriving (Show, Eq, Generic, ByteArrayAccess)
+        deriving (Show, Eq, Generic, ByteArrayAccess, CanonicalExamples)
         deriving NoUnexpectedThunks via UseIsNormalForm Signature
 
     --

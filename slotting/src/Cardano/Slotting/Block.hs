@@ -8,7 +8,8 @@ module Cardano.Slotting.Block
 where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
-import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Prelude (CanonicalExamples, NoUnexpectedThunks)
+import Cardano.Prelude.CanonicalExamples.Orphans ()
 import Codec.Serialise (Serialise (..))
 import Data.Word (Word64)
 import GHC.Generics (Generic)
@@ -18,7 +19,7 @@ import GHC.Generics (Generic)
 -- for every slot where N <= SlotNo.
 newtype BlockNo = BlockNo {unBlockNo :: Word64}
   deriving stock (Show, Eq, Ord, Generic)
-  deriving newtype (Enum, Bounded, Num, Serialise, NoUnexpectedThunks)
+  deriving newtype (Enum, Bounded, Num, Serialise, NoUnexpectedThunks, CanonicalExamples)
 
 instance ToCBOR BlockNo where
   toCBOR = encode
