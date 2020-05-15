@@ -115,6 +115,11 @@ testKESAlgorithm _p n =
         , testProperty "SignKey" $ prop_cbor @(SignKeyKES v)
         , testProperty "Sig"     $ prop_cbor @(SigKES v)
         ]
+      , testGroup "ToCBOR size"
+        [ testProperty "VerKey"  $ prop_cbor_size @(VerKeyKES v)
+        , testProperty "SignKey" $ prop_cbor_size @(SignKeyKES v)
+        , testProperty "Sig"     $ prop_cbor_size @(SigKES v)
+        ]
 
       , testGroup "direct matches class"
         [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyKES v)
