@@ -24,6 +24,7 @@ import Cardano.Binary
   ( Encoding
   , FromCBOR (..)
   , ToCBOR (..)
+  , Size
   , decodeBytes
   , serializeEncoding'
   )
@@ -70,6 +71,18 @@ instance IsString (Hash h a) where
 
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
   toCBOR = toCBOR . getHash
+
+  -- | 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
+  -- instance for 'ByteString' (as is the above 'toCBOR' method).  'Size'
+  -- computation of length of the bytestring is passed as the first argument to
+  -- 'encodedSizeExpr'.  The 'ByteString' instance will use it to calculate
+  -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
+  --
+  encodedSizeExpr _size proxy =
+      encodedSizeExpr (\_ -> hashSize) (getHash <$> proxy)
+    where
+      hashSize :: Size
+      hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))
 
 instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
   fromCBOR = do

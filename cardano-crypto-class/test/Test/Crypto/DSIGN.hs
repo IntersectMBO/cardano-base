@@ -94,6 +94,12 @@ testDSIGNAlgorithm _ n =
         , testProperty "Sig"     $ prop_cbor @(SigDSIGN v)
         ]
 
+      , testGroup "ToCBOR size"
+        [ testProperty "VerKey"  $ prop_cbor_size @(VerKeyDSIGN v)
+        , testProperty "SignKey" $ prop_cbor_size @(SignKeyDSIGN v)
+        , testProperty "Sig"     $ prop_cbor_size @(SigDSIGN v)
+        ]
+
       , testGroup "direct matches class"
         [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyDSIGN v)
                                                              encodeVerKeyDSIGN

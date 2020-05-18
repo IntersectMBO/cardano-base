@@ -27,6 +27,11 @@ module Cardano.Crypto.DSIGN.Class
   , decodeSigDSIGN
   , encodeSignedDSIGN
   , decodeSignedDSIGN
+  
+    -- * Encoded 'Size' expresssions
+  , encodedVerKeyDSIGNSizeExpr
+  , encodedSignKeyDESIGNSizeExpr
+  , encodedSigDSIGNSizeExpr
   )
 where
 
@@ -40,7 +45,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 
 import Cardano.Prelude (NoUnexpectedThunks)
-import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes)
+import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Seed
@@ -227,3 +232,37 @@ encodeSignedDSIGN (SignedDSIGN s) = encodeSigDSIGN s
 
 decodeSignedDSIGN :: DSIGNAlgorithm v => Decoder s (SignedDSIGN v a)
 decodeSignedDSIGN = SignedDSIGN <$> decodeSigDSIGN
+
+--
+-- Encoded 'Size' expressions for 'ToCBOR' instances
+--
+
+-- | 'Size' expression for 'VerKeyDSIGN' which is using 'sizeVerKeyDSIGN'
+-- encoded as 'Size'.
+--
+encodedVerKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (VerKeyDSIGN v) -> Size
+encodedVerKeyDSIGNSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyDSIGN (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy v))
+
+-- | 'Size' expression for 'SignKeyDSIGN' which is using 'sizeSignKeyDSIGN'
+-- encoded as 'Size'.
+--
+encodedSignKeyDESIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SignKeyDSIGN v) -> Size
+encodedSignKeyDESIGNSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyDSIGN (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v))
+
+-- | 'Size' expression for 'SigDSIGN' which is using 'sizeSigDSIGN' encoded as
+-- 'Size'.
+--
+encodedSigDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SigDSIGN v) -> Size
+encodedSigDSIGNSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeSigDSIGN (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeSigDSIGN (Proxy :: Proxy v))

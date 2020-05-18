@@ -1,6 +1,8 @@
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -24,6 +26,12 @@ module Cardano.Crypto.VRF.Class
   , decodeSignKeyVRF
   , encodeCertVRF
   , decodeCertVRF
+
+
+    -- * Encoded 'Size' expressions
+  , encodedVerKeyVRFSizeExpr
+  , encodedSignKeyVRFSizeExpr
+  , encodedCertVRFSizeExpr
 )
 where
 
@@ -39,8 +47,9 @@ import GHC.Stack
 
 import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary
-         (Decoder, Encoding, FromCBOR (..), ToCBOR (..),
-          encodeListLen, enforceSize, decodeBytes, encodeBytes)
+         (Decoder, Encoding, FromCBOR (..), ToCBOR (..), Size,
+          encodeListLen, enforceSize, decodeBytes, encodeBytes,
+          withWordSize)
 
 import Crypto.Random (MonadRandom)
 
@@ -218,6 +227,15 @@ instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
       toCBOR (certifiedNatural cvrf) <>
       encodeCertVRF (certifiedProof cvrf)
 
+  encodedSizeExpr _size proxy =
+        1
+      + certifiedNaturalSize (certifiedNatural <$> proxy)
+      + fromIntegral (sizeCertVRF (Proxy :: Proxy v))
+    where
+      certifiedNaturalSize :: Proxy Natural -> Size
+      certifiedNaturalSize _proxy =
+        fromIntegral $ (withWordSize :: Natural -> Integer) (maxVRF (Proxy :: Proxy v))
+
 instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
   fromCBOR =
     CertifiedVRF <$
@@ -241,3 +259,37 @@ verifyCertified
   -> CertifiedVRF v a
   -> Bool
 verifyCertified ctxt vk a CertifiedVRF {..} = verifyVRF ctxt vk a (certifiedNatural, certifiedProof)
+
+--
+-- 'Size' expressions for 'ToCBOR' instances
+--
+
+-- | 'Size' expression for 'VerKeyVRF' which is using 'sizeVerKeyVRF' encoded as
+-- 'Size'.
+--
+encodedVerKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (VerKeyVRF v) -> Size
+encodedVerKeyVRFSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyVRF (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeVerKeyVRF (Proxy :: Proxy v))
+
+-- | 'Size' expression for 'SignKeyVRF' which is using 'sizeSignKeyVRF' encoded
+-- as 'Size'
+--
+encodedSignKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (SignKeyVRF v) -> Size
+encodedSignKeyVRFSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyVRF (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeSignKeyVRF (Proxy :: Proxy v))
+
+-- | 'Size' expression for 'CertVRF' which is using 'sizeCertVRF' encoded as
+-- 'Size'.
+--
+encodedCertVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (CertVRF v) -> Size
+encodedCertVRFSizeExpr _proxy =
+      -- 'encodeBytes' envelope
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeCertVRF (Proxy :: Proxy v)))
+      -- payload
+    + fromIntegral (sizeCertVRF (Proxy :: Proxy v))

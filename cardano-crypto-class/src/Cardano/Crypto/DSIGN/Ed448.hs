@@ -108,18 +108,21 @@ instance DSIGNAlgorithm Ed448DSIGN where
 
 instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
   toCBOR = encodeVerKeyDSIGN
+  encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN Ed448DSIGN) where
   fromCBOR = decodeVerKeyDSIGN
 
 instance ToCBOR (SignKeyDSIGN Ed448DSIGN) where
   toCBOR = encodeSignKeyDSIGN
+  encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN Ed448DSIGN) where
   fromCBOR = decodeSignKeyDSIGN
 
 instance ToCBOR (SigDSIGN Ed448DSIGN) where
   toCBOR = encodeSigDSIGN
+  encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN Ed448DSIGN) where
   fromCBOR = decodeSigDSIGN

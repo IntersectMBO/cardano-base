@@ -1,12 +1,15 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Test.Crypto.Util
   ( -- * CBOR
     FromCBOR (..)
   , ToCBOR (..)
   , prop_cbor
+  , prop_cbor_size
   , prop_cbor_with
   , prop_cbor_valid
   , prop_cbor_roundtrip
@@ -27,9 +30,10 @@ where
 
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..),
-                       Encoding, Decoder,
-                       decodeFullDecoder, serializeEncoding)
+                       Encoding, Decoder, Range (..),
+                       decodeFullDecoder, serializeEncoding, szGreedy, szSimplify)
 import Codec.CBOR.FlatTerm
+import Codec.CBOR.Write
 import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
 import Crypto.Random
   ( ChaChaDRG
@@ -38,7 +42,9 @@ import Crypto.Random
   , withDRG
   )
 import Data.ByteString as BS (ByteString, pack, length)
+import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
+import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
   , (===)
@@ -96,6 +102,14 @@ prop_cbor :: (ToCBOR a, FromCBOR a, Eq a, Show a)
           => a -> Property
 prop_cbor = prop_cbor_with toCBOR fromCBOR
 
+prop_cbor_size :: forall a. ToCBOR a => a -> Property
+prop_cbor_size a = counterexample (show lo ++ " ≰ " ++ show len) (lo <= len)
+              .&&. counterexample (show len ++ " ≰ " ++ show hi) (len <= hi)
+  where
+    len, lo, hi :: Natural
+    len = fromIntegral $ BS.length (toStrictByteString (toCBOR a))
+    Right (Range {lo, hi}) = szSimplify $ encodedSizeExpr szGreedy (Proxy :: Proxy a)
+
 
 prop_cbor_with :: (Eq a, Show a)
                => (a -> Encoding)
@@ -151,4 +165,3 @@ prop_cbor_direct_vs_class encoder x =
 prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
 prop_size_serialise serialise size x =
     BS.length (serialise x) === fromIntegral size
-
