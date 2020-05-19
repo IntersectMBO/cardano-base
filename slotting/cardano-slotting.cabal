@@ -45,5 +45,6 @@ library
                       , containers
                       , mmorph
                       , mtl
+                      , quiet
                       , serialise
                       , transformers
