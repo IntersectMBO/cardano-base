@@ -66,6 +66,7 @@ library
                      , cardano-prelude
                      , cryptonite
                      , deepseq
+                     , kes-mmm-sumed
                      , memory
                      , text
                      , transformers
