@@ -6,6 +6,9 @@
 
 module Cardano.Slotting.EpochInfo.API
   ( EpochInfo (..),
+    epochInfoSize,
+    epochInfoFirst,
+    epochInfoEpoch,
     epochInfoRange,
 
     -- * Utility
@@ -14,7 +17,7 @@ module Cardano.Slotting.EpochInfo.API
   )
 where
 
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
+import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..), HasCallStack)
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
 import Control.Monad.Morph (generalize)
 import Data.Functor.Classes (showsUnaryWith)
@@ -38,26 +41,26 @@ data EpochInfo m
         --
         -- Note that the number of slots does /not/ bound the number of blocks,
         -- since the EBB and a regular block share a slot number.
-        epochInfoSize :: EpochNo -> m EpochSize,
+        epochInfoSize_ :: HasCallStack => EpochNo -> m EpochSize,
         -- | First slot in the specified epoch
         --
         -- See also 'epochInfoRange'
-        epochInfoFirst :: EpochNo -> m SlotNo,
+        epochInfoFirst_ :: HasCallStack => EpochNo -> m SlotNo,
         -- | Epoch containing the given slot
         --
         -- We should have the property that
         --
         -- > s `inRange` epochInfoRange (epochInfoEpoch s)
-        epochInfoEpoch :: SlotNo -> m EpochNo
+        epochInfoEpoch_ :: HasCallStack => SlotNo -> m EpochNo
       }
   deriving (NoUnexpectedThunks) via OnlyCheckIsWHNF "EpochInfo" (EpochInfo m)
 
 -- | Show instance only for non-stateful instances
 instance Show (EpochInfo Identity) where
-  showsPrec p EpochInfo {..} =
+  showsPrec p ei =
     showsUnaryWith showsPrec "fixedSizeEpochInfo" p
       $ runIdentity
-      $ epochInfoSize (EpochNo 0)
+      $ epochInfoSize ei (EpochNo 0)
 
 epochInfoRange :: Monad m => EpochInfo m -> EpochNo -> m (SlotNo, SlotNo)
 epochInfoRange epochInfo epochNo =
@@ -68,14 +71,29 @@ epochInfoRange epochInfo epochNo =
     aux (SlotNo s) (EpochSize sz) = (SlotNo s, SlotNo (s + sz - 1))
 
 {-------------------------------------------------------------------------------
+  Extraction functions that preserve the HasCallStack constraint
+
+  (Ideally, ghc would just do this..)
+-------------------------------------------------------------------------------}
+
+epochInfoSize :: HasCallStack => EpochInfo m -> EpochNo -> m EpochSize
+epochInfoSize = epochInfoSize_
+
+epochInfoFirst :: HasCallStack => EpochInfo m -> EpochNo -> m SlotNo
+epochInfoFirst = epochInfoFirst_
+
+epochInfoEpoch :: HasCallStack => EpochInfo m -> SlotNo -> m EpochNo
+epochInfoEpoch = epochInfoEpoch_
+
+{-------------------------------------------------------------------------------
   Utility
 -------------------------------------------------------------------------------}
 
 hoistEpochInfo :: (forall a. m a -> n a) -> EpochInfo m -> EpochInfo n
-hoistEpochInfo f EpochInfo {..} = EpochInfo
-  { epochInfoSize = f . epochInfoSize,
-    epochInfoFirst = f . epochInfoFirst,
-    epochInfoEpoch = f . epochInfoEpoch
+hoistEpochInfo f ei = EpochInfo
+  { epochInfoSize_ = f . epochInfoSize ei,
+    epochInfoFirst_ = f . epochInfoFirst ei,
+    epochInfoEpoch_ = f . epochInfoEpoch ei
   }
 
 generalizeEpochInfo :: Monad m => EpochInfo Identity -> EpochInfo m

@@ -11,10 +11,10 @@ import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
 
 fixedSizeEpochInfo :: Monad m => EpochSize -> EpochInfo m
 fixedSizeEpochInfo (EpochSize size) = EpochInfo
-  { epochInfoSize = \_ ->
+  { epochInfoSize_ = \_ ->
       return $ EpochSize size,
-    epochInfoFirst = \(EpochNo epochNo) ->
+    epochInfoFirst_ = \(EpochNo epochNo) ->
       return $ SlotNo (epochNo * size),
-    epochInfoEpoch = \(SlotNo slot) ->
+    epochInfoEpoch_ = \(SlotNo slot) ->
       return $ EpochNo (slot `div` size)
   }
