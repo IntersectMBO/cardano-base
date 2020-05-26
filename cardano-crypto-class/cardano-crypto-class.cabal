@@ -96,6 +96,7 @@ test-suite test-crypto
                        Test.Crypto.KES
                        Test.Crypto.Util
                        Test.Crypto.VRF
+                       Test.Crypto.Work
 
   build-depends:       base
                      , bytestring
@@ -106,6 +107,7 @@ test-suite test-crypto
                      , QuickCheck
                      , tasty
                      , tasty-quickcheck
+                     , kes-mmm-sumed
 
   default-language:    Haskell2010
 
