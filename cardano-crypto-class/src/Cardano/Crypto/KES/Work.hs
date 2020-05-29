@@ -11,11 +11,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 
-module Work(go,foo) where
+module Work(go) where
 
 import System.IO.Unsafe(unsafePerformIO)
 import qualified Data.ByteString as BS
-import Data.ByteArray(ScrubbedBytes,convert)
+import Data.ByteArray(ScrubbedBytes,convert,allocRet)
 
 
 import GHC.TypeNats (Nat, KnownNat, natVal)
