@@ -41,5 +41,6 @@ source-repository-package
    location: https://github.com/TimSheard/kes-mmm-sumed25519
    --tag: 5fefcf714c5f045f5328d897f191268cc2444926
    tag: 509873ab0d8de79d189772ab1627c36c61001511
-   sha256:0dkal9brmrrn9ifrp3vqgm23mm93a2drabg40snl4v285df1gh79
+   --sha256:0dkal9brmrrn9ifrp3vqgm23mm93a2drabg40snl4v285df1gh79
+   sha256:0lh69m8vnijpcf40lagx81v26x2xd0bc2fzfaaipbn6k6wfdhr1n
    subdir: kes-mmm-sumed25519-hs
