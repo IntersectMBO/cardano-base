@@ -55,7 +55,8 @@ library
                        Cardano.Crypto.VRF.NeverUsed
                        Cardano.Crypto.VRF.Simple
 
-  build-depends:       base
+  build-depends:       aeson
+                     , base
                      , base16-bytestring
                      , bytestring
                      , cardano-binary
@@ -63,6 +64,7 @@ library
                      , cryptonite
                      , deepseq
                      , memory
+                     , text
                      , transformers
                      , vector
 

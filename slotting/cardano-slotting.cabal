@@ -38,7 +38,8 @@ library
                         Cardano.Slotting.EpochInfo
                         Cardano.Slotting.EpochInfo.API
                         Cardano.Slotting.EpochInfo.Impl
-  build-depends:        base
+  build-depends:        aeson
+                      , base
                       , cardano-prelude
                       , cardano-binary
                       , cborg

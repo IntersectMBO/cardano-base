@@ -29,6 +29,10 @@ import Cardano.Binary
   , serializeEncoding'
   )
 import Control.DeepSeq (NFData)
+import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
+import qualified Data.Aeson.Encoding as Aeson
 import qualified Data.Bits as Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as SB
@@ -37,13 +41,15 @@ import qualified Data.ByteString.Char8 as SB8
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
+import Data.Text (Text)
+import qualified Data.Text.Encoding as Text
 import Data.Typeable (Typeable)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import GHC.Stack
 import Numeric.Natural
 
-import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Prelude (Base16ParseError, NoUnexpectedThunks, parseBase16)
 
 class Typeable h => HashAlgorithm h where
 
@@ -93,6 +99,32 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
     if la == le
     then return $ UnsafeHash bs
     else fail $ "expected " ++ show le ++ " byte(s), but got " ++ show la
+
+instance ToJSONKey (Hash crypto a) where
+  toJSONKey = Aeson.ToJSONKeyText hashToText (Aeson.text . hashToText)
+
+instance HashAlgorithm crypto => FromJSONKey (Hash crypto a) where
+  fromJSONKey = Aeson.FromJSONKeyTextParser parseHash
+
+instance ToJSON (Hash crypto a) where
+  toJSON = toJSON . hashToText
+
+instance HashAlgorithm crypto => FromJSON (Hash crypto a) where
+  parseJSON = Aeson.withText "hash" parseHash
+
+hashToText :: Hash crypto a -> Text
+hashToText = Text.decodeLatin1 . getHashBytesAsHex
+
+parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
+parseHash t = do
+    bytes <- either badHex return (parseBase16 t)
+    maybe badSize return (hashFromBytes bytes)
+  where
+    badHex :: Base16ParseError -> Aeson.Parser ByteString
+    badHex _ = fail "Hashes are expected in hex encoding"
+
+    badSize :: Aeson.Parser (Hash crypto a)
+    badSize  = fail "Hash is the wrong length"
 
 castHash :: Hash h a -> Hash h b
 castHash (UnsafeHash h) = UnsafeHash h
