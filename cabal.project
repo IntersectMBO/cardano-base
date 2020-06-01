@@ -39,6 +39,6 @@ source-repository-package
    type: git
    --location: https://github.com/input-output-hk/kes-mmm-sumed25519
    location: https://github.com/TimSheard/kes-mmm-sumed25519
-   tag: 53c82e531712eec8787e34e550fb6487540e8d1c
-   --sha256: 0f36czh95x2xp3ncv3nxd3lcpanxzrylrbfi8xin6ddmcim12khx
+   tag: 0d2db3866551f76384f8684381f18ae1e7bbd016
+   --sha256: 1ckr4adhmyv7wyq47bhac7vmn9l1ckvwlsayw3j1in53lldib9rz
    subdir: kes-mmm-sumed25519-hs
