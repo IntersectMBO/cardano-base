@@ -10,9 +10,10 @@
 {-# LANGUAGE DerivingVia         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE FlexibleContexts    #-}
 
 
-module Rust(go) where
+module Rust(test1,test2) where
 
 -- ==========================================================
 -- Some Haskell Control operations
@@ -28,7 +29,7 @@ import Data.Word(Word,Word8,Word32)
 import Foreign(Ptr)
 import Foreign.ForeignPtr(mallocForeignPtrBytes,ForeignPtr)
 import Foreign.Storable(pokeElemOff)
-
+import Data.Char(ord)
 
 -- ==========================================================
 -- import the KES wrappers that are just C-calls
@@ -49,7 +50,7 @@ import Data.ByteString(ByteString,copy)
 import Cardano.Crypto.KES.Class(KESAlgorithm(..),Period)
 import Cardano.Prelude(NoUnexpectedThunks(),UseIsNormalForm(..))
 import Cardano.Binary(ToCBOR(),serialize')
-import Cardano.Crypto.Seed(getSeedBytes)
+import Cardano.Crypto.Seed(Seed,getSeedBytes,mkSeedFromBytes)
 
 -- ===============================================================================
 -- General purpose GHC type class wizardry for Nat as index, and Generic functions
@@ -71,7 +72,7 @@ pattern SEED_SIZE = 32
 newtype PublicKey = PublicKey BS.ByteString deriving Show
 newtype SecretKey = SecretKey ScrubbedBytes deriving Show
 newtype Signature = Signature BS.ByteString deriving Show
-newtype Seed = Seed { unSeed :: ScrubbedBytes } deriving Show
+-- Seed is imported from Cardano.Crypto.Seed
 
 
 -- ============================================================
@@ -82,12 +83,12 @@ createSeedIO :: IO Seed
 createSeedIO = do
   (_,seed) <- allocRet SEED_SIZE $ \seed_ptr -> do
     mapM_ (\i -> pokeElemOff seed_ptr i ((fromIntegral i) :: Word8)) [0..31]
-  pure $ Seed seed
+  pure $ mkSeedFromBytes seed
 
 
 generateIO :: Seed -> IO (PublicKey, SecretKey)
 generateIO  seed = do
-  withByteArray (unSeed seed) $ \seed_ptr -> do
+  withByteArray (getSeedBytes seed) $ \seed_ptr -> do
     (public, secret) <- allocRet CWrap.SECRET_KEY_SIZE $ \secret -> do
       (_,public) <- allocRet CWrap.PUBLIC_KEY_SIZE $ \public_ptr -> do
         CWrap.generate seed_ptr secret public_ptr
@@ -144,7 +145,7 @@ generate seed = unsafePerformIO (generateIO seed)
 
 scrub:: BS.ByteString -> ScrubbedBytes
 scrub bs = convert bs
-seedToSeed xs = Seed(scrub (getSeedBytes xs))
+-- seedToSeed xs = Seed(scrub (getSeedBytes xs))
 
 
 {-# NOINLINE verify #-}
@@ -219,11 +220,10 @@ instance KnownNat t => KESAlgorithm (RustKES t) where
 
     algorithmNameKES proxy = "Rust_" ++ show (totalPeriodsKES proxy)
 
-                                     -- These realy should not be in KES.Internal, so we can see them here
-    sizeVerKeyKES  _ = 32            -- See KES.Internal   pattern PUBLIC_KEY_SIZE = 32
-    sizeSignKeyKES _ = 1220          -- See KES.Internal   pattern SECRET_KEY_SIZE = 1220
-    sizeSigKES     _ = 484           -- See KES.Internal   pattern SIGNATURE_SIZE = 484
-    seedSizeKES    _ = 32            -- See KES.Internal   pattern SEED_SIZE = 32
+    sizeVerKeyKES  _ = CWrap.PUBLIC_KEY_SIZE    -- 32
+    sizeSignKeyKES _ = CWrap.SECRET_KEY_SIZE    -- 1220
+    sizeSigKES     _ = CWrap.SIGNATURE_SIZE     -- 484
+    seedSizeKES    _ = SEED_SIZE                -- 32
 
     type Signable (RustKES t) = ToCBOR
 
@@ -244,7 +244,7 @@ instance KnownNat t => KESAlgorithm (RustKES t) where
                  else Nothing)
 
     genKeyKES seed = Sign secret
-       where (public,secret) = generate(seedToSeed seed)  -- Converson from Cardano Seed to Rust Seed
+       where (public,secret) = generate seed
 
     rawSerialiseVerKeyKES (Verify (PublicKey public)) = public
     rawSerialiseSignKeyKES (Sign (SecretKey secret)) = convert secret
@@ -258,6 +258,56 @@ instance KnownNat t => KESAlgorithm (RustKES t) where
 
 -- =========================================================
 
+byteString :: String -> ByteString
+byteString str = BS.pack (map (fromIntegral . ord) str)
 
-go:: IO()
-go = putStrLn "DONE"
+test1 :: IO ()
+test1 = do
+  putStrLn "test 1"
+  seed <- createSeedIO
+  (pub, sec) <- generateIO seed
+  print pub
+  print sec
+  let bytes = (byteString "hello world")
+  sig <- signIO sec bytes
+  print sig
+  valid <- verifyIO pub bytes sig
+  print valid
+  t_val <- compute_publicIO sec
+  print t_val
+
+test2 :: IO ()
+test2 = do
+  putStrLn "test 2"
+  seed <- createSeedIO
+  let bytes = (byteString "hello world")
+      (pub, sec) = generate seed
+  print pub
+  print sec
+  let sig = sign sec bytes
+  print sig
+  let valid = verify pub bytes sig
+  print valid
+  let t_val = compute_public sec
+  print t_val
+
+
+test3 :: IO ()
+test3 = do
+  seed <- createSeedIO
+  let bytes = (byteString "hello world")
+      sec :: SignKeyKES (RustKES 5)   -- This signature fixes the KESAlgorithm instance
+      sec = genKeyKES seed
+      public = deriveVerKeyKES sec
+      sig = signKES () (0::Period) bytes sec
+      valid = verifyKES () public (0::Period) bytes sig
+  print sec
+  print public
+  print sig
+  print valid
+  let msec = updateKES () sec (0::Period)
+  case msec of
+     Just sec2 -> print valid2
+        where sig2 = signKES () (1::Period) bytes sec2
+              valid2 = verifyKES () public (1::Period) bytes sig2
+     Nothing -> print "Update failed"
