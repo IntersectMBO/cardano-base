@@ -33,13 +33,7 @@ let
           // import ./util.nix { inherit haskell-nix; }
           # also expose our sources and overlays
           // { inherit overlays sources; };
-      })
-      (self: super: let
-        kesSrc = self.cardanoBaseHaskellPackages.kes-mmm-sumed.src;
-        kesOverlay = import "${kesSrc}/../nix/pkgs.nix";
-        kesPkgs = kesOverlay self {};
-      in {
-        inherit (kesPkgs) kes_mmm_sumed25519_c;
+        kes_mmm_sumed25519_c = pkgs.callPackage ./kes_mmm_sumed25519_c.nix {};
       })
       # And, of course, our haskell-nix-ified cabal project:
       (import ./pkgs.nix)

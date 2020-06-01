@@ -32,6 +32,7 @@ let
       pkgconfig
       sqlite-interactive
       git
+      kes_mmm_sumed25519_c
     ];
 
     # Prevents cabal from choosing alternate plans, so that

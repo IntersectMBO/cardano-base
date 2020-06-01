@@ -22,5 +22,17 @@
         "type": "tarball",
         "url": "https://github.com/input-output-hk/iohk-nix/archive/8eb95138be415ea7a02c80cc52cbc14edc0a9e05.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "naersk": {
+        "branch": "more-fixes",
+        "description": "Build rust crates in Nix. No configuration, no code generation, no IFD. Sandbox friendly.",
+        "homepage": "",
+        "owner": "input-output-hk",
+        "repo": "naersk",
+        "rev": "a3f5eb1b1d9326c4012260d50cda08ea6be17f67",
+        "sha256": "0kkfdzlvg29x4aic28jckpjqnh58j9fmvq7kh8w7i7746yslqvia",
+        "type": "tarball",
+        "url": "https://github.com/input-output-hk/naersk/archive/a3f5eb1b1d9326c4012260d50cda08ea6be17f67.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
