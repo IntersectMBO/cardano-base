@@ -38,6 +38,7 @@ library
                        Cardano.Crypto.Hash.MD5
                        Cardano.Crypto.Hash.NeverUsed
                        Cardano.Crypto.Hash.SHA256
+                       Cardano.Crypto.Hash.SHA3_256
                        Cardano.Crypto.Hash.Short
 
                        Cardano.Crypto.KES.Class
