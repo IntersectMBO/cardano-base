@@ -26,6 +26,7 @@ tests =
   testGroup "Crypto.Hash"
     [ testHashAlgorithm (Proxy :: Proxy MD5) "MD5"
     , testHashAlgorithm (Proxy :: Proxy SHA256) "SHA256"
+    , testHashAlgorithm (Proxy :: Proxy SHA3_256) "SHA3_256"
     , testHashAlgorithm (Proxy :: Proxy Blake2b_224) "Blake2b_224"
     , testHashAlgorithm (Proxy :: Proxy Blake2b_256) "Blake2b_256"
     ]
