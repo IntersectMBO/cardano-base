@@ -15,9 +15,6 @@ let
       sources.nixpkgs)
     else (builtins.trace "Using IOHK default nixpkgs"
       iohKNix.nixpkgs);
-  kesOverlay = pkgs: _: with pkgs; {
-    kes_mmm_sumed25519_c = pkgs.callPackage ./kes_mmm_sumed25519_c.nix {};
-  };
 
   # for inclusion in pkgs:
   overlays =
@@ -29,7 +26,7 @@ let
     ++ iohKNix.overlays.iohkNix
     # our own overlays:
     ++ [
-      kesOverlay
+      (import "${sources."rust-libs.nix"}/overlay.nix")
       (pkgs: _: with pkgs; {
 
         # commonLib: mix pkgs.lib with iohk-nix utils and our own:
@@ -47,4 +44,4 @@ let
     config = haskellNix.config // config;
   };
 
-in pkgs // { inherit kesOverlay; }
+in pkgs

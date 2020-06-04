@@ -21,6 +21,7 @@ let
 
   self = {
     inherit haskellPackages;
+    inherit kes_mmm_sumed25519_c; # not strictly necessary, but useful for debugging
 
     # `tests` are the test suites which have been built.
     tests = collectComponents' "tests" haskellPackages;

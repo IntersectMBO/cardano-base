@@ -34,5 +34,17 @@
         "type": "tarball",
         "url": "https://github.com/input-output-hk/naersk/archive/a3f5eb1b1d9326c4012260d50cda08ea6be17f67.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "rust-libs.nix": {
+        "branch": "master",
+        "description": "nix overlay for rust libraries",
+        "homepage": null,
+        "owner": "input-output-hk",
+        "repo": "rust-libs.nix",
+        "rev": "ad06e6a51ca2a65f2358ed1fe97d2160d3f63c34",
+        "sha256": "0gpyk2a5d4k199b9cq437mb5i7420x8p3hz2zvi3sjg096q9h21b",
+        "type": "tarball",
+        "url": "https://github.com/input-output-hk/rust-libs.nix/archive/ad06e6a51ca2a65f2358ed1fe97d2160d3f63c34.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
