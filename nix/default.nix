@@ -26,6 +26,7 @@ let
     ++ iohKNix.overlays.iohkNix
     # our own overlays:
     ++ [
+      (import sources."rust.nix")
       (import "${sources."rust-libs.nix"}/overlay.nix")
       (pkgs: _: with pkgs; {
 
