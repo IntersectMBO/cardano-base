@@ -107,6 +107,9 @@ test-suite test-crypto
                      , QuickCheck
                      , tasty
                      , tasty-quickcheck
+
+                     , memory
+                     , cardano-prelude
                      , kes-mmm-sumed
 
   default-language:    Haskell2010
