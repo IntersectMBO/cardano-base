@@ -11,7 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 
-module Work(go) where
+module Test.Crypto.Work(go) where
 
 import System.IO.Unsafe(unsafePerformIO)
 import qualified Data.ByteString as BS
