@@ -1,12 +1,15 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Mock implementation of digital signatures.
 module Cardano.Crypto.DSIGN.Mock
@@ -20,9 +23,11 @@ where
 
 import Data.Word (Word64)
 import GHC.Generics (Generic)
+import GHC.TypeLits (type (+))
+import Data.Proxy (Proxy (..))
 import GHC.Stack
 
-import Cardano.Prelude (NoUnexpectedThunks, Proxy(..))
+import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class
@@ -34,6 +39,10 @@ import Cardano.Crypto.Util
 data MockDSIGN
 
 instance DSIGNAlgorithm MockDSIGN where
+    type SeedSizeDSIGN MockDSIGN = 8
+    type SizeVerKeyDSIGN  MockDSIGN = 8 -- for 64 bit int
+    type SizeSignKeyDSIGN MockDSIGN = 8
+    type SizeSigDSIGN     MockDSIGN = SizeHash ShortHash + 8
 
     --
     -- Key and signature types
@@ -80,7 +89,6 @@ instance DSIGNAlgorithm MockDSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _    = 8
     genKeyDSIGN seed   =
       SignKeyMockDSIGN (runMonadRandomWithSeed seed getRandomWord64)
 
@@ -89,10 +97,6 @@ instance DSIGNAlgorithm MockDSIGN where
     -- raw serialise/deserialise
     --
 
-    sizeVerKeyDSIGN  _ = 8 -- for 64 bit Int
-    sizeSignKeyDSIGN _ = 8
-    sizeSigDSIGN     _ = sizeHash (Proxy :: Proxy ShortHash)
-                       + 8
 
     rawSerialiseVerKeyDSIGN  (VerKeyMockDSIGN  k) = writeBinaryWord64 k
     rawSerialiseSignKeyDSIGN (SignKeyMockDSIGN k) = writeBinaryWord64 k

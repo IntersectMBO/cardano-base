@@ -48,6 +48,7 @@ library
                        Cardano.Crypto.KES.Single
                        Cardano.Crypto.KES.Sum
 
+                       Cardano.Crypto.PinnedSizedBytes
                        Cardano.Crypto.Seed
                        Cardano.Crypto.Util
 
@@ -57,6 +58,18 @@ library
                        Cardano.Crypto.VRF.Simple
 
                        Cardano.Crypto.Libsodium
+                       Cardano.Crypto.Libsodium.C
+                       Cardano.Crypto.Libsodium.Constants
+                       Cardano.Crypto.Libsodium.DSIGN
+                       Cardano.Crypto.Libsodium.Hash
+                       Cardano.Crypto.Libsodium.Init
+                       Cardano.Crypto.Libsodium.Memory
+                       Cardano.Crypto.Libsodium.Memory.Internal
+                       Cardano.Crypto.Libsodium.MLockedBytes
+                       Cardano.Crypto.Libsodium.MLockedBytes.Internal
+                       Cardano.Crypto.Libsodium.UnsafeC
+
+                       Cardano.Foreign
 
   build-depends:       aeson
                      , base
@@ -67,7 +80,9 @@ library
                      , cryptonite
                      , deepseq
                      , integer-gmp
+                     , ghc-prim
                      , memory
+                     , primitive
                      , text
                      , transformers
                      , vector
@@ -92,6 +107,7 @@ test-suite test-memory-example
   main-is:             Main.hs
 
   build-depends:       base
+                     , bytestring
                      , cardano-crypto-class
 
   if os(linux) || os(osx)

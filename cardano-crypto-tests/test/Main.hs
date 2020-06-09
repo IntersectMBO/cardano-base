@@ -5,9 +5,12 @@ import qualified Test.Crypto.Hash (tests)
 import qualified Test.Crypto.KES (tests)
 import qualified Test.Crypto.VRF (tests)
 import Test.Tasty
+import Cardano.Crypto.Libsodium (sodiumInit)
 
 main :: IO ()
-main = defaultMain tests
+main = do
+    sodiumInit
+    defaultMain tests
 
 tests :: TestTree
 tests =
