@@ -48,6 +48,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
+>>>>>>> Cardano.Crypto.KES using libsodium bindings
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
