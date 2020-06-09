@@ -1,10 +1,15 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
+  , sizeHash
   , ByteString
   , Hash(..)
 
@@ -44,6 +49,7 @@ import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
+import GHC.TypeLits (Nat, KnownNat, natVal)
 
 import           Data.Word (Word8)
 import qualified Data.Bits as Bits
@@ -74,17 +80,19 @@ import           Cardano.Binary
                     serializeEncoding')
 
 
-class Typeable h => HashAlgorithm h where
+class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
       --TODO: eliminate this Typeable constraint needed only for the ToCBOR
       -- the ToCBOR should not need it either
+  -- size of hash digest
+  type SizeHash h :: Nat
 
   hashAlgorithmName :: proxy h -> String
 
-  -- | The size in bytes of the output of 'digest'
-  sizeHash :: proxy h -> Word
-
   digest :: proxy h -> ByteString -> ByteString
 
+-- | The size in bytes of the output of 'digest'
+sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
+sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
 newtype Hash h a = UnsafeHash ShortByteString
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
@@ -142,13 +150,6 @@ hashFromBytes bytes
   | otherwise
   = Nothing
 
-
--- | The representation of the hash as bytes, as a 'ShortByteString'.
---
-hashToBytesShort :: Hash h a -> ShortByteString
-hashToBytesShort (UnsafeHash h) = h
-
-
 -- | Make a hash from it bytes representation, as a 'ShortByteString'.
 --
 -- It must be a a bytestring of the correct length, as given by 'sizeHash'.
@@ -161,6 +162,12 @@ hashFromBytesShort bytes
 
   | otherwise
   = Nothing
+
+
+-- | The representation of the hash as bytes, as a 'ShortByteString'.
+--
+hashToBytesShort :: Hash h a -> ShortByteString
+hashToBytesShort (UnsafeHash h) = h
 
 
 --

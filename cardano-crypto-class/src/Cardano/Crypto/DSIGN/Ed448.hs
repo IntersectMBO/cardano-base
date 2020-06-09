@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
@@ -32,6 +33,11 @@ import Cardano.Crypto.Util (SignableRepresentation(..))
 data Ed448DSIGN
 
 instance DSIGNAlgorithm Ed448DSIGN where
+    type SeedSizeDSIGN Ed448DSIGN = 57
+    -- | Goldilocks points are 448 bits long
+    type SizeVerKeyDSIGN  Ed448DSIGN = 57
+    type SizeSignKeyDSIGN Ed448DSIGN = 57
+    type SizeSigDSIGN     Ed448DSIGN = 114
 
     --
     -- Key and signature types
@@ -80,7 +86,6 @@ instance DSIGNAlgorithm Ed448DSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _  = 57
     genKeyDSIGN seed =
         let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
          in SignKeyEd448DSIGN sk
@@ -88,11 +93,6 @@ instance DSIGNAlgorithm Ed448DSIGN where
     --
     -- raw serialise/deserialise
     --
-
-    -- | Goldilocks points are 448 bits long
-    sizeVerKeyDSIGN  _ = 57
-    sizeSignKeyDSIGN _ = 57
-    sizeSigDSIGN     _ = 114
 
     rawSerialiseVerKeyDSIGN   = BA.convert
     rawSerialiseSignKeyDSIGN  = BA.convert

@@ -27,6 +27,7 @@ library
                        Test.Crypto.KES
                        Test.Crypto.Util
                        Test.Crypto.VRF
+                       Test.Crypto.Instances
 
   build-depends:       base
                      , bytestring
@@ -38,6 +39,7 @@ library
                      , cryptonite
                      , formatting
                      , QuickCheck
+                     , quickcheck-instances
                      , tasty
                      , tasty-quickcheck
 

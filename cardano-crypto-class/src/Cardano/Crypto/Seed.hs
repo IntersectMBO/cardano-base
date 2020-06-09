@@ -35,7 +35,6 @@ import           Cardano.Crypto.Hash.Class (HashAlgorithm(digest))
 
 import           Cardano.Prelude (NoUnexpectedThunks)
 
-
 -- | A seed contains a finite number of bytes, and is used for seeding
 -- cryptographic algorithms including key generation.
 --
@@ -139,7 +138,5 @@ getRandomBytesFromSeed n =
           Identity $
             getBytesFromSeed (fromIntegral n) s
 
-
 instance MonadRandom MonadRandomFromSeed where
   getRandomBytes n = BA.convert <$> getRandomBytesFromSeed n
-

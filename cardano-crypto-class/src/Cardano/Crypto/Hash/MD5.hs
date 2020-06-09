@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PackageImports #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the MD5 hashing algorithm.
 module Cardano.Crypto.Hash.MD5
@@ -13,8 +15,8 @@ import qualified Data.ByteArray as BA
 data MD5
 
 instance HashAlgorithm MD5 where
+  type SizeHash MD5 = 16
   hashAlgorithmName _ = "md5"
-  sizeHash _ = 16
   digest _ = convert . H.hash
 
 convert :: H.Digest H.MD5 -> ByteString

@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 module Cardano.Crypto.Hash.NeverUsed (NeverHash) where
 
 import Cardano.Crypto.Hash.Class
@@ -8,6 +10,6 @@ import Cardano.Crypto.Hash.Class
 data NeverHash
 
 instance HashAlgorithm NeverHash where
+  type SizeHash NeverHash = 0
   hashAlgorithmName _ = "never"
-  sizeHash _ = 0
   digest = error "HASH not available"
