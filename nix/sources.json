@@ -27,12 +27,12 @@
         "branch": "nixos-20.03-small",
         "description": "Nix Packages collection",
         "homepage": null,
-        "owner": "nixos",
+        "owner": "NixOS",
         "repo": "nixpkgs",
         "rev": "92d5b1b55f68971ac3c6a13af308af3a0d39e30c",
         "sha256": "1da3qpkhsk7pajbkiccjlzw9a5p7b50d5ym6vv91i48s6xyk5671",
         "type": "tarball",
-        "url": "https://github.com/nixos/nixpkgs/archive/92d5b1b55f68971ac3c6a13af308af3a0d39e30c.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/92d5b1b55f68971ac3c6a13af308af3a0d39e30c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "rust-libs.nix": {
