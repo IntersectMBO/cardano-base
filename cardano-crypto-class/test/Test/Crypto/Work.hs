@@ -1,13 +1,18 @@
+{-# LANGUAGE DataKinds           #-}
 
 module Test.Crypto.Work(test1,test2,test3) where
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.Char (ord)
+
 import Cardano.Crypto.KES.Rust(
-  -- Local datatype used in the KESAlgorithm class
-   Seed,PublicKey, SecretKey, Signature,
    -- Local functions used in thr KESAlgorihm class
-   generate,verify,sign,uodate,period_from,compute_public,
+   generate, verify, sign, compute_public,
    -- IO version tah call the foreign functions, used in the tests
-   generateIO,verifyIO,signIO,updateIO,period_fromIO,compute_publicIO,
+   generateIO, verifyIO, signIO, compute_publicIO, createSeedIO,
+
+   RustKES
    )
 
 import Cardano.Crypto.KES.Class

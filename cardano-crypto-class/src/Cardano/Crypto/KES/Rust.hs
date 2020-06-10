@@ -13,13 +13,14 @@
 {-# LANGUAGE FlexibleContexts    #-}
 
 
-module Rust(
+module Cardano.Crypto.KES.Rust (
    -- Local datatype used in the KESAlgorithm class
    Seed,PublicKey, SecretKey, Signature,
    -- Local functions used in thr KESAlgorihm class
-   generate,verify,sign,uodate,period_from,compute_public,
+   generate, verify, sign, update, period_from, compute_public,
    -- IO version tah call the foreign functions, used in the tests
-   generateIO,verifyIO,signIO,updateIO,period_fromIO,compute_publicIO,
+   generateIO, verifyIO, signIO, updateIO, period_fromIO, compute_publicIO, createSeedIO,
+   RustKES
    )  where
 
 -- ==========================================================
