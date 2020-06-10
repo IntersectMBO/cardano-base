@@ -24,15 +24,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "nixos-20.03",
+        "branch": "nixos-20.03-small",
         "description": "A read-only mirror of NixOS/nixpkgs tracking the released channels. Send issues and PRs to",
         "homepage": "https://github.com/NixOS/nixpkgs",
         "owner": "nixos",
         "repo": "nixpkgs-channels",
-        "rev": "70717a337f7ae4e486ba71a500367cad697e5f09",
-        "sha256": "1sbmqn7yc5iilqnvy9nvhsa9bx6spfq1kndvvis9031723iyymd1",
+        "rev": "92d5b1b55f68971ac3c6a13af308af3a0d39e30c",
+        "sha256": "1da3qpkhsk7pajbkiccjlzw9a5p7b50d5ym6vv91i48s6xyk5671",
         "type": "tarball",
-        "url": "https://github.com/nixos/nixpkgs-channels/archive/70717a337f7ae4e486ba71a500367cad697e5f09.tar.gz",
+        "url": "https://github.com/nixos/nixpkgs-channels/archive/92d5b1b55f68971ac3c6a13af308af3a0d39e30c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "rust-libs.nix": {
