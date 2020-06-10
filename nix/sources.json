@@ -23,28 +23,16 @@
         "url": "https://github.com/input-output-hk/iohk-nix/archive/8eb95138be415ea7a02c80cc52cbc14edc0a9e05.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "naersk": {
-        "branch": "more-fixes",
-        "description": "Build rust crates in Nix. No configuration, no code generation, no IFD. Sandbox friendly.",
-        "homepage": "",
-        "owner": "input-output-hk",
-        "repo": "naersk",
-        "rev": "a3f5eb1b1d9326c4012260d50cda08ea6be17f67",
-        "sha256": "0kkfdzlvg29x4aic28jckpjqnh58j9fmvq7kh8w7i7746yslqvia",
-        "type": "tarball",
-        "url": "https://github.com/input-output-hk/naersk/archive/a3f5eb1b1d9326c4012260d50cda08ea6be17f67.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
     "nixpkgs": {
-        "branch": "nixos-20.03-iohk",
+        "branch": "nixos-20.03",
         "description": "A read-only mirror of NixOS/nixpkgs tracking the released channels. Send issues and PRs to",
         "homepage": "https://github.com/NixOS/nixpkgs",
-        "owner": "input-output-hk",
+        "owner": "nixos",
         "repo": "nixpkgs-channels",
-        "rev": "c0c42d3aa68dcd79d6d548f72f8322f197c7536e",
-        "sha256": "1wwkmq62v44gj8lqy5p8gnlxn1hw9zsc5anly2hfj36pff506g2i",
+        "rev": "70717a337f7ae4e486ba71a500367cad697e5f09",
+        "sha256": "1sbmqn7yc5iilqnvy9nvhsa9bx6spfq1kndvvis9031723iyymd1",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/nixpkgs-channels/archive/c0c42d3aa68dcd79d6d548f72f8322f197c7536e.tar.gz",
+        "url": "https://github.com/nixos/nixpkgs-channels/archive/70717a337f7ae4e486ba71a500367cad697e5f09.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "rust-libs.nix": {
@@ -53,10 +41,10 @@
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "rust-libs.nix",
-        "rev": "7909fd4f3cc5e645669a76bc13eff1b2e42c5ce6",
-        "sha256": "0nwrjs9a33lpbjh26rwxf9l0i3awjzmrnch6i78iagcn0sznr45h",
+        "rev": "5ef9d5431dd1279b101ff434ae129d9004d59dc1",
+        "sha256": "1kcqpwy2m3sg28wkknx4q31hm29wbp1ivgswax4gca204g9as7qb",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/rust-libs.nix/archive/7909fd4f3cc5e645669a76bc13eff1b2e42c5ce6.tar.gz",
+        "url": "https://github.com/input-output-hk/rust-libs.nix/archive/5ef9d5431dd1279b101ff434ae129d9004d59dc1.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "rust.nix": {
