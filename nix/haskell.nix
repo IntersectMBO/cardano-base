@@ -68,9 +68,19 @@ let
           find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
         done
         '';
+
+        # This one is not really rust related, it's libsodium, conceptually the
+        # same issue though.
+        packages.cardano-crypto-class.components.tests.test-memory-example.postInstall = ''
+        echo "Symlink kes-mmm-sumed25519 .dlls ..."
+        for p in ${lib.concatStringsSep " " [ pkgs.libsodium ]}; do
+          find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
+        done
+        '';
+
         packages.cardano-crypto-class.components.all.postInstall = lib.mkForce ''
         echo "Symlink kes-mmm-sumed25519 .dlls ..."
-        for p in ${lib.concatStringsSep " " [ pkgs.kes_mmm_sumed25519_c ]}; do
+        for p in ${lib.concatStringsSep " " [ pkgs.kes_mmm_sumed25519_c pkgs.libsodium ]}; do
           find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
         done
         '';
