@@ -41,10 +41,10 @@
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "rust-libs.nix",
-        "rev": "d92b71a470c5ecbf5ea5693712c9c8912751c94f",
-        "sha256": "1ws7npayca9lindl26hb31nbg26vnnkc1zhzwvhm2sfv58xvyq54",
+        "rev": "b561a88cda17e05a87defa360a18bb0e8240e0a9",
+        "sha256": "1jkjx41n2sz5j3pal8s1bhhqw5dcqnagqirf0hgqd9rzr1512vci",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/rust-libs.nix/archive/d92b71a470c5ecbf5ea5693712c9c8912751c94f.tar.gz",
+        "url": "https://github.com/input-output-hk/rust-libs.nix/archive/b561a88cda17e05a87defa360a18bb0e8240e0a9.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "rust.nix": {
@@ -53,10 +53,10 @@
         "homepage": "",
         "owner": "input-output-hk",
         "repo": "rust.nix",
-        "rev": "661cd18f3f3582d859435c813b2fe038a9a648ba",
-        "sha256": "1qp8w4by9j4bzhzsiza8592lhls5pdmdswd4hw8g2c92xarfcfsi",
+        "rev": "6959812b844b1cb98dc61fe1cbc8a83fd761cc8c",
+        "sha256": "1qhnzqp1d0zs2f9vkbscccmzyhh4nkq902xzvsphfgv15ismjk54",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/rust.nix/archive/661cd18f3f3582d859435c813b2fe038a9a648ba.tar.gz",
+        "url": "https://github.com/input-output-hk/rust.nix/archive/6959812b844b1cb98dc61fe1cbc8a83fd761cc8c.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

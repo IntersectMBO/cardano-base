@@ -59,15 +59,16 @@ let
         # them here.  This however means we'd have to do this by hand for each
         # rust dependency.  Not ideal.  Maybe haskell.nix should walk
         # dependencies, I'm not certain about the implications there though.
+
+        # This is not needed anymore since we now build fully static rust libs.
+        # (.lib suffix instead of .a)
         #
-        # TODO: figure out why rust won't build window static libs.
-        #
-        packages.cardano-crypto-class.components.tests.test-crypto.postInstall = ''
-        echo "Symlink kes-mmm-sumed25519 .dlls ..."
-        for p in ${lib.concatStringsSep " " [ pkgs.kes_mmm_sumed25519_c ]}; do
-          find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
-        done
-        '';
+        # packages.cardano-crypto-class.components.tests.test-crypto.postInstall = ''
+        # echo "Symlink kes-mmm-sumed25519 .dlls ..."
+        # for p in ${lib.concatStringsSep " " [ pkgs.kes_mmm_sumed25519_c ]}; do
+        #   find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
+        # done
+        # '';
 
         # This one is not really rust related, it's libsodium, conceptually the
         # same issue though.
