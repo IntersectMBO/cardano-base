@@ -68,6 +68,12 @@ let
           find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
         done
         '';
+        packages.cardano-crypto-class.components.all.postInstall = lib.mkForce ''
+        echo "Symlink kes-mmm-sumed25519 .dlls ..."
+        for p in ${lib.concatStringsSep " " [ pkgs.kes_mmm_sumed25519_c ]}; do
+          find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
+        done
+        '';
 
         # Disable cabal-doctest tests by turning off custom setups
         packages.comonad.package.buildType = lib.mkForce "Simple";
