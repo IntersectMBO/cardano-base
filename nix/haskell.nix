@@ -5,6 +5,7 @@
 , stdenv
 , haskell-nix
 , buildPackages
+, pkgs
 , config ? {}
 # GHC attribute name
 , compiler ? config.haskellNix.compiler or "ghc865"
@@ -51,6 +52,23 @@ let
         enableLibraryProfiling = profiling;
       }
       (lib.optionalAttrs stdenv.hostPlatform.isWindows {
+
+        # This is a bit fragile but will work for now.  In haskell.nix we only
+        # collect the .dll's as referenced in the package database files, this
+        # means that for rust libraries we will miss them.  Thus we are copying
+        # them here.  This however means we'd have to do this by hand for each
+        # rust dependency.  Not ideal.  Maybe haskell.nix should walk
+        # dependencies, I'm not certain about the implications there though.
+        #
+        # TODO: figure out why rust won't build window static libs.
+        #
+        packages.cardano-crypto-class.components.tests.test-crypto.postInstall = ''
+        echo "Symlink kes-mmm-sumed25519 .dlls ..."
+        for p in ${lib.concatStringsSep " " [ pkgs.kes_mmm_sumed25519_c ]}; do
+          find "$p" -iname '*.dll' -exec ln -s {} $out/bin \;
+        done
+        '';
+
         # Disable cabal-doctest tests by turning off custom setups
         packages.comonad.package.buildType = lib.mkForce "Simple";
         packages.distributive.package.buildType = lib.mkForce "Simple";

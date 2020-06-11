@@ -6,6 +6,7 @@ pkgs: _: with pkgs; {
       stdenv
       haskell-nix
       buildPackages
+      pkgs
       ;
   };
 }
