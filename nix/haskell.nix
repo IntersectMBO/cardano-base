@@ -17,7 +17,7 @@ let
   # https://input-output-hk.github.io/haskell.nix/user-guide/projects/
   pkgSet = haskell-nix.cabalProject {
     src = haskell-nix.haskellLib.cleanGit { src = ../.; name = "cardano-base"; };
-    ghc = buildPackages.haskell-nix.compiler.${compiler};
+    compiler-nix-name = compiler;
     modules = [
 
       # Allow reinstallation of Win32
