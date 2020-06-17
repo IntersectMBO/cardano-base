@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -21,7 +22,7 @@ import           Data.Proxy (Proxy (..))
 import           GHC.Generics (Generic)
 import           Numeric.Natural (Natural)
 
-import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..))
+import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..), force)
 import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 
 import           Crypto.Number.Generate (generateBetween)
@@ -46,9 +47,19 @@ curve = C.getCurveByName C.SEC_t113r1
 q :: Integer
 q = C.ecc_n $ C.common_curve curve
 
-newtype Point = Point C.Point
+newtype Point = ThunkyPoint C.Point
   deriving (Eq, Generic)
   deriving NoUnexpectedThunks via UseIsNormalForm C.Point
+
+-- | Smart constructor for @Point@ that evaluates the wrapped 'C.Point' to
+-- normal form. This is needed because 'C.Point' has a constructor with two
+-- 'Integer' arguments that don't have bangs on them.
+pattern Point :: C.Point -> Point
+pattern Point p <- ThunkyPoint p
+  where
+    Point p = ThunkyPoint (force p)
+
+{-# COMPLETE Point #-}
 
 instance Show Point where
   show (Point p) = show p
@@ -105,9 +116,9 @@ instance VRFAlgorithm SimpleVRF where
 
   data CertVRF SimpleVRF
     = CertSimpleVRF
-        { certU :: Point    -- 15 byte point numbers, round up to 16
-        , certC :: Natural  -- md5 hash, so 16 bytes
-        , certS :: Integer  -- at most q, so 15 bytes, round up to 16
+        { certU :: !Point    -- 15 byte point numbers, round up to 16
+        , certC :: !Natural  -- md5 hash, so 16 bytes
+        , certS :: !Integer  -- at most q, so 15 bytes, round up to 16
         }
     deriving stock    (Show, Eq, Generic)
     deriving anyclass (NoUnexpectedThunks)

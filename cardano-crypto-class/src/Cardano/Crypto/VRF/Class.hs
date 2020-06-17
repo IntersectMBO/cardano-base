@@ -210,8 +210,8 @@ decodeCertVRF = do
 
 data CertifiedVRF v a
   = CertifiedVRF
-      { certifiedNatural :: Natural
-      , certifiedProof :: CertVRF v
+      { certifiedNatural :: !Natural
+      , certifiedProof :: !(CertVRF v)
       }
   deriving Generic
 
