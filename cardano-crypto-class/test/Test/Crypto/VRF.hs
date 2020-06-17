@@ -110,6 +110,12 @@ testVRFAlgorithm _ n =
       , testProperty "verify positive" $ prop_vrf_verify_pos @Int @v
       , testProperty "verify negative" $ prop_vrf_verify_neg @Int @v
       ]
+
+    , testGroup "NoUnexpectedThunks"
+      [ testProperty "VerKey"  $ prop_no_unexpected_thunks @(VerKeyVRF v)
+      , testProperty "SignKey" $ prop_no_unexpected_thunks @(SignKeyVRF v)
+      , testProperty "Cert"    $ prop_no_unexpected_thunks @(CertVRF v)
+      ]
     ]
 
 prop_vrf_max

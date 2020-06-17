@@ -147,6 +147,12 @@ testKESAlgorithm _p n =
       , testProperty "SignKey" $ prop_serialise_SignKeyKES @v
       , testProperty "Sig"     $ prop_serialise_SigKES     @v @Int
       ]
+
+    , testGroup "NoUnexpectedThunks"
+      [ testProperty "VerKey"  $ prop_no_unexpected_thunks @(VerKeyKES v)
+      , testProperty "SignKey" $ prop_no_unexpected_thunks @(SignKeyKES v)
+      , testProperty "Sig"     $ prop_no_unexpected_thunks @(SigKES v)
+      ]
     ]
 
 

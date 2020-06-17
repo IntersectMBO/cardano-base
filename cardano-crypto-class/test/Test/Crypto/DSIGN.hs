@@ -115,6 +115,12 @@ testDSIGNAlgorithm _ n =
       , testProperty "verify newgative (wrong key)" $ prop_dsign_verify_neg_key @Int @v
       , testProperty "verify newgative (wrong message)" $ prop_dsign_verify_neg_msg @Int @v
       ]
+
+    , testGroup "NoUnexpectedThunks"
+      [ testProperty "VerKey"  $ prop_no_unexpected_thunks @(VerKeyDSIGN v)
+      , testProperty "SignKey" $ prop_no_unexpected_thunks @(SignKeyDSIGN v)
+      , testProperty "Sig"     $ prop_no_unexpected_thunks @(SigDSIGN v)
+      ]
     ]
 
 

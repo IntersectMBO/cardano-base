@@ -13,7 +13,7 @@ import Cardano.Crypto.Hash
 import qualified Data.ByteString as SB
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
-import Test.Crypto.Util (prop_cbor, prop_cbor_size)
+import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_unexpected_thunks)
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
@@ -42,6 +42,7 @@ testHashAlgorithm _ n =
     , testProperty "serialise" $ prop_hash_cbor @h
     , testProperty "ToCBOR size" $ prop_hash_cbor_size @h
     , testProperty "show/fromString" $ prop_hash_show_fromString @h @Float
+    , testProperty "NoUnexpectedThunks" $ prop_no_unexpected_thunks @(Hash h Int)
     ]
 
 prop_hash_cbor :: HashAlgorithm h => Hash h Int -> Property
