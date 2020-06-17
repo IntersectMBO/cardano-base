@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -13,7 +14,7 @@
 module Cardano.Crypto.KES.Simple
   ( SimpleKES
   , SigKES (..)
-  , SignKeyKES (..)
+  , SignKeyKES (SignKeySimpleKES, ThunkySignKeySimpleKES)
   )
 where
 
@@ -26,7 +27,7 @@ import qualified Data.Vector as Vec
 import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal)
 
-import           Cardano.Prelude (NoUnexpectedThunks)
+import           Cardano.Prelude (NoUnexpectedThunks, forceElemsToWHNF)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.DSIGN
@@ -38,6 +39,27 @@ import           Cardano.Crypto.Util
 
 data SimpleKES d (t :: Nat)
 
+-- | 'VerKeySimpleKES' uses a boxed 'Vector', which is lazy in its elements.
+-- We don't want laziness and the potential space leak, so we use this pattern
+-- synonym to force the elements of the vector to WHNF upon construction.
+--
+-- The alternative is to use an unboxed vector, but that would require an
+-- unreasonable 'Unbox' constraint.
+pattern VerKeySimpleKES :: Vector (VerKeyDSIGN d) -> VerKeyKES (SimpleKES d t)
+pattern VerKeySimpleKES v <- ThunkyVerKeySimpleKES v
+  where
+    VerKeySimpleKES v = ThunkyVerKeySimpleKES (forceElemsToWHNF v)
+
+{-# COMPLETE VerKeySimpleKES #-}
+
+-- | See 'VerKeySimpleKES'.
+pattern SignKeySimpleKES :: Vector (SignKeyDSIGN d) -> SignKeyKES (SimpleKES d t)
+pattern SignKeySimpleKES v <- ThunkySignKeySimpleKES v
+  where
+    SignKeySimpleKES v = ThunkySignKeySimpleKES (forceElemsToWHNF v)
+
+{-# COMPLETE SignKeySimpleKES #-}
+
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
          KESAlgorithm (SimpleKES d t) where
 
@@ -47,11 +69,11 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
     --
 
     newtype VerKeyKES (SimpleKES d t) =
-              VerKeySimpleKES (Vector (VerKeyDSIGN d))
+              ThunkyVerKeySimpleKES (Vector (VerKeyDSIGN d))
         deriving Generic
 
     newtype SignKeyKES (SimpleKES d t) =
-              SignKeySimpleKES (Vector (SignKeyDSIGN d))
+              ThunkySignKeySimpleKES (Vector (SignKeyDSIGN d))
         deriving Generic
 
     newtype SigKES (SimpleKES d t) =
