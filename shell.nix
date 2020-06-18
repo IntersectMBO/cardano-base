@@ -18,6 +18,7 @@ let
     packages = ps: with ps; [
        cardano-binary
        cardano-crypto-class
+       cardano-crypto-praos
        cardano-slotting
     ];
 

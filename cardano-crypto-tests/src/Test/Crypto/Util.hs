@@ -63,6 +63,7 @@ import Test.QuickCheck
   , shrink
   , vector
   )
+import Formatting.Buildable (Buildable (..))
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -113,7 +114,10 @@ prop_cbor_size a = counterexample (show lo ++ " ≰ " ++ show len) (lo <= len)
   where
     len, lo, hi :: Natural
     len = fromIntegral $ BS.length (toStrictByteString (toCBOR a))
-    Right (Range {lo, hi}) = szSimplify $ encodedSizeExpr szGreedy (Proxy :: Proxy a)
+    Range {lo, hi} =
+      case szSimplify $ encodedSizeExpr szGreedy (Proxy :: Proxy a) of
+        Right x -> x
+        Left err -> error . show . build $ err
 
 
 prop_cbor_with :: (Eq a, Show a)

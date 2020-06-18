@@ -37,7 +37,6 @@ where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Numeric.Natural
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
@@ -57,6 +56,7 @@ import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Seed (Seed)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
 
+type OutputVRF = ByteString
 
 class ( Typeable v
       , Show (VerKeyVRF v)
@@ -91,7 +91,6 @@ class ( Typeable v
   hashVerKeyVRF :: HashAlgorithm h => VerKeyVRF v -> Hash h (VerKeyVRF v)
   hashVerKeyVRF = hashRaw rawSerialiseVerKeyVRF
 
-
   --
   -- Core algorithm operations
   --
@@ -110,26 +109,31 @@ class ( Typeable v
     => ContextVRF v
     -> a
     -> SignKeyVRF v
-    -> m (Natural, CertVRF v)
+    -> m (OutputVRF, CertVRF v)
 
   verifyVRF
     :: (HasCallStack, Signable v a)
     => ContextVRF v
     -> VerKeyVRF v
     -> a
-    -> (Natural, CertVRF v)
+    -> (OutputVRF, CertVRF v)
     -> Bool
-
-  maxVRF :: proxy v -> Natural
-
 
   --
   -- Key generation
   --
 
   genKeyVRF :: Seed -> SignKeyVRF v
+  genKeyPairVRF :: Seed -> (SignKeyVRF v, VerKeyVRF v)
 
-  -- | The upper bound on the 'Seed' size needed by 'genKeyVRF'
+  genKeyVRF =
+    fst . genKeyPairVRF
+
+  genKeyPairVRF = \seed ->
+    let sk = genKeyVRF seed
+    in (sk, deriveVerKeyVRF sk)
+
+  -- | The upper bound on the 'Seed' size needed by 'genKeyVRF', in bytes.
   seedSizeVRF :: proxy v -> Word
 
 
@@ -140,6 +144,7 @@ class ( Typeable v
   sizeVerKeyVRF  :: proxy v -> Word
   sizeSignKeyVRF :: proxy v -> Word
   sizeCertVRF    :: proxy v -> Word
+  sizeOutputVRF  :: proxy v -> Word
 
   rawSerialiseVerKeyVRF    :: VerKeyVRF  v -> ByteString
   rawSerialiseSignKeyVRF   :: SignKeyVRF v -> ByteString
@@ -148,6 +153,25 @@ class ( Typeable v
   rawDeserialiseVerKeyVRF  :: ByteString -> Maybe (VerKeyVRF  v)
   rawDeserialiseSignKeyVRF :: ByteString -> Maybe (SignKeyVRF v)
   rawDeserialiseCertVRF    :: ByteString -> Maybe (CertVRF    v)
+
+  {-# MINIMAL
+        algorithmNameVRF
+      , deriveVerKeyVRF
+      , evalVRF
+      , verifyVRF
+      , seedSizeVRF
+      , (genKeyVRF                | genKeyPairVRF)
+      , rawSerialiseVerKeyVRF
+      , rawSerialiseSignKeyVRF
+      , rawSerialiseCertVRF
+      , rawDeserialiseVerKeyVRF
+      , rawDeserialiseSignKeyVRF
+      , rawDeserialiseCertVRF
+      , sizeVerKeyVRF
+      , sizeSignKeyVRF
+      , sizeCertVRF
+      , sizeOutputVRF
+    #-}
 
 
 --
@@ -207,10 +231,9 @@ decodeCertVRF = do
           expected = fromIntegral (sizeCertVRF (Proxy :: Proxy v))
           actual   = BS.length bs
 
-
 data CertifiedVRF v a
   = CertifiedVRF
-      { certifiedNatural :: !Natural
+      { certifiedOutput :: !OutputVRF
       , certifiedProof :: !(CertVRF v)
       }
   deriving Generic
@@ -224,17 +247,17 @@ instance VRFAlgorithm v => NoUnexpectedThunks (CertifiedVRF v a)
 instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
   toCBOR cvrf =
     encodeListLen 2 <>
-      toCBOR (certifiedNatural cvrf) <>
+      toCBOR (certifiedOutput cvrf) <>
       encodeCertVRF (certifiedProof cvrf)
 
   encodedSizeExpr _size proxy =
         1
-      + certifiedNaturalSize (certifiedNatural <$> proxy)
+      + certifiedOutputSize (certifiedOutput <$> proxy)
       + fromIntegral (sizeCertVRF (Proxy :: Proxy v))
     where
-      certifiedNaturalSize :: Proxy Natural -> Size
-      certifiedNaturalSize _proxy =
-        fromIntegral $ (withWordSize :: Natural -> Integer) (maxVRF (Proxy :: Proxy v))
+      certifiedOutputSize :: Proxy OutputVRF -> Size
+      certifiedOutputSize _proxy =
+        fromIntegral $ sizeOutputVRF (Proxy :: Proxy v)
 
 instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
   fromCBOR =
@@ -258,7 +281,7 @@ verifyCertified
   -> a
   -> CertifiedVRF v a
   -> Bool
-verifyCertified ctxt vk a CertifiedVRF {..} = verifyVRF ctxt vk a (certifiedNatural, certifiedProof)
+verifyCertified ctxt vk a CertifiedVRF {..} = verifyVRF ctxt vk a (certifiedOutput, certifiedProof)
 
 --
 -- 'Size' expressions for 'ToCBOR' instances

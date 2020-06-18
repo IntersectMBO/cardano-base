@@ -13,9 +13,10 @@ where
 
 import Cardano.Binary (FromCBOR, ToCBOR (..))
 import Cardano.Crypto.VRF
+import Cardano.Crypto.VRF.Praos
 import Data.Proxy (Proxy (..))
 import Test.Crypto.Util
-import Test.QuickCheck ((==>), Arbitrary(..), Gen, Property, counterexample)
+import Test.QuickCheck ((==>), Arbitrary(..), Gen, Property {-, counterexample -})
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -27,6 +28,7 @@ tests =
   testGroup "Crypto.VRF"
     [ testVRFAlgorithm (Proxy :: Proxy MockVRF) "MockVRF"
     , testVRFAlgorithm (Proxy :: Proxy SimpleVRF) "SimpleVRF"
+    , testVRFAlgorithm (Proxy :: Proxy PraosVRF) "PraosVRF"
     ]
 
 testVRFAlgorithm
@@ -106,8 +108,11 @@ testVRFAlgorithm _ n =
       ]
 
     , testGroup "verify"
-      [ testProperty "max" $ prop_vrf_max @Int @v
-      , testProperty "verify positive" $ prop_vrf_verify_pos @Int @v
+      [ -- NOTE: we no longer test against maxVRF, because the maximum numeric
+        -- value isn't actually what we're interested in, as long as all
+        -- keys/hashes have the correct sizes, which 'prop_size_serialise'
+        -- tests already.
+        testProperty "verify positive" $ prop_vrf_verify_pos @Int @v
       , testProperty "verify negative" $ prop_vrf_verify_neg @Int @v
       ]
 
@@ -117,17 +122,6 @@ testVRFAlgorithm _ n =
       , testProperty "Cert"    $ prop_no_unexpected_thunks @(CertVRF v)
       ]
     ]
-
-prop_vrf_max
-  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => TestSeed
-  -> a
-  -> SignKeyVRF v
-  -> Property
-prop_vrf_max seed a sk =
-  let (y, _) = withTestSeed seed $ evalVRF () a sk
-      m = maxVRF (Proxy :: Proxy v)
-  in counterexample ("expected " ++ show y ++ " <= " ++ show m) $ y <= m
 
 prop_vrf_verify_pos
   :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
