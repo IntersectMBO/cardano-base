@@ -13,7 +13,6 @@ module Cardano.Crypto.VRF.Mock
 where
 
 import Data.Word (Word64)
-import Numeric.Natural (Natural)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 
@@ -24,7 +23,6 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Util
 import Cardano.Crypto.Seed
 import Cardano.Crypto.VRF.Class
-
 
 data MockVRF
 
@@ -62,7 +60,7 @@ instance VRFAlgorithm MockVRF where
 
   verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
-  maxVRF _ = 2 ^ (8 * sizeHash (Proxy :: Proxy MD5)) - 1
+  sizeOutputVRF _ = sizeHash (Proxy :: Proxy MD5)
 
   --
   -- Key generation
@@ -133,7 +131,7 @@ instance FromCBOR (CertVRF MockVRF) where
   fromCBOR = decodeCertVRF
 
 
-evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (Natural, CertVRF MockVRF)
+evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (ByteString, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
-  let y = fromHash $ hashWithSerialiser @MD5 id $ toCBOR a <> toCBOR sk
+  let y = getHash $ hashWithSerialiser @MD5 id $ toCBOR a <> toCBOR sk
   in (y, CertMockVRF n)

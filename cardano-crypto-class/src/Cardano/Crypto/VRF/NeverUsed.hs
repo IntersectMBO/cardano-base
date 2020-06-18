@@ -42,7 +42,7 @@ instance VRFAlgorithm NeverVRF where
 
   verifyVRF = error "VRF unavailable"
 
-  maxVRF _ = 0
+  sizeOutputVRF _ = 0
 
   genKeyVRF _ = NeverUsedSignKeyVRF
   seedSizeVRF _ = 0

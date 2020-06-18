@@ -85,41 +85,6 @@ library
   if (!flag(development))
     ghc-options:         -Werror
 
-test-suite test-crypto
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Main.hs
-  other-modules:
-                       Test.Crypto.DSIGN
-                       Test.Crypto.Hash
-                       Test.Crypto.KES
-                       Test.Crypto.Util
-                       Test.Crypto.VRF
-
-  build-depends:       base
-                     , bytestring
-                     , cardano-binary
-                     , cardano-crypto-class
-                     , cardano-prelude
-                     , cborg
-                     , cryptonite
-                     , QuickCheck
-                     , tasty
-                     , tasty-quickcheck
-
-  default-language:    Haskell2010
-
-  ghc-options:         -Weverything
-                       -Wno-incomplete-uni-patterns
-                       -fno-warn-all-missed-specialisations
-                       -fno-warn-implicit-prelude
-                       -fno-warn-missing-import-lists
-                       -fno-warn-safe
-                       -fno-warn-unsafe
-
-  if (!flag(development))
-    ghc-options:         -Werror
-
 test-suite test-memory-example
   type:                exitcode-stdio-1.0
   hs-source-dirs:      memory-example
