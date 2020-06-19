@@ -14,8 +14,11 @@ module Cardano.Crypto.VRF.Class
   (
     -- * VRF algorithm class
     VRFAlgorithm (..)
+
+    -- ** VRF output
   , OutputVRF(..)
   , getOutputVRFNatural
+  , mkTestOutputVRF
 
     -- * 'CertifiedVRF' wrapper
   , CertifiedVRF (..)
@@ -56,7 +59,7 @@ import Cardano.Binary
 
 import Crypto.Random (MonadRandom)
 
-import Cardano.Crypto.Util (Empty, bytesToNatural)
+import Cardano.Crypto.Util (Empty, bytesToNatural, naturalToBytes)
 import Cardano.Crypto.Seed (Seed)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
 
@@ -192,6 +195,14 @@ newtype OutputVRF v = OutputVRF { getOutputVRFBytes :: ByteString }
 getOutputVRFNatural :: OutputVRF v -> Natural
 getOutputVRFNatural = bytesToNatural . getOutputVRFBytes
 
+-- | For testing purposes, make an 'OutputVRF' from a 'Natural'.
+--
+-- The 'OutputVRF' will be of the appropriate size for the 'VRFAlgorithm'.
+--
+mkTestOutputVRF :: forall v. VRFAlgorithm v => Natural -> OutputVRF v
+mkTestOutputVRF = OutputVRF . naturalToBytes sz
+  where
+    sz = fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
 
 --
 -- Convenient CBOR encoding/decoding

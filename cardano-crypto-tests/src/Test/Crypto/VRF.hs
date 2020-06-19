@@ -21,7 +21,9 @@ import Data.Word (Word8, Word64)
 import Data.Proxy (Proxy (..))
 
 import Test.Crypto.Util
-import Test.QuickCheck ((==>), Arbitrary(..), Gen, Property, NonNegative(..))
+import Test.QuickCheck
+         ((==>), (===), Arbitrary(..), Gen, Property,  NonNegative(..),
+          counterexample)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -126,6 +128,10 @@ testVRFAlgorithm _ n =
       , testProperty "verify negative" $ prop_vrf_verify_neg @Int @v
       ]
 
+    , testGroup "output"
+      [ testProperty "mkTestOutputVRF" $ prop_vrf_output_natural @Int @v
+      ]
+
     , testGroup "NoUnexpectedThunks"
       [ testProperty "VerKey"  $ prop_no_unexpected_thunks @(VerKeyVRF v)
       , testProperty "SignKey" $ prop_no_unexpected_thunks @(SignKeyVRF v)
@@ -158,6 +164,17 @@ prop_vrf_verify_neg seed a sk sk' =
         vk = deriveVerKeyVRF sk
     in not $ verifyVRF () vk a (y, c)
 
+prop_vrf_output_natural
+  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
+  => TestSeed
+  -> a
+  -> SignKeyVRF v
+  -> Property
+prop_vrf_output_natural seed a sk =
+  let (out, _c) = withTestSeed seed $ evalVRF () a sk
+      n         = getOutputVRFNatural out
+   in counterexample (show n) $
+      mkTestOutputVRF n === out
 
 --
 -- Natural <-> bytes conversion
