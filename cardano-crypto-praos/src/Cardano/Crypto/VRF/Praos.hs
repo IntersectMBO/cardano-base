@@ -433,7 +433,8 @@ instance VRFAlgorithm PraosVRF where
     let msgBS = serialize' msg
     proof <- maybe (error "Invalid Key") pure $ prove sk msgBS
     output <- maybe (error "Invalid Proof") pure $ outputFromProof proof
-    return $ output `seq` proof `seq` (outputBytes output, CertPraosVRF proof)
+    return $ output `seq` proof `seq`
+             (OutputVRF (outputBytes output), CertPraosVRF proof)
 
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
     isJust $! verify pk proof (serialize' msg)

@@ -131,7 +131,10 @@ instance FromCBOR (CertVRF MockVRF) where
   fromCBOR = decodeCertVRF
 
 
-evalVRF' :: ToCBOR a => a -> SignKeyVRF MockVRF -> (ByteString, CertVRF MockVRF)
+evalVRF' :: ToCBOR a
+         => a
+         -> SignKeyVRF MockVRF
+         -> (OutputVRF MockVRF, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
   let y = getHash $ hashWithSerialiser @MD5 id $ toCBOR a <> toCBOR sk
-  in (y, CertMockVRF n)
+  in (OutputVRF y, CertMockVRF n)

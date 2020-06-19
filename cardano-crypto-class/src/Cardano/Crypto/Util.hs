@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
 
 module Cardano.Crypto.Util
   ( Empty
@@ -11,6 +12,10 @@ module Cardano.Crypto.Util
   , readBinaryNatural
   , writeBinaryNatural
   , splitsAt
+
+  -- * Low level conversions
+  , bytesToNatural
+  , naturalToBytes
   )
 where
 
@@ -18,7 +23,14 @@ import           Data.Word
 import           Numeric.Natural
 import           Data.Bits
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
 import           Data.ByteString (ByteString)
+
+import qualified GHC.Exts    as GHC
+import qualified GHC.IO      as GHC (unsafeDupablePerformIO)
+import qualified GHC.Natural as GHC
+import qualified GHC.Integer.GMP.Internals as GMP
+import           Foreign.ForeignPtr (withForeignPtr)
 
 import           Crypto.Random (MonadRandom (..))
 
@@ -70,3 +82,29 @@ splitsAt szs0 bs0 =
     go !off (sz:szs) bs
       | BS.length bs >= sz = BS.take sz bs : go (off+sz) szs (BS.drop sz bs)
       | otherwise          = []
+
+-- | Create a 'Natural' out of a 'ByteString', in big endian.
+--
+-- This is fast enough to use in production.
+--
+bytesToNatural :: ByteString -> Natural
+bytesToNatural = GHC.naturalFromInteger . bytesToInteger
+
+-- | The inverse of 'bytesToNatural'. Note that this is a naive implementation
+-- and only suitable for tests.
+--
+naturalToBytes :: Int -> Natural -> ByteString
+naturalToBytes = writeBinaryNatural
+
+bytesToInteger :: ByteString -> Integer
+bytesToInteger (BS.PS fp (GHC.I# off#) (GHC.I# len#)) =
+    -- This should be safe since we're simply reading from ByteString (which is
+    -- immutable) and GMP allocates a new memory for the Integer, i.e., there is
+    -- no mutation involved.
+    GHC.unsafeDupablePerformIO $
+      withForeignPtr fp $ \(GHC.Ptr addr#) ->
+        let addrOff# = addr# `GHC.plusAddr#` off#
+        -- The last parmaeter (`1#`) tells the import function to use big
+        -- endian encoding.
+        in GMP.importIntegerFromAddr addrOff# (GHC.int2Word# len#) 1#
+

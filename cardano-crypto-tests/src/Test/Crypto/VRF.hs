@@ -14,9 +14,14 @@ where
 import Cardano.Binary (FromCBOR, ToCBOR (..))
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
+import Cardano.Crypto.Util
+
+import qualified Data.ByteString as BS
+import Data.Word (Word8, Word64)
 import Data.Proxy (Proxy (..))
+
 import Test.Crypto.Util
-import Test.QuickCheck ((==>), Arbitrary(..), Gen, Property {-, counterexample -})
+import Test.QuickCheck ((==>), Arbitrary(..), Gen, Property, NonNegative(..))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -29,6 +34,11 @@ tests =
     [ testVRFAlgorithm (Proxy :: Proxy MockVRF) "MockVRF"
     , testVRFAlgorithm (Proxy :: Proxy SimpleVRF) "SimpleVRF"
     , testVRFAlgorithm (Proxy :: Proxy PraosVRF) "PraosVRF"
+
+    , testGroup "OutputVRF"
+      [ testProperty "bytesToNatural" prop_bytesToNatural
+      , testProperty "naturalToBytes" prop_naturalToBytes
+      ]
     ]
 
 testVRFAlgorithm
@@ -147,6 +157,22 @@ prop_vrf_verify_neg seed a sk sk' =
     let (y, c) = withTestSeed seed $ evalVRF () a sk'
         vk = deriveVerKeyVRF sk
     in not $ verifyVRF () vk a (y, c)
+
+
+--
+-- Natural <-> bytes conversion
+--
+
+prop_bytesToNatural :: [Word8] -> Bool
+prop_bytesToNatural ws =
+    naturalToBytes (BS.length bs) (bytesToNatural bs) == bs
+  where
+    bs = BS.pack ws
+
+prop_naturalToBytes :: NonNegative Int -> Word64 -> Property
+prop_naturalToBytes (NonNegative sz) n =
+    sz >= 8 ==>
+      bytesToNatural (naturalToBytes sz (fromIntegral n)) == fromIntegral n
 
 
 --
