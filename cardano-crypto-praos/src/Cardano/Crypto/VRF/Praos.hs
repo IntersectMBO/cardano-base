@@ -439,7 +439,7 @@ instance VRFAlgorithm PraosVRF where
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
     isJust $! verify pk proof (serialize' msg)
 
-  sizeOutputVRF _ = fromIntegral crypto_vrf_proofbytes
+  sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_seedbytes
 
   genKeyPairVRF = \cryptoseed ->
