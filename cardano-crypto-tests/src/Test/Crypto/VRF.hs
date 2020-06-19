@@ -129,7 +129,8 @@ testVRFAlgorithm _ n =
       ]
 
     , testGroup "output"
-      [ testProperty "mkTestOutputVRF" $ prop_vrf_output_natural @Int @v
+      [ testProperty "sizeOutputVRF"   $ prop_vrf_output_size    @Int @v
+      , testProperty "mkTestOutputVRF" $ prop_vrf_output_natural @Int @v
       ]
 
     , testGroup "NoUnexpectedThunks"
@@ -163,6 +164,18 @@ prop_vrf_verify_neg seed a sk sk' =
     let (y, c) = withTestSeed seed $ evalVRF () a sk'
         vk = deriveVerKeyVRF sk
     in not $ verifyVRF () vk a (y, c)
+
+
+prop_vrf_output_size
+  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
+  => TestSeed
+  -> a
+  -> SignKeyVRF v
+  -> Property
+prop_vrf_output_size seed a sk =
+  let (out, _c) = withTestSeed seed $ evalVRF () a sk
+   in     BS.length (getOutputVRFBytes out)
+      === fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
 
 prop_vrf_output_natural
   :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
