@@ -169,9 +169,9 @@ instance VRFAlgorithm SimpleVRF where
     r <- getR
     let c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
         s = mod (r + k * fromIntegral (bsToNat c)) q
-    return (y, CertSimpleVRF u (bsToNat c) s)
+    return (OutputVRF y, CertSimpleVRF u (bsToNat c) s)
 
-  verifyVRF () (VerKeySimpleVRF v) a (y, cert) =
+  verifyVRF () (VerKeySimpleVRF v) a (OutputVRF y, cert) =
     let u = certU cert
         c = certC cert
         c' = -fromIntegral c

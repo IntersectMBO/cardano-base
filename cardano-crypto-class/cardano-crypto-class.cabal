@@ -66,6 +66,7 @@ library
                      , cardano-prelude
                      , cryptonite
                      , deepseq
+                     , integer-gmp
                      , memory
                      , text
                      , transformers

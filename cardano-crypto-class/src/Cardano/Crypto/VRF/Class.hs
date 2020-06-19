@@ -1,6 +1,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -13,6 +14,11 @@ module Cardano.Crypto.VRF.Class
   (
     -- * VRF algorithm class
     VRFAlgorithm (..)
+
+    -- ** VRF output
+  , OutputVRF(..)
+  , getOutputVRFNatural
+  , mkTestOutputVRF
 
     -- * 'CertifiedVRF' wrapper
   , CertifiedVRF (..)
@@ -40,6 +46,7 @@ import qualified Data.ByteString as BS
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
+import Numeric.Natural (Natural)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
@@ -52,11 +59,10 @@ import Cardano.Binary
 
 import Crypto.Random (MonadRandom)
 
-import Cardano.Crypto.Util (Empty)
+import Cardano.Crypto.Util (Empty, bytesToNatural, naturalToBytes)
 import Cardano.Crypto.Seed (Seed)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
 
-type OutputVRF = ByteString
 
 class ( Typeable v
       , Show (VerKeyVRF v)
@@ -109,14 +115,14 @@ class ( Typeable v
     => ContextVRF v
     -> a
     -> SignKeyVRF v
-    -> m (OutputVRF, CertVRF v)
+    -> m (OutputVRF v, CertVRF v)
 
   verifyVRF
     :: (HasCallStack, Signable v a)
     => ContextVRF v
     -> VerKeyVRF v
     -> a
-    -> (OutputVRF, CertVRF v)
+    -> (OutputVRF v, CertVRF v)
     -> Bool
 
   --
@@ -173,6 +179,30 @@ class ( Typeable v
       , sizeOutputVRF
     #-}
 
+-- | The output bytes of the VRF.
+--
+-- The output size is a fixed number of bytes and is given by 'sizeOutputVRF'.
+--
+newtype OutputVRF v = OutputVRF { getOutputVRFBytes :: ByteString }
+  deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoUnexpectedThunks)
+
+
+-- | The output bytes of the VRF interpreted as a big endian natural number.
+--
+-- The range of this number is determined by the size of the VRF output bytes.
+-- It is thus in the range @0 ..  2 ^ (8 * sizeOutputVRF proxy) - 1@.
+--
+getOutputVRFNatural :: OutputVRF v -> Natural
+getOutputVRFNatural = bytesToNatural . getOutputVRFBytes
+
+-- | For testing purposes, make an 'OutputVRF' from a 'Natural'.
+--
+-- The 'OutputVRF' will be of the appropriate size for the 'VRFAlgorithm'.
+--
+mkTestOutputVRF :: forall v. VRFAlgorithm v => Natural -> OutputVRF v
+mkTestOutputVRF = OutputVRF . naturalToBytes sz
+  where
+    sz = fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
 
 --
 -- Convenient CBOR encoding/decoding
@@ -233,7 +263,7 @@ decodeCertVRF = do
 
 data CertifiedVRF v a
   = CertifiedVRF
-      { certifiedOutput :: !OutputVRF
+      { certifiedOutput :: !(OutputVRF v)
       , certifiedProof :: !(CertVRF v)
       }
   deriving Generic
@@ -255,7 +285,7 @@ instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
       + certifiedOutputSize (certifiedOutput <$> proxy)
       + fromIntegral (sizeCertVRF (Proxy :: Proxy v))
     where
-      certifiedOutputSize :: Proxy OutputVRF -> Size
+      certifiedOutputSize :: Proxy (OutputVRF v) -> Size
       certifiedOutputSize _proxy =
         fromIntegral $ sizeOutputVRF (Proxy :: Proxy v)
 

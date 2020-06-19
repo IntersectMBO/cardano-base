@@ -14,9 +14,16 @@ where
 import Cardano.Binary (FromCBOR, ToCBOR (..))
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
+import Cardano.Crypto.Util
+
+import qualified Data.ByteString as BS
+import Data.Word (Word8, Word64)
 import Data.Proxy (Proxy (..))
+
 import Test.Crypto.Util
-import Test.QuickCheck ((==>), Arbitrary(..), Gen, Property {-, counterexample -})
+import Test.QuickCheck
+         ((==>), (===), Arbitrary(..), Gen, Property,  NonNegative(..),
+          counterexample)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -29,6 +36,11 @@ tests =
     [ testVRFAlgorithm (Proxy :: Proxy MockVRF) "MockVRF"
     , testVRFAlgorithm (Proxy :: Proxy SimpleVRF) "SimpleVRF"
     , testVRFAlgorithm (Proxy :: Proxy PraosVRF) "PraosVRF"
+
+    , testGroup "OutputVRF"
+      [ testProperty "bytesToNatural" prop_bytesToNatural
+      , testProperty "naturalToBytes" prop_naturalToBytes
+      ]
     ]
 
 testVRFAlgorithm
@@ -116,6 +128,11 @@ testVRFAlgorithm _ n =
       , testProperty "verify negative" $ prop_vrf_verify_neg @Int @v
       ]
 
+    , testGroup "output"
+      [ testProperty "sizeOutputVRF"   $ prop_vrf_output_size    @Int @v
+      , testProperty "mkTestOutputVRF" $ prop_vrf_output_natural @Int @v
+      ]
+
     , testGroup "NoUnexpectedThunks"
       [ testProperty "VerKey"  $ prop_no_unexpected_thunks @(VerKeyVRF v)
       , testProperty "SignKey" $ prop_no_unexpected_thunks @(SignKeyVRF v)
@@ -147,6 +164,45 @@ prop_vrf_verify_neg seed a sk sk' =
     let (y, c) = withTestSeed seed $ evalVRF () a sk'
         vk = deriveVerKeyVRF sk
     in not $ verifyVRF () vk a (y, c)
+
+
+prop_vrf_output_size
+  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
+  => TestSeed
+  -> a
+  -> SignKeyVRF v
+  -> Property
+prop_vrf_output_size seed a sk =
+  let (out, _c) = withTestSeed seed $ evalVRF () a sk
+   in     BS.length (getOutputVRFBytes out)
+      === fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
+
+prop_vrf_output_natural
+  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
+  => TestSeed
+  -> a
+  -> SignKeyVRF v
+  -> Property
+prop_vrf_output_natural seed a sk =
+  let (out, _c) = withTestSeed seed $ evalVRF () a sk
+      n         = getOutputVRFNatural out
+   in counterexample (show n) $
+      mkTestOutputVRF n === out
+
+--
+-- Natural <-> bytes conversion
+--
+
+prop_bytesToNatural :: [Word8] -> Bool
+prop_bytesToNatural ws =
+    naturalToBytes (BS.length bs) (bytesToNatural bs) == bs
+  where
+    bs = BS.pack ws
+
+prop_naturalToBytes :: NonNegative Int -> Word64 -> Property
+prop_naturalToBytes (NonNegative sz) n =
+    sz >= 8 ==>
+      bytesToNatural (naturalToBytes sz (fromIntegral n)) == fromIntegral n
 
 
 --
