@@ -22,6 +22,7 @@ let
     haskellNix.overlays
     # haskell-nix.haskellLib.extra: some useful extra utility functions for haskell.nix
     ++ iohKNix.overlays.haskell-nix-extra
+    ++ iohKNix.overlays.crypto
     # iohkNix: nix utilities and niv:
     ++ iohKNix.overlays.iohkNix
     # our own overlays:

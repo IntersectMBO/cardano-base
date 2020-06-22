@@ -9,5 +9,4 @@ pkgs: _: with pkgs; {
       ;
   };
 
-  libsodium = pkgs.callPackage ./pkgs/libsodium {};
 }
