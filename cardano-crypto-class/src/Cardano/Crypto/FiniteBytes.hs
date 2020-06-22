@@ -6,26 +6,36 @@
 module Cardano.Crypto.FiniteBytes
   (
     FiniteBytes,
+    -- * Initialization
+    zeroFiniteBytes,
     -- * Conversions
     fromBytes,
     toBytes,
+    fromByteString,
+    toByteString,
   ) where
 
 
 import Control.Monad.Primitive  (primitive_)
 import Data.Char (ord)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray (..), byteArrayFromListN, copyByteArrayToAddr, newByteArray, unsafeFreezeByteArray, foldrByteArray)
+import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray (..), byteArrayFromListN, copyByteArrayToAddr, newByteArray, unsafeFreezeByteArray, foldrByteArray, byteArrayContents)
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
 import Data.Word (Word8)
+import Foreign.C.Types (CSize)
 import Foreign.Ptr (FunPtr, castPtr)
 import Foreign.Storable (Storable (..))
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import Numeric (showHex)
+import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import GHC.Exts (Int (..))
 import GHC.Prim (copyAddrToByteArray#)
 import GHC.Ptr (Ptr (..))
+
+import qualified Data.ByteString as BS
+
+import Cardano.Crypto.Libsodium.UnsafeC (c_sodium_compare_unsafe)
 
 -- $setup
 -- >>> :set -XDataKinds -XTypeApplications -XOverloadedStrings
@@ -43,6 +53,18 @@ instance Show (FiniteBytes n) where
         show8 :: Word8 -> ShowS
         show8 w | w < 16    = showChar '0' . showHex w
                 | otherwise = showHex w
+
+-- | The comparison is done in constant time for a given size @n@.
+instance KnownNat n => Eq (FiniteBytes n) where
+    x == y = compare x y == EQ
+
+instance KnownNat n => Ord (FiniteBytes n) where
+    compare (FiniteBytes x) (FiniteBytes y) = unsafeDupablePerformIO $ do
+        res <- c_sodium_compare_unsafe (byteArrayContents x) (byteArrayContents y) size
+        return (compare res 0)
+      where
+        size :: CSize
+        size = fromInteger (natVal (Proxy :: Proxy n))
 
 -- |
 --
@@ -72,6 +94,9 @@ instance KnownNat n => IsString (FiniteBytes n) where
 toBytes :: FiniteBytes n -> [Word8]
 toBytes (FiniteBytes ba) = foldrByteArray (:) [] ba
 
+toByteString :: FiniteBytes n -> BS.ByteString
+toByteString = BS.pack . toBytes
+
 -- | See @'IsString' ('FiniteBytes' n)@ instance.
 --
 -- >>> toBytes . (id @(FiniteBytes 4)) . fromBytes $ [1,2,3,4]
@@ -94,6 +119,12 @@ fromBytes ws0 = FiniteBytes (byteArrayFromListN size ws)
         $ take size
         $ (++ repeat 0)
         $ reverse ws0
+
+fromByteString :: KnownNat n => BS.ByteString -> FiniteBytes n
+fromByteString = fromBytes . BS.unpack
+
+zeroFiniteBytes :: KnownNat n =>  FiniteBytes n
+zeroFiniteBytes = fromBytes []
 
 instance KnownNat n => Storable (FiniteBytes n) where
     sizeOf _          = fromInteger (natVal (Proxy :: Proxy n))

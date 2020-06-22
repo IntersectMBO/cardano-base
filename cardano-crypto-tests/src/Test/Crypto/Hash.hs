@@ -15,8 +15,13 @@ import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
 import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_unexpected_thunks)
 import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
+import Foreign.Storable (peek)
+
+import qualified Cardano.Crypto.Libsodium as NaCl
+import qualified Cardano.Crypto.FiniteBytes as FB
 
 --
 -- The list of all tests
@@ -24,19 +29,21 @@ import Test.Tasty.QuickCheck (testProperty)
 tests :: TestTree
 tests =
   testGroup "Crypto.Hash"
-    [ testHashAlgorithm (Proxy :: Proxy MD5) "MD5"
-    , testHashAlgorithm (Proxy :: Proxy SHA256) "SHA256"
-    , testHashAlgorithm (Proxy :: Proxy SHA3_256) "SHA3_256"
-    , testHashAlgorithm (Proxy :: Proxy Blake2b_224) "Blake2b_224"
-    , testHashAlgorithm (Proxy :: Proxy Blake2b_256) "Blake2b_256"
+    [ testHashAlgorithm (Proxy :: Proxy MD5)
+    , testHashAlgorithm (Proxy :: Proxy SHA256)
+    , testHashAlgorithm (Proxy :: Proxy SHA3_256)
+    , testHashAlgorithm (Proxy :: Proxy Blake2b_224)
+    , testHashAlgorithm (Proxy :: Proxy Blake2b_256)
+
+    , testSodiumHashAlgorithm (Proxy :: Proxy SHA256)
+    , testSodiumHashAlgorithm (Proxy :: Proxy Blake2b_256)
     ]
 
 testHashAlgorithm
   :: forall proxy h. HashAlgorithm h
   => proxy h
-  -> String
   -> TestTree
-testHashAlgorithm _ n =
+testHashAlgorithm p =
   testGroup n
     [ testProperty "hash size" $ prop_hash_correct_sizeHash @h @[Int]
     , testProperty "serialise" $ prop_hash_cbor @h
@@ -44,6 +51,17 @@ testHashAlgorithm _ n =
     , testProperty "show/fromString" $ prop_hash_show_fromString @h @Float
     , testProperty "NoUnexpectedThunks" $ prop_no_unexpected_thunks @(Hash h Int)
     ]
+    where n = hashAlgorithmName p
+
+testSodiumHashAlgorithm
+  :: forall proxy h. NaCl.SodiumHashAlgorithm h
+  => proxy h
+  -> TestTree 
+testSodiumHashAlgorithm p =
+  testGroup n
+    [ testProperty "sodium and cryptonite work the same" $ prop_libsodium_model @h Proxy
+    ]
+    where n = hashAlgorithmName p
 
 prop_hash_cbor :: HashAlgorithm h => Hash h Int -> Property
 prop_hash_cbor = prop_cbor
@@ -61,6 +79,17 @@ prop_hash_correct_sizeHash h =
 prop_hash_show_fromString :: Hash h a -> Property
 prop_hash_show_fromString h = h === fromString (show h)
 
+prop_libsodium_model
+  :: forall h. NaCl.SodiumHashAlgorithm h
+  => Proxy h -> SB.ByteString -> Property
+prop_libsodium_model p bs = ioProperty $ do
+  NaCl.UnsafeHash hashPtr <- NaCl.digestSecureBS p bs
+  bytes <- NaCl.withSecureForeignPtr hashPtr peek
+  let actual = SB.pack (FB.toBytes bytes)
+  return (expected === actual)
+  where
+    expected = digest p bs
+  
 
 --
 -- Arbitrary instances

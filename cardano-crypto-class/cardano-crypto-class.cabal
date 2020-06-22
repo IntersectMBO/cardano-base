@@ -58,6 +58,15 @@ library
                        Cardano.Crypto.VRF.Simple
 
                        Cardano.Crypto.Libsodium
+                       Cardano.Crypto.Libsodium.C
+                       Cardano.Crypto.Libsodium.Constants
+                       Cardano.Crypto.Libsodium.Hash
+                       Cardano.Crypto.Libsodium.Init
+                       Cardano.Crypto.Libsodium.Memory
+                       Cardano.Crypto.Libsodium.Memory.Internal
+                       Cardano.Crypto.Libsodium.SecureBytes
+                       Cardano.Crypto.Libsodium.SecureBytes.Internal
+                       Cardano.Crypto.Libsodium.UnsafeC
 
   build-depends:       aeson
                      , base
@@ -95,6 +104,7 @@ test-suite test-memory-example
   main-is:             Main.hs
 
   build-depends:       base
+                     , bytestring
                      , cardano-crypto-class
 
   if os(linux) || os(osx)

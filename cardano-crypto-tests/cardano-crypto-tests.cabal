@@ -38,6 +38,7 @@ library
                      , cryptonite
                      , formatting
                      , QuickCheck
+                     , quickcheck-instances
                      , tasty
                      , tasty-quickcheck
 
