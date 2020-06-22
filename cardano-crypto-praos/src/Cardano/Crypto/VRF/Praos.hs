@@ -132,7 +132,7 @@ newtype SignKey = SignKey { unSignKey :: ForeignPtr SignKeyValue }
   deriving NoUnexpectedThunks via OnlyCheckIsWHNF "SignKey" SignKey
 
 instance NFData SignKey where
-  rnf x = rnf (skBytes x)
+  rnf a = seq a ()
 
 -- | Verification key.
 newtype VerKey = VerKey { unVerKey :: ForeignPtr VerKeyValue }
@@ -140,7 +140,7 @@ newtype VerKey = VerKey { unVerKey :: ForeignPtr VerKeyValue }
   deriving NoUnexpectedThunks via OnlyCheckIsWHNF "VerKey" VerKey
 
 instance NFData VerKey where
-  rnf x = rnf (vkBytes x)
+  rnf a = seq a ()
 
 -- | A proof, as constructed by the 'prove' function.
 newtype Proof = Proof { unProof :: ForeignPtr ProofValue }
@@ -148,7 +148,7 @@ newtype Proof = Proof { unProof :: ForeignPtr ProofValue }
   deriving NoUnexpectedThunks via OnlyCheckIsWHNF "Proof" Proof
 
 instance NFData Proof where
-  rnf x = rnf (proofBytes x)
+  rnf a = seq a ()
 
 -- | Hashed output of a proof verification, as returned by the 'verify'
 -- function.
