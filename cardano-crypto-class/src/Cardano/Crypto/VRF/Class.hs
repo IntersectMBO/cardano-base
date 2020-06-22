@@ -1,5 +1,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -51,7 +52,7 @@ import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
 
-import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Prelude (NoUnexpectedThunks, NFData)
 import Cardano.Binary
          (Decoder, Encoding, FromCBOR (..), ToCBOR (..), Size,
           encodeListLen, enforceSize, decodeBytes, encodeBytes,
@@ -185,6 +186,7 @@ class ( Typeable v
 --
 newtype OutputVRF v = OutputVRF { getOutputVRFBytes :: ByteString }
   deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoUnexpectedThunks)
+  deriving newtype NFData
 
 
 -- | The output bytes of the VRF interpreted as a big endian natural number.

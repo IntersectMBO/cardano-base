@@ -22,7 +22,7 @@ import           Data.Proxy (Proxy (..))
 import           GHC.Generics (Generic)
 import           Numeric.Natural (Natural)
 
-import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..), force)
+import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..), force, NFData)
 import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 
 import           Crypto.Number.Generate (generateBetween)
@@ -54,6 +54,7 @@ q = C.ecc_n $ C.common_curve curve
 newtype Point = ThunkyPoint C.Point
   deriving (Eq, Generic)
   deriving NoUnexpectedThunks via UseIsNormalForm C.Point
+  deriving newtype NFData
 
 -- | Smart constructor for @Point@ that evaluates the wrapped 'C.Point' to
 -- normal form. This is needed because 'C.Point' has a constructor with two
@@ -128,10 +129,12 @@ instance VRFAlgorithm SimpleVRF where
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
     deriving stock   (Show, Eq, Generic)
     deriving newtype (NoUnexpectedThunks)
+    deriving anyclass (NFData)
 
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
     deriving stock   (Show, Eq, Generic)
     deriving NoUnexpectedThunks via UseIsNormalForm C.PrivateNumber
+    deriving anyclass (NFData)
 
   data CertVRF SimpleVRF
     = CertSimpleVRF
@@ -141,6 +144,7 @@ instance VRFAlgorithm SimpleVRF where
         }
     deriving stock    (Show, Eq, Generic)
     deriving anyclass (NoUnexpectedThunks)
+    deriving anyclass (NFData)
 
   --
   -- Metadata and basic key operations

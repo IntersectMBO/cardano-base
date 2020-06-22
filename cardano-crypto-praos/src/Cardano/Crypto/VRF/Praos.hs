@@ -67,7 +67,7 @@ import Cardano.Binary
   )
 
 import Cardano.Crypto.VRF.Class
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
+import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..), NFData (..))
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import GHC.Generics (Generic)
 import Data.Coerce (coerce)
@@ -131,15 +131,24 @@ newtype SignKey = SignKey { unSignKey :: ForeignPtr SignKeyValue }
   deriving (Generic)
   deriving NoUnexpectedThunks via OnlyCheckIsWHNF "SignKey" SignKey
 
+instance NFData SignKey where
+  rnf x = rnf (skBytes x)
+
 -- | Verification key.
 newtype VerKey = VerKey { unVerKey :: ForeignPtr VerKeyValue }
   deriving (Generic)
   deriving NoUnexpectedThunks via OnlyCheckIsWHNF "VerKey" VerKey
 
+instance NFData VerKey where
+  rnf x = rnf (vkBytes x)
+
 -- | A proof, as constructed by the 'prove' function.
 newtype Proof = Proof { unProof :: ForeignPtr ProofValue }
   deriving (Generic)
   deriving NoUnexpectedThunks via OnlyCheckIsWHNF "Proof" Proof
+
+instance NFData Proof where
+  rnf x = rnf (proofBytes x)
 
 -- | Hashed output of a proof verification, as returned by the 'verify'
 -- function.
@@ -412,16 +421,19 @@ instance VRFAlgorithm PraosVRF where
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
     deriving NoUnexpectedThunks via OnlyCheckIsWHNF "VerKeyVRF" VerKey
+    deriving newtype (NFData)
 
   newtype SignKeyVRF PraosVRF = SignKeyPraosVRF SignKey
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
     deriving NoUnexpectedThunks via OnlyCheckIsWHNF "SignKeyVRF" SignKey
+    deriving newtype (NFData)
 
   newtype CertVRF PraosVRF = CertPraosVRF Proof
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
     deriving NoUnexpectedThunks via OnlyCheckIsWHNF "CertKeyVRF" Proof
+    deriving newtype (NFData)
 
   type Signable PraosVRF = ToCBOR
 
