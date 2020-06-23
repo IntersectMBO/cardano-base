@@ -139,9 +139,16 @@ class ( Typeable v
     -> Period  -- ^ The /current/ period for the key, not the target period.
     -> Maybe (SignKeyKES v)
 
-  -- | Return the current KES period of a KES signing key.
+  -- | Return the total number of KES periods supported by this algorithm. The
+  -- KES algorithm is assumed to support a fixed maximum number of periods, not
+  -- a variable number.
+  --
+  -- Do note that this is the total number of /periods/ not the total number of
+  -- evolutions. The difference is off-by-one. For example if there are 2
+  -- periods (period 0 and 1) then there is only one evolution.
+  --
   totalPeriodsKES
-    :: proxy v -> Period
+    :: proxy v -> Word
 
 
   --
@@ -229,7 +236,10 @@ decodeSigKES = do
           actual   = BS.length bs
 
 
--- | The KES period. The KES evolution index.
+-- | The KES period. Periods are enumerated from zero.
+--
+-- Be careful of fencepost errors: if there are 2 periods (period 0 and 1)
+-- then there is only one key evolution.
 --
 type Period = Word
 
