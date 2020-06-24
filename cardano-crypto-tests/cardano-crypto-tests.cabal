@@ -28,6 +28,7 @@ library
                        Test.Crypto.Util
                        Test.Crypto.VRF
                        Bench.Crypto.VRF
+                       Bench.Crypto.KES
 
   build-depends:       base
                      , bytestring

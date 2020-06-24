@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -40,7 +41,7 @@ import GHC.Generics (Generic)
 
 import Control.Exception (assert)
 
-import Cardano.Prelude (NoUnexpectedThunks)
+import Cardano.Prelude (NoUnexpectedThunks, NFData)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.Hash.Class
@@ -54,6 +55,10 @@ import Cardano.Crypto.KES.Class
 --
 data SingleKES d
 
+deriving instance NFData (VerKeyDSIGN d) => NFData (VerKeyKES (SingleKES d))
+deriving instance NFData (SignKeyDSIGN d) => NFData (SignKeyKES (SingleKES d))
+deriving instance NFData (SigDSIGN d) => NFData (SigKES (SingleKES d))
+
 instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
 
 
@@ -63,6 +68,7 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
 
     newtype VerKeyKES (SingleKES d) = VerKeySingleKES (VerKeyDSIGN d)
         deriving Generic
+
 
     newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGN d)
         deriving Generic

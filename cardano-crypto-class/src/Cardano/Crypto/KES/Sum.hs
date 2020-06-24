@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -46,7 +48,7 @@ import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
 import           Control.Monad (guard)
 
-import           Cardano.Prelude (NoUnexpectedThunks)
+import           Cardano.Prelude (NoUnexpectedThunks, NFData)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.Seed
@@ -90,6 +92,10 @@ type Sum7KES d h = SumKES h (Sum6KES d h)
 --
 data SumKES h d
 
+instance (NFData (SigKES d), NFData (VerKeyKES d)) => NFData (SigKES (SumKES h d)) where
+
+instance (NFData (SignKeyKES d), NFData (VerKeyKES d)) => NFData (SignKeyKES (SumKES h d)) where
+
 instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
       => KESAlgorithm (SumKES h d) where
 
@@ -106,6 +112,7 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     newtype VerKeyKES (SumKES h d) =
               VerKeySumKES (Hash h (VerKeyKES d, VerKeyKES d))
         deriving Generic
+        deriving newtype NFData
 
     -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
     --
