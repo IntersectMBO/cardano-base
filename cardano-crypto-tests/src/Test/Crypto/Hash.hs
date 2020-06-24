@@ -18,10 +18,8 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
-import Foreign.Storable (peek)
 
 import qualified Cardano.Crypto.Libsodium as NaCl
-import qualified Cardano.Crypto.FiniteBytes as FB
 
 --
 -- The list of all tests
@@ -83,9 +81,8 @@ prop_libsodium_model
   :: forall h. NaCl.SodiumHashAlgorithm h
   => Proxy h -> SB.ByteString -> Property
 prop_libsodium_model p bs = ioProperty $ do
-  NaCl.UnsafeHash hashPtr <- NaCl.digestSecureBS p bs
-  bytes <- NaCl.withSecureForeignPtr hashPtr peek
-  let actual = SB.pack (FB.toBytes bytes)
+  sfb <- NaCl.digestSecureBS p bs
+  let actual = NaCl.sfbToByteString sfb
   return (expected === actual)
   where
     expected = digest p bs

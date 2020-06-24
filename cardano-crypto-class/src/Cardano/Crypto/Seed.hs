@@ -17,6 +17,9 @@ module Cardano.Crypto.Seed
   , getBytesFromSeedT
   , runMonadRandomWithSeed
   , SeedBytesExhausted(..)
+    -- * Libsodium co-op
+  , sfbToSeed
+  , sfbFromSeed
   ) where
 
 import           Data.ByteString (ByteString)
@@ -35,6 +38,7 @@ import           Cardano.Crypto.Hash.Class (HashAlgorithm(digest))
 
 import           Cardano.Prelude (NoUnexpectedThunks)
 
+import qualified Cardano.Crypto.Libsodium as NaCl
 
 -- | A seed contains a finite number of bytes, and is used for seeding
 -- cryptographic algorithms including key generation.
@@ -143,3 +147,10 @@ getRandomBytesFromSeed n =
 instance MonadRandom MonadRandomFromSeed where
   getRandomBytes n = BA.convert <$> getRandomBytesFromSeed n
 
+-- Libsodium co-op
+
+sfbToSeed :: NaCl.SodiumHashAlgorithm h => proxy h -> NaCl.SecureFiniteBytes (NaCl.SizeHash h) -> Seed
+sfbToSeed _ = mkSeedFromBytes . NaCl.sfbToByteString
+
+sfbFromSeed :: NaCl.SodiumHashAlgorithm h => proxy h -> Seed -> NaCl.SecureFiniteBytes (NaCl.SizeHash h)
+sfbFromSeed _ = NaCl.sfbFromByteString . getSeedBytes

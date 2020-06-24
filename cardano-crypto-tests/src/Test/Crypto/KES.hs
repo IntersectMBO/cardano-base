@@ -23,13 +23,13 @@ import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
 import qualified Cardano.Crypto.KES as KES
+import qualified Cardano.Crypto.Libsodium as NaCl
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
 import Test.Crypto.Util hiding (label)
-
 
 --
 -- The list of all tests
@@ -52,7 +52,7 @@ deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
 
 deriving instance Eq (SignKeyDSIGN d)
                => Eq (SignKeyKES (SingleKES d))
-deriving instance (KESAlgorithm d, Eq (SignKeyKES d))
+deriving instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Eq (SignKeyKES d))
                => Eq (SignKeyKES (SumKES h d))
 
 testKESAlgorithm
