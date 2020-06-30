@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -43,6 +44,7 @@ import Control.Exception (assert)
 import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
+import Cardano.Crypto.Seed (mlfbToSeed)
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGN.Class
 import qualified Cardano.Crypto.DSIGN as DSIGN
@@ -55,7 +57,7 @@ import Cardano.Crypto.KES.Class
 data SingleKES d
 
 instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
-
+    type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
 
     --
     -- Key and signature types
@@ -108,7 +110,7 @@ instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
     --
 
     seedSizeKES _ = seedSizeDSIGN (Proxy :: Proxy d)
-    genKeyKES seed = SignKeySingleKES (genKeyDSIGN seed)
+    genKeyKES seed = SignKeySingleKES (genKeyDSIGN (mlfbToSeed seed))
 
 
     --

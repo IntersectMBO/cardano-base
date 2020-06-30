@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -36,6 +37,7 @@ import Cardano.Crypto.Util
 data MockDSIGN
 
 instance DSIGNAlgorithm MockDSIGN where
+    type SeedSizeDSIGN MockDSIGN = 8
 
     --
     -- Key and signature types
@@ -82,7 +84,6 @@ instance DSIGNAlgorithm MockDSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _    = 8
     genKeyDSIGN seed   =
       SignKeyMockDSIGN (runMonadRandomWithSeed seed getRandomWord64)
 

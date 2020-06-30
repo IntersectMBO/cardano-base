@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Abstract digital signatures.
 module Cardano.Crypto.DSIGN.Class
@@ -27,7 +29,7 @@ module Cardano.Crypto.DSIGN.Class
   , decodeSigDSIGN
   , encodeSignedDSIGN
   , decodeSignedDSIGN
-  
+
     -- * Encoded 'Size' expresssions
   , encodedVerKeyDSIGNSizeExpr
   , encodedSignKeyDESIGNSizeExpr
@@ -43,6 +45,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
+import GHC.TypeLits (KnownNat, Nat, natVal)
 
 import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
@@ -62,9 +65,11 @@ class ( Typeable v
       , NoUnexpectedThunks (SigDSIGN     v)
       , NoUnexpectedThunks (SignKeyDSIGN v)
       , NoUnexpectedThunks (VerKeyDSIGN  v)
+      , KnownNat (SeedSizeDSIGN v)
       )
       => DSIGNAlgorithm v where
 
+  type SeedSizeDSIGN v :: Nat
 
   --
   -- Key and signature types
@@ -124,6 +129,7 @@ class ( Typeable v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
   seedSizeDSIGN :: proxy v -> Word
+  seedSizeDSIGN _ = fromInteger (natVal (Proxy @(SeedSizeDSIGN v)))
 
 
   --

@@ -17,10 +17,12 @@ where
 
 import Data.Proxy (Proxy(..))
 import Data.List (unfoldr)
+import GHC.TypeLits (KnownNat, natVal)
 
 import Cardano.Binary (FromCBOR, ToCBOR(..))
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Hash
+import Cardano.Crypto.Seed
 import Cardano.Crypto.KES
 import qualified Cardano.Crypto.KES as KES
 import qualified Cardano.Crypto.Libsodium as NaCl
@@ -362,9 +364,7 @@ instance KESAlgorithm v => Arbitrary (VerKeyKES v) where
   shrink = const []
 
 instance KESAlgorithm v => Arbitrary (SignKeyKES v) where
-  arbitrary = genKeyKES <$> arbitrarySeedOfSize seedSize
-    where
-      seedSize = seedSizeKES (Proxy :: Proxy v)
+  arbitrary = genKeyKES <$> arbitrary
   shrink = const []
 
 instance (KES.Signable v Int, KESAlgorithm v, ContextKES v ~ ())
@@ -375,3 +375,6 @@ instance (KES.Signable v Int, KESAlgorithm v, ContextKES v ~ ())
     let sig = signKES () 0 a sk
     return sig
   shrink = const []
+
+instance KnownNat n => Arbitrary (NaCl.MLockedFiniteBytes n) where
+    arbitrary = mlfbFromSeed <$> arbitrarySeedOfSize (fromIntegral (natVal (Proxy @n)))

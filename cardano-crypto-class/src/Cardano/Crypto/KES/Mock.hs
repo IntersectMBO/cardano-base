@@ -47,6 +47,7 @@ data MockKES (t :: Nat)
 -- keys. Mock KES is more suitable for a basic testnet, since it doesn't suffer
 -- from the performance implications of shuffling a giant list of keys around
 instance KnownNat t => KESAlgorithm (MockKES t) where
+    type SeedSizeKES (MockKES t) = 8
 
     --
     -- Key and signature types
@@ -113,9 +114,8 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- Key generation
     --
 
-    seedSizeKES _ = 8
     genKeyKES seed =
-        let vk = VerKeyMockKES (runMonadRandomWithSeed seed getRandomWord64)
+        let vk = VerKeyMockKES (runMonadRandomWithSeed (mlfbToSeed seed) getRandomWord64)
          in SignKeyMockKES vk 0
 
 

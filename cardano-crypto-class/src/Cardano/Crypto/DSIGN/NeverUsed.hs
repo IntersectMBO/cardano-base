@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -24,6 +25,7 @@ import Cardano.Crypto.DSIGN.Class
 data NeverDSIGN
 
 instance DSIGNAlgorithm NeverDSIGN where
+  type SeedSizeDSIGN NeverDSIGN = 0
 
   data VerKeyDSIGN  NeverDSIGN = NeverUsedVerKeyDSIGN
      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
@@ -45,7 +47,6 @@ instance DSIGNAlgorithm NeverDSIGN where
   signDSIGN   = error "DSIGN not available"
   verifyDSIGN = error "DSIGN not available"
 
-  seedSizeDSIGN     _ = 0
   genKeyDSIGN       _ = NeverUsedSignKeyDSIGN
 
   rawSerialiseVerKeyDSIGN  _ = mempty

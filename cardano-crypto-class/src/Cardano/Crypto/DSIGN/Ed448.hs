@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
@@ -32,6 +33,7 @@ import Cardano.Crypto.Seed
 data Ed448DSIGN
 
 instance DSIGNAlgorithm Ed448DSIGN where
+    type SeedSizeDSIGN Ed448DSIGN = 57
 
     --
     -- Key and signature types
@@ -80,7 +82,6 @@ instance DSIGNAlgorithm Ed448DSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _  = 57
     genKeyDSIGN seed =
         let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
          in SignKeyEd448DSIGN sk
