@@ -160,6 +160,18 @@ class ( Typeable v
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
   seedSizeKES :: proxy v -> Word
 
+  --
+  -- Secure forgetting
+  --
+
+  -- | Forget a signing key synchronously, rather than waiting for GC. In some
+  -- non-mock instances this provides a guarantee that the signing key is no
+  -- longer in memory.
+  --
+  -- The precondition is that this key value will not be used again.
+  --
+  forgetSignKeyKES :: SignKeyKES v -> IO ()
+  forgetSignKeyKES = const $ return ()
 
   --
   -- Serialisation/(de)serialisation in fixed-size raw format
