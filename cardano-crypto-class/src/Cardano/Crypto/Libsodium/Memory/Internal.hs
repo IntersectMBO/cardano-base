@@ -4,11 +4,11 @@
 {-# LANGUAGE TypeApplications #-}
 module Cardano.Crypto.Libsodium.Memory.Internal (
   -- * High-level memory management
-  SecureForeignPtr (..),
-  withSecureForeignPtr,
-  allocSecureForeignPtr,
-  finalizeSecureForeignPtr,
-  traceSecureForeignPtr,
+  MLockedForeignPtr (..),
+  withMLockedForeignPtr,
+  allocMLockedForeignPtr,
+  finalizeMLockedForeignPtr,
+  traceMLockedForeignPtr,
   -- * Low-level memory function
   sodiumMalloc,
   sodiumFree,
@@ -27,29 +27,29 @@ import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
 import Cardano.Crypto.Libsodium.C
 
 -- | Foreign pointer to securely allocated memory.
-newtype SecureForeignPtr a = SFP { _unwrapSecureForeignPtr :: ForeignPtr a }
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "SecureForeignPtr" (SecureForeignPtr a)
+newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: ForeignPtr a }
+  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "MLockedForeignPtr" (MLockedForeignPtr a)
 
-withSecureForeignPtr :: forall a b. SecureForeignPtr a -> (Ptr a -> IO b) -> IO b
-withSecureForeignPtr = coerce (withForeignPtr @a @b)
+withMLockedForeignPtr :: forall a b. MLockedForeignPtr a -> (Ptr a -> IO b) -> IO b
+withMLockedForeignPtr = coerce (withForeignPtr @a @b)
 
-finalizeSecureForeignPtr :: forall a. SecureForeignPtr a -> IO ()
-finalizeSecureForeignPtr = coerce (finalizeForeignPtr @a)
+finalizeMLockedForeignPtr :: forall a. MLockedForeignPtr a -> IO ()
+finalizeMLockedForeignPtr = coerce (finalizeForeignPtr @a)
 
-traceSecureForeignPtr :: (Storable a, Show a) => SecureForeignPtr a -> IO ()
-traceSecureForeignPtr fptr = withSecureForeignPtr fptr $ \ptr -> do
+traceMLockedForeignPtr :: (Storable a, Show a) => MLockedForeignPtr a -> IO ()
+traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
     a <- peek ptr
     print a
 
-{-# DEPRECATED traceSecureForeignPtr "Don't leave traceSecureForeignPtr in production" #-}
+{-# DEPRECATED traceMLockedForeignPtr "Don't leave traceMLockedForeignPtr in production" #-}
 
 -- | Allocate secure memory using 'c_sodium_malloc'.
 --
 -- <https://libsodium.gitbook.io/doc/memory_management>
 --
-allocSecureForeignPtr :: Storable a => IO (SecureForeignPtr a)
-allocSecureForeignPtr = impl undefined where
-    impl :: forall b. Storable b => b -> IO (SecureForeignPtr b)
+allocMLockedForeignPtr :: Storable a => IO (MLockedForeignPtr a)
+allocMLockedForeignPtr = impl undefined where
+    impl :: forall b. Storable b => b -> IO (MLockedForeignPtr b)
     impl b = do
         ptr <- sodiumMalloc size
         fmap SFP (newForeignPtr c_sodium_free_funptr ptr)

@@ -2,10 +2,10 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Cardano.Crypto.Libsodium.SecureBytes.Internal (
-    SecureFiniteBytes (..),
-    sfbFromByteString,
-    sfbToByteString,
+module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
+    MLockedFiniteBytes (..),
+    mlfbFromByteString,
+    mlfbToByteString,
 ) where
 
 import Control.DeepSeq (NFData (..))
@@ -25,37 +25,37 @@ import qualified Cardano.Crypto.FiniteBytes as FB
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 
-newtype SecureFiniteBytes n = SFB (SecureForeignPtr (FB.FiniteBytes n))
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "SecureFiniteBytes" (SecureFiniteBytes n)
+newtype MLockedFiniteBytes n = MLFB (MLockedForeignPtr (FB.FiniteBytes n))
+  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "MLockedFiniteBytes" (MLockedFiniteBytes n)
 
-instance KnownNat n => Eq (SecureFiniteBytes n) where
+instance KnownNat n => Eq (MLockedFiniteBytes n) where
     x == y = compare x y == EQ
 
-instance KnownNat n => Ord (SecureFiniteBytes n) where
-    compare (SFB x) (SFB y) = unsafeDupablePerformIO $
-        withSecureForeignPtr x $ \x' ->
-        withSecureForeignPtr y $ \y' -> do
+instance KnownNat n => Ord (MLockedFiniteBytes n) where
+    compare (MLFB x) (MLFB y) = unsafeDupablePerformIO $
+        withMLockedForeignPtr x $ \x' ->
+        withMLockedForeignPtr y $ \y' -> do
             res <- c_sodium_compare x' y' (CSize (fromIntegral size))
             return (compare res 0)
       where
         size = natVal (Proxy @n)
 
-instance KnownNat n => Show (SecureFiniteBytes n) where
+instance KnownNat n => Show (MLockedFiniteBytes n) where
     showsPrec d _ = showParen (d > 10)
-        $ showString "_ :: SecureFiniteBytes"
+        $ showString "_ :: MLockedFiniteBytes"
         . showsPrec 11 (natVal (Proxy @n))
         
     
-instance NFData (SecureFiniteBytes n) where
-    rnf (SFB p) = seq p ()
+instance NFData (MLockedFiniteBytes n) where
+    rnf (MLFB p) = seq p ()
 
-sfbFromByteString :: forall n. KnownNat n => BS.ByteString -> SecureFiniteBytes n
-sfbFromByteString bs = unsafeDupablePerformIO $ BS.useAsCStringLen bs $ \(ptrBS, len) -> do
-    fptr <- allocSecureForeignPtr
-    withSecureForeignPtr fptr $ \ptr -> do
+mlfbFromByteString :: forall n. KnownNat n => BS.ByteString -> MLockedFiniteBytes n
+mlfbFromByteString bs = unsafeDupablePerformIO $ BS.useAsCStringLen bs $ \(ptrBS, len) -> do
+    fptr <- allocMLockedForeignPtr
+    withMLockedForeignPtr fptr $ \ptr -> do
         _ <- memcpy (castPtr ptr) ptrBS (fromIntegral (min len size))
         return ()
-    return (SFB fptr)
+    return (MLFB fptr)
   where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))
@@ -63,8 +63,8 @@ sfbFromByteString bs = unsafeDupablePerformIO $ BS.useAsCStringLen bs $ \(ptrBS,
 -- | /Note:/ the resulting 'BS.ByteString' will still refer to secure memory,
 -- but the types don't prevent it from be exposed.
 --
-sfbToByteString :: forall n. KnownNat n => SecureFiniteBytes n -> BS.ByteString
-sfbToByteString (SFB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size where
+mlfbToByteString :: forall n. KnownNat n => MLockedFiniteBytes n -> BS.ByteString
+mlfbToByteString (MLFB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))
 

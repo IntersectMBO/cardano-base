@@ -18,8 +18,8 @@ module Cardano.Crypto.Seed
   , runMonadRandomWithSeed
   , SeedBytesExhausted(..)
     -- * Libsodium co-op
-  , sfbToSeed
-  , sfbFromSeed
+  , mlfbToSeed
+  , mlfbFromSeed
   ) where
 
 import           Data.ByteString (ByteString)
@@ -31,6 +31,7 @@ import           Control.Exception (Exception(..), throw)
 import           Data.Functor.Identity
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
+import           GHC.TypeLits (KnownNat)
 
 import           Crypto.Random (MonadRandom(..))
 import           Crypto.Random.Entropy (getEntropy)
@@ -149,8 +150,8 @@ instance MonadRandom MonadRandomFromSeed where
 
 -- Libsodium co-op
 
-sfbToSeed :: NaCl.SodiumHashAlgorithm h => proxy h -> NaCl.SecureFiniteBytes (NaCl.SizeHash h) -> Seed
-sfbToSeed _ = mkSeedFromBytes . NaCl.sfbToByteString
+mlfbToSeed :: KnownNat n => NaCl.MLockedFiniteBytes n -> Seed
+mlfbToSeed = mkSeedFromBytes . NaCl.mlfbToByteString
 
-sfbFromSeed :: NaCl.SodiumHashAlgorithm h => proxy h -> Seed -> NaCl.SecureFiniteBytes (NaCl.SizeHash h)
-sfbFromSeed _ = NaCl.sfbFromByteString . getSeedBytes
+mlfbFromSeed :: KnownNat n => Seed -> NaCl.MLockedFiniteBytes n
+mlfbFromSeed = NaCl.mlfbFromByteString . getSeedBytes

@@ -115,7 +115,7 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d)
     --
     data SignKeyKES (SumKES h d) =
            SignKeySumKES !(SignKeyKES d)
-                         !(NaCl.SecureFiniteBytes (NaCl.SizeHash h))
+                         !(NaCl.MLockedFiniteBytes (NaCl.SizeHash h))
                          !(VerKeyKES d)
                          !(VerKeyKES d)
         deriving Generic
@@ -172,8 +172,8 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d)
     updateKES ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
       | t+1 <  _T = do sk' <- updateKES ctx sk t
                        return $ SignKeySumKES sk' r_1 vk_0 vk_1
-      | t+1 == _T = do let sk' = genKeyKES $ sfbToSeed (Proxy @h) r_1
-                       return $ SignKeySumKES sk' (sfbFromSeed (Proxy @h) zero) vk_0 vk_1
+      | t+1 == _T = do let sk' = genKeyKES $ mlfbToSeed r_1
+                       return $ SignKeySumKES sk' (mlfbFromSeed zero) vk_0 vk_1
       | otherwise = do sk' <- updateKES ctx sk (t - _T)
                        return $ SignKeySumKES sk' r_1 vk_0 vk_1
       where
@@ -188,7 +188,7 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d)
     --
 
     seedSizeKES _ = seedSizeKES (Proxy :: Proxy d)
-    genKeyKES = genKeyKES' . sfbFromSeed (Proxy @h)
+    genKeyKES = genKeyKES' . mlfbFromSeed
 
     --
     -- raw serialise/deserialise
@@ -206,7 +206,7 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d)
     rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) =
       mconcat
         [ rawSerialiseSignKeyKES sk
-        , getSeedBytes $ sfbToSeed (Proxy @h) r_1
+        , getSeedBytes $ mlfbToSeed r_1
         , rawSerialiseVerKeyKES vk_0
         , rawSerialiseVerKeyKES vk_1
         ]
@@ -226,7 +226,7 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d)
         let r = mkSeedFromBytes          b_r
         vk_0 <- rawDeserialiseVerKeyKES  b_vk0
         vk_1 <- rawDeserialiseVerKeyKES  b_vk1
-        return (SignKeySumKES sk (sfbFromSeed (Proxy @h) r) vk_0 vk_1)
+        return (SignKeySumKES sk (mlfbFromSeed r) vk_0 vk_1)
       where
         b_sk  = slice off_sk  size_sk b
         b_r   = slice off_r   size_r  b
@@ -264,16 +264,16 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d)
 
 genKeyKES'
     :: forall h d. (NaCl.SodiumHashAlgorithm h, KESAlgorithm d)
-    => NaCl.SecureFiniteBytes (NaCl.SizeHash h)
+    => NaCl.MLockedFiniteBytes (NaCl.SizeHash h)
     -> SignKeyKES (SumKES h d)
 genKeyKES' r = SignKeySumKES sk_0 r1 vk_0 vk_1
   where
     (r0, r1) = NaCl.expandHash (Proxy :: Proxy h) r
 
-    sk_0 = genKeyKES (sfbToSeed (Proxy @h) r0)
+    sk_0 = genKeyKES (mlfbToSeed r0)
     vk_0 = deriveVerKeyKES sk_0
 
-    sk_1 = genKeyKES (sfbToSeed (Proxy @h) r1)
+    sk_1 = genKeyKES (mlfbToSeed r1)
     vk_1 = deriveVerKeyKES sk_1
 
 

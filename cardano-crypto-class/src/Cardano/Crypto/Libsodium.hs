@@ -1,25 +1,25 @@
 module Cardano.Crypto.Libsodium (
   -- * Initialization
   sodiumInit,
-  -- * Secure memory management
-  SecureForeignPtr,
-  withSecureForeignPtr,
-  allocSecureForeignPtr,
-  finalizeSecureForeignPtr,
-  traceSecureForeignPtr,
-  -- * Secure bytes
-  SecureFiniteBytes,
-  sfbFromByteString,
-  sfbToByteString,
+  -- * MLocked memory management
+  MLockedForeignPtr,
+  withMLockedForeignPtr,
+  allocMLockedForeignPtr,
+  finalizeMLockedForeignPtr,
+  traceMLockedForeignPtr,
+  -- * MLocked bytes
+  MLockedFiniteBytes,
+  mlfbFromByteString,
+  mlfbToByteString,
   -- * Hashing
   SodiumHashAlgorithm (..),
-  digestSecureStorable,
-  digestSecureFB,
-  digestSecureBS,
+  digestMLockedStorable,
+  digestMLockedFB,
+  digestMLockedBS,
   expandHash,
 ) where
 
 import Cardano.Crypto.Libsodium.Hash
 import Cardano.Crypto.Libsodium.Init
 import Cardano.Crypto.Libsodium.Memory
-import Cardano.Crypto.Libsodium.SecureBytes
+import Cardano.Crypto.Libsodium.MLockedBytes

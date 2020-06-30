@@ -81,8 +81,8 @@ prop_libsodium_model
   :: forall h. NaCl.SodiumHashAlgorithm h
   => Proxy h -> SB.ByteString -> Property
 prop_libsodium_model p bs = ioProperty $ do
-  sfb <- NaCl.digestSecureBS p bs
-  let actual = NaCl.sfbToByteString sfb
+  mlfb <- NaCl.digestMLockedBS p bs
+  let actual = NaCl.mlfbToByteString mlfb
   return (expected === actual)
   where
     expected = digest p bs

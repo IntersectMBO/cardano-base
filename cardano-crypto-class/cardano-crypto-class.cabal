@@ -64,8 +64,8 @@ library
                        Cardano.Crypto.Libsodium.Init
                        Cardano.Crypto.Libsodium.Memory
                        Cardano.Crypto.Libsodium.Memory.Internal
-                       Cardano.Crypto.Libsodium.SecureBytes
-                       Cardano.Crypto.Libsodium.SecureBytes.Internal
+                       Cardano.Crypto.Libsodium.MLockedBytes
+                       Cardano.Crypto.Libsodium.MLockedBytes.Internal
                        Cardano.Crypto.Libsodium.UnsafeC
 
   build-depends:       aeson

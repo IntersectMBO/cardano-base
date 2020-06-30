@@ -19,7 +19,7 @@ import           System.Posix.Process (getProcessID)
 import qualified Data.ByteString as SB
 
 import           Cardano.Crypto.Libsodium
-import           Cardano.Crypto.Libsodium.SecureBytes.Internal (SecureFiniteBytes (..))
+import           Cardano.Crypto.Libsodium.MLockedBytes.Internal (MLockedFiniteBytes (..))
 import           Cardano.Crypto.Hash (SHA256, Blake2b_256, digest)
 
 main :: IO ()
@@ -37,30 +37,30 @@ main = do
     args <- getArgs
 
     sodiumInit
-    example args allocSecureForeignPtr
+    example args allocMLockedForeignPtr
 
     -- example SHA256 hash
     do
       let input = SB.pack [0..255]
-      SFB hash <- digestSecureBS (Proxy @SHA256) input
-      traceSecureForeignPtr hash
+      MLFB hash <- digestMLockedBS (Proxy @SHA256) input
+      traceMLockedForeignPtr hash
       print (digest (Proxy @SHA256) input)
 
     -- example Blake2b_256 hash
     do
       let input = SB.pack [0..255]
-      SFB hash <- digestSecureBS (Proxy @Blake2b_256) input
-      traceSecureForeignPtr hash
+      MLFB hash <- digestMLockedBS (Proxy @Blake2b_256) input
+      traceMLockedForeignPtr hash
       print (digest (Proxy @Blake2b_256) input)
 
 example
     :: [String]
-    -> (IO (SecureForeignPtr Fingerprint))
+    -> (IO (MLockedForeignPtr Fingerprint))
     -> IO ()
 example args alloc = do
     -- create foreign ptr to mlocked memory
     fptr <- alloc
-    withSecureForeignPtr fptr $ \ptr -> poke ptr (Fingerprint 0xdead 0xc0de)
+    withMLockedForeignPtr fptr $ \ptr -> poke ptr (Fingerprint 0xdead 0xc0de)
 
     when ("pause" `elem` args) $ do
         putStrLn "Allocated..."
@@ -68,18 +68,18 @@ example args alloc = do
 
     -- we shouldn't do this, but rather do computation inside
     -- withForeignPtr on provided Ptr a
-    traceSecureForeignPtr fptr
+    traceMLockedForeignPtr fptr
 
-    SFB hash <- withSecureForeignPtr fptr $ \ptr ->
-        digestSecureStorable (Proxy @SHA256) ptr
+    MLFB hash <- withMLockedForeignPtr fptr $ \ptr ->
+        digestMLockedStorable (Proxy @SHA256) ptr
     -- compare with
     -- Crypto.Hash.SHA256> hash "\x00\x00\x00\x00\x00\x00\xde\xad\x00\x00\x00\x00\x00\x00\xc0\xd
     -- (cryptohash-sha256)
     -- TODO: write proper tests.
-    traceSecureForeignPtr hash
+    traceMLockedForeignPtr hash
 
     -- force finalizers
-    finalizeSecureForeignPtr fptr
+    finalizeMLockedForeignPtr fptr
 
     when ("pause" `elem` args) $ do
         putStrLn "Finalized..."
@@ -88,4 +88,4 @@ example args alloc = do
     when ("use-after-free" `elem` args) $ do
         -- in this demo we can try to print it again.
         -- this should deterministically cause segmentation fault
-        traceSecureForeignPtr fptr
+        traceMLockedForeignPtr fptr

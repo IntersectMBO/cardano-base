@@ -8,9 +8,9 @@
 {-# LANGUAGE TypeApplications #-}
 module Cardano.Crypto.Libsodium.Hash (
     SodiumHashAlgorithm (..),
-    digestSecureStorable,
-    digestSecureFB,
-    digestSecureBS,
+    digestMLockedStorable,
+    digestMLockedFB,
+    digestMLockedBS,
     expandHash,
 ) where
 
@@ -33,7 +33,7 @@ import Cardano.Crypto.Hash (HashAlgorithm, SHA256, Blake2b_256)
 import Cardano.Crypto.FiniteBytes (FiniteBytes)
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium.Memory.Internal
-import Cardano.Crypto.Libsodium.SecureBytes.Internal
+import Cardano.Crypto.Libsodium.MLockedBytes.Internal
 
 -------------------------------------------------------------------------------
 -- Type-Class
@@ -43,31 +43,31 @@ class (HashAlgorithm h, KnownNat (SizeHash h)) => SodiumHashAlgorithm h where
     -- | The size in bytes of the output of 'digest'
     type SizeHash h :: Nat
 
-    digestSecure
+    digestMLocked
         :: proxy h
         -> Ptr a  -- ^ input
         -> Int    -- ^ input length
-        -> IO (SecureFiniteBytes (SizeHash h))
+        -> IO (MLockedFiniteBytes (SizeHash h))
 
     -- TODO: provide interface for multi-part?
     -- That will be useful to hashing ('1' <> oldseed).
 
-digestSecureStorable
+digestMLockedStorable
     :: forall h a proxy. (SodiumHashAlgorithm h, Storable a)
-    => proxy h -> Ptr a -> IO (SecureFiniteBytes (SizeHash h))
-digestSecureStorable p ptr =
-  digestSecure p ptr ((sizeOf (undefined :: a)))
+    => proxy h -> Ptr a -> IO (MLockedFiniteBytes (SizeHash h))
+digestMLockedStorable p ptr =
+  digestMLocked p ptr ((sizeOf (undefined :: a)))
 
-digestSecureFB
+digestMLockedFB
     :: forall h n proxy. (SodiumHashAlgorithm h, KnownNat n)
-    => proxy h -> Ptr (FiniteBytes n) -> IO (SecureFiniteBytes (SizeHash h))
-digestSecureFB = digestSecureStorable
+    => proxy h -> Ptr (FiniteBytes n) -> IO (MLockedFiniteBytes (SizeHash h))
+digestMLockedFB = digestMLockedStorable
 
-digestSecureBS
+digestMLockedBS
     :: forall h proxy. (SodiumHashAlgorithm h)
-    => proxy h -> SB.ByteString -> IO (SecureFiniteBytes (SizeHash h))
-digestSecureBS p bs = SB.useAsCStringLen bs $ \(ptr, len) -> do
-    digestSecure p (castPtr ptr) len
+    => proxy h -> SB.ByteString -> IO (MLockedFiniteBytes (SizeHash h))
+digestMLockedBS p bs = SB.useAsCStringLen bs $ \(ptr, len) -> do
+    digestMLocked p (castPtr ptr) len
 
 -------------------------------------------------------------------------------
 -- Hash expansion
@@ -76,19 +76,19 @@ digestSecureBS p bs = SB.useAsCStringLen bs $ \(ptr, len) -> do
 expandHash
     :: forall h proxy. SodiumHashAlgorithm h
     => proxy h
-    -> (SecureFiniteBytes (SizeHash h))
-    -> (SecureFiniteBytes (SizeHash h), SecureFiniteBytes (SizeHash h))
-expandHash h (SFB sfptr) = unsafeDupablePerformIO $ do
-    withSecureForeignPtr sfptr $ \ptr -> do
+    -> (MLockedFiniteBytes (SizeHash h))
+    -> (MLockedFiniteBytes (SizeHash h), MLockedFiniteBytes (SizeHash h))
+expandHash h (MLFB sfptr) = unsafeDupablePerformIO $ do
+    withMLockedForeignPtr sfptr $ \ptr -> do
         l <- bracket (sodiumMalloc size1) sodiumFree $ \ptr' -> do
             poke ptr' (1 :: Word8)
             _ <- memcpy (castPtr (plusPtr ptr' 1)) ptr size
-            digestSecure h ptr' (fromIntegral size1)
+            digestMLocked h ptr' (fromIntegral size1)
 
         r <- bracket (sodiumMalloc size1) sodiumFree $ \ptr' -> do
             poke ptr' (2 :: Word8)
             _ <- memcpy (castPtr (plusPtr ptr' 1)) ptr size
-            digestSecure h ptr' (fromIntegral size1)
+            digestMLocked h ptr' (fromIntegral size1)
 
         return (l, r)
   where
@@ -105,30 +105,30 @@ expandHash h (SFB sfptr) = unsafeDupablePerformIO $ do
 instance SodiumHashAlgorithm SHA256 where
     type SizeHash SHA256 = CRYPTO_SHA256_BYTES
 
-    digestSecure :: forall proxy a. proxy SHA256 -> Ptr a -> Int -> IO (SecureFiniteBytes (SizeHash SHA256))
-    digestSecure _ input inputlen = do
-        output <- allocSecureForeignPtr
-        withSecureForeignPtr output $ \output' -> do
+    digestMLocked :: forall proxy a. proxy SHA256 -> Ptr a -> Int -> IO (MLockedFiniteBytes (SizeHash SHA256))
+    digestMLocked _ input inputlen = do
+        output <- allocMLockedForeignPtr
+        withMLockedForeignPtr output $ \output' -> do
             res <- c_crypto_hash_sha256 (castPtr output') (castPtr input) (fromIntegral inputlen)
             unless (res == 0) $ do
                 errno <- getErrno
-                ioException $ errnoToIOError "digestSecure @SHA256: c_crypto_hash_sha256" errno Nothing Nothing
+                ioException $ errnoToIOError "digestMLocked @SHA256: c_crypto_hash_sha256" errno Nothing Nothing
 
-        return (SFB output)
+        return (MLFB output)
 
 instance SodiumHashAlgorithm Blake2b_256 where
     type SizeHash Blake2b_256 = CRYPTO_BLAKE2B_256_BYTES
 
-    digestSecure :: forall proxy a. proxy Blake2b_256 -> Ptr a -> Int -> IO (SecureFiniteBytes (SizeHash Blake2b_256))
-    digestSecure _ input inputlen = do
-        output <- allocSecureForeignPtr
-        withSecureForeignPtr output $ \output' -> do
+    digestMLocked :: forall proxy a. proxy Blake2b_256 -> Ptr a -> Int -> IO (MLockedFiniteBytes (SizeHash Blake2b_256))
+    digestMLocked _ input inputlen = do
+        output <- allocMLockedForeignPtr
+        withMLockedForeignPtr output $ \output' -> do
             res <- c_crypto_generichash
                 output' (fromInteger $ natVal (Proxy @CRYPTO_BLAKE2B_256_BYTES))  -- output
                 (castPtr input) (fromIntegral inputlen)  -- input
                 nullPtr 0                                -- key, unused
             unless (res == 0) $ do
                 errno <- getErrno
-                ioException $ errnoToIOError "digestSecure @Blake2b_256: c_crypto_hash_sha256" errno Nothing Nothing
+                ioException $ errnoToIOError "digestMLocked @Blake2b_256: c_crypto_hash_sha256" errno Nothing Nothing
 
-        return (SFB output)
+        return (MLFB output)
