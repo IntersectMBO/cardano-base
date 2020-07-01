@@ -56,7 +56,7 @@ instance VRFAlgorithm MockVRF where
 
   type Signable MockVRF = ToCBOR
 
-  evalVRF () a sk = return $ evalVRF' a sk
+  evalVRF () a sk = evalVRF' a sk
 
   verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 

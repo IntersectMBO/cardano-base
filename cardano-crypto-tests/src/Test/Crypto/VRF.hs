@@ -11,7 +11,6 @@ module Test.Crypto.VRF
   )
 where
 
-import Cardano.Binary (FromCBOR, ToCBOR (..))
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
 import Cardano.Crypto.Util
@@ -142,49 +141,45 @@ testVRFAlgorithm _ n =
 
 prop_vrf_verify_pos
   :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => TestSeed
-  -> a
+  => a
   -> SignKeyVRF v
   -> Bool
-prop_vrf_verify_pos seed a sk =
-  let (y, c) = withTestSeed seed $ evalVRF () a sk
+prop_vrf_verify_pos a sk =
+  let (y, c) = evalVRF () a sk
       vk = deriveVerKeyVRF sk
   in verifyVRF () vk a (y, c)
 
 prop_vrf_verify_neg
   :: forall a v. (Signable v a, VRFAlgorithm v, Eq (SignKeyVRF v), ContextVRF v ~ ())
-  => TestSeed
-  -> a
+  => a
   -> SignKeyVRF v
   -> SignKeyVRF v
   -> Property
-prop_vrf_verify_neg seed a sk sk' =
+prop_vrf_verify_neg a sk sk' =
   sk /=
     sk' ==>
-    let (y, c) = withTestSeed seed $ evalVRF () a sk'
+    let (y, c) = evalVRF () a sk'
         vk = deriveVerKeyVRF sk
     in not $ verifyVRF () vk a (y, c)
 
 
 prop_vrf_output_size
   :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => TestSeed
-  -> a
+  => a
   -> SignKeyVRF v
   -> Property
-prop_vrf_output_size seed a sk =
-  let (out, _c) = withTestSeed seed $ evalVRF () a sk
+prop_vrf_output_size a sk =
+  let (out, _c) = evalVRF () a sk
    in     BS.length (getOutputVRFBytes out)
       === fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
 
 prop_vrf_output_natural
   :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => TestSeed
-  -> a
+  => a
   -> SignKeyVRF v
   -> Property
-prop_vrf_output_natural seed a sk =
-  let (out, _c) = withTestSeed seed $ evalVRF () a sk
+prop_vrf_output_natural a sk =
+  let (out, _c) = evalVRF () a sk
       n         = getOutputVRFNatural out
    in counterexample (show n) $
       mkTestOutputVRF n === out
@@ -224,6 +219,5 @@ instance (Signable v Int, VRFAlgorithm v, ContextVRF v ~ ())
   arbitrary = do
     a <- arbitrary :: Gen Int
     sk <- arbitrary
-    seed <- arbitrary
-    return $ withTestSeed seed $ fmap snd $ evalVRF () a sk
+    return $ snd $ evalVRF () a sk
   shrink = const []

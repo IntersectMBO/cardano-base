@@ -25,13 +25,10 @@ import           Numeric.Natural (Natural)
 import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..), force)
 import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 
-import           Crypto.Number.Generate (generateBetween)
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
-import           Crypto.Random (MonadRandom (..))
 
 import           Data.Word
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.Bits (shiftL)
 
@@ -101,9 +98,6 @@ h = getHash . hashWithSerialiser @H id
 h' :: Encoding -> Integer -> Point
 h' enc l = pow $ mod (l * (fromIntegral . bsToNat $ h enc)) q
 
-getR :: MonadRandom m => m Integer
-getR = generateBetween 0 (q - 1)
-
 -- | Convert a 'ByteString' into a 'Natural'. Assumes big-endian input.
 bsToNat :: ByteString -> Natural
 bsToNat = bytesToNatBE . BS.unpack
@@ -162,14 +156,15 @@ instance VRFAlgorithm SimpleVRF where
 
   type Signable SimpleVRF = ToCBOR
 
-  evalVRF () a sk@(SignKeySimpleVRF k) = do
+  evalVRF () a sk@(SignKeySimpleVRF k) =
     let u = h' (toCBOR a) k
         y = h $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
-    r <- getR
-    let c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
+
+        r = fromIntegral (bsToNat y) `mod` q
+        c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
         s = mod (r + k * fromIntegral (bsToNat c)) q
-    return (OutputVRF y, CertSimpleVRF u (bsToNat c) s)
+    in (OutputVRF y, CertSimpleVRF u (bsToNat c) s)
 
   verifyVRF () (VerKeySimpleVRF v) a (OutputVRF y, cert) =
     let u = certU cert
