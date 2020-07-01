@@ -14,6 +14,10 @@ module Cardano.Crypto.DSIGN.Class
     -- * DSIGN algorithm class
     DSIGNAlgorithm (..)
   , Seed
+  , seedSizeDSIGN
+  , sizeVerKeyDSIGN
+  , sizeSignKeyDSIGN
+  , sizeSigDSIGN
 
     -- * 'SignedDSIGN' wrapper
   , SignedDSIGN (..)
@@ -66,10 +70,16 @@ class ( Typeable v
       , NoUnexpectedThunks (SignKeyDSIGN v)
       , NoUnexpectedThunks (VerKeyDSIGN  v)
       , KnownNat (SeedSizeDSIGN v)
+      , KnownNat (SizeVerKeyDSIGN v)
+      , KnownNat (SizeSignKeyDSIGN v)
+      , KnownNat (SizeSigDSIGN v)
       )
       => DSIGNAlgorithm v where
 
-  type SeedSizeDSIGN v :: Nat
+  type SeedSizeDSIGN    v :: Nat
+  type SizeVerKeyDSIGN  v :: Nat
+  type SizeSignKeyDSIGN v :: Nat
+  type SizeSigDSIGN     v :: Nat
 
   --
   -- Key and signature types
@@ -127,18 +137,9 @@ class ( Typeable v
 
   genKeyDSIGN :: Seed -> SignKeyDSIGN v
 
-  -- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
-  seedSizeDSIGN :: proxy v -> Word
-  seedSizeDSIGN _ = fromInteger (natVal (Proxy @(SeedSizeDSIGN v)))
-
-
   --
   -- Serialisation/(de)serialisation in fixed-size raw format
   --
-
-  sizeVerKeyDSIGN  :: proxy v -> Word
-  sizeSignKeyDSIGN :: proxy v -> Word
-  sizeSigDSIGN     :: proxy v -> Word
 
   rawSerialiseVerKeyDSIGN    :: VerKeyDSIGN  v -> ByteString
   rawSerialiseSignKeyDSIGN   :: SignKeyDSIGN v -> ByteString
@@ -148,6 +149,17 @@ class ( Typeable v
   rawDeserialiseSignKeyDSIGN :: ByteString -> Maybe (SignKeyDSIGN v)
   rawDeserialiseSigDSIGN     :: ByteString -> Maybe (SigDSIGN     v)
 
+
+-- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
+seedSizeDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
+seedSizeDSIGN _ = fromInteger (natVal (Proxy @(SeedSizeDSIGN v)))
+
+sizeVerKeyDSIGN    :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
+sizeVerKeyDSIGN  _ = fromInteger (natVal (Proxy @(SizeVerKeyDSIGN v)))
+sizeSignKeyDSIGN   :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
+sizeSignKeyDSIGN _ = fromInteger (natVal (Proxy @(SizeSignKeyDSIGN v)))
+sizeSigDSIGN       :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
+sizeSigDSIGN     _ = fromInteger (natVal (Proxy @(SizeSigDSIGN v)))
 
 --
 -- Convenient CBOR encoding/decoding
