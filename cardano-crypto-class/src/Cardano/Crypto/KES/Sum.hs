@@ -95,7 +95,7 @@ type Sum7KES d h = SumKES h (Sum6KES d h)
 data SumKES h d
 
 instance ( KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d
-         , NaCl.SizeHash h ~ SeedSizeKES d -- can be relaxed
+         , SizeHash h ~ SeedSizeKES d -- can be relaxed
          )
       => KESAlgorithm (SumKES h d) where
 
@@ -309,12 +309,12 @@ deriving instance Eq   (VerKeyKES (SumKES h d))
 
 instance KESAlgorithm d => NoUnexpectedThunks (SignKeyKES (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, NaCl.SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (VerKeyKES (SumKES h d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, NaCl.SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (VerKeyKES (SumKES h d)) where
   fromCBOR = decodeVerKeyKES
 
@@ -323,16 +323,16 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, NaCl.SizeHash 
 -- SignKey instances
 --
 
-deriving instance (KnownNat (NaCl.SizeHash h), KESAlgorithm d) => Show (SignKeyKES (SumKES h d))
+deriving instance (KnownNat (SizeHash h), KESAlgorithm d) => Show (SignKeyKES (SumKES h d))
 
 instance KESAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, NaCl.SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (SignKeyKES (SumKES h d)) where
   toCBOR = encodeSignKeyKES
   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, NaCl.SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (SignKeyKES (SumKES h d)) where
   fromCBOR = decodeSignKeyKES
 
@@ -346,12 +346,12 @@ deriving instance KESAlgorithm d => Eq   (SigKES (SumKES h d))
 
 instance KESAlgorithm d => NoUnexpectedThunks (SigKES (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, NaCl.SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (SigKES (SumKES h d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, NaCl.SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
 

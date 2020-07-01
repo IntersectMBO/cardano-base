@@ -1,10 +1,16 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
+  , sizeHash
+  , byteCount
   , ByteString
   , Hash(..)
   , castHash
@@ -47,23 +53,27 @@ import Data.Typeable (Typeable)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import GHC.Stack
+import GHC.TypeLits (Nat, KnownNat, natVal)
 import Numeric.Natural
 
 import Cardano.Prelude (Base16ParseError, NoUnexpectedThunks, parseBase16)
 
-class Typeable h => HashAlgorithm h where
+class (Typeable h, KnownNat (SizeHash h)) => HashAlgorithm h where
+  -- size of hash digest
+  type SizeHash h :: Nat
 
   hashAlgorithmName :: proxy h -> String
 
-  -- | The size in bytes of the output of 'digest'
-  sizeHash :: proxy h -> Word
-
-  byteCount :: proxy h -> Natural
-  byteCount = fromIntegral . sizeHash
-
   digest :: HasCallStack => proxy h -> ByteString -> ByteString
 
+
+byteCount :: HashAlgorithm h => proxy h -> Natural
+byteCount = fromIntegral . sizeHash
 {-# DEPRECATED byteCount "Use sizeHash" #-}
+
+-- | The size in bytes of the output of 'digest'
+sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
+sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
 newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
@@ -95,7 +105,7 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
     bs <- decodeBytes
     let la = SB.length bs
         le :: Int
-        le = fromIntegral $ byteCount (Proxy :: Proxy h)
+        le = fromIntegral $ sizeHash (Proxy :: Proxy h)
     if la == le
     then return $ UnsafeHash bs
     else fail $ "expected " ++ show le ++ " byte(s), but got " ++ show la
@@ -163,7 +173,7 @@ hashFromBytesAsHex hexrep
 
 hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytes bytes
-  | SB.length bytes == fromIntegral (byteCount (Proxy :: Proxy h))
+  | SB.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
   = Just (UnsafeHash bytes)
 
   | otherwise

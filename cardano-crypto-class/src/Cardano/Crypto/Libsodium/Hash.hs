@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 module Cardano.Crypto.Libsodium.Hash (
     SodiumHashAlgorithm (..),
     digestMLockedStorable,
@@ -22,6 +23,7 @@ import Foreign.C.Types (CSize)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import Foreign.Storable (Storable (sizeOf, poke))
 import Data.Word (Word8)
+import Data.Type.Equality ((:~:)(..))
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits
 import System.IO.Unsafe (unsafeDupablePerformIO)
@@ -29,7 +31,7 @@ import GHC.IO.Handle.Text (memcpy)
 
 import qualified Data.ByteString as SB
 
-import Cardano.Crypto.Hash (HashAlgorithm, SHA256, Blake2b_256)
+import Cardano.Crypto.Hash (HashAlgorithm(SizeHash), SHA256, Blake2b_256)
 import Cardano.Crypto.FiniteBytes (FiniteBytes)
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium.Memory.Internal
@@ -39,10 +41,7 @@ import Cardano.Crypto.Libsodium.MLockedBytes.Internal
 -- Type-Class
 -------------------------------------------------------------------------------
 
-class (HashAlgorithm h, KnownNat (SizeHash h)) => SodiumHashAlgorithm h where
-    -- | The size in bytes of the output of 'digest'
-    type SizeHash h :: Nat
-
+class HashAlgorithm h => SodiumHashAlgorithm h where
     digestMLocked
         :: proxy h
         -> Ptr a  -- ^ input
@@ -103,7 +102,6 @@ expandHash h (MLFB sfptr) = unsafeDupablePerformIO $ do
 -------------------------------------------------------------------------------
 
 instance SodiumHashAlgorithm SHA256 where
-    type SizeHash SHA256 = CRYPTO_SHA256_BYTES
 
     digestMLocked :: forall proxy a. proxy SHA256 -> Ptr a -> Int -> IO (MLockedFiniteBytes (SizeHash SHA256))
     digestMLocked _ input inputlen = do
@@ -116,9 +114,11 @@ instance SodiumHashAlgorithm SHA256 where
 
         return (MLFB output)
 
-instance SodiumHashAlgorithm Blake2b_256 where
-    type SizeHash Blake2b_256 = CRYPTO_BLAKE2B_256_BYTES
+-- Test that manually written numbers are the same as in libsodium
+_testSHA256 :: SizeHash SHA256 :~: CRYPTO_SHA256_BYTES
+_testSHA256 = Refl
 
+instance SodiumHashAlgorithm Blake2b_256 where
     digestMLocked :: forall proxy a. proxy Blake2b_256 -> Ptr a -> Int -> IO (MLockedFiniteBytes (SizeHash Blake2b_256))
     digestMLocked _ input inputlen = do
         output <- allocMLockedForeignPtr
@@ -132,3 +132,6 @@ instance SodiumHashAlgorithm Blake2b_256 where
                 ioException $ errnoToIOError "digestMLocked @Blake2b_256: c_crypto_hash_sha256" errno Nothing Nothing
 
         return (MLFB output)
+
+_testBlake2b256 :: SizeHash Blake2b_256 :~: CRYPTO_BLAKE2B_256_BYTES
+_testBlake2b256 = Refl
