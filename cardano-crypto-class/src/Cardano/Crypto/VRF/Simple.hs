@@ -96,22 +96,7 @@ h :: Encoding -> ByteString
 h = getHash . hashWithSerialiser @H id
 
 h' :: Encoding -> Integer -> Point
-h' enc l = pow $ mod (l * (fromIntegral . bsToNat $ h enc)) q
-
--- | Convert a 'ByteString' into a 'Natural'. Assumes big-endian input.
-bsToNat :: ByteString -> Natural
-bsToNat = bytesToNatBE . BS.unpack
-
--- | Convert a list of 'Word8', as returned by 'BS.unpack', into a 'Natural'.
--- Assumes big-endian input.
-bytesToNatBE :: [Word8] -> Natural
-bytesToNatBE = bytesToNatLE . reverse
-
--- | Convert a list of 'Word8', as returned by 'BS.unpack', into a 'Natural'.
--- Assumes little-endian input.
-bytesToNatLE :: [Word8] -> Natural
-bytesToNatLE [] = 0
-bytesToNatLE (n:ns) = fromIntegral n + bytesToNatLE ns `shiftL` 8
+h' enc l = pow $ mod (l * (fromIntegral . bytesToNatural $ h enc)) q
 
 instance VRFAlgorithm SimpleVRF where
 
@@ -161,10 +146,10 @@ instance VRFAlgorithm SimpleVRF where
         y = h $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
 
-        r = fromIntegral (bsToNat y) `mod` q
+        r = fromIntegral (bytesToNatural y) `mod` q
         c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
-        s = mod (r + k * fromIntegral (bsToNat c)) q
-    in (OutputVRF y, CertSimpleVRF u (bsToNat c) s)
+        s = mod (r + k * fromIntegral (bytesToNatural c)) q
+    in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
 
   verifyVRF () (VerKeySimpleVRF v) a (OutputVRF y, cert) =
     let u = certU cert
@@ -177,7 +162,7 @@ instance VRFAlgorithm SimpleVRF where
             toCBOR v <>
             toCBOR (pow s <> pow' v c') <>
             toCBOR (h' (toCBOR a) s <> pow' u c')
-    in b1 && c == bsToNat rhs
+    in b1 && c == bytesToNatural rhs
 
   sizeOutputVRF _ = sizeHash (Proxy :: Proxy H)
 
