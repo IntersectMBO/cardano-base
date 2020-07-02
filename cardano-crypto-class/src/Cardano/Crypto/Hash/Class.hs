@@ -35,9 +35,9 @@ import qualified Data.Aeson.Types as Aeson
 import qualified Data.Aeson.Encoding as Aeson
 import qualified Data.Bits as Bits
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as SB
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as SB8
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Char8 as BS8
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
@@ -69,10 +69,10 @@ newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
 
 instance Show (Hash h a) where
-  show = SB8.unpack . getHashBytesAsHex
+  show = BS8.unpack . getHashBytesAsHex
 
 instance IsString (Hash h a) where
-  fromString = UnsafeHash . fst . B16.decode . SB8.pack
+  fromString = UnsafeHash . fst . Base16.decode . BS8.pack
   --Ugg this does not check anything
 
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
@@ -93,7 +93,7 @@ instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
 instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
   fromCBOR = do
     bs <- decodeBytes
-    let la = SB.length bs
+    let la = BS.length bs
         le :: Int
         le = fromIntegral $ byteCount (Proxy :: Proxy h)
     if la == le
@@ -140,7 +140,7 @@ hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashRaw serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
 
 fromHash :: Hash h a -> Natural
-fromHash = foldl' f 0 . SB.unpack . getHash
+fromHash = foldl' f 0 . BS.unpack . getHash
   where
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b
@@ -150,12 +150,12 @@ fromHash = foldl' f 0 . SB.unpack . getHash
 -- | Convert the hash to hex encoding, as a ByteString.
 --
 getHashBytesAsHex :: Hash h a -> ByteString
-getHashBytesAsHex = B16.encode . getHash
+getHashBytesAsHex = Base16.encode . getHash
 
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytesAsHex hexrep
-  | (bytes, trailing) <- B16.decode hexrep
-  , SB.null trailing
+  | (bytes, trailing) <- Base16.decode hexrep
+  , BS.null trailing
   = hashFromBytes bytes
 
   | otherwise
@@ -163,7 +163,7 @@ hashFromBytesAsHex hexrep
 
 hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytes bytes
-  | SB.length bytes == fromIntegral (byteCount (Proxy :: Proxy h))
+  | BS.length bytes == fromIntegral (byteCount (Proxy :: Proxy h))
   = Just (UnsafeHash bytes)
 
   | otherwise
@@ -173,7 +173,7 @@ hashFromBytes bytes
 --
 --   This functionality is required for VRF calculation.
 xor :: Hash h a -> Hash h a -> Hash h a
-xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x y
+xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ BS.pack $ BS.zipWith Bits.xor x y
 --TODO: make this efficient ^^
 
 hashPair :: forall h a b c. HashAlgorithm h => Hash h a -> Hash h b -> Hash h c

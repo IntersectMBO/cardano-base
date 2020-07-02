@@ -17,7 +17,7 @@ import           System.Environment (getArgs)
 import           System.Posix.Process (getProcessID)
 #endif
 
-import qualified Data.ByteString as SB
+import qualified Data.ByteString as BS
 
 import           Cardano.Crypto.Libsodium
 import           Cardano.Crypto.Libsodium.MLockedBytes.Internal (MLockedFiniteBytes (..))
@@ -42,14 +42,14 @@ main = do
 
     -- example SHA256 hash
     do
-      let input = SB.pack [0..255]
+      let input = BS.pack [0..255]
       MLFB hash <- digestMLockedBS (Proxy @SHA256) input
       traceMLockedForeignPtr hash
       print (digest (Proxy @SHA256) input)
 
     -- example Blake2b_256 hash
     do
-      let input = SB.pack [0..255]
+      let input = BS.pack [0..255]
       MLFB hash <- digestMLockedBS (Proxy @Blake2b_256) input
       traceMLockedForeignPtr hash
       print (digest (Proxy @Blake2b_256) input)

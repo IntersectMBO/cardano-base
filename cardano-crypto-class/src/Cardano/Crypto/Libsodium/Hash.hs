@@ -27,7 +27,7 @@ import GHC.TypeLits
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import GHC.IO.Handle.Text (memcpy)
 
-import qualified Data.ByteString as SB
+import qualified Data.ByteString as BS
 
 import Cardano.Crypto.Hash (HashAlgorithm, SHA256, Blake2b_256)
 import Cardano.Crypto.FiniteBytes (FiniteBytes)
@@ -65,8 +65,8 @@ digestMLockedFB = digestMLockedStorable
 
 digestMLockedBS
     :: forall h proxy. (SodiumHashAlgorithm h)
-    => proxy h -> SB.ByteString -> IO (MLockedFiniteBytes (SizeHash h))
-digestMLockedBS p bs = SB.useAsCStringLen bs $ \(ptr, len) -> do
+    => proxy h -> BS.ByteString -> IO (MLockedFiniteBytes (SizeHash h))
+digestMLockedBS p bs = BS.useAsCStringLen bs $ \(ptr, len) -> do
     digestMLocked p (castPtr ptr) len
 
 -------------------------------------------------------------------------------

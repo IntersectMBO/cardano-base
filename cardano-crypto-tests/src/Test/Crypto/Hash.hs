@@ -10,7 +10,7 @@ where
 
 import Cardano.Binary (ToCBOR(..))
 import Cardano.Crypto.Hash
-import qualified Data.ByteString as SB
+import qualified Data.ByteString as BS
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
 import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_unexpected_thunks)
@@ -72,14 +72,14 @@ prop_hash_correct_sizeHash
   => Hash h a
   -> Property
 prop_hash_correct_sizeHash h =
-  SB.length (getHash h) === fromIntegral (sizeHash (Proxy :: Proxy h))
+  BS.length (getHash h) === fromIntegral (sizeHash (Proxy :: Proxy h))
 
 prop_hash_show_fromString :: Hash h a -> Property
 prop_hash_show_fromString h = h === fromString (show h)
 
 prop_libsodium_model
   :: forall h. NaCl.SodiumHashAlgorithm h
-  => Proxy h -> SB.ByteString -> Property
+  => Proxy h -> BS.ByteString -> Property
 prop_libsodium_model p bs = ioProperty $ do
   mlfb <- NaCl.digestMLockedBS p bs
   let actual = NaCl.mlfbToByteString mlfb
