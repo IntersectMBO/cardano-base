@@ -69,7 +69,7 @@ instance KnownNat n => Ord (FiniteBytes n) where
 -- |
 --
 -- If given 'String' is too long, it is truncated,
--- If it is too short, it is padded with zeros.
+-- If it is too short, it is left-padded with zeros.
 --
 -- Padding and truncation make it behave like an integer mod @n*8@.
 --
