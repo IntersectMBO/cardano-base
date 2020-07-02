@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
+-- deprecations disabled to allow using traceMLockedForeignPtr
 {-# OPTIONS_GHC -Wno-deprecations #-}
 module Main (main) where
 
