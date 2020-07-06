@@ -28,10 +28,6 @@ import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
 
-import           Data.Word
-import qualified Data.ByteString as BS
-import           Data.Bits (shiftL)
-
 import           Cardano.Crypto.Hash
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
