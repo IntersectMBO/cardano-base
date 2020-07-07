@@ -57,8 +57,6 @@ import Cardano.Binary
           encodeListLen, enforceSize, decodeBytes, encodeBytes,
           withWordSize)
 
-import Crypto.Random (MonadRandom)
-
 import Cardano.Crypto.Util (Empty, bytesToNatural, naturalToBytes)
 import Cardano.Crypto.Seed (Seed)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
@@ -111,11 +109,11 @@ class ( Typeable v
   type Signable c = Empty
 
   evalVRF
-    :: (MonadRandom m, HasCallStack, Signable v a)
+    :: (HasCallStack, Signable v a)
     => ContextVRF v
     -> a
     -> SignKeyVRF v
-    -> m (OutputVRF v, CertVRF v)
+    -> (OutputVRF v, CertVRF v)
 
   verifyVRF
     :: (HasCallStack, Signable v a)
@@ -297,12 +295,12 @@ instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
       decodeCertVRF
 
 evalCertified
-  :: (VRFAlgorithm v, MonadRandom m, Signable v a)
+  :: (VRFAlgorithm v, Signable v a)
   => ContextVRF v
   -> a
   -> SignKeyVRF v
-  -> m (CertifiedVRF v a)
-evalCertified ctxt a key = uncurry CertifiedVRF <$> evalVRF ctxt a key
+  -> (CertifiedVRF v a)
+evalCertified ctxt a key = uncurry CertifiedVRF $ evalVRF ctxt a key
 
 verifyCertified
   :: (VRFAlgorithm v, Signable v a)

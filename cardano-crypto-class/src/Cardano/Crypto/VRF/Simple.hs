@@ -25,15 +25,8 @@ import           Numeric.Natural (Natural)
 import           Cardano.Prelude (NoUnexpectedThunks, UseIsNormalForm(..), force)
 import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 
-import           Crypto.Number.Generate (generateBetween)
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
-import           Crypto.Random (MonadRandom (..))
-
-import           Data.Word
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import           Data.Bits (shiftL)
 
 import           Cardano.Crypto.Hash
 import           Cardano.Crypto.Seed
@@ -99,25 +92,7 @@ h :: Encoding -> ByteString
 h = getHash . hashWithSerialiser @H id
 
 h' :: Encoding -> Integer -> Point
-h' enc l = pow $ mod (l * (fromIntegral . bsToNat $ h enc)) q
-
-getR :: MonadRandom m => m Integer
-getR = generateBetween 0 (q - 1)
-
--- | Convert a 'ByteString' into a 'Natural'. Assumes big-endian input.
-bsToNat :: ByteString -> Natural
-bsToNat = bytesToNatBE . BS.unpack
-
--- | Convert a list of 'Word8', as returned by 'BS.unpack', into a 'Natural'.
--- Assumes big-endian input.
-bytesToNatBE :: [Word8] -> Natural
-bytesToNatBE = bytesToNatLE . reverse
-
--- | Convert a list of 'Word8', as returned by 'BS.unpack', into a 'Natural'.
--- Assumes little-endian input.
-bytesToNatLE :: [Word8] -> Natural
-bytesToNatLE [] = 0
-bytesToNatLE (n:ns) = fromIntegral n + bytesToNatLE ns `shiftL` 8
+h' enc l = pow $ mod (l * (fromIntegral . bytesToNatural $ h enc)) q
 
 instance VRFAlgorithm SimpleVRF where
 
@@ -162,14 +137,15 @@ instance VRFAlgorithm SimpleVRF where
 
   type Signable SimpleVRF = ToCBOR
 
-  evalVRF () a sk@(SignKeySimpleVRF k) = do
+  evalVRF () a sk@(SignKeySimpleVRF k) =
     let u = h' (toCBOR a) k
         y = h $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
-    r <- getR
-    let c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
-        s = mod (r + k * fromIntegral (bsToNat c)) q
-    return (OutputVRF y, CertSimpleVRF u (bsToNat c) s)
+
+        r = fromIntegral (bytesToNatural y) `mod` q
+        c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
+        s = mod (r + k * fromIntegral (bytesToNatural c)) q
+    in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
 
   verifyVRF () (VerKeySimpleVRF v) a (OutputVRF y, cert) =
     let u = certU cert
@@ -182,7 +158,7 @@ instance VRFAlgorithm SimpleVRF where
             toCBOR v <>
             toCBOR (pow s <> pow' v c') <>
             toCBOR (h' (toCBOR a) s <> pow' u c')
-    in b1 && c == bsToNat rhs
+    in b1 && c == bytesToNatural rhs
 
   sizeOutputVRF _ = sizeHash (Proxy :: Proxy H)
 
