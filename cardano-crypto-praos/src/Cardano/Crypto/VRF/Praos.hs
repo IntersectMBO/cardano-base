@@ -38,6 +38,7 @@ module Cardano.Crypto.VRF.Praos
   , vrfKeySizeVRF
 
   -- * Seed and key generation
+  , Seed
   , genSeed
   , keypairFromSeed
 
@@ -187,6 +188,16 @@ mkSeed = do
 
 -- | Generate a random seed.
 -- Uses 'randombytes_buf' to create random data.
+--
+-- This function provides an alternative way of generating seeds specifically
+-- for the 'PraosVRF' algorithm. Unlike the 'genKeyPairVRF' method, which uses
+-- a 'ByteString'-based 'Cardano.Crypto.Seed.Seed', this seed generation method
+-- bypasses the GHC heap, keeping the seed in C-allocated memory instead.
+--
+-- This provides two advantages:
+-- 1. It avoids the overhead of unnecessary GHC-side heap allocations.
+-- 2. It avoids leaking the seed via the GHC heap; the 'Seed' type itself
+--    takes care of zeroing out its memory upon finalization.
 genSeed :: IO Seed
 genSeed = do
   seed <- mkSeed
