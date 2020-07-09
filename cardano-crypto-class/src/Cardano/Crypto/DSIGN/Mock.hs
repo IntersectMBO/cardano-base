@@ -118,7 +118,7 @@ instance DSIGNAlgorithm MockDSIGN where
       = Nothing
 
     rawDeserialiseSigDSIGN bs
-      | [hb, kb] <- splitsAt [sizeHash (Proxy :: Proxy ShortHash), 8] bs
+      | [hb, kb] <- splitsAt [fromIntegral $ sizeHash (Proxy :: Proxy ShortHash), 8] bs
       , Just h   <- hashFromBytes hb
       , let k = readBinaryWord64 kb
       = Just $! SigMockDSIGN h k
