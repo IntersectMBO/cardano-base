@@ -17,7 +17,7 @@ data ShortHash
 
 instance HashAlgorithm ShortHash where
   hashAlgorithmName _ = "md5_short"
-  sizeHash _ = 4
+  sizeHash _ = 8
   digest p =
     B.take (fromIntegral (sizeHash p)) .
       BA.convert .
