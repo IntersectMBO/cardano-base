@@ -57,12 +57,8 @@ class Typeable h => HashAlgorithm h where
   -- | The size in bytes of the output of 'digest'
   sizeHash :: proxy h -> Word
 
-  byteCount :: proxy h -> Natural
-  byteCount = fromIntegral . sizeHash
-
   digest :: HasCallStack => proxy h -> ByteString -> ByteString
 
-{-# DEPRECATED byteCount "Use sizeHash" #-}
 
 newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
@@ -94,7 +90,7 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
     bs <- decodeBytes
     let la = SB.length bs
         le :: Int
-        le = fromIntegral $ byteCount (Proxy :: Proxy h)
+        le = fromIntegral $ sizeHash (Proxy :: Proxy h)
     if la == le
     then return $ UnsafeHash bs
     else fail $ "expected " ++ show le ++ " byte(s), but got " ++ show la
@@ -162,7 +158,7 @@ hashFromBytesAsHex hexrep
 
 hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytes bytes
-  | SB.length bytes == fromIntegral (byteCount (Proxy :: Proxy h))
+  | SB.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
   = Just (UnsafeHash bytes)
 
   | otherwise
