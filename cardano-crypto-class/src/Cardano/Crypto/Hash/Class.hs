@@ -10,7 +10,6 @@ module Cardano.Crypto.Hash.Class
   , castHash
   , hash
   , hashRaw
-  , hashPair
   , hashWithSerialiser
   , fromHash
   , hashFromBytes
@@ -175,6 +174,3 @@ hashFromBytes bytes
 xor :: Hash h a -> Hash h a -> Hash h a
 xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x y
 --TODO: make this efficient ^^
-
-hashPair :: forall h a b c. HashAlgorithm h => Hash h a -> Hash h b -> Hash h c
-hashPair (UnsafeHash a) (UnsafeHash b) = UnsafeHash $ digest (Proxy :: Proxy h) $ a <> b
