@@ -8,7 +8,6 @@ module Test.Crypto.Hash
   )
 where
 
-import Cardano.Binary (ToCBOR(..))
 import Cardano.Crypto.Hash
 import qualified Data.ByteString as SB
 import Data.Proxy (Proxy (..))
@@ -66,6 +65,6 @@ prop_hash_show_fromString h = h === fromString (show h)
 -- Arbitrary instances
 --
 
-instance (ToCBOR a, Arbitrary a, HashAlgorithm h) => Arbitrary (Hash h a) where
-  arbitrary = hash <$> arbitrary
+instance HashAlgorithm h => Arbitrary (Hash h a) where
+  arbitrary = castHash . hashRaw SB.pack <$> vector 16
   shrink = const []
