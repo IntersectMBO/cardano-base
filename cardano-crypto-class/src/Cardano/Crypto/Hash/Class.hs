@@ -10,7 +10,6 @@ module Cardano.Crypto.Hash.Class
   , castHash
   , hashRaw
   , hashWithSerialiser
-  , fromHash
   , hashFromBytes
   , getHashBytesAsHex
   , hashFromBytesAsHex
@@ -18,6 +17,7 @@ module Cardano.Crypto.Hash.Class
 
   -- * Deprecated
   , hash
+  , fromHash
   )
 where
 
@@ -133,13 +133,6 @@ hashWithSerialiser toEnc
 hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashRaw serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
 
-fromHash :: Hash h a -> Natural
-fromHash = foldl' f 0 . SB.unpack . getHash
-  where
-    f :: Natural -> Word8 -> Natural
-    f n b = n * 256 + fromIntegral b
---TODO: make this efficient ^^
-
 
 -- | Convert the hash to hex encoding, as a ByteString.
 --
@@ -177,3 +170,11 @@ xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x
 {-# DEPRECATED hash "Use hashRaw or hashWithSerialiser" #-}
 hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
 hash = hashWithSerialiser toCBOR
+
+{-# DEPRECATED fromHash "Use bytesToNatural . hashToBytes" #-}
+fromHash :: Hash h a -> Natural
+fromHash = foldl' f 0 . SB.unpack . getHash
+  where
+    f :: Natural -> Word8 -> Natural
+    f n b = n * 256 + fromIntegral b
+
