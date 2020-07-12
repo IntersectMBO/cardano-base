@@ -28,6 +28,7 @@ module Cardano.Crypto.Hash.Class
   , hash
   , fromHash
   , hashRaw
+  , getHash
   , getHashBytesAsHex
   )
 where
@@ -72,7 +73,7 @@ class Typeable h => HashAlgorithm h where
   digest :: proxy h -> ByteString -> ByteString
 
 
-newtype Hash h a = UnsafeHash {getHash :: ByteString}
+newtype Hash h a = UnsafeHash ByteString
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
 
 
@@ -233,6 +234,10 @@ fromHash = foldl' f 0 . SB.unpack . getHash
 
 hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashRaw = hashWith
+
+{-# DEPRECATED getHash "Use hashToBytes" #-}
+getHash :: Hash h a -> ByteString
+getHash = hashToBytes
 
 {-# DEPRECATED getHashBytesAsHex "Use hashToBytesAsHex" #-}
 getHashBytesAsHex :: Hash h a -> ByteString
