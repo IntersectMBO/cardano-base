@@ -7,8 +7,8 @@ module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
   , ByteString
   , Hash(..)
+  , hashWith
   , castHash
-  , hashRaw
   , hashWithSerialiser
   , hashFromBytes
   , getHashBytesAsHex
@@ -18,6 +18,7 @@ module Cardano.Crypto.Hash.Class
   -- * Deprecated
   , hash
   , fromHash
+  , hashRaw
   )
 where
 
@@ -63,6 +64,17 @@ class Typeable h => HashAlgorithm h where
 
 newtype Hash h a = UnsafeHash {getHash :: ByteString}
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
+
+
+--
+-- Core operations
+--
+
+-- | Hash the given value, using a serialisation function to turn it into bytes.
+--
+hashWith :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
+hashWith serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
+
 
 instance Show (Hash h a) where
   show = SB8.unpack . getHashBytesAsHex
@@ -126,11 +138,7 @@ castHash :: Hash h a -> Hash h b
 castHash (UnsafeHash h) = UnsafeHash h
 
 hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
-hashWithSerialiser toEnc
-  = UnsafeHash . digest (Proxy :: Proxy h) . serializeEncoding' . toEnc
-
-hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
-hashRaw serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
+hashWithSerialiser toEnc = hashWith (serializeEncoding' . toEnc)
 
 
 -- | Convert the hash to hex encoding, as a ByteString.
@@ -177,3 +185,5 @@ fromHash = foldl' f 0 . SB.unpack . getHash
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b
 
+hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
+hashRaw = hashWith
