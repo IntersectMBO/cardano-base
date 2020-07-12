@@ -76,6 +76,20 @@ hashWith :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashWith serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
 
 
+--
+-- Conversions
+--
+
+-- | Cast the type of the hashed data.
+--
+-- The 'Hash' type has a phantom type parameter to indicate what type the
+-- hash is of. It is sometimes necessary to fake this and hash a value of one
+-- type and use it where as hash of a different type is expected.
+--
+castHash :: Hash h a -> Hash h b
+castHash (UnsafeHash h) = UnsafeHash h
+
+
 instance Show (Hash h a) where
   show = SB8.unpack . getHashBytesAsHex
 
@@ -133,9 +147,6 @@ parseHash t = do
 
     badSize :: Aeson.Parser (Hash crypto a)
     badSize  = fail "Hash is the wrong length"
-
-castHash :: Hash h a -> Hash h b
-castHash (UnsafeHash h) = UnsafeHash h
 
 hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
 hashWithSerialiser toEnc = hashWith (serializeEncoding' . toEnc)
