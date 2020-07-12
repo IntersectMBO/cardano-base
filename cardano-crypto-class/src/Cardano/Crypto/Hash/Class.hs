@@ -14,6 +14,7 @@ module Cardano.Crypto.Hash.Class
 
     -- * Conversions
   , castHash
+  , hashToBytes
   , hashFromBytes
   , getHashBytesAsHex
   , hashFromBytesAsHex
@@ -102,6 +103,25 @@ castHash :: Hash h a -> Hash h b
 castHash (UnsafeHash h) = UnsafeHash h
 
 
+-- | The representation of the hash as bytes.
+--
+hashToBytes :: Hash h a -> ByteString
+hashToBytes (UnsafeHash h) = h
+
+
+-- | Make a hash from it bytes representation.
+--
+-- It must be a a bytestring of the correct length, as given by 'sizeHash'.
+--
+hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
+hashFromBytes bytes
+  | SB.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
+  = Just (UnsafeHash bytes)
+
+  | otherwise
+  = Nothing
+
+
 instance Show (Hash h a) where
   show = SB8.unpack . getHashBytesAsHex
 
@@ -175,13 +195,6 @@ hashFromBytesAsHex hexrep
   | otherwise
   = Nothing
 
-hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
-hashFromBytes bytes
-  | SB.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just (UnsafeHash bytes)
-
-  | otherwise
-  = Nothing
 
 -- | XOR two hashes together
 --
