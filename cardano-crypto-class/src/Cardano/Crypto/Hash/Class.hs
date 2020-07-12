@@ -16,7 +16,9 @@ module Cardano.Crypto.Hash.Class
   , castHash
   , hashToBytes
   , hashFromBytes
-  , getHashBytesAsHex
+
+    -- * Rendering and parsing
+  , hashToBytesAsHex
   , hashFromBytesAsHex
 
     -- * Other operations
@@ -26,6 +28,7 @@ module Cardano.Crypto.Hash.Class
   , hash
   , fromHash
   , hashRaw
+  , getHashBytesAsHex
   )
 where
 
@@ -45,7 +48,7 @@ import qualified Data.Aeson.Encoding as Aeson
 import qualified Data.Bits as Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as SB
-import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as SB8
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
@@ -122,11 +125,36 @@ hashFromBytes bytes
   = Nothing
 
 
+--
+-- Rendering and parsing
+--
+
+-- | Convert the hash to hex encoding, as a ByteString.
+--
+hashToBytesAsHex :: Hash h a -> ByteString
+hashToBytesAsHex = Base16.encode . hashToBytes
+
+
+-- | Make a hash from it bytes representation, starting from a hex encoding.
+--
+-- This can fail for the same reason as 'hashFromBytes', or because the input
+-- is invalid hex. The whole byte string must be valid hex, not just a prefix.
+--
+hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
+hashFromBytesAsHex hexrep
+  | (bytes, trailing) <- Base16.decode hexrep
+  , SB.null trailing
+  = hashFromBytes bytes
+
+  | otherwise
+  = Nothing
+
+
 instance Show (Hash h a) where
-  show = SB8.unpack . getHashBytesAsHex
+  show = show . hashToBytesAsHex
 
 instance IsString (Hash h a) where
-  fromString = UnsafeHash . fst . B16.decode . SB8.pack
+  fromString = UnsafeHash . fst . Base16.decode . SB8.pack
   --Ugg this does not check anything
 
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
@@ -181,21 +209,6 @@ parseHash t = do
     badSize  = fail "Hash is the wrong length"
 
 
--- | Convert the hash to hex encoding, as a ByteString.
---
-getHashBytesAsHex :: Hash h a -> ByteString
-getHashBytesAsHex = B16.encode . getHash
-
-hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
-hashFromBytesAsHex hexrep
-  | (bytes, trailing) <- B16.decode hexrep
-  , SB.null trailing
-  = hashFromBytes bytes
-
-  | otherwise
-  = Nothing
-
-
 -- | XOR two hashes together
 --
 --   This functionality is required for VRF calculation.
@@ -220,3 +233,8 @@ fromHash = foldl' f 0 . SB.unpack . getHash
 
 hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashRaw = hashWith
+
+{-# DEPRECATED getHashBytesAsHex "Use hashToBytesAsHex" #-}
+getHashBytesAsHex :: Hash h a -> ByteString
+getHashBytesAsHex = hashToBytesAsHex
+
