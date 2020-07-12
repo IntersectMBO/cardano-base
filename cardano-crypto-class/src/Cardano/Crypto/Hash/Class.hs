@@ -47,7 +47,6 @@ import qualified Data.Text.Encoding as Text
 import Data.Typeable (Typeable)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
-import GHC.Stack
 import Numeric.Natural
 
 import Cardano.Prelude (Base16ParseError, NoUnexpectedThunks, parseBase16)
@@ -59,7 +58,7 @@ class Typeable h => HashAlgorithm h where
   -- | The size in bytes of the output of 'digest'
   sizeHash :: proxy h -> Word
 
-  digest :: HasCallStack => proxy h -> ByteString -> ByteString
+  digest :: proxy h -> ByteString -> ByteString
 
 
 newtype Hash h a = UnsafeHash {getHash :: ByteString}
