@@ -7,15 +7,21 @@ module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
   , ByteString
   , Hash(..)
+
+    -- * Core operations
   , hashWith
-  , castHash
   , hashWithSerialiser
+
+    -- * Conversions
+  , castHash
   , hashFromBytes
   , getHashBytesAsHex
   , hashFromBytesAsHex
+
+    -- * Other operations
   , xor
 
-  -- * Deprecated
+    -- * Deprecated
   , hash
   , fromHash
   , hashRaw
@@ -74,6 +80,12 @@ newtype Hash h a = UnsafeHash {getHash :: ByteString}
 --
 hashWith :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashWith serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
+
+
+-- | A variation on 'hashWith', but specially for CBOR encodings.
+--
+hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
+hashWithSerialiser toEnc = hashWith (serializeEncoding' . toEnc)
 
 
 --
@@ -147,9 +159,6 @@ parseHash t = do
 
     badSize :: Aeson.Parser (Hash crypto a)
     badSize  = fail "Hash is the wrong length"
-
-hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
-hashWithSerialiser toEnc = hashWith (serializeEncoding' . toEnc)
 
 
 -- | Convert the hash to hex encoding, as a ByteString.
