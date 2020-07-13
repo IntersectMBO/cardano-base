@@ -89,7 +89,7 @@ pow' :: Point -> Integer -> Point
 pow' (Point p) n = Point $ C.pointMul curve n p
 
 h :: Encoding -> ByteString
-h = getHash . hashWithSerialiser @H id
+h = hashToBytes . hashWithSerialiser @H id
 
 h' :: Encoding -> Integer -> Point
 h' enc l = pow $ mod (l * (fromIntegral . bytesToNatural $ h enc)) q

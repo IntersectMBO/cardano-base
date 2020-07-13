@@ -96,7 +96,7 @@ instance DSIGNAlgorithm MockDSIGN where
 
     rawSerialiseVerKeyDSIGN  (VerKeyMockDSIGN  k) = writeBinaryWord64 k
     rawSerialiseSignKeyDSIGN (SignKeyMockDSIGN k) = writeBinaryWord64 k
-    rawSerialiseSigDSIGN     (SigMockDSIGN   h k) = getHash h
+    rawSerialiseSigDSIGN     (SigMockDSIGN   h k) = hashToBytes h
                                                  <> writeBinaryWord64 k
 
     rawDeserialiseVerKeyDSIGN bs
