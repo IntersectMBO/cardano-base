@@ -51,6 +51,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as SB8
+import qualified Data.ByteString.Short as SBS
+import           Data.ByteString.Short (ShortByteString)
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
@@ -73,7 +75,7 @@ class Typeable h => HashAlgorithm h where
   digest :: proxy h -> ByteString -> ByteString
 
 
-newtype Hash h a = UnsafeHash ByteString
+newtype Hash h a = UnsafeHash ShortByteString
   deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
 
 
@@ -84,7 +86,11 @@ newtype Hash h a = UnsafeHash ByteString
 -- | Hash the given value, using a serialisation function to turn it into bytes.
 --
 hashWith :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
-hashWith serialise = UnsafeHash . digest (Proxy :: Proxy h) . serialise
+hashWith serialise =
+    UnsafeHash
+  . SBS.toShort
+  . digest (Proxy :: Proxy h)
+  . serialise
 
 
 -- | A variation on 'hashWith', but specially for CBOR encodings.
@@ -110,7 +116,7 @@ castHash (UnsafeHash h) = UnsafeHash h
 -- | The representation of the hash as bytes.
 --
 hashToBytes :: Hash h a -> ByteString
-hashToBytes (UnsafeHash h) = h
+hashToBytes (UnsafeHash h) = SBS.fromShort h
 
 
 -- | Make a hash from it bytes representation.
@@ -120,7 +126,7 @@ hashToBytes (UnsafeHash h) = h
 hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytes bytes
   | SB.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just (UnsafeHash bytes)
+  = Just (UnsafeHash (SBS.toShort bytes))
 
   | otherwise
   = Nothing
@@ -249,4 +255,8 @@ getHashBytesAsHex = hashToBytesAsHex
 -- | XOR two hashes together
 --TODO: fully deprecate this, or rename it and make it efficient.
 xor :: Hash h a -> Hash h a -> Hash h a
-xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x y
+xor (UnsafeHash x) (UnsafeHash y) =
+    UnsafeHash
+  . SBS.toShort
+  . SB.pack
+  $ SB.zipWith Bits.xor (SBS.fromShort x) (SBS.fromShort y)
