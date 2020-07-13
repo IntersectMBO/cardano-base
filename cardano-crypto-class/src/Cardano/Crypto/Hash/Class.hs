@@ -33,37 +33,37 @@ module Cardano.Crypto.Hash.Class
   )
 where
 
-import Cardano.Binary
-  ( Encoding
-  , FromCBOR (..)
-  , ToCBOR (..)
-  , Size
-  , decodeBytes
-  , serializeEncoding'
-  )
-import Control.DeepSeq (NFData)
-import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..))
-import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Types as Aeson
-import qualified Data.Aeson.Encoding as Aeson
-import qualified Data.Bits as Bits
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as SB
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Char8 as SB8
-import qualified Data.ByteString.Short as SBS
-import           Data.ByteString.Short (ShortByteString)
 import Data.List (foldl')
 import Data.Proxy (Proxy (..))
-import Data.String (IsString (..))
-import Data.Text (Text)
-import qualified Data.Text.Encoding as Text
 import Data.Typeable (Typeable)
-import Data.Word (Word8)
 import GHC.Generics (Generic)
-import Numeric.Natural
 
-import Cardano.Prelude (NoUnexpectedThunks)
+import           Data.Word (Word8)
+import qualified Data.Bits as Bits
+import           Numeric.Natural (Natural)
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Char8 as BSC
+import qualified Data.ByteString.Short as SBS
+import           Data.ByteString.Short (ShortByteString)
+
+import           Data.String (IsString (..))
+import qualified Data.Text.Encoding as Text
+import           Data.Text (Text)
+
+import qualified Data.Aeson as Aeson
+import           Data.Aeson
+                   (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..))
+import qualified Data.Aeson.Types as Aeson
+import qualified Data.Aeson.Encoding as Aeson
+
+import           Control.DeepSeq (NFData)
+
+import           Cardano.Prelude (NoUnexpectedThunks)
+import           Cardano.Binary
+                   (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
+                    serializeEncoding')
 
 
 class Typeable h => HashAlgorithm h where
@@ -128,7 +128,7 @@ hashToBytes (UnsafeHash h) = SBS.fromShort h
 --
 hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytes bytes
-  | SB.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
+  | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
   = Just (UnsafeHash (SBS.toShort bytes))
 
   | otherwise
@@ -153,7 +153,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytesAsHex hexrep
   | (bytes, trailing) <- Base16.decode hexrep
-  , SB.null trailing
+  , BS.null trailing
   = hashFromBytes bytes
 
   | otherwise
@@ -165,7 +165,7 @@ instance Show (Hash h a) where
 
 instance HashAlgorithm h => IsString (Hash h a) where
   fromString str =
-    case hashFromBytesAsHex (SB8.pack str) of
+    case hashFromBytesAsHex (BSC.pack str) of
       Just x  -> x
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
@@ -189,7 +189,7 @@ parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
     case Base16.decode (Text.encodeUtf8 t) of
       (bytes, trailing)
-        | SB.null trailing -> maybe badSize return (hashFromBytes bytes)
+        | BS.null trailing -> maybe badSize return (hashFromBytes bytes)
         | otherwise        -> badHex
   where
     badHex :: Aeson.Parser b
@@ -226,7 +226,7 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
                      ++ " but got " ++ show actual
         where
           expected = sizeHash (Proxy :: Proxy h)
-          actual   = SB.length bs
+          actual   = BS.length bs
 
 
 --
@@ -239,7 +239,7 @@ hash = hashWithSerialiser toCBOR
 
 {-# DEPRECATED fromHash "Use bytesToNatural . hashToBytes" #-}
 fromHash :: Hash h a -> Natural
-fromHash = foldl' f 0 . SB.unpack . getHash
+fromHash = foldl' f 0 . BS.unpack . getHash
   where
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b
@@ -261,5 +261,5 @@ xor :: Hash h a -> Hash h a -> Hash h a
 xor (UnsafeHash x) (UnsafeHash y) =
     UnsafeHash
   . SBS.toShort
-  . SB.pack
-  $ SB.zipWith Bits.xor (SBS.fromShort x) (SBS.fromShort y)
+  . BS.pack
+  $ BS.zipWith Bits.xor (SBS.fromShort x) (SBS.fromShort y)
