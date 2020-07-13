@@ -49,7 +49,7 @@ import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWo
 
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Seed
-import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
+import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
 
 
@@ -84,7 +84,7 @@ class ( Typeable v
   deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
 
   hashVerKeyDSIGN :: HashAlgorithm h => VerKeyDSIGN v -> Hash h (VerKeyDSIGN v)
-  hashVerKeyDSIGN = hashRaw rawSerialiseVerKeyDSIGN
+  hashVerKeyDSIGN = hashWith rawSerialiseVerKeyDSIGN
 
 
   --

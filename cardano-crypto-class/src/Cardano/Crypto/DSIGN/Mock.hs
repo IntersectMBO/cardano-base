@@ -162,4 +162,4 @@ data VerificationFailure
 mockSign :: SignableRepresentation a
          => a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
 mockSign a (SignKeyMockDSIGN n) =
-  SigMockDSIGN (castHash (hashRaw getSignableRepresentation a)) n
+  SigMockDSIGN (castHash (hashWith getSignableRepresentation a)) n

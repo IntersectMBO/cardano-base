@@ -66,5 +66,5 @@ prop_hash_show_fromString h = h === fromString (show h)
 --
 
 instance HashAlgorithm h => Arbitrary (Hash h a) where
-  arbitrary = castHash . hashRaw SB.pack <$> vector 16
+  arbitrary = castHash . hashWith SB.pack <$> vector 16
   shrink = const []

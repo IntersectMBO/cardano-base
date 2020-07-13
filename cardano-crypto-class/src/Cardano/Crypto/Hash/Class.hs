@@ -233,7 +233,7 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
 -- Deprecated
 --
 
-{-# DEPRECATED hash "Use hashRaw or hashWithSerialiser" #-}
+{-# DEPRECATED hash "Use hashWith or hashWithSerialiser" #-}
 hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
 hash = hashWithSerialiser toCBOR
 
@@ -244,6 +244,7 @@ fromHash = foldl' f 0 . BS.unpack . hashToBytes
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b
 
+{-# DEPRECATED hashRaw "Use hashWith" #-}
 hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashRaw = hashWith
 

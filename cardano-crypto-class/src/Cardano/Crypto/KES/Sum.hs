@@ -272,7 +272,7 @@ hashPairOfVKeys :: (KESAlgorithm d, HashAlgorithm h)
                 => (VerKeyKES d, VerKeyKES d)
                 -> Hash h (VerKeyKES d, VerKeyKES d)
 hashPairOfVKeys =
-    hashRaw $ \(a,b) ->
+    hashWith $ \(a,b) ->
       rawSerialiseVerKeyKES a <> rawSerialiseVerKeyKES b
 
 slice :: Word -> Word -> ByteString -> ByteString
