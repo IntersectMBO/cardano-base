@@ -220,13 +220,6 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
           actual   = SB.length bs
 
 
--- | XOR two hashes together
---
---   This functionality is required for VRF calculation.
-xor :: Hash h a -> Hash h a -> Hash h a
-xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x y
---TODO: make this efficient ^^
-
 --
 -- Deprecated
 --
@@ -253,3 +246,7 @@ getHash = hashToBytes
 getHashBytesAsHex :: Hash h a -> ByteString
 getHashBytesAsHex = hashToBytesAsHex
 
+-- | XOR two hashes together
+--TODO: fully deprecate this, or rename it and make it efficient.
+xor :: Hash h a -> Hash h a -> Hash h a
+xor (UnsafeHash x) (UnsafeHash y) = UnsafeHash $ SB.pack $ SB.zipWith Bits.xor x y
