@@ -61,7 +61,7 @@ import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Numeric.Natural
 
-import Cardano.Prelude (Base16ParseError, NoUnexpectedThunks, parseBase16)
+import Cardano.Prelude (NoUnexpectedThunks)
 
 class Typeable h => HashAlgorithm h where
 
@@ -198,19 +198,22 @@ instance ToJSON (Hash crypto a) where
 instance HashAlgorithm crypto => FromJSON (Hash crypto a) where
   parseJSON = Aeson.withText "hash" parseHash
 
+-- utils used in the instances above
 hashToText :: Hash crypto a -> Text
 hashToText = Text.decodeLatin1 . getHashBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
-parseHash t = do
-    bytes <- either badHex return (parseBase16 t)
-    maybe badSize return (hashFromBytes bytes)
+parseHash t =
+    case Base16.decode (Text.encodeUtf8 t) of
+      (bytes, trailing)
+        | SB.null trailing -> maybe badSize return (hashFromBytes bytes)
+        | otherwise        -> badHex
   where
-    badHex :: Base16ParseError -> Aeson.Parser ByteString
-    badHex _ = fail "Hashes are expected in hex encoding"
+    badHex :: Aeson.Parser b
+    badHex = fail "Hashes are expected in hex encoding"
 
     badSize :: Aeson.Parser (Hash crypto a)
-    badSize  = fail "Hash is the wrong length"
+    badSize = fail "Hash is the wrong length"
 
 
 -- | XOR two hashes together
