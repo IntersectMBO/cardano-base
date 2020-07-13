@@ -57,7 +57,7 @@ prop_hash_correct_sizeHash
 prop_hash_correct_sizeHash h =
   SB.length (getHash h) === fromIntegral (sizeHash (Proxy :: Proxy h))
 
-prop_hash_show_fromString :: Hash h a -> Property
+prop_hash_show_fromString :: HashAlgorithm h => Hash h a -> Property
 prop_hash_show_fromString h = h === fromString (show h)
 
 

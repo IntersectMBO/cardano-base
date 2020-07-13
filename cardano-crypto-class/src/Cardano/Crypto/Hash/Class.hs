@@ -154,9 +154,11 @@ hashFromBytesAsHex hexrep
 instance Show (Hash h a) where
   show = show . hashToBytesAsHex
 
-instance IsString (Hash h a) where
-  fromString = UnsafeHash . fst . Base16.decode . SB8.pack
-  --Ugg this does not check anything
+instance HashAlgorithm h => IsString (Hash h a) where
+  fromString str =
+    case hashFromBytesAsHex (SB8.pack str) of
+      Just x  -> x
+      Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
   toCBOR = toCBOR . getHash
@@ -176,12 +178,13 @@ instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
 instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
   fromCBOR = do
     bs <- decodeBytes
-    let la = SB.length bs
-        le :: Int
-        le = fromIntegral $ sizeHash (Proxy :: Proxy h)
-    if la == le
-    then return $ UnsafeHash bs
-    else fail $ "expected " ++ show le ++ " byte(s), but got " ++ show la
+    case hashFromBytes bs of
+      Just x  -> return x
+      Nothing -> fail $ "hash bytes wrong size, expected " ++ show expected
+                     ++ " but got " ++ show actual
+        where
+          expected = sizeHash (Proxy :: Proxy h)
+          actual   = SB.length bs
 
 instance ToJSONKey (Hash crypto a) where
   toJSONKey = Aeson.ToJSONKeyText hashToText (Aeson.text . hashToText)
