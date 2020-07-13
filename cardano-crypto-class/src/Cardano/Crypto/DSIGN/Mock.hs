@@ -14,9 +14,7 @@ module Cardano.Crypto.DSIGN.Mock
   , SignKeyDSIGN (..)
   , VerKeyDSIGN (..)
   , SigDSIGN (..)
-  , verKeyIdFromSigned
   , mockSign
-  , mockSigned
   )
 where
 
@@ -165,11 +163,3 @@ mockSign :: SignableRepresentation a
          => a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
 mockSign a (SignKeyMockDSIGN n) =
   SigMockDSIGN (castHash (hashRaw getSignableRepresentation a)) n
-
-mockSigned :: SignableRepresentation a
-           => a -> SignKeyDSIGN MockDSIGN -> SignedDSIGN MockDSIGN a
-mockSigned a k = SignedDSIGN (mockSign a k)
-
--- | Get the id of the signer from a signature. Used for testing.
-verKeyIdFromSigned :: SignedDSIGN MockDSIGN a -> Word64
-verKeyIdFromSigned (SignedDSIGN (SigMockDSIGN _ i)) = i
