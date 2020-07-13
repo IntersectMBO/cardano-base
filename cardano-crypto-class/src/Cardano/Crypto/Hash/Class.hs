@@ -160,32 +160,6 @@ instance HashAlgorithm h => IsString (Hash h a) where
       Just x  -> x
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
-instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
-  toCBOR = toCBOR . getHash
-
-  -- | 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
-  -- instance for 'ByteString' (as is the above 'toCBOR' method).  'Size'
-  -- computation of length of the bytestring is passed as the first argument to
-  -- 'encodedSizeExpr'.  The 'ByteString' instance will use it to calculate
-  -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
-  --
-  encodedSizeExpr _size proxy =
-      encodedSizeExpr (\_ -> hashSize) (getHash <$> proxy)
-    where
-      hashSize :: Size
-      hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))
-
-instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
-  fromCBOR = do
-    bs <- decodeBytes
-    case hashFromBytes bs of
-      Just x  -> return x
-      Nothing -> fail $ "hash bytes wrong size, expected " ++ show expected
-                     ++ " but got " ++ show actual
-        where
-          expected = sizeHash (Proxy :: Proxy h)
-          actual   = SB.length bs
-
 instance ToJSONKey (Hash crypto a) where
   toJSONKey = Aeson.ToJSONKeyText hashToText (Aeson.text . hashToText)
 
@@ -214,6 +188,36 @@ parseHash t =
 
     badSize :: Aeson.Parser (Hash crypto a)
     badSize = fail "Hash is the wrong length"
+
+--
+-- CBOR serialisation
+--
+
+instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
+  toCBOR = toCBOR . getHash
+
+  -- | 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
+  -- instance for 'ByteString' (as is the above 'toCBOR' method).  'Size'
+  -- computation of length of the bytestring is passed as the first argument to
+  -- 'encodedSizeExpr'.  The 'ByteString' instance will use it to calculate
+  -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
+  --
+  encodedSizeExpr _size proxy =
+      encodedSizeExpr (\_ -> hashSize) (getHash <$> proxy)
+    where
+      hashSize :: Size
+      hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))
+
+instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
+  fromCBOR = do
+    bs <- decodeBytes
+    case hashFromBytes bs of
+      Just x  -> return x
+      Nothing -> fail $ "hash bytes wrong size, expected " ++ show expected
+                     ++ " but got " ++ show actual
+        where
+          expected = sizeHash (Proxy :: Proxy h)
+          actual   = SB.length bs
 
 
 -- | XOR two hashes together
