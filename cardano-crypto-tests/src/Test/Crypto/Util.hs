@@ -29,9 +29,11 @@ module Test.Crypto.Util
 
     -- * Seeds
   , arbitrarySeedOfSize
+
+   -- * test messages for signings
+  , Message(..)
   )
 where
-
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..),
                        Encoding, Decoder, Range (..),
@@ -40,13 +42,14 @@ import Cardano.Prelude (NoUnexpectedThunks, unsafeNoUnexpectedThunks)
 import Codec.CBOR.FlatTerm
 import Codec.CBOR.Write
 import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
+import Cardano.Crypto.Util (SignableRepresentation(..))
 import Crypto.Random
   ( ChaChaDRG
   , MonadPseudoRandom
   , drgNewTest
   , withDRG
   )
-import Data.ByteString as BS (ByteString, pack, length)
+import Data.ByteString as BS (ByteString, pack, unpack, length)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
 import Numeric.Natural (Natural)
@@ -99,6 +102,18 @@ instance Arbitrary TestSeed where
 arbitrarySeedOfSize :: Word -> Gen Seed
 arbitrarySeedOfSize sz =
   (mkSeedFromBytes . BS.pack) <$> vector (fromIntegral sz)
+
+--------------------------------------------------------------------------------
+-- Messages to sign
+--------------------------------------------------------------------------------
+
+newtype Message = Message { messageBytes :: ByteString }
+  deriving (Eq, Show, SignableRepresentation)
+
+instance Arbitrary Message where
+  arbitrary = Message . BS.pack <$> arbitrary
+  shrink    = map (Message . BS.pack) . shrink . BS.unpack . messageBytes
+
 
 --------------------------------------------------------------------------------
 -- Serialisation properties

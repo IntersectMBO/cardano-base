@@ -135,10 +135,11 @@ instance VRFAlgorithm SimpleVRF where
   -- Core algorithm operations
   --
 
-  type Signable SimpleVRF = ToCBOR
+  type Signable SimpleVRF = SignableRepresentation
 
-  evalVRF () a sk@(SignKeySimpleVRF k) =
-    let u = h' (toCBOR a) k
+  evalVRF () a' sk@(SignKeySimpleVRF k) =
+    let a = getSignableRepresentation a'
+        u = h' (toCBOR a) k
         y = h $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
 
@@ -147,8 +148,9 @@ instance VRFAlgorithm SimpleVRF where
         s = mod (r + k * fromIntegral (bytesToNatural c)) q
     in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
 
-  verifyVRF () (VerKeySimpleVRF v) a (OutputVRF y, cert) =
-    let u = certU cert
+  verifyVRF () (VerKeySimpleVRF v) a' (OutputVRF y, cert) =
+    let a = getSignableRepresentation a'
+        u = certU cert
         c = certC cert
         c' = -fromIntegral c
         s = certS cert

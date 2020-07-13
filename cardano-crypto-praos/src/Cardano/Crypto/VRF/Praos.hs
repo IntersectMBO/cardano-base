@@ -63,12 +63,13 @@ where
 import Cardano.Binary
   ( FromCBOR (..)
   , ToCBOR (..)
-  , serialize'
   )
 
 import Cardano.Crypto.VRF.Class
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
 import Cardano.Crypto.Seed (getBytesFromSeedT)
+import Cardano.Crypto.Util (SignableRepresentation(..))
+
+import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
 import GHC.Generics (Generic)
 import Data.Coerce (coerce)
 
@@ -423,21 +424,21 @@ instance VRFAlgorithm PraosVRF where
     deriving newtype (ToCBOR, FromCBOR)
     deriving NoUnexpectedThunks via OnlyCheckIsWHNF "CertKeyVRF" Proof
 
-  type Signable PraosVRF = ToCBOR
+  type Signable PraosVRF = SignableRepresentation
 
   algorithmNameVRF = const "PraosVRF"
 
   deriveVerKeyVRF = coerce skToVerKey
 
   evalVRF = \_ msg (SignKeyPraosVRF sk) ->
-    let msgBS = serialize' msg
+    let msgBS = getSignableRepresentation msg
         proof = maybe (error "Invalid Key") id $ prove sk msgBS
         output = maybe (error "Invalid Proof") id $ outputFromProof proof
     in output `seq` proof `seq`
            (OutputVRF (outputBytes output), CertPraosVRF proof)
 
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
-    isJust $! verify pk proof (serialize' msg)
+    isJust $! verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_seedbytes

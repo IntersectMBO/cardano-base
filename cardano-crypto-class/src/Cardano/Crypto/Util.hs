@@ -4,6 +4,7 @@
 
 module Cardano.Crypto.Util
   ( Empty
+  , SignableRepresentation(..)
   , getRandomWord64
 
     -- * Simple serialisation used in mock instances
@@ -37,6 +38,21 @@ import           Crypto.Random (MonadRandom (..))
 
 class Empty a
 instance Empty a
+
+
+
+--
+-- Signable
+--
+
+-- | A class of types that have a representation in bytes that can be used
+-- for signing and verifying.
+--
+class SignableRepresentation a where
+    getSignableRepresentation :: a -> ByteString
+
+instance SignableRepresentation ByteString where
+    getSignableRepresentation = id
 
 
 --
