@@ -183,7 +183,7 @@ instance HashAlgorithm crypto => FromJSON (Hash crypto a) where
 
 -- utils used in the instances above
 hashToText :: Hash crypto a -> Text
-hashToText = Text.decodeLatin1 . getHashBytesAsHex
+hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
@@ -203,7 +203,7 @@ parseHash t =
 --
 
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
-  toCBOR = toCBOR . getHash
+  toCBOR (UnsafeHash h) = toCBOR h
 
   -- | 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
   -- instance for 'ByteString' (as is the above 'toCBOR' method).  'Size'
@@ -212,7 +212,7 @@ instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
   -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
   --
   encodedSizeExpr _size proxy =
-      encodedSizeExpr (\_ -> hashSize) (getHash <$> proxy)
+      encodedSizeExpr (\_ -> hashSize) (hashToBytes <$> proxy)
     where
       hashSize :: Size
       hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))
@@ -239,7 +239,7 @@ hash = hashWithSerialiser toCBOR
 
 {-# DEPRECATED fromHash "Use bytesToNatural . hashToBytes" #-}
 fromHash :: Hash h a -> Natural
-fromHash = foldl' f 0 . BS.unpack . getHash
+fromHash = foldl' f 0 . BS.unpack . hashToBytes
   where
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b
