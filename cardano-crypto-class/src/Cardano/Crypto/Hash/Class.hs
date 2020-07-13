@@ -65,7 +65,10 @@ import Numeric.Natural
 
 import Cardano.Prelude (NoUnexpectedThunks)
 
+
 class Typeable h => HashAlgorithm h where
+      --TODO: eliminate this Typeable constraint needed only for the ToCBOR
+      -- the ToCBOR should not need it either
 
   hashAlgorithmName :: proxy h -> String
 
