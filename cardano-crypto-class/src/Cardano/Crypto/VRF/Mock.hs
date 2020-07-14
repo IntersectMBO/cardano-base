@@ -54,7 +54,7 @@ instance VRFAlgorithm MockVRF where
   -- Core algorithm operations
   --
 
-  type Signable MockVRF = ToCBOR
+  type Signable MockVRF = SignableRepresentation
 
   evalVRF () a sk = evalVRF' a sk
 
@@ -131,10 +131,11 @@ instance FromCBOR (CertVRF MockVRF) where
   fromCBOR = decodeCertVRF
 
 
-evalVRF' :: ToCBOR a
+evalVRF' :: SignableRepresentation a
          => a
          -> SignKeyVRF MockVRF
          -> (OutputVRF MockVRF, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
-  let y = getHash $ hashWithSerialiser @MD5 id $ toCBOR a <> toCBOR sk
+  let y = getHash $ hashWithSerialiser @MD5 id $
+            toCBOR (getSignableRepresentation a) <> toCBOR sk
   in (OutputVRF y, CertMockVRF n)

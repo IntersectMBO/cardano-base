@@ -19,10 +19,10 @@ import Data.Proxy (Proxy(..))
 import Data.List (unfoldr)
 
 import Cardano.Binary (FromCBOR, ToCBOR(..))
-import Cardano.Crypto.DSIGN
+import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
-import qualified Cardano.Crypto.KES as KES
+import Cardano.Crypto.Util (SignableRepresentation(..))
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
@@ -65,7 +65,7 @@ testKESAlgorithm
      , Eq (SignKeyKES v)   -- no Eq for signing keys normally
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
-     , KES.Signable v ~ ToCBOR
+     , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
      )
   => proxy v
@@ -135,17 +135,17 @@ testKESAlgorithm _p n =
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
 
     , testGroup "verify"
-      [ testProperty "positive"           $ prop_verifyKES_positive         @v @Int
-      , testProperty "negative (key)"     $ prop_verifyKES_negative_key     @v @Int
-      , testProperty "negative (message)" $ prop_verifyKES_negative_message @v @Int
+      [ testProperty "positive"           $ prop_verifyKES_positive         @v
+      , testProperty "negative (key)"     $ prop_verifyKES_negative_key     @v
+      , testProperty "negative (message)" $ prop_verifyKES_negative_message @v
       , adjustOption (\(QuickCheckMaxSize sz) -> QuickCheckMaxSize (min sz 50)) $
-        testProperty "negative (period)"  $ prop_verifyKES_negative_period  @v @Int
+        testProperty "negative (period)"  $ prop_verifyKES_negative_period  @v
       ]
 
     , testGroup "serialisation of all KES evolutions"
       [ testProperty "VerKey"  $ prop_serialise_VerKeyKES  @v
       , testProperty "SignKey" $ prop_serialise_SignKeyKES @v
-      , testProperty "Sig"     $ prop_serialise_SigKES     @v @Int
+      , testProperty "Sig"     $ prop_serialise_SigKES     @v
       ]
 
     , testGroup "NoUnexpectedThunks"
@@ -200,9 +200,9 @@ prop_deriveVerKeyKES sk_0 =
 -- corresponding period.
 --
 prop_verifyKES_positive
-  :: forall v a.
-     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ ())
-  => SignKeyKES v -> [a] -> Property
+  :: forall v.
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+  => SignKeyKES v -> [Message] -> Property
 prop_verifyKES_positive sk_0 xs =
     cover 1 (length xs >= totalPeriods) "covers total periods" $
     conjoin [ counterexample ("period " ++ show t) $
@@ -221,9 +221,10 @@ prop_verifyKES_positive sk_0 xs =
 -- corresponding to a different signing key, then the verification fails.
 --
 prop_verifyKES_negative_key
-  :: forall v a.
-     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ (), Eq (SignKeyKES v))
-  => SignKeyKES v -> SignKeyKES v -> a -> Property
+  :: forall v.
+     (KESAlgorithm v, ContextKES v ~ (),
+      Signable v ~ SignableRepresentation, Eq (SignKeyKES v))
+  => SignKeyKES v -> SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_key sk_0 sk'_0 x =
     sk_0 /= sk'_0 ==>
     conjoin [ counterexample ("period " ++ show t) $
@@ -239,9 +240,9 @@ prop_verifyKES_negative_key sk_0 sk'_0 x =
 -- verification fails.
 --
 prop_verifyKES_negative_message
-  :: forall v a.
-     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ (), Eq a)
-  => SignKeyKES v -> a -> a -> Property
+  :: forall v.
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+  => SignKeyKES v -> Message -> Message -> Property
 prop_verifyKES_negative_message sk_0 x x' =
     x /= x' ==>
     conjoin [ counterexample ("period " ++ show t) $
@@ -258,9 +259,9 @@ prop_verifyKES_negative_message sk_0 x x' =
 -- verification fails.
 --
 prop_verifyKES_negative_period
-  :: forall v a.
-     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ ())
-  => SignKeyKES v -> a -> Property
+  :: forall v.
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+  => SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_period sk_0 x =
     conjoin [ counterexample ("periods " ++ show (t, t')) $
               verifyKES () vk t' x sig =/= Right ()
@@ -317,9 +318,9 @@ prop_serialise_SignKeyKES sk_0 =
 -- for 'SigKES' on /all/ the KES key evolutions.
 --
 prop_serialise_SigKES
-  :: forall v a.
-     (KESAlgorithm v, KES.Signable v a, ContextKES v ~ ())
-  => SignKeyKES v -> a -> Property
+  :: forall v.
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+  => SignKeyKES v -> Message -> Property
 prop_serialise_SigKES sk_0 x =
     conjoin
       [ counterexample ("period " ++ show t) $
@@ -367,10 +368,10 @@ instance KESAlgorithm v => Arbitrary (SignKeyKES v) where
       seedSize = seedSizeKES (Proxy :: Proxy v)
   shrink = const []
 
-instance (KES.Signable v Int, KESAlgorithm v, ContextKES v ~ ())
+instance (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
       => Arbitrary (SigKES v) where
   arbitrary = do
-    a <- arbitrary :: Gen Int
+    a <- arbitrary :: Gen Message
     sk <- arbitrary
     let sig = signKES () 0 a sk
     return sig

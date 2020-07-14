@@ -65,7 +65,7 @@ instance DSIGNAlgorithm MockDSIGN where
     -- Core algorithm operations
     --
 
-    type Signable MockDSIGN = ToCBOR
+    type Signable MockDSIGN = SignableRepresentation
 
     signDSIGN () a sk = mockSign a sk
 
@@ -161,10 +161,13 @@ data VerificationFailure
       }
   deriving Show
 
-mockSign :: ToCBOR a => a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
-mockSign a (SignKeyMockDSIGN n) = SigMockDSIGN (castHash (hash a)) n
+mockSign :: SignableRepresentation a
+         => a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
+mockSign a (SignKeyMockDSIGN n) =
+  SigMockDSIGN (castHash (hashRaw getSignableRepresentation a)) n
 
-mockSigned :: ToCBOR a => a -> SignKeyDSIGN MockDSIGN -> SignedDSIGN MockDSIGN a
+mockSigned :: SignableRepresentation a
+           => a -> SignKeyDSIGN MockDSIGN -> SignedDSIGN MockDSIGN a
 mockSigned a k = SignedDSIGN (mockSign a k)
 
 -- | Get the id of the signer from a signature. Used for testing.

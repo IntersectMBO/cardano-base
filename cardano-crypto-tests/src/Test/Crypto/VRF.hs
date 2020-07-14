@@ -51,8 +51,8 @@ testVRFAlgorithm
                      , ToCBOR (CertVRF v)
                      , FromCBOR (CertVRF v)
                      , Eq (SignKeyVRF v)     -- no Eq for signing keys normally
-                     , Signable v Int
                      , ContextVRF v ~ ()
+                     , Signable v ~ SignableRepresentation
                      )
   => proxy v
   -> String
@@ -123,13 +123,13 @@ testVRFAlgorithm _ n =
         -- value isn't actually what we're interested in, as long as all
         -- keys/hashes have the correct sizes, which 'prop_size_serialise'
         -- tests already.
-        testProperty "verify positive" $ prop_vrf_verify_pos @Int @v
-      , testProperty "verify negative" $ prop_vrf_verify_neg @Int @v
+        testProperty "verify positive" $ prop_vrf_verify_pos @v
+      , testProperty "verify negative" $ prop_vrf_verify_neg @v
       ]
 
     , testGroup "output"
-      [ testProperty "sizeOutputVRF"   $ prop_vrf_output_size    @Int @v
-      , testProperty "mkTestOutputVRF" $ prop_vrf_output_natural @Int @v
+      [ testProperty "sizeOutputVRF"   $ prop_vrf_output_size    @v
+      , testProperty "mkTestOutputVRF" $ prop_vrf_output_natural @v
       ]
 
     , testGroup "NoUnexpectedThunks"
@@ -140,8 +140,9 @@ testVRFAlgorithm _ n =
     ]
 
 prop_vrf_verify_pos
-  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => a
+  :: forall v. (VRFAlgorithm v,
+                ContextVRF v ~ (), Signable v ~ SignableRepresentation)
+  => Message
   -> SignKeyVRF v
   -> Bool
 prop_vrf_verify_pos a sk =
@@ -150,8 +151,9 @@ prop_vrf_verify_pos a sk =
   in verifyVRF () vk a (y, c)
 
 prop_vrf_verify_neg
-  :: forall a v. (Signable v a, VRFAlgorithm v, Eq (SignKeyVRF v), ContextVRF v ~ ())
-  => a
+  :: forall v. (VRFAlgorithm v, Eq (SignKeyVRF v),
+                ContextVRF v ~ (), Signable v ~ SignableRepresentation)
+  => Message
   -> SignKeyVRF v
   -> SignKeyVRF v
   -> Property
@@ -164,8 +166,9 @@ prop_vrf_verify_neg a sk sk' =
 
 
 prop_vrf_output_size
-  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => a
+  :: forall v. (VRFAlgorithm v,
+                ContextVRF v ~ (), Signable v ~ SignableRepresentation)
+  => Message
   -> SignKeyVRF v
   -> Property
 prop_vrf_output_size a sk =
@@ -174,8 +177,9 @@ prop_vrf_output_size a sk =
       === fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
 
 prop_vrf_output_natural
-  :: forall a v. (Signable v a, VRFAlgorithm v, ContextVRF v ~ ())
-  => a
+  :: forall v. (VRFAlgorithm v,
+                ContextVRF v ~ (), Signable v ~ SignableRepresentation)
+  => Message
   -> SignKeyVRF v
   -> Property
 prop_vrf_output_natural a sk =
@@ -214,10 +218,11 @@ instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
       seedSize = seedSizeVRF (Proxy :: Proxy v)
   shrink = const []
 
-instance (Signable v Int, VRFAlgorithm v, ContextVRF v ~ ())
+instance (VRFAlgorithm v,
+          ContextVRF v ~ (), Signable v ~ SignableRepresentation)
       => Arbitrary (CertVRF v) where
   arbitrary = do
-    a <- arbitrary :: Gen Int
+    a <- arbitrary :: Gen Message
     sk <- arbitrary
     return $ snd $ evalVRF () a sk
   shrink = const []

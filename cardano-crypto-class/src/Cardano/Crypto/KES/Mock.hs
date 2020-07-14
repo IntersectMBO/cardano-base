@@ -83,7 +83,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- Core algorithm operations
     --
 
-    type Signable (MockKES t) = ToCBOR
+    type Signable (MockKES t) = SignableRepresentation
 
     updateKES () (SignKeyMockKES vk t') t =
         assert (t == t') $
@@ -95,12 +95,13 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- allowed KES period.
     signKES () t a (SignKeyMockKES vk t') =
         assert (t == t') $
-        SigMockKES (castHash (hash a)) (SignKeyMockKES vk t)
+        SigMockKES (castHash (hashRaw getSignableRepresentation a))
+                   (SignKeyMockKES vk t)
 
     verifyKES () vk t a (SigMockKES h (SignKeyMockKES vk' t'))
       | t' == t
       , vk == vk'
-      , castHash (hash a) == h
+      , castHash (hashRaw getSignableRepresentation a) == h
       = Right ()
 
       | otherwise

@@ -15,18 +15,18 @@ module Cardano.Crypto.DSIGN.Ed25519
   )
 where
 
-import Data.ByteString.Lazy (toStrict)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
 
 import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
-import Cardano.Binary (FromCBOR (..), ToCBOR (..), serialize)
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed25519 as Ed25519
 
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Seed
+import Cardano.Crypto.Util (SignableRepresentation(..))
 
 
 data Ed25519DSIGN
@@ -64,15 +64,15 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     -- Core algorithm operations
     --
 
-    type Signable Ed25519DSIGN = ToCBOR
+    type Signable Ed25519DSIGN = SignableRepresentation
 
     signDSIGN () a (SignKeyEd25519DSIGN sk) =
         let vk = toPublic sk
-            bs = toStrict $ serialize a
+            bs = getSignableRepresentation a
          in SigEd25519DSIGN $ sign sk vk bs
 
     verifyDSIGN () (VerKeyEd25519DSIGN vk) a (SigEd25519DSIGN sig) =
-        if verify vk (toStrict $ serialize a) sig
+        if verify vk (getSignableRepresentation a) sig
           then Right ()
           else Left "Verification failed"
 

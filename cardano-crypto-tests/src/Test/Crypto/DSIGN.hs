@@ -16,6 +16,7 @@ import Data.Proxy (Proxy (..))
 import Cardano.Binary (FromCBOR, ToCBOR (..))
 
 import Cardano.Crypto.DSIGN
+import Cardano.Crypto.Util (SignableRepresentation(..))
 
 import Test.Crypto.Util
 import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property)
@@ -43,7 +44,7 @@ testDSIGNAlgorithm
                      , Eq (SignKeyDSIGN v)   -- no Eq for signing keys normally
                      , ToCBOR (SigDSIGN v)
                      , FromCBOR (SigDSIGN v)
-                     , Signable v Int
+                     , Signable v ~ SignableRepresentation
                      , ContextDSIGN v ~ ()
                      )
   => proxy v
@@ -111,9 +112,9 @@ testDSIGNAlgorithm _ n =
       ]
 
     , testGroup "verify"
-      [ testProperty "verify positive" $ prop_dsign_verify_pos @Int @v
-      , testProperty "verify newgative (wrong key)" $ prop_dsign_verify_neg_key @Int @v
-      , testProperty "verify newgative (wrong message)" $ prop_dsign_verify_neg_msg @Int @v
+      [ testProperty "verify positive" $ prop_dsign_verify_pos @v
+      , testProperty "verify newgative (wrong key)" $ prop_dsign_verify_neg_key @v
+      , testProperty "verify newgative (wrong message)" $ prop_dsign_verify_neg_msg @v
       ]
 
     , testGroup "NoUnexpectedThunks"
@@ -128,8 +129,8 @@ testDSIGNAlgorithm _ n =
 -- signature using the corresponding verification key.
 --
 prop_dsign_verify_pos
-  :: forall a v. (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
-  => a
+  :: forall v. (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v ~ SignableRepresentation)
+  => Message
   -> SignKeyDSIGN v
   -> Property
 prop_dsign_verify_pos a sk =
@@ -143,8 +144,9 @@ prop_dsign_verify_pos a sk =
 -- different signing key, then the verification fails.
 --
 prop_dsign_verify_neg_key
-  :: forall a v. (DSIGNAlgorithm v, Eq (SignKeyDSIGN v), Signable v a, ContextDSIGN v ~ ())
-  => a
+  :: forall v. (DSIGNAlgorithm v, Eq (SignKeyDSIGN v),
+                ContextDSIGN v ~ (), Signable v ~ SignableRepresentation)
+  => Message
   -> SignKeyDSIGN v
   -> SignKeyDSIGN v
   -> Property
@@ -159,9 +161,10 @@ prop_dsign_verify_neg_key a sk sk' =
 -- signature with a message other than @a@, then the verification fails.
 --
 prop_dsign_verify_neg_msg
-  :: forall a v. (Eq a, DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
-  => a
-  -> a
+  :: forall v. (DSIGNAlgorithm v,
+                ContextDSIGN v ~ (), Signable v ~ SignableRepresentation)
+  => Message
+  -> Message
   -> SignKeyDSIGN v
   -> Property
 prop_dsign_verify_neg_msg a a' sk =
@@ -185,10 +188,11 @@ instance DSIGNAlgorithm v => Arbitrary (SignKeyDSIGN v) where
       seedSize = seedSizeDSIGN (Proxy :: Proxy v)
   shrink = const []
 
-instance (Signable v Int, DSIGNAlgorithm v, ContextDSIGN v ~ ())
+instance (DSIGNAlgorithm v,
+          ContextDSIGN v ~ (), Signable v ~ SignableRepresentation)
       => Arbitrary (SigDSIGN v) where
   arbitrary = do
-    a <- arbitrary :: Gen Int
+    a <- arbitrary :: Gen Message
     sk <- arbitrary
     return $ signDSIGN () a sk
   shrink = const []
