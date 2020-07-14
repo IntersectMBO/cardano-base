@@ -16,6 +16,8 @@ module Cardano.Crypto.Hash.Class
   , castHash
   , hashToBytes
   , hashFromBytes
+  , hashToBytesShort
+  , hashFromBytesShort
 
     -- * Rendering and parsing
   , hashToBytesAsHex
@@ -130,6 +132,26 @@ hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytes bytes
   | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
   = Just (UnsafeHash (SBS.toShort bytes))
+
+  | otherwise
+  = Nothing
+
+
+-- | The representation of the hash as bytes, as a 'ShortByteString'.
+--
+hashToBytesShort :: Hash h a -> ShortByteString
+hashToBytesShort (UnsafeHash h) = h
+
+
+-- | Make a hash from it bytes representation, as a 'ShortByteString'.
+--
+-- It must be a a bytestring of the correct length, as given by 'sizeHash'.
+--
+hashFromBytesShort :: forall h a. HashAlgorithm h
+                   => ShortByteString -> Maybe (Hash h a)
+hashFromBytesShort bytes
+  | SBS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
+  = Just (UnsafeHash bytes)
 
   | otherwise
   = Nothing
