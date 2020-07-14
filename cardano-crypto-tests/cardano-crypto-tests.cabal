@@ -37,8 +37,10 @@ library
                      , cborg
                      , cryptonite
                      , formatting
+                     , memory
                      , QuickCheck
                      , tasty
+                     , tasty-hunit
                      , tasty-quickcheck
 
   default-language:    Haskell2010

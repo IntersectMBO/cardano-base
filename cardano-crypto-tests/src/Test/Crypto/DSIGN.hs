@@ -22,7 +22,14 @@ import Test.Crypto.Util
 import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
+import Test.Tasty.HUnit (testCase, assertEqual, assertFailure, Assertion)
 
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.ByteArray.Encoding (convertFromBase, Base (Base16))
+import Data.Char (ord)
+import Data.Word (Word8)
+import Control.Monad (forM_)
 
 --
 -- The list of all tests
@@ -33,6 +40,7 @@ tests =
     [ testDSIGNAlgorithm (Proxy :: Proxy MockDSIGN) "MockDSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy Ed25519DSIGN) "Ed25519DSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy Ed448DSIGN) "Ed448DSIGN"
+    , testDSIGNRegressions (Proxy :: Proxy Ed25519DSIGN) "fixtures/ed25519.input"
     ]
 
 testDSIGNAlgorithm
@@ -124,7 +132,6 @@ testDSIGNAlgorithm _ n =
       ]
     ]
 
-
 -- | If we sign a message @a@ with the signing key, then we can verify the
 -- signature using the corresponding verification key.
 --
@@ -173,6 +180,48 @@ prop_dsign_verify_neg_msg a a' sk =
         vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk a' sig =/= Right ()
 
+testDSIGNRegressions
+  :: forall v. (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v ~ SignableRepresentation)
+  => Proxy v
+  -> FilePath
+  -> TestTree
+testDSIGNRegressions p fp =
+  testCase ("DSIGN regressions " <> fp) (test_dsign_regressions p fp)
+
+test_dsign_regressions
+  :: forall v. (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v ~ SignableRepresentation)
+  => Proxy v
+  -> FilePath
+  -> Assertion
+test_dsign_regressions _ fixtureFilePath = do
+  fixture <- parseFixture <$> BS.readFile fixtureFilePath
+  forM_ (zip [1..] fixture) $ \(lineNum :: Int, (sk, pk, m, sm)) -> do
+    let s = signDSIGN () m sk
+    assertEqual ("signature " ++ fixtureFilePath ++ ":" ++ show lineNum) sm s
+    let v = deriveVerKeyDSIGN sk
+    assertEqual ("ver key " ++ fixtureFilePath ++ ":" ++ show lineNum) pk v
+    case verifyDSIGN () pk m sm of
+      Left err -> assertFailure ("verify " ++ fixtureFilePath ++ ":" ++ show lineNum ++ ":" ++ err)
+      Right () -> return ()
+    let forged = BS.pack . forge . BS.unpack $ m
+    case verifyDSIGN () pk forged sm of
+      Left _ -> return ()
+      Right () -> assertFailure ("verify forged " ++ fixtureFilePath ++ ":" ++ show lineNum)
+  where
+    -- ported from https://ed25519.cr.yp.to/python/sign.py
+    forge :: [Word8] -> [Word8]
+    forge [] = [fromIntegral $ ord 'x']
+    forge xs = init xs ++ [last xs + 1]
+
+    parseFixture input =
+      [ ( maybe (error "Failed to parse key") id . rawDeserialiseSignKeyDSIGN $ either error id (convertFromBase Base16 sk) :: SignKeyDSIGN v
+        , maybe (error "Failed to parse key") id . rawDeserialiseVerKeyDSIGN $ either error id (convertFromBase Base16 pk) :: VerKeyDSIGN v
+        , either error id (convertFromBase Base16 m) :: ByteString
+        , maybe (error "Failed to parse key") id . rawDeserialiseSigDSIGN $ either error id (convertFromBase Base16 sm) :: SigDSIGN v
+        )
+      | [sk, pk, m, sm] <-
+        map (BS.split (fromIntegral $ ord ':')) (BS.split (fromIntegral $ ord '\n') input)
+      ]
 
 --
 -- Arbitrary instances
