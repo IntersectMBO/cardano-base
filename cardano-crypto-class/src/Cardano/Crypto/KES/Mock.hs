@@ -95,13 +95,13 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- allowed KES period.
     signKES () t a (SignKeyMockKES vk t') =
         assert (t == t') $
-        SigMockKES (castHash (hashRaw getSignableRepresentation a))
+        SigMockKES (castHash (hashWith getSignableRepresentation a))
                    (SignKeyMockKES vk t)
 
     verifyKES () vk t a (SigMockKES h (SignKeyMockKES vk' t'))
       | t' == t
       , vk == vk'
-      , castHash (hashRaw getSignableRepresentation a) == h
+      , castHash (hashWith getSignableRepresentation a) == h
       = Right ()
 
       | otherwise
@@ -132,7 +132,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
      <> writeBinaryWord64 (fromIntegral t)
 
     rawSerialiseSigKES (SigMockKES h sk) =
-        getHash h
+        hashToBytes h
      <> rawSerialiseSignKeyKES sk
 
     rawDeserialiseVerKeyKES bs

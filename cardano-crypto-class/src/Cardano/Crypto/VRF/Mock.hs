@@ -136,6 +136,6 @@ evalVRF' :: SignableRepresentation a
          -> SignKeyVRF MockVRF
          -> (OutputVRF MockVRF, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
-  let y = getHash $ hashWithSerialiser @MD5 id $
+  let y = hashToBytes $ hashWithSerialiser @MD5 id $
             toCBOR (getSignableRepresentation a) <> toCBOR sk
   in (OutputVRF y, CertMockVRF n)

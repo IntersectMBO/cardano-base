@@ -59,7 +59,7 @@ import Cardano.Binary
 
 import Cardano.Crypto.Util (Empty, bytesToNatural, naturalToBytes)
 import Cardano.Crypto.Seed (Seed)
-import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashRaw)
+import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
 
 class ( Typeable v
@@ -93,7 +93,7 @@ class ( Typeable v
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
 
   hashVerKeyVRF :: HashAlgorithm h => VerKeyVRF v -> Hash h (VerKeyVRF v)
-  hashVerKeyVRF = hashRaw rawSerialiseVerKeyVRF
+  hashVerKeyVRF = hashWith rawSerialiseVerKeyVRF
 
   --
   -- Core algorithm operations

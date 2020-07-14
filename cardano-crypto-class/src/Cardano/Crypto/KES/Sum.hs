@@ -139,7 +139,7 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     -- the hash, not the implementation. So that's why we have to hash
     -- the hash here. We could alternatively provide a "key identifier"
     -- function and let the implementation choose what that is.
-    hashVerKeyKES (VerKeySumKES vk) = castHash (hashRaw getHash vk)
+    hashVerKeyKES (VerKeySumKES vk) = castHash (hashWith hashToBytes vk)
 
 
     --
@@ -206,7 +206,7 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     sizeSigKES     _ = sizeSigKES     (Proxy :: Proxy d)
                      + sizeVerKeyKES  (Proxy :: Proxy d) * 2
 
-    rawSerialiseVerKeyKES  (VerKeySumKES  vk) = getHash vk
+    rawSerialiseVerKeyKES  (VerKeySumKES  vk) = hashToBytes vk
 
     rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) =
       mconcat
@@ -272,7 +272,7 @@ hashPairOfVKeys :: (KESAlgorithm d, HashAlgorithm h)
                 => (VerKeyKES d, VerKeyKES d)
                 -> Hash h (VerKeyKES d, VerKeyKES d)
 hashPairOfVKeys =
-    hashRaw $ \(a,b) ->
+    hashWith $ \(a,b) ->
       rawSerialiseVerKeyKES a <> rawSerialiseVerKeyKES b
 
 slice :: Word -> Word -> ByteString -> ByteString
