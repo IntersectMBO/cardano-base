@@ -37,8 +37,10 @@ tests =
     , testHashAlgorithm (Proxy :: Proxy SHA3_256) "SHA3_256"
     , testHashAlgorithm (Proxy :: Proxy Blake2b_224) "Blake2b_224"
     , testHashAlgorithm (Proxy :: Proxy Blake2b_256) "Blake2b_256"
-    , testHashRegressions (Proxy :: Proxy SHA256) "fixtures/sha256.input"
     , testHashRegressions (Proxy :: Proxy MD5) "fixtures/md5.input"
+    , testHashRegressions (Proxy :: Proxy SHA256) "fixtures/sha256.input"
+    , testHashRegressions (Proxy :: Proxy Blake2b_224) "fixtures/blake2b_224.input"
+    , testHashRegressions (Proxy :: Proxy Blake2b_256) "fixtures/blake2b_256.input"
     ]
 
 testHashAlgorithm
