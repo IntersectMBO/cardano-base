@@ -52,6 +52,7 @@ import           Data.ByteString.Short (ShortByteString)
 
 import           Data.String (IsString (..))
 import qualified Data.Text.Encoding as Text
+import qualified Data.Text as Text
 import           Data.Text (Text)
 
 import qualified Data.Aeson as Aeson
@@ -183,7 +184,7 @@ hashFromBytesAsHex hexrep
 
 
 instance Show (Hash h a) where
-  show = show . hashToBytesAsHex
+  show = Text.unpack . Text.decodeUtf8 . hashToBytesAsHex
 
 instance HashAlgorithm h => IsString (Hash h a) where
   fromString str =
