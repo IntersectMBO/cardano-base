@@ -23,7 +23,6 @@ import Cardano.Prelude
 import Codec.CBOR.Decoding as D
 import Codec.CBOR.ByteArray as BA
 import qualified Codec.CBOR.Read as CBOR.Read
-import Control.Exception (Exception)
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Short.Internal as SBS
@@ -33,7 +32,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
 import Data.Time.Clock (NominalDiffTime)
-import Data.Typeable (typeRep)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
 import Formatting (bprint, int, shown, stext)

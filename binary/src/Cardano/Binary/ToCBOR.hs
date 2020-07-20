@@ -51,7 +51,6 @@ import Data.Tagged (Tagged(..))
 import qualified Data.Text as Text
 import Data.Text.Lazy.Builder (Builder)
 import Data.Time.Clock (NominalDiffTime)
-import Data.Typeable (TypeRep, typeRep)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
 import Foreign.Storable (sizeOf)
