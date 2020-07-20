@@ -48,3 +48,4 @@ library
                       , mtl
                       , serialise
                       , transformers
+                      , quiet
