@@ -13,11 +13,17 @@
 }:
 let
 
+  src = haskell-nix.haskellLib.cleanGit {
+      name = "cardano-base-src";
+      src = ../.;
+  };
+
   # This creates the Haskell package set.
   # https://input-output-hk.github.io/haskell.nix/user-guide/projects/
   pkgSet = haskell-nix.cabalProject {
-    src = haskell-nix.haskellLib.cleanGit { src = ../.; };
-    ghc = buildPackages.haskell-nix.compiler.${compiler};
+    inherit src;
+    compiler-nix-name = compiler;
+    #ghc = buildPackages.haskell-nix.compiler.${compiler};
     modules = [
 
       # Allow reinstallation of Win32
