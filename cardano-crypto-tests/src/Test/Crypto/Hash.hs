@@ -10,9 +10,11 @@ where
 
 import Cardano.Crypto.Hash
 import qualified Data.ByteString as SB
+import Data.Maybe (fromJust)
 import Data.Proxy (Proxy (..))
 import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_unexpected_thunks)
 import Test.QuickCheck
+import Data.String(fromString)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -43,7 +45,9 @@ testHashAlgorithm _ n =
     -- TODO The following property is wrong because show and fromString are not inverses of each other
     -- Commenting the following out to fix CI and unblock other unrelated PRs to this project.
 
-    -- , testProperty "show/fromString" $ prop_hash_show_fromString @h @Float
+    , testProperty "hashFromStringAsHex/hashToStringFromHash" $ prop_hash_hashFromStringAsHex_hashToStringFromHash @h @Float
+    , testProperty "hashFromStringAsHex/fromString" $ prop_hash_hashFromStringAsHex_fromString @h @Float
+    , testProperty "show/read" $ prop_hash_show_read @h @Float
     , testProperty "NoUnexpectedThunks" $ prop_no_unexpected_thunks @(Hash h Int)
     ]
 
@@ -60,8 +64,20 @@ prop_hash_correct_sizeHash
 prop_hash_correct_sizeHash h =
   SB.length (hashToBytes h) === fromIntegral (sizeHash (Proxy :: Proxy h))
 
--- prop_hash_show_fromString :: HashAlgorithm h => Hash h a -> Property
--- prop_hash_show_fromString h = h === fromString (show h)
+prop_hash_show_read
+  :: forall h a. HashAlgorithm h
+  => Hash h a -> Property
+prop_hash_show_read h = read (show h) === h
+
+prop_hash_hashFromStringAsHex_fromString
+  :: forall h a. HashAlgorithm h
+  => Hash h a -> Property
+prop_hash_hashFromStringAsHex_fromString h = let s = hashToStringAsHex h in fromJust (hashFromStringAsHex @h @a s) === fromString s
+
+prop_hash_hashFromStringAsHex_hashToStringFromHash
+  :: forall h a. HashAlgorithm h
+  => Hash h a -> Property
+prop_hash_hashFromStringAsHex_hashToStringFromHash h = fromJust (hashFromStringAsHex @h @a (hashToStringAsHex h)) === h
 
 
 --
