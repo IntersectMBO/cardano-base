@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Cardano.Slotting.Slot
@@ -26,11 +27,13 @@ import Codec.Serialise (Serialise (..))
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Typeable (Typeable)
 import Data.Word (Word64)
+import Quiet (Quiet (..))
 import GHC.Generics (Generic)
 
 -- | The 0-based index for the Ourboros time slot.
 newtype SlotNo = SlotNo {unSlotNo :: Word64}
-  deriving stock (Show, Eq, Ord, Generic)
+  deriving stock (Eq, Ord, Generic)
+  deriving Show via Quiet SlotNo
   deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoUnexpectedThunks, ToJSON, FromJSON)
 
 instance ToCBOR SlotNo where
@@ -91,9 +94,11 @@ withOriginFromMaybe (Just t) = At t
 
 -- | An epoch, i.e. the number of the epoch.
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
-  deriving stock (Eq, Ord, Show, Generic)
+  deriving stock (Eq, Ord, Generic)
+  deriving Show via Quiet EpochNo
   deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoUnexpectedThunks, ToJSON, FromJSON)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
-  deriving stock (Eq, Ord, Show, Generic)
+  deriving stock (Eq, Ord, Generic)
+  deriving Show via Quiet EpochSize
   deriving newtype (Enum, Num, Real, Integral, NoUnexpectedThunks, ToJSON, FromJSON)
