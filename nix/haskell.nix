@@ -23,7 +23,6 @@ let
   pkgSet = haskell-nix.cabalProject {
     inherit src;
     compiler-nix-name = compiler;
-    #ghc = buildPackages.haskell-nix.compiler.${compiler};
     modules = [
 
       # Allow reinstallation of Win32
