@@ -29,3 +29,10 @@ result
 
 # Local development
 stack-local.yaml
+
+# Visual Studio Code
+/.vscode
+
+# Test artefacts
+/result-*
+
