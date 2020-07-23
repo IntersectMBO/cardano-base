@@ -22,6 +22,10 @@ module Cardano.Crypto.Hash.Class
     -- * Rendering and parsing
   , hashToBytesAsHex
   , hashFromBytesAsHex
+  , hashToTextAsHex
+  , hashFromTextAsHex
+  , hashToStringAsHex
+  , hashFromStringAsHex
 
     -- * Other operations
   , xor
@@ -36,6 +40,7 @@ module Cardano.Crypto.Hash.Class
 where
 
 import Data.List (foldl')
+import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
@@ -162,13 +167,37 @@ hashFromBytesShort bytes
 -- Rendering and parsing
 --
 
--- | Convert the hash to hex encoding, as a ByteString.
+-- | Convert the hash to hex encoding, as 'String'.
+hashToStringAsHex :: Hash h a -> String
+hashToStringAsHex = Text.unpack . hashToTextAsHex
+
+-- | Make a hash from hex-encoded 'String' representation.
+--
+-- This can fail for the same reason as 'hashFromBytes', or because the input
+-- is invalid hex. The whole byte string must be valid hex, not just a prefix.
+--
+hashFromStringAsHex :: HashAlgorithm h => String -> Maybe (Hash h a)
+hashFromStringAsHex = hashFromTextAsHex . Text.pack
+
+-- | Convert the hash to hex encoding, as 'Text'.
+--
+hashToTextAsHex :: Hash h a -> Text
+hashToTextAsHex = Text.decodeUtf8 . hashToBytesAsHex
+
+-- | Make a hash from hex-encoded 'Text' representation.
+--
+-- This can fail for the same reason as 'hashFromBytes', or because the input
+-- is invalid hex. The whole byte string must be valid hex, not just a prefix.
+--
+hashFromTextAsHex :: HashAlgorithm h => Text -> Maybe (Hash h a)
+hashFromTextAsHex = hashFromBytesAsHex . Text.encodeUtf8
+
+-- | Convert the hash to hex encoding, as 'ByteString'.
 --
 hashToBytesAsHex :: Hash h a -> ByteString
 hashToBytesAsHex = Base16.encode . hashToBytes
 
-
--- | Make a hash from it bytes representation, starting from a hex encoding.
+-- | Make a hash from hex-encoded 'ByteString' representation.
 --
 -- This can fail for the same reason as 'hashFromBytes', or because the input
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
@@ -184,7 +213,10 @@ hashFromBytesAsHex hexrep
 
 
 instance Show (Hash h a) where
-  show = Text.unpack . Text.decodeUtf8 . hashToBytesAsHex
+  show = show . hashToStringAsHex
+
+instance HashAlgorithm h => Read (Hash h a) where
+  readsPrec p str = [ (h, y) | (x, y) <- readsPrec p str, h <- maybeToList (hashFromStringAsHex x) ]
 
 instance HashAlgorithm h => IsString (Hash h a) where
   fromString str =
