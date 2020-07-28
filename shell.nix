@@ -26,13 +26,13 @@ let
     buildInputs = with haskellPackages; [
       cabal-install
       ghcid
+      gitAndTools.git
       hlint
       weeder
       nix
       niv
       pkgconfig
       sqlite-interactive
-      git
     ];
 
     # Prevents cabal from choosing alternate plans, so that
