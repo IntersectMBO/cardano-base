@@ -38,6 +38,7 @@ module Cardano.Crypto.VRF.Praos
   , vrfKeySizeVRF
 
   -- * Seed and key generation
+  , Seed
   , genSeed
   , keypairFromSeed
 
@@ -188,6 +189,16 @@ mkSeed = do
 
 -- | Generate a random seed.
 -- Uses 'randombytes_buf' to create random data.
+--
+-- This function provides an alternative way of generating seeds specifically
+-- for the 'PraosVRF' algorithm. Unlike the 'genKeyPairVRF' method, which uses
+-- a 'ByteString'-based 'Cardano.Crypto.Seed.Seed', this seed generation method
+-- bypasses the GHC heap, keeping the seed in C-allocated memory instead.
+--
+-- This provides two advantages:
+-- 1. It avoids the overhead of unnecessary GHC-side heap allocations.
+-- 2. It avoids leaking the seed via the GHC heap; the 'Seed' type itself
+--    takes care of zeroing out its memory upon finalization.
 genSeed :: IO Seed
 genSeed = do
   seed <- mkSeed
@@ -195,14 +206,21 @@ genSeed = do
     randombytes_buf ptr crypto_vrf_seedbytes
   return seed
 
+copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
+copyFromByteString ptr bs lenExpected =
+  BS.useAsCStringLen bs $ \(cstr, lenActual) ->
+    if (lenActual >= lenExpected) then
+      copyBytes (castPtr ptr) cstr lenExpected
+    else
+      error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
+
 seedFromBytes :: ByteString -> Seed
 seedFromBytes bs | BS.length bs < fromIntegral crypto_vrf_seedbytes =
   error "Not enough bytes for seed"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
-    BS.useAsCString bs $ \cstr ->
-      copyBytes (castPtr ptr) cstr (fromIntegral crypto_vrf_seedbytes)
+    copyFromByteString ptr bs (fromIntegral crypto_vrf_seedbytes)
   return seed
 
 -- | Convert an opaque 'Seed' into a 'ByteString' that we can inspect.
@@ -302,8 +320,7 @@ proofFromBytes bs
   = unsafePerformIO $ do
       proof <- mkProof
       withForeignPtr (unProof proof) $ \ptr ->
-        BS.useAsCString bs $ \cstr -> do
-          copyBytes (castPtr ptr) cstr (certSizeVRF)
+        copyFromByteString ptr bs certSizeVRF
       return proof
 
 skFromBytes :: ByteString -> SignKey
@@ -314,8 +331,7 @@ skFromBytes bs
   = unsafePerformIO $ do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
-        BS.useAsCString bs $ \cstr -> do
-          copyBytes (castPtr ptr) cstr signKeySizeVRF
+        copyFromByteString ptr bs signKeySizeVRF
       return sk
 
 vkFromBytes :: ByteString -> VerKey
@@ -326,8 +342,7 @@ vkFromBytes bs
   = unsafePerformIO $ do
       pk <- mkVerKey
       withForeignPtr (unVerKey pk) $ \ptr ->
-        BS.useAsCString bs $ \cstr -> do
-          copyBytes (castPtr ptr) cstr verKeySizeVRF
+        copyFromByteString ptr bs verKeySizeVRF
       return pk
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
