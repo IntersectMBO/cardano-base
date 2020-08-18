@@ -32,7 +32,6 @@ import qualified Codec.CBOR.Decoding as D
 import qualified Codec.CBOR.Read as Read
 import qualified Codec.CBOR.Write as CBOR.Write
 import Control.Exception.Safe (impureThrow)
-import Control.Monad.ST (ST, runST)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Internal as BSL
@@ -134,4 +133,3 @@ decodeNestedCborBytes :: D.Decoder s ByteString
 decodeNestedCborBytes = do
   decodeNestedCborTag
   D.decodeBytes
-

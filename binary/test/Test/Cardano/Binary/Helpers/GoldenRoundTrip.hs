@@ -19,7 +19,6 @@ import Cardano.Prelude
 import Test.Cardano.Prelude
 
 import qualified Codec.CBOR.Decoding as D
-import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import Formatting.Buildable (Buildable(..))
 import Hedgehog

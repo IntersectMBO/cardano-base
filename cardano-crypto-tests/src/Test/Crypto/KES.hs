@@ -18,7 +18,6 @@ where
 import Data.Proxy (Proxy(..))
 import Data.List (unfoldr)
 
-import Cardano.Binary (FromCBOR, ToCBOR(..))
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES

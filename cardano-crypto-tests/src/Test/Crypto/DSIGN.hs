@@ -13,8 +13,6 @@ where
 
 import Data.Proxy (Proxy (..))
 
-import Cardano.Binary (FromCBOR, ToCBOR (..))
-
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Util (SignableRepresentation(..))
 
@@ -196,4 +194,3 @@ instance (DSIGNAlgorithm v,
     sk <- arbitrary
     return $ signDSIGN () a sk
   shrink = const []
-

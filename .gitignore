@@ -36,3 +36,6 @@ stack-local.yaml
 # Test artefacts
 /result-*
 
+# ghcid
+**/.ghcid
+**/ghcid.txt
