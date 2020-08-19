@@ -40,11 +40,11 @@ instance DSIGNAlgorithm MockDSIGN where
     --
 
     newtype VerKeyDSIGN MockDSIGN = VerKeyMockDSIGN Word64
-        deriving stock   (Show, Eq, Ord, Generic)
+        deriving stock   (Show, Eq, Generic)
         deriving newtype (Num, NoUnexpectedThunks)
 
     newtype SignKeyDSIGN MockDSIGN = SignKeyMockDSIGN Word64
-        deriving stock   (Show, Eq, Ord, Generic)
+        deriving stock   (Show, Eq, Generic)
         deriving newtype (Num, NoUnexpectedThunks)
 
     data SigDSIGN MockDSIGN = SigMockDSIGN !(Hash ShortHash ()) !Word64

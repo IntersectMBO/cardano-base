@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Abstract digital signatures.
 module Cardano.Crypto.DSIGN.Class
@@ -43,6 +45,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
+import GHC.TypeLits (TypeError, ErrorMessage (..))
 
 import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
@@ -142,6 +145,21 @@ class ( Typeable v
   rawDeserialiseSignKeyDSIGN :: ByteString -> Maybe (SignKeyDSIGN v)
   rawDeserialiseSigDSIGN     :: ByteString -> Maybe (SigDSIGN     v)
 
+--
+-- Do not provide Ord instances for keys, see #38
+--
+
+instance ( TypeError ('Text "Ord not supported for signing keys, use the hash instead")
+         , Eq (SignKeyDSIGN v)
+         )
+      => Ord (SignKeyDSIGN v) where
+    compare = error "unsupported"
+
+instance ( TypeError ('Text "Ord not supported for verification keys, use the hash instead")
+         , Eq (VerKeyDSIGN v)
+         )
+      => Ord (VerKeyDSIGN v) where
+    compare = error "unsupported"
 
 --
 -- Convenient CBOR encoding/decoding

@@ -26,10 +26,10 @@ data NeverDSIGN
 instance DSIGNAlgorithm NeverDSIGN where
 
   data VerKeyDSIGN  NeverDSIGN = NeverUsedVerKeyDSIGN
-     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+     deriving (Show, Eq, Generic, NoUnexpectedThunks)
 
   data SignKeyDSIGN NeverDSIGN = NeverUsedSignKeyDSIGN
-     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+     deriving (Show, Eq, Generic, NoUnexpectedThunks)
 
   data SigDSIGN     NeverDSIGN = NeverUsedSigDSIGN
      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)

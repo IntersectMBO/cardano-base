@@ -53,12 +53,12 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     --
 
     newtype VerKeyKES (MockKES t) = VerKeyMockKES Word64
-        deriving stock   (Show, Eq, Ord, Generic)
+        deriving stock   (Show, Eq, Generic)
         deriving newtype (NoUnexpectedThunks)
 
     data SignKeyKES (MockKES t) =
            SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
-        deriving stock    (Show, Eq, Ord, Generic)
+        deriving stock    (Show, Eq, Generic)
         deriving anyclass (NoUnexpectedThunks)
 
     data SigKES (MockKES t) =

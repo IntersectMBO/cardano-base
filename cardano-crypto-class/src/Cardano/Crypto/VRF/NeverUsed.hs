@@ -26,10 +26,10 @@ data NeverVRF
 instance VRFAlgorithm NeverVRF where
 
   data VerKeyVRF NeverVRF = NeverUsedVerKeyVRF
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+    deriving (Show, Eq, Generic, NoUnexpectedThunks)
 
   data SignKeyVRF NeverVRF = NeverUsedSignKeyVRF
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+    deriving (Show, Eq, Generic, NoUnexpectedThunks)
 
   data CertVRF NeverVRF = NeverUsedCertVRF
     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
