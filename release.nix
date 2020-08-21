@@ -57,7 +57,7 @@ let
 
   jobs = {
     native = mapTestOn (__trace (__toJSON (packagePlatforms project)) (packagePlatforms project));
-    "${mingwW64.config}" = mapTestOnCross mingwW64 (packagePlatformsCross project);
+    #"${mingwW64.config}" = mapTestOnCross mingwW64 (packagePlatformsCross project);
     # TODO: fix broken evals
     #musl64 = mapTestOnCross musl64 (packagePlatformsCross project);
   } // (mkRequiredJob (
