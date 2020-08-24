@@ -13,7 +13,6 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
 import Data.Tagged (Tagged(..))
 import qualified Data.Text as T
-import Data.Typeable (typeRep)
 
 import Cardano.Binary
 
