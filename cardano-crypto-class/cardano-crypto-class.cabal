@@ -81,11 +81,11 @@ library
                        -Wpartial-fields
                        -Wcompat
   if impl(ghc >=8.8)
-    ghc-options:       -fno-warn-missing-deriving-strategies
+    ghc-options:       -Wno-missing-deriving-strategies
   if impl(ghc >=8.10)
-    ghc-options:       -fno-warn-missing-safe-haskell-mode
-                       -fno-warn-prepositive-qualified-module
-                       -fno-warn-unused-packages
+    ghc-options:       -Wno-missing-safe-haskell-mode
+                       -Wno-prepositive-qualified-module
+                       -Wno-unused-packages
   pkgconfig-depends:   libsodium
 
   if (!flag(development))
@@ -111,10 +111,10 @@ test-suite test-memory-example
                        -Wpartial-fields
                        -Wcompat
   if impl(ghc >=8.8)
-    ghc-options:       -fno-warn-missing-deriving-strategies
+    ghc-options:       -Wno-missing-deriving-strategies
   if impl(ghc >=8.10)
-    ghc-options:       -fno-warn-missing-safe-haskell-mode
-                       -fno-warn-prepositive-qualified-module
-                       -fno-warn-unused-packages
+    ghc-options:       -Wno-missing-safe-haskell-mode
+                       -Wno-prepositive-qualified-module
+                       -Wno-unused-packages
   if (!flag(development))
     ghc-options:         -Werror
