@@ -3,7 +3,7 @@ version:             1.5.0
 synopsis:            Binary serialization for Cardano
 description:         This package includes the binary serialization format for Cardano
 license:             Apache-2.0
-license-files:        
+license-files:
   LICENSE
   NOTICE
 author:              IOHK
@@ -60,7 +60,12 @@ library
                        -Wredundant-constraints
                        -Wpartial-fields
                        -Wcompat
-
+  if impl(ghc >=8.8)
+    ghc-options:       -fno-warn-missing-deriving-strategies
+  if impl(ghc >=8.10)
+    ghc-options:       -fno-warn-missing-safe-haskell-mode
+                       -fno-warn-prepositive-qualified-module
+                       -fno-warn-unused-packages
   if (!flag(development))
     ghc-options:         -Werror
 
@@ -104,7 +109,12 @@ test-suite test
                        -Wredundant-constraints
                        -Wpartial-fields
                        -Wcompat
-
+  if impl(ghc >=8.8)
+    ghc-options:       -fno-warn-missing-deriving-strategies
+  if impl(ghc >=8.10)
+    ghc-options:       -fno-warn-missing-safe-haskell-mode
+                       -fno-warn-prepositive-qualified-module
+                       -fno-warn-unused-packages
   if (!flag(development))
     ghc-options:         -Werror
 
