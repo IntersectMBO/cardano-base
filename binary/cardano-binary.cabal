@@ -3,7 +3,7 @@ version:             1.5.0
 synopsis:            Binary serialization for Cardano
 description:         This package includes the binary serialization format for Cardano
 license:             Apache-2.0
-license-files:        
+license-files:
   LICENSE
   NOTICE
 author:              IOHK

@@ -84,7 +84,7 @@ roundTripRatioBi =
 roundTripNanoBi :: Property
 roundTripNanoBi = eachOf
   1000
-  (MkFixed @E9 <$> Gen.integral (Range.constantFrom 0 (-1e12) 1e12))
+  ((MkFixed :: Integer -> Fixed E9) <$> Gen.integral (Range.constantFrom 0 (-1e12) 1e12))
   roundTripsCBORShow
 
 roundTripMapBi :: Property

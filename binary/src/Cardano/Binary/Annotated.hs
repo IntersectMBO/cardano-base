@@ -32,7 +32,6 @@ import Cardano.Prelude
 import Codec.CBOR.Read (ByteOffset)
 import Data.Aeson (FromJSON(..), ToJSON(..))
 import qualified Data.ByteString.Lazy as BSL
-import Data.Kind (Type)
 
 import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR

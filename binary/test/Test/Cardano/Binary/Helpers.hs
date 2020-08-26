@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeApplications           #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Cardano.Binary.Helpers
   (
@@ -29,12 +29,10 @@ import Cardano.Prelude
 import Codec.CBOR.FlatTerm (toFlatTerm, validFlatTerm)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import Data.Map (Map)
 import qualified Data.Map as M
 import Data.String (String)
 import Data.Text.Lazy (unpack)
 import Data.Text.Lazy.Builder (toLazyText)
-import Data.Typeable (TypeRep)
 import Formatting (Buildable, bprint, build)
 import Hedgehog (annotate, failure, forAllWith, success)
 import qualified Hedgehog as HH
