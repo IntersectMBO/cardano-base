@@ -60,12 +60,7 @@ library
                        -Wredundant-constraints
                        -Wpartial-fields
                        -Wcompat
-  if impl(ghc >=8.8)
-    ghc-options:       -Wno-missing-deriving-strategies
-  if impl(ghc >=8.10)
-    ghc-options:       -Wno-missing-safe-haskell-mode
-                       -Wno-prepositive-qualified-module
-                       -Wno-unused-packages
+
   if (!flag(development))
     ghc-options:         -Werror
 
@@ -109,12 +104,7 @@ test-suite test
                        -Wredundant-constraints
                        -Wpartial-fields
                        -Wcompat
-  if impl(ghc >=8.8)
-    ghc-options:       -Wno-missing-deriving-strategies
-  if impl(ghc >=8.10)
-    ghc-options:       -Wno-missing-safe-haskell-mode
-                       -Wno-prepositive-qualified-module
-                       -Wno-unused-packages
+
   if (!flag(development))
     ghc-options:         -Werror
 
