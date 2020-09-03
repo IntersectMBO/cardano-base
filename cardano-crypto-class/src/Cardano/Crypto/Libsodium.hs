@@ -23,6 +23,7 @@ module Cardano.Crypto.Libsodium (
   SodiumDSIGNAlgorithm (..),
   naclSignDSIGN,
   naclVerifyDSIGN,
+  naclForgetSignKeyDSIGN,
   SodiumSignKeyDSIGN,
   SodiumVerKeyDSIGN,
   SodiumSigDSIGN,

@@ -118,10 +118,8 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     --
     -- forgetting
     --
-
-    -- TODO: to implement this, we
-    -- should know how to forget DSIGN keys.
-    forgetSignKeyKES = const $ return ()
+    forgetSignKeyKES (SignKeySingleKES sk) =
+      NaCl.naclForgetSignKeyDSIGN (Proxy @d) sk
 
     --
     -- raw serialise/deserialise

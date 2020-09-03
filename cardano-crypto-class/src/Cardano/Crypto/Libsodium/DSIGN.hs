@@ -10,6 +10,7 @@ module Cardano.Crypto.Libsodium.DSIGN (
     SodiumDSIGNAlgorithm (..),
     naclSignDSIGN,
     naclVerifyDSIGN,
+    naclForgetSignKeyDSIGN,
     SodiumSignKeyDSIGN,
     SodiumVerKeyDSIGN,
     SodiumSigDSIGN,
@@ -62,6 +63,13 @@ class (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v ~ SignableRepresentatio
         :: Proxy v
         -> SodiumSignKeyDSIGN v
         -> SodiumVerKeyDSIGN v
+
+naclForgetSignKeyDSIGN
+    :: Proxy v
+    -> SodiumSignKeyDSIGN v
+    -> IO ()
+naclForgetSignKeyDSIGN _ (MLSB mfp) =
+  finalizeMLockedForeignPtr mfp
 
 naclSignDSIGN
     :: (SodiumDSIGNAlgorithm v, SignableRepresentation a)
