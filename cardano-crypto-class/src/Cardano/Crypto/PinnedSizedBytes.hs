@@ -30,7 +30,17 @@ module Cardano.Crypto.PinnedSizedBytes
 import Control.Monad.ST (runST)
 import Control.Monad.Primitive  (primitive_)
 import Data.Char (ord)
-import Data.Primitive.ByteArray (ByteArray (..), MutableByteArray (..), copyByteArrayToAddr, newPinnedByteArray, unsafeFreezeByteArray, foldrByteArray, byteArrayContents, writeByteArray, mutableByteArrayContents)
+import Data.Primitive.ByteArray
+          ( ByteArray (..)
+          , MutableByteArray (..)
+          , copyByteArrayToAddr
+          , newPinnedByteArray
+          , unsafeFreezeByteArray
+          , foldrByteArray
+          , byteArrayContents
+          , writeByteArray
+          , mutableByteArrayContents
+          )
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
 import Data.Word (Word8)
@@ -210,18 +220,21 @@ ptrPsbToSizedPtr = SizedPtr . castPtr
 -------------------------------------------------------------------------------
 
 -- | Create a 'ByteArray' from a list of a known length. If the length
---   of the list does not match the given length, this throws an exception.
+--   of the list does not match the given length, or if the length is zero,
+--   then this throws an exception.
 pinnedByteArrayFromListN :: forall a. Prim.Prim a => Int -> [a] -> ByteArray
+pinnedByteArrayFromListN 0 _ =
+    die "pinnedByteArrayFromListN" "list length zero"
 pinnedByteArrayFromListN n ys = runST $ do
     marr <- newPinnedByteArray (n * Prim.sizeOf (head ys))
     let go !ix [] = if ix == n
           then return ()
-          else die "byteArrayFromListN" "list length less than specified size"
+          else die "pinnedByteArrayFromListN" "list length less than specified size"
         go !ix (x : xs) = if ix < n
           then do
             writeByteArray marr ix x
             go (ix + 1) xs
-          else die "byteArrayFromListN" "list length greater than specified size"
+          else die "pinnedByteArrayFromListN" "list length greater than specified size"
     go 0 ys
     unsafeFreezeByteArray marr
 

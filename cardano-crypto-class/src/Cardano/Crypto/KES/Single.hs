@@ -58,7 +58,8 @@ import qualified Cardano.Crypto.Libsodium as NaCl
 --
 data SingleKES d
 
-instance (NaCl.SodiumDSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
+instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
+         , Typeable d) => KESAlgorithm (SingleKES d) where
     type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
 
     --

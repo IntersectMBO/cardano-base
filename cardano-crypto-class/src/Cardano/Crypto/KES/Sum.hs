@@ -92,7 +92,9 @@ type Sum7KES d h = SumKES h (Sum6KES d h)
 --
 data SumKES h d
 
-instance ( KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d
+instance ( KESAlgorithm d
+         , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
+         , Typeable d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
          )
       => KESAlgorithm (SumKES h d) where
