@@ -41,6 +41,7 @@ library
                      , cardano-prelude
                      , cborg              >= 0.2.2 && < 0.3
                      , containers
+                     , data-fix
                      , digest
                      , formatting
                      , nothunks

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                       #-}
 {-# LANGUAGE ConstrainedClassMethods   #-}
 {-# LANGUAGE DeriveFunctor             #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -44,7 +45,12 @@ import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Short.Internal as SBS
 import qualified Data.Primitive.ByteArray as Prim
 import Data.Fixed (E12, Fixed(..), Nano, Pico, resolution)
-import Data.Functor.Foldable (Fix(..), cata, unfix)
+#if MIN_VERSION_recursion_schemes(5,2,0)
+import Data.Fix ( Fix(..) )
+#else
+import Data.Functor.Foldable (Fix(..))
+#endif
+import Data.Functor.Foldable (cata, project)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
@@ -166,7 +172,7 @@ instance B.Buildable t => B.Buildable (SizeF t) where
           TodoF _ x -> bprint ("(_ :: " . shown . ")") (typeRep x)
 
 instance B.Buildable (Fix SizeF) where
-  build x = bprint build (unfix x)
+  build x = bprint build (project @(Fix _) x)
 
 -- | Create a case expression from individual cases.
 szCases :: [Case Size] -> Size
