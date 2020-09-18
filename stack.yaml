@@ -22,5 +22,8 @@ extra-deps:
       - .
       - test
 
+  - git: https://github.com/input-output-hk/cardano-crypto
+    commit: 2547ad1e80aeabca2899951601079408becbc92c
+
 nix:
   shell-file: ./nix/stack-shell.nix
