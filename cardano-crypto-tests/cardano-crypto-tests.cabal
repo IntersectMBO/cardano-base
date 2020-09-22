@@ -56,6 +56,7 @@ library
                       , cardano-crypto-praos
                       , cardano-prelude
                       , cborg
+                      , containers
                       , cryptonite
                       , formatting
                       , nothunks
@@ -64,6 +65,8 @@ library
                       , tasty
                       , tasty-quickcheck
                       , criterion
+                      , tasty-hunit
+                      , HUnit
 
 test-suite test-crypto
   import:               base, project-config

@@ -7,6 +7,7 @@ module Cardano.Crypto.Libsodium.MLockedBytes (
     mlsbUseAsCPtr,
     mlsbUseAsSizedPtr,
     mlsbFinalize,
+    mlsbCopy,
 ) where
 
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal

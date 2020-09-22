@@ -14,6 +14,7 @@ module Cardano.Crypto.Libsodium (
   mlsbFromByteStringCheck,
   mlsbToByteString,
   mlsbFinalize,
+  mlsbCopy,
   -- * Hashing
   SodiumHashAlgorithm (..),
   digestMLockedStorable,

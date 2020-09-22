@@ -15,6 +15,7 @@ module Test.Crypto.Util
   , prop_cbor_valid
   , prop_cbor_roundtrip
   , prop_raw_serialise
+  , prop_raw_serialise_only
   , prop_size_serialise
   , prop_cbor_direct_vs_class
 
@@ -67,6 +68,7 @@ import Test.QuickCheck
   , vector
   )
 import Formatting.Buildable (Buildable (..))
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -100,7 +102,8 @@ instance Arbitrary TestSeed where
 --------------------------------------------------------------------------------
 
 arbitrarySeedOfSize :: Word -> Gen Seed
-arbitrarySeedOfSize sz = mkSeedFromBytes . BS.pack <$> vector (fromIntegral sz)
+arbitrarySeedOfSize sz =
+  (mkSeedFromBytes . BS.pack) <$> vector (fromIntegral sz)
 
 --------------------------------------------------------------------------------
 -- Messages to sign
@@ -173,6 +176,13 @@ prop_raw_serialise serialise deserialise x =
     case deserialise (serialise x) of
       Just y  -> y === x
       Nothing -> property False
+
+prop_raw_serialise_only :: (Eq a, Show a)
+                        => (a -> ByteString)
+                        -> a -> Bool
+prop_raw_serialise_only serialise x =
+    let y = serialise x
+    in y `seq` True
 
 -- | The crypto algorithm classes have direct encoding functions, and the key
 -- types are also typically a member of the 'ToCBOR' class. Where a 'ToCBOR'
