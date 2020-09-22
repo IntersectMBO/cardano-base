@@ -114,8 +114,8 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
           Just vk -> verifyDSIGN ctxt vk a sig
 
     updateKES _ sk t
-      | t+1 < fromIntegral (natVal (Proxy @ t)) = Just sk
-      | otherwise                               = Nothing
+      | t+1 < fromIntegral (natVal (Proxy @ t)) = return $ Just sk
+      | otherwise                               = return Nothing
 
     totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
 
@@ -137,7 +137,7 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
                      . map mkSeedFromBytes
                      $ unfoldr (getBytesFromSeed seedSize) seed
             sks      = map genKeyDSIGN seeds
-         in SignKeySimpleKES (Vec.fromList sks)
+         in return $ SignKeySimpleKES (Vec.fromList sks)
 
 
     --

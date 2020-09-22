@@ -104,7 +104,7 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
         assert (t == 0) $
         NaCl.naclVerifyDSIGN (Proxy @d) vk a sig
 
-    updateKES _ctx (SignKeySingleKES _sk) _to = Nothing
+    updateKES _ctx (SignKeySingleKES _sk) _to = return Nothing
 
     totalPeriodsKES  _ = 1
 
@@ -112,7 +112,8 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     -- Key generation
     --
 
-    genKeyKES seed = SignKeySingleKES (NaCl.naclGenKeyDSIGN (Proxy @d) seed)
+    genKeyKES seed =
+      return $ SignKeySingleKES (NaCl.naclGenKeyDSIGN (Proxy @d) seed)
 
     --
     -- forgetting

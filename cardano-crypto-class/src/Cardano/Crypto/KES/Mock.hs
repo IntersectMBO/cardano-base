@@ -89,8 +89,8 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     updateKES () (SignKeyMockKES vk t') t =
         assert (t == t') $
          if t+1 < totalPeriodsKES (Proxy @ (MockKES t))
-           then Just (SignKeyMockKES vk (t+1))
-           else Nothing
+           then return $ Just (SignKeyMockKES vk (t+1))
+           else return Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
     -- allowed KES period.
@@ -115,9 +115,9 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- Key generation
     --
 
-    genKeyKES seed =
+    genKeyKES seed = do
         let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
-         in SignKeyMockKES vk 0
+        return $ SignKeyMockKES vk 0
 
 
     --

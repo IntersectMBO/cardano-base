@@ -47,7 +47,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
->>>>>>> Cardano.Crypto.KES using libsodium bindings
+import Data.Functor.Identity (Identity)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
@@ -66,6 +66,8 @@ class ( Typeable v
       , NoThunks (SignKeyKES v)
       , NoThunks (VerKeyKES v)
       , KnownNat (SeedSizeKES v)
+      , Monad (ForgetKES v)
+      , Monad (GenerateKES v)
       )
       => KESAlgorithm v where
 
@@ -79,6 +81,13 @@ class ( Typeable v
   data SignKeyKES v :: Type
   data SigKES     v :: Type
 
+  -- | The monad in which keys can be generated or updated.
+  type GenerateKES v :: Type -> Type
+  type GenerateKES v = Identity
+
+  -- | The monad in which keys can be forgotten.
+  type ForgetKES v :: Type -> Type
+  type ForgetKES v = IO
 
   --
   -- Metadata and basic key operations
@@ -143,7 +152,7 @@ class ( Typeable v
     => ContextKES v
     -> SignKeyKES v
     -> Period  -- ^ The /current/ period for the key, not the target period.
-    -> Maybe (SignKeyKES v)
+    -> GenerateKES v (Maybe (SignKeyKES v))
 
   -- | Return the total number of KES periods supported by this algorithm. The
   -- KES algorithm is assumed to support a fixed maximum number of periods, not
@@ -161,7 +170,9 @@ class ( Typeable v
   -- Key generation
   --
 
-  genKeyKES :: NaCl.MLockedSizedBytes (SeedSizeKES v) -> SignKeyKES v
+  genKeyKES
+    :: NaCl.MLockedSizedBytes (SeedSizeKES v)
+    -> GenerateKES v (SignKeyKES v)
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
   seedSizeKES :: proxy v -> Word
@@ -177,8 +188,11 @@ class ( Typeable v
   --
   -- The precondition is that this key value will not be used again.
   --
-  forgetSignKeyKES :: SignKeyKES v -> IO ()
-  forgetSignKeyKES = const $ return ()
+  forgetSignKeyKES
+    :: SignKeyKES v
+    -> ForgetKES v ()
+  forgetSignKeyKES =
+    const $ return ()
 
   --
   -- Serialisation/(de)serialisation in fixed-size raw format

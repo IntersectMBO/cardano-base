@@ -31,6 +31,7 @@ library
 
   build-depends:       base
                      , bytestring
+                     , cardano-prelude
                      , cardano-binary
                      , cardano-crypto-class
                      , cardano-crypto-praos
@@ -42,6 +43,8 @@ library
                      , quickcheck-instances
                      , tasty
                      , tasty-quickcheck
+                     , tasty-hunit
+                     , HUnit
 
   default-language:    Haskell2010
 

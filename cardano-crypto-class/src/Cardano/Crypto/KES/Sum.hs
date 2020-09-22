@@ -55,7 +55,8 @@ import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.Single (SingleKES)
 
 import qualified Cardano.Crypto.Libsodium as NaCl
-
+import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
@@ -96,10 +97,14 @@ instance ( KESAlgorithm d
          , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
          , Typeable d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
+         , MonadIO (ForgetKES (SumKES h d))
          )
       => KESAlgorithm (SumKES h d) where
 
     type SeedSizeKES (SumKES h d) = SeedSizeKES d
+
+    type GenerateKES (SumKES h d) = GenerateKES d
+    type ForgetKES (SumKES h d) = ForgetKES d
 
     --
     -- Key and signature types
@@ -173,12 +178,17 @@ instance ( KESAlgorithm d
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
     updateKES ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
-      | t+1 <  _T = do sk' <- updateKES ctx sk t
-                       return $ SignKeySumKES sk' r_1 vk_0 vk_1
-      | t+1 == _T = do let sk' = genKeyKES r_1
-                       return $ SignKeySumKES sk' NaCl.mlsbZero vk_0 vk_1
-      | otherwise = do sk' <- updateKES ctx sk (t - _T)
-                       return $ SignKeySumKES sk' r_1 vk_0 vk_1
+      | t+1 <  _T = runMaybeT $
+                      do
+                        sk' <- MaybeT $ updateKES ctx sk t
+                        return $ SignKeySumKES sk' r_1 vk_0 vk_1
+      | t+1 == _T = do
+                        sk' <- genKeyKES r_1
+                        return . Just $ SignKeySumKES sk' NaCl.mlsbZero vk_0 vk_1
+      | otherwise = runMaybeT $
+                      do
+                        sk' <- MaybeT $ updateKES ctx sk (t - _T)
+                        return $ SignKeySumKES sk' r_1 vk_0 vk_1
       where
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
@@ -189,22 +199,23 @@ instance ( KESAlgorithm d
     -- Key generation
     --
 
-    genKeyKES r = SignKeySumKES sk_0 r1 vk_0 vk_1
-      where
-        (r0, r1) = NaCl.expandHash (Proxy :: Proxy h) r
+    genKeyKES r = do
+      let (r0, r1) = NaCl.expandHash (Proxy :: Proxy h) r
 
-        sk_0 = genKeyKES r0
-        vk_0 = deriveVerKeyKES sk_0
+      sk_0 <- genKeyKES r0
+      let vk_0 = deriveVerKeyKES sk_0
 
-        sk_1 = genKeyKES r1
-        vk_1 = deriveVerKeyKES sk_1
+      sk_1 <- genKeyKES r1
+      let vk_1 = deriveVerKeyKES sk_1
+
+      return $ SignKeySumKES sk_0 r1 vk_0 vk_1
 
     --
     -- forgetting
     --
     forgetSignKeyKES (SignKeySumKES sk_0 r1 _ _) = do
         forgetSignKeyKES sk_0
-        NaCl.mlsbFinalize r1
+        liftIO $ NaCl.mlsbFinalize r1
 
     --
     -- raw serialise/deserialise
@@ -308,12 +319,12 @@ deriving instance Eq   (VerKeyKES (SumKES h d))
 
 instance KESAlgorithm d => NoThunks (SignKeyKES (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
       => ToCBOR (VerKeyKES (SumKES h d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
       => FromCBOR (VerKeyKES (SumKES h d)) where
   fromCBOR = decodeVerKeyKES
 
@@ -326,12 +337,12 @@ deriving instance (KnownNat (SizeHash h), KESAlgorithm d) => Show (SignKeyKES (S
 
 instance KESAlgorithm d => NoThunks (VerKeyKES  (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
       => ToCBOR (SignKeyKES (SumKES h d)) where
   toCBOR = encodeSignKeyKES
   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
       => FromCBOR (SignKeyKES (SumKES h d)) where
   fromCBOR = decodeSignKeyKES
 
@@ -345,12 +356,12 @@ deriving instance KESAlgorithm d => Eq   (SigKES (SumKES h d))
 
 instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
       => ToCBOR (SigKES (SumKES h d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
+instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
 

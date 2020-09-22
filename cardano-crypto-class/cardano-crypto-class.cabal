@@ -43,6 +43,7 @@ library
 
                        Cardano.Crypto.KES.Class
                        Cardano.Crypto.KES.Mock
+                       Cardano.Crypto.KES.ForgetMock
                        Cardano.Crypto.KES.NeverUsed
                        Cardano.Crypto.KES.Simple
                        Cardano.Crypto.KES.Single
@@ -84,6 +85,7 @@ library
                      , memory
                      , nothunks
                      , primitive
+                     , stm
                      , text
                      , transformers
                      , vector

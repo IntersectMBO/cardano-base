@@ -16,20 +16,29 @@ module Test.Crypto.KES
 where
 
 import Data.Proxy (Proxy(..))
-import Data.List (unfoldr)
+import Data.List (unfoldr, isPrefixOf)
+import qualified Data.ByteString as BS
+
+import Control.Exception (evaluate)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
+import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import qualified Cardano.Crypto.Libsodium as NaCl
+import Cardano.Prelude (Identity, runIdentity, ReaderT, runReaderT)
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
+import Test.Tasty.HUnit (testCase)
+import Test.HUnit
 
 import Test.Crypto.Util hiding (label)
 import Test.Crypto.Instances ()
+
+import Data.IORef
 
 --
 -- The list of all tests
@@ -43,6 +52,7 @@ tests =
   , testKESAlgorithm (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
+  , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
@@ -54,6 +64,68 @@ deriving instance Eq (NaCl.SodiumSignKeyDSIGN d)
                => Eq (SignKeyKES (SingleKES d))
 deriving instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Eq (SignKeyKES d))
                => Eq (SignKeyKES (SumKES h d))
+
+testKESAlloc
+  :: forall v proxy.
+     ( KESAlgorithm v
+     , ForgetKES v ~ IO
+     , GenerateKES v ~ Identity
+     , ContextKES v ~ ()
+     )
+  => proxy v
+  -> String
+  -> TestTree
+
+testKESAlloc _p n =
+  testGroup n
+    [ testGroup "Forget mock"
+      [ testCase "genKey" $ testGenKeyKES _p
+      , testCase "updateKey" $ testUpdateKeyKES _p
+      ]
+    ]
+
+testGenKeyKES
+  :: forall v proxy.
+     ( KESAlgorithm v
+     , ForgetKES v ~ IO
+     , GenerateKES v ~ Identity
+     )
+  => proxy v
+  -> Assertion
+testGenKeyKES _p = do
+  let seed = NaCl.mlsbFromByteString (BS.replicate 1024 23)
+  logVar <- newIORef []
+  let logger str = modifyIORef logVar (++ [str])
+  sk <- evaluate . runIdentity . flip runReaderT logger $ genKeyKES @(ForgetMockKES v) seed
+  flip runReaderT logger $ forgetSignKeyKES sk
+  result <- readIORef logVar
+  assertEqual "number of log entries" 2 (length result)
+  assertBool "first entry is GEN" ("GEN" `isPrefixOf` (result !! 0))
+  assertBool "second entry is DEL" ("DEL" `isPrefixOf` (result !! 1))
+  return ()
+
+testUpdateKeyKES
+  :: forall v proxy.
+     ( KESAlgorithm v
+     , ForgetKES v ~ IO
+     , GenerateKES v ~ Identity
+     , ContextKES v ~ ()
+     )
+  => proxy v
+  -> Assertion
+testUpdateKeyKES _p = do
+  let seed = NaCl.mlsbFromByteString (BS.replicate 1024 23)
+  logVar <- newIORef []
+  let logger str = modifyIORef logVar (++ [str])
+  sk <- evaluate . runIdentity . flip runReaderT logger $ genKeyKES @(ForgetMockKES v) seed
+  Just sk' <- evaluate . runIdentity . flip runReaderT logger $ updateKES () sk 0
+  flip runReaderT logger $ forgetSignKeyKES sk'
+  result <- readIORef logVar
+  assertEqual "number of log entries" 3 (length result)
+  assertBool "first entry is GEN" ("GEN" `isPrefixOf` (result !! 0))
+  assertBool "second entry is UPD" ("UPD" `isPrefixOf` (result !! 1))
+  assertBool "third entry is DEL" ("DEL" `isPrefixOf` (result !! 2))
+  return ()
 
 testKESAlgorithm
   :: forall v proxy.
@@ -67,6 +139,7 @@ testKESAlgorithm
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
+     , GenerateKES v ~ Identity
      )
   => proxy v
   -> String
@@ -161,7 +234,7 @@ testKESAlgorithm _p n =
 -- total number of periods for this algorithm.
 --
 prop_totalPeriodsKES
-  :: forall v. (KESAlgorithm v, ContextKES v ~ ())
+  :: forall v. (KESAlgorithm v, ContextKES v ~ (), GenerateKES v ~ Identity)
   => SignKeyKES v -> Property
 prop_totalPeriodsKES sk_0 =
     totalPeriods > 0 ==>
@@ -180,7 +253,7 @@ prop_totalPeriodsKES sk_0 =
 -- keys we derive from each one are the same.
 --
 prop_deriveVerKeyKES
-  :: forall v. (KESAlgorithm v, ContextKES v ~ ())
+  :: forall v. (KESAlgorithm v, ContextKES v ~ (), GenerateKES v ~ Identity)
   => SignKeyKES v -> Property
 prop_deriveVerKeyKES sk_0 =
     counterexample (show vks) $
@@ -201,7 +274,7 @@ prop_deriveVerKeyKES sk_0 =
 --
 prop_verifyKES_positive
   :: forall v.
-     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation, GenerateKES v ~ Identity)
   => SignKeyKES v -> [Message] -> Property
 prop_verifyKES_positive sk_0 xs =
     cover 1 (length xs >= totalPeriods) "covers total periods" $
@@ -223,7 +296,7 @@ prop_verifyKES_positive sk_0 xs =
 prop_verifyKES_negative_key
   :: forall v.
      (KESAlgorithm v, ContextKES v ~ (),
-      Signable v ~ SignableRepresentation, Eq (SignKeyKES v))
+      Signable v ~ SignableRepresentation, Eq (SignKeyKES v), GenerateKES v ~ Identity)
   => SignKeyKES v -> SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_key sk_0 sk'_0 x =
     sk_0 /= sk'_0 ==>
@@ -241,7 +314,7 @@ prop_verifyKES_negative_key sk_0 sk'_0 x =
 --
 prop_verifyKES_negative_message
   :: forall v.
-     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation, GenerateKES v ~ Identity)
   => SignKeyKES v -> Message -> Message -> Property
 prop_verifyKES_negative_message sk_0 x x' =
     x /= x' ==>
@@ -260,7 +333,7 @@ prop_verifyKES_negative_message sk_0 x x' =
 --
 prop_verifyKES_negative_period
   :: forall v.
-     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation, GenerateKES v ~ Identity)
   => SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_period sk_0 x =
     conjoin [ counterexample ("periods " ++ show (t, t')) $
@@ -279,7 +352,7 @@ prop_verifyKES_negative_period sk_0 x =
 --
 prop_serialise_VerKeyKES
   :: forall v.
-     (KESAlgorithm v, ContextKES v ~ ())
+     (KESAlgorithm v, ContextKES v ~ (), GenerateKES v ~ Identity)
   => SignKeyKES v -> Property
 prop_serialise_VerKeyKES sk_0 =
     conjoin
@@ -299,7 +372,7 @@ prop_serialise_VerKeyKES sk_0 =
 --
 prop_serialise_SignKeyKES
   :: forall v.
-     (KESAlgorithm v, ContextKES v ~ (), Eq (SignKeyKES v))
+     (KESAlgorithm v, ContextKES v ~ (), Eq (SignKeyKES v), GenerateKES v ~ Identity)
   => SignKeyKES v -> Property
 prop_serialise_SignKeyKES sk_0 =
     conjoin
@@ -319,7 +392,7 @@ prop_serialise_SignKeyKES sk_0 =
 --
 prop_serialise_SigKES
   :: forall v.
-     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+     (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation, GenerateKES v ~ Identity)
   => SignKeyKES v -> Message -> Property
 prop_serialise_SigKES sk_0 x =
     conjoin
@@ -341,7 +414,7 @@ prop_serialise_SigKES sk_0 x =
 -- KES test utils
 --
 
-allUpdatesKES :: forall v. (KESAlgorithm v, ContextKES v ~ ())
+allUpdatesKES :: forall v. (KESAlgorithm v, ContextKES v ~ (), GenerateKES v ~ Identity)
               => SignKeyKES v -> [SignKeyKES v]
 allUpdatesKES sk_0 =
     sk_0 : unfoldr update (sk_0, 0)
@@ -349,7 +422,7 @@ allUpdatesKES sk_0 =
     update :: (SignKeyKES v, Period)
            -> Maybe (SignKeyKES v, (SignKeyKES v, Period))
     update (sk, t) =
-      case updateKES () sk t of
+      case runIdentity (updateKES () sk t) of
         Nothing  -> Nothing
         Just sk' -> Just (sk', (sk', t+1))
 
@@ -358,15 +431,15 @@ allUpdatesKES sk_0 =
 -- Arbitrary instances
 --
 
-instance KESAlgorithm v => Arbitrary (VerKeyKES v) where
+instance (KESAlgorithm v, GenerateKES v ~ Identity) => Arbitrary (VerKeyKES v) where
   arbitrary = deriveVerKeyKES <$> arbitrary
   shrink = const []
 
-instance KESAlgorithm v => Arbitrary (SignKeyKES v) where
-  arbitrary = genKeyKES <$> arbitrary
+instance (KESAlgorithm v, GenerateKES v ~ Identity) => Arbitrary (SignKeyKES v) where
+  arbitrary = runIdentity . genKeyKES <$> arbitrary
   shrink = const []
 
-instance (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
+instance (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation, GenerateKES v ~ Identity)
       => Arbitrary (SigKES v) where
   arbitrary = do
     a <- arbitrary :: Gen Message
