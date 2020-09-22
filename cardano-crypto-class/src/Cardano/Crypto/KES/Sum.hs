@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | A key evolving signatures implementation.
@@ -56,6 +57,9 @@ import           Cardano.Crypto.KES.Single (SingleKES)
 import Data.Word (Word8)
 import Control.DeepSeq (NFData)
 
+import qualified Cardano.Crypto.Libsodium as NaCl
+import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
@@ -92,16 +96,16 @@ type Sum7KES d h = SumKES h (Sum6KES d h)
 --
 data SumKES h d
 
-instance (NFData (SigKES d), NFData (VerKeyKES d)) =>
-  NFData (SigKES (SumKES h d)) where
-
-instance (NFData (SignKeyKES d), NFData (VerKeyKES d)) =>
-  NFData (SignKeyKES (SumKES h d)) where
-
-instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
+instance ( KESAlgorithm d
+         , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
+         , Typeable d
+         , SizeHash h ~ SeedSizeKES d -- can be relaxed
+         , MonadIO (SignKeyAccessKES d)
+         )
       => KESAlgorithm (SumKES h d) where
 
     type SeedSizeKES (SumKES h d) = SeedSizeKES d
+    type SignKeyAccessKES (SumKES h d) = SignKeyAccessKES d
 
     --
     -- Key and signature types
@@ -121,7 +125,7 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     --
     data SignKeyKES (SumKES h d) =
            SignKeySumKES !(SignKeyKES d)
-                         !Seed
+                         !(NaCl.MLockedSizedBytes (SeedSizeKES d))
                          !(VerKeyKES d)
                          !(VerKeyKES d)
         deriving Generic
@@ -142,7 +146,7 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     algorithmNameKES _ = mungeName (algorithmNameKES (Proxy :: Proxy d))
 
     deriveVerKeyKES (SignKeySumKES _ _ vk_0 vk_1) =
-        VerKeySumKES (hashPairOfVKeys (vk_0, vk_1))
+        return $ VerKeySumKES (hashPairOfVKeys (vk_0, vk_1))
 
     -- The verification key in this scheme is actually a hash already
     -- however the type of hashVerKeyKES says the caller gets to choose
@@ -159,11 +163,12 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     type Signable   (SumKES h d) = Signable   d
     type ContextKES (SumKES h d) = ContextKES d
 
-    signKES ctxt t a (SignKeySumKES sk _r_1 vk_0 vk_1) =
-        SigSumKES sigma vk_0 vk_1
+    signKES ctxt t a (SignKeySumKES sk _r_1 vk_0 vk_1) = do
+        sigma <- getSigma
+        return $ SigSumKES sigma vk_0 vk_1
       where
-        sigma | t < _T    = signKES ctxt  t       a sk
-              | otherwise = signKES ctxt (t - _T) a sk
+        getSigma | t < _T    = signKES ctxt  t       a sk
+                 | otherwise = signKES ctxt (t - _T) a sk
 
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
@@ -176,12 +181,17 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
     updateKES ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
-      | t+1 <  _T = do sk' <- updateKES ctx sk t
-                       return $ SignKeySumKES sk' r_1 vk_0 vk_1
-      | t+1 == _T = do let sk' = genKeyKES r_1
-                       return $ SignKeySumKES sk' zero vk_0 vk_1
-      | otherwise = do sk' <- updateKES ctx sk (t - _T)
-                       return $ SignKeySumKES sk' r_1 vk_0 vk_1
+      | t+1 <  _T = runMaybeT $
+                      do
+                        sk' <- MaybeT $ updateKES ctx sk t
+                        return $ SignKeySumKES sk' r_1 vk_0 vk_1
+      | t+1 == _T = do
+                        sk' <- genKeyKES r_1
+                        return . Just $ SignKeySumKES sk' NaCl.mlsbZero vk_0 vk_1
+      | otherwise = runMaybeT $
+                      do
+                        sk' <- MaybeT $ updateKES ctx sk (t - _T)
+                        return $ SignKeySumKES sk' r_1 vk_0 vk_1
       where
         _T = totalPeriodsKES (Proxy :: Proxy d)
         zero = zeroSeed (Proxy :: Proxy d)
@@ -193,17 +203,22 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
     -- Key generation
     --
 
-    seedSizeKES _ = seedSizeKES (Proxy :: Proxy d)
-    genKeyKES r = SignKeySumKES sk_0 r1 vk_0 vk_1
-      where
-        (r0, r1) = expandSeed (Proxy :: Proxy h) r
+    genKeyKES r = do
+      let (r0, r1) = NaCl.expandHash (Proxy :: Proxy h) r
 
-        sk_0 = genKeyKES r0
-        vk_0 = deriveVerKeyKES sk_0
+      sk_0 <- genKeyKES r0
+      vk_0 <- deriveVerKeyKES sk_0
+      sk_1 <- genKeyKES r1
+      vk_1 <- deriveVerKeyKES @d sk_1
+      forgetSignKeyKES sk_1
+      return $ SignKeySumKES sk_0 r1 vk_0 vk_1
 
-        sk_1 = genKeyKES r1
-        vk_1 = deriveVerKeyKES sk_1
-
+    --
+    -- forgetting
+    --
+    forgetSignKeyKES (SignKeySumKES sk_0 r1 _ _) = do
+        forgetSignKeyKES sk_0
+        liftIO $ NaCl.mlsbFinalize r1
 
     --
     -- raw serialise/deserialise
@@ -218,13 +233,14 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
 
     rawSerialiseVerKeyKES  (VerKeySumKES  vk) = hashToBytes vk
 
-    rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) =
-      mconcat
-        [ rawSerialiseSignKeyKES sk
-        , getSeedBytes r_1
-        , rawSerialiseVerKeyKES vk_0
-        , rawSerialiseVerKeyKES vk_1
-        ]
+    -- TODO: we will need this :(
+    -- rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) =
+    --   mconcat
+    --     [ rawSerialiseSignKeyKES sk
+    --     , getSeedBytes r_1
+    --     , rawSerialiseVerKeyKES vk_0
+    --     , rawSerialiseVerKeyKES vk_1
+    --     ]
 
     rawSerialiseSigKES (SigSumKES sigma vk_0 vk_1) =
       mconcat
@@ -235,28 +251,28 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
 
     rawDeserialiseVerKeyKES = fmap VerKeySumKES  . hashFromBytes
 
-    rawDeserialiseSignKeyKES b = do
-        guard (BS.length b == fromIntegral size_total)
-        sk   <- rawDeserialiseSignKeyKES b_sk
-        let r = mkSeedFromBytes          b_r
-        vk_0 <- rawDeserialiseVerKeyKES  b_vk0
-        vk_1 <- rawDeserialiseVerKeyKES  b_vk1
-        return (SignKeySumKES sk r vk_0 vk_1)
-      where
-        b_sk  = slice off_sk  size_sk b
-        b_r   = slice off_r   size_r  b
-        b_vk0 = slice off_vk0 size_vk b
-        b_vk1 = slice off_vk1 size_vk b
+    -- rawDeserialiseSignKeyKES b = do
+    --     guard (BS.length b == fromIntegral size_total)
+    --     sk   <- rawDeserialiseSignKeyKES b_sk
+    --     let r = mkSeedFromBytes          b_r
+    --     vk_0 <- rawDeserialiseVerKeyKES  b_vk0
+    --     vk_1 <- rawDeserialiseVerKeyKES  b_vk1
+    --     return (SignKeySumKES sk r vk_0 vk_1)
+    --   where
+    --     b_sk  = slice off_sk  size_sk b
+    --     b_r   = slice off_r   size_r  b
+    --     b_vk0 = slice off_vk0 size_vk b
+    --     b_vk1 = slice off_vk1 size_vk b
 
-        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
-        size_r     = seedSizeKES    (Proxy :: Proxy d)
-        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
-        size_total = sizeSignKeyKES (Proxy :: Proxy (SumKES h d))
+    --     size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
+    --     size_r     = seedSizeKES    (Proxy :: Proxy d)
+    --     size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
+    --     size_total = sizeSignKeyKES (Proxy :: Proxy (SumKES h d))
 
-        off_sk     = 0 :: Word
-        off_r      = size_sk
-        off_vk0    = off_r + size_r
-        off_vk1    = off_vk0 + size_vk
+    --     off_sk     = 0 :: Word
+    --     off_r      = size_sk
+    --     off_vk0    = off_r + size_r
+    --     off_vk1    = off_vk0 + size_vk
 
     rawDeserialiseSigKES b = do
         guard (BS.length b == fromIntegral size_total)
@@ -313,12 +329,12 @@ deriving instance Eq   (VerKeyKES (SumKES h d))
 
 instance KESAlgorithm d => NoThunks (SignKeyKES (SumKES h d))
 
-instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (VerKeyKES (SumKES h d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (VerKeyKES (SumKES h d)) where
   fromCBOR = decodeVerKeyKES
 
@@ -327,34 +343,34 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
 -- SignKey instances
 --
 
-deriving instance KESAlgorithm d => Show (SignKeyKES (SumKES h d))
+-- TODO: might need these
+-- deriving instance KESAlgorithm d => Show (SignKeyKES (SumKES h d))
+-- 
+-- instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
+--       => ToCBOR (SignKeyKES (SumKES h d)) where
+--   toCBOR = encodeSignKeyKES
+--   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
+-- 
+-- instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
+--       => FromCBOR (SignKeyKES (SumKES h d)) where
+--   fromCBOR = decodeSignKeyKES
 
 instance KESAlgorithm d => NoThunks (VerKeyKES  (SumKES h d))
-
-instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
-      => ToCBOR (SignKeyKES (SumKES h d)) where
-  toCBOR = encodeSignKeyKES
-  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
-
-instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
-      => FromCBOR (SignKeyKES (SumKES h d)) where
-  fromCBOR = decodeSignKeyKES
-
 
 --
 -- Sig instances
 --
 
-deriving instance KESAlgorithm d => Show (SigKES (SumKES h d))
-deriving instance KESAlgorithm d => Eq   (SigKES (SumKES h d))
+deriving instance (KESAlgorithm d, KESAlgorithm (SumKES h d)) => Show (SigKES (SumKES h d))
+deriving instance (KESAlgorithm d, KESAlgorithm (SumKES h d)) => Eq (SigKES (SumKES h d))
 
 instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 
-instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (SigKES (SumKES h d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES

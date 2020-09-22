@@ -67,16 +67,6 @@ testSodiumHashAlgorithm p =
     ]
     where n = hashAlgorithmName p
 
-testSodiumHashAlgorithm
-  :: forall proxy h. NaCl.SodiumHashAlgorithm h
-  => proxy h
-  -> TestTree 
-testSodiumHashAlgorithm p =
-  testGroup n
-    [ testProperty "sodium and cryptonite work the same" $ prop_libsodium_model @h Proxy
-    ]
-    where n = hashAlgorithmName p
-
 prop_hash_cbor :: HashAlgorithm h => Hash h Int -> Property
 prop_hash_cbor = prop_cbor
 

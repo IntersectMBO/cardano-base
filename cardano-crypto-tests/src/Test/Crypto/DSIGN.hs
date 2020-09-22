@@ -22,15 +22,12 @@ import Cardano.Crypto.PinnedSizedBytes
 import GHC.Stack (HasCallStack)
 import Test.Crypto.Util hiding (label)
 import Test.Crypto.Instances ()
-import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property, label)
+import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property, label, ioProperty)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
 import qualified Data.ByteString as BS
 import qualified Cardano.Crypto.Libsodium as NaCl
-
-{- HLINT ignore "Use <$>" -}
-{- HLINT ignore "Reduce duplication" -}
 
 --
 -- The list of all tests
@@ -205,10 +202,10 @@ prop_sodium_genKey
     => Proxy v
     -> NaCl.MLockedSizedBytes (SeedSizeDSIGN v)
     -> Property
-prop_sodium_genKey p seed = actual === expected
-  where
-    actual = NaCl.mlsbToByteString $ NaCl.naclGenKeyDSIGN p seed
-    expected = rawSerialiseSignKeyDSIGN (genKeyDSIGN (mkSeedFromBytes (NaCl.mlsbToByteString seed)) :: SignKeyDSIGN v)
+prop_sodium_genKey p seed = ioProperty $ do
+    actual <- NaCl.mlsbToByteString <$> NaCl.naclGenKeyDSIGN p seed
+    let expected = rawSerialiseSignKeyDSIGN (genKeyDSIGN (mkSeedFromBytes (NaCl.mlsbToByteString seed)) :: SignKeyDSIGN v)
+    return (actual === expected)
 
 fromJustCS :: HasCallStack => Maybe a -> a
 fromJustCS (Just x) = x
@@ -219,11 +216,11 @@ prop_sodium_deriveVerKey
     => Proxy v
     -> NaCl.SodiumSignKeyDSIGN v
     -> Property
-prop_sodium_deriveVerKey p sk = actual === expected
-  where
-    actual = psbToByteString $ NaCl.naclDeriveVerKeyDSIGN p sk
-    sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
-    expected = rawSerialiseVerKeyDSIGN $ deriveVerKeyDSIGN sk'
+prop_sodium_deriveVerKey p sk = ioProperty $ do
+  actual <- psbToByteString <$> NaCl.naclDeriveVerKeyDSIGN p sk
+  let sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
+      expected = rawSerialiseVerKeyDSIGN $ deriveVerKeyDSIGN sk'
+  return (actual === expected)
 
 prop_sodium_sign
     :: forall v. (NaCl.SodiumDSIGNAlgorithm v, Signable v ~ SignableRepresentation, ContextDSIGN v ~ ())
@@ -244,14 +241,13 @@ prop_sodium_verify
     -> NaCl.SodiumSignKeyDSIGN v
     -> [Word8]
     -> Property
-prop_sodium_verify p sk bytes =
-    label (con expected) $ actual === expected
+prop_sodium_verify p sk bytes = ioProperty $ do
+    vk <- NaCl.naclDeriveVerKeyDSIGN p sk
+    let actual = NaCl.naclVerifyDSIGN p vk msg sig
+    return $ label (con expected) $ actual === expected
   where
     msg = BS.pack bytes
-    vk = NaCl.naclDeriveVerKeyDSIGN p sk
     sig = NaCl.naclSignDSIGN p msg sk
-
-    actual = NaCl.naclVerifyDSIGN p vk msg sig
 
     sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
     sig' = fromJustCS $ rawDeserialiseSigDSIGN $ psbToByteString sig :: SigDSIGN v
@@ -270,13 +266,12 @@ prop_sodium_verify_neg
     -> [Word8]
     -> NaCl.SodiumSigDSIGN v
     -> Property
-prop_sodium_verify_neg p sk bytes sig =
-    label (con expected) $ actual === expected
+prop_sodium_verify_neg p sk bytes sig = ioProperty $ do
+    vk <- NaCl.naclDeriveVerKeyDSIGN p sk
+    let actual = NaCl.naclVerifyDSIGN p vk msg sig
+    return $ label (con expected) $ actual === expected
   where
     msg = BS.pack bytes
-    vk = NaCl.naclDeriveVerKeyDSIGN p sk
-
-    actual = NaCl.naclVerifyDSIGN p vk msg sig
 
     sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
     sig' = fromJustCS $ rawDeserialiseSigDSIGN $ psbToByteString sig :: SigDSIGN v

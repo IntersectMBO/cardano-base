@@ -1,6 +1,6 @@
 {-# LANGUAGE CApiFFI             #-}
 {-# LANGUAGE DerivingStrategies  #-}
-
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Cardano.Crypto.Libsodium.C (
     -- * Initialization
     c_sodium_init,

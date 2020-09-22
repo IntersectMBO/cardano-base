@@ -54,7 +54,7 @@ digestMLockedStorable
     :: forall h a proxy. (SodiumHashAlgorithm h, Storable a)
     => proxy h -> Ptr a -> MLockedSizedBytes (SizeHash h)
 digestMLockedStorable p ptr = unsafeDupablePerformIO $
-    naclDigestPtr p ptr (sizeOf (undefined :: a))
+    naclDigestPtr p ptr ((sizeOf (undefined :: a)))
 
 digestMLockedBS
     :: forall h proxy. (SodiumHashAlgorithm h)
@@ -70,7 +70,7 @@ digestMLockedBS p bs = unsafeDupablePerformIO $
 expandHash
     :: forall h proxy. SodiumHashAlgorithm h
     => proxy h
-    -> MLockedSizedBytes (SizeHash h)
+    -> (MLockedSizedBytes (SizeHash h))
     -> (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
 expandHash h (MLSB sfptr) = unsafeDupablePerformIO $ do
     withMLockedForeignPtr sfptr $ \ptr -> do

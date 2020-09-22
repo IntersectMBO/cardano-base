@@ -37,7 +37,7 @@ instance KESAlgorithm NeverKES where
 
   algorithmNameKES _ = "never"
 
-  deriveVerKeyKES _ = NeverUsedVerKeyKES
+  deriveVerKeyKES _ = return NeverUsedVerKeyKES
 
   signKES   = error "KES not available"
   verifyKES = error "KES not available"
@@ -45,17 +45,15 @@ instance KESAlgorithm NeverKES where
 
   totalPeriodsKES _ = 0
 
-  genKeyKES       _ = NeverUsedSignKeyKES
+  genKeyKES       _ = return NeverUsedSignKeyKES
 
   sizeVerKeyKES  _ = 0
   sizeSignKeyKES _ = 0
   sizeSigKES     _ = 0
 
   rawSerialiseVerKeyKES  _ = mempty
-  rawSerialiseSignKeyKES _ = mempty
   rawSerialiseSigKES     _ = mempty
 
   rawDeserialiseVerKeyKES  _ = Just NeverUsedVerKeyKES
-  rawDeserialiseSignKeyKES _ = Just NeverUsedSignKeyKES
   rawDeserialiseSigKES     _ = Just NeverUsedSigKES
 
