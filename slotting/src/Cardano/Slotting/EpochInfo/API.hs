@@ -17,11 +17,12 @@ module Cardano.Slotting.EpochInfo.API
   )
 where
 
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..), HasCallStack)
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
 import Control.Monad.Morph (generalize)
 import Data.Functor.Classes (showsUnaryWith)
 import Data.Functor.Identity
+import GHC.Stack (HasCallStack)
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 -- | Information about epochs
 --
@@ -53,7 +54,7 @@ data EpochInfo m
         -- > s `inRange` epochInfoRange (epochInfoEpoch s)
         epochInfoEpoch_ :: HasCallStack => SlotNo -> m EpochNo
       }
-  deriving (NoUnexpectedThunks) via OnlyCheckIsWHNF "EpochInfo" (EpochInfo m)
+  deriving NoThunks via OnlyCheckWhnfNamed "EpochInfo" (EpochInfo m)
 
 -- | Show instance only for non-stateful instances
 instance Show (EpochInfo Identity) where

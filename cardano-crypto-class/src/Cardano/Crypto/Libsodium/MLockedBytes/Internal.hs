@@ -19,20 +19,20 @@ import Foreign.C.Types (CSize (..))
 import Foreign.ForeignPtr (castForeignPtr)
 import Foreign.Ptr (Ptr, castPtr)
 import GHC.TypeLits (KnownNat, natVal)
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import Data.Word (Word8)
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.Memory.Internal
 import Cardano.Crypto.Libsodium.C
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
 import Cardano.Crypto.PinnedSizedBytes
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 
 newtype MLockedSizedBytes n = MLSB (MLockedForeignPtr (PinnedSizedBytes n))
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "MLockedSizedBytes" (MLockedSizedBytes n)
+  deriving NoThunks via OnlyCheckWhnfNamed "MLockedSizedBytes" (MLockedSizedBytes n)
 
 instance KnownNat n => Eq (MLockedSizedBytes n) where
     x == y = compare x y == EQ

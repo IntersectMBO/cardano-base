@@ -28,12 +28,11 @@ import           Control.Exception (Exception(..), throw)
 import           Data.Functor.Identity
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
+import           NoThunks.Class (NoThunks)
 
 import           Crypto.Random (MonadRandom(..))
 import           Crypto.Random.Entropy (getEntropy)
 import           Cardano.Crypto.Hash.Class (HashAlgorithm(digest))
-
-import           Cardano.Prelude (NoUnexpectedThunks)
 
 -- | A seed contains a finite number of bytes, and is used for seeding
 -- cryptographic algorithms including key generation.
@@ -41,7 +40,7 @@ import           Cardano.Prelude (NoUnexpectedThunks)
 -- This is not itself a PRNG, but can be used to seed a PRNG.
 --
 newtype Seed = Seed ByteString
-  deriving (Show, Eq, Semigroup, Monoid, NoUnexpectedThunks)
+  deriving (Show, Eq, Semigroup, Monoid, NoThunks)
 
 
 -- | Construct a 'Seed' deterministically from a number of bytes.

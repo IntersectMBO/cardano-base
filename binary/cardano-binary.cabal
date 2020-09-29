@@ -43,6 +43,7 @@ library
                      , containers
                      , digest
                      , formatting
+                     , nothunks
                      , primitive
                      , recursion-schemes  >= 5.1   && < 5.2
                      , safe-exceptions

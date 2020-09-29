@@ -50,8 +50,8 @@ import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (KnownNat, Nat, natVal)
+import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
@@ -66,9 +66,9 @@ class ( Typeable v
       , Show (SignKeyDSIGN v)
       , Show (SigDSIGN v)
       , Eq (SigDSIGN v)
-      , NoUnexpectedThunks (SigDSIGN     v)
-      , NoUnexpectedThunks (SignKeyDSIGN v)
-      , NoUnexpectedThunks (VerKeyDSIGN  v)
+      , NoThunks (SigDSIGN v)
+      , NoThunks (SignKeyDSIGN v)
+      , NoThunks (VerKeyDSIGN v)
       , KnownNat (SeedSizeDSIGN v)
       , KnownNat (SizeVerKeyDSIGN v)
       , KnownNat (SizeSignKeyDSIGN v)
@@ -225,7 +225,7 @@ newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
 deriving instance DSIGNAlgorithm v => Show (SignedDSIGN v a)
 deriving instance DSIGNAlgorithm v => Eq   (SignedDSIGN v a)
 
-instance DSIGNAlgorithm v => NoUnexpectedThunks (SignedDSIGN v a)
+instance DSIGNAlgorithm v => NoThunks (SignedDSIGN v a)
   -- use generic instance
 
 signedDSIGN

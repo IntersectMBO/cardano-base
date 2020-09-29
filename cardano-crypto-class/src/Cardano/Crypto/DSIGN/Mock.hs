@@ -26,8 +26,8 @@ import GHC.Generics (Generic)
 import GHC.TypeLits (type (+))
 import Data.Proxy (Proxy (..))
 import GHC.Stack
+import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class
@@ -50,15 +50,15 @@ instance DSIGNAlgorithm MockDSIGN where
 
     newtype VerKeyDSIGN MockDSIGN = VerKeyMockDSIGN Word64
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (Num, NoUnexpectedThunks)
+        deriving newtype (Num, NoThunks)
 
     newtype SignKeyDSIGN MockDSIGN = SignKeyMockDSIGN Word64
         deriving stock   (Show, Eq, Ord, Generic)
-        deriving newtype (Num, NoUnexpectedThunks)
+        deriving newtype (Num, NoThunks)
 
     data SigDSIGN MockDSIGN = SigMockDSIGN !(Hash ShortHash ()) !Word64
         deriving stock    (Show, Eq, Ord, Generic)
-        deriving anyclass (NoUnexpectedThunks)
+        deriving anyclass (NoThunks)
 
     --
     -- Metadata and basic key operations

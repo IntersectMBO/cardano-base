@@ -58,6 +58,7 @@ library
                      , cryptonite
                      , deepseq
                      , memory
+                     , nothunks
                      , reflection
                      , vector
 

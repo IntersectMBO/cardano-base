@@ -38,6 +38,7 @@ library
                      , cborg
                      , cryptonite
                      , formatting
+                     , nothunks
                      , QuickCheck
                      , quickcheck-instances
                      , tasty

@@ -48,6 +48,7 @@ import Foreign.C.Types (CSize)
 import Foreign.Ptr (FunPtr, castPtr)
 import Foreign.Storable (Storable (..))
 import GHC.TypeLits (KnownNat, Nat, natVal)
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -59,7 +60,6 @@ import qualified Data.Primitive as Prim
 import qualified Data.ByteString as BS
 
 import Cardano.Foreign
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 
 -- $setup
@@ -79,7 +79,7 @@ import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 -- I'm sorry for adding more types for bytes. :(
 --
 data PinnedSizedBytes (n :: Nat) = PSB ByteArray
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "PinnedSizedBytes" (PinnedSizedBytes n)
+  deriving NoThunks via OnlyCheckWhnfNamed "PinnedSizedBytes" (PinnedSizedBytes n)
 
 instance Show (PinnedSizedBytes n) where
     showsPrec _ (PSB ba)

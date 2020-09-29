@@ -132,10 +132,10 @@ testVRFAlgorithm _ n =
       , testProperty "mkTestOutputVRF" $ prop_vrf_output_natural @v
       ]
 
-    , testGroup "NoUnexpectedThunks"
-      [ testProperty "VerKey"  $ prop_no_unexpected_thunks @(VerKeyVRF v)
-      , testProperty "SignKey" $ prop_no_unexpected_thunks @(SignKeyVRF v)
-      , testProperty "Cert"    $ prop_no_unexpected_thunks @(CertVRF v)
+    , testGroup "NoThunks"
+      [ testProperty "VerKey"  $ prop_no_thunks @(VerKeyVRF v)
+      , testProperty "SignKey" $ prop_no_thunks @(SignKeyVRF v)
+      , testProperty "Cert"    $ prop_no_thunks @(CertVRF v)
       ]
     ]
 

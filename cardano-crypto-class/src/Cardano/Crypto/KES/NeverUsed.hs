@@ -12,9 +12,9 @@ module Cardano.Crypto.KES.NeverUsed
 where
 
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks)
 
 import Cardano.Crypto.KES.Class
-import Cardano.Prelude (NoUnexpectedThunks)
 
 
 -- | KES never used
@@ -27,13 +27,13 @@ instance KESAlgorithm NeverKES where
   type SeedSizeKES NeverKES = 0
 
   data VerKeyKES  NeverKES = NeverUsedVerKeyKES
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data SignKeyKES NeverKES = NeverUsedSignKeyKES
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data SigKES     NeverKES = NeverUsedSigKES
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   algorithmNameKES _ = "never"
 

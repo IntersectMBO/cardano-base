@@ -18,8 +18,8 @@ module Test.Crypto.Util
   , prop_size_serialise
   , prop_cbor_direct_vs_class
 
-    -- * NoUnexpectedThunks
-  , prop_no_unexpected_thunks
+    -- * NoThunks
+  , prop_no_thunks
 
     -- * Test Seed
   , TestSeed (..)
@@ -38,7 +38,6 @@ where
 import Cardano.Binary (FromCBOR (..), ToCBOR (..),
                        Encoding, Decoder, Range (..),
                        decodeFullDecoder, serializeEncoding, szGreedy, szSimplify)
-import Cardano.Prelude (NoUnexpectedThunks, unsafeNoUnexpectedThunks)
 import Codec.CBOR.FlatTerm
 import Codec.CBOR.Write
 import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
@@ -52,6 +51,7 @@ import Crypto.Random
 import Data.ByteString as BS (ByteString, pack, unpack, length)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
+import NoThunks.Class (NoThunks, unsafeNoThunks)
 import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
@@ -191,11 +191,11 @@ prop_size_serialise serialise size x =
     BS.length (serialise x) === fromIntegral size
 
 --------------------------------------------------------------------------------
--- NoUnexpectedThunks
+-- NoThunks
 --------------------------------------------------------------------------------
 
 -- | When forcing the given value to WHNF, it may no longer contain thunks.
-prop_no_unexpected_thunks :: NoUnexpectedThunks a => a -> Property
-prop_no_unexpected_thunks !a = case unsafeNoUnexpectedThunks a of
+prop_no_thunks :: NoThunks a => a -> Property
+prop_no_thunks !a = case unsafeNoThunks a of
     Nothing  -> property True
-    Just msg -> counterexample msg (property False)
+    Just msg -> counterexample (show msg) (property False)

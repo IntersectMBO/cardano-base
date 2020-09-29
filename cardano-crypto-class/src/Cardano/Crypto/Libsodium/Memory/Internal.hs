@@ -27,14 +27,14 @@ import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable (alignment, sizeOf, peek))
 import GHC.TypeLits (KnownNat, natVal)
 import GHC.IO.Exception (ioException)
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C
 
 -- | Foreign pointer to securely allocated memory.
 newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: ForeignPtr a }
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "MLockedForeignPtr" (MLockedForeignPtr a)
+  deriving NoThunks via OnlyCheckWhnfNamed "MLockedForeignPtr" (MLockedForeignPtr a)
 
 withMLockedForeignPtr :: forall a b. MLockedForeignPtr a -> (Ptr a -> IO b) -> IO b
 withMLockedForeignPtr = coerce (withForeignPtr @a @b)

@@ -12,7 +12,7 @@ import Cardano.Crypto.Hash
 import qualified Data.ByteString as SB
 import Data.Maybe (fromJust)
 import Data.Proxy (Proxy (..))
-import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_unexpected_thunks)
+import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_thunks)
 import Test.QuickCheck
 import Data.String(fromString)
 import Test.QuickCheck.Instances ()
@@ -53,7 +53,7 @@ testHashAlgorithm p =
     , testProperty "hashFromStringAsHex/hashToStringFromHash" $ prop_hash_hashFromStringAsHex_hashToStringFromHash @h @Float
     , testProperty "hashFromStringAsHex/fromString" $ prop_hash_hashFromStringAsHex_fromString @h @Float
     , testProperty "show/read" $ prop_hash_show_read @h @Float
-    , testProperty "NoUnexpectedThunks" $ prop_no_unexpected_thunks @(Hash h Int)
+    , testProperty "NoThunks" $ prop_no_thunks @(Hash h Int)
     ]
     where n = hashAlgorithmName p
 

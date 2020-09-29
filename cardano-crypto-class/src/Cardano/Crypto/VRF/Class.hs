@@ -50,8 +50,8 @@ import Numeric.Natural (Natural)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
+import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary
          (Decoder, Encoding, FromCBOR (..), ToCBOR (..), Size,
           encodeListLen, enforceSize, decodeBytes, encodeBytes,
@@ -68,9 +68,9 @@ class ( Typeable v
       , Show (SignKeyVRF v)
       , Show (CertVRF v)
       , Eq (CertVRF v)
-      , NoUnexpectedThunks (CertVRF    v)
-      , NoUnexpectedThunks (VerKeyVRF  v)
-      , NoUnexpectedThunks (SignKeyVRF v)
+      , NoThunks (CertVRF v)
+      , NoThunks (VerKeyVRF v)
+      , NoThunks (SignKeyVRF v)
       )
       => VRFAlgorithm v where
 
@@ -182,7 +182,7 @@ class ( Typeable v
 -- The output size is a fixed number of bytes and is given by 'sizeOutputVRF'.
 --
 newtype OutputVRF v = OutputVRF { getOutputVRFBytes :: ByteString }
-  deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoUnexpectedThunks)
+  deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoThunks)
 
 
 -- | The output bytes of the VRF interpreted as a big endian natural number.
@@ -269,7 +269,7 @@ data CertifiedVRF v a
 deriving instance VRFAlgorithm v => Show (CertifiedVRF v a)
 deriving instance VRFAlgorithm v => Eq   (CertifiedVRF v a)
 
-instance VRFAlgorithm v => NoUnexpectedThunks (CertifiedVRF v a)
+instance VRFAlgorithm v => NoThunks (CertifiedVRF v a)
   -- use generic instance
 
 instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
