@@ -7,8 +7,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoStarIsType #-}
 
 -- | Mock key evolving signatures.
 module Cardano.Crypto.KES.Simple
@@ -25,7 +27,7 @@ import qualified Data.ByteString as BS
 import           Data.Vector ((!?), Vector)
 import qualified Data.Vector as Vec
 import           GHC.Generics (Generic)
-import           GHC.TypeNats (Nat, KnownNat, natVal)
+import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 
 import           Cardano.Prelude (NoUnexpectedThunks, forceElemsToWHNF)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -35,6 +37,7 @@ import qualified Cardano.Crypto.DSIGN as DSIGN
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
+import           Cardano.Crypto.Libsodium (mlsbToByteString)
 
 
 data SimpleKES d (t :: Nat)
@@ -60,9 +63,10 @@ pattern SignKeySimpleKES v <- ThunkySignKeySimpleKES v
 
 {-# COMPLETE SignKeySimpleKES #-}
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t)) =>
          KESAlgorithm (SimpleKES d t) where
 
+    type SeedSizeKES (SimpleKES d t) = SeedSizeDSIGN d * t
 
     --
     -- Key and signature types
@@ -124,8 +128,9 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t) =>
             duration = fromIntegral (natVal (Proxy @ t))
          in duration * seedSize
 
-    genKeyKES seed =
-        let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+    genKeyKES mlsb =
+        let seed     = mkSeedFromBytes $ mlsbToByteString mlsb
+            seedSize = seedSizeDSIGN (Proxy :: Proxy d)
             duration = fromIntegral (natVal (Proxy @ t))
             seeds    = take duration
                      . map mkSeedFromBytes
@@ -193,31 +198,31 @@ instance DSIGNAlgorithm d => NoUnexpectedThunks (SigKES     (SimpleKES d t))
 instance DSIGNAlgorithm d => NoUnexpectedThunks (SignKeyKES (SimpleKES d t))
 instance DSIGNAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SimpleKES d t))
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (VerKeyKES (SimpleKES d t)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (VerKeyKES (SimpleKES d t)) where
   fromCBOR = decodeVerKeyKES
 
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (SignKeyKES (SimpleKES d t)) where
   toCBOR = encodeSignKeyKES
   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (SignKeyKES (SimpleKES d t)) where
   fromCBOR = decodeSignKeyKES
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (SigKES (SimpleKES d t)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t)
+instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (SigKES (SimpleKES d t)) where
   fromCBOR = decodeSigKES
 

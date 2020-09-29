@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -23,6 +24,7 @@ import Cardano.Prelude (NoUnexpectedThunks)
 data NeverKES
 
 instance KESAlgorithm NeverKES where
+  type SeedSizeKES NeverKES = 0
 
   data VerKeyKES  NeverKES = NeverUsedVerKeyKES
       deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
@@ -43,7 +45,6 @@ instance KESAlgorithm NeverKES where
 
   totalPeriodsKES _ = 0
 
-  seedSizeKES     _ = 0
   genKeyKES       _ = NeverUsedSignKeyKES
 
   sizeVerKeyKES  _ = 0

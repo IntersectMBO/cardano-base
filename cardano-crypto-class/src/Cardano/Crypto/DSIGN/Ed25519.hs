@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
@@ -32,6 +33,13 @@ import Cardano.Crypto.Util (SignableRepresentation(..))
 data Ed25519DSIGN
 
 instance DSIGNAlgorithm Ed25519DSIGN where
+    type SeedSizeDSIGN Ed25519DSIGN = 32
+    -- | Ed25519 key size is 32 octets
+    -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
+    type SizeVerKeyDSIGN  Ed25519DSIGN = 32
+    type SizeSignKeyDSIGN Ed25519DSIGN = 32
+    -- | Ed25519 signature size is 64 octets
+    type SizeSigDSIGN     Ed25519DSIGN = 64
 
     --
     -- Key and signature types
@@ -80,7 +88,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     -- Key generation
     --
 
-    seedSizeDSIGN _  = 32
     genKeyDSIGN seed =
         let sk = runMonadRandomWithSeed seed Ed25519.generateSecretKey
          in SignKeyEd25519DSIGN sk
@@ -88,13 +95,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     --
     -- raw serialise/deserialise
     --
-
-    -- | Ed25519 key size is 32 octets
-    -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
-    sizeVerKeyDSIGN  _ = 32
-    sizeSignKeyDSIGN _ = 32
-    -- | Ed25519 signature size is 64 octets
-    sizeSigDSIGN     _ = 64
 
     rawSerialiseVerKeyDSIGN   = BA.convert
     rawSerialiseSignKeyDSIGN  = BA.convert
