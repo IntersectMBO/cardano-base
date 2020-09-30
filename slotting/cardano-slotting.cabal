@@ -42,11 +42,8 @@ library
                       , base
                       , cardano-binary
                       , cborg
-                      , containers
                       , deepseq
                       , mmorph
-                      , mtl
                       , nothunks
                       , serialise
-                      , transformers
                       , quiet

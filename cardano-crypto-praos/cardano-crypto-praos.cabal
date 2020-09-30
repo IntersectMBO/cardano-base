@@ -50,17 +50,10 @@ library
   exposed-modules:     Cardano.Crypto.VRF.Praos
 
   build-depends:       base
-                     , base16-bytestring
                      , bytestring
                      , cardano-binary
-                     , cardano-prelude
                      , cardano-crypto-class
-                     , cryptonite
-                     , deepseq
-                     , memory
                      , nothunks
-                     , reflection
-                     , vector
 
   default-language:    Haskell2010
 
