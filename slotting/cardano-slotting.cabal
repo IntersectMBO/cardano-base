@@ -34,7 +34,6 @@ library
       -Werror
   exposed-modules:      Cardano.Slotting.Block
                         Cardano.Slotting.Slot
-                        Cardano.Slotting.SlotBounded
                         Cardano.Slotting.EpochInfo
                         Cardano.Slotting.EpochInfo.API
                         Cardano.Slotting.EpochInfo.Impl
