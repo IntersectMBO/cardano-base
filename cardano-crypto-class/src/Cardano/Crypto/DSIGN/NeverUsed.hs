@@ -13,7 +13,7 @@ where
 
 import GHC.Generics (Generic)
 
-import Cardano.Prelude (NoUnexpectedThunks)
+import NoThunks.Class (NoThunks)
 
 import Cardano.Crypto.DSIGN.Class
 
@@ -31,13 +31,13 @@ instance DSIGNAlgorithm NeverDSIGN where
   type SizeSigDSIGN     NeverDSIGN = 0
 
   data VerKeyDSIGN  NeverDSIGN = NeverUsedVerKeyDSIGN
-     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+     deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data SignKeyDSIGN NeverDSIGN = NeverUsedSignKeyDSIGN
-     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+     deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data SigDSIGN     NeverDSIGN = NeverUsedSigDSIGN
-     deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+     deriving (Show, Eq, Ord, Generic, NoThunks)
 
   algorithmNameDSIGN _ = "never"
 

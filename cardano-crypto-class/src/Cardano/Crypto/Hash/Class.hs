@@ -74,7 +74,8 @@ import qualified Data.Aeson.Encoding as Aeson
 
 import           Control.DeepSeq (NFData)
 
-import           Cardano.Prelude (NoUnexpectedThunks)
+import           NoThunks.Class (NoThunks)
+
 import           Cardano.Binary
                    (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
                     serializeEncoding')
@@ -95,7 +96,7 @@ sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
 sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
 newtype Hash h a = UnsafeHash ShortByteString
-  deriving (Eq, Ord, Generic, NFData, NoUnexpectedThunks)
+  deriving (Eq, Ord, Generic, NFData, NoThunks)
 
 
 --

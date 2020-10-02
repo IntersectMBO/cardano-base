@@ -70,21 +70,20 @@ import Cardano.Crypto.VRF.Class
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation(..))
 
-import Cardano.Prelude (NoUnexpectedThunks, OnlyCheckIsWHNF (..))
-import GHC.Generics (Generic)
-import Data.Coerce (coerce)
-
-import Foreign.ForeignPtr
-import Foreign.C.Types
-import Foreign.Ptr
-import Foreign.Marshal.Alloc
-import Foreign.Marshal.Utils
-import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.Coerce (coerce)
 import Data.Maybe (isJust)
 import Data.Proxy (Proxy (..))
+import Foreign.C.Types
+import Foreign.ForeignPtr
+import Foreign.Marshal.Alloc
+import Foreign.Marshal.Utils
+import Foreign.Ptr
+import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks, OnlyCheckWhnf (..), OnlyCheckWhnfNamed (..))
+import System.IO.Unsafe (unsafePerformIO)
 
 -- Value types.
 --
@@ -124,30 +123,30 @@ type OutputPtr = Ptr OutputValue
 
 -- | A random seed, used to derive a key pair.
 newtype Seed = Seed { unSeed :: ForeignPtr SeedValue }
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "Seed" Seed
+  deriving NoThunks via OnlyCheckWhnf Seed
 
 -- | Signing key. In this implementation, the signing key is actually a 64-byte
 -- value that contains both the 32-byte signing key and the corresponding
 -- 32-byte verification key.
 newtype SignKey = SignKey { unSignKey :: ForeignPtr SignKeyValue }
   deriving (Generic)
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "SignKey" SignKey
+  deriving NoThunks via OnlyCheckWhnf SignKey
 
 -- | Verification key.
 newtype VerKey = VerKey { unVerKey :: ForeignPtr VerKeyValue }
   deriving (Generic)
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "VerKey" VerKey
+  deriving NoThunks via OnlyCheckWhnf VerKey
 
 -- | A proof, as constructed by the 'prove' function.
 newtype Proof = Proof { unProof :: ForeignPtr ProofValue }
   deriving (Generic)
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "Proof" Proof
+  deriving NoThunks via OnlyCheckWhnf Proof
 
 -- | Hashed output of a proof verification, as returned by the 'verify'
 -- function.
 newtype Output = Output { unOutput :: ForeignPtr OutputValue }
   deriving (Generic)
-  deriving NoUnexpectedThunks via OnlyCheckIsWHNF "Output" Output
+  deriving NoThunks via OnlyCheckWhnf Output
 
 -- Raw low-level FFI bindings.
 --
@@ -427,17 +426,17 @@ instance VRFAlgorithm PraosVRF where
   newtype VerKeyVRF PraosVRF = VerKeyPraosVRF VerKey
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoUnexpectedThunks via OnlyCheckIsWHNF "VerKeyVRF" VerKey
+    deriving NoThunks via OnlyCheckWhnfNamed "VerKeyVRF PraosVRF" VerKey
 
   newtype SignKeyVRF PraosVRF = SignKeyPraosVRF SignKey
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoUnexpectedThunks via OnlyCheckIsWHNF "SignKeyVRF" SignKey
+    deriving NoThunks via OnlyCheckWhnfNamed "SignKeyVRF PraosVRF" SignKey
 
   newtype CertVRF PraosVRF = CertPraosVRF Proof
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoUnexpectedThunks via OnlyCheckIsWHNF "CertKeyVRF" Proof
+    deriving NoThunks via OnlyCheckWhnfNamed "CertKeyVRF PraosVRF" Proof
 
   type Signable PraosVRF = SignableRepresentation
 

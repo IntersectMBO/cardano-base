@@ -15,8 +15,8 @@ where
 import Data.Word (Word64)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
 
 import Cardano.Crypto.Hash
@@ -33,13 +33,13 @@ instance VRFAlgorithm MockVRF where
   --
 
   newtype VerKeyVRF MockVRF = VerKeyMockVRF Word64
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   newtype SignKeyVRF MockVRF = SignKeyMockVRF Word64
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   newtype CertVRF MockVRF = CertMockVRF Word64
-      deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+      deriving (Show, Eq, Ord, Generic, NoThunks)
 
   --
   -- Metadata and basic key operations

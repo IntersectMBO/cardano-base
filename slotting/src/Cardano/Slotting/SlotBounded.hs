@@ -25,7 +25,6 @@ module Cardano.Slotting.SlotBounded
 where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Slotting.Slot (SlotNo, WithOrigin(..))
 import qualified Codec.CBOR.Decoding as CBOR
 import qualified Codec.CBOR.Encoding as CBOR
@@ -33,6 +32,7 @@ import Codec.Serialise (Serialise)
 import Data.Proxy
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks)
 
 {-------------------------------------------------------------------------------
   Bounds
@@ -66,7 +66,7 @@ data SlotBounded (bounds :: Bounds) a
         sbUpper   :: !SlotNo,
         sbContent :: !a
       }
-  deriving (Eq, Functor, Show, Generic, Serialise, NoUnexpectedThunks)
+  deriving (Eq, Functor, Show, Generic, Serialise, NoThunks)
 
 instance (FromCBOR a, Typeable b) => FromCBOR (SlotBounded b a) where
   fromCBOR = do

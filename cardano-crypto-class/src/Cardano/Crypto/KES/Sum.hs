@@ -46,8 +46,8 @@ import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
 import           Control.Monad (guard)
 import           GHC.TypeLits (KnownNat)
+import           NoThunks.Class (NoThunks)
 
-import           Cardano.Prelude (NoUnexpectedThunks)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.Hash.Class
@@ -306,7 +306,7 @@ mungeName basename
 deriving instance Show (VerKeyKES (SumKES h d))
 deriving instance Eq   (VerKeyKES (SumKES h d))
 
-instance KESAlgorithm d => NoUnexpectedThunks (SignKeyKES (SumKES h d))
+instance KESAlgorithm d => NoThunks (SignKeyKES (SumKES h d))
 
 instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (VerKeyKES (SumKES h d)) where
@@ -324,7 +324,7 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ S
 
 deriving instance (KnownNat (SizeHash h), KESAlgorithm d) => Show (SignKeyKES (SumKES h d))
 
-instance KESAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SumKES h d))
+instance KESAlgorithm d => NoThunks (VerKeyKES  (SumKES h d))
 
 instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (SignKeyKES (SumKES h d)) where
@@ -343,7 +343,7 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ S
 deriving instance KESAlgorithm d => Show (SigKES (SumKES h d))
 deriving instance KESAlgorithm d => Eq   (SigKES (SumKES h d))
 
-instance KESAlgorithm d => NoUnexpectedThunks (SigKES (SumKES h d))
+instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 
 instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d)
       => ToCBOR (SigKES (SumKES h d)) where

@@ -32,6 +32,7 @@ import Cardano.Prelude
 import Codec.CBOR.Read (ByteOffset)
 import Data.Aeson (FromJSON(..), ToJSON(..))
 import qualified Data.ByteString.Lazy as BSL
+import NoThunks.Class (NoThunks)
 
 import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR
@@ -56,7 +57,7 @@ instance ToJSON ByteSpan where
 
 data Annotated b a = Annotated { unAnnotated :: !b, annotation :: !a }
   deriving (Eq, Show, Functor, Generic)
-  deriving anyclass (NFData, NoUnexpectedThunks)
+  deriving anyclass (NFData, NoThunks)
 
 instance Bifunctor Annotated where
   first f (Annotated b a) = Annotated (f b) a

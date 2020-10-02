@@ -9,10 +9,10 @@ module Cardano.Slotting.Block
 where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
-import Cardano.Prelude (NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
 import Data.Word (Word64)
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks)
 import Quiet (Quiet (..))
 
 -- | The 0-based index of the block in the blockchain.
@@ -21,7 +21,7 @@ import Quiet (Quiet (..))
 newtype BlockNo = BlockNo {unBlockNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet BlockNo
-  deriving newtype (Enum, Bounded, Num, Serialise, NoUnexpectedThunks)
+  deriving newtype (Enum, Bounded, Num, Serialise, NoThunks)
 
 instance ToCBOR BlockNo where
   toCBOR = encode

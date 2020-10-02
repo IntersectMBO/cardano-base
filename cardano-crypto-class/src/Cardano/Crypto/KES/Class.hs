@@ -46,8 +46,8 @@ import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal)
+import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
@@ -61,9 +61,9 @@ class ( Typeable v
       , Show (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
-      , NoUnexpectedThunks (SigKES     v)
-      , NoUnexpectedThunks (SignKeyKES v)
-      , NoUnexpectedThunks (VerKeyKES  v)
+      , NoThunks (SigKES v)
+      , NoThunks (SignKeyKES v)
+      , NoThunks (VerKeyKES v)
       , KnownNat (SeedSizeKES v)
       )
       => KESAlgorithm v where
@@ -267,7 +267,7 @@ newtype SignedKES v a = SignedKES {getSig :: SigKES v}
 deriving instance KESAlgorithm v => Show (SignedKES v a)
 deriving instance KESAlgorithm v => Eq   (SignedKES v a)
 
-instance KESAlgorithm v => NoUnexpectedThunks (SignedKES v a)
+instance KESAlgorithm v => NoThunks (SignedKES v a)
   -- use generic instance
 
 signedKES

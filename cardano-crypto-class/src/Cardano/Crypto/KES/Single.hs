@@ -39,10 +39,10 @@ module Cardano.Crypto.KES.Single (
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
 
-import Cardano.Prelude (NoUnexpectedThunks)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.Hash.Class
@@ -145,7 +145,7 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SingleKES d))
 deriving instance DSIGNAlgorithm d => Eq   (VerKeyKES (SingleKES d))
 
-instance DSIGNAlgorithm d => NoUnexpectedThunks (SignKeyKES (SingleKES d))
+instance DSIGNAlgorithm d => NoThunks (SignKeyKES (SingleKES d))
 
 instance NaCl.SodiumDSIGNAlgorithm d => ToCBOR (VerKeyKES (SingleKES d)) where
   toCBOR = encodeVerKeyKES
@@ -161,7 +161,7 @@ instance NaCl.SodiumDSIGNAlgorithm d => FromCBOR (VerKeyKES (SingleKES d)) where
 
 deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SingleKES d))
 
-instance DSIGNAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SingleKES d))
+instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SingleKES d))
 
 instance NaCl.SodiumDSIGNAlgorithm d => ToCBOR (SignKeyKES (SingleKES d)) where
   toCBOR = encodeSignKeyKES
@@ -178,7 +178,7 @@ instance NaCl.SodiumDSIGNAlgorithm d => FromCBOR (SignKeyKES (SingleKES d)) wher
 deriving instance DSIGNAlgorithm d => Show (SigKES (SingleKES d))
 deriving instance DSIGNAlgorithm d => Eq   (SigKES (SingleKES d))
 
-instance DSIGNAlgorithm d => NoUnexpectedThunks (SigKES (SingleKES d))
+instance DSIGNAlgorithm d => NoThunks (SigKES (SingleKES d))
 
 instance NaCl.SodiumDSIGNAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
   toCBOR = encodeSigKES

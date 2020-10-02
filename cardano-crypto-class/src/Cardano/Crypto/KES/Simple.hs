@@ -28,8 +28,9 @@ import           Data.Vector ((!?), Vector)
 import qualified Data.Vector as Vec
 import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
+import           NoThunks.Class (NoThunks)
 
-import           Cardano.Prelude (NoUnexpectedThunks, forceElemsToWHNF)
+import           Cardano.Prelude (forceElemsToWHNF)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.DSIGN
@@ -194,9 +195,9 @@ deriving instance DSIGNAlgorithm d => Show (SigKES (SimpleKES d t))
 deriving instance DSIGNAlgorithm d => Eq   (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNAlgorithm d => Eq   (SigKES (SimpleKES d t))
 
-instance DSIGNAlgorithm d => NoUnexpectedThunks (SigKES     (SimpleKES d t))
-instance DSIGNAlgorithm d => NoUnexpectedThunks (SignKeyKES (SimpleKES d t))
-instance DSIGNAlgorithm d => NoUnexpectedThunks (VerKeyKES  (SimpleKES d t))
+instance DSIGNAlgorithm d => NoThunks (SigKES     (SimpleKES d t))
+instance DSIGNAlgorithm d => NoThunks (SignKeyKES (SimpleKES d t))
+instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SimpleKES d t))
 
 instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (VerKeyKES (SimpleKES d t)) where

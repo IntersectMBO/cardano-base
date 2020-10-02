@@ -11,8 +11,7 @@ module Cardano.Crypto.VRF.NeverUsed
 where
 
 import GHC.Generics (Generic)
-
-import Cardano.Prelude (NoUnexpectedThunks)
+import NoThunks.Class (NoThunks)
 
 import Cardano.Crypto.VRF.Class
 
@@ -26,13 +25,13 @@ data NeverVRF
 instance VRFAlgorithm NeverVRF where
 
   data VerKeyVRF NeverVRF = NeverUsedVerKeyVRF
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+    deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data SignKeyVRF NeverVRF = NeverUsedSignKeyVRF
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+    deriving (Show, Eq, Ord, Generic, NoThunks)
 
   data CertVRF NeverVRF = NeverUsedCertVRF
-    deriving (Show, Eq, Ord, Generic, NoUnexpectedThunks)
+    deriving (Show, Eq, Ord, Generic, NoThunks)
 
   algorithmNameVRF _ = "never"
 

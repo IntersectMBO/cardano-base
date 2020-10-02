@@ -22,19 +22,20 @@ module Cardano.Slotting.Slot
 where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
-import Cardano.Prelude (NFData, NoUnexpectedThunks)
 import Codec.Serialise (Serialise (..))
+import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Typeable (Typeable)
 import Data.Word (Word64)
-import Quiet (Quiet (..))
 import GHC.Generics (Generic)
+import Quiet (Quiet (..))
+import NoThunks.Class (NoThunks)
 
 -- | The 0-based index for the Ourboros time slot.
 newtype SlotNo = SlotNo {unSlotNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet SlotNo
-  deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoUnexpectedThunks, ToJSON, FromJSON)
+  deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoThunks, ToJSON, FromJSON)
 
 instance ToCBOR SlotNo where
   toCBOR = encode
@@ -57,7 +58,7 @@ data WithOrigin t = Origin | At !t
       Foldable,
       Traversable,
       Serialise,
-      NoUnexpectedThunks
+      NoThunks
     )
 
 instance (Serialise t, Typeable t) => ToCBOR (WithOrigin t) where
@@ -96,9 +97,9 @@ withOriginFromMaybe (Just t) = At t
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochNo
-  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoUnexpectedThunks, ToJSON, FromJSON)
+  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochSize
-  deriving newtype (Enum, Num, Real, Integral, NoUnexpectedThunks, ToJSON, FromJSON)
+  deriving newtype (Enum, Num, Real, Integral, NoThunks, ToJSON, FromJSON)

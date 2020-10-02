@@ -82,6 +82,7 @@ library
                      , integer-gmp
                      , ghc-prim
                      , memory
+                     , nothunks
                      , primitive
                      , text
                      , transformers

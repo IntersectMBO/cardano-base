@@ -6,7 +6,7 @@ synopsis:            Key slotting types for cardano libraries
 -- description:
 -- bug-reports:
 license:             Apache-2.0
-license-files:        
+license-files:
   LICENSE
   NOTICE
 author:              IOHK Formal Methods Team
@@ -40,12 +40,10 @@ library
                         Cardano.Slotting.EpochInfo.Impl
   build-depends:        aeson
                       , base
-                      , cardano-prelude
                       , cardano-binary
                       , cborg
-                      , containers
+                      , deepseq
                       , mmorph
-                      , mtl
+                      , nothunks
                       , serialise
-                      , transformers
                       , quiet

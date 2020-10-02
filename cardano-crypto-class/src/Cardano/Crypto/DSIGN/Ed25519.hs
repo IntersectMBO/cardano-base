@@ -16,10 +16,11 @@ module Cardano.Crypto.DSIGN.Ed25519
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks, InspectHeap(..))
 
-import Cardano.Prelude (NFData, NoUnexpectedThunks, UseIsNormalForm(..))
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Crypto.Error (CryptoFailable (..))
@@ -48,16 +49,16 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     newtype VerKeyDSIGN Ed25519DSIGN = VerKeyEd25519DSIGN PublicKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
-        deriving NoUnexpectedThunks via UseIsNormalForm PublicKey
+        deriving NoThunks via InspectHeap PublicKey
 
     newtype SignKeyDSIGN Ed25519DSIGN = SignKeyEd25519DSIGN SecretKey
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving newtype NFData
-        deriving NoUnexpectedThunks via UseIsNormalForm SecretKey
+        deriving NoThunks via InspectHeap SecretKey
 
     newtype SigDSIGN Ed25519DSIGN = SigEd25519DSIGN Signature
         deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving NoUnexpectedThunks via UseIsNormalForm Signature
+        deriving NoThunks via InspectHeap Signature
 
     --
     -- Metadata and basic key operations
