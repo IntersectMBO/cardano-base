@@ -324,25 +324,29 @@ proofFromBytes bs
 
 skFromBytes :: ByteString -> SignKey
 skFromBytes bs
-  | BS.length bs /= signKeySizeVRF
-  = error "Invalid sk length"
+  | bsLen /= signKeySizeVRF
+  = error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF)
   | otherwise
   = unsafePerformIO $ do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
         copyFromByteString ptr bs signKeySizeVRF
       return sk
+  where
+    bsLen = BS.length bs
 
 vkFromBytes :: ByteString -> VerKey
 vkFromBytes bs
   | BS.length bs /= verKeySizeVRF
-  = error "Invalid pk length"
+  = error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF)
   | otherwise
   = unsafePerformIO $ do
       pk <- mkVerKey
       withForeignPtr (unVerKey pk) $ \ptr ->
         copyFromByteString ptr bs verKeySizeVRF
       return pk
+  where
+    bsLen = BS.length bs
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
