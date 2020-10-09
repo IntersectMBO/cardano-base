@@ -331,28 +331,37 @@ proofFromBytes bs
       return proof
 
 decodeSignKey :: D.Decoder s SignKey
-decodeSignKey = do
-  bs <- D.decodeBytes
-  let bsLen = BS.length bs
-  if bsLen /= signKeySizeVRF
-    then fail $ "Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF
-    else return . unsafePerformIO $ do
+decodeSignKey = skFromBytes <$> D.decodeBytes
+
+decodeVerKey :: D.Decoder s VerKey
+decodeVerKey = vkFromBytes <$> D.decodeBytes
+
+skFromBytes :: ByteString -> SignKey
+skFromBytes bs
+  | bsLen /= signKeySizeVRF
+  = error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF)
+  | otherwise
+  = unsafePerformIO $ do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
         copyFromByteString ptr bs signKeySizeVRF
       return sk
+  where
+    bsLen = BS.length bs
 
-decodeVerKey :: D.Decoder s VerKey
-decodeVerKey = do
-  bs <- D.decodeBytes
-  let bsLen = BS.length bs
-  if bsLen /= verKeySizeVRF
-    then fail $ "Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF
-    else return . unsafePerformIO $ do
+vkFromBytes :: ByteString -> VerKey
+vkFromBytes bs
+  | BS.length bs /= verKeySizeVRF
+  = error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF)
+  | otherwise
+  = unsafePerformIO $ do
       pk <- mkVerKey
       withForeignPtr (unVerKey pk) $ \ptr ->
         copyFromByteString ptr bs verKeySizeVRF
       return pk
+  where
+    bsLen = BS.length bs
+
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
