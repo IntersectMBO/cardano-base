@@ -226,7 +226,7 @@ decodeVerKeyVRF = do
         | actual /= expected
                     -> fail ("decodeVerKeyVRF: wrong length, expected " ++
                              show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeVerKeyVRF: cannot decode key"
+        | otherwise -> fail $ "decodeVerKeyVRF: cannot decode key " <> show bs <> " " <> show (BS.length bs) <> " " <> show actual <> " " <> show expected
         where
           expected = fromIntegral (sizeVerKeyVRF (Proxy :: Proxy v))
           actual   = BS.length bs

@@ -7,6 +7,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -74,8 +75,10 @@ import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Coerce (coerce)
+import Data.Functor
 import Data.Maybe (isJust)
 import Data.Proxy (Proxy (..))
+import Data.Text (Text)
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc
@@ -84,6 +87,12 @@ import Foreign.Ptr
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..), OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
+
+import qualified Codec.CBOR.Decoding as D
+import qualified Cardano.Binary as D
+import qualified Data.ByteString.Lazy as LBS
+
+{- HLINT ignore "Reduce duplication" -}
 
 -- Value types.
 --
@@ -208,7 +217,7 @@ genSeed = do
 copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
 copyFromByteString ptr bs lenExpected =
   BS.useAsCStringLen bs $ \(cstr, lenActual) ->
-    if (lenActual >= lenExpected) then
+    if lenActual >= lenExpected then
       copyBytes (castPtr ptr) cstr lenExpected
     else
       error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
@@ -279,8 +288,7 @@ instance ToCBOR SignKey where
     encodedSizeExpr (\_ -> fromIntegral signKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR SignKey where
-  fromCBOR = skFromBytes <$> fromCBOR
-
+  fromCBOR = decodeSignKey
 
 instance Show VerKey where
   show = show . vkBytes
@@ -294,7 +302,7 @@ instance ToCBOR VerKey where
     encodedSizeExpr (\_ -> fromIntegral verKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR VerKey where
-  fromCBOR = vkFromBytes <$> fromCBOR
+  fromCBOR = decodeVerKey
 
 -- | Allocate a Verification Key and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -322,31 +330,29 @@ proofFromBytes bs
         copyFromByteString ptr bs certSizeVRF
       return proof
 
-skFromBytes :: ByteString -> SignKey
-skFromBytes bs
-  | bsLen /= signKeySizeVRF
-  = error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF)
-  | otherwise
-  = unsafePerformIO $ do
+decodeSignKey :: D.Decoder s SignKey
+decodeSignKey = do
+  bs <- D.decodeBytes
+  let bsLen = BS.length bs
+  if bsLen /= signKeySizeVRF
+    then fail $ "Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF
+    else return . unsafePerformIO $ do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
         copyFromByteString ptr bs signKeySizeVRF
       return sk
-  where
-    bsLen = BS.length bs
 
-vkFromBytes :: ByteString -> VerKey
-vkFromBytes bs
-  | BS.length bs /= verKeySizeVRF
-  = error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF)
-  | otherwise
-  = unsafePerformIO $ do
+decodeVerKey :: D.Decoder s VerKey
+decodeVerKey = do
+  bs <- D.decodeBytes
+  let bsLen = BS.length bs
+  if bsLen /= verKeySizeVRF
+    then fail $ "Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF
+    else return . unsafePerformIO $ do
       pk <- mkVerKey
       withForeignPtr (unVerKey pk) $ \ptr ->
         copyFromByteString ptr bs verKeySizeVRF
       return pk
-  where
-    bsLen = BS.length bs
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -469,13 +475,16 @@ instance VRFAlgorithm PraosVRF where
   rawSerialiseVerKeyVRF (VerKeyPraosVRF pk) = vkBytes pk
   rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
   rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
-  rawDeserialiseVerKeyVRF = fmap (VerKeyPraosVRF . vkFromBytes) . assertLength verKeySizeVRF
-  rawDeserialiseSignKeyVRF = fmap (SignKeyPraosVRF . skFromBytes) . assertLength signKeySizeVRF
+  rawDeserialiseVerKeyVRF sk = (assertLength verKeySizeVRF sk >>= deserialiseFromBytesToMaybe "ver key" decodeVerKey) <&> VerKeyPraosVRF
+  rawDeserialiseSignKeyVRF vk = (assertLength signKeySizeVRF vk >>= deserialiseFromBytesToMaybe "sign key" decodeSignKey) <&> SignKeyPraosVRF
   rawDeserialiseCertVRF = fmap (CertPraosVRF . proofFromBytes) . assertLength certSizeVRF
 
   sizeVerKeyVRF _ = fromIntegral verKeySizeVRF
   sizeSignKeyVRF _ = fromIntegral signKeySizeVRF
   sizeCertVRF _ = fromIntegral certSizeVRF
+
+deserialiseFromBytesToMaybe :: Text -> (forall s. D.Decoder s a) -> BS.ByteString -> Maybe a
+deserialiseFromBytesToMaybe t d = either (const Nothing) Just . D.decodeFullDecoder t d . LBS.fromStrict
 
 assertLength :: Int -> ByteString -> Maybe ByteString
 assertLength l bs
