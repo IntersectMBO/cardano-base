@@ -1,0 +1,25 @@
+cradle:
+  cabal:
+    - path: "binary/src"
+      component: "lib:cardano-binary"
+
+    - path: "binary/test"
+      component: "cardano-binary:test:test"
+
+    - path: "cardano-crypto-class/src"
+      component: "lib:cardano-crypto-class"
+
+    - path: "cardano-crypto-class/memory-example"
+      component: "cardano-crypto-class:test:test-memory-example"
+
+    - path: "cardano-crypto-praos/src"
+      component: "lib:cardano-crypto-praos"
+
+    - path: "cardano-crypto-tests/src"
+      component: "lib:cardano-crypto-tests"
+
+    - path: "cardano-crypto-tests/test"
+      component: "cardano-crypto-tests:test:test-crypto"
+
+    - path: "slotting/src"
+      component: "lib:cardano-slotting"
