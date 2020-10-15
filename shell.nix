@@ -36,6 +36,7 @@ let
 
     tools = {
       cabal = "3.2.0.0";
+      haskell-language-server = "0.5.1";
     };
 
     # Prevents cabal from choosing alternate plans, so that
