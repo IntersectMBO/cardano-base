@@ -44,6 +44,7 @@ module Cardano.Crypto.Hash.Class
   )
 where
 
+import Control.Monad (join)
 import Data.List (foldl')
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (..))
@@ -80,6 +81,7 @@ import           Cardano.Binary
                    (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
                     serializeEncoding')
 
+import qualified Cardano.Prelude as P
 
 class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
       --TODO: eliminate this Typeable constraint needed only for the ToCBOR
@@ -211,14 +213,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
 --
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
-hashFromBytesAsHex hexrep
-  | (bytes, trailing) <- Base16.decode hexrep
-  , BS.null trailing
-  = hashFromBytes bytes
-
-  | otherwise
-  = Nothing
-
+hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . P.decodeEitherBase16
 
 instance Show (Hash h a) where
   show = show . hashToStringAsHex
@@ -250,10 +245,9 @@ hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
-    case Base16.decode (Text.encodeUtf8 t) of
-      (bytes, trailing)
-        | BS.null trailing -> maybe badSize return (hashFromBytes bytes)
-        | otherwise        -> badHex
+    case P.decodeEitherBase16 (Text.encodeUtf8 t) of
+      Right bytes -> maybe badSize return (hashFromBytes bytes)
+      Left _ -> badHex
   where
     badHex :: Aeson.Parser b
     badHex = fail "Hashes are expected in hex encoding"
