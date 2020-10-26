@@ -5,10 +5,10 @@
         "homepage": "https://input-output-hk.github.io/haskell.nix",
         "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "58e5214901dc3e5220a6f5875b11521cfa8c1a35",
-        "sha256": "1g4jwg5pj4szq78lz6iq80frrz07gcy8c1lzxrn1ddmffn37r7iv",
+        "rev": "5fc93a3fd171bb40b97585e5eb2cab43dc467446",
+        "sha256": "0a4q51jsxsy6z1ljbfr97haffzhwsrai74mzj17ljk8d78c26kfm",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/haskell.nix/archive/58e5214901dc3e5220a6f5875b11521cfa8c1a35.tar.gz",
+        "url": "https://github.com/input-output-hk/haskell.nix/archive/5fc93a3fd171bb40b97585e5eb2cab43dc467446.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "iohk-nix": {
@@ -17,10 +17,22 @@
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "iohk-nix",
-        "rev": "f2dee151a917aac96121246ed76fb17e3f9026b0",
-        "sha256": "1d8ygzczk4zbzz04j1yrwzbfld59bc6a6ar7bmlfx1j5m6fhjb8k",
+        "rev": "f0542228f98a2590e0f39c507b364321995ad802",
+        "sha256": "0yhgjg4bj7cv1lmrb9ig2iapv1mslhn6m750zn2x0n1a3ll267yh",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/iohk-nix/archive/f2dee151a917aac96121246ed76fb17e3f9026b0.tar.gz",
+        "url": "https://github.com/input-output-hk/iohk-nix/archive/f0542228f98a2590e0f39c507b364321995ad802.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    }
+    },
+    "nixpkgs": {
+        "branch": "nixpkgs-20.09-darwin",
+        "description": "Nix Packages collection",
+        "homepage": null,
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "07e5844fdf6fe99f41229d7392ce81cfe191bcfc",
+        "sha256": "0p2z6jidm4rlp2yjfl553q234swj1vxl8z0z8ra1hm61lfrlcmb9",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/07e5844fdf6fe99f41229d7392ce81cfe191bcfc.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+   }
 }
