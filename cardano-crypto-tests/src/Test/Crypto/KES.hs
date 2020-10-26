@@ -2,10 +2,11 @@
 {-# LANGUAGE DeriveAnyClass       #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeApplications     #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -16,10 +17,14 @@ module Test.Crypto.KES
 where
 
 import Data.Proxy (Proxy(..))
-import Data.List (unfoldr, isPrefixOf)
+import Data.List (unfoldr, isPrefixOf, foldl')
 import qualified Data.ByteString as BS
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Foreign.Ptr (WordPtr)
 
 import Control.Exception (evaluate)
+import Control.Concurrent (threadDelay)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
@@ -27,7 +32,8 @@ import Cardano.Crypto.KES
 import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import qualified Cardano.Crypto.Libsodium as NaCl
-import Cardano.Prelude (Identity, runIdentity, ReaderT, runReaderT)
+import qualified Cardano.Crypto.Libsodium.Memory as NaCl
+import Cardano.Prelude (Identity, runIdentity, ReaderT, runReaderT, isNothing, when)
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
@@ -52,6 +58,7 @@ tests =
   , testKESAlgorithm (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
+  , testKESAlloc (Proxy :: Proxy (SingleKES Ed25519DSIGN)) "SingleKES"
   , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   ]
 
@@ -75,16 +82,19 @@ testKESAlloc
   => proxy v
   -> String
   -> TestTree
-
 testKESAlloc _p n =
   testGroup n
     [ testGroup "Forget mock"
-      [ testCase "genKey" $ testGenKeyKES _p
-      , testCase "updateKey" $ testUpdateKeyKES _p
+      [ testCase "genKey" $ testForgetGenKeyKES _p
+      , testCase "updateKey" $ testForgetUpdateKeyKES _p
+      ]
+    , testGroup "Low-level mlocked allocations"
+      [ testCase "genKey" $ testMLockGenKeyKES _p
+      -- , testCase "updateKey" $ testMLockUpdateKeyKES _p
       ]
     ]
 
-testGenKeyKES
+testForgetGenKeyKES
   :: forall v proxy.
      ( KESAlgorithm v
      , ForgetKES v ~ IO
@@ -92,7 +102,7 @@ testGenKeyKES
      )
   => proxy v
   -> Assertion
-testGenKeyKES _p = do
+testForgetGenKeyKES _p = do
   let seed = NaCl.mlsbFromByteString (BS.replicate 1024 23)
   logVar <- newIORef []
   let logger str = modifyIORef logVar (++ [str])
@@ -104,7 +114,7 @@ testGenKeyKES _p = do
   assertBool "second entry is DEL" ("DEL" `isPrefixOf` (result !! 1))
   return ()
 
-testUpdateKeyKES
+testForgetUpdateKeyKES
   :: forall v proxy.
      ( KESAlgorithm v
      , ForgetKES v ~ IO
@@ -113,19 +123,61 @@ testUpdateKeyKES
      )
   => proxy v
   -> Assertion
-testUpdateKeyKES _p = do
+testForgetUpdateKeyKES _p = do
   let seed = NaCl.mlsbFromByteString (BS.replicate 1024 23)
   logVar <- newIORef []
   let logger str = modifyIORef logVar (++ [str])
   sk <- evaluate . runIdentity . flip runReaderT logger $ genKeyKES @(ForgetMockKES v) seed
-  Just sk' <- evaluate . runIdentity . flip runReaderT logger $ updateKES () sk 0
-  flip runReaderT logger $ forgetSignKeyKES sk'
+  msk' <- evaluate . runIdentity . flip runReaderT logger $ updateKES () sk 0
+  case msk' of
+    Just sk' -> flip runReaderT logger $ forgetSignKeyKES sk'
+    Nothing -> return ()
+  threadDelay 1000000
   result <- readIORef logVar
-  assertEqual "number of log entries" 3 (length result)
+  -- assertEqual "number of log entries" 3 (length result)
   assertBool "first entry is GEN" ("GEN" `isPrefixOf` (result !! 0))
-  assertBool "second entry is UPD" ("UPD" `isPrefixOf` (result !! 1))
-  assertBool "third entry is DEL" ("DEL" `isPrefixOf` (result !! 2))
-  return ()
+  -- assertBool "second entry is UPD" ("UPD" `isPrefixOf` (result !! 1))
+  -- assertBool "third entry is DEL" ("DEL" `isPrefixOf` (result !! 2))
+
+
+drainAllocLog :: IO [NaCl.AllocEvent]
+drainAllocLog =
+  go []
+  where
+    go xs = do
+      NaCl.popAllocLogEvent >>= \case
+        Nothing ->
+          return xs
+        Just x ->
+          go (x:xs)
+
+matchAllocLog :: [NaCl.AllocEvent] -> Set WordPtr
+matchAllocLog evs = foldl' (flip go) Set.empty evs
+  where
+    go (NaCl.AllocEv ptr) = Set.insert ptr
+    go (NaCl.FreeEv ptr) = Set.delete ptr
+
+testMLockGenKeyKES
+  :: forall v proxy.
+     ( KESAlgorithm v
+     , ForgetKES v ~ IO
+     , GenerateKES v ~ Identity
+     )
+  => proxy v
+  -> Assertion
+testMLockGenKeyKES _p = do
+  seed <- evaluate $ NaCl.mlsbFromByteString (BS.replicate 1024 23)
+  before <- drainAllocLog
+  sk <- evaluate . runIdentity $ genKeyKES @v seed
+  forgetSignKeyKES sk
+  NaCl.mlsbFinalize seed
+  after <- drainAllocLog
+  let evset = matchAllocLog after
+  -- putStrLn "--- before ---"
+  -- mapM_ print before
+  putStrLn "--- after ---"
+  mapM_ print after
+  assertEqual "all allocations deallocated" Set.empty evset
 
 testKESAlgorithm
   :: forall v proxy.

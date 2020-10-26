@@ -36,6 +36,7 @@ library
                      , cardano-crypto-class
                      , cardano-crypto-praos
                      , cborg
+                     , containers
                      , cryptonite
                      , formatting
                      , nothunks

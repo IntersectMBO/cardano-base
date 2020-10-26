@@ -5,6 +5,9 @@ module Cardano.Crypto.Libsodium.Memory (
   allocMLockedForeignPtr,
   finalizeMLockedForeignPtr,
   traceMLockedForeignPtr,
+  -- * Debugging / testing instrumentation
+  AllocEvent (..),
+  popAllocLogEvent,
 ) where
 
 import Cardano.Crypto.Libsodium.Memory.Internal

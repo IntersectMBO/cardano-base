@@ -16,19 +16,22 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   sodiumMalloc,
   sodiumFree,
   -- * Debugging / testing instrumentation
-  popAllocLogEvent
+  AllocEvent (..),
+  popAllocLogEvent,
 ) where
 
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (newTChanIO, TChan, tryReadTChan, writeTChan)
 import Control.Exception (bracket)
 import Control.Monad (when)
+import Control.Concurrent.STM.TChan (TChan)
 import Data.Coerce (coerce)
 import Data.Proxy (Proxy (..))
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.Types (CSize (..))
-import Foreign.ForeignPtr (ForeignPtr, newForeignPtr, withForeignPtr, finalizeForeignPtr)
-import Foreign.Ptr (Ptr, nullPtr, WordPtr, ptrToWordPtr)
+import Foreign.Ptr (Ptr, nullPtr, WordPtr, ptrToWordPtr, FunPtr)
+import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, finalizeForeignPtr)
+import Foreign.Concurrent (newForeignPtr)
 import Foreign.Storable (Storable (alignment, sizeOf, peek))
 import GHC.TypeLits (KnownNat, natVal)
 import GHC.IO.Exception (ioException)
@@ -41,6 +44,7 @@ import Cardano.Crypto.Libsodium.C
 data AllocEvent
   = AllocEv !WordPtr
   | FreeEv !WordPtr
+  deriving (Eq, Show)
 
 {-#NOINLINE allocLog #-}
 allocLog :: TChan AllocEvent
@@ -78,7 +82,8 @@ allocMLockedForeignPtr = impl undefined where
     impl :: forall b. Storable b => b -> IO (MLockedForeignPtr b)
     impl b = do
         ptr <- sodiumMalloc size
-        fmap SFP (newForeignPtr c_sodium_free_funptr ptr)
+        let finalizer = sodiumFree ptr
+        fmap SFP (newForeignPtr ptr finalizer)
 
       where
         size :: CSize
