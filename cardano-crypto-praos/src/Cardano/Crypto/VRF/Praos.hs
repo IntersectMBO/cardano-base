@@ -1,12 +1,10 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -75,7 +73,7 @@ import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Coerce (coerce)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromMaybe)
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types
 import Foreign.ForeignPtr
@@ -218,7 +216,7 @@ genSeed = do
 copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
 copyFromByteString ptr bs lenExpected =
   BS.useAsCStringLen bs $ \(cstr, lenActual) ->
-    if (lenActual >= lenExpected) then
+    if lenActual >= lenExpected then
       copyBytes (castPtr ptr) cstr lenExpected
     else
       error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
@@ -274,7 +272,7 @@ instance ToCBOR Proof where
     encodedSizeExpr (\_ -> fromIntegral certSizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR Proof where
-  fromCBOR = proofFromBytes <$> fromCBOR
+  fromCBOR = fromCBOR >>= either fail return . proofFromBytes
 
 
 instance Show SignKey where
@@ -289,8 +287,7 @@ instance ToCBOR SignKey where
     encodedSizeExpr (\_ -> fromIntegral signKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR SignKey where
-  fromCBOR = skFromBytes <$> fromCBOR
-
+  fromCBOR = fromCBOR >>= either fail return . skFromBytes
 
 instance Show VerKey where
   show = show . vkBytes
@@ -304,7 +301,7 @@ instance ToCBOR VerKey where
     encodedSizeExpr (\_ -> fromIntegral verKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR VerKey where
-  fromCBOR = vkFromBytes <$> fromCBOR
+  fromCBOR = fromCBOR >>= either fail return . vkFromBytes
 
 -- | Allocate a Verification Key and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -319,44 +316,37 @@ mkSignKey = fmap SignKey $ newForeignPtr finalizerFree =<< mallocBytes signKeySi
 -- | Allocate a Proof and attach a finalizer. The allocated memory will
 -- not be initialized.
 mkProof :: IO Proof
-mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes (certSizeVRF)
+mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 
-proofFromBytes :: ByteString -> Proof
-proofFromBytes bs
-  | BS.length bs /= certSizeVRF
-  = error "Invalid proof length"
-  | otherwise
-  = unsafePerformIO $ do
+proofFromBytes :: ByteString -> Either String Proof
+proofFromBytes bs = case BS.length bs of
+  bsLen -> if bsLen /= certSizeVRF
+    then Left $ "Invalid proof length " <> show @Int bsLen <> ", expecting " <> show @Int certSizeVRF
+    else Right . unsafePerformIO $ do
       proof <- mkProof
       withForeignPtr (unProof proof) $ \ptr ->
         copyFromByteString ptr bs certSizeVRF
       return proof
 
-skFromBytes :: ByteString -> SignKey
-skFromBytes bs
-  | bsLen /= signKeySizeVRF
-  = error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF)
-  | otherwise
-  = unsafePerformIO $ do
+skFromBytes :: BS.ByteString -> Either String SignKey
+skFromBytes bs = case BS.length bs of
+  bsLen -> if bsLen /= signKeySizeVRF
+    then Left $ "Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF
+    else Right . unsafePerformIO $ do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
         copyFromByteString ptr bs signKeySizeVRF
       return sk
-  where
-    bsLen = BS.length bs
 
-vkFromBytes :: ByteString -> VerKey
-vkFromBytes bs
-  | BS.length bs /= verKeySizeVRF
-  = error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF)
-  | otherwise
-  = unsafePerformIO $ do
+vkFromBytes :: BS.ByteString -> Either String VerKey
+vkFromBytes bs = case BS.length bs of
+  bsLen -> if bsLen /= verKeySizeVRF
+    then Left $ "Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF
+    else return . unsafePerformIO $ do
       pk <- mkVerKey
       withForeignPtr (unVerKey pk) $ \ptr ->
         copyFromByteString ptr bs verKeySizeVRF
       return pk
-  where
-    bsLen = BS.length bs
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -463,8 +453,8 @@ instance VRFAlgorithm PraosVRF where
 
   evalVRF = \_ msg (SignKeyPraosVRF sk) ->
     let msgBS = getSignableRepresentation msg
-        proof = maybe (error "Invalid Key") id $ prove sk msgBS
-        output = maybe (error "Invalid Proof") id $ outputFromProof proof
+        proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
+        output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
     in output `seq` proof `seq`
            (OutputVRF (outputBytes output), CertPraosVRF proof)
 
@@ -482,17 +472,10 @@ instance VRFAlgorithm PraosVRF where
   rawSerialiseVerKeyVRF (VerKeyPraosVRF pk) = vkBytes pk
   rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
   rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
-  rawDeserialiseVerKeyVRF = fmap (VerKeyPraosVRF . vkFromBytes) . assertLength verKeySizeVRF
-  rawDeserialiseSignKeyVRF = fmap (SignKeyPraosVRF . skFromBytes) . assertLength signKeySizeVRF
-  rawDeserialiseCertVRF = fmap (CertPraosVRF . proofFromBytes) . assertLength certSizeVRF
-
+  rawDeserialiseVerKeyVRF = either (const Nothing) (Just . VerKeyPraosVRF) . vkFromBytes
+  rawDeserialiseSignKeyVRF = either (const Nothing) (Just . SignKeyPraosVRF) . skFromBytes
+  rawDeserialiseCertVRF = either (const Nothing) (Just . CertPraosVRF) . proofFromBytes
+  
   sizeVerKeyVRF _ = fromIntegral verKeySizeVRF
   sizeSignKeyVRF _ = fromIntegral signKeySizeVRF
   sizeCertVRF _ = fromIntegral certSizeVRF
-
-assertLength :: Int -> ByteString -> Maybe ByteString
-assertLength l bs
-  | BS.length bs == l
-  = Just bs
-  | otherwise
-  = Nothing
