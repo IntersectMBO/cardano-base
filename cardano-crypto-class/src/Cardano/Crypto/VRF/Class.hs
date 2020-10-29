@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Abstract Verifiable Random Functions.
 module Cardano.Crypto.VRF.Class
@@ -42,15 +44,17 @@ module Cardano.Crypto.VRF.Class
 where
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
-import Numeric.Natural (Natural)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
+import GHC.TypeLits (TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
+import Numeric.Natural (Natural)
+
+import qualified Data.ByteString as BS
 
 import Cardano.Binary
          (Decoder, Encoding, FromCBOR (..), ToCBOR (..), Size,
@@ -176,6 +180,22 @@ class ( Typeable v
       , sizeCertVRF
       , sizeOutputVRF
     #-}
+
+--
+-- Do not provide Ord instances for keys, see #38
+--
+
+instance ( TypeError ('Text "Ord not supported for signing keys, use the hash instead")
+         , Eq (SignKeyVRF v)
+         )
+      => Ord (SignKeyVRF v) where
+    compare = error "unsupported"
+
+instance ( TypeError ('Text "Ord not supported for verification keys, use the hash instead")
+         , Eq (VerKeyVRF v)
+         )
+      => Ord (VerKeyVRF v) where
+    compare = error "unsupported"
 
 -- | The output bytes of the VRF.
 --

@@ -27,13 +27,13 @@ instance KESAlgorithm NeverKES where
   type SeedSizeKES NeverKES = 0
 
   data VerKeyKES  NeverKES = NeverUsedVerKeyKES
-      deriving (Show, Eq, Ord, Generic, NoThunks)
+      deriving (Show, Eq, Generic, NoThunks)
 
   data SignKeyKES NeverKES = NeverUsedSignKeyKES
-      deriving (Show, Eq, Ord, Generic, NoThunks)
+      deriving (Show, Eq, Generic, NoThunks)
 
   data SigKES     NeverKES = NeverUsedSigKES
-      deriving (Show, Eq, Ord, Generic, NoThunks)
+      deriving (Show, Eq, Generic, NoThunks)
 
   algorithmNameKES _ = "never"
 

@@ -31,13 +31,13 @@ instance DSIGNAlgorithm NeverDSIGN where
   type SizeSigDSIGN     NeverDSIGN = 0
 
   data VerKeyDSIGN  NeverDSIGN = NeverUsedVerKeyDSIGN
-     deriving (Show, Eq, Ord, Generic, NoThunks)
+     deriving (Show, Eq, Generic, NoThunks)
 
   data SignKeyDSIGN NeverDSIGN = NeverUsedSignKeyDSIGN
-     deriving (Show, Eq, Ord, Generic, NoThunks)
+     deriving (Show, Eq, Generic, NoThunks)
 
   data SigDSIGN     NeverDSIGN = NeverUsedSigDSIGN
-     deriving (Show, Eq, Ord, Generic, NoThunks)
+     deriving (Show, Eq, Generic, NoThunks)
 
   algorithmNameDSIGN _ = "never"
 
