@@ -7,6 +7,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Abstract key evolving signatures.
 module Cardano.Crypto.KES.Class
@@ -45,7 +46,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
-import GHC.TypeLits (Nat, KnownNat, natVal)
+import GHC.TypeLits (Nat, KnownNat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
@@ -195,6 +196,21 @@ class ( Typeable v
   rawDeserialiseSignKeyKES :: ByteString -> Maybe (SignKeyKES v)
   rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
 
+--
+-- Do not provide Ord instances for keys, see #38
+--
+
+instance ( TypeError ('Text "Ord not supported for signing keys, use the hash instead")
+         , Eq (SignKeyKES v)
+         )
+      => Ord (SignKeyKES v) where
+    compare = error "unsupported"
+
+instance ( TypeError ('Text "Ord not supported for verification keys, use the hash instead")
+         , KESAlgorithm v
+         )
+      => Ord (VerKeyKES v) where
+    compare = error "unsupported"
 
 --
 -- Convenient CBOR encoding/decoding
