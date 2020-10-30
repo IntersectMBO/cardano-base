@@ -59,6 +59,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     newtype SigDSIGN Ed25519DSIGN = SigEd25519DSIGN Signature
         deriving (Show, Eq, Generic, ByteArrayAccess)
         deriving NoThunks via InspectHeap Signature
+        deriving newtype NFData
 
     --
     -- Metadata and basic key operations

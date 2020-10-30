@@ -1,10 +1,11 @@
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE UnboxedTuples       #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE UnboxedTuples              #-}
 
 -- for pinnedByteArrayFromListN
 {-# OPTIONS_GHC -Wno-missing-local-signatures #-}
@@ -27,6 +28,7 @@ module Cardano.Crypto.PinnedSizedBytes
     ptrPsbToSizedPtr,
   ) where
 
+import Control.DeepSeq (NFData)
 import Control.Monad.ST (runST)
 import Control.Monad.Primitive  (primitive_)
 import Data.Char (ord)
@@ -78,8 +80,9 @@ import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 --
 -- I'm sorry for adding more types for bytes. :(
 --
-data PinnedSizedBytes (n :: Nat) = PSB ByteArray
+newtype PinnedSizedBytes (n :: Nat) = PSB ByteArray
   deriving NoThunks via OnlyCheckWhnfNamed "PinnedSizedBytes" (PinnedSizedBytes n)
+  deriving NFData
 
 instance Show (PinnedSizedBytes n) where
     showsPrec _ (PSB ba)
