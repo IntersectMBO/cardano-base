@@ -28,12 +28,15 @@ library
                        Test.Crypto.Util
                        Test.Crypto.VRF
                        Test.Crypto.Instances
+                       Bench.Crypto.VRF
+                       Bench.Crypto.KES
 
   build-depends:       base
                      , bytestring
                      , cardano-binary
                      , cardano-crypto-class
                      , cardano-crypto-praos
+                     , cardano-prelude
                      , cborg
                      , cryptonite
                      , formatting
@@ -42,6 +45,7 @@ library
                      , quickcheck-instances
                      , tasty
                      , tasty-quickcheck
+                     , criterion
 
   default-language:    Haskell2010
 
@@ -64,6 +68,21 @@ test-suite test-crypto
                      , cardano-crypto-class
                      , cardano-crypto-tests
                      , tasty
+
+benchmark bench-crypto
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      bench
+  main-is:             Main.hs
+  build-depends:       base
+                     , bytestring
+                     , cardano-binary
+                     , cardano-crypto-class
+                     , cardano-crypto-praos
+                     , cardano-crypto-tests
+                     , cborg
+                     , cryptonite
+                     , formatting
+                     , criterion
 
   default-language:    Haskell2010
 

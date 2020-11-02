@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -43,6 +44,7 @@ import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
 
+import Cardano.Prelude (NFData)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.Hash.Class
@@ -57,6 +59,10 @@ import qualified Cardano.Crypto.Libsodium as NaCl
 -- single time period.
 --
 data SingleKES d
+
+deriving instance NFData (VerKeyKES (SingleKES d))
+deriving instance NFData (SignKeyKES (SingleKES d))
+deriving instance NFData (SigKES (SingleKES d))
 
 instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
          , Typeable d) => KESAlgorithm (SingleKES d) where

@@ -103,3 +103,6 @@ jobs:
 
     - name: Run tests
       run: cabal test all --builddir="$CABAL_BUILDDIR"
+
+    - name: Run benchmarks
+      run: cabal bench all --builddir="$CABAL_BUILDDIR"
