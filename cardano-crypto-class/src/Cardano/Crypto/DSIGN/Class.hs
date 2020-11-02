@@ -90,7 +90,6 @@ class ( Typeable v
   data SignKeyDSIGN v :: Type
   data SigDSIGN     v :: Type
 
-
   --
   -- Metadata and basic key operations
   --

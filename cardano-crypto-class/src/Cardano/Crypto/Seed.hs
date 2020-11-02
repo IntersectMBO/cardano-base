@@ -34,13 +34,16 @@ import           Crypto.Random (MonadRandom(..))
 import           Crypto.Random.Entropy (getEntropy)
 import           Cardano.Crypto.Hash.Class (HashAlgorithm(digest))
 
+import           Cardano.Prelude (NFData)
+
+
 -- | A seed contains a finite number of bytes, and is used for seeding
 -- cryptographic algorithms including key generation.
 --
 -- This is not itself a PRNG, but can be used to seed a PRNG.
 --
 newtype Seed = Seed ByteString
-  deriving (Show, Eq, Semigroup, Monoid, NoThunks)
+  deriving (Show, Eq, Semigroup, Monoid, NoThunks, NFData)
 
 
 -- | Construct a 'Seed' deterministically from a number of bytes.

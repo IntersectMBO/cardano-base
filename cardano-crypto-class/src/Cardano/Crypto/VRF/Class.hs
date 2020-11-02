@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -56,6 +57,7 @@ import Numeric.Natural (Natural)
 
 import qualified Data.ByteString as BS
 
+import Cardano.Prelude (NFData)
 import Cardano.Binary
          (Decoder, Encoding, FromCBOR (..), ToCBOR (..), Size,
           encodeListLen, enforceSize, decodeBytes, encodeBytes,
@@ -203,6 +205,7 @@ instance ( TypeError ('Text "Ord not supported for verification keys, use the ha
 --
 newtype OutputVRF v = OutputVRF { getOutputVRFBytes :: ByteString }
   deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoThunks)
+  deriving newtype NFData
 
 
 -- | The output bytes of the VRF interpreted as a big endian natural number.

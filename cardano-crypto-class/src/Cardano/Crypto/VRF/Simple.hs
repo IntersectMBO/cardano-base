@@ -24,6 +24,7 @@ import           GHC.Generics (Generic)
 import           NoThunks.Class (NoThunks, InspectHeap(..))
 import           Numeric.Natural (Natural)
 
+import           Cardano.Prelude (NFData)
 import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 
 import qualified Crypto.PubKey.ECC.Prim as C
@@ -48,6 +49,7 @@ q = C.ecc_n $ C.common_curve curve
 newtype Point = ThunkyPoint C.Point
   deriving (Eq, Generic)
   deriving NoThunks via InspectHeap C.Point
+  deriving newtype NFData
 
 -- | Smart constructor for @Point@ that evaluates the wrapped 'C.Point' to
 -- normal form. This is needed because 'C.Point' has a constructor with two
@@ -104,10 +106,12 @@ instance VRFAlgorithm SimpleVRF where
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
     deriving stock   (Show, Eq, Generic)
     deriving newtype (NoThunks)
+    deriving anyclass (NFData)
 
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
     deriving stock   (Show, Eq, Generic)
     deriving NoThunks via InspectHeap C.PrivateNumber
+    deriving anyclass (NFData)
 
   data CertVRF SimpleVRF
     = CertSimpleVRF
@@ -117,6 +121,7 @@ instance VRFAlgorithm SimpleVRF where
         }
     deriving stock    (Show, Eq, Generic)
     deriving anyclass (NoThunks)
+    deriving anyclass (NFData)
 
   --
   -- Metadata and basic key operations
