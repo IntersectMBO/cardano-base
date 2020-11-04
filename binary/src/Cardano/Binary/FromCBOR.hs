@@ -15,6 +15,8 @@ module Cardano.Binary.FromCBOR
   , module D
   , fromCBORMaybe
   , decodeListWith
+    -- * Helper tools to build instances
+  , decodeMapSkel
   )
 where
 
