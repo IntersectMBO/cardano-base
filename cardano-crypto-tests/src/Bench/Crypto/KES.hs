@@ -15,14 +15,14 @@ import Cardano.Crypto.DSIGN.Ed25519
 import Cardano.Crypto.Hash.Blake2b
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.KES.Sum
-import Cardano.Crypto.Seed
+import Cardano.Crypto.Libsodium
 import qualified Data.ByteString as BS (pack)
 import Data.Maybe (fromJust)
 
 {- HLINT ignore "Use camelCase" -}
 
-testSeed :: Seed
-testSeed = mkSeedFromBytes (BS.pack testBytes)
+testSeed :: forall (n :: Nat). KnownNat n => MLockedSizedBytes n
+testSeed = mlsbFromByteString (BS.pack testBytes)
 
 testBytes :: [Word8]
 testBytes = [

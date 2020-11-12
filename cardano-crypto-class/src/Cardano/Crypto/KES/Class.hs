@@ -51,10 +51,10 @@ import NoThunks.Class (NoThunks)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
-import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
+import qualified Cardano.Crypto.Libsodium as NaCl
 
 class ( Typeable v
       , Show (VerKeyKES v)
@@ -161,7 +161,7 @@ class ( Typeable v
   -- Key generation
   --
 
-  genKeyKES :: Seed -> SignKeyKES v
+  genKeyKES :: NaCl.MLockedSizedBytes (SeedSizeKES v) -> SignKeyKES v
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
   seedSizeKES :: proxy v -> Word
