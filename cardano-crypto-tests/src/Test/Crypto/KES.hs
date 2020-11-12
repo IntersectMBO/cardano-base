@@ -15,6 +15,7 @@ module Test.Crypto.KES
   )
 where
 
+import Data.Maybe (fromJust)
 import Data.Proxy (Proxy(..))
 import Data.List (unfoldr)
 
@@ -29,6 +30,7 @@ import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
 import Test.Crypto.Util hiding (label)
 import Test.Crypto.Instances ()
+import qualified Test.Crypto.KES.NoSalt as NoSalt
 
 --
 -- The list of all tests
@@ -42,6 +44,8 @@ tests =
   , testKESAlgorithm (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
+  , testSodiumUpgrade (Proxy :: Proxy (SingleKES Ed25519DSIGN))  "SingleKESSodium"
+  , testSodiumUpgrade (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KESSodium"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
@@ -335,6 +339,69 @@ prop_serialise_SigKES sk_0 x =
       , let sig = signKES () t x sk
       ]
 
+testSodiumUpgrade ::
+  forall v proxy.
+  ( NoSalt.NoSalt v
+  , Signable v ~ SignableRepresentation
+  , ContextKES v ~ ()
+  ) =>
+  proxy v ->
+  String ->
+  TestTree
+testSodiumUpgrade _p n =
+  testGroup
+    n
+    [ testProperty "sodium_upgrade" $ prop_sodium_upgrade @v
+    ]
+
+-- | If we start with a key generated in non-Sodium times, can we continue to
+-- use it once we've added salt?
+prop_sodium_upgrade ::
+  forall v.
+  ( NoSalt.NoSalt v
+  , Signable v ~ SignableRepresentation
+  , ContextKES v ~ ()
+  ) =>
+  NoSalt.SignKeyKES v ->
+  Message ->
+  Property
+prop_sodium_upgrade sk_ns msg =
+  conjoin
+    [ prop_raw_serialise'
+        NoSalt.rawSerialiseSignKeyKES
+        (rawDeserialiseSignKeyKES @v)
+        rawSerialiseSignKeyKES
+        sk_ns,
+      prop_raw_serialise'
+        NoSalt.rawSerialiseVerKeyKES
+        (rawDeserialiseVerKeyKES @v)
+        rawSerialiseVerKeyKES
+        vk_ns,
+      prop_sign_update_verify
+    ]
+  where
+    vk_ns = NoSalt.deriveVerKeyKES sk_ns
+    prop_sign_update_verify =
+      let vk_s = fromJust .
+            rawDeserialiseVerKeyKES @v $
+              NoSalt.rawSerialiseVerKeyKES vk_ns
+       in conjoin
+            [ verifyKES () vk_s 0 msg sig === Right ()
+              | let sig_ns = NoSalt.signKES 0 msg sk_ns
+                    sig = fromJust .
+                      rawDeserialiseSigKES $
+                        NoSalt.rawSerialiseSigKES sig_ns
+            ]
+-- | Variant on @prop_raw_serialise@ which compares as bytes by re-serialising.
+prop_raw_serialise' :: (a -> ByteString)
+                   -> (ByteString -> Maybe b)
+                   -> (b -> ByteString)
+                   -> a -> Property
+prop_raw_serialise' serialise deserialise reserialise x =
+  let serx = serialise x in
+    case deserialise serx of
+      Just y  -> reserialise y === serx
+      Nothing -> property False
 
 --
 -- KES test utils

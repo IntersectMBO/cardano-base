@@ -30,6 +30,8 @@ library
                        Test.Crypto.Instances
                        Bench.Crypto.VRF
                        Bench.Crypto.KES
+  other-modules:
+    Test.Crypto.KES.NoSalt
 
   build-depends:       base
                      , bytestring
