@@ -38,7 +38,6 @@ import qualified Cardano.Crypto.DSIGN as DSIGN
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
-import           Cardano.Crypto.Libsodium (mlsbToByteString)
 
 
 data SimpleKES d (t :: Nat)
@@ -129,9 +128,8 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
             duration = fromIntegral (natVal (Proxy @ t))
          in duration * seedSize
 
-    genKeyKES mlsb =
-        let seed     = mkSeedFromBytes $ mlsbToByteString mlsb
-            seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+    genKeyKES seed =
+        let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
             duration = fromIntegral (natVal (Proxy @ t))
             seeds    = take duration
                      . map mkSeedFromBytes

@@ -31,7 +31,7 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Crypto.Libsodium (mlsbToByteString)
+
 
 data MockKES (t :: Nat)
 
@@ -116,7 +116,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     --
 
     genKeyKES seed =
-        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
+        let vk = VerKeyMockKES (runMonadRandomWithSeed seed getRandomWord64)
          in SignKeyMockKES vk 0
 
 

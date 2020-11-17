@@ -22,7 +22,6 @@ import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
 import Cardano.Crypto.Util (SignableRepresentation(..))
-import qualified Cardano.Crypto.Libsodium as NaCl
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
@@ -50,9 +49,9 @@ tests =
 -- instance here.
 deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
 
-deriving instance Eq (NaCl.SodiumSignKeyDSIGN d)
+deriving instance Eq (SignKeyDSIGN d)
                => Eq (SignKeyKES (SingleKES d))
-deriving instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Eq (SignKeyKES d))
+deriving instance (KESAlgorithm d, Eq (SignKeyKES d))
                => Eq (SignKeyKES (SumKES h d))
 
 testKESAlgorithm
@@ -363,7 +362,9 @@ instance KESAlgorithm v => Arbitrary (VerKeyKES v) where
   shrink = const []
 
 instance KESAlgorithm v => Arbitrary (SignKeyKES v) where
-  arbitrary = genKeyKES <$> arbitrary
+  arbitrary = genKeyKES <$> arbitrarySeedOfSize seedSize
+    where
+      seedSize = seedSizeKES (Proxy :: Proxy v)
   shrink = const []
 
 instance (KESAlgorithm v, ContextKES v ~ (), Signable v ~ SignableRepresentation)
