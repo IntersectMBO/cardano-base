@@ -57,6 +57,8 @@ import           Cardano.Crypto.KES.Single (SingleKES)
 import qualified Cardano.Crypto.Libsodium as NaCl
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import System.IO.Unsafe (unsafePerformIO)
+import Control.Exception (evaluate)
 
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
@@ -97,14 +99,13 @@ instance ( KESAlgorithm d
          , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
          , Typeable d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , MonadIO (ForgetKES (SumKES h d))
+         , MonadIO (GenerateKES d)
          )
       => KESAlgorithm (SumKES h d) where
 
     type SeedSizeKES (SumKES h d) = SeedSizeKES d
 
     type GenerateKES (SumKES h d) = GenerateKES d
-    type ForgetKES (SumKES h d) = ForgetKES d
 
     --
     -- Key and signature types
@@ -204,10 +205,10 @@ instance ( KESAlgorithm d
 
       sk_0 <- genKeyKES r0
       let vk_0 = deriveVerKeyKES sk_0
-
       sk_1 <- genKeyKES r1
-      let vk_1 = deriveVerKeyKES sk_1
-
+      let vk_1 = deriveVerKeyKES @d sk_1
+      liftIO $ putStrLn ("DERIVED: " ++ show vk_1)
+      forgetSignKeyKES sk_1
       return $ SignKeySumKES sk_0 r1 vk_0 vk_1
 
     --
@@ -319,12 +320,12 @@ deriving instance Eq   (VerKeyKES (SumKES h d))
 
 instance KESAlgorithm d => NoThunks (SignKeyKES (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (GenerateKES d))
       => ToCBOR (VerKeyKES (SumKES h d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (GenerateKES d))
       => FromCBOR (VerKeyKES (SumKES h d)) where
   fromCBOR = decodeVerKeyKES
 
@@ -337,12 +338,12 @@ deriving instance (KnownNat (SizeHash h), KESAlgorithm d) => Show (SignKeyKES (S
 
 instance KESAlgorithm d => NoThunks (VerKeyKES  (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (GenerateKES d))
       => ToCBOR (SignKeyKES (SumKES h d)) where
   toCBOR = encodeSignKeyKES
   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (GenerateKES d))
       => FromCBOR (SignKeyKES (SumKES h d)) where
   fromCBOR = decodeSignKeyKES
 
@@ -351,17 +352,17 @@ instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ S
 -- Sig instances
 --
 
-deriving instance KESAlgorithm d => Show (SigKES (SumKES h d))
-deriving instance KESAlgorithm d => Eq   (SigKES (SumKES h d))
+deriving instance (KESAlgorithm d, KESAlgorithm (SumKES h d)) => Show (SigKES (SumKES h d))
+deriving instance (KESAlgorithm d, KESAlgorithm (SumKES h d)) => Eq (SigKES (SumKES h d))
 
 instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (GenerateKES d))
       => ToCBOR (SigKES (SumKES h d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (ForgetKES d))
+instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, Typeable d, SizeHash h ~ SeedSizeKES d, MonadIO (GenerateKES d))
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
 

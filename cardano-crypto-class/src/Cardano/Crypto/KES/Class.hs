@@ -66,7 +66,6 @@ class ( Typeable v
       , NoThunks (SignKeyKES v)
       , NoThunks (VerKeyKES v)
       , KnownNat (SeedSizeKES v)
-      , Monad (ForgetKES v)
       , Monad (GenerateKES v)
       )
       => KESAlgorithm v where
@@ -81,13 +80,9 @@ class ( Typeable v
   data SignKeyKES v :: Type
   data SigKES     v :: Type
 
-  -- | The monad in which keys can be generated or updated.
+  -- | The monad in which keys can be generated, updated, and forgotten.
   type GenerateKES v :: Type -> Type
-  type GenerateKES v = Identity
-
-  -- | The monad in which keys can be forgotten.
-  type ForgetKES v :: Type -> Type
-  type ForgetKES v = IO
+  type GenerateKES v = IO
 
   --
   -- Metadata and basic key operations
@@ -190,7 +185,7 @@ class ( Typeable v
   --
   forgetSignKeyKES
     :: SignKeyKES v
-    -> ForgetKES v ()
+    -> GenerateKES v ()
   forgetSignKeyKES =
     const $ return ()
 

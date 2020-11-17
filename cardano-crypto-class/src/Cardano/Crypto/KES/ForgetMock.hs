@@ -44,7 +44,7 @@ type Logger = String -> IO ()
 
 instance
   ( KESAlgorithm k
-  , MonadIO (ForgetKES k)
+  , MonadIO (GenerateKES k)
   )
   => KESAlgorithm (ForgetMockKES k) where
     type SeedSizeKES (ForgetMockKES k) = SeedSizeKES k
@@ -60,7 +60,6 @@ instance
     type ContextKES (ForgetMockKES k) = ContextKES k
 
     type GenerateKES (ForgetMockKES k) = ReaderT Logger (GenerateKES k)
-    type ForgetKES (ForgetMockKES k) = ReaderT Logger (ForgetKES k)
 
     genKeyKES seed = do
       sk <- lift $ genKeyKES seed
