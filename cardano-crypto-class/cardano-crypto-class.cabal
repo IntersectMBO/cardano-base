@@ -73,7 +73,7 @@ library
 
   build-depends:       aeson
                      , base
-                     , base16-bytestring
+                     , base16-bytestring >= 1
                      , bytestring
                      , cardano-binary
                      , cardano-prelude

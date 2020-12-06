@@ -81,8 +81,6 @@ import           Cardano.Binary
                    (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
                     serializeEncoding')
 
-import qualified Cardano.Prelude as P
-
 class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
       --TODO: eliminate this Typeable constraint needed only for the ToCBOR
       -- the ToCBOR should not need it either
@@ -213,7 +211,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
 --
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
-hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . P.decodeEitherBase16
+hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . Base16.decode
 
 instance Show (Hash h a) where
   show = show . hashToStringAsHex
@@ -245,7 +243,7 @@ hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
-    case P.decodeEitherBase16 (Text.encodeUtf8 t) of
+    case Base16.decode (Text.encodeUtf8 t) of
       Right bytes -> maybe badSize return (hashFromBytes bytes)
       Left _ -> badHex
   where
