@@ -22,6 +22,9 @@ import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
+import Data.Coerce (coerce)
+
+import Cardano.Prelude (Identity, runIdentity)
 
 import Control.Exception (assert)
 
@@ -49,6 +52,8 @@ data MockKES (t :: Nat)
 instance KnownNat t => KESAlgorithm (MockKES t) where
     type SeedSizeKES (MockKES t) = 8
 
+    type SignKeyAccessKES (MockKES t) = Identity
+
     --
     -- Key and signature types
     --
@@ -73,7 +78,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     algorithmNameKES proxy = "mock_" ++ show (totalPeriodsKES proxy)
 
-    deriveVerKeyKES (SignKeyMockKES vk _) = vk
+    deriveVerKeyKES (SignKeyMockKES vk _) = return vk
 
     sizeVerKeyKES  _ = 8
     sizeSignKeyKES _ = 16
@@ -96,6 +101,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- allowed KES period.
     signKES () t a (SignKeyMockKES vk t') =
         assert (t == t') $
+        return $
         SigMockKES (castHash (hashWith getSignableRepresentation a))
                    (SignKeyMockKES vk t)
 
@@ -127,13 +133,10 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     rawSerialiseVerKeyKES (VerKeyMockKES vk) =
         writeBinaryWord64 vk
 
-    rawSerialiseSignKeyKES (SignKeyMockKES vk t) =
-        rawSerialiseVerKeyKES vk
-     <> writeBinaryWord64 (fromIntegral t)
-
-    rawSerialiseSigKES (SigMockKES h sk) =
+    rawSerialiseSigKES (SigMockKES h (SignKeyMockKES k t)) =
         hashToBytes h
-     <> rawSerialiseSignKeyKES sk
+     <> rawSerialiseVerKeyKES k
+     <> writeBinaryWord64 (fromIntegral t)
 
     rawDeserialiseVerKeyKES bs
       | [vkb] <- splitsAt [8] bs
@@ -143,20 +146,12 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
-    rawDeserialiseSignKeyKES bs
-      | [vkb, tb] <- splitsAt [8, 8] bs
-      , Just vk   <- rawDeserialiseVerKeyKES vkb
-      , let t      = fromIntegral (readBinaryWord64 tb)
-      = Just $! SignKeyMockKES vk t
-
-      | otherwise
-      = Nothing
-
     rawDeserialiseSigKES bs
-      | [hb, skb] <- splitsAt [16, 16] bs
+      | [hb, kb, tb] <- splitsAt [16, 8, 8] bs
       , Just h    <- hashFromBytes hb
-      , Just sk   <- rawDeserialiseSignKeyKES skb
-      = Just $! SigMockKES h sk
+      , Just k    <- rawDeserialiseVerKeyKES kb
+      , t    <- fromIntegral (readBinaryWord64 tb)
+      = Just $! SigMockKES h (SignKeyMockKES k t)
 
       | otherwise
       = Nothing
@@ -169,13 +164,6 @@ instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
 
 instance KnownNat t => FromCBOR (VerKeyKES (MockKES t)) where
   fromCBOR = decodeVerKeyKES
-
-instance KnownNat t => ToCBOR (SignKeyKES (MockKES t)) where
-  toCBOR = encodeSignKeyKES
-  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
-
-instance KnownNat t => FromCBOR (SignKeyKES (MockKES t)) where
-  fromCBOR = decodeSignKeyKES
 
 instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
   toCBOR = encodeSigKES

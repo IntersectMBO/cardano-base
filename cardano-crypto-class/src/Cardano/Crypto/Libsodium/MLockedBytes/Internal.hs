@@ -10,6 +10,7 @@ module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     mlsbToByteString,
     mlsbUseAsCPtr,
     mlsbUseAsSizedPtr,
+    mlsbCopy,
     mlsbFinalize,
 ) where
 
@@ -22,6 +23,7 @@ import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import Data.Word (Word8)
+import Control.Monad (void)
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.Memory.Internal
@@ -67,12 +69,21 @@ mlsbZero = unsafeDupablePerformIO $ do
     size  :: CSize
     size = fromInteger (natVal (Proxy @n))
 
+mlsbCopy :: forall n. KnownNat n => MLockedSizedBytes n -> MLockedSizedBytes n
+mlsbCopy src = unsafeDupablePerformIO $ mlsbUseAsCPtr src $ \ptrSrc -> do
+  dst <- allocMLockedForeignPtr
+  withMLockedForeignPtr dst $ \ptrDst -> do
+    void $ c_memcpy (castPtr ptrDst) ptrSrc size
+  return (MLSB dst)
+  where
+    size :: CSize
+    size = fromInteger (natVal (Proxy @n))
+
 mlsbFromByteString :: forall n. KnownNat n => BS.ByteString -> MLockedSizedBytes n
 mlsbFromByteString bs = unsafeDupablePerformIO $ BS.useAsCStringLen bs $ \(ptrBS, len) -> do
     fptr <- allocMLockedForeignPtr
     withMLockedForeignPtr fptr $ \ptr -> do
-        _ <- c_memcpy (castPtr ptr) ptrBS (fromIntegral (min len size))
-        return ()
+        void $ c_memcpy (castPtr ptr) ptrBS (fromIntegral (min len size))
     return (MLSB fptr)
   where
     size  :: Int

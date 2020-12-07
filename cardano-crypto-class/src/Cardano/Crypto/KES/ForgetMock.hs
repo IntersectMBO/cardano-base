@@ -26,9 +26,9 @@ import GHC.Generics (Generic)
 import Cardano.Prelude (lift, MonadIO, liftIO, ReaderT (..), ask)
 
 import Cardano.Crypto.KES.Class
-import Debug.Trace (traceEvent)
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe
+import System.Random (randomRIO)
 
 -- | A wrapper for a KES implementation that adds logging functionality, for
 -- the purpose of verifying that invocations of 'genKeyKES' and
@@ -44,7 +44,7 @@ type Logger = String -> IO ()
 
 instance
   ( KESAlgorithm k
-  , MonadIO (GenerateKES k)
+  , MonadIO (SignKeyAccessKES k)
   )
   => KESAlgorithm (ForgetMockKES k) where
     type SeedSizeKES (ForgetMockKES k) = SeedSizeKES k
@@ -52,45 +52,48 @@ instance
 
     newtype VerKeyKES (ForgetMockKES k) = VerKeyForgetMockKES (VerKeyKES k)
       deriving (Generic)
-    newtype SignKeyKES (ForgetMockKES k) = SignKeyForgetMockKES (SignKeyKES k)
+    data SignKeyKES (ForgetMockKES k) = SignKeyForgetMockKES !Word !(SignKeyKES k)
       deriving (Generic)
     newtype SigKES (ForgetMockKES k) = SigForgetMockKES (SigKES k)
       deriving (Generic)
 
     type ContextKES (ForgetMockKES k) = ContextKES k
 
-    type GenerateKES (ForgetMockKES k) = ReaderT Logger (GenerateKES k)
+    type SignKeyAccessKES (ForgetMockKES k) = ReaderT Logger (SignKeyAccessKES k)
 
     genKeyKES seed = do
-      sk <- lift $ genKeyKES seed
-      (writeLog :: Logger) <- ask
-      let a = unsafePerformIO $ writeLog ("GEN: " ++ show sk)
-      a `seq` return (SignKeyForgetMockKES sk)
-
-    forgetSignKeyKES (SignKeyForgetMockKES sk) = do
+      sk <- lift (genKeyKES seed)
+      nonce <- liftIO $ randomRIO (10000000, 99999999)
       writeLog <- ask
-      liftIO $ writeLog ("DEL: " ++ show sk)
+      liftIO $ writeLog ("GEN: " ++ show nonce)
+      return (SignKeyForgetMockKES nonce sk)
+
+    forgetSignKeyKES (SignKeyForgetMockKES nonce sk) = do
+      writeLog <- ask
+      liftIO $ writeLog ("DEL: " ++ show nonce)
       return ()
 
     algorithmNameKES _ = algorithmNameKES (Proxy @k)
 
-    deriveVerKeyKES (SignKeyForgetMockKES k) = VerKeyForgetMockKES $ deriveVerKeyKES k
+    deriveVerKeyKES (SignKeyForgetMockKES _ k) =
+      VerKeyForgetMockKES <$> lift (deriveVerKeyKES k)
 
-    signKES ctx p msg (SignKeyForgetMockKES sk) =
-        SigForgetMockKES $ signKES ctx p msg sk
+    signKES ctx p msg (SignKeyForgetMockKES _ sk) =
+        SigForgetMockKES <$> lift (signKES ctx p msg sk)
 
     verifyKES ctx (VerKeyForgetMockKES vk) p msg (SigForgetMockKES sig) =
         verifyKES ctx vk p msg sig
 
-    updateKES ctx (SignKeyForgetMockKES sk) p = do
+    updateKES ctx (SignKeyForgetMockKES nonce sk) p = do
       writeLog <- ask
+      nonce' <- liftIO $ randomRIO (10000000, 99999999)
       lift (updateKES ctx sk p) >>= \case
         Just sk' -> do
-          let a = unsafePerformIO $ writeLog ("UPD: " ++ show sk')
-          a `seq` (return $ Just $ SignKeyForgetMockKES sk')
+          liftIO $ writeLog ("UPD: " ++ show nonce ++ "->" ++ show nonce')
+          return $ Just $ SignKeyForgetMockKES nonce' sk'
         Nothing -> do
-          let a = unsafePerformIO $ writeLog ("UPD: ---")
-          a `seq` return Nothing
+          liftIO $ writeLog ("UPD: ---")
+          return Nothing
 
     totalPeriodsKES _ = totalPeriodsKES (Proxy @k)
 
@@ -99,11 +102,9 @@ instance
     sizeSigKES _ = sizeSigKES (Proxy @k)
 
     rawSerialiseVerKeyKES (VerKeyForgetMockKES k) = rawSerialiseVerKeyKES k
-    rawSerialiseSignKeyKES (SignKeyForgetMockKES k) = rawSerialiseSignKeyKES k
     rawSerialiseSigKES (SigForgetMockKES k) = rawSerialiseSigKES k
 
     rawDeserialiseVerKeyKES = fmap VerKeyForgetMockKES . rawDeserialiseVerKeyKES
-    rawDeserialiseSignKeyKES = fmap SignKeyForgetMockKES . rawDeserialiseSignKeyKES
     rawDeserialiseSigKES = fmap SigForgetMockKES . rawDeserialiseSigKES
 
 
@@ -113,10 +114,9 @@ deriving instance Eq (VerKeyKES k) => Eq (VerKeyKES (ForgetMockKES k))
 deriving instance Ord (VerKeyKES k) => Ord (VerKeyKES (ForgetMockKES k))
 deriving instance NoThunks (VerKeyKES k) => NoThunks (VerKeyKES (ForgetMockKES k))
 
-deriving instance Show (SignKeyKES k) => Show (SignKeyKES (ForgetMockKES k))
 deriving instance Eq (SignKeyKES k) => Eq (SignKeyKES (ForgetMockKES k))
 deriving instance Ord (SignKeyKES k) => Ord (SignKeyKES (ForgetMockKES k))
-deriving instance NoThunks (SignKeyKES k) => NoThunks (SignKeyKES (ForgetMockKES k))
+instance NoThunks (SignKeyKES k) => NoThunks (SignKeyKES (ForgetMockKES k)) where
 
 deriving instance Show (SigKES k) => Show (SigKES (ForgetMockKES k))
 deriving instance Eq (SigKES k) => Eq (SigKES (ForgetMockKES k))

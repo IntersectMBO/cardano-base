@@ -50,6 +50,7 @@ library
                        Cardano.Crypto.KES.Sum
 
                        Cardano.Crypto.PinnedSizedBytes
+                       Cardano.Crypto.SafePinned
                        Cardano.Crypto.Seed
                        Cardano.Crypto.Util
 
@@ -85,6 +86,7 @@ library
                      , memory
                      , nothunks
                      , primitive
+                     , random
                      , stm
                      , text
                      , transformers

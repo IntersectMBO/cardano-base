@@ -23,8 +23,6 @@ module Cardano.Crypto.KES.Class
     -- * CBOR encoding and decoding
   , encodeVerKeyKES
   , decodeVerKeyKES
-  , encodeSignKeyKES
-  , decodeSignKeyKES
   , encodeSigKES
   , decodeSigKES
   , encodeSignedKES
@@ -47,7 +45,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
-import Data.Functor.Identity (Identity)
+import System.IO.Unsafe (unsafePerformIO)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
@@ -59,14 +57,14 @@ import qualified Cardano.Crypto.Libsodium as NaCl
 class ( Typeable v
       , Show (VerKeyKES v)
       , Eq (VerKeyKES v)
-      , Show (SignKeyKES v)
+      -- , Show (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
       , NoThunks (SigKES v)
       , NoThunks (SignKeyKES v)
       , NoThunks (VerKeyKES v)
       , KnownNat (SeedSizeKES v)
-      , Monad (GenerateKES v)
+      , Monad (SignKeyAccessKES v)
       )
       => KESAlgorithm v where
 
@@ -81,8 +79,8 @@ class ( Typeable v
   data SigKES     v :: Type
 
   -- | The monad in which keys can be generated, updated, and forgotten.
-  type GenerateKES v :: Type -> Type
-  type GenerateKES v = IO
+  type SignKeyAccessKES v :: Type -> Type
+  type SignKeyAccessKES v = IO
 
   --
   -- Metadata and basic key operations
@@ -90,7 +88,7 @@ class ( Typeable v
 
   algorithmNameKES :: proxy v -> String
 
-  deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
+  deriveVerKeyKES :: SignKeyKES v -> SignKeyAccessKES v (VerKeyKES v)
 
   hashVerKeyKES :: HashAlgorithm h => VerKeyKES v -> Hash h (VerKeyKES v)
   hashVerKeyKES = hashWith rawSerialiseVerKeyKES
@@ -115,7 +113,7 @@ class ( Typeable v
     -> Period  -- ^ The /current/ period for the key
     -> a
     -> SignKeyKES v
-    -> SigKES v
+    -> SignKeyAccessKES v (SigKES v)
 
   verifyKES
     :: (Signable v a, HasCallStack)
@@ -147,7 +145,7 @@ class ( Typeable v
     => ContextKES v
     -> SignKeyKES v
     -> Period  -- ^ The /current/ period for the key, not the target period.
-    -> GenerateKES v (Maybe (SignKeyKES v))
+    -> SignKeyAccessKES v (Maybe (SignKeyKES v))
 
   -- | Return the total number of KES periods supported by this algorithm. The
   -- KES algorithm is assumed to support a fixed maximum number of periods, not
@@ -167,7 +165,7 @@ class ( Typeable v
 
   genKeyKES
     :: NaCl.MLockedSizedBytes (SeedSizeKES v)
-    -> GenerateKES v (SignKeyKES v)
+    -> SignKeyAccessKES v (SignKeyKES v)
 
   -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
   seedSizeKES :: proxy v -> Word
@@ -185,7 +183,7 @@ class ( Typeable v
   --
   forgetSignKeyKES
     :: SignKeyKES v
-    -> GenerateKES v ()
+    -> SignKeyAccessKES v ()
   forgetSignKeyKES =
     const $ return ()
 
@@ -198,11 +196,9 @@ class ( Typeable v
   sizeSigKES     :: proxy v -> Word
 
   rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
-  rawSerialiseSignKeyKES   :: SignKeyKES v -> ByteString
   rawSerialiseSigKES       :: SigKES     v -> ByteString
 
   rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
-  rawDeserialiseSignKeyKES :: ByteString -> Maybe (SignKeyKES v)
   rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
 
 
@@ -214,9 +210,6 @@ class ( Typeable v
 
 encodeVerKeyKES :: KESAlgorithm v => VerKeyKES v -> Encoding
 encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
-
-encodeSignKeyKES :: KESAlgorithm v => SignKeyKES v -> Encoding
-encodeSignKeyKES = encodeBytes . rawSerialiseSignKeyKES
 
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
@@ -233,20 +226,6 @@ decodeVerKeyKES = do
         | otherwise -> fail "decodeVerKeyKES: cannot decode key"
         where
           expected = fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
-          actual   = BS.length bs
-
-decodeSignKeyKES :: forall v s. KESAlgorithm v => Decoder s (SignKeyKES v)
-decodeSignKeyKES = do
-    bs <- decodeBytes
-    case rawDeserialiseSignKeyKES bs of
-      Just sk -> return sk
-      Nothing
-        | actual /= expected
-                    -> fail ("decodeSignKeyKES: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeSignKeyKES: cannot decode key"
-        where
-          expected = fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
           actual   = BS.length bs
 
 decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
@@ -286,8 +265,8 @@ signedKES
   -> Period
   -> a
   -> SignKeyKES v
-  -> SignedKES v a
-signedKES ctxt time a key = SignedKES (signKES ctxt time a key)
+  -> SignKeyAccessKES v (SignedKES v a)
+signedKES ctxt time a key = SignedKES <$> (signKES ctxt time a key)
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)

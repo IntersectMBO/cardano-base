@@ -99,7 +99,7 @@ naclVerifyDSIGN pv vk a sig = unsafeDupablePerformIO $ do
 -------------------------------------------------------------------------------
 
 instance SodiumDSIGNAlgorithm Ed25519DSIGN where
-    naclGenKeyDSIGN _ = id
+    naclGenKeyDSIGN _ = mlsbCopy
 
     naclDeriveVerKeyDSIGN _ seed = unsafeDupablePerformIO $
         mlsbUseAsSizedPtr seed $ \seedPtr ->

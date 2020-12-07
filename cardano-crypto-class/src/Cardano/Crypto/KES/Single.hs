@@ -51,6 +51,7 @@ import qualified Cardano.Crypto.DSIGN as DSIGN
 import Cardano.Crypto.KES.Class
 
 import Cardano.Crypto.PinnedSizedBytes
+import Cardano.Crypto.SafePinned
 import qualified Cardano.Crypto.Libsodium as NaCl
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
@@ -69,7 +70,7 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     newtype VerKeyKES (SingleKES d) = VerKeySingleKES (NaCl.SodiumVerKeyDSIGN d)
         deriving Generic
 
-    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (NaCl.SodiumSignKeyDSIGN d)
+    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SafePinned (NaCl.SodiumSignKeyDSIGN d))
         deriving Generic
 
     newtype SigKES (SingleKES d) = SigSingleKES (NaCl.SodiumSigDSIGN d)
@@ -82,8 +83,9 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
 
     algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
-    deriveVerKeyKES (SignKeySingleKES sk) =
-        VerKeySingleKES $ NaCl.naclDeriveVerKeyDSIGN (Proxy :: Proxy d) sk
+    deriveVerKeyKES (SignKeySingleKES v) =
+      interactSafePinned v $ \sk -> do
+        return (VerKeySingleKES $! NaCl.naclDeriveVerKeyDSIGN (Proxy :: Proxy d) (NaCl.mlsbCopy sk))
 
     hashVerKeyKES (VerKeySingleKES vk) =
         castHash (hashWith psbToByteString vk)
@@ -96,9 +98,10 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     type ContextKES (SingleKES d) = DSIGN.ContextDSIGN d
     type Signable   (SingleKES d) = DSIGN.Signable     d
 
-    signKES _ctxt t a (SignKeySingleKES sk) =
+    signKES _ctxt t a (SignKeySingleKES v) =
         assert (t == 0) $
-        SigSingleKES (NaCl.naclSignDSIGN (Proxy @d) a sk)
+        interactSafePinned v $ \sk ->
+        return (SigSingleKES (NaCl.naclSignDSIGN (Proxy @d) a sk))
 
     verifyKES _ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
         assert (t == 0) $
@@ -113,13 +116,14 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     --
 
     genKeyKES seed =
-      return $ SignKeySingleKES (NaCl.naclGenKeyDSIGN (Proxy @d) seed)
+      SignKeySingleKES <$> makeSafePinned (NaCl.naclGenKeyDSIGN (Proxy @d) seed)
 
     --
     -- forgetting
     --
-    forgetSignKeyKES (SignKeySingleKES sk) =
-      NaCl.naclForgetSignKeyDSIGN (Proxy @d) sk
+    forgetSignKeyKES (SignKeySingleKES v) =
+      releaseSafePinned v
+      -- NaCl.naclForgetSignKeyDSIGN (Proxy @d) sk
 
     --
     -- raw serialise/deserialise
@@ -130,11 +134,9 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     sizeSigKES     _ = sizeSigDSIGN     (Proxy :: Proxy d)
 
     rawSerialiseVerKeyKES  (VerKeySingleKES  vk) = psbToByteString vk
-    rawSerialiseSignKeyKES (SignKeySingleKES sk) = NaCl.mlsbToByteString sk
     rawSerialiseSigKES     (SigSingleKES    sig) = psbToByteString sig
 
     rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . psbFromByteStringCheck
-    rawDeserialiseSignKeyKES = fmap SignKeySingleKES . NaCl.mlsbFromByteStringCheck
     rawDeserialiseSigKES     = fmap SigSingleKES     . psbFromByteStringCheck
 
 --
@@ -158,17 +160,9 @@ instance NaCl.SodiumDSIGNAlgorithm d => FromCBOR (VerKeyKES (SingleKES d)) where
 -- SignKey instances
 --
 
-deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SingleKES d))
+-- deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SingleKES d))
-
-instance NaCl.SodiumDSIGNAlgorithm d => ToCBOR (SignKeyKES (SingleKES d)) where
-  toCBOR = encodeSignKeyKES
-  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
-
-instance NaCl.SodiumDSIGNAlgorithm d => FromCBOR (SignKeyKES (SingleKES d)) where
-  fromCBOR = decodeSignKeyKES
-
 
 --
 -- Sig instances
