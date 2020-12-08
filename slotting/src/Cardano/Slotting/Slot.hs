@@ -67,6 +67,10 @@ instance (Serialise t, Typeable t) => ToCBOR (WithOrigin t) where
 instance (Serialise t, Typeable t) => FromCBOR (WithOrigin t) where
   fromCBOR = decode
 
+instance Bounded t => Bounded (WithOrigin t) where
+  minBound = Origin
+  maxBound = At maxBound
+
 at :: t -> WithOrigin t
 at = At
 
