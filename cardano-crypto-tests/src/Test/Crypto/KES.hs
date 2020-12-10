@@ -55,14 +55,14 @@ import Data.IORef
 tests :: TestTree
 tests =
   testGroup "Crypto.KES"
-  [ testKESAlgorithm (Proxy :: Proxy (MockKES 7))               "MockKES"
+  [ testKESAlloc (Proxy :: Proxy (SingleKES Ed25519DSIGN)) "SingleKES"
+  , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
+  , testKESAlgorithm (Proxy :: Proxy (MockKES 7))               "MockKES"
   , testKESAlgorithm (Proxy :: Proxy (SimpleKES Ed448DSIGN 7))  "SimpleKES"
   , testKESAlgorithm (Proxy :: Proxy (SingleKES Ed25519DSIGN))  "SingleKES"
   , testKESAlgorithm (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
-  , testKESAlloc (Proxy :: Proxy (SingleKES Ed25519DSIGN)) "SingleKES"
-  , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
@@ -269,6 +269,8 @@ testKESAlgorithm _p n =
         ]
       ]
 
+    , testProperty "only gen signkey" $ prop_onlyGenSignKeyKES @v
+    , testProperty "one update signkey" $ prop_oneUpdageSignKeyKES @v
     , testProperty "total periods" $ prop_totalPeriodsKES @v
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
 
@@ -292,6 +294,31 @@ testKESAlgorithm _p n =
       ]
     ]
 
+
+prop_onlyGenSignKeyKES
+  :: forall v.
+        ( KESAlgorithm v
+        , ContextKES v ~ ()
+        , Show (SignKeyKES v)
+        , UnsafeSignKeyAccess (SignKeyAccessKES v)
+        )
+  => SignKeyKES v -> Bool
+prop_onlyGenSignKeyKES sk =
+  sk `seq` True
+
+prop_oneUpdageSignKeyKES 
+  :: forall v.
+        ( KESAlgorithm v
+        , ContextKES v ~ ()
+        , Show (SignKeyKES v)
+        , UnsafeSignKeyAccess (SignKeyAccessKES v)
+        )
+  => SignKeyKES v -> Bool
+
+prop_oneUpdageSignKeyKES sk = unsafeAccessSignKey $ do
+  sk' <- updateKES () sk 0
+  sk' `seq` return True
+  
 
 -- | If we start with a signing key, we can evolve it a number of times so that
 -- the total number of signing keys (including the initial one) equals the
