@@ -31,6 +31,8 @@ import Cardano.Crypto.PinnedSizedBytes
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 
+{- HLINT ignore "Reduce duplication" -}
+
 newtype MLockedSizedBytes n = MLSB (MLockedForeignPtr (PinnedSizedBytes n))
   deriving NoThunks via OnlyCheckWhnfNamed "MLockedSizedBytes" (MLockedSizedBytes n)
 

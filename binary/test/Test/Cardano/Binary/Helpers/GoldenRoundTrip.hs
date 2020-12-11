@@ -110,8 +110,8 @@ goldenTestCBORExplicit
   -> a
   -> FilePath
   -> Property
-goldenTestCBORExplicit eLabel enc dec x path =
-  goldenTestExplicit (serializeEncoding . enc) fullDecoder x path
+goldenTestCBORExplicit eLabel enc dec =
+  goldenTestExplicit (serializeEncoding . enc) fullDecoder
   where
   fullDecoder :: LByteString -> Either DecoderError a
   fullDecoder = decodeFullDecoder eLabel dec

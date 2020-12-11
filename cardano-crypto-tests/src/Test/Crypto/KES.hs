@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DeriveAnyClass       #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
@@ -29,6 +28,8 @@ import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
 import Test.Crypto.Util hiding (label)
 import Test.Crypto.Instances ()
+
+{- HLINT ignore "Reduce duplication" -}
 
 --
 -- The list of all tests

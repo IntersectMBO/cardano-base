@@ -26,6 +26,8 @@ import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
+{- HLINT IGNORE "Use <$>" -}
+
 --
 -- The list of all tests
 --

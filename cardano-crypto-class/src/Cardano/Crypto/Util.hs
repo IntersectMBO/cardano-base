@@ -88,8 +88,7 @@ writeBinaryNatural bytes =
   . BS.unfoldrN bytes (\w -> Just (fromIntegral w, unsafeShiftR w 8))
 
 splitsAt :: [Int] -> ByteString -> [ByteString]
-splitsAt szs0 bs0 =
-    go 0 szs0 bs0
+splitsAt = go 0
   where
     go !_   [] bs
       | BS.null bs         = []

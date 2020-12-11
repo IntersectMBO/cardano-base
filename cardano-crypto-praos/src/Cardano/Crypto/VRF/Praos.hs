@@ -1,9 +1,6 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -75,7 +72,7 @@ import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Coerce (coerce)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromMaybe)
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types
 import Foreign.ForeignPtr
@@ -218,7 +215,7 @@ genSeed = do
 copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
 copyFromByteString ptr bs lenExpected =
   BS.useAsCStringLen bs $ \(cstr, lenActual) ->
-    if (lenActual >= lenExpected) then
+    if lenActual >= lenExpected then
       copyBytes (castPtr ptr) cstr lenExpected
     else
       error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
@@ -319,7 +316,7 @@ mkSignKey = fmap SignKey $ newForeignPtr finalizerFree =<< mallocBytes signKeySi
 -- | Allocate a Proof and attach a finalizer. The allocated memory will
 -- not be initialized.
 mkProof :: IO Proof
-mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes (certSizeVRF)
+mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 
 proofFromBytes :: ByteString -> Proof
 proofFromBytes bs
@@ -463,8 +460,8 @@ instance VRFAlgorithm PraosVRF where
 
   evalVRF = \_ msg (SignKeyPraosVRF sk) ->
     let msgBS = getSignableRepresentation msg
-        proof = maybe (error "Invalid Key") id $ prove sk msgBS
-        output = maybe (error "Invalid Proof") id $ outputFromProof proof
+        proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
+        output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
     in output `seq` proof `seq`
            (OutputVRF (outputBytes output), CertPraosVRF proof)
 

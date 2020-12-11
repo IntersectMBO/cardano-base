@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -322,7 +321,7 @@ evalCertified
   => ContextVRF v
   -> a
   -> SignKeyVRF v
-  -> (CertifiedVRF v a)
+  -> CertifiedVRF v a
 evalCertified ctxt a key = uncurry CertifiedVRF $ evalVRF ctxt a key
 
 verifyCertified

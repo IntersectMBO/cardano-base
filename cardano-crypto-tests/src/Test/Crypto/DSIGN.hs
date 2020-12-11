@@ -29,6 +29,9 @@ import Test.Tasty.QuickCheck (testProperty)
 import qualified Data.ByteString as BS
 import qualified Cardano.Crypto.Libsodium as NaCl
 
+{- HLINT ignore "Use <$>" -}
+{- HLINT ignore "Reduce duplication" -}
+
 --
 -- The list of all tests
 --

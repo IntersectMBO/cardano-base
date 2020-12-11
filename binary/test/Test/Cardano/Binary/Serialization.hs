@@ -20,6 +20,8 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+{- HLINT ignore "Redundant <$>" -}
+
 tests :: IO Bool
 tests = checkParallel $$(discover)
 
@@ -55,7 +57,7 @@ data TestStruct = TestStruct
   deriving (Show, Eq)
 
 genTestStruct :: Gen TestStruct
-genTestStruct = TestStruct 
+genTestStruct = TestStruct
     <$> pure ()
     <*> Gen.bool
     <*> Gen.integral (Range.linearFrom 0 (-1e40) 1e40 :: Range Integer)
@@ -79,8 +81,8 @@ genTestStruct = TestStruct
     <*> Gen.maybe Gen.bool
     <*> Gen.map (Range.constant 0 2) ((,) <$> Gen.bool <*> Gen.bool)
     <*> Gen.set (Range.constant 0 2) Gen.bool
-    <*> (Raw <$> ( Gen.bytes (Range.linear 0 20)))
-    <*> (V.fromList <$> ( Gen.list (Range.constant 0 10) Gen.bool))
+    <*> (Raw <$> Gen.bytes (Range.linear 0 20))
+    <*> (V.fromList <$> Gen.list (Range.constant 0 10) Gen.bool)
     <*> (BS.Lazy.fromStrict <$> Gen.bytes (Range.linear 0 20))
     <*> (BS.Short.toShort <$> Gen.bytes (Range.linear 0 20))
 
