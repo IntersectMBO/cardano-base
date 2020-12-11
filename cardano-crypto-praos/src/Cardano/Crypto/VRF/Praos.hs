@@ -332,10 +332,13 @@ proofFromBytes bs
         copyFromByteString ptr bs certSizeVRF
       return proof
 
+sizeSummary :: String
+sizeSummary = show (certSizeVRF, signKeySizeVRF, verKeySizeVRF, vrfKeySizeVRF)
+
 skFromBytes :: ByteString -> SignKey
 skFromBytes bs
   | bsLen /= signKeySizeVRF
-  = error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF)
+  = error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF <> ", size summary is " <> sizeSummary)
   | otherwise
   = unsafePerformIO $ do
       sk <- mkSignKey
@@ -348,7 +351,7 @@ skFromBytes bs
 vkFromBytes :: ByteString -> VerKey
 vkFromBytes bs
   | BS.length bs /= verKeySizeVRF
-  = error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF)
+  = error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF <> ", size summary is " <> sizeSummary)
   | otherwise
   = unsafePerformIO $ do
       pk <- mkVerKey
