@@ -41,11 +41,12 @@ library
                      , cardano-prelude
                      , cborg              >= 0.2.2 && < 0.3
                      , containers
+                     , data-fix
                      , digest
                      , formatting
                      , nothunks
                      , primitive
-                     , recursion-schemes  >= 5.1   && < 5.2
+                     , recursion-schemes  >= 5.1
                      , safe-exceptions
                      , tagged
                      , text
