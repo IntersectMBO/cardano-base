@@ -100,8 +100,7 @@ instance Arbitrary TestSeed where
 --------------------------------------------------------------------------------
 
 arbitrarySeedOfSize :: Word -> Gen Seed
-arbitrarySeedOfSize sz =
-  (mkSeedFromBytes . BS.pack) <$> vector (fromIntegral sz)
+arbitrarySeedOfSize sz = mkSeedFromBytes . BS.pack <$> vector (fromIntegral sz)
 
 --------------------------------------------------------------------------------
 -- Messages to sign

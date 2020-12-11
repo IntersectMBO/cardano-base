@@ -64,6 +64,8 @@ import qualified Data.ByteString as BS
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 
+{- HLINT ignore "Reduce duplication" -}
+
 -- $setup
 -- >>> :set -XDataKinds -XTypeApplications -XOverloadedStrings
 -- >>> import Cardano.Crypto.PinnedSizedBytes

@@ -6,7 +6,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving  #-}
 {-# LANGUAGE Rank2Types         #-}
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Cardano.Binary.Annotated
@@ -133,7 +132,7 @@ annotatorSlice dec = do
 withSlice :: Decoder s a -> Decoder s (a, Annotator LByteString)
 withSlice dec = do
   (r, start, end) <- decodeWithByteSpan dec
-  return $ (r, Annotator $ sliceOffsets start end)
+  return (r, Annotator $ sliceOffsets start end)
   where
   sliceOffsets :: ByteOffset -> ByteOffset -> FullByteString -> LByteString
   sliceOffsets start end (Full b) = (BSL.take (end - start) . BSL.drop start) b

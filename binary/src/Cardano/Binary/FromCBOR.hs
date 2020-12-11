@@ -2,7 +2,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE LambdaCase                #-}
-{-# LANGUAGE MultiWayIf                #-}
 {-# LANGUAGE NumDecimals               #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RankNTypes                #-}
@@ -39,6 +38,8 @@ import qualified Data.Vector.Generic as Vector.Generic
 import Formatting (bprint, int, shown, stext)
 import qualified Formatting.Buildable as B (Buildable(..))
 
+{- HLINT ignore "Reduce duplication" -}
+{- HLINT ignore "Redundant <$>" -}
 
 --------------------------------------------------------------------------------
 -- FromCBOR

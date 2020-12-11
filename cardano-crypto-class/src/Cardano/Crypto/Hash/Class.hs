@@ -267,7 +267,7 @@ instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
   -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
   --
   encodedSizeExpr _size proxy =
-      encodedSizeExpr (\_ -> hashSize) (hashToBytes <$> proxy)
+      encodedSizeExpr (const hashSize) (hashToBytes <$> proxy)
     where
       hashSize :: Size
       hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))

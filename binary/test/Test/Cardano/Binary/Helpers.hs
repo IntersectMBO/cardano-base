@@ -189,8 +189,8 @@ cfg = SizeTestConfig
   { debug       = bshow
   , gen         = HH.Gen.discard
   , precise     = False
-  , addlCtx     = M.fromList []
-  , computedCtx = const (M.fromList [])
+  , addlCtx     = M.empty
+  , computedCtx = const M.empty
   }
 
 -- | Default configuration, for @Show@able types.
@@ -199,8 +199,8 @@ scfg = SizeTestConfig
   { debug       = show
   , gen         = HH.Gen.discard
   , precise     = False
-  , addlCtx     = M.fromList []
-  , computedCtx = const (M.fromList [])
+  , addlCtx     = M.empty
+  , computedCtx = const M.empty
   }
 
 -- | Create a test case from the given test configuration.

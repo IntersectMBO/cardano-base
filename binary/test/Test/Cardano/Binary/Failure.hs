@@ -15,6 +15,8 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Hedgehog.Internal.Property (failWith)
 
+{- HLINT ignore "Use record patterns" -}
+
 tests :: IO Bool
 tests = checkParallel $$(discover)
 
@@ -22,7 +24,7 @@ tests = checkParallel $$(discover)
 -------------------------   Generators   -----------------------------
 
 genInvalidNonEmptyCBOR :: Gen Encoding -- NonEmpty Bool
-genInvalidNonEmptyCBOR  = toCBOR <$> pure ([] ::[Bool])
+genInvalidNonEmptyCBOR  = pure (toCBOR ([] :: [Bool]))
 
 genInvalidEitherCBOR :: Gen Encoding -- Either Bool Bool
 genInvalidEitherCBOR = do
@@ -61,13 +63,13 @@ prop_shouldFailSet :: Property
 prop_shouldFailSet = property $ do
   ls <- forAll $ Gen.list (Range.constant 0 20) (Gen.int Range.constantBounded)
   let set = encodeTag 258
-          <> encodeListLen (fromIntegral $ length ls + 2) 
-          <> (mconcat $ toCBOR <$> (4: 3:ls))
+          <> encodeListLen (fromIntegral (length ls + 2))
+          <> mconcat (toCBOR <$> (4:3:ls))
   assertIsLeft (decode set :: Either DecoderError (Set Int))
 
 prop_shouldFailNegativeNatural :: Property
 prop_shouldFailNegativeNatural = property $ do
-  n <- forAll $ genNegativeInteger
+  n <- forAll genNegativeInteger
   assertIsLeft (decode (toCBOR n) :: Either DecoderError Natural)
 
 ---------------------------------------------------------------------
@@ -76,7 +78,7 @@ prop_shouldFailNegativeNatural = property $ do
 assertIsLeft :: (HasCallStack, MonadTest m) => Either DecoderError b -> m ()
 assertIsLeft (Right _) = withFrozenCallStack $ failWith Nothing "This should have Left : failed"
 assertIsLeft (Left !x) = case x of
-  DecoderErrorDeserialiseFailure _ (CR.DeserialiseFailure _ str) | length str > 0 -> success
+  DecoderErrorDeserialiseFailure _ (CR.DeserialiseFailure _ str) | not (null str) -> success
   DecoderErrorCanonicityViolation _  -> success
   DecoderErrorCustom _  _            -> success 
   DecoderErrorEmptyList _            -> success

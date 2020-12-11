@@ -56,7 +56,7 @@ main = do
 
 example
     :: [String]
-    -> (IO (MLockedForeignPtr Fingerprint))
+    -> IO (MLockedForeignPtr Fingerprint)
     -> IO ()
 example args alloc = do
     -- create foreign ptr to mlocked memory
