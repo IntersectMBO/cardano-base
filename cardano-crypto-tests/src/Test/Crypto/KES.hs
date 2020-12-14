@@ -254,7 +254,8 @@ testKESAlgorithm _p n =
       ]
 
     , testProperty "only gen signkey" $ prop_onlyGenSignKeyKES @v
-    , testProperty "one update signkey" $ prop_oneUpdageSignKeyKES @v
+    , testProperty "one update signkey" $ prop_oneUpdateSignKeyKES @v
+    , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES @v
     , testProperty "total periods" $ prop_totalPeriodsKES @v
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
 
@@ -289,7 +290,7 @@ prop_onlyGenSignKeyKES
 prop_onlyGenSignKeyKES sk =
   sk `seq` True
 
-prop_oneUpdageSignKeyKES 
+prop_oneUpdateSignKeyKES 
   :: forall v.
         ( KESAlgorithm v
         , ContextKES v ~ ()
@@ -297,9 +298,21 @@ prop_oneUpdageSignKeyKES
         , RunIO (SignKeyAccessKES v)
         )
   => SignKeyKES v -> Property
-prop_oneUpdageSignKeyKES sk = ioProperty . io $ do
+prop_oneUpdateSignKeyKES sk = ioProperty . io $ do
   sk' <- updateKES () sk 0
   sk' `seq` return True
+
+prop_allUpdatesSignKeyKES 
+  :: forall v.
+        ( KESAlgorithm v
+        , ContextKES v ~ ()
+        , Show (SignKeyKES v)
+        , RunIO (SignKeyAccessKES v)
+        )
+  => SignKeyKES v -> Property
+prop_allUpdatesSignKeyKES sk = ioProperty . io $ do
+  sks' <- allUpdatesKES sk
+  sks' `seq` return True
   
 
 -- | If we start with a signing key, we can evolve it a number of times so that
@@ -539,8 +552,8 @@ unfoldrM f x = do
   case my of
     Nothing -> return []
     Just (y, x') -> do
-      ys <- unfoldrM f x'
-      return (y:ys)
+      ys <- x' `seq` unfoldrM f x'
+      y `seq` ys `seq` return (y:ys)
 
 --
 -- Arbitrary instances
