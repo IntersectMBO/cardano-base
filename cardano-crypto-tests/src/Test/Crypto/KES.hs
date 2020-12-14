@@ -17,15 +17,17 @@ module Test.Crypto.KES
 where
 
 import Data.Proxy (Proxy(..))
-import Data.List (unfoldr, isPrefixOf, foldl')
+import Data.List (isPrefixOf, foldl')
 import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
+import System.IO.Unsafe (unsafePerformIO)
+import Data.IORef
 
 import Control.Exception (evaluate)
 import Control.Concurrent (threadDelay)
-import System.IO.Unsafe (unsafePerformIO)
+import Control.Monad (forM)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
@@ -42,12 +44,10 @@ import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 import Test.Tasty.HUnit (testCase)
 import Test.HUnit
-import Debug.Trace (traceShow)
+-- import Debug.Trace (traceShow)
 
 import Test.Crypto.Util hiding (label)
 import Test.Crypto.Instances ()
-
-import Data.IORef
 
 --
 -- The list of all tests
@@ -86,22 +86,6 @@ deriving instance Eq (NaCl.SodiumSignKeyDSIGN d)
                => Eq (SignKeyKES (SingleKES d))
 deriving instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Eq (SignKeyKES d))
                => Eq (SignKeyKES (SumKES h d))
-
--- Generating and deriving signing keys is normally considered effectful,
--- because we have to make sure that they are allocated and erased in a
--- predictable, deterministic way. In our property checks, however, we don't
--- really care about this particular aspect, so we provide a typeclass for
--- bypassing the type-level effect assurances, allowing us to pretend that
--- operations on signing keys (SignKeyKES) are pure.
-
-class UnsafeSignKeyAccess m where
-  unsafeAccessSignKey :: m a -> a
-
-instance UnsafeSignKeyAccess Identity where
-  unsafeAccessSignKey = runIdentity
-
-instance UnsafeSignKeyAccess IO where
-  unsafeAccessSignKey = unsafePerformIO
 
 testKESAlloc
   :: forall v proxy.
@@ -217,7 +201,7 @@ testKESAlgorithm
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
-     , UnsafeSignKeyAccess (SignKeyAccessKES v)
+     , RunIO (SignKeyAccessKES v)
      )
   => proxy v
   -> String
@@ -299,8 +283,7 @@ prop_onlyGenSignKeyKES
   :: forall v.
         ( KESAlgorithm v
         , ContextKES v ~ ()
-        , Show (SignKeyKES v)
-        , UnsafeSignKeyAccess (SignKeyAccessKES v)
+        , RunIO (SignKeyAccessKES v)
         )
   => SignKeyKES v -> Bool
 prop_onlyGenSignKeyKES sk =
@@ -311,11 +294,10 @@ prop_oneUpdageSignKeyKES
         ( KESAlgorithm v
         , ContextKES v ~ ()
         , Show (SignKeyKES v)
-        , UnsafeSignKeyAccess (SignKeyAccessKES v)
+        , RunIO (SignKeyAccessKES v)
         )
-  => SignKeyKES v -> Bool
-
-prop_oneUpdageSignKeyKES sk = unsafeAccessSignKey $ do
+  => SignKeyKES v -> Property
+prop_oneUpdageSignKeyKES sk = ioProperty . io $ do
   sk' <- updateKES () sk 0
   sk' `seq` return True
   
@@ -329,39 +311,36 @@ prop_totalPeriodsKES
         ( KESAlgorithm v
         , ContextKES v ~ ()
         , Show (SignKeyKES v)
-        , UnsafeSignKeyAccess (SignKeyAccessKES v)
+        , RunIO (SignKeyAccessKES v)
         )
   => SignKeyKES v -> Property
 prop_totalPeriodsKES sk_0 =
-    totalPeriods > 0 ==>
-    counterexample (show totalPeriods) $
-    counterexample (show sks) $
-      length sks === totalPeriods
+    ioProperty $ do
+        sks <- io $ allUpdatesKES sk_0
+        return $
+          totalPeriods > 0 ==>
+          counterexample (show totalPeriods) $
+          counterexample (show sks) $
+          length sks === totalPeriods
   where
     totalPeriods :: Int
     totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
-
-    sks :: [SignKeyKES v]
-    sks = unsafeAccessSignKey $ allUpdatesKES sk_0
 
 
 -- | If we start with a signing key, and all its evolutions, the verification
 -- keys we derive from each one are the same.
 --
 prop_deriveVerKeyKES
-  :: forall v. (KESAlgorithm v, ContextKES v ~ (), UnsafeSignKeyAccess (SignKeyAccessKES v))
+  :: forall v. (KESAlgorithm v, ContextKES v ~ (), RunIO (SignKeyAccessKES v))
   => SignKeyKES v -> Property
 prop_deriveVerKeyKES sk_0 =
-    counterexample (show vks) $
-      conjoin [ vk === vk_0 | vk <- vks ]
-  where
-    sks :: [SignKeyKES v]
-    sks = unsafeAccessSignKey $ allUpdatesKES sk_0
-
-    vk_0 = unsafeAccessSignKey $ deriveVerKeyKES sk_0
-
-    vks :: [VerKeyKES v]
-    vks = unsafeAccessSignKey $ mapM deriveVerKeyKES sks
+    ioProperty $ do
+        sks <- io $ allUpdatesKES sk_0
+        vk_0 <- io $ deriveVerKeyKES sk_0
+        vks <- io $ mapM deriveVerKeyKES sks
+        return $
+          counterexample (show vks) $
+          conjoin (map (vk_0 ===) vks)
 
 
 -- | If we take an initial signing key, a sequence of messages to sign, and
@@ -373,17 +352,22 @@ prop_verifyKES_positive
      ( KESAlgorithm v
      , ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , UnsafeSignKeyAccess (SignKeyAccessKES v)
+     , RunIO (SignKeyAccessKES v)
      )
   => SignKeyKES v -> [Message] -> Property
 prop_verifyKES_positive sk_0 xs =
-    cover 1 (length xs >= totalPeriods) "covers total periods" $
-    conjoin [ counterexample ("period " ++ show t) $
-              verifyKES () vk t x sig === Right ()
-            | let vk = unsafeAccessSignKey (deriveVerKeyKES sk_0)
-            , (t, x, sk) <- zip3 [0..] xs (unsafeAccessSignKey $ allUpdatesKES sk_0)
-            , let sig = unsafeAccessSignKey (signKES () t x sk)
-            ]
+    ioProperty $ do
+        sks <- io $ allUpdatesKES sk_0
+        vk <- io $ deriveVerKeyKES sk_0
+        txsks <- forM (zip3 [0..] xs sks) $ \(t, x, sk) -> do
+            sig <- io $ signKES () t x sk
+            return (t, x, sk, sig)
+        return $
+            cover 1 (length xs >= totalPeriods) "covers total periods" $
+            conjoin [ counterexample ("period " ++ show t) $
+                      verifyKES () vk t x sig === Right ()
+                    | (t, x, sk, sig) <- txsks
+                    ]
   where
     totalPeriods :: Int
     totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
@@ -399,18 +383,21 @@ prop_verifyKES_negative_key
      , ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
      , Eq (SignKeyKES v)
-     , UnsafeSignKeyAccess (SignKeyAccessKES v)
+     , RunIO (SignKeyAccessKES v)
      )
   => SignKeyKES v -> SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_key sk_0 sk'_0 x =
-    sk_0 /= sk'_0 ==>
-    conjoin [ counterexample ("period " ++ show t) $
-              verifyKES () vk' t x sig =/= Right ()
-            | let sks = unsafeAccessSignKey $ allUpdatesKES sk_0
-                  vk' = unsafeAccessSignKey (deriveVerKeyKES sk'_0)
-            , (t, sk) <- zip [0..] sks
-            , let sig = unsafeAccessSignKey (signKES () t x sk)
-            ]
+    sk_0 /= sk'_0 ==> ioProperty $ do
+        sks <- io $ allUpdatesKES sk_0
+        vk' <- io $ deriveVerKeyKES sk'_0
+        tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
+            sig <- io $ signKES () t x sk
+            return (t, sk, sig)
+        return $
+            conjoin [ counterexample ("period " ++ show t) $
+                      verifyKES () vk' t x sig =/= Right ()
+                    | (t, sk, sig) <- tsks
+                    ]
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
 -- try to verify the signature with a message other than @a@, then the
@@ -421,18 +408,21 @@ prop_verifyKES_negative_message
      ( KESAlgorithm v
      , ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , UnsafeSignKeyAccess (SignKeyAccessKES v)
+     , RunIO (SignKeyAccessKES v)
      )
   => SignKeyKES v -> Message -> Message -> Property
 prop_verifyKES_negative_message sk_0 x x' =
-    x /= x' ==>
-    conjoin [ counterexample ("period " ++ show t) $
-              verifyKES () vk t x' sig =/= Right ()
-            | let sks = unsafeAccessSignKey $ allUpdatesKES sk_0
-                  vk  = unsafeAccessSignKey (deriveVerKeyKES sk_0)
-            , (t, sk) <- zip [0..] sks
-            , let sig = unsafeAccessSignKey (signKES () t x sk)
-            ]
+    x /= x' ==> ioProperty $ do
+        sks <- io $ allUpdatesKES sk_0
+        vk <- io $ deriveVerKeyKES sk_0
+        tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
+            sig <- io $ signKES () t x sk
+            return (t, sk, sig)
+        return $
+            conjoin [ counterexample ("period " ++ show t) $
+                      verifyKES () vk t x' sig =/= Right ()
+                    | (t, sk, sig) <- tsks
+                    ]
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
 -- try to verify the signature (and message @a@) using the right verification
@@ -444,19 +434,23 @@ prop_verifyKES_negative_period
      ( KESAlgorithm v
      , ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , UnsafeSignKeyAccess (SignKeyAccessKES v)
+     , RunIO (SignKeyAccessKES v)
      )
   => SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_period sk_0 x =
-    conjoin [ counterexample ("periods " ++ show (t, t')) $
-              verifyKES () vk t' x sig =/= Right ()
-            | let sks = unsafeAccessSignKey $ allUpdatesKES sk_0
-                  vk  = unsafeAccessSignKey $ deriveVerKeyKES sk_0
-            , (t, sk) <- zip [0..] sks
-            , let sig = unsafeAccessSignKey $ signKES () t x sk
-            , (t', _) <- zip [0..] sks
-            , t /= t'
-            ]
+    ioProperty $ do
+        sks <- io $ allUpdatesKES sk_0
+        vk <- io $ deriveVerKeyKES sk_0
+        tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
+            sig <- io $ signKES () t x sk
+            return (t, sk, sig)
+        return $
+            conjoin [ counterexample ("periods " ++ show (t, t')) $
+                      verifyKES () vk t' x sig =/= Right ()
+                    | (t, sk, sig) <- tsks
+                    , (t', _) <- zip [0..] sks
+                    , t /= t'
+                    ]
 
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
@@ -466,21 +460,24 @@ prop_serialise_VerKeyKES
   :: forall v.
      ( KESAlgorithm v
      , ContextKES v ~ ()
-     , UnsafeSignKeyAccess (SignKeyAccessKES v)
+     , RunIO (SignKeyAccessKES v)
      )
   => SignKeyKES v -> Property
 prop_serialise_VerKeyKES sk_0 =
-    conjoin
-      [ counterexample ("period " ++ show (t :: Int)) $
-        counterexample ("vkey " ++ show vk) $
-           prop_raw_serialise rawSerialiseVerKeyKES
-                              rawDeserialiseVerKeyKES vk
-       .&. prop_cbor_with encodeVerKeyKES
-                          decodeVerKeyKES vk
-       .&. prop_size_serialise rawSerialiseVerKeyKES
-                               (sizeVerKeyKES (Proxy @ v)) vk
-      | (t, vk) <- unsafeAccessSignKey $ zip [0..] <$> (mapM deriveVerKeyKES =<< allUpdatesKES sk_0)
-      ]
+    ioProperty $ do
+        vks <- io $ mapM deriveVerKeyKES =<< allUpdatesKES sk_0
+        return $
+            conjoin
+              [ counterexample ("period " ++ show (t :: Int)) $
+                counterexample ("vkey " ++ show vk) $
+                   prop_raw_serialise rawSerialiseVerKeyKES
+                                      rawDeserialiseVerKeyKES vk
+               .&. prop_cbor_with encodeVerKeyKES
+                                  decodeVerKeyKES vk
+               .&. prop_size_serialise rawSerialiseVerKeyKES
+                                       (sizeVerKeyKES (Proxy @ v)) vk
+              | (t, vk) <- zip [0..] vks
+              ]
 
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
@@ -491,24 +488,30 @@ prop_serialise_SigKES
      ( KESAlgorithm v
      , ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , UnsafeSignKeyAccess (SignKeyAccessKES v)
+     , RunIO (SignKeyAccessKES v)
      , Show (SignKeyKES v)
      )
   => SignKeyKES v -> Message -> Property
 prop_serialise_SigKES sk_0 x =
-    conjoin
-      [ counterexample ("period " ++ show t) $
-        counterexample ("vkey "   ++ show sk) $
-        counterexample ("sig "    ++ show sig) $
-           prop_raw_serialise rawSerialiseSigKES
-                              rawDeserialiseSigKES sig
-       .&. prop_cbor_with encodeSigKES
-                          decodeSigKES sig
-       .&. prop_size_serialise rawSerialiseSigKES
-                               (sizeSigKES (Proxy @ v)) sig
-      | (t, sk) <- zip [0..] (unsafeAccessSignKey $ allUpdatesKES sk_0)
-      , let sig = unsafeAccessSignKey $ signKES () t x sk
-      ]
+    ioProperty $ do
+        tsks <- io $ do
+            sks <- allUpdatesKES sk_0
+            forM (zip [0..] sks) $ \(t, sk) -> do
+                sig <- signKES () t x sk
+                return (t, sk, sig)
+        return $
+            conjoin
+              [ counterexample ("period " ++ show t) $
+                counterexample ("vkey "   ++ show sk) $
+                counterexample ("sig "    ++ show sig) $
+                   prop_raw_serialise rawSerialiseSigKES
+                                      rawDeserialiseSigKES sig
+               .&. prop_cbor_with encodeSigKES
+                                  decodeSigKES sig
+               .&. prop_size_serialise rawSerialiseSigKES
+                                       (sizeSigKES (Proxy @ v)) sig
+              | (t, sk, sig) <- tsks
+              ]
 
 --
 -- KES test utils
@@ -518,7 +521,8 @@ allUpdatesKES :: forall v.
                   ( KESAlgorithm v
                   , ContextKES v ~ ()
                   )
-              => SignKeyKES v -> SignKeyAccessKES v [SignKeyKES v]
+              => SignKeyKES v
+              -> SignKeyAccessKES v [SignKeyKES v]
 allUpdatesKES sk_0 =
     (sk_0 :) <$> unfoldrM update (sk_0, 0)
   where
@@ -542,23 +546,32 @@ unfoldrM f x = do
 -- Arbitrary instances
 --
 
-instance (KESAlgorithm v, UnsafeSignKeyAccess (SignKeyAccessKES v)) => Arbitrary (VerKeyKES v) where
-  arbitrary = unsafeAccessSignKey . deriveVerKeyKES <$> arbitrary
+instance (KESAlgorithm v, RunIO (SignKeyAccessKES v)) => Arbitrary (VerKeyKES v) where
+  arbitrary = unsafePerformIO . io . deriveVerKeyKES <$> arbitrary
   shrink = const []
 
-instance (KESAlgorithm v, UnsafeSignKeyAccess (SignKeyAccessKES v)) => Arbitrary (SignKeyKES v) where
-  arbitrary = unsafeAccessSignKey . genKeyKES <$> arbitrary
+instance (KESAlgorithm v, RunIO (SignKeyAccessKES v)) => Arbitrary (SignKeyKES v) where
+  arbitrary = unsafePerformIO . io . genKeyKES <$> arbitrary
   shrink = const []
 
 instance ( KESAlgorithm v
          , ContextKES v ~ ()
          , Signable v ~ SignableRepresentation
-         , UnsafeSignKeyAccess (SignKeyAccessKES v)
+         , RunIO (SignKeyAccessKES v)
          )
       => Arbitrary (SigKES v) where
   arbitrary = do
     a <- arbitrary :: Gen Message
     sk <- arbitrary
-    let sig = unsafeAccessSignKey $ signKES () 0 a sk
+    let sig = unsafePerformIO . io $ signKES () 0 a sk
     return sig
   shrink = const []
+
+class RunIO m where
+  io :: m a -> IO a
+
+instance RunIO IO where
+  io = id
+
+instance RunIO Identity where
+  io = return . runIdentity
