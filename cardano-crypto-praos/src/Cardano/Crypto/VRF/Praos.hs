@@ -28,6 +28,9 @@ module Cardano.Crypto.VRF.Praos
   , crypto_vrf_seedbytes
   , crypto_vrf_outputbytes
 
+  , io_crypto_vrf_publickeybytes
+  , io_crypto_vrf_secretkeybytes
+
   -- * Key sizes
   , certSizeVRF
   , signKeySizeVRF
@@ -163,6 +166,9 @@ foreign import ccall "crypto_vrf_secretkeybytes" crypto_vrf_secretkeybytes :: CS
 foreign import ccall "crypto_vrf_seedbytes" crypto_vrf_seedbytes :: CSize
 foreign import ccall "crypto_vrf_outputbytes" crypto_vrf_outputbytes :: CSize
 
+foreign import ccall "crypto_vrf_publickeybytes" io_crypto_vrf_publickeybytes :: IO CSize
+foreign import ccall "crypto_vrf_secretkeybytes" io_crypto_vrf_secretkeybytes :: IO CSize
+
 foreign import ccall "crypto_vrf_keypair_from_seed" crypto_vrf_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
 foreign import ccall "crypto_vrf_sk_to_pk" crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
 foreign import ccall "crypto_vrf_sk_to_seed" crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
@@ -186,6 +192,12 @@ verKeySizeVRF = fromIntegral $! crypto_vrf_publickeybytes
 
 vrfKeySizeVRF :: Int
 vrfKeySizeVRF = fromIntegral $! crypto_vrf_outputbytes
+
+ioSignKeySizeVRF :: IO Int
+ioSignKeySizeVRF = fromIntegral <$> io_crypto_vrf_secretkeybytes
+
+ioVerKeySizeVRF :: IO Int
+ioVerKeySizeVRF = fromIntegral <$> io_crypto_vrf_publickeybytes
 
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
@@ -330,11 +342,12 @@ proofFromBytes bs
       return proof
 
 skFromBytes :: ByteString -> SignKey
-skFromBytes bs
-  | bsLen /= signKeySizeVRF
-  = error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF)
-  | otherwise
-  = unsafePerformIO $ do
+skFromBytes bs = unsafePerformIO $ do
+  if bsLen /= signKeySizeVRF
+    then do
+      ioSize <- ioSignKeySizeVRF
+      error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF <> " or " <> show @Int ioSize)
+    else do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
         copyFromByteString ptr bs signKeySizeVRF
@@ -343,11 +356,12 @@ skFromBytes bs
     bsLen = BS.length bs
 
 vkFromBytes :: ByteString -> VerKey
-vkFromBytes bs
-  | BS.length bs /= verKeySizeVRF
-  = error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF)
-  | otherwise
-  = unsafePerformIO $ do
+vkFromBytes bs = unsafePerformIO $ do
+  if BS.length bs /= verKeySizeVRF
+    then do
+      ioSize <- ioVerKeySizeVRF
+      error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF <> " or " <> show @Int ioSize)
+    else do
       pk <- mkVerKey
       withForeignPtr (unVerKey pk) $ \ptr ->
         copyFromByteString ptr bs verKeySizeVRF
