@@ -23,7 +23,9 @@ jobs:
     - uses: actions/checkout@v1
 
     - name: Select build directory
-      run: echo "CABAL_BUILDDIR=dist" >> $GITHUB_ENV
+      run: |
+        echo "CABAL_BUILDDIR=dist"              >> $GITHUB_ENV
+        echo "PLAN_JSON=dist/cache/plan.json"   >> $GITHUB_ENV
 
     - name: Install pkgconfiglite (Windows)
       if: matrix.os == 'windows-latest'
@@ -94,8 +96,10 @@ jobs:
       name: Cache cabal store
       with:
         path: ${{ steps.setup-haskell.outputs.cabal-store }}
-        key: cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles('cabal-cache.cabal') }}-${{ github.sha }}
-        restore-keys: cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles('cabal-cache.cabal') }}-
+        key: cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles(env.PLAN_JSON) }}-${{ github.sha }}
+        restore-keys: |
+          cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles(env.PLAN_JSON) }}-
+          cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-
 
     - name: Install dependencies
       run: cabal build all --builddir="$CABAL_BUILDDIR" --only-dependencies
