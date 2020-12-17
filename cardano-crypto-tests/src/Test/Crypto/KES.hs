@@ -208,8 +208,21 @@ testKESAlgorithm
   -> TestTree
 testKESAlgorithm _p n =
   testGroup n
-    [ testGroup "serialisation"
-      [ testGroup "raw"
+    [ testProperty "only gen signkey" $ prop_onlyGenSignKeyKES @v
+    , testProperty "only gen verkey" $ prop_onlyGenVerKeyKES @v
+    , testProperty "one update signkey" $ prop_oneUpdateSignKeyKES @v
+    , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES @v
+    , testProperty "total periods" $ prop_totalPeriodsKES @v
+    , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
+    , testGroup "serialisation"
+
+      [ testGroup "raw ser only"
+        [ testProperty "VerKey"  $ prop_raw_serialise_only @(VerKeyKES v)
+                                                           rawSerialiseVerKeyKES
+        , testProperty "Sig"     $ prop_raw_serialise_only @(SigKES v)
+                                                           rawSerialiseSigKES
+        ]
+      , testGroup "raw"
         [ testProperty "VerKey"  $ prop_raw_serialise @(VerKeyKES v)
                                                       rawSerialiseVerKeyKES
                                                       rawDeserialiseVerKeyKES
@@ -253,12 +266,6 @@ testKESAlgorithm _p n =
         ]
       ]
 
-    , testProperty "only gen signkey" $ prop_onlyGenSignKeyKES @v
-    , testProperty "one update signkey" $ prop_oneUpdateSignKeyKES @v
-    , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES @v
-    , testProperty "total periods" $ prop_totalPeriodsKES @v
-    , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
-
     , testGroup "verify"
       [ testProperty "positive"           $ prop_verifyKES_positive         @v
       , testProperty "negative (key)"     $ prop_verifyKES_negative_key     @v
@@ -289,6 +296,15 @@ prop_onlyGenSignKeyKES
   => SignKeyKES v -> Bool
 prop_onlyGenSignKeyKES sk =
   sk `seq` True
+
+prop_onlyGenVerKeyKES
+  :: forall v.
+        ( KESAlgorithm v
+        , ContextKES v ~ ()
+        )
+  => VerKeyKES v -> Bool
+prop_onlyGenVerKeyKES vk =
+  vk `seq` True
 
 prop_oneUpdateSignKeyKES 
   :: forall v.

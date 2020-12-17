@@ -69,8 +69,8 @@ mlsbZero = unsafeDupablePerformIO $ do
     size  :: CSize
     size = fromInteger (natVal (Proxy @n))
 
-mlsbCopy :: forall n. KnownNat n => MLockedSizedBytes n -> MLockedSizedBytes n
-mlsbCopy src = unsafeDupablePerformIO $ mlsbUseAsCPtr src $ \ptrSrc -> do
+mlsbCopy :: forall n. KnownNat n => MLockedSizedBytes n -> IO (MLockedSizedBytes n)
+mlsbCopy src = mlsbUseAsCPtr src $ \ptrSrc -> do
   dst <- allocMLockedForeignPtr
   withMLockedForeignPtr dst $ \ptrDst -> do
     void $ c_memcpy (castPtr ptrDst) ptrSrc size

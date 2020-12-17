@@ -57,12 +57,12 @@ class (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v ~ SignableRepresentatio
     naclGenKeyDSIGN
         :: Proxy v
         -> MLockedSizedBytes (SeedSizeDSIGN v)
-        -> SodiumSignKeyDSIGN v
+        -> IO (SodiumSignKeyDSIGN v)
 
     naclDeriveVerKeyDSIGN
         :: Proxy v
         -> SodiumSignKeyDSIGN v
-        -> SodiumVerKeyDSIGN v
+        -> IO (SodiumVerKeyDSIGN v)
 
 naclForgetSignKeyDSIGN
     :: Proxy v
@@ -101,7 +101,7 @@ naclVerifyDSIGN pv vk a sig = unsafeDupablePerformIO $ do
 instance SodiumDSIGNAlgorithm Ed25519DSIGN where
     naclGenKeyDSIGN _ = mlsbCopy
 
-    naclDeriveVerKeyDSIGN _ seed = unsafeDupablePerformIO $
+    naclDeriveVerKeyDSIGN _ seed =
         mlsbUseAsSizedPtr seed $ \seedPtr ->
         mlockedAllocaSized $ \skPtr ->
         psbCreateSized $ \pkPtr -> do

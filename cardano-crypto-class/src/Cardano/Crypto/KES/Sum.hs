@@ -57,6 +57,8 @@ import qualified Cardano.Crypto.Libsodium as NaCl
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 
+import Debug.Trace
+
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
 
@@ -176,14 +178,17 @@ instance ( KESAlgorithm d
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
     updateKES ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
-      | t+1 <  _T = runMaybeT $
+      | t+1 <  _T = trace "t+1 < _T" $
+                    runMaybeT $
                       do
                         sk' <- MaybeT $ updateKES ctx sk t
                         return $ SignKeySumKES sk' r_1 vk_0 vk_1
-      | t+1 == _T = do
+      | t+1 == _T = trace "t+1 == _T" $
+                    do
                         sk' <- genKeyKES r_1
                         return . Just $ SignKeySumKES sk' NaCl.mlsbZero vk_0 vk_1
-      | otherwise = runMaybeT $
+      | otherwise = trace "t+1 > _T" $
+                    runMaybeT $
                       do
                         sk' <- MaybeT $ updateKES ctx sk (t - _T)
                         return $ SignKeySumKES sk' r_1 vk_0 vk_1
@@ -205,7 +210,7 @@ instance ( KESAlgorithm d
       sk_1 <- genKeyKES r1
       vk_1 <- deriveVerKeyKES @d sk_1
       forgetSignKeyKES sk_1
-      return $ SignKeySumKES sk_0 r1 vk_0 vk_1
+      return (SignKeySumKES sk_0 r1 vk_0 vk_1)
 
     --
     -- forgetting
