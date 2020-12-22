@@ -27,7 +27,7 @@ import Data.IORef
 
 import Control.Exception (evaluate)
 import Control.Concurrent (threadDelay)
-import Control.Monad (forM)
+import Control.Monad (forM, void)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
@@ -154,7 +154,7 @@ testForgetUpdateKeyKES _p = do
 
 drainAllocLog :: IO [NaCl.AllocEvent]
 drainAllocLog =
-  go []
+  reverse <$> go []
   where
     go xs = do
       NaCl.popAllocLogEvent >>= \case
@@ -177,16 +177,15 @@ testMLockGenKeyKES
   => proxy v
   -> Assertion
 testMLockGenKeyKES _p = do
-  seed <- evaluate $ NaCl.mlsbFromByteString (BS.replicate 1024 23)
   _ <- drainAllocLog
+
+  (seed :: NaCl.MLockedSizedBytes (SeedSizeKES v)) <- evaluate $ NaCl.mlsbFromByteString (BS.replicate 1024 23)
   sk <- genKeyKES @v seed
   forgetSignKeyKES sk
   NaCl.mlsbFinalize seed
   after <- drainAllocLog
   let evset = matchAllocLog after
-  -- putStrLn "--- before ---"
-  -- mapM_ print before
-  putStrLn "--- after ---"
+  putStrLn ""
   mapM_ print after
   assertEqual "all allocations deallocated" Set.empty evset
 
@@ -327,9 +326,7 @@ prop_allUpdatesSignKeyKES
         )
   => SignKeyKES v -> Property
 prop_allUpdatesSignKeyKES sk = ioProperty . io $ do
-  sks' <- allUpdatesKES sk
-  sks' `seq` return True
-  
+  void $ withAllUpdatesKES_ sk $ \sk -> sk `seq` return ()
 
 -- | If we start with a signing key, we can evolve it a number of times so that
 -- the total number of signing keys (including the initial one) equals the
@@ -345,11 +342,11 @@ prop_totalPeriodsKES
   => SignKeyKES v -> Property
 prop_totalPeriodsKES sk_0 =
     ioProperty $ do
-        sks <- io $ allUpdatesKES sk_0
+        sks <- io $ withAllUpdatesKES_ sk_0 (const . return $ ())
         return $
           totalPeriods > 0 ==>
           counterexample (show totalPeriods) $
-          counterexample (show sks) $
+          counterexample (show $ length sks) $
           length sks === totalPeriods
   where
     totalPeriods :: Int
@@ -364,9 +361,8 @@ prop_deriveVerKeyKES
   => SignKeyKES v -> Property
 prop_deriveVerKeyKES sk_0 =
     ioProperty $ do
-        sks <- io $ allUpdatesKES sk_0
         vk_0 <- io $ deriveVerKeyKES sk_0
-        vks <- io $ mapM deriveVerKeyKES sks
+        vks <- io $ withAllUpdatesKES_ sk_0 $ deriveVerKeyKES
         return $
           counterexample (show vks) $
           conjoin (map (vk_0 ===) vks)
@@ -385,18 +381,18 @@ prop_verifyKES_positive
      )
   => SignKeyKES v -> [Message] -> Property
 prop_verifyKES_positive sk_0 xs =
-    ioProperty $ do
-        sks <- io $ allUpdatesKES sk_0
-        vk <- io $ deriveVerKeyKES sk_0
-        txsks <- forM (zip3 [0..] xs sks) $ \(t, x, sk) -> do
-            sig <- io $ signKES () t x sk
-            return (t, x, sk, sig)
-        return $
-            cover 1 (length xs >= totalPeriods) "covers total periods" $
-            conjoin [ counterexample ("period " ++ show t) $
-                      verifyKES () vk t x sig === Right ()
-                    | (t, x, sk, sig) <- txsks
-                    ]
+    checkCoverage $
+      cover 1 (length xs >= totalPeriods) "Message count covers total periods" $
+      (length xs > 0) ==>
+      ioProperty $ fmap conjoin $ io $ do
+        vk <- deriveVerKeyKES sk_0
+        withAllUpdatesKES sk_0 $ \t sk -> do
+          let x = (cycle xs) !! (fromIntegral t)
+          sig <- signKES () t x sk
+          let verResult = verifyKES () vk t x sig
+          return $
+            counterexample ("period " ++ show t ++ "/" ++ show totalPeriods) $
+            verResult === Right ()
   where
     totalPeriods :: Int
     totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
@@ -416,17 +412,27 @@ prop_verifyKES_negative_key
      )
   => SignKeyKES v -> SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_key sk_0 sk'_0 x =
-    sk_0 /= sk'_0 ==> ioProperty $ do
-        sks <- io $ allUpdatesKES sk_0
-        vk' <- io $ deriveVerKeyKES sk'_0
-        tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
-            sig <- io $ signKES () t x sk
-            return (t, sk, sig)
-        return $
-            conjoin [ counterexample ("period " ++ show t) $
-                      verifyKES () vk' t x sig =/= Right ()
-                    | (t, sk, sig) <- tsks
-                    ]
+    sk_0 /= sk'_0 ==> ioProperty $ fmap conjoin $ io $ do
+        vk <- deriveVerKeyKES sk_0
+        vk' <- deriveVerKeyKES sk'_0
+        withAllUpdatesKES sk_0 $ \t sk -> do
+          sig <- signKES () t x sk
+          let verResult = verifyKES () vk' t x sig
+          return $
+            counterexample ("period " ++ show t) $
+            verResult =/= Right ()
+
+    -- sk_0 /= sk'_0 ==> ioProperty $ do
+    --     sks <- io $ allUpdatesKES sk_0
+    --     vk' <- io $ deriveVerKeyKES sk'_0
+    --     tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
+    --         sig <- io $ signKES () t x sk
+    --         return (t, sk, sig)
+    --     return $
+    --         conjoin [ counterexample ("period " ++ show t) $
+    --                   verifyKES () vk' t x sig =/= Right ()
+    --                 | (t, sk, sig) <- tsks
+    --                 ]
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
 -- try to verify the signature with a message other than @a@, then the
@@ -441,17 +447,14 @@ prop_verifyKES_negative_message
      )
   => SignKeyKES v -> Message -> Message -> Property
 prop_verifyKES_negative_message sk_0 x x' =
-    x /= x' ==> ioProperty $ do
-        sks <- io $ allUpdatesKES sk_0
-        vk <- io $ deriveVerKeyKES sk_0
-        tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
-            sig <- io $ signKES () t x sk
-            return (t, sk, sig)
-        return $
-            conjoin [ counterexample ("period " ++ show t) $
-                      verifyKES () vk t x' sig =/= Right ()
-                    | (t, sk, sig) <- tsks
-                    ]
+    x /= x' ==> ioProperty $ fmap conjoin $ io $ do
+        vk <- deriveVerKeyKES sk_0
+        withAllUpdatesKES sk_0 $ \t sk -> do
+          sig <- signKES () t x sk
+          let verResult = verifyKES () vk t x' sig
+          return $
+            counterexample ("period " ++ show t) $
+            verResult =/= Right ()
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
 -- try to verify the signature (and message @a@) using the right verification
@@ -467,19 +470,19 @@ prop_verifyKES_negative_period
      )
   => SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_period sk_0 x =
-    ioProperty $ do
-        sks <- io $ allUpdatesKES sk_0
-        vk <- io $ deriveVerKeyKES sk_0
-        tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
-            sig <- io $ signKES () t x sk
-            return (t, sk, sig)
-        return $
-            conjoin [ counterexample ("periods " ++ show (t, t')) $
-                      verifyKES () vk t' x sig =/= Right ()
-                    | (t, sk, sig) <- tsks
-                    , (t', _) <- zip [0..] sks
-                    , t /= t'
-                    ]
+    ioProperty $ fmap conjoin $ io $ do
+        vk <- deriveVerKeyKES sk_0
+        withAllUpdatesKES sk_0 $ \t sk -> do
+            sig <- signKES () t x sk
+            return $
+              conjoin [ counterexample ("periods " ++ show (t, t')) $
+                        verifyKES () vk t' x sig =/= Right ()
+                      | t' <- [0..totalPeriods-1]
+                      , t /= t'
+                      ]
+  where
+    totalPeriods :: Word
+    totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
 
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
@@ -493,21 +496,18 @@ prop_serialise_VerKeyKES
      )
   => SignKeyKES v -> Property
 prop_serialise_VerKeyKES sk_0 =
-    ioProperty $ do
-        vks <- io $ mapM deriveVerKeyKES =<< allUpdatesKES sk_0
-        return $
-            conjoin
-              [ counterexample ("period " ++ show (t :: Int)) $
-                counterexample ("vkey " ++ show vk) $
-                   prop_raw_serialise rawSerialiseVerKeyKES
-                                      rawDeserialiseVerKeyKES vk
-               .&. prop_cbor_with encodeVerKeyKES
-                                  decodeVerKeyKES vk
-               .&. prop_size_serialise rawSerialiseVerKeyKES
-                                       (sizeVerKeyKES (Proxy @ v)) vk
-              | (t, vk) <- zip [0..] vks
-              ]
-
+    ioProperty $ fmap conjoin $ io $ do
+        withAllUpdatesKES sk_0 $ \t sk -> do
+          vk <- deriveVerKeyKES sk
+          return $
+                 counterexample ("period " ++ show t) $
+                 counterexample ("vkey " ++ show vk) $
+                    prop_raw_serialise rawSerialiseVerKeyKES
+                                       rawDeserialiseVerKeyKES vk
+                .&. prop_cbor_with encodeVerKeyKES
+                                   decodeVerKeyKES vk
+                .&. prop_size_serialise rawSerialiseVerKeyKES
+                                        (sizeVerKeyKES (Proxy @ v)) vk
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
 -- for 'SigKES' on /all/ the KES key evolutions.
@@ -522,54 +522,54 @@ prop_serialise_SigKES
      )
   => SignKeyKES v -> Message -> Property
 prop_serialise_SigKES sk_0 x =
-    ioProperty $ do
-        tsks <- io $ do
-            sks <- allUpdatesKES sk_0
-            forM (zip [0..] sks) $ \(t, sk) -> do
-                sig <- signKES () t x sk
-                return (t, sk, sig)
-        return $
-            conjoin
-              [ counterexample ("period " ++ show t) $
-                counterexample ("vkey "   ++ show sk) $
-                counterexample ("sig "    ++ show sig) $
-                   prop_raw_serialise rawSerialiseSigKES
-                                      rawDeserialiseSigKES sig
-               .&. prop_cbor_with encodeSigKES
-                                  decodeSigKES sig
-               .&. prop_size_serialise rawSerialiseSigKES
-                                       (sizeSigKES (Proxy @ v)) sig
-              | (t, sk, sig) <- tsks
-              ]
+    ioProperty $ fmap conjoin $ io $ do
+        withAllUpdatesKES sk_0 $ \t sk -> do
+            sig <- signKES () t x sk
+            return $
+              counterexample ("period " ++ show t) $
+              counterexample ("vkey "   ++ show sk) $
+              counterexample ("sig "    ++ show sig) $
+                  prop_raw_serialise rawSerialiseSigKES
+                                     rawDeserialiseSigKES sig
+              .&. prop_cbor_with encodeSigKES
+                                 decodeSigKES sig
+              .&. prop_size_serialise rawSerialiseSigKES
+                                      (sizeSigKES (Proxy @ v)) sig
 
 --
 -- KES test utils
 --
 
-allUpdatesKES :: forall v.
+withAllUpdatesKES_ :: forall v a.
                   ( KESAlgorithm v
                   , ContextKES v ~ ()
                   )
               => SignKeyKES v
-              -> SignKeyAccessKES v [SignKeyKES v]
-allUpdatesKES sk_0 =
-    (sk_0 :) <$> unfoldrM update (sk_0, 0)
-  where
-    update :: (SignKeyKES v, Period)
-           -> SignKeyAccessKES v (Maybe (SignKeyKES v, (SignKeyKES v, Period)))
-    update (sk, t) = do
-      updateKES () sk t >>= \case
-        Nothing  -> return Nothing
-        Just sk' -> sk' `seq` return $ Just (sk', (sk', t+1))
+              -> (SignKeyKES v -> SignKeyAccessKES v a)
+              -> SignKeyAccessKES v [a]
+withAllUpdatesKES_ sk f =
+  withAllUpdatesKES sk (const f)
 
-unfoldrM :: Monad m => (b -> m (Maybe (a, b))) -> b -> m [a]
-unfoldrM f x = do
-  my <- f x
-  case my of
-    Nothing -> return []
-    Just (y, x') -> do
-      ys <- x' `seq` unfoldrM f x'
-      y `seq` ys `seq` return (y:ys)
+withAllUpdatesKES :: forall v a.
+                  ( KESAlgorithm v
+                  , ContextKES v ~ ()
+                  )
+              => SignKeyKES v
+              -> (Word -> SignKeyKES v -> SignKeyAccessKES v a)
+              -> SignKeyAccessKES v [a]
+withAllUpdatesKES sk f =
+  go sk 0
+  where
+    go sk t = do
+      x <- f t sk
+      msk' <- updateKES () sk t
+      forgetSignKeyKES sk
+      case msk' of
+        Nothing ->
+          return [x]
+        Just sk' -> do
+          xs <- go sk' (t + 1)
+          return $ x:xs
 
 --
 -- Arbitrary instances

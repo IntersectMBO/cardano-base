@@ -182,7 +182,7 @@ prop_raw_serialise_only :: (Eq a, Show a)
                         -> a -> Bool
 prop_raw_serialise_only serialise x =
     let y = serialise x
-    in traceShow x $ traceShow y $ y `seq` True
+    in y `seq` True
 
 -- | The crypto algorithm classes have direct encoding functions, and the key
 -- types are also typically a member of the 'ToCBOR' class. Where a 'ToCBOR'
