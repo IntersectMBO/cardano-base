@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.6.5", "8.10.2"]
+        ghc: ["8.6.5", "8.10.3"]
         os: [ubuntu-latest, macos-latest, windows-latest]
         exclude:
           - os: windows-latest
@@ -64,20 +64,18 @@ jobs:
         echo "LIBSODIUM_PATH=$LIBSODIUM_PATH"
         echo "$LIBSODIUM_PATH" >> $GITHUB_PATH
 
-    - uses: actions/setup-haskell@v1
+    - name: Select optimal cabal version
+      run: |
+        case "$OS" in
+          Windows_NT)   echo "CABAL_VERSION=3.4.0.0-rc5"  >> $GITHUB_ENV;;
+          *)            echo "CABAL_VERSION=3.4.0.0-rc4"  >> $GITHUB_ENV;;
+        esac
+
+    - uses: haskell/actions/setup@v1
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
-        cabal-version: '3.2.0.0'
-
-    - name: Patch GHC 8.10.2 linker
-      if: matrix.os == 'windows-latest'
-      run: |
-        if [ -f /c/ProgramData/chocolatey/lib/ghc.8.10.2/tools/ghc-8.10.2/lib/settings ]; then
-          sed -i \
-            's|C:/GitLabRunner/builds/2WeHDSFP/0/ghc/ghc/inplace/mingw/bin/ld.exe|C:/ProgramData/chocolatey/lib/ghc.8.10.2/tools/ghc-8.10.2/mingw/bin/ld.exe|g' \
-            /c/ProgramData/chocolatey/lib/ghc.8.10.2/tools/ghc-8.10.2/lib/settings
-        fi
+        cabal-version: ${{ env.CABAL_VERSION }}
 
     - name: Configure to use libsodium
       run: |
@@ -92,14 +90,21 @@ jobs:
     - name: Cabal Configure
       run: cabal configure --builddir="$CABAL_BUILDDIR" --enable-tests --enable-benchmarks --write-ghc-environment-files=always
 
+    - name: Record dependencies
+      run: |
+        cat ${{ env.PLAN_JSON }} | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
+
+    - name: Set cache version
+      run: echo "CACHE_VERSION=9w76Z3Q" >> $GITHUB_ENV
+
     - uses: actions/cache@v2
       name: Cache cabal store
       with:
         path: ${{ steps.setup-haskell.outputs.cabal-store }}
-        key: cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles(env.PLAN_JSON) }}-${{ github.sha }}
+        key: cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
         restore-keys: |
-          cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-${{ hashFiles(env.PLAN_JSON) }}-
-          cache-5e43c04-${{ runner.os }}-${{ matrix.ghc }}-v1-
+          cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
+          cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-
 
     - name: Install dependencies
       run: cabal build all --builddir="$CABAL_BUILDDIR" --only-dependencies
