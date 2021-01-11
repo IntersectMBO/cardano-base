@@ -8,7 +8,7 @@ license-files:
   NOTICE
 author:              IOHK
 maintainer:          operations@iohk.io
-copyright:           2019 IOHK
+copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
@@ -41,11 +41,12 @@ library
                      , cardano-prelude
                      , cborg              >= 0.2.2 && < 0.3
                      , containers
+                     , data-fix
                      , digest
                      , formatting
                      , nothunks
                      , primitive
-                     , recursion-schemes  >= 5.1   && < 5.2
+                     , recursion-schemes  >= 5.1   && < 5.3
                      , safe-exceptions
                      , tagged
                      , text

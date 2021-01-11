@@ -6,7 +6,7 @@ license:             MIT
 license-file:        LICENSE
 author:              IOHK
 maintainer:          operations@iohk.io
-copyright:           2019 IOHK
+copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 cabal-version:       >=1.10

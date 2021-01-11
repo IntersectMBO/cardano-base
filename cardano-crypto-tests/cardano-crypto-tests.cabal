@@ -8,7 +8,7 @@ license-files:
   NOTICE
 author:              IOHK
 maintainer:          operations@iohk.io
-copyright:           2020 IOHK
+copyright:           2020-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
