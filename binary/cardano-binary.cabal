@@ -46,7 +46,7 @@ library
                      , formatting
                      , nothunks
                      , primitive
-                     , recursion-schemes  >= 5.1
+                     , recursion-schemes  >= 5.1   && < 5.3
                      , safe-exceptions
                      , tagged
                      , text
