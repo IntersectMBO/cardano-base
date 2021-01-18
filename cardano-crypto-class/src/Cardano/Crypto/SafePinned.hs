@@ -43,7 +43,7 @@ interactSafePinned (SafePinned var) action = do
   case mval of
     Just val -> do
       result <- action val
-      putMVar var val
+      result `seq` putMVar var val
       return result
     Nothing -> do
       throw SafePinnedFinalizedError

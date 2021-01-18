@@ -84,8 +84,9 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
     deriveVerKeyKES (SignKeySingleKES v) =
-      interactSafePinned v $ \sk ->
-        VerKeySingleKES <$> NaCl.naclDeriveVerKeyDSIGN (Proxy :: Proxy d) sk
+      interactSafePinned v $ \sk -> do
+        vk <- NaCl.naclDeriveVerKeyDSIGN (Proxy :: Proxy d) sk
+        vk `seq` return (VerKeySingleKES vk)
 
     hashVerKeyKES (VerKeySingleKES vk) =
         castHash (hashWith psbToByteString vk)

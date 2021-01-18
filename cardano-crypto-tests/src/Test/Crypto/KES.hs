@@ -27,7 +27,7 @@ import Data.IORef
 
 import Control.Exception (evaluate)
 import Control.Concurrent (threadDelay)
-import Control.Monad (forM, void)
+import Control.Monad (void)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
@@ -288,20 +288,13 @@ testKESAlgorithm _p n =
 
 prop_onlyGenSignKeyKES
   :: forall v.
-        ( KESAlgorithm v
-        , ContextKES v ~ ()
-        , RunIO (SignKeyAccessKES v)
-        )
-  => SignKeyKES v -> Bool
+     SignKeyKES v -> Bool
 prop_onlyGenSignKeyKES sk =
   sk `seq` True
 
 prop_onlyGenVerKeyKES
   :: forall v.
-        ( KESAlgorithm v
-        , ContextKES v ~ ()
-        )
-  => VerKeyKES v -> Bool
+     VerKeyKES v -> Bool
 prop_onlyGenVerKeyKES vk =
   vk `seq` True
 
@@ -309,7 +302,6 @@ prop_oneUpdateSignKeyKES
   :: forall v.
         ( KESAlgorithm v
         , ContextKES v ~ ()
-        , Show (SignKeyKES v)
         , RunIO (SignKeyAccessKES v)
         )
   => SignKeyKES v -> Property
@@ -321,7 +313,6 @@ prop_allUpdatesSignKeyKES
   :: forall v.
         ( KESAlgorithm v
         , ContextKES v ~ ()
-        , Show (SignKeyKES v)
         , RunIO (SignKeyAccessKES v)
         )
   => SignKeyKES v -> Property
@@ -336,7 +327,6 @@ prop_totalPeriodsKES
   :: forall v.
         ( KESAlgorithm v
         , ContextKES v ~ ()
-        , Show (SignKeyKES v)
         , RunIO (SignKeyAccessKES v)
         )
   => SignKeyKES v -> Property
@@ -560,14 +550,16 @@ withAllUpdatesKES :: forall v a.
 withAllUpdatesKES sk f =
   go sk 0
   where
+    go :: SignKeyKES v -> Word -> SignKeyAccessKES v [a]
     go sk t = do
       x <- f t sk
-      msk' <- updateKES () sk t
-      forgetSignKeyKES sk
+      msk' <- x `seq` updateKES () sk t
       case msk' of
-        Nothing ->
+        Nothing -> do
+          forgetSignKeyKES sk
           return [x]
         Just sk' -> do
+          forgetSignKeyKES sk
           xs <- go sk' (t + 1)
           return $ x:xs
 
