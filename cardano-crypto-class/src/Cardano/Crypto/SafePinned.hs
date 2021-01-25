@@ -1,4 +1,5 @@
 {-#LANGUAGE DerivingVia #-}
+{-#LANGUAGE GeneralizedNewtypeDeriving #-}
 module Cardano.Crypto.SafePinned
 ( SafePinned
 , makeSafePinned
@@ -12,7 +13,10 @@ import Control.Concurrent.MVar
 import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.MLockedBytes
 import Control.Exception (Exception, throw)
+import Control.DeepSeq (NFData (..))
+import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..))
+
 
 data SafePinnedFinalizedError = SafePinnedFinalizedError
   deriving (Show)
@@ -47,3 +51,8 @@ interactSafePinned (SafePinned var) action = do
       return result
     Nothing -> do
       throw SafePinnedFinalizedError
+
+-- If it's fine by Kmett & Marlow, ...
+-- https://github.com/haskell/deepseq/issues/6
+instance NFData (SafePinned a) where
+  rnf x = x `seq` ()

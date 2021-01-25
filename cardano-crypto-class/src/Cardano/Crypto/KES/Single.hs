@@ -42,6 +42,7 @@ import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
+import Control.DeepSeq (NFData)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -54,10 +55,15 @@ import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.SafePinned
 import qualified Cardano.Crypto.Libsodium as NaCl
 
+
 -- | A standard signature scheme is a forward-secure signature scheme with a
 -- single time period.
 --
 data SingleKES d
+
+deriving instance NFData (VerKeyDSIGN d) => NFData (VerKeyKES (SingleKES d))
+deriving instance NFData (SignKeyDSIGN d) => NFData (SignKeyKES (SingleKES d))
+deriving instance NFData (SigDSIGN d) => NFData (SigKES (SingleKES d))
 
 instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
          , Typeable d) => KESAlgorithm (SingleKES d) where

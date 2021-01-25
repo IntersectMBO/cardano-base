@@ -15,14 +15,15 @@ import Cardano.Crypto.DSIGN.Ed25519
 import Cardano.Crypto.Hash.Blake2b
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.KES.Sum
-import Cardano.Crypto.Seed
+import Cardano.Crypto.Libsodium as NaCl
 import qualified Data.ByteString as BS (pack)
 import Data.Maybe (fromJust)
+import Test.Crypto.RunIO (RunIO (..))
 
 {- HLINT ignore "Use camelCase" -}
 
-testSeed :: Seed
-testSeed = mkSeedFromBytes (BS.pack testBytes)
+testSeed :: forall n. KnownNat n => NaCl.MLockedSizedBytes n
+testSeed = NaCl.mlsbFromByteString (BS.pack testBytes)
 
 testBytes :: [Word8]
 testBytes = [
@@ -55,34 +56,35 @@ typicalMsg = BS.pack
 
 benchmarks :: Benchmark
 benchmarks = bgroup "KES"
-  []
-  -- Neutered due to changed API (TODO)
-  -- [ bench_kes @Proxy @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy "Sum6KES"
-  -- , bench_kes @Proxy @(Sum7KES Ed25519DSIGN Blake2b_256) Proxy "Sum7KES"
-  -- ]
+  [ bench_kes @Proxy @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy "Sum6KES"
+  , bench_kes @Proxy @(Sum7KES Ed25519DSIGN Blake2b_256) Proxy "Sum7KES"
+  ]
 
--- bench_kes :: forall proxy v
---            . ( KESAlgorithm v
---              , ContextKES v ~ ()
---              , Signable v ByteString
---              , NFData (SignKeyKES v)
---              , NFData (SigKES v)
---              )
---           => proxy v
---           -> [Char]
---           -> Benchmark
--- bench_kes _ lbl =
---   bgroup lbl
---     [ bench "genKey" $
---         nf (genKeyKES @v) testSeed
---     , bench "signKES" $
---         nf (signKES @v () 0 typicalMsg) (genKeyKES @v testSeed)
---     , bench "verifyKES" $
---         let signKey = genKeyKES @v testSeed
---             sig = signKES @v () 0 typicalMsg signKey
---             verKey = deriveVerKeyKES signKey
---         in  nf (\ ~(verKey', sig') -> verifyKES @v () verKey' 0 typicalMsg sig') (verKey, sig)
---     , bench "updateKES" $
---         let signKey = genKeyKES @v testSeed
---         in  nf (\signKey' -> fromJust $ updateKES () signKey' 0) signKey
---     ]
+bench_kes :: forall proxy v
+           . ( KESAlgorithm v
+             , ContextKES v ~ ()
+             , Signable v ByteString
+             , NFData (SignKeyKES v)
+             , NFData (SigKES v)
+             , RunIO (SignKeyAccessKES v)
+             )
+          => proxy v
+          -> [Char]
+          -> Benchmark
+bench_kes _ lbl =
+  bgroup lbl
+    [ bench "genKey" $
+        nfIO . io $ (genKeyKES @v) testSeed
+    , bench "signKES" $
+        nfIO . io $ (signKES @v () 0 typicalMsg) =<< (genKeyKES @v testSeed)
+    , bench "verifyKES" $
+        nfIO . io $ do
+          signKey <- genKeyKES @v testSeed
+          sig <- signKES @v () 0 typicalMsg signKey
+          verKey <- deriveVerKeyKES signKey
+          return . fromRight $ verifyKES @v () verKey 0 typicalMsg sig
+    , bench "updateKES" $
+        nfIO . io $ do
+          signKey <- genKeyKES @v testSeed
+          fromJust <$> updateKES () signKey 0
+    ]
