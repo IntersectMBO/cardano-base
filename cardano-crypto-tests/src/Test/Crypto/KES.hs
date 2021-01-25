@@ -47,6 +47,7 @@ import Test.HUnit
 -- import Debug.Trace (traceShow)
 
 import Test.Crypto.Util hiding (label)
+import Test.Crypto.RunIO (RunIO (..))
 import Test.Crypto.Instances ()
 
 --
@@ -587,12 +588,3 @@ instance ( KESAlgorithm v
     let sig = unsafePerformIO . io $ signKES () 0 a sk
     return sig
   shrink = const []
-
-class RunIO m where
-  io :: m a -> IO a
-
-instance RunIO IO where
-  io = id
-
-instance RunIO Identity where
-  io = return . runIdentity

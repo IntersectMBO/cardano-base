@@ -96,6 +96,12 @@ type Sum7KES d h = SumKES h (Sum6KES d h)
 --
 data SumKES h d
 
+instance (NFData (SigKES d), NFData (VerKeyKES d)) =>
+  NFData (SigKES (SumKES h d)) where
+
+instance (NFData (SignKeyKES d), NFData (VerKeyKES d)) =>
+  NFData (SignKeyKES (SumKES h d)) where
+
 instance ( KESAlgorithm d
          , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
          , Typeable d
