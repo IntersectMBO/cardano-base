@@ -51,6 +51,7 @@ import           NoThunks.Class (NoThunks)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.Seed
+import           Cardano.Crypto.SafePinned
 import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.Single (SingleKES)
@@ -241,14 +242,14 @@ instance ( KESAlgorithm d
 
     rawSerialiseVerKeyKES  (VerKeySumKES  vk) = hashToBytes vk
 
-    -- TODO: we will need this :(
-    -- rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) =
-    --   mconcat
-    --     [ rawSerialiseSignKeyKES sk
-    --     , getSeedBytes r_1
-    --     , rawSerialiseVerKeyKES vk_0
-    --     , rawSerialiseVerKeyKES vk_1
-    --     ]
+    rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) = do
+      ssk <- rawSerialiseSignKeyKES sk
+      return $ mconcat
+                  [ ssk
+                  , NaCl.mlsbToByteString r_1
+                  , rawSerialiseVerKeyKES vk_0
+                  , rawSerialiseVerKeyKES vk_1
+                  ]
 
     rawSerialiseSigKES (SigSumKES sigma vk_0 vk_1) =
       mconcat

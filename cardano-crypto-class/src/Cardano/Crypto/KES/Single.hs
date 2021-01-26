@@ -143,6 +143,7 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
 
     rawSerialiseVerKeyKES  (VerKeySingleKES  vk) = psbToByteString vk
     rawSerialiseSigKES     (SigSingleKES    sig) = psbToByteString sig
+    rawSerialiseSignKeyKES (SignKeySingleKES sk) = interactSafePinned sk $ return . NaCl.mlsbToByteString
 
     rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . psbFromByteStringCheck
     rawDeserialiseSigKES     = fmap SigSingleKES     . psbFromByteStringCheck
