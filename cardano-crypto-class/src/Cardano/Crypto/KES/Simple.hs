@@ -160,6 +160,10 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
     rawSerialiseSigKES (SigSimpleKES sig) =
         rawSerialiseSigDSIGN sig
 
+    rawSerialiseSignKeyKES (SignKeySimpleKES sks) =
+        return $ BS.concat [ rawSerialiseSignKeyDSIGN sk | sk <- Vec.toList sks ]
+
+
     rawDeserialiseVerKeyKES bs
       | let duration = fromIntegral (natVal (Proxy :: Proxy t))
             sizeKey  = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy d))

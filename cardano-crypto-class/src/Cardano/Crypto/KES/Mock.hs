@@ -138,6 +138,10 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
      <> rawSerialiseVerKeyKES k
      <> writeBinaryWord64 (fromIntegral t)
 
+    rawSerialiseSignKeyKES (SignKeyMockKES vk t) = return $
+        rawSerialiseVerKeyKES vk
+     <> writeBinaryWord64 (fromIntegral t)
+
     rawDeserialiseVerKeyKES bs
       | [vkb] <- splitsAt [8] bs
       , let vk = readBinaryWord64 vkb

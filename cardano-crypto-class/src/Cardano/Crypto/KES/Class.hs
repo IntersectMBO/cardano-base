@@ -200,9 +200,11 @@ class ( Typeable v
 
   rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
   rawSerialiseSigKES       :: SigKES     v -> ByteString
+  rawSerialiseSignKeyKES   :: SignKeyKES v -> SignKeyAccessKES v ByteString
 
   rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
   rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
+  rawDeserialiseSignKeyKES  :: ByteString -> SignKeyAccessKES v (Maybe (SignKeyKES v))
 
 --
 -- Do not provide Ord instances for keys, see #38

@@ -221,6 +221,8 @@ testKESAlgorithm _p n =
                                                            rawSerialiseVerKeyKES
         , testProperty "Sig"     $ prop_raw_serialise_only @(SigKES v)
                                                            rawSerialiseSigKES
+        , testProperty "SignKey" $ prop_raw_serialise_only @(SignKeyKES v)
+                                                           (unsafePerformIO . io . rawSerialiseSignKeyKES)
         ]
       , testGroup "raw"
         [ testProperty "VerKey"  $ prop_raw_serialise @(VerKeyKES v)
