@@ -231,6 +231,9 @@ testKESAlgorithm _p n =
         , testProperty "Sig"     $ prop_raw_serialise @(SigKES v)
                                                       rawSerialiseSigKES
                                                       rawDeserialiseSigKES
+        , testProperty "SignKey" $ prop_raw_serialise @(SignKeyKES v)
+                                                      (unsafePerformIO . io . rawSerialiseSignKeyKES)
+                                                      (unsafePerformIO . io . rawDeserialiseSignKeyKES)
         ]
 
       , testGroup "size"

@@ -29,6 +29,7 @@ import qualified Data.Vector as Vec
 import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 import           NoThunks.Class (NoThunks)
+import           Control.Monad.Trans.Maybe
 
 import           Cardano.Prelude (forceElemsToWHNF)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -177,6 +178,17 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
 
     rawDeserialiseSigKES = fmap SigSimpleKES . rawDeserialiseSigDSIGN
 
+    rawDeserialiseSignKeyKES bs
+      | let duration = fromIntegral (natVal (Proxy :: Proxy t))
+            sizeKey  = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
+      , skbs     <- splitsAt (replicate duration sizeKey) bs
+      , length skbs == duration
+      = runMaybeT $ do
+          sks <- mapM (MaybeT . return . rawDeserialiseSignKeyDSIGN) skbs
+          return $! SignKeySimpleKES (Vec.fromList sks)
+
+      | otherwise
+      = return Nothing
 
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SimpleKES d t))
