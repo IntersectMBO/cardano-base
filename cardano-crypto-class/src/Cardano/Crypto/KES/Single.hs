@@ -147,6 +147,10 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
 
     rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . psbFromByteStringCheck
     rawDeserialiseSigKES     = fmap SigSingleKES     . psbFromByteStringCheck
+    rawDeserialiseSignKeyKES bs = do
+      case NaCl.mlsbFromByteStringCheck bs of
+        Nothing -> return Nothing
+        Just x -> Just . SignKeySingleKES <$> makeSafePinned x
 
 --
 -- VerKey instances

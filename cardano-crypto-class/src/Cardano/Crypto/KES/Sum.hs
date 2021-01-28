@@ -260,28 +260,28 @@ instance ( KESAlgorithm d
 
     rawDeserialiseVerKeyKES = fmap VerKeySumKES  . hashFromBytes
 
-    -- rawDeserialiseSignKeyKES b = do
-    --     guard (BS.length b == fromIntegral size_total)
-    --     sk   <- rawDeserialiseSignKeyKES b_sk
-    --     let r = mkSeedFromBytes          b_r
-    --     vk_0 <- rawDeserialiseVerKeyKES  b_vk0
-    --     vk_1 <- rawDeserialiseVerKeyKES  b_vk1
-    --     return (SignKeySumKES sk r vk_0 vk_1)
-    --   where
-    --     b_sk  = slice off_sk  size_sk b
-    --     b_r   = slice off_r   size_r  b
-    --     b_vk0 = slice off_vk0 size_vk b
-    --     b_vk1 = slice off_vk1 size_vk b
+    rawDeserialiseSignKeyKES b = runMaybeT $ do
+        guard (BS.length b == fromIntegral size_total)
+        sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
+        r <- MaybeT . return $ NaCl.mlsbFromByteStringCheck b_r
+        vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk0
+        vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk1
+        return (SignKeySumKES sk r vk_0 vk_1)
+      where
+        b_sk  = slice off_sk  size_sk b
+        b_r   = slice off_r   size_r  b
+        b_vk0 = slice off_vk0 size_vk b
+        b_vk1 = slice off_vk1 size_vk b
 
-    --     size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
-    --     size_r     = seedSizeKES    (Proxy :: Proxy d)
-    --     size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
-    --     size_total = sizeSignKeyKES (Proxy :: Proxy (SumKES h d))
+        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
+        size_r     = seedSizeKES    (Proxy :: Proxy d)
+        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
+        size_total = sizeSignKeyKES (Proxy :: Proxy (SumKES h d))
 
-    --     off_sk     = 0 :: Word
-    --     off_r      = size_sk
-    --     off_vk0    = off_r + size_r
-    --     off_vk1    = off_vk0 + size_vk
+        off_sk     = 0 :: Word
+        off_r      = size_sk
+        off_vk0    = off_r + size_r
+        off_vk1    = off_vk0 + size_vk
 
     rawDeserialiseSigKES b = do
         guard (BS.length b == fromIntegral size_total)

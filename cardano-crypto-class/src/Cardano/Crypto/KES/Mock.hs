@@ -160,6 +160,16 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
+    rawDeserialiseSignKeyKES bs
+      | [vkb, tb] <- splitsAt [8, 8] bs
+      , Just vk   <- rawDeserialiseVerKeyKES vkb
+      , let t      = fromIntegral (readBinaryWord64 tb)
+      = return . Just $! SignKeyMockKES vk t
+
+      | otherwise
+      = return Nothing
+
+
 
 
 instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
