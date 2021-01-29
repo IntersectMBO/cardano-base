@@ -24,6 +24,7 @@ import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
+import Data.Maybe (fromJust)
 
 import Control.Exception (evaluate)
 import Control.Concurrent (threadDelay)
@@ -252,6 +253,9 @@ testKESAlgorithm _p n =
         , testProperty "Sig"     $ prop_cbor_with @(SigKES v)
                                                   encodeSigKES
                                                   decodeSigKES
+        , testProperty "SignKey" $ prop_cbor_with @(SignKeyKES v)
+                                                  (unsafePerformIO . io . encodeSignKeyKES)
+                                                  (fromJust . unsafePerformIO . io <$> decodeSignKeyKES)
         ]
 
       , testGroup "To/FromCBOR class"

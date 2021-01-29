@@ -26,6 +26,8 @@ module Cardano.Crypto.KES.Class
   , decodeVerKeyKES
   , encodeSigKES
   , decodeSigKES
+  , encodeSignKeyKES
+  , decodeSignKeyKES
   , encodeSignedKES
   , decodeSignedKES
 
@@ -234,6 +236,9 @@ encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
+encodeSignKeyKES :: KESAlgorithm v => SignKeyKES v -> SignKeyAccessKES v Encoding
+encodeSignKeyKES = fmap encodeBytes . rawSerialiseSignKeyKES
+
 decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
 decodeVerKeyKES = do
     bs <- decodeBytes
@@ -257,11 +262,21 @@ decodeSigKES = do
         | actual /= expected
                     -> fail ("decodeSigKES: wrong length, expected " ++
                              show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeSigKES: cannot decode key"
+        | otherwise -> fail "decodeSigKES: cannot decode signature"
         where
           expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
           actual   = BS.length bs
 
+decodeSignKeyKES :: forall v s. KESAlgorithm v => Decoder s (SignKeyAccessKES v (Maybe (SignKeyKES v)))
+decodeSignKeyKES = do
+    bs <- decodeBytes
+    let expected = fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
+        actual   = BS.length bs
+    if actual /= expected then
+      fail ("decodeSigKES: wrong length, expected " ++
+               show expected ++ " bytes but got " ++ show actual)
+    else
+      return $ rawDeserialiseSignKeyKES bs
 
 -- | The KES period. Periods are enumerated from zero.
 --
