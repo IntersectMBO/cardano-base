@@ -22,9 +22,8 @@ import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
-import Data.Coerce (coerce)
 
-import Cardano.Prelude (Identity, runIdentity)
+import Cardano.Prelude (Identity)
 
 import Control.Exception (assert)
 

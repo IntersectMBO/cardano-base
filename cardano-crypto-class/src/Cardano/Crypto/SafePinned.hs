@@ -10,11 +10,9 @@ module Cardano.Crypto.SafePinned
 where
 
 import Control.Concurrent.MVar
-import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.MLockedBytes
 import Control.Exception (Exception, throw)
 import Control.DeepSeq (NFData (..))
-import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..))
 
 
@@ -37,8 +35,8 @@ makeSafePinned :: a -> IO (SafePinned a)
 makeSafePinned val = SafePinned <$> newMVar val
 
 releaseSafePinned :: Release a => SafePinned a -> IO ()
-releaseSafePinned (SafePinned var) = do
-  mval <- tryTakeMVar var
+releaseSafePinned sp = do
+  mval <- tryTakeMVar (safePinnedMVar sp)
   maybe (return ()) release mval
 
 interactSafePinned :: SafePinned a -> (a -> IO b) -> IO b

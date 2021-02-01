@@ -68,7 +68,6 @@ import Test.QuickCheck
   , vector
   )
 import Formatting.Buildable (Buildable (..))
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -177,8 +176,7 @@ prop_raw_serialise serialise deserialise x =
       Just y  -> y === x
       Nothing -> property False
 
-prop_raw_serialise_only :: (Eq a, Show a)
-                        => (a -> ByteString)
+prop_raw_serialise_only :: (a -> ByteString)
                         -> a -> Bool
 prop_raw_serialise_only serialise x =
     let y = serialise x

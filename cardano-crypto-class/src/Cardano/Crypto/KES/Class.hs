@@ -48,11 +48,9 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
-import System.IO.Unsafe (unsafePerformIO)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
-import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
