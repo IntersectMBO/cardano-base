@@ -50,12 +50,9 @@ import           NoThunks.Class (NoThunks)
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
-import           Cardano.Crypto.Seed
-import           Cardano.Crypto.SafePinned
 import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.Single (SingleKES)
-import Data.Word (Word8)
 import Control.DeepSeq (NFData)
 
 import qualified Cardano.Crypto.Libsodium as NaCl
@@ -312,12 +309,6 @@ hashPairOfVKeys =
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size = BS.take (fromIntegral size)
                   . BS.drop (fromIntegral offset)
-
-zeroSeed :: KESAlgorithm d => Proxy d -> Seed
-zeroSeed p = mkSeedFromBytes (BS.replicate seedSize (0 :: Word8))
-  where
-    seedSize :: Int
-    seedSize = fromIntegral (seedSizeKES p)
 
 mungeName :: String -> String
 mungeName basename

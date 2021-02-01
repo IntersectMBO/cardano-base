@@ -61,9 +61,9 @@ import qualified Cardano.Crypto.Libsodium as NaCl
 --
 data SingleKES d
 
-deriving instance NFData (VerKeyDSIGN d) => NFData (VerKeyKES (SingleKES d))
-deriving instance NFData (SignKeyDSIGN d) => NFData (SignKeyKES (SingleKES d))
-deriving instance NFData (SigDSIGN d) => NFData (SigKES (SingleKES d))
+deriving instance NFData (VerKeyKES (SingleKES d))
+deriving instance NFData (SignKeyKES (SingleKES d))
+deriving instance NFData (SigKES (SingleKES d))
 
 instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
          , Typeable d) => KESAlgorithm (SingleKES d) where

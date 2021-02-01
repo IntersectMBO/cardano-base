@@ -37,7 +37,7 @@ import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import qualified Cardano.Crypto.Libsodium as NaCl
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
-import Cardano.Prelude (runReaderT, Identity, runIdentity)
+import Cardano.Prelude (runReaderT)
 import Cardano.Crypto.SafePinned
 
 import Test.QuickCheck
@@ -326,8 +326,8 @@ prop_allUpdatesSignKeyKES
         , RunIO (SignKeyAccessKES v)
         )
   => SignKeyKES v -> Property
-prop_allUpdatesSignKeyKES sk = ioProperty . io $ do
-  void $ withAllUpdatesKES_ sk $ \sk -> sk `seq` return ()
+prop_allUpdatesSignKeyKES sk_0 = ioProperty . io $ do
+  void $ withAllUpdatesKES_ sk_0 $ \sk_n -> sk_n `seq` return ()
 
 -- | If we start with a signing key, we can evolve it a number of times so that
 -- the total number of signing keys (including the initial one) equals the
@@ -413,7 +413,7 @@ prop_verifyKES_negative_key
   => SignKeyKES v -> SignKeyKES v -> Message -> Property
 prop_verifyKES_negative_key sk_0 sk'_0 x =
     sk_0 /= sk'_0 ==> ioProperty $ fmap conjoin $ io $ do
-        vk <- deriveVerKeyKES sk_0
+        _ <- deriveVerKeyKES sk_0
         vk' <- deriveVerKeyKES sk'_0
         withAllUpdatesKES sk_0 $ \t sk -> do
           sig <- signKES () t x sk
@@ -421,18 +421,6 @@ prop_verifyKES_negative_key sk_0 sk'_0 x =
           return $
             counterexample ("period " ++ show t) $
             verResult =/= Right ()
-
-    -- sk_0 /= sk'_0 ==> ioProperty $ do
-    --     sks <- io $ allUpdatesKES sk_0
-    --     vk' <- io $ deriveVerKeyKES sk'_0
-    --     tsks <- forM (zip [0..] sks) $ \(t, sk) -> do
-    --         sig <- io $ signKES () t x sk
-    --         return (t, sk, sig)
-    --     return $
-    --         conjoin [ counterexample ("period " ++ show t) $
-    --                   verifyKES () vk' t x sig =/= Right ()
-    --                 | (t, sk, sig) <- tsks
-    --                 ]
 
 -- | If we sign a message @a@ with one list of signing key evolutions, if we
 -- try to verify the signature with a message other than @a@, then the
@@ -557,8 +545,8 @@ withAllUpdatesKES :: forall v a.
               => SignKeyKES v
               -> (Word -> SignKeyKES v -> SignKeyAccessKES v a)
               -> SignKeyAccessKES v [a]
-withAllUpdatesKES sk f =
-  go sk 0
+withAllUpdatesKES sk_0 f =
+  go sk_0 0
   where
     go :: SignKeyKES v -> Word -> SignKeyAccessKES v [a]
     go sk t = do

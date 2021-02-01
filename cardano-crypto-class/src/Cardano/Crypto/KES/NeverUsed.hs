@@ -53,7 +53,9 @@ instance KESAlgorithm NeverKES where
 
   rawSerialiseVerKeyKES  _ = mempty
   rawSerialiseSigKES     _ = mempty
+  rawSerialiseSignKeyKES _ = return mempty
 
   rawDeserialiseVerKeyKES  _ = Just NeverUsedVerKeyKES
   rawDeserialiseSigKES     _ = Just NeverUsedSigKES
+  rawDeserialiseSignKeyKES _ = return $ Just NeverUsedSignKeyKES
 

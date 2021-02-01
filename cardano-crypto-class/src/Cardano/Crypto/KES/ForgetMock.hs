@@ -27,7 +27,6 @@ import Cardano.Prelude (lift, MonadIO, liftIO, ReaderT (..), ask)
 
 import Cardano.Crypto.KES.Class
 import NoThunks.Class (NoThunks)
-import System.IO.Unsafe
 import System.Random (randomRIO)
 
 -- | A wrapper for a KES implementation that adds logging functionality, for
@@ -68,7 +67,7 @@ instance
       liftIO $ writeLog ("GEN: " ++ show nonce)
       return (SignKeyForgetMockKES nonce sk)
 
-    forgetSignKeyKES (SignKeyForgetMockKES nonce sk) = do
+    forgetSignKeyKES (SignKeyForgetMockKES nonce _) = do
       writeLog <- ask
       liftIO $ writeLog ("DEL: " ++ show nonce)
       return ()
@@ -103,9 +102,14 @@ instance
 
     rawSerialiseVerKeyKES (VerKeyForgetMockKES k) = rawSerialiseVerKeyKES k
     rawSerialiseSigKES (SigForgetMockKES k) = rawSerialiseSigKES k
+    rawSerialiseSignKeyKES (SignKeyForgetMockKES _ k) = lift $ rawSerialiseSignKeyKES k
 
     rawDeserialiseVerKeyKES = fmap VerKeyForgetMockKES . rawDeserialiseVerKeyKES
     rawDeserialiseSigKES = fmap SigForgetMockKES . rawDeserialiseSigKES
+    rawDeserialiseSignKeyKES bs = do
+      msk <- lift $ rawDeserialiseSignKeyKES bs
+      nonce :: Word <- liftIO $ randomRIO (10000000, 99999999)
+      return $ fmap (SignKeyForgetMockKES nonce) msk
 
 
 
