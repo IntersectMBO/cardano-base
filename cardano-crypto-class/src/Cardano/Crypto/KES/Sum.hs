@@ -53,11 +53,12 @@ import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.Single (SingleKES)
-import Control.DeepSeq (NFData)
+import           Cardano.Crypto.SafePinned
 
 import qualified Cardano.Crypto.Libsodium as NaCl
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.DeepSeq (NFData)
 
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
@@ -129,7 +130,7 @@ instance ( KESAlgorithm d
     --
     data SignKeyKES (SumKES h d) =
            SignKeySumKES !(SignKeyKES d)
-                         !(NaCl.MLockedSizedBytes (SeedSizeKES d))
+                         !(SafePinned (NaCl.MLockedSizedBytes (SeedSizeKES d)))
                          !(VerKeyKES d)
                          !(VerKeyKES d)
         deriving Generic
@@ -188,15 +189,16 @@ instance ( KESAlgorithm d
       | t+1 <  _T = runMaybeT $
                       do
                         sk' <- MaybeT $ updateKES ctx sk t
-                        r_1' <- MaybeT $ Just <$> liftIO (NaCl.mlsbCopy r_1)
+                        r_1' <- MaybeT $ Just <$> liftIO (mapSafePinned NaCl.mlsbCopy r_1)
                         return $ SignKeySumKES sk' r_1' vk_0 vk_1
       | t+1 == _T = do
-                        sk' <- genKeyKES r_1
-                        return . Just $ SignKeySumKES sk' NaCl.mlsbZero vk_0 vk_1
+                        sk' <- interactSafePinned r_1 genKeyKES
+                        sk0 <- liftIO $ makeSafePinned NaCl.mlsbZero
+                        return . Just $ SignKeySumKES sk' sk0 vk_0 vk_1
       | otherwise = runMaybeT $
                       do
                         sk' <- MaybeT $ updateKES ctx sk (t - _T)
-                        r_1' <- MaybeT $ Just <$> liftIO (NaCl.mlsbCopy r_1)
+                        r_1' <- MaybeT $ Just <$> liftIO (mapSafePinned NaCl.mlsbCopy r_1)
                         return $ SignKeySumKES sk' r_1' vk_0 vk_1
       where
         _T = totalPeriodsKES (Proxy :: Proxy d)
@@ -209,14 +211,15 @@ instance ( KESAlgorithm d
     --
 
     genKeyKES r = do
-      let (r0, r1) = NaCl.expandHash (Proxy :: Proxy h) r
-
-      sk_0 <- genKeyKES r0
+      let (rr0, rr1) = NaCl.expandHash (Proxy :: Proxy h) r
+      r0 <- makeSafePinned rr0
+      r1 <- makeSafePinned rr1
+      sk_0 <- interactSafePinned r0 genKeyKES
       vk_0 <- deriveVerKeyKES sk_0
-      sk_1 <- genKeyKES r1
+      sk_1 <- interactSafePinned r1 genKeyKES
       vk_1 <- deriveVerKeyKES @d sk_1
       forgetSignKeyKES sk_1
-      liftIO $ NaCl.mlsbFinalize r0
+      releaseSafePinned r0
       return $ SignKeySumKES sk_0 r1 vk_0 vk_1
 
     --
@@ -224,7 +227,7 @@ instance ( KESAlgorithm d
     --
     forgetSignKeyKES (SignKeySumKES sk_0 r1 _ _) = do
         forgetSignKeyKES sk_0
-        liftIO $ NaCl.mlsbFinalize r1
+        releaseSafePinned r1
 
     --
     -- raw serialise/deserialise
@@ -241,9 +244,10 @@ instance ( KESAlgorithm d
 
     rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) = do
       ssk <- rawSerialiseSignKeyKES sk
+      rr1 <- interactSafePinned r_1 return
       return $ mconcat
                   [ ssk
-                  , NaCl.mlsbToByteString r_1
+                  , NaCl.mlsbToByteString rr1
                   , rawSerialiseVerKeyKES vk_0
                   , rawSerialiseVerKeyKES vk_1
                   ]
@@ -260,7 +264,8 @@ instance ( KESAlgorithm d
     rawDeserialiseSignKeyKES b = runMaybeT $ do
         guard (BS.length b == fromIntegral size_total)
         sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
-        r <- MaybeT . return $ NaCl.mlsbFromByteStringCheck b_r
+        rr <- MaybeT . return $ NaCl.mlsbFromByteStringCheck b_r
+        r <- makeSafePinned rr
         vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk0
         vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk1
         return (SignKeySumKES sk r vk_0 vk_1)

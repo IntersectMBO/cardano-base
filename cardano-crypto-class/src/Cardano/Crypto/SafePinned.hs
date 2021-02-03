@@ -5,6 +5,7 @@ module Cardano.Crypto.SafePinned
 , makeSafePinned
 , releaseSafePinned
 , interactSafePinned
+, mapSafePinned
 , Release (..)
 )
 where
@@ -14,7 +15,7 @@ import Cardano.Crypto.Libsodium.MLockedBytes
 import Control.Exception (Exception, throw)
 import Control.DeepSeq (NFData (..))
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..))
-
+import Control.Monad.IO.Class (MonadIO, liftIO)
 
 data SafePinnedFinalizedError = SafePinnedFinalizedError
   deriving (Show)
@@ -31,21 +32,25 @@ newtype SafePinned a =
   SafePinned { safePinnedMVar :: MVar a }
   deriving NoThunks via OnlyCheckWhnf (MVar a)
 
-makeSafePinned :: a -> IO (SafePinned a)
-makeSafePinned val = SafePinned <$> newMVar val
+makeSafePinned :: MonadIO m => a -> m (SafePinned a)
+makeSafePinned val = SafePinned <$> liftIO (newMVar val)
 
-releaseSafePinned :: Release a => SafePinned a -> IO ()
+mapSafePinned :: MonadIO m => (a -> m b) -> SafePinned a -> m (SafePinned b)
+mapSafePinned f p =
+  interactSafePinned p f >>= makeSafePinned
+
+releaseSafePinned :: (MonadIO m, Release a) => SafePinned a -> m ()
 releaseSafePinned sp = do
-  mval <- tryTakeMVar (safePinnedMVar sp)
-  maybe (return ()) release mval
+  mval <- liftIO $ tryTakeMVar (safePinnedMVar sp)
+  maybe (return ()) (liftIO . release) mval
 
-interactSafePinned :: SafePinned a -> (a -> IO b) -> IO b
+interactSafePinned :: MonadIO m => SafePinned a -> (a -> m b) -> m b
 interactSafePinned (SafePinned var) action = do
-  mval <- tryTakeMVar var
+  mval <- liftIO (tryTakeMVar var)
   case mval of
     Just val -> do
       result <- action val
-      result `seq` putMVar var val
+      result `seq` liftIO (putMVar var val)
       return result
     Nothing -> do
       throw SafePinnedFinalizedError
