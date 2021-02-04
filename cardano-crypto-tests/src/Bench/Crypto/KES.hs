@@ -74,17 +74,20 @@ bench_kes :: forall proxy v
 bench_kes _ lbl =
   bgroup lbl
     [ bench "genKey" $
-        nfIO . io $ (genKeyKES @v) testSeed
+        nfIO . io $ genKeyKES @v testSeed >>= forgetSignKeyKES @v
     , bench "signKES" $
-        nfIO . io $ (signKES @v () 0 typicalMsg) =<< (genKeyKES @v testSeed)
+        nfIO . io $ (\sk -> do { sig <- signKES @v () 0 typicalMsg sk; forgetSignKeyKES sk; return sig }) =<< (genKeyKES @v testSeed)
     , bench "verifyKES" $
         nfIO . io $ do
           signKey <- genKeyKES @v testSeed
           sig <- signKES @v () 0 typicalMsg signKey
           verKey <- deriveVerKeyKES signKey
+          forgetSignKeyKES signKey
           return . fromRight $ verifyKES @v () verKey 0 typicalMsg sig
     , bench "updateKES" $
         nfIO . io $ do
           signKey <- genKeyKES @v testSeed
-          fromJust <$> updateKES () signKey 0
+          sk' <- fromJust <$> updateKES () signKey 0
+          forgetSignKeyKES signKey
+          return sk'
     ]
