@@ -379,9 +379,10 @@ prop_verifyKES_positive
      , Signable v ~ SignableRepresentation
      , RunIO (SignKeyAccessKES v)
      )
-  => SignKeyKES v -> [Message] -> Property
-prop_verifyKES_positive sk_0 xs =
-    checkCoverage $
+  => SignKeyKES v -> Gen Property
+prop_verifyKES_positive sk_0 = do
+    xs :: [Message] <- vectorOf totalPeriods arbitrary
+    return $ checkCoverage $
       cover 1 (length xs >= totalPeriods) "Message count covers total periods" $
       (length xs > 0) ==>
       ioProperty $ fmap conjoin $ io $ do
