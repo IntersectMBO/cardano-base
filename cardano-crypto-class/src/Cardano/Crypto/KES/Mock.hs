@@ -23,8 +23,6 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (Identity)
-
 import Control.Exception (assert)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -51,7 +49,7 @@ data MockKES (t :: Nat)
 instance KnownNat t => KESAlgorithm (MockKES t) where
     type SeedSizeKES (MockKES t) = 8
 
-    type SignKeyAccessKES (MockKES t) = Identity
+    type SignKeyAccessKES (MockKES t) = IO
 
     --
     -- Key and signature types
