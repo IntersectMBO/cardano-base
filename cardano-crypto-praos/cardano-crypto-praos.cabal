@@ -1,3 +1,5 @@
+cabal-version: 2.2
+
 name:                cardano-crypto-praos
 version:             2.0.0
 synopsis:            Crypto primitives from libsodium
@@ -12,7 +14,6 @@ copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
-cabal-version:       >=1.10
 
 extra-source-files:    cbits/crypto_vrf.h
                        cbits/crypto_vrf_ietfdraft03.h
@@ -45,36 +46,43 @@ flag external-libsodium-vrf
     default: True
     manual: True
 
+common base                         { build-depends: base                             >= 4.12       && < 4.15     }
+
+common project-config
+  default-language:     Haskell2010
+
+  ghc-options:          -Wall
+                        -Wcompat
+                        -Wincomplete-record-updates
+                        -Wincomplete-uni-patterns
+                        -Wpartial-fields
+                        -Wredundant-constraints
+
+  if impl(ghc >= 8.10)
+    ghc-options:        -Wunused-packages
+
+  if (!flag(development))
+    ghc-options:        -Werror
+
 library
-  hs-source-dirs:      src
-  exposed-modules:     Cardano.Crypto.VRF.Praos
+  import:               base, project-config
+  hs-source-dirs:       src
+  exposed-modules:      Cardano.Crypto.VRF.Praos
 
-  build-depends:       base
-                     , bytestring
-                     , cardano-binary
-                     , cardano-crypto-class
-                     , cardano-prelude
-                     , nothunks
-
-  default-language:    Haskell2010
-
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
+  build-depends:        base
+                      , bytestring
+                      , cardano-binary
+                      , cardano-crypto-class
+                      , cardano-prelude
+                      , nothunks
 
   pkgconfig-depends: libsodium
 
-  if (!flag(development))
-    ghc-options:         -Werror
-
   if !flag(external-libsodium-vrf)
-    c-sources:         cbits/crypto_vrf.c
-                       cbits/convert.c
-                       cbits/keypair.c
-                       cbits/prove.c
-                       cbits/verify.c
-                       cbits/vrf.c
-                       cbits/private/ed25519_ref10.c
+    c-sources:          cbits/crypto_vrf.c
+                        cbits/convert.c
+                        cbits/keypair.c
+                        cbits/prove.c
+                        cbits/verify.c
+                        cbits/vrf.c
+                        cbits/private/ed25519_ref10.c

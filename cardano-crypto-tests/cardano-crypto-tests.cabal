@@ -1,3 +1,5 @@
+cabal-version: 2.2
+
 name:                cardano-crypto-tests
 version:             2.0.0
 synopsis:            Tests for cardano-crypto-class and -praos
@@ -12,94 +14,79 @@ copyright:           2020-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
-cabal-version:       >=1.10
 
 flag development
     description: Disable `-Werror`
     default: False
     manual: True
 
-library
-  hs-source-dirs:      src
-  exposed-modules:
-                       Test.Crypto.DSIGN
-                       Test.Crypto.Hash
-                       Test.Crypto.KES
-                       Test.Crypto.Util
-                       Test.Crypto.VRF
-                       Test.Crypto.Instances
-                       Bench.Crypto.VRF
-                       Bench.Crypto.KES
+common base                         { build-depends: base                             >= 4.12       && < 4.15     }
 
-  build-depends:       base
-                     , bytestring
-                     , cardano-binary
-                     , cardano-crypto-class
-                     , cardano-crypto-praos
-                     , cardano-prelude
-                     , cborg
-                     , cryptonite
-                     , formatting
-                     , nothunks
-                     , QuickCheck
-                     , quickcheck-instances
-                     , tasty
-                     , tasty-quickcheck
-                     , criterion
+common project-config
+  default-language:     Haskell2010
 
-  default-language:    Haskell2010
+  ghc-options:          -Wall
+                        -Wcompat
+                        -Wincomplete-record-updates
+                        -Wincomplete-uni-patterns
+                        -Wpartial-fields
+                        -Wredundant-constraints
 
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
+  if impl(ghc >= 8.10)
+    ghc-options:        -Wunused-packages
 
   if (!flag(development))
-    ghc-options:         -Werror
+    ghc-options:        -Werror
 
+library
+  import:               base, project-config
+  hs-source-dirs:       src
+
+  exposed-modules:      Test.Crypto.DSIGN
+                        Test.Crypto.Hash
+                        Test.Crypto.KES
+                        Test.Crypto.Util
+                        Test.Crypto.VRF
+                        Test.Crypto.Instances
+                        Bench.Crypto.VRF
+                        Bench.Crypto.KES
+
+  build-depends:        base
+                      , bytestring
+                      , cardano-binary
+                      , cardano-crypto-class
+                      , cardano-crypto-praos
+                      , cardano-prelude
+                      , cborg
+                      , cryptonite
+                      , formatting
+                      , nothunks
+                      , QuickCheck
+                      , quickcheck-instances
+                      , tasty
+                      , tasty-quickcheck
+                      , criterion
 
 test-suite test-crypto
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Main.hs
-  build-depends:       base
-                     , cardano-crypto-class
-                     , cardano-crypto-tests
-                     , tasty
+  import:               base, project-config
+  type:                 exitcode-stdio-1.0
+  hs-source-dirs:       test
+  main-is:              Main.hs
+  build-depends:        base
+                      , cardano-crypto-class
+                      , cardano-crypto-tests
+                      , tasty
 
-  default-language:    Haskell2010
-
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
-                       -threaded
+  ghc-options:          -threaded
 
 benchmark bench-crypto
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      bench
-  main-is:             Main.hs
-  build-depends:       base
-                     , bytestring
-                     , cardano-binary
-                     , cardano-crypto-class
-                     , cardano-crypto-praos
-                     , cardano-crypto-tests
-                     , cborg
-                     , cryptonite
-                     , formatting
-                     , criterion
+  import:               base, project-config
+  type:                 exitcode-stdio-1.0
+  hs-source-dirs:       bench
+  main-is:              Main.hs
+  build-depends:        base
+                      , cardano-crypto-class
+                      , cardano-crypto-tests
+                      , criterion
 
-  default-language:    Haskell2010
-
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
-                       -threaded
+  ghc-options:          -threaded

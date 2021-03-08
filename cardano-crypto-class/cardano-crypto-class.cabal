@@ -1,3 +1,5 @@
+cabal-version: 2.2
+
 name:                cardano-crypto-class
 version:             2.0.0
 synopsis:            Type classes abstracting over cryptography primitives for Cardano
@@ -12,116 +14,111 @@ copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
-cabal-version:       >=1.10
 
 flag development
     description: Disable `-Werror`
     default: False
     manual: True
 
-library
-  hs-source-dirs:      src
-  exposed-modules:
-                       Cardano.Crypto.DSIGN
-                       Cardano.Crypto.Hash
-                       Cardano.Crypto.KES
-                       Cardano.Crypto.VRF
+common base                         { build-depends: base                             >= 4.12       && < 4.15     }
 
-                       Cardano.Crypto.DSIGN.Class
-                       Cardano.Crypto.DSIGN.Ed25519
-                       Cardano.Crypto.DSIGN.Ed448
-                       Cardano.Crypto.DSIGN.Mock
-                       Cardano.Crypto.DSIGN.NeverUsed
+common project-config
+  default-language:     Haskell2010
 
-                       Cardano.Crypto.Hash.Blake2b
-                       Cardano.Crypto.Hash.Class
-                       Cardano.Crypto.Hash.MD5
-                       Cardano.Crypto.Hash.NeverUsed
-                       Cardano.Crypto.Hash.SHA256
-                       Cardano.Crypto.Hash.SHA3_256
-                       Cardano.Crypto.Hash.Short
+  ghc-options:          -Wall
+                        -Wcompat
+                        -Wincomplete-record-updates
+                        -Wincomplete-uni-patterns
+                        -Wpartial-fields
+                        -Wredundant-constraints
 
-                       Cardano.Crypto.KES.Class
-                       Cardano.Crypto.KES.Mock
-                       Cardano.Crypto.KES.NeverUsed
-                       Cardano.Crypto.KES.Simple
-                       Cardano.Crypto.KES.Single
-                       Cardano.Crypto.KES.Sum
-
-                       Cardano.Crypto.PinnedSizedBytes
-                       Cardano.Crypto.Seed
-                       Cardano.Crypto.Util
-
-                       Cardano.Crypto.VRF.Class
-                       Cardano.Crypto.VRF.Mock
-                       Cardano.Crypto.VRF.NeverUsed
-                       Cardano.Crypto.VRF.Simple
-
-                       Cardano.Crypto.Libsodium
-                       Cardano.Crypto.Libsodium.C
-                       Cardano.Crypto.Libsodium.Constants
-                       Cardano.Crypto.Libsodium.DSIGN
-                       Cardano.Crypto.Libsodium.Hash
-                       Cardano.Crypto.Libsodium.Init
-                       Cardano.Crypto.Libsodium.Memory
-                       Cardano.Crypto.Libsodium.Memory.Internal
-                       Cardano.Crypto.Libsodium.MLockedBytes
-                       Cardano.Crypto.Libsodium.MLockedBytes.Internal
-                       Cardano.Crypto.Libsodium.UnsafeC
-
-                       Cardano.Foreign
-
-  build-depends:       aeson
-                     , base
-                     , base16-bytestring >= 1
-                     , bytestring
-                     , cardano-binary
-                     , cardano-prelude
-                     , cryptonite
-                     , deepseq
-                     , integer-gmp
-                     , ghc-prim
-                     , memory
-                     , nothunks
-                     , primitive
-                     , text
-                     , transformers
-                     , vector
-
-  default-language:    Haskell2010
-
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
-
-  pkgconfig-depends:   libsodium
+  if impl(ghc >= 8.10)
+    ghc-options:        -Wunused-packages
 
   if (!flag(development))
-    ghc-options:         -Werror
+    ghc-options:        -Werror
+
+library
+  import:               base, project-config
+  hs-source-dirs:       src
+  exposed-modules:
+                        Cardano.Crypto.DSIGN
+                        Cardano.Crypto.Hash
+                        Cardano.Crypto.KES
+                        Cardano.Crypto.VRF
+
+                        Cardano.Crypto.DSIGN.Class
+                        Cardano.Crypto.DSIGN.Ed25519
+                        Cardano.Crypto.DSIGN.Ed448
+                        Cardano.Crypto.DSIGN.Mock
+                        Cardano.Crypto.DSIGN.NeverUsed
+
+                        Cardano.Crypto.Hash.Blake2b
+                        Cardano.Crypto.Hash.Class
+                        Cardano.Crypto.Hash.MD5
+                        Cardano.Crypto.Hash.NeverUsed
+                        Cardano.Crypto.Hash.SHA256
+                        Cardano.Crypto.Hash.SHA3_256
+                        Cardano.Crypto.Hash.Short
+
+                        Cardano.Crypto.KES.Class
+                        Cardano.Crypto.KES.Mock
+                        Cardano.Crypto.KES.NeverUsed
+                        Cardano.Crypto.KES.Simple
+                        Cardano.Crypto.KES.Single
+                        Cardano.Crypto.KES.Sum
+
+                        Cardano.Crypto.PinnedSizedBytes
+                        Cardano.Crypto.Seed
+                        Cardano.Crypto.Util
+
+                        Cardano.Crypto.VRF.Class
+                        Cardano.Crypto.VRF.Mock
+                        Cardano.Crypto.VRF.NeverUsed
+                        Cardano.Crypto.VRF.Simple
+
+                        Cardano.Crypto.Libsodium
+                        Cardano.Crypto.Libsodium.C
+                        Cardano.Crypto.Libsodium.Constants
+                        Cardano.Crypto.Libsodium.DSIGN
+                        Cardano.Crypto.Libsodium.Hash
+                        Cardano.Crypto.Libsodium.Init
+                        Cardano.Crypto.Libsodium.Memory
+                        Cardano.Crypto.Libsodium.Memory.Internal
+                        Cardano.Crypto.Libsodium.MLockedBytes
+                        Cardano.Crypto.Libsodium.MLockedBytes.Internal
+                        Cardano.Crypto.Libsodium.UnsafeC
+
+                        Cardano.Foreign
+
+  build-depends:        aeson
+                      , base
+                      , base16-bytestring >= 1
+                      , bytestring
+                      , cardano-binary
+                      , cardano-prelude
+                      , cryptonite
+                      , deepseq
+                      , integer-gmp
+                      , ghc-prim
+                      , memory
+                      , nothunks
+                      , primitive
+                      , text
+                      , transformers
+                      , vector
+
+  pkgconfig-depends:    libsodium
 
 test-suite test-memory-example
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      memory-example
-  main-is:             Main.hs
+  import:               base, project-config
+  type:                 exitcode-stdio-1.0
+  hs-source-dirs:       memory-example
+  main-is:              Main.hs
 
-  build-depends:       base
-                     , bytestring
-                     , cardano-crypto-class
+  build-depends:        base
+                      , bytestring
+                      , cardano-crypto-class
 
   if os(linux) || os(osx)
-    build-depends:     unix
-
-  default-language:    Haskell2010
-
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
-
-  if (!flag(development))
-    ghc-options:         -Werror
+    build-depends:      unix
