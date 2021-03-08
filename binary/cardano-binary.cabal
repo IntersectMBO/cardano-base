@@ -1,3 +1,5 @@
+cabal-version: 2.2
+
 name:                cardano-binary
 version:             1.5.0
 synopsis:            Binary serialization for Cardano
@@ -12,103 +14,92 @@ copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
-cabal-version:       >=1.10
 
 flag development
     description: Disable `-Werror`
     default: False
     manual: True
 
-library
-  hs-source-dirs:      src
-  exposed-modules:
-                       Cardano.Binary
+common base                         { build-depends: base                             >= 4.12       && < 4.15     }
 
-  other-modules:
-                       Cardano.Binary.Annotated
-                       Cardano.Binary.Drop
-                       Cardano.Binary.Raw
+common project-config
+  default-language:     Haskell2010
+  default-extensions:   NoImplicitPrelude
 
-                       Cardano.Binary.ToCBOR
-                       Cardano.Binary.FromCBOR
+  ghc-options:          -Wall
+                        -Wcompat
+                        -Wincomplete-record-updates
+                        -Wincomplete-uni-patterns
+                        -Wpartial-fields
+                        -Wredundant-constraints
 
-                       Cardano.Binary.Serialize
-                       Cardano.Binary.Deserialize
-
-  build-depends:       base
-                     , aeson
-                     , bytestring
-                     , cardano-prelude
-                     , cborg              >= 0.2.2 && < 0.3
-                     , containers
-                     , data-fix
-                     , digest
-                     , formatting
-                     , nothunks
-                     , primitive
-                     , recursion-schemes  >= 5.1   && < 5.3
-                     , safe-exceptions
-                     , tagged
-                     , text
-                     , time
-                     , vector
-
-  default-language:    Haskell2010
-  default-extensions:  NoImplicitPrelude
-
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
+  if impl(ghc >= 8.10)
+    ghc-options:        -Wunused-packages
 
   if (!flag(development))
-    ghc-options:         -Werror
+    ghc-options:        -Werror
+
+library
+  import:               base, project-config
+  hs-source-dirs:       src
+  exposed-modules:      Cardano.Binary
+  other-modules:        Cardano.Binary.Annotated
+                        Cardano.Binary.Drop
+                        Cardano.Binary.Raw
+
+                        Cardano.Binary.ToCBOR
+                        Cardano.Binary.FromCBOR
+
+                        Cardano.Binary.Serialize
+                        Cardano.Binary.Deserialize
+
+  build-depends:        base
+                      , aeson
+                      , bytestring
+                      , cardano-prelude
+                      , cborg              >= 0.2.2 && < 0.3
+                      , containers
+                      , data-fix
+                      , formatting
+                      , nothunks
+                      , primitive
+                      , recursion-schemes  >= 5.1   && < 5.3
+                      , safe-exceptions
+                      , tagged
+                      , text
+                      , time
+                      , vector
 
 test-suite test
-  hs-source-dirs:      test
-  main-is:             test.hs
-  type:                exitcode-stdio-1.0
+  import:               base, project-config
+  hs-source-dirs:       test
+  main-is:              test.hs
+  type:                 exitcode-stdio-1.0
 
-  other-modules:
-                       Test.Cardano.Binary.SizeBounds
-                       Test.Cardano.Binary.Helpers
-                       Test.Cardano.Binary.Helpers.GoldenRoundTrip
-                       Test.Cardano.Binary.RoundTrip
-                       Test.Cardano.Binary.Serialization
-                       Test.Cardano.Binary.Drop
-                       Test.Cardano.Binary.Failure
+  other-modules:        Test.Cardano.Binary.SizeBounds
+                        Test.Cardano.Binary.Helpers
+                        Test.Cardano.Binary.Helpers.GoldenRoundTrip
+                        Test.Cardano.Binary.RoundTrip
+                        Test.Cardano.Binary.Serialization
+                        Test.Cardano.Binary.Drop
+                        Test.Cardano.Binary.Failure
 
-  build-depends:       base
-                     , bytestring
-                     , cardano-binary
-                     , cardano-prelude
-                     , cardano-prelude-test
-                     , cborg
-                     , containers
-                     , formatting
-                     , hedgehog
-                     , hspec
-                     , pretty-show
-                     , QuickCheck
-                     , quickcheck-instances
-                     , tagged
-                     , text
-                     , vector
+  build-depends:        base
+                      , bytestring
+                      , cardano-binary
+                      , cardano-prelude
+                      , cardano-prelude-test
+                      , cborg
+                      , containers
+                      , formatting
+                      , hedgehog
+                      , hspec
+                      , pretty-show
+                      , QuickCheck
+                      , quickcheck-instances
+                      , tagged
+                      , text
+                      , vector
 
-  default-language:    Haskell2010
-  default-extensions:  NoImplicitPrelude
-
-  ghc-options:         -Wall
-                       -Wincomplete-record-updates
-                       -Wincomplete-uni-patterns
-                       -Wredundant-constraints
-                       -Wpartial-fields
-                       -Wcompat
-
-  if (!flag(development))
-    ghc-options:         -Werror
-
-  ghc-options:         -threaded
-                       -rtsopts
+  ghc-options:          -threaded
+                        -rtsopts
