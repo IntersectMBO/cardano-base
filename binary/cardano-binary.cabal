@@ -20,7 +20,7 @@ flag development
     default: False
     manual: True
 
-common base                         { build-depends: base                             >= 4.12       && < 4.15     }
+common base                         { build-depends: base                             >= 4.14       && < 4.15     }
 
 common project-config
   default-language:     Haskell2010
@@ -32,9 +32,7 @@ common project-config
                         -Wincomplete-uni-patterns
                         -Wpartial-fields
                         -Wredundant-constraints
-
-  if impl(ghc >= 8.10)
-    ghc-options:        -Wunused-packages
+                        -Wunused-packages
 
   if (!flag(development))
     ghc-options:        -Werror
