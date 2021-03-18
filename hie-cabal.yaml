@@ -23,3 +23,6 @@ cradle:
 
     - path: "slotting/src"
       component: "lib:cardano-slotting"
+
+    - path: "strict-containers"
+      component: "lib:strict-containers"
