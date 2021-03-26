@@ -56,7 +56,8 @@ import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
 import qualified Data.Text as Text
 import Data.Text.Lazy.Builder (Builder)
-import Data.Time.Clock (NominalDiffTime)
+import Data.Time.Calendar.OrdinalDate ( toOrdinalDate )
+import Data.Time.Clock (NominalDiffTime, UTCTime(..), diffTimeToPicoseconds)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
 import Foreign.Storable (sizeOf)
@@ -684,3 +685,18 @@ instance (ToCBOR a) => ToCBOR (Vector.Vector a) where
   {-# INLINE toCBOR #-}
   encodedSizeExpr size _ =
     2 + size (Proxy @(LengthOf (Vector.Vector a))) * size (Proxy @a)
+
+
+--------------------------------------------------------------------------------
+-- Time
+--------------------------------------------------------------------------------
+
+
+instance ToCBOR UTCTime where
+  toCBOR (UTCTime day timeOfDay)
+    = encodeInteger year
+    <> encodeInt dayOfYear
+    <> encodeInteger timeOfDayPico
+    where
+      (year, dayOfYear) = toOrdinalDate day
+      timeOfDayPico = diffTimeToPicoseconds timeOfDay
