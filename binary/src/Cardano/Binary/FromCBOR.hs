@@ -32,7 +32,8 @@ import Data.Fixed (Fixed(..), Nano, Pico)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
-import Data.Time.Clock (NominalDiffTime)
+import Data.Time.Calendar.OrdinalDate ( fromOrdinalDate )
+import Data.Time.Clock (NominalDiffTime, UTCTime(..), picosecondsToDiffTime)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
 import Formatting (bprint, int, shown, stext)
@@ -455,3 +456,17 @@ decodeVector = decodeContainerSkelWithReplicate
 instance (FromCBOR a) => FromCBOR (Vector.Vector a) where
   fromCBOR = decodeVector
   {-# INLINE fromCBOR #-}
+
+
+--------------------------------------------------------------------------------
+-- Time
+--------------------------------------------------------------------------------
+
+instance FromCBOR UTCTime where
+  fromCBOR = do
+    year <- decodeInteger
+    dayOfYear <- decodeInt
+    timeOfDayPico <- decodeInteger
+    return $ UTCTime
+      (fromOrdinalDate year dayOfYear)
+      (picosecondsToDiffTime timeOfDayPico)
