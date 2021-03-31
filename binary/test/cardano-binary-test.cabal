@@ -56,4 +56,5 @@ library
                       , QuickCheck
                       , quickcheck-instances
                       , text
+                      , time
                       , vector

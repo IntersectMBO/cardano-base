@@ -10,9 +10,11 @@ import Cardano.Binary hiding (Range)
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.Decoding as D
 
-import qualified Data.Vector as V
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as BS.Short
+import qualified Data.Time as Time
+import qualified Data.Time.Calendar.OrdinalDate as Time
+import qualified Data.Vector as V
 
 import Cardano.Prelude
 
@@ -53,6 +55,7 @@ data TestStruct = TestStruct
   , tsVectorBool            :: !(V.Vector Bool)
   , tsLByteString           :: BS.Lazy.ByteString
   , tsSByteString           :: BS.Short.ShortByteString
+  , tsUTCTime               :: Time.UTCTime
   }
   deriving (Show, Eq)
 
@@ -85,6 +88,7 @@ genTestStruct = TestStruct
     <*> (V.fromList <$> Gen.list (Range.constant 0 10) Gen.bool)
     <*> (BS.Lazy.fromStrict <$> Gen.bytes (Range.linear 0 20))
     <*> (BS.Short.toShort <$> Gen.bytes (Range.linear 0 20))
+    <*> genUTCTime
 
 instance ToCBOR TestStruct where
   toCBOR ts = E.encodeListLen 1
@@ -115,6 +119,7 @@ instance ToCBOR TestStruct where
     <> toCBOR (tsVectorBool            ts)
     <> toCBOR (tsLByteString           ts)
     <> toCBOR (tsSByteString           ts)
+    <> toCBOR (tsUTCTime               ts)
 
 instance FromCBOR TestStruct where
   fromCBOR = do
@@ -147,6 +152,26 @@ instance FromCBOR TestStruct where
       <*> fromCBOR
       <*> fromCBOR
       <*> fromCBOR
+      <*> fromCBOR
+
+genUTCTime :: Gen Time.UTCTime
+genUTCTime = Time.UTCTime
+  <$> genDay
+  <*> genDiffTimeOfDay
+  where
+  -- UTC time takes a DiffTime s.t. 0 <= t < 86401s
+  genDiffTimeOfDay :: Gen Time.DiffTime
+  genDiffTimeOfDay = Time.picosecondsToDiffTime <$>
+    Gen.integral (Range.constantFrom 0 0 ((86401e12) - 1))
+
+genDay :: Gen Time.Day
+genDay = Time.fromOrdinalDate <$> genYear <*> genDayOfYear
+
+genYear :: Gen Integer
+genYear = Gen.integral (Range.linear (-10000) 10000)
+
+genDayOfYear :: Gen Int
+genDayOfYear = Gen.int (Range.constantFrom 1 1 366)
 
 prop_roundTripSerialize' :: Property
 prop_roundTripSerialize' = property $ do
