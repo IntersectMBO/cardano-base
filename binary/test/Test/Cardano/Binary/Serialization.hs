@@ -16,7 +16,7 @@ import qualified Data.ByteString.Short as BS.Short
 
 import Cardano.Prelude
 
-import Hedgehog 
+import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
@@ -87,39 +87,39 @@ genTestStruct = TestStruct
     <*> (BS.Short.toShort <$> Gen.bytes (Range.linear 0 20))
 
 instance ToCBOR TestStruct where
-  toCBOR ts = E.encodeListLen 1 
-    <> toCBOR ( tsUnit                  ts) 
-    <> toCBOR ( tsBool                  ts) 
-    <> toCBOR ( tsInteger               ts) 
-    <> toCBOR ( tsWord                  ts) 
-    <> toCBOR ( tsWord8                 ts) 
-    <> toCBOR ( tsWord16                ts) 
-    <> toCBOR ( tsWord32                ts) 
-    <> toCBOR ( tsWord64                ts) 
-    <> toCBOR ( tsInt                   ts) 
-    <> toCBOR ( tsFloat                 ts) 
-    <> toCBOR ( tsInt32                 ts) 
-    <> toCBOR ( tsInt64                 ts) 
-    <> toCBOR ( tsTupleBoolBool         ts) 
-    <> toCBOR ( tsTupleBoolBoolBool     ts) 
-    <> toCBOR ( tsTupleBoolBoolBoolBool ts) 
-    <> toCBOR ( tsByteString            ts) 
-    <> toCBOR ( tsText                  ts) 
-    <> toCBOR ( tsListBool              ts) 
-    <> toCBOR ( tsEitherBoolBool        ts) 
-    <> toCBOR ( tsNonEmptyBool          ts) 
-    <> toCBOR ( tsMaybeBool             ts) 
-    <> toCBOR ( tsMapBoolBool           ts) 
-    <> toCBOR ( tsSetBool               ts) 
-    <> toCBOR ( tsRaw                   ts)
-    <> toCBOR ( tsVectorBool            ts)
-    <> toCBOR ( tsLByteString           ts)
-    <> toCBOR ( tsSByteString           ts)
+  toCBOR ts = E.encodeListLen 1
+    <> toCBOR (tsUnit                  ts)
+    <> toCBOR (tsBool                  ts)
+    <> toCBOR (tsInteger               ts)
+    <> toCBOR (tsWord                  ts)
+    <> toCBOR (tsWord8                 ts)
+    <> toCBOR (tsWord16                ts)
+    <> toCBOR (tsWord32                ts)
+    <> toCBOR (tsWord64                ts)
+    <> toCBOR (tsInt                   ts)
+    <> toCBOR (tsFloat                 ts)
+    <> toCBOR (tsInt32                 ts)
+    <> toCBOR (tsInt64                 ts)
+    <> toCBOR (tsTupleBoolBool         ts)
+    <> toCBOR (tsTupleBoolBoolBool     ts)
+    <> toCBOR (tsTupleBoolBoolBoolBool ts)
+    <> toCBOR (tsByteString            ts)
+    <> toCBOR (tsText                  ts)
+    <> toCBOR (tsListBool              ts)
+    <> toCBOR (tsEitherBoolBool        ts)
+    <> toCBOR (tsNonEmptyBool          ts)
+    <> toCBOR (tsMaybeBool             ts)
+    <> toCBOR (tsMapBoolBool           ts)
+    <> toCBOR (tsSetBool               ts)
+    <> toCBOR (tsRaw                   ts)
+    <> toCBOR (tsVectorBool            ts)
+    <> toCBOR (tsLByteString           ts)
+    <> toCBOR (tsSByteString           ts)
 
 instance FromCBOR TestStruct where
   fromCBOR = do
-    D.decodeListLenOf 1 
-    TestStruct 
+    D.decodeListLenOf 1
+    TestStruct
       <$> fromCBOR
       <*> fromCBOR
       <*> fromCBOR
