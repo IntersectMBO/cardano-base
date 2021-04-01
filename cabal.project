@@ -1,4 +1,4 @@
-index-state: 2021-01-01T00:00:00Z
+index-state: 2021-03-15T00:00:00Z
 
 packages:
   binary
@@ -16,8 +16,8 @@ package cardano-crypto
 source-repository-package
   type: git
   location: https://github.com/input-output-hk/cardano-prelude
-  tag: 116087dbcebb88aafdc7d3d0577477ba36129b41
-  --sha256: 0kxk5vcywsl19qc65y8mkc0npv5qz9fm23avs247xnb0zq17wcrd
+  tag: fd773f7a58412131512b9f694ab95653ac430852
+  --sha256: 02jddik1yw0222wd6q0vv10f7y8rdgrlqaiy83ph002f9kjx7mh6
   subdir:
     cardano-prelude
     cardano-prelude-test
