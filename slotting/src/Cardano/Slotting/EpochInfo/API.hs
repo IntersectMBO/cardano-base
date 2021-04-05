@@ -29,16 +29,13 @@ import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 -- | Information about epochs
 --
--- Epochs may have different sizes at different times during the lifetime of the
--- blockchain. This information is encapsulated by 'EpochInfo'; it is
--- parameterized over a monad @m@ because the information about how long each
--- epoch is may depend on information derived from the blockchain itself, and
--- hence requires access to state.
---
--- The other functions provide some derived information from epoch sizes. In the
--- default implementation all of these functions query and update an internal
--- cache maintaining cumulative epoch sizes; for that reason, all of these
--- functions live in a monad @m@.
+-- Different epochs may have different sizes and different slot lengths. This
+-- information is encapsulated by 'EpochInfo'. It is parameterized over a monad
+-- @m@ because the information about how long each epoch is may depend on
+-- information derived from the blockchain itself. It ultimately requires acess
+-- to state, and so either uses the monad for that or uses the monad to reify
+-- failure due to cached state information being too stale for the current
+-- query.
 data EpochInfo m
   = EpochInfo
       { -- | Return the size of the given epoch as a number of slots
