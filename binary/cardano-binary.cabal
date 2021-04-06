@@ -97,6 +97,7 @@ test-suite test
                       , quickcheck-instances
                       , tagged
                       , text
+                      , time
                       , vector
 
   ghc-options:          -threaded

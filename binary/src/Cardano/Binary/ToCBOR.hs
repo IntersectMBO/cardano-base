@@ -691,7 +691,6 @@ instance (ToCBOR a) => ToCBOR (Vector.Vector a) where
 -- Time
 --------------------------------------------------------------------------------
 
-
 instance ToCBOR UTCTime where
   toCBOR (UTCTime day timeOfDay)
     = encodeInteger year
