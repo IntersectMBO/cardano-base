@@ -13,6 +13,7 @@ where
 
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
+import Cardano.Prelude (Identity)
 
 import Cardano.Crypto.KES.Class
 
@@ -25,6 +26,8 @@ data NeverKES
 
 instance KESAlgorithm NeverKES where
   type SeedSizeKES NeverKES = 0
+
+  type SignKeyAccessKES NeverKES = Identity
 
   data VerKeyKES  NeverKES = NeverUsedVerKeyKES
       deriving (Show, Eq, Generic, NoThunks)
