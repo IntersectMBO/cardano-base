@@ -38,11 +38,13 @@ common project-config
 library
   import:               base, project-config
 
-  exposed-modules:      Cardano.Slotting.Block
-                        Cardano.Slotting.Slot
+  exposed-modules:
+                        Cardano.Slotting.Block
                         Cardano.Slotting.EpochInfo
                         Cardano.Slotting.EpochInfo.API
                         Cardano.Slotting.EpochInfo.Impl
+                        Cardano.Slotting.Slot
+                        Cardano.Slotting.Time
 
   build-depends:        aeson
                       , base
@@ -51,5 +53,6 @@ library
                       , deepseq
                       , mmorph
                       , nothunks
-                      , serialise
                       , quiet
+                      , serialise
+                      , time             >=1.9.1 && <1.11
