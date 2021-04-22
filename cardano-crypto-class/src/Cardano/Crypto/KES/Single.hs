@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
 -- single time period.
@@ -50,10 +51,10 @@ import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGN.Class
 import qualified Cardano.Crypto.DSIGN as DSIGN
 import Cardano.Crypto.KES.Class
-
 import Cardano.Crypto.PinnedSizedBytes
-import Cardano.Crypto.SafePinned
-import qualified Cardano.Crypto.Libsodium as NaCl
+
+import Cardano.Crypto.MonadSodium (MonadSodium (..), makeSafePinned, releaseSafePinned, interactSafePinned)
+import qualified Cardano.Crypto.MonadSodium as NaCl
 
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
@@ -65,8 +66,7 @@ deriving instance NFData (VerKeyKES (SingleKES d))
 deriving instance NFData (SignKeyKES (SingleKES d))
 deriving instance NFData (SigKES (SingleKES d))
 
-instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
-         , Typeable d) => KESAlgorithm (SingleKES d) where
+instance (NaCl.SodiumDSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
     type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
 
     --
@@ -76,11 +76,14 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
     newtype VerKeyKES (SingleKES d) = VerKeySingleKES (NaCl.SodiumVerKeyDSIGN d)
         deriving Generic
 
-    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SafePinned (NaCl.SodiumSignKeyDSIGN d))
+    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (NaCl.SafePinned (NaCl.SodiumSignKeyDSIGN d))
         deriving Generic
 
     newtype SigKES (SingleKES d) = SigSingleKES (NaCl.SodiumSigDSIGN d)
         deriving Generic
+
+    type ContextKES (SingleKES d) = DSIGN.ContextDSIGN d
+    type Signable   (SingleKES d) = DSIGN.Signable     d
 
 
     --
@@ -89,34 +92,49 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
 
     algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
+    totalPeriodsKES  _ = 1
+
+    verifyKES _ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
+        assert (t == 0) $
+        NaCl.naclVerifyDSIGN (Proxy @d) vk a sig
+
+    --
+    -- raw serialise/deserialise
+    --
+
+    sizeVerKeyKES  _ = sizeVerKeyDSIGN  (Proxy :: Proxy d)
+    sizeSignKeyKES _ = sizeSignKeyDSIGN (Proxy :: Proxy d)
+    sizeSigKES     _ = sizeSigDSIGN     (Proxy :: Proxy d)
+
+    hashVerKeyKES (VerKeySingleKES vk) =
+        castHash (hashWith psbToByteString vk)
+
+    rawSerialiseVerKeyKES  (VerKeySingleKES  vk) = psbToByteString vk
+    rawSerialiseSigKES     (SigSingleKES    sig) = psbToByteString sig
+
+    rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . psbFromByteStringCheck
+    rawDeserialiseSigKES     = fmap SigSingleKES     . psbFromByteStringCheck
+
+
+instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
+         , Monad m
+         , MonadSodium m
+         , Typeable d) => KESSignAlgorithm m (SingleKES d) where
     deriveVerKeyKES (SignKeySingleKES v) =
       interactSafePinned v $ \sk -> do
         vk <- NaCl.naclDeriveVerKeyDSIGN (Proxy :: Proxy d) sk
         vk `seq` return (VerKeySingleKES vk)
 
-    hashVerKeyKES (VerKeySingleKES vk) =
-        castHash (hashWith psbToByteString vk)
-
-
     --
     -- Core algorithm operations
     --
-
-    type ContextKES (SingleKES d) = DSIGN.ContextDSIGN d
-    type Signable   (SingleKES d) = DSIGN.Signable     d
 
     signKES _ctxt t a (SignKeySingleKES v) =
         assert (t == 0) $
         interactSafePinned v $ \sk ->
         return (SigSingleKES (NaCl.naclSignDSIGN (Proxy @d) a sk))
 
-    verifyKES _ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
-        assert (t == 0) $
-        NaCl.naclVerifyDSIGN (Proxy @d) vk a sig
-
     updateKES _ctx (SignKeySingleKES _sk) _to = return Nothing
-
-    totalPeriodsKES  _ = 1
 
     --
     -- Key generation
@@ -133,20 +151,7 @@ instance ( NaCl.SodiumDSIGNAlgorithm d -- needed for secure forgetting
       releaseSafePinned v
       -- NaCl.naclForgetSignKeyDSIGN (Proxy @d) sk
 
-    --
-    -- raw serialise/deserialise
-    --
-
-    sizeVerKeyKES  _ = sizeVerKeyDSIGN  (Proxy :: Proxy d)
-    sizeSignKeyKES _ = sizeSignKeyDSIGN (Proxy :: Proxy d)
-    sizeSigKES     _ = sizeSigDSIGN     (Proxy :: Proxy d)
-
-    rawSerialiseVerKeyKES  (VerKeySingleKES  vk) = psbToByteString vk
-    rawSerialiseSigKES     (SigSingleKES    sig) = psbToByteString sig
     rawSerialiseSignKeyKES (SignKeySingleKES sk) = interactSafePinned sk $ return . NaCl.mlsbToByteString
-
-    rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . psbFromByteStringCheck
-    rawDeserialiseSigKES     = fmap SigSingleKES     . psbFromByteStringCheck
     rawDeserialiseSignKeyKES bs = do
       case NaCl.mlsbFromByteStringCheck bs of
         Nothing -> return Nothing

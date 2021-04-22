@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Mock key evolving signatures.
 module Cardano.Crypto.KES.ForgetMock
@@ -43,7 +44,6 @@ type Logger = String -> IO ()
 
 instance
   ( KESAlgorithm k
-  , MonadIO (SignKeyAccessKES k)
   )
   => KESAlgorithm (ForgetMockKES k) where
     type SeedSizeKES (ForgetMockKES k) = SeedSizeKES k
@@ -58,8 +58,29 @@ instance
 
     type ContextKES (ForgetMockKES k) = ContextKES k
 
-    type SignKeyAccessKES (ForgetMockKES k) = ReaderT Logger (SignKeyAccessKES k)
+    algorithmNameKES _ = algorithmNameKES (Proxy @k)
 
+    verifyKES ctx (VerKeyForgetMockKES vk) p msg (SigForgetMockKES sig) =
+        verifyKES ctx vk p msg sig
+
+    totalPeriodsKES _ = totalPeriodsKES (Proxy @k)
+
+    sizeVerKeyKES _ = sizeVerKeyKES (Proxy @k)
+    sizeSignKeyKES _ = sizeSignKeyKES (Proxy @k)
+    sizeSigKES _ = sizeSigKES (Proxy @k)
+
+    rawSerialiseVerKeyKES (VerKeyForgetMockKES k) = rawSerialiseVerKeyKES k
+    rawSerialiseSigKES (SigForgetMockKES k) = rawSerialiseSigKES k
+
+    rawDeserialiseVerKeyKES = fmap VerKeyForgetMockKES . rawDeserialiseVerKeyKES
+    rawDeserialiseSigKES = fmap SigForgetMockKES . rawDeserialiseSigKES
+
+
+instance
+  ( KESSignAlgorithm m k
+  , MonadIO m
+  )
+  => KESSignAlgorithm (ReaderT Logger m) (ForgetMockKES k) where
     genKeyKES seed = do
       sk <- lift (genKeyKES seed)
       nonce <- liftIO $ randomRIO (10000000, 99999999)
@@ -72,16 +93,11 @@ instance
       liftIO $ writeLog ("DEL: " ++ show nonce)
       return ()
 
-    algorithmNameKES _ = algorithmNameKES (Proxy @k)
-
     deriveVerKeyKES (SignKeyForgetMockKES _ k) =
       VerKeyForgetMockKES <$> lift (deriveVerKeyKES k)
 
     signKES ctx p msg (SignKeyForgetMockKES _ sk) =
         SigForgetMockKES <$> lift (signKES ctx p msg sk)
-
-    verifyKES ctx (VerKeyForgetMockKES vk) p msg (SigForgetMockKES sig) =
-        verifyKES ctx vk p msg sig
 
     updateKES ctx (SignKeyForgetMockKES nonce sk) p = do
       writeLog <- ask
@@ -94,23 +110,12 @@ instance
           liftIO $ writeLog ("UPD: ---")
           return Nothing
 
-    totalPeriodsKES _ = totalPeriodsKES (Proxy @k)
-
-    sizeVerKeyKES _ = sizeVerKeyKES (Proxy @k)
-    sizeSignKeyKES _ = sizeSignKeyKES (Proxy @k)
-    sizeSigKES _ = sizeSigKES (Proxy @k)
-
-    rawSerialiseVerKeyKES (VerKeyForgetMockKES k) = rawSerialiseVerKeyKES k
-    rawSerialiseSigKES (SigForgetMockKES k) = rawSerialiseSigKES k
     rawSerialiseSignKeyKES (SignKeyForgetMockKES _ k) = lift $ rawSerialiseSignKeyKES k
 
-    rawDeserialiseVerKeyKES = fmap VerKeyForgetMockKES . rawDeserialiseVerKeyKES
-    rawDeserialiseSigKES = fmap SigForgetMockKES . rawDeserialiseSigKES
     rawDeserialiseSignKeyKES bs = do
       msk <- lift $ rawDeserialiseSignKeyKES bs
       nonce :: Word <- liftIO $ randomRIO (10000000, 99999999)
       return $ fmap (SignKeyForgetMockKES nonce) msk
-
 
 
 deriving instance Show (VerKeyKES k) => Show (VerKeyKES (ForgetMockKES k))

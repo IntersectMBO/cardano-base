@@ -24,12 +24,16 @@ module Cardano.Crypto.MonadSodium
   NaCl.digestMLockedBS,
   NaCl.expandHash,
   -- * Signing
-  NaCl.SodiumDSIGNAlgorithm (..),
+  NaCl.SodiumDSIGNAlgorithm,
   NaCl.naclSignDSIGN,
   NaCl.naclVerifyDSIGN,
   NaCl.SodiumSignKeyDSIGN,
   NaCl.SodiumVerKeyDSIGN,
   NaCl.SodiumSigDSIGN,
+
+  -- * SafePinned
+  SP.SafePinned,
+  mapSafePinned
 )
 where
 
@@ -39,6 +43,8 @@ import Cardano.Crypto.Libsodium
   , SodiumSignKeyDSIGN
   )
 import qualified Cardano.Crypto.Libsodium as NaCl
+import qualified Cardano.Crypto.DSIGN.Class as NaCl
+import qualified Cardano.Crypto.SafePinned as SP
 
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
@@ -59,6 +65,39 @@ class Monad m => MonadSodium m where
   -- * Signing
   naclForgetSignKeyDSIGN :: Proxy v -> SodiumSignKeyDSIGN v -> m ()
 
+  -- * SafePinned
+  makeSafePinned :: a -> m (SP.SafePinned a)
+  releaseSafePinned :: forall a. SP.Release a => SP.SafePinned a -> m ()
+  interactSafePinned :: SP.SafePinned a -> (a -> m b) -> m b
+
+  -- * DSIGN
+  naclSignDSIGNPtr
+      :: forall a v. NaCl.SodiumDSIGNAlgorithm v
+      => Proxy v
+      -> Ptr a -> Int
+      -> NaCl.SodiumSignKeyDSIGN v
+      -> m (NaCl.SodiumSigDSIGN v)
+
+  naclVerifyDSIGNPtr
+      :: forall a v. NaCl.SodiumDSIGNAlgorithm v
+      => Proxy v
+      -> NaCl.SodiumVerKeyDSIGN v
+      -> Ptr a -> Int
+      -> NaCl.SodiumSigDSIGN v
+      -> m (Either String ())
+
+  naclGenKeyDSIGN
+      :: forall v. NaCl.SodiumDSIGNAlgorithm v
+      => Proxy v
+      -> MLockedSizedBytes (NaCl.SeedSizeDSIGN v)
+      -> m (NaCl.SodiumSignKeyDSIGN v)
+
+  naclDeriveVerKeyDSIGN
+      :: forall v. NaCl.SodiumDSIGNAlgorithm v
+      => Proxy v
+      -> NaCl.SodiumSignKeyDSIGN v
+      -> m (NaCl.SodiumVerKeyDSIGN v)
+
 instance MonadSodium IO where
   withMLockedForeignPtr = NaCl.withMLockedForeignPtr
   finalizeMLockedForeignPtr = NaCl.finalizeMLockedForeignPtr
@@ -67,3 +106,14 @@ instance MonadSodium IO where
   mlsbFinalize = NaCl.mlsbFinalize
   mlsbCopy = NaCl.mlsbCopy
   naclForgetSignKeyDSIGN = NaCl.naclForgetSignKeyDSIGN
+  makeSafePinned = SP.makeSafePinned
+  releaseSafePinned = SP.releaseSafePinned
+  interactSafePinned = SP.interactSafePinned
+  naclSignDSIGNPtr = NaCl.naclSignDSIGNPtr
+  naclVerifyDSIGNPtr = NaCl.naclVerifyDSIGNPtr
+  naclGenKeyDSIGN = NaCl.naclGenKeyDSIGN
+  naclDeriveVerKeyDSIGN = NaCl.naclDeriveVerKeyDSIGN
+
+mapSafePinned :: MonadSodium m => (a -> m b) -> SP.SafePinned a -> m (SP.SafePinned b)
+mapSafePinned f p =
+  interactSafePinned p f >>= makeSafePinned

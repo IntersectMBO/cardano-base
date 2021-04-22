@@ -5,6 +5,8 @@
 {-#LANGUAGE TypeFamilies #-}
 {-#LANGUAGE FlexibleContexts #-}
 {-#LANGUAGE OverloadedStrings #-}
+{-#LANGUAGE PolyKinds #-}
+{-#LANGUAGE RankNTypes #-}
 module Bench.Crypto.KES
   ( benchmarks
   ) where
@@ -56,37 +58,41 @@ typicalMsg = BS.pack
 
 benchmarks :: Benchmark
 benchmarks = bgroup "KES"
-  [ bench_kes @Proxy @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy "Sum6KES"
-  , bench_kes @Proxy @(Sum7KES Ed25519DSIGN Blake2b_256) Proxy "Sum7KES"
+  [ bench_kes @Proxy @IO @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy Proxy "Sum6KES"
+  , bench_kes @Proxy @IO @(Sum7KES Ed25519DSIGN Blake2b_256) Proxy Proxy "Sum7KES"
   ]
 
-bench_kes :: forall proxy v
+bench_kes :: forall (proxy :: forall k. k -> Type) m v
            . ( KESAlgorithm v
+             , KESSignAlgorithm m v
              , ContextKES v ~ ()
              , Signable v ByteString
              , NFData (SignKeyKES v)
              , NFData (SigKES v)
-             , RunIO (SignKeyAccessKES v)
+             , RunIO m
              )
-          => proxy v
+          => proxy m
+          -> proxy v
           -> [Char]
           -> Benchmark
-bench_kes _ lbl =
+bench_kes _ _ lbl =
   bgroup lbl
     [ bench "genKey" $
-        nfIO . io $ genKeyKES @v testSeed >>= forgetSignKeyKES @v
+        nfIO . io $ genKeyKES @m @v testSeed >>= forgetSignKeyKES @m @v
     , bench "signKES" $
-        nfIO . io $ (\sk -> do { sig <- signKES @v () 0 typicalMsg sk; forgetSignKeyKES sk; return sig }) =<< (genKeyKES @v testSeed)
+        nfIO . io $
+          (\sk -> do { sig <- signKES @m @v () 0 typicalMsg sk; forgetSignKeyKES sk; return sig })
+            =<< (genKeyKES @m @v testSeed)
     , bench "verifyKES" $
         nfIO . io $ do
-          signKey <- genKeyKES @v testSeed
-          sig <- signKES @v () 0 typicalMsg signKey
+          signKey <- genKeyKES @m @v testSeed
+          sig <- signKES @m @v () 0 typicalMsg signKey
           verKey <- deriveVerKeyKES signKey
           forgetSignKeyKES signKey
           return . fromRight $ verifyKES @v () verKey 0 typicalMsg sig
     , bench "updateKES" $
         nfIO . io $ do
-          signKey <- genKeyKES @v testSeed
+          signKey <- genKeyKES @m @v testSeed
           sk' <- fromJust <$> updateKES () signKey 0
           forgetSignKeyKES signKey
           return sk'
