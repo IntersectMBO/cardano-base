@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoStarIsType #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Mock key evolving signatures.
 module Cardano.Crypto.KES.Simple
@@ -39,7 +40,7 @@ import qualified Cardano.Crypto.DSIGN as DSIGN
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
-import           Cardano.Crypto.Libsodium (mlsbToByteString)
+import           Cardano.Crypto.MonadSodium (mlsbToByteString)
 
 
 data SimpleKES d (t :: Nat)
@@ -93,9 +94,7 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
 
     algorithmNameKES proxy = "simple_" ++ show (totalPeriodsKES proxy)
 
-    deriveVerKeyKES (SignKeySimpleKES sks) =
-        return $ VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)
-
+    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
 
     --
     -- Core algorithm operations
@@ -104,22 +103,10 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
     type ContextKES (SimpleKES d t) = DSIGN.ContextDSIGN d
     type Signable   (SimpleKES d t) = DSIGN.Signable     d
 
-    signKES ctxt j a (SignKeySimpleKES sks) =
-        case sks !? fromIntegral j of
-          Nothing -> error ("SimpleKES.signKES: period out of range " ++ show j)
-          Just sk -> return $ SigSimpleKES (signDSIGN ctxt a sk)
-
     verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
         case vks !? fromIntegral j of
           Nothing -> Left "KES verification failed: out of range"
           Just vk -> verifyDSIGN ctxt vk a sig
-
-    updateKES _ sk t
-      | t+1 < fromIntegral (natVal (Proxy @ t)) = return $ Just sk
-      | otherwise                               = return Nothing
-
-    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
-
 
     --
     -- Key generation
@@ -129,17 +116,6 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
         let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
             duration = fromIntegral (natVal (Proxy @ t))
          in duration * seedSize
-
-    genKeyKES mlsb =
-        let seed     = mkSeedFromBytes $ mlsbToByteString mlsb
-            seedSize = seedSizeDSIGN (Proxy :: Proxy d)
-            duration = fromIntegral (natVal (Proxy @ t))
-            seeds    = take duration
-                     . map mkSeedFromBytes
-                     $ unfoldr (getBytesFromSeed seedSize) seed
-            sks      = map genKeyDSIGN seeds
-         in return $ SignKeySimpleKES (Vec.fromList sks)
-
 
     --
     -- raw serialise/deserialise
@@ -161,10 +137,6 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
     rawSerialiseSigKES (SigSimpleKES sig) =
         rawSerialiseSigDSIGN sig
 
-    rawSerialiseSignKeyKES (SignKeySimpleKES sks) =
-        return $ BS.concat [ rawSerialiseSignKeyDSIGN sk | sk <- Vec.toList sks ]
-
-
     rawDeserialiseVerKeyKES bs
       | let duration = fromIntegral (natVal (Proxy :: Proxy t))
             sizeKey  = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy d))
@@ -177,6 +149,51 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
       = Nothing
 
     rawDeserialiseSigKES = fmap SigSimpleKES . rawDeserialiseSigDSIGN
+
+
+
+instance ( KESAlgorithm (SimpleKES d t)
+         , DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t)
+         , Monad m
+         ) =>
+         KESSignAlgorithm m (SimpleKES d t) where
+
+    deriveVerKeyKES (SignKeySimpleKES sks) =
+        return $ VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)
+
+
+    signKES ctxt j a (SignKeySimpleKES sks) =
+        case sks !? fromIntegral j of
+          Nothing -> error ("SimpleKES.signKES: period out of range " ++ show j)
+          Just sk -> return $ SigSimpleKES (signDSIGN ctxt a sk)
+
+    updateKES _ sk t
+      | t+1 < fromIntegral (natVal (Proxy @ t)) = return $ Just sk
+      | otherwise                               = return Nothing
+
+
+    --
+    -- Key generation
+    --
+
+    genKeyKES mlsb =
+        let seed     = mkSeedFromBytes $ mlsbToByteString mlsb
+            seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+            duration = fromIntegral (natVal (Proxy @ t))
+            seeds    = take duration
+                     . map mkSeedFromBytes
+                     $ unfoldr (getBytesFromSeed seedSize) seed
+            sks      = map genKeyDSIGN seeds
+         in return $ SignKeySimpleKES (Vec.fromList sks)
+
+
+    --
+    -- raw serialise/deserialise
+    --
+
+    rawSerialiseSignKeyKES (SignKeySimpleKES sks) =
+        return $ BS.concat [ rawSerialiseSignKeyDSIGN sk | sk <- Vec.toList sks ]
+
 
     rawDeserialiseSignKeyKES bs
       | let duration = fromIntegral (natVal (Proxy :: Proxy t))

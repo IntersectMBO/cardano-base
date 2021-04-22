@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Mock key evolving signatures.
 module Cardano.Crypto.KES.Mock
@@ -31,7 +32,7 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Crypto.Libsodium (mlsbToByteString)
+import Cardano.Crypto.MonadSodium (mlsbToByteString)
 
 data MockKES (t :: Nat)
 
@@ -48,8 +49,6 @@ data MockKES (t :: Nat)
 -- from the performance implications of shuffling a giant list of keys around
 instance KnownNat t => KESAlgorithm (MockKES t) where
     type SeedSizeKES (MockKES t) = 8
-
-    type SignKeyAccessKES (MockKES t) = IO
 
     --
     -- Key and signature types
@@ -75,8 +74,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     algorithmNameKES proxy = "mock_" ++ show (totalPeriodsKES proxy)
 
-    deriveVerKeyKES (SignKeyMockKES vk _) = return vk
-
     sizeVerKeyKES  _ = 8
     sizeSignKeyKES _ = 16
     sizeSigKES     _ = 32
@@ -87,20 +84,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     --
 
     type Signable (MockKES t) = SignableRepresentation
-
-    updateKES () (SignKeyMockKES vk t') t =
-        assert (t == t') $
-         if t+1 < totalPeriodsKES (Proxy @ (MockKES t))
-           then return $ Just (SignKeyMockKES vk (t+1))
-           else return Nothing
-
-    -- | Produce valid signature only with correct key, i.e., same iteration and
-    -- allowed KES period.
-    signKES () t a (SignKeyMockKES vk t') =
-        assert (t == t') $
-        return $
-        SigMockKES (castHash (hashWith getSignableRepresentation a))
-                   (SignKeyMockKES vk t)
 
     verifyKES () vk t a (SigMockKES h (SignKeyMockKES vk' t'))
       | t' == t
@@ -115,15 +98,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
 
     --
-    -- Key generation
-    --
-
-    genKeyKES seed = do
-        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
-        return $ SignKeyMockKES vk 0
-
-
-    --
     -- raw serialise/deserialise
     --
 
@@ -133,10 +107,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     rawSerialiseSigKES (SigMockKES h (SignKeyMockKES k t)) =
         hashToBytes h
      <> rawSerialiseVerKeyKES k
-     <> writeBinaryWord64 (fromIntegral t)
-
-    rawSerialiseSignKeyKES (SignKeyMockKES vk t) = return $
-        rawSerialiseVerKeyKES vk
      <> writeBinaryWord64 (fromIntegral t)
 
     rawDeserialiseVerKeyKES bs
@@ -157,6 +127,35 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
+instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
+    deriveVerKeyKES (SignKeyMockKES vk _) = return vk
+
+    updateKES () (SignKeyMockKES vk t') t =
+        assert (t == t') $
+         if t+1 < totalPeriodsKES (Proxy @ (MockKES t))
+           then return $ Just (SignKeyMockKES vk (t+1))
+           else return Nothing
+
+    -- | Produce valid signature only with correct key, i.e., same iteration and
+    -- allowed KES period.
+    signKES () t a (SignKeyMockKES vk t') =
+        assert (t == t') $
+        return $
+        SigMockKES (castHash (hashWith getSignableRepresentation a))
+                   (SignKeyMockKES vk t)
+
+    --
+    -- Key generation
+    --
+
+    genKeyKES seed = do
+        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
+        return $ SignKeyMockKES vk 0
+
+    rawSerialiseSignKeyKES (SignKeyMockKES vk t) = return $
+        rawSerialiseVerKeyKES vk
+     <> writeBinaryWord64 (fromIntegral t)
+
     rawDeserialiseSignKeyKES bs
       | [vkb, tb] <- splitsAt [8, 8] bs
       , Just vk   <- rawDeserialiseVerKeyKES vkb
@@ -165,9 +164,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
       | otherwise
       = return Nothing
-
-
-
 
 instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
   toCBOR = encodeVerKeyKES

@@ -11,11 +11,11 @@ module Cardano.Crypto.SafePinned
 where
 
 import Control.Concurrent.MVar
-import Cardano.Crypto.Libsodium.MLockedBytes
 import Control.Exception (Exception, throw)
 import Control.DeepSeq (NFData (..))
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..))
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Cardano.Crypto.Libsodium.MLockedBytes
 
 data SafePinnedFinalizedError = SafePinnedFinalizedError
   deriving (Show)

@@ -8,12 +8,14 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Abstract key evolving signatures.
 module Cardano.Crypto.KES.Class
   (
     -- * KES algorithm class
     KESAlgorithm (..)
+  , KESSignAlgorithm (..)
   , Period
 
     -- * 'SignedKES' wrapper
@@ -54,52 +56,35 @@ import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWo
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
-import qualified Cardano.Crypto.Libsodium as NaCl
+import qualified Cardano.Crypto.MonadSodium as NaCl
 
 
 class ( Typeable v
       , Show (VerKeyKES v)
       , Eq (VerKeyKES v)
-      -- , Show (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
       , NoThunks (SigKES v)
       , NoThunks (SignKeyKES v)
       , NoThunks (VerKeyKES v)
       , KnownNat (SeedSizeKES v)
-      , Monad (SignKeyAccessKES v)
       )
       => KESAlgorithm v where
-
-  type SeedSizeKES v :: Nat
-
   --
   -- Key and signature types
   --
-
   data VerKeyKES  v :: Type
-  data SignKeyKES v :: Type
   data SigKES     v :: Type
-
-  -- | The monad in which keys can be generated, updated, and forgotten.
-  type SignKeyAccessKES v :: Type -> Type
-  type SignKeyAccessKES v = IO
+  type SeedSizeKES v :: Nat
+  data SignKeyKES v :: Type
 
   --
   -- Metadata and basic key operations
   --
-
   algorithmNameKES :: proxy v -> String
-
-  deriveVerKeyKES :: SignKeyKES v -> SignKeyAccessKES v (VerKeyKES v)
 
   hashVerKeyKES :: HashAlgorithm h => VerKeyKES v -> Hash h (VerKeyKES v)
   hashVerKeyKES = hashWith rawSerialiseVerKeyKES
-
-
-  --
-  -- Core algorithm operations
-  --
 
   -- | Context required to run the KES algorithm
   --
@@ -110,13 +95,13 @@ class ( Typeable v
   type Signable v :: Type -> Constraint
   type Signable v = Empty
 
-  signKES
-    :: (Signable v a, HasCallStack)
-    => ContextKES v
-    -> Period  -- ^ The /current/ period for the key
-    -> a
-    -> SignKeyKES v
-    -> SignKeyAccessKES v (SigKES v)
+  -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
+  seedSizeKES :: proxy v -> Word
+  seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
+
+  --
+  -- Core algorithm operations
+  --
 
   verifyKES
     :: (Signable v a, HasCallStack)
@@ -126,6 +111,52 @@ class ( Typeable v
     -> a
     -> SigKES v
     -> Either String ()
+
+  -- | Return the total number of KES periods supported by this algorithm. The
+  -- KES algorithm is assumed to support a fixed maximum number of periods, not
+  -- a variable number.
+  --
+  -- Do note that this is the total number of /periods/ not the total number of
+  -- evolutions. The difference is off-by-one. For example if there are 2
+  -- periods (period 0 and 1) then there is only one evolution.
+  --
+  totalPeriodsKES
+    :: proxy v -> Word
+
+  --
+  -- Serialisation/(de)serialisation in fixed-size raw format
+  --
+
+  sizeVerKeyKES  :: proxy v -> Word
+  sizeSigKES     :: proxy v -> Word
+  sizeSignKeyKES :: proxy v -> Word
+
+  rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
+  rawSerialiseSigKES       :: SigKES     v -> ByteString
+
+  rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
+  rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
+
+
+
+class ( KESAlgorithm v
+      , Monad m
+      )
+      => KESSignAlgorithm m v where
+
+  deriveVerKeyKES :: SignKeyKES v -> m (VerKeyKES v)
+
+  --
+  -- Core algorithm operations
+  --
+
+  signKES
+    :: forall a. (Signable v a, HasCallStack)
+    => ContextKES v
+    -> Period  -- ^ The /current/ period for the key
+    -> a
+    -> SignKeyKES v
+    -> m (SigKES v)
 
   -- | Update the KES signature key to the /next/ period, given the /current/
   -- period.
@@ -148,19 +179,7 @@ class ( Typeable v
     => ContextKES v
     -> SignKeyKES v
     -> Period  -- ^ The /current/ period for the key, not the target period.
-    -> SignKeyAccessKES v (Maybe (SignKeyKES v))
-
-  -- | Return the total number of KES periods supported by this algorithm. The
-  -- KES algorithm is assumed to support a fixed maximum number of periods, not
-  -- a variable number.
-  --
-  -- Do note that this is the total number of /periods/ not the total number of
-  -- evolutions. The difference is off-by-one. For example if there are 2
-  -- periods (period 0 and 1) then there is only one evolution.
-  --
-  totalPeriodsKES
-    :: proxy v -> Word
-
+    -> m (Maybe (SignKeyKES v))
 
   --
   -- Key generation
@@ -168,11 +187,7 @@ class ( Typeable v
 
   genKeyKES
     :: NaCl.MLockedSizedBytes (SeedSizeKES v)
-    -> SignKeyAccessKES v (SignKeyKES v)
-
-  -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
-  seedSizeKES :: proxy v -> Word
-  seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
+    -> m (SignKeyKES v)
 
   --
   -- Secure forgetting
@@ -186,25 +201,12 @@ class ( Typeable v
   --
   forgetSignKeyKES
     :: SignKeyKES v
-    -> SignKeyAccessKES v ()
+    -> m ()
   forgetSignKeyKES =
     const $ return ()
 
-  --
-  -- Serialisation/(de)serialisation in fixed-size raw format
-  --
-
-  sizeVerKeyKES  :: proxy v -> Word
-  sizeSignKeyKES :: proxy v -> Word
-  sizeSigKES     :: proxy v -> Word
-
-  rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
-  rawSerialiseSigKES       :: SigKES     v -> ByteString
-  rawSerialiseSignKeyKES   :: SignKeyKES v -> SignKeyAccessKES v ByteString
-
-  rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
-  rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
-  rawDeserialiseSignKeyKES  :: ByteString -> SignKeyAccessKES v (Maybe (SignKeyKES v))
+  rawDeserialiseSignKeyKES  :: ByteString -> m (Maybe (SignKeyKES v))
+  rawSerialiseSignKeyKES   :: SignKeyKES v -> m ByteString
 
 --
 -- Do not provide Ord instances for keys, see #38
@@ -234,7 +236,7 @@ encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
-encodeSignKeyKES :: KESAlgorithm v => SignKeyKES v -> SignKeyAccessKES v Encoding
+encodeSignKeyKES :: forall v m. (KESSignAlgorithm m v) => SignKeyKES v -> m Encoding
 encodeSignKeyKES = fmap encodeBytes . rawSerialiseSignKeyKES
 
 decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
@@ -265,10 +267,10 @@ decodeSigKES = do
           expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
           actual   = BS.length bs
 
-decodeSignKeyKES :: forall v s. KESAlgorithm v => Decoder s (SignKeyAccessKES v (Maybe (SignKeyKES v)))
+decodeSignKeyKES :: forall v s m. (KESSignAlgorithm m v) => Decoder s (m (Maybe (SignKeyKES v)))
 decodeSignKeyKES = do
     bs <- decodeBytes
-    let expected = fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
+    let expected = fromIntegral (sizeSignKeyKES (Proxy @v))
         actual   = BS.length bs
     if actual /= expected then
       fail ("decodeSigKES: wrong length, expected " ++
@@ -293,12 +295,12 @@ instance KESAlgorithm v => NoThunks (SignedKES v a)
   -- use generic instance
 
 signedKES
-  :: (KESAlgorithm v, Signable v a)
+  :: (KESSignAlgorithm m v, Signable v a)
   => ContextKES v
   -> Period
   -> a
   -> SignKeyKES v
-  -> SignKeyAccessKES v (SignedKES v a)
+  -> m (SignedKES v a)
 signedKES ctxt time a key = SignedKES <$> (signKES ctxt time a key)
 
 verifySignedKES
@@ -337,7 +339,7 @@ encodedVerKeyKESSizeExpr _proxy =
 encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
 encodedSignKeyKESSizeExpr _proxy =
       -- 'encodeBytes' envelope
-      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy :: Proxy v)))
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy @v)))
       -- payload
     + fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
 
