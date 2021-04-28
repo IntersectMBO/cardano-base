@@ -21,7 +21,6 @@ where
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
 import Cardano.Slotting.Time (RelativeTime, SystemStart, fromRelativeTime)
 import Control.Monad.Morph (generalize)
-import Data.Functor.Classes (showsUnaryWith)
 import Data.Functor.Identity
 import Data.Time.Clock (UTCTime)
 import GHC.Stack (HasCallStack)
@@ -64,12 +63,10 @@ data EpochInfo m
       }
   deriving NoThunks via OnlyCheckWhnfNamed "EpochInfo" (EpochInfo m)
 
--- | Show instance only for non-stateful instances
-instance Show (EpochInfo Identity) where
-  showsPrec p ei =
-    showsUnaryWith showsPrec "fixedSizeEpochInfo" p
-      $ runIdentity
-      $ epochInfoSize ei (EpochNo 0)
+-- | Unhelpful instance, but this type occurs in records (eg @Shelley.Globals@)
+-- that we want to be able to 'show'
+instance Show (EpochInfo f) where
+  showsPrec _ _ = showString "EpochInfoHasNoUsefulShowInstance"
 
 epochInfoRange :: Monad m => EpochInfo m -> EpochNo -> m (SlotNo, SlotNo)
 epochInfoRange epochInfo epochNo =
