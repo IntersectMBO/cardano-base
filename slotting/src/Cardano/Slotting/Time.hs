@@ -43,6 +43,7 @@ newtype SystemStart = SystemStart { getSystemStart :: UTCTime }
   deriving (Eq, Generic)
   deriving NoThunks via InspectHeap SystemStart
   deriving Show via Quiet SystemStart
+  deriving newtype Serialise
 
 {-------------------------------------------------------------------------------
   Relative time
