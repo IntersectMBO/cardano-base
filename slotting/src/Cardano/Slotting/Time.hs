@@ -24,6 +24,7 @@ module Cardano.Slotting.Time (
   , SlotLength
   ) where
 
+import           Cardano.Binary (FromCBOR(..), ToCBOR(..))
 import           Codec.Serialise
 import           Control.Exception (assert)
 import           Data.Fixed
@@ -44,6 +45,7 @@ newtype SystemStart = SystemStart { getSystemStart :: UTCTime }
   deriving NoThunks via InspectHeap SystemStart
   deriving Show via Quiet SystemStart
   deriving newtype Serialise
+  deriving newtype (ToCBOR, FromCBOR)
 
 {-------------------------------------------------------------------------------
   Relative time
