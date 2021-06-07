@@ -22,6 +22,7 @@ module Cardano.Crypto.Libsodium.C (
     c_crypto_generichash_update,
     -- * ED25519
     c_crypto_sign_ed25519_seed_keypair,
+    c_crypto_sign_ed25519_sk_to_seed,
     c_crypto_sign_ed25519_detached,
     c_crypto_sign_ed25519_verify_detached,
     c_crypto_sign_ed25519_sk_to_pk,
@@ -130,6 +131,12 @@ foreign import capi "sodium.h crypto_sign_ed25519_seed_keypair" c_crypto_sign_ed
     :: SizedPtr CRYPTO_SIGN_ED25519_PUBLICKEYBYTES
     -> SizedPtr CRYPTO_SIGN_ED25519_SECRETKEYBYTES
     -> SizedPtr CRYPTO_SIGN_ED25519_SEEDBYTES
+    -> IO Int
+
+-- | @int crypto_sign_ed25519_sk_to_seed(unsigned char *seed, const unsigned char *sk);@
+foreign import capi "sodium.h crypto_sign_ed25519_sk_to_seed" c_crypto_sign_ed25519_sk_to_seed
+    :: SizedPtr CRYPTO_SIGN_ED25519_SEEDBYTES
+    -> SizedPtr CRYPTO_SIGN_ED25519_SECRETKEYBYTES
     -> IO Int
 
 -- | @int crypto_sign_ed25519_detached(unsigned char *sig, unsigned long long *siglen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *sk);@
