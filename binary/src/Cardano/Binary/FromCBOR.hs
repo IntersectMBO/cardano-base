@@ -184,7 +184,13 @@ instance FromCBOR Int64 where
   fromCBOR = D.decodeInt64
 
 instance (Integral a, FromCBOR a) => FromCBOR (Ratio a) where
-  fromCBOR = (%) <$ enforceSize "Ratio" 2 <*> fromCBOR <*> fromCBOR
+  fromCBOR = do
+    enforceSize "Ratio" 2
+    n <- fromCBOR
+    d <- fromCBOR
+    if d <= 0
+      then cborError $ DecoderErrorCustom "Ratio" "invalid denominator"
+      else return $! n % d
 
 instance FromCBOR Nano where
   fromCBOR = MkFixed <$> fromCBOR
