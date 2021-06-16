@@ -55,6 +55,7 @@ library
                         Test.Crypto.Instances
                         Bench.Crypto.VRF
                         Bench.Crypto.KES
+                        Bench.Crypto.BenchData
 
   build-depends:        base
                       , bytestring
