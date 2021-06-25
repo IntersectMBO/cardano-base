@@ -103,4 +103,4 @@ newtype EpochNo = EpochNo {unEpochNo :: Word64}
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochSize
-  deriving newtype (Enum, Num, Real, Integral, NoThunks, ToJSON, FromJSON)
+  deriving newtype (Enum, Num, Real, Integral, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON)

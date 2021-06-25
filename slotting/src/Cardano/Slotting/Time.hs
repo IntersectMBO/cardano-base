@@ -125,5 +125,11 @@ instance Serialise RelativeTime where
       fromPico = realToFrac
 
 instance Serialise SlotLength where
-  encode = encode . slotLengthToMillisec
-  decode = slotLengthFromMillisec <$> decode
+  encode = toCBOR
+  decode = fromCBOR
+
+instance ToCBOR SlotLength where
+  toCBOR = toCBOR . slotLengthToMillisec
+
+instance FromCBOR SlotLength where
+  fromCBOR = slotLengthFromMillisec <$> fromCBOR

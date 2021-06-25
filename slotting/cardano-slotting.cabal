@@ -51,7 +51,6 @@ library
                       , cardano-binary
                       , cborg
                       , deepseq
-                      , mmorph
                       , nothunks
                       , quiet
                       , serialise
