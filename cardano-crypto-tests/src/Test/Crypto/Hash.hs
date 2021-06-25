@@ -32,6 +32,7 @@ tests =
     , testHashAlgorithm (Proxy :: Proxy SHA3_256)
     , testHashAlgorithm (Proxy :: Proxy Blake2b_224)
     , testHashAlgorithm (Proxy :: Proxy Blake2b_256)
+    , testHashAlgorithm (Proxy :: Proxy Keccak256)
 
     , testSodiumHashAlgorithm (Proxy :: Proxy SHA256)
     , testSodiumHashAlgorithm (Proxy :: Proxy Blake2b_256)
@@ -60,7 +61,7 @@ testHashAlgorithm p =
 testSodiumHashAlgorithm
   :: forall proxy h. NaCl.SodiumHashAlgorithm h
   => proxy h
-  -> TestTree 
+  -> TestTree
 testSodiumHashAlgorithm p =
   testGroup n
     [ testProperty "sodium and cryptonite work the same" $ prop_libsodium_model @h Proxy
@@ -103,7 +104,7 @@ prop_libsodium_model p bs = expected === actual
     mlsb = NaCl.digestMLockedBS p bs
     actual = NaCl.mlsbToByteString mlsb
     expected = digest p bs
-  
+
 
 --
 -- Arbitrary instances
