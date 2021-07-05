@@ -692,10 +692,12 @@ instance (ToCBOR a) => ToCBOR (Vector.Vector a) where
 --------------------------------------------------------------------------------
 
 instance ToCBOR UTCTime where
-  toCBOR (UTCTime day timeOfDay)
-    = encodeInteger year
-    <> encodeInt dayOfYear
-    <> encodeInteger timeOfDayPico
+  toCBOR (UTCTime day timeOfDay) = mconcat [
+      encodeListLen 3
+    , encodeInteger year
+    , encodeInt dayOfYear
+    , encodeInteger timeOfDayPico
+    ]
     where
       (year, dayOfYear) = toOrdinalDate day
       timeOfDayPico = diffTimeToPicoseconds timeOfDay
