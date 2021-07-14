@@ -1,5 +1,8 @@
 cradle:
   cabal:
+    - path: "base-deriving-via/src"
+      component: "lib:base-deriving-via"
+
     - path: "binary/src"
       component: "lib:cardano-binary"
 
