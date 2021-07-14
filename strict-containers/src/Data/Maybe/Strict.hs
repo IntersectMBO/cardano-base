@@ -10,8 +10,11 @@ module Data.Maybe.Strict
     strictMaybeToMaybe,
     maybeToStrictMaybe,
 
-    -- * accessing the optional component
+    -- * Accessing the underlying value
     fromSMaybe,
+    isSNothing,
+    isSJust,
+    strictMaybe,
   )
 where
 
@@ -99,9 +102,26 @@ maybeToStrictMaybe :: Maybe a -> StrictMaybe a
 maybeToStrictMaybe Nothing = SNothing
 maybeToStrictMaybe (Just x) = SJust x
 
+-- | Same as `Data.Maybe.fromMaybe`
 fromSMaybe :: a -> StrictMaybe a -> a
 fromSMaybe d SNothing = d
 fromSMaybe _ (SJust x) = x
+
+
+-- | Same as `Data.Maybe.isNothing`
+isSNothing :: StrictMaybe a -> Bool
+isSNothing SNothing = True
+isSNothing _ = False
+
+-- | Same as `Data.Maybe.isJust`
+isSJust :: StrictMaybe a -> Bool
+isSJust = not . isSNothing
+
+-- | Same as `Data.Maybe.maybe`
+strictMaybe :: a -> (b -> a) -> StrictMaybe b -> a
+strictMaybe x _ SNothing = x
+strictMaybe _ f (SJust y) = f y
+
 
 instance Default (StrictMaybe t) where
   def = SNothing
