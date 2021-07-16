@@ -24,6 +24,9 @@ cradle:
     - path: "cardano-crypto-tests/test"
       component: "cardano-crypto-tests:test:test-crypto"
 
+    - path: "orphans-deriving-via/src"
+      component: "lib:orphans-deriving-via"
+
     - path: "slotting/src"
       component: "lib:cardano-slotting"
 

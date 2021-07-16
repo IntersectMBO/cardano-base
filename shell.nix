@@ -21,6 +21,7 @@ let
        cardano-crypto-class
        cardano-crypto-praos
        cardano-slotting
+       orphan-deriving-via
     ];
 
     # These programs will be available inside the nix-shell.
