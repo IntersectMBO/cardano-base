@@ -7,6 +7,7 @@ packages:
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
+  measures
   orphans-deriving-via
   slotting
   strict-containers

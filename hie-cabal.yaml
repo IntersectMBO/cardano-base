@@ -24,6 +24,12 @@ cradle:
     - path: "cardano-crypto-tests/test"
       component: "cardano-crypto-tests:test:test-crypto"
 
+    - path: "measures/src"
+      component: "lib:measures"
+
+    - path: "measures/test"
+      component: "measures:test:test"
+
     - path: "orphans-deriving-via/src"
       component: "lib:orphans-deriving-via"
 
