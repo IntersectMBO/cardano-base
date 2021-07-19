@@ -212,6 +212,10 @@ instance (Prelude.Eq a, Generic a, GMeasure (Rep a))
   min  = coerce $ gbinop @a gmin
   max  = coerce $ gbinop @a gmax
 
+instance (Prelude.Eq a, Generic a, GBoundedMeasure (Rep a), GMeasure (Rep a))
+      => BoundedMeasure (InstantiatedAt Generic a) where
+  maxBound = coerce $ to @a gmaxBound
+
 -- not exported
 gbinop ::
   Generic a => (forall x. Rep a x -> Rep a x -> Rep a x) -> a -> a -> a
@@ -263,3 +267,29 @@ instance TypeError (     Text "No Generics definition of "
   gplus = Prelude.error "GMeasure gplus :+:"
   gmin  = Prelude.error "GMeasure gmin :+:"
   gmax  = Prelude.error "GMeasure gmax :+:"
+
+class GBoundedMeasure rep where
+  gmaxBound :: rep x
+
+instance BoundedMeasure c => GBoundedMeasure (K1 i c) where
+  gmaxBound = K1 maxBound
+
+instance GBoundedMeasure f => GBoundedMeasure (M1 i c f) where
+  gmaxBound = M1 gmaxBound
+
+instance GBoundedMeasure V1 where
+  gmaxBound = Prelude.error "GBoundedMeasure V1"
+
+instance GBoundedMeasure U1 where
+  gmaxBound = U1
+
+instance (GBoundedMeasure l, GBoundedMeasure r) => GBoundedMeasure (l :*: r) where
+  gmaxBound = gmaxBound :*: gmaxBound
+
+instance TypeError (     Text "No Generics definition of "
+                    :<>: ShowType BoundedMeasure
+                    :<>: Text " for types with multiple constructors "
+                    :<>: ShowType (l :+: r)
+                   )
+      => GBoundedMeasure (l :+: r) where
+  gmaxBound = Prelude.error "GBoundedMeasure :+:"
