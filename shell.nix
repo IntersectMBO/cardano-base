@@ -16,10 +16,13 @@ let
     # If shellFor default local packages selection is wrong,
     # then list all local packages then include source-repository-package that cabal complains about:
     packages = ps: with ps; [
+       base-deriving-via
        cardano-binary
        cardano-crypto-class
        cardano-crypto-praos
        cardano-slotting
+       measures
+       orphan-deriving-via
     ];
 
     # These programs will be available inside the nix-shell.
