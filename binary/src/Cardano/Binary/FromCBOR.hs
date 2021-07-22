@@ -470,6 +470,7 @@ instance (FromCBOR a) => FromCBOR (Vector.Vector a) where
 
 instance FromCBOR UTCTime where
   fromCBOR = do
+    enforceSize "UTCTime" 3
     year <- decodeInteger
     dayOfYear <- decodeInt
     timeOfDayPico <- decodeInteger
