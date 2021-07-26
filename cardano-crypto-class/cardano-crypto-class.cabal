@@ -52,7 +52,9 @@ library
   exposed-modules:
                         Cardano.Crypto.DSIGN
                         Cardano.Crypto.DSIGN.Class
+                        Cardano.Crypto.DSIGNM.Class
                         Cardano.Crypto.DSIGN.Ed25519
+                        Cardano.Crypto.DSIGN.Ed25519ML
                         Cardano.Crypto.DSIGN.Ed448
                         Cardano.Crypto.DSIGN.Mock
                         Cardano.Crypto.DSIGN.NeverUsed

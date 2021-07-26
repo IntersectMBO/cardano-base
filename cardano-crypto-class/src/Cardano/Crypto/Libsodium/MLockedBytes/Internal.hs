@@ -5,6 +5,7 @@
 module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     MLockedSizedBytes (..),
     mlsbZero,
+    mlsbNew,
     mlsbFromByteString,
     mlsbFromByteStringCheck,
     mlsbToByteString,
@@ -59,7 +60,10 @@ instance NFData (MLockedSizedBytes n) where
 -- | Note: this doesn't need to allocate mlocked memory,
 -- but we do that for consistency
 mlsbZero :: forall n. KnownNat n => MLockedSizedBytes n
-mlsbZero = unsafeDupablePerformIO $ do
+mlsbZero = unsafeDupablePerformIO mlsbNew
+
+mlsbNew :: forall n. KnownNat n => IO (MLockedSizedBytes n)
+mlsbNew = do
     fptr <- allocMLockedForeignPtr
     withMLockedForeignPtr fptr $ \ptr -> do
         _ <- c_memset (castPtr ptr) 0 size
