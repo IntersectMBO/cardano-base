@@ -36,7 +36,7 @@ import           Cardano.Crypto.VRF.Class
 
 data SimpleVRF
 
-type H = MD5
+type H = ShortHash
 
 curve :: C.Curve
 curve = C.getCurveByName C.SEC_t113r1
@@ -250,4 +250,3 @@ instance ToCBOR (CertVRF SimpleVRF) where
 
 instance FromCBOR (CertVRF SimpleVRF) where
   fromCBOR = decodeCertVRF
-

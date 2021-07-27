@@ -60,7 +60,7 @@ instance VRFAlgorithm MockVRF where
 
   verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
 
-  sizeOutputVRF _ = sizeHash (Proxy :: Proxy MD5)
+  sizeOutputVRF _ = sizeHash (Proxy :: Proxy ShortHash)
 
   --
   -- Key generation
@@ -136,6 +136,6 @@ evalVRF' :: SignableRepresentation a
          -> SignKeyVRF MockVRF
          -> (OutputVRF MockVRF, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
-  let y = hashToBytes $ hashWithSerialiser @MD5 id $
+  let y = hashToBytes $ hashWithSerialiser @ShortHash id $
             toCBOR (getSignableRepresentation a) <> toCBOR sk
   in (OutputVRF y, CertMockVRF n)

@@ -6,30 +6,24 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 
--- | Implementation of short hashing algorithm, suitable for testing as
--- it's not very collision-resistant.
+-- | Implementation of short hashing algorithm, suitable for testing.
 module Cardano.Crypto.Hash.Short
   ( ShortHash
-  , MD5Prefix
+  , Blake2bPrefix
   )
 where
 
 import Cardano.Crypto.Hash.Class
-import qualified "cryptonite" Crypto.Hash as H
-import qualified Data.ByteArray as BA
-import qualified Data.ByteString as B
+import Cardano.Crypto.Hash.Blake2b (blake2b_libsodium)
 
 import GHC.TypeLits (Nat, KnownNat, CmpNat, natVal)
 import Data.Proxy (Proxy (..))
 
-type ShortHash = MD5Prefix 8
+type ShortHash = Blake2bPrefix 8
 
-data MD5Prefix (n :: Nat)
+data Blake2bPrefix (n :: Nat)
 
-instance (KnownNat n, CmpNat n 33 ~ 'LT) => HashAlgorithm (MD5Prefix n) where
-  type SizeHash (MD5Prefix n) = n
-  hashAlgorithmName _ = "md5_prefix_" <> show (natVal (Proxy :: Proxy n))
-  digest p =
-    B.take (fromIntegral (sizeHash p)) .
-      BA.convert .
-      H.hash @ByteString @H.MD5 -- Internally, treat it like MD5.
+instance (KnownNat n, CmpNat n 33 ~ 'LT) => HashAlgorithm (Blake2bPrefix n) where
+  type SizeHash (Blake2bPrefix n) = n
+  hashAlgorithmName _ = "blake2b_prefix_" <> show (natVal (Proxy :: Proxy n))
+  digest _ = blake2b_libsodium (fromIntegral (natVal (Proxy :: Proxy n)))

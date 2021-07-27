@@ -7,6 +7,7 @@
 module Cardano.Crypto.Hash.Blake2b
   ( Blake2b_224
   , Blake2b_256
+  , blake2b_libsodium -- Used for Hash.Short
   )
 where
 

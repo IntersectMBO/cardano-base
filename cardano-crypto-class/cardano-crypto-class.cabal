@@ -53,7 +53,6 @@ library
 
                         Cardano.Crypto.Hash.Blake2b
                         Cardano.Crypto.Hash.Class
-                        Cardano.Crypto.Hash.MD5
                         Cardano.Crypto.Hash.NeverUsed
                         Cardano.Crypto.Hash.SHA256
                         Cardano.Crypto.Hash.SHA3_256
