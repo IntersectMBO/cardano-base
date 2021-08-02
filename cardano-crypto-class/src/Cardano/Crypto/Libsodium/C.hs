@@ -16,10 +16,10 @@ module Cardano.Crypto.Libsodium.C (
     c_crypto_hash_sha256_init,
     c_crypto_hash_sha256_update,
     -- ** Blake2b 256
-    c_crypto_generichash,
-    c_crypto_generichash_final,
-    c_crypto_generichash_init,
-    c_crypto_generichash_update,
+    c_crypto_generichash_blake2b,
+    c_crypto_generichash_blake2b_final,
+    c_crypto_generichash_blake2b_init,
+    c_crypto_generichash_blake2b_update,
     -- * ED25519
     c_crypto_sign_ed25519_seed_keypair,
     c_crypto_sign_ed25519_sk_to_seed,
@@ -102,23 +102,23 @@ foreign import capi "sodium.h crypto_hash_sha256_final" c_crypto_hash_sha256_fin
 -- Hashing: Blake2b
 -------------------------------------------------------------------------------
 
--- | @int crypto_generichash(unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen);@
+-- | @int crypto_generichash_blake2b(unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen);@
 --
 -- <https://libsodium.gitbook.io/doc/hashing/generic_hashing>
-foreign import capi "sodium.h crypto_generichash" c_crypto_generichash
+foreign import capi "sodium.h crypto_generichash_blake2b" c_crypto_generichash_blake2b
     :: Ptr out -> CSize
     -> Ptr CUChar -> CULLong
     -> Ptr key -> CSize
     -> IO Int
 
--- | @int crypto_generichash_init(crypto_generichash_state *state, const unsigned char *key, const size_t keylen, const size_t outlen);@
-foreign import capi "sodium.h crypto_generichash_init" c_crypto_generichash_init :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr key -> CSize -> CSize -> IO Int
+-- | @int crypto_generichash_blake2b_init(crypto_generichash_blake2b_state *state, const unsigned char *key, const size_t keylen, const size_t outlen);@
+foreign import capi "sodium.h crypto_generichash_blake2b_init" c_crypto_generichash_blake2b_init :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr key -> CSize -> CSize -> IO Int
 
--- | @int crypto_generichash_update(crypto_generichash_state *state, const unsigned char *in, unsigned long long inlen);@
-foreign import capi "sodium.h crypto_generichash_update" c_crypto_generichash_update :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr CUChar -> CULLong -> IO Int
+-- | @int crypto_generichash_blake2b_update(crypto_generichash_blake2b_state *state, const unsigned char *in, unsigned long long inlen);@
+foreign import capi "sodium.h crypto_generichash_blake2b_update" c_crypto_generichash_blake2b_update :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr CUChar -> CULLong -> IO Int
 
--- | @int crypto_generichash_final(crypto_generichash_state *state, unsigned char *out, const size_t outlen);@
-foreign import capi "sodium.h crypto_generichash_final" c_crypto_generichash_final :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr out -> CSize -> IO Int
+-- | @int crypto_generichash_blake2b_final(crypto_generichash_blake2b_state *state, unsigned char *out, const size_t outlen);@
+foreign import capi "sodium.h crypto_generichash_blake2b_final" c_crypto_generichash_blake2b_final :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr out -> CSize -> IO Int
 
 -------------------------------------------------------------------------------
 -- Signing: ED25519

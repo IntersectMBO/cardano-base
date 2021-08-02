@@ -27,8 +27,7 @@ import qualified Cardano.Crypto.Libsodium as NaCl
 tests :: TestTree
 tests =
   testGroup "Crypto.Hash"
-    [ testHashAlgorithm (Proxy :: Proxy MD5)
-    , testHashAlgorithm (Proxy :: Proxy SHA256)
+    [testHashAlgorithm (Proxy :: Proxy SHA256)
     , testHashAlgorithm (Proxy :: Proxy SHA3_256)
     , testHashAlgorithm (Proxy :: Proxy Blake2b_224)
     , testHashAlgorithm (Proxy :: Proxy Blake2b_256)

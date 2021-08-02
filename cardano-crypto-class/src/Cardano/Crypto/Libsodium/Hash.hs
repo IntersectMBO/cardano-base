@@ -117,7 +117,7 @@ instance SodiumHashAlgorithm Blake2b_256 where
     naclDigestPtr _ input inputlen = do
         output <- allocMLockedForeignPtr
         withMLockedForeignPtr output $ \output' -> do
-            res <- c_crypto_generichash
+            res <- c_crypto_generichash_blake2b
                 output' (fromInteger $ natVal (Proxy @CRYPTO_BLAKE2B_256_BYTES))  -- output
                 (castPtr input) (fromIntegral inputlen)  -- input
                 nullPtr 0                                -- key, unused

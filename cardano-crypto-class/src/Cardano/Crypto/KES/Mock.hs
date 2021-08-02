@@ -63,7 +63,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
         deriving anyclass (NoThunks)
 
     data SigKES (MockKES t) =
-           SigMockKES !(Hash MD5 ()) !(SignKeyKES (MockKES t))
+           SigMockKES !(Hash ShortHash ()) !(SignKeyKES (MockKES t))
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoThunks)
 
@@ -77,7 +77,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     sizeVerKeyKES  _ = 8
     sizeSignKeyKES _ = 16
-    sizeSigKES     _ = 32
+    sizeSigKES     _ = 24
 
 
     --
@@ -153,7 +153,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       = Nothing
 
     rawDeserialiseSigKES bs
-      | [hb, skb] <- splitsAt [16, 16] bs
+      | [hb, skb] <- splitsAt [8, 16] bs
       , Just h    <- hashFromBytes hb
       , Just sk   <- rawDeserialiseSignKeyKES skb
       = Just $! SigMockKES h sk
@@ -183,4 +183,3 @@ instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
 
 instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
   fromCBOR = decodeSigKES
-
