@@ -78,7 +78,6 @@ library
                         Cardano.Crypto.Libsodium
                         Cardano.Crypto.Libsodium.C
                         Cardano.Crypto.Libsodium.Constants
-                        Cardano.Crypto.Libsodium.DSIGN
                         Cardano.Crypto.Libsodium.Hash
                         Cardano.Crypto.Libsodium.Init
                         Cardano.Crypto.Libsodium.Memory

@@ -19,17 +19,8 @@ module Cardano.Crypto.Libsodium (
   digestMLockedStorable,
   digestMLockedBS,
   expandHash,
-  -- * Signing
-  SodiumDSIGNAlgorithm (..),
-  naclSignDSIGN,
-  naclVerifyDSIGN,
-  naclForgetSignKeyDSIGN,
-  SodiumSignKeyDSIGN,
-  SodiumVerKeyDSIGN,
-  SodiumSigDSIGN,
 ) where
 
-import Cardano.Crypto.Libsodium.DSIGN
 import Cardano.Crypto.Libsodium.Hash
 import Cardano.Crypto.Libsodium.Init
 import Cardano.Crypto.Libsodium.Memory
