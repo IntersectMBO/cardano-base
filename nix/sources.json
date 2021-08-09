@@ -5,10 +5,10 @@
         "homepage": "https://input-output-hk.github.io/haskell.nix",
         "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "f848b47dde85297a11dc84d32687bf0b165db309",
-        "sha256": "0a585wa2crsk5jb5kc02gnshjv7n5i08kzd1r31m3wzpx15krd1s",
+        "rev": "d5d304d5b50db1e584ce62915c48fc8c0c8b626a",
+        "sha256": "0j70lnw99v62qshdd0a03ph37d0zyb9lqiiq48av3iw5g2f6h44z",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/haskell.nix/archive/f848b47dde85297a11dc84d32687bf0b165db309.tar.gz",
+        "url": "https://github.com/input-output-hk/haskell.nix/archive/d5d304d5b50db1e584ce62915c48fc8c0c8b626a.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "iohk-nix": {
@@ -17,22 +17,10 @@
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "iohk-nix",
-        "rev": "65d5b5eabf5252c7ece10efdc507f0a5c9b2aa8a",
-        "sha256": "1b2n1c3cygrczhgffq6px42hln0344l88cf0hgq78l7m5w7lysal",
+        "rev": "ced24db2fbed1e56563e17fd2d47436c3a4649f3",
+        "sha256": "0631fal6zczgs7b7nhsp4jrp0xini8r653xv0831makxd496b2v8",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/iohk-nix/archive/65d5b5eabf5252c7ece10efdc507f0a5c9b2aa8a.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "nixpkgs": {
-        "branch": "nixpkgs-20.09-darwin",
-        "description": "Nix Packages collection",
-        "homepage": null,
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "d04a7a30979db2ba6ac001e4c24907e5594dc07d",
-        "sha256": "1vhd56z706lmjb8pq3ky72gn6j3naacwxwks52wd2fr2bwwb73z2",
-        "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/d04a7a30979db2ba6ac001e4c24907e5594dc07d.tar.gz",
+        "url": "https://github.com/input-output-hk/iohk-nix/archive/ced24db2fbed1e56563e17fd2d47436c3a4649f3.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
