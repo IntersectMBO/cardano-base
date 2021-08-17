@@ -30,7 +30,7 @@ module Cardano.Crypto.PinnedSizedBytes
 
 import Control.DeepSeq (NFData)
 import Control.Monad.ST (runST)
-import Control.Monad.Primitive  (primitive_)
+import Control.Monad.Primitive  (primitive_, touch)
 import Data.Char (ord)
 import Data.Primitive.ByteArray
           ( ByteArray (..)
@@ -101,9 +101,12 @@ instance KnownNat n => Eq (PinnedSizedBytes n) where
     x == y = compare x y == EQ
 
 instance KnownNat n => Ord (PinnedSizedBytes n) where
-    compare (PSB x) (PSB y) = unsafeDupablePerformIO $ do
-        res <- c_sodium_compare (byteArrayContents x) (byteArrayContents y) size
-        return (compare res 0)
+    compare x y =
+        unsafeDupablePerformIO $
+            psbUseAsCPtr x $ \xPtr ->
+                psbUseAsCPtr y $ \yPtr -> do
+                    res <- c_sodium_compare xPtr yPtr size
+                    return (compare res 0)
       where
         size :: CSize
         size = fromInteger (natVal (Proxy :: Proxy n))
@@ -200,10 +203,14 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
         copyByteArrayToAddr (castPtr p) arr 0 size
 
 psbUseAsCPtr :: PinnedSizedBytes n -> (Ptr Word8 -> IO r) -> IO r
-psbUseAsCPtr (PSB ba) k = k (byteArrayContents ba)
+psbUseAsCPtr (PSB ba) k = do
+    r <- k (byteArrayContents ba)
+    r <$ touch ba
 
 psbUseAsSizedPtr :: PinnedSizedBytes n -> (SizedPtr n -> IO r) -> IO r
-psbUseAsSizedPtr (PSB ba) k = k (SizedPtr $ castPtr $ byteArrayContents ba)
+psbUseAsSizedPtr (PSB ba) k = do
+    r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
+    r <$ touch ba
 
 psbCreate :: forall n. KnownNat n => (Ptr Word8 -> IO ()) -> IO (PinnedSizedBytes n)
 psbCreate k = do
