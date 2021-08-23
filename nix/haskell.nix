@@ -7,7 +7,7 @@
 , buildPackages
 , config ? {}
 # GHC attribute name
-, compiler ? config.haskellNix.compiler or "ghc8102"
+, compiler ? config.haskellNix.compiler or "ghc8105"
 # Enable profiling
 , profiling ? config.haskellNix.profiling or false
 }:
@@ -52,6 +52,7 @@ let
         packages.binary.configureFlags = [ "--ghc-option=-Werror" ];
         #packages.binary/test.configureFlags = [ "--ghc-option=-Werror" ];
         packages.cardano-crypto-class.configureFlags = [ "--ghc-option=-Werror" ];
+        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ buildPackages.libsodium-vrf ]];
         packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
       }

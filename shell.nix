@@ -22,7 +22,7 @@ let
        cardano-crypto-praos
        cardano-slotting
        measures
-       orphan-deriving-via
+       orphans-deriving-via
     ];
 
     # These programs will be available inside the nix-shell.
@@ -39,7 +39,7 @@ let
 
     tools = {
       cabal = "3.2.0.0";
-      haskell-language-server = "0.5.1";
+      haskell-language-server = "latest";
     };
 
     # Prevents cabal from choosing alternate plans, so that
