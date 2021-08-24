@@ -1,17 +1,21 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
   , sizeHash
   , ByteString
-  , Hash(..)
+  , Hash(UnsafeHash)
 
     -- * Core operations
   , hashWith
@@ -54,6 +58,7 @@ import GHC.TypeLits (Nat, KnownNat, natVal)
 
 import           Data.Word (Word8)
 import qualified Data.Bits as Bits
+import           Data.Kind (Type)
 import           Numeric.Natural (Natural)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -81,11 +86,33 @@ import           Cardano.Binary
                    (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
                     serializeEncoding')
 
-class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
-      --TODO: eliminate this Typeable constraint needed only for the ToCBOR
-      -- the ToCBOR should not need it either
+class
+  ( KnownNat (SizeHash h)
+  , Typeable h
+  , Eq (HashRep h)
+  , NFData (HashRep h)
+  , Ord (HashRep h)
+  , NoThunks (HashRep h)
+  ) =>
+  HashAlgorithm h
+  where
+  --TODO: eliminate this Typeable constraint needed only for the ToCBOR
+  -- the ToCBOR should not need it either
   -- size of hash digest
   type SizeHash h :: Nat
+
+  type HashRep h :: Type
+  type HashRep h = ShortByteString
+
+  unsafeToHashRep :: proxy h -> ShortByteString -> HashRep h
+  default unsafeToHashRep ::
+    (HashRep h ~ ShortByteString) => proxy h -> ShortByteString -> HashRep h
+  unsafeToHashRep _ = id
+
+  fromHashRep :: proxy h -> HashRep h -> ShortByteString
+  default fromHashRep ::
+    (HashRep h ~ ShortByteString) => proxy h -> HashRep h -> ShortByteString
+  fromHashRep _ = id
 
   hashAlgorithmName :: proxy h -> String
 
@@ -95,9 +122,20 @@ class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
 sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
 sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
-newtype Hash h a = UnsafeHash ShortByteString
-  deriving (Eq, Ord, Generic, NFData, NoThunks)
+newtype Hash h a = UnsafeHashRep (HashRep h)
 
+deriving instance HashAlgorithm h => Eq (Hash h a)
+deriving instance HashAlgorithm h => Ord (Hash h a)
+deriving instance HashAlgorithm h => NFData (Hash h a)
+deriving instance HashAlgorithm h => NoThunks (Hash h a)
+deriving instance Generic (Hash h a)
+
+pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
+pattern UnsafeHash bytes <- UnsafeHashRep (fromHashRep (Proxy :: Proxy h) -> bytes)
+  where
+  UnsafeHash bytes = UnsafeHashRep (unsafeToHashRep (Proxy :: Proxy h) bytes)
+
+{-# Complete UnsafeHash #-}
 
 --
 -- Core operations
@@ -129,13 +167,13 @@ hashWithSerialiser toEnc = hashWith (serializeEncoding' . toEnc)
 -- hash is of. It is sometimes necessary to fake this and hash a value of one
 -- type and use it where as hash of a different type is expected.
 --
-castHash :: Hash h a -> Hash h b
+castHash :: HashAlgorithm h => Hash h a -> Hash h b
 castHash (UnsafeHash h) = UnsafeHash h
 
 
 -- | The representation of the hash as bytes.
 --
-hashToBytes :: Hash h a -> ByteString
+hashToBytes :: HashAlgorithm h => Hash h a -> ByteString
 hashToBytes (UnsafeHash h) = SBS.fromShort h
 
 
@@ -167,7 +205,7 @@ hashFromBytesShort bytes
 
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
 --
-hashToBytesShort :: Hash h a -> ShortByteString
+hashToBytesShort :: HashAlgorithm h => Hash h a -> ShortByteString
 hashToBytesShort (UnsafeHash h) = h
 
 
@@ -176,7 +214,7 @@ hashToBytesShort (UnsafeHash h) = h
 --
 
 -- | Convert the hash to hex encoding, as 'String'.
-hashToStringAsHex :: Hash h a -> String
+hashToStringAsHex :: HashAlgorithm h => Hash h a -> String
 hashToStringAsHex = Text.unpack . hashToTextAsHex
 
 -- | Make a hash from hex-encoded 'String' representation.
@@ -189,7 +227,7 @@ hashFromStringAsHex = hashFromTextAsHex . Text.pack
 
 -- | Convert the hash to hex encoding, as 'Text'.
 --
-hashToTextAsHex :: Hash h a -> Text
+hashToTextAsHex :: HashAlgorithm h => Hash h a -> Text
 hashToTextAsHex = Text.decodeUtf8 . hashToBytesAsHex
 
 -- | Make a hash from hex-encoded 'Text' representation.
@@ -202,7 +240,7 @@ hashFromTextAsHex = hashFromBytesAsHex . Text.encodeUtf8
 
 -- | Convert the hash to hex encoding, as 'ByteString'.
 --
-hashToBytesAsHex :: Hash h a -> ByteString
+hashToBytesAsHex :: HashAlgorithm h => Hash h a -> ByteString
 hashToBytesAsHex = Base16.encode . hashToBytes
 
 -- | Make a hash from hex-encoded 'ByteString' representation.
@@ -213,7 +251,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . Base16.decode
 
-instance Show (Hash h a) where
+instance HashAlgorithm h => Show (Hash h a) where
   show = show . hashToStringAsHex
 
 instance HashAlgorithm h => Read (Hash h a) where
@@ -225,20 +263,20 @@ instance HashAlgorithm h => IsString (Hash h a) where
       Just x  -> x
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
-instance ToJSONKey (Hash crypto a) where
+instance HashAlgorithm h => ToJSONKey (Hash h a) where
   toJSONKey = Aeson.ToJSONKeyText hashToText (Aeson.text . hashToText)
 
-instance HashAlgorithm crypto => FromJSONKey (Hash crypto a) where
+instance HashAlgorithm h => FromJSONKey (Hash h a) where
   fromJSONKey = Aeson.FromJSONKeyTextParser parseHash
 
-instance ToJSON (Hash crypto a) where
+instance HashAlgorithm h => ToJSON (Hash h a) where
   toJSON = toJSON . hashToText
 
-instance HashAlgorithm crypto => FromJSON (Hash crypto a) where
+instance HashAlgorithm h => FromJSON (Hash h a) where
   parseJSON = Aeson.withText "hash" parseHash
 
 -- utils used in the instances above
-hashToText :: Hash crypto a -> Text
+hashToText :: HashAlgorithm h => Hash h a -> Text
 hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
@@ -293,7 +331,7 @@ hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
 hash = hashWithSerialiser toCBOR
 
 {-# DEPRECATED fromHash "Use bytesToNatural . hashToBytes" #-}
-fromHash :: Hash h a -> Natural
+fromHash :: HashAlgorithm h => Hash h a -> Natural
 fromHash = foldl' f 0 . BS.unpack . hashToBytes
   where
     f :: Natural -> Word8 -> Natural
@@ -304,16 +342,16 @@ hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashRaw = hashWith
 
 {-# DEPRECATED getHash "Use hashToBytes" #-}
-getHash :: Hash h a -> ByteString
+getHash :: HashAlgorithm h => Hash h a -> ByteString
 getHash = hashToBytes
 
 {-# DEPRECATED getHashBytesAsHex "Use hashToBytesAsHex" #-}
-getHashBytesAsHex :: Hash h a -> ByteString
+getHashBytesAsHex :: HashAlgorithm h => Hash h a -> ByteString
 getHashBytesAsHex = hashToBytesAsHex
 
 -- | XOR two hashes together
 --TODO: fully deprecate this, or rename it and make it efficient.
-xor :: Hash h a -> Hash h a -> Hash h a
+xor :: HashAlgorithm h => Hash h a -> Hash h a -> Hash h a
 xor (UnsafeHash x) (UnsafeHash y) =
     UnsafeHash
   . SBS.toShort
