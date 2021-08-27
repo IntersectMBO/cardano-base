@@ -1,18 +1,22 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
   ( HashAlgorithm (..)
+  , CanUnpack
   , sizeHash
   , ByteString
   , Hash(UnsafeHash)
@@ -58,7 +62,6 @@ import GHC.TypeLits (Nat, KnownNat, natVal)
 
 import           Data.Word (Word8)
 import qualified Data.Bits as Bits
-import           Data.Kind (Type)
 import           Numeric.Natural (Natural)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -78,41 +81,21 @@ import           Data.Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Aeson.Encoding as Aeson
 
-import           Control.DeepSeq (NFData)
+import           Control.DeepSeq (NFData(..), rwhnf)
 
-import           NoThunks.Class (NoThunks)
+import           NoThunks.Class (NoThunks, OnlyCheckWhnfNamed(..))
 
+import           Cardano.Crypto.PackedBytes
 import           Cardano.Binary
                    (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
                     serializeEncoding')
 
-class
-  ( KnownNat (SizeHash h)
-  , Typeable h
-  , Eq (HashRep h)
-  , NFData (HashRep h)
-  , Ord (HashRep h)
-  , NoThunks (HashRep h)
-  ) =>
-  HashAlgorithm h
-  where
+class (KnownNat (SizeHash h), CanUnpack (SizeHash h), Typeable h) => HashAlgorithm h where
   --TODO: eliminate this Typeable constraint needed only for the ToCBOR
   -- the ToCBOR should not need it either
-  -- size of hash digest
+
+  -- | Size of hash digest
   type SizeHash h :: Nat
-
-  type HashRep h :: Type
-  type HashRep h = ShortByteString
-
-  unsafeToHashRep :: proxy h -> ShortByteString -> HashRep h
-  default unsafeToHashRep ::
-    (HashRep h ~ ShortByteString) => proxy h -> ShortByteString -> HashRep h
-  unsafeToHashRep _ = id
-
-  fromHashRep :: proxy h -> HashRep h -> ShortByteString
-  default fromHashRep ::
-    (HashRep h ~ ShortByteString) => proxy h -> HashRep h -> ShortByteString
-  fromHashRep _ = id
 
   hashAlgorithmName :: proxy h -> String
 
@@ -122,20 +105,25 @@ class
 sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
 sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
-newtype Hash h a = UnsafeHashRep (HashRep h)
+newtype Hash h a = UnsafeHashRep (PackedBytes (SizeHash h))
 
-deriving instance HashAlgorithm h => Eq (Hash h a)
-deriving instance HashAlgorithm h => Ord (Hash h a)
-deriving instance HashAlgorithm h => NFData (Hash h a)
-deriving instance HashAlgorithm h => NoThunks (Hash h a)
 deriving instance Generic (Hash h a)
+deriving via OnlyCheckWhnfNamed "Hash" (Hash h a) instance NoThunks (Hash h a)
 
-pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
-pattern UnsafeHash bytes <- UnsafeHashRep (fromHashRep (Proxy :: Proxy h) -> bytes)
+instance NFData (Hash h a) where
+  rnf = rwhnf
+
+instance KnownNat (SizeHash h) => Eq (Hash h a) where
+  UnsafeHashRep x1 == UnsafeHashRep x2 = applyOrdPackedBytes (==) x1 x2
+
+instance KnownNat (SizeHash h) => Ord (Hash h a) where
+  UnsafeHashRep x1 <= UnsafeHashRep x2 = applyOrdPackedBytes (<=) x1 x2
+
+pattern UnsafeHash :: forall h a. KnownNat (SizeHash h) => ShortByteString -> Hash h a
+pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)
   where
-  UnsafeHash bytes = UnsafeHashRep (unsafeToHashRep (Proxy :: Proxy h) bytes)
-
-{-# Complete UnsafeHash #-}
+  UnsafeHash bytes = UnsafeHashRep (packBytes bytes :: PackedBytes (SizeHash h))
+{-# COMPLETE UnsafeHash #-}
 
 --
 -- Core operations

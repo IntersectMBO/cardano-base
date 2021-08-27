@@ -6,6 +6,7 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 module Cardano.Crypto.Libsodium.Hash (
     SodiumHashAlgorithm (..),
     digestMLockedStorable,
