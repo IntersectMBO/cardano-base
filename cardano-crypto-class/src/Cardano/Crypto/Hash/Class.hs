@@ -54,11 +54,10 @@ import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-import GHC.TypeLits (Nat, KnownNat, natVal)
+import GHC.TypeLits (Nat, KnownNat, natVal, CmpNat)
 
 import           Data.Word (Word8)
 import qualified Data.Bits as Bits
-import           Data.Kind (Type)
 import           Numeric.Natural (Natural)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -85,14 +84,12 @@ import           NoThunks.Class (NoThunks)
 import           Cardano.Binary
                    (Encoding, FromCBOR (..), ToCBOR (..), Size, decodeBytes,
                     serializeEncoding')
+import qualified Cardano.Crypto.Hash.Packed as P
 
 class
   ( KnownNat (SizeHash h)
   , Typeable h
-  , Eq (HashRep h)
-  , NFData (HashRep h)
-  , Ord (HashRep h)
-  , NoThunks (HashRep h)
+  , CmpNat (SizeHash h) 33 ~ 'LT
   ) =>
   HashAlgorithm h
   where
@@ -100,40 +97,21 @@ class
   -- the ToCBOR should not need it either
   -- size of hash digest
   type SizeHash h :: Nat
-
-  type HashRep h :: Type
-  type HashRep h = ShortByteString
-
-  unsafeToHashRep :: proxy h -> ShortByteString -> HashRep h
-  default unsafeToHashRep ::
-    (HashRep h ~ ShortByteString) => proxy h -> ShortByteString -> HashRep h
-  unsafeToHashRep _ = id
-
-  fromHashRep :: proxy h -> HashRep h -> ShortByteString
-  default fromHashRep ::
-    (HashRep h ~ ShortByteString) => proxy h -> HashRep h -> ShortByteString
-  fromHashRep _ = id
-
   hashAlgorithmName :: proxy h -> String
-
   digest :: proxy h -> ByteString -> ByteString
 
 -- | The size in bytes of the output of 'digest'
 sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
 sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
-newtype Hash h a = UnsafeHashRep (HashRep h)
+newtype Hash h a = UnsafePackedHash P.Bytes32
+  deriving
+   (Eq, Ord, NFData, Generic, NoThunks)
 
-deriving instance HashAlgorithm h => Eq (Hash h a)
-deriving instance HashAlgorithm h => Ord (Hash h a)
-deriving instance HashAlgorithm h => NFData (Hash h a)
-deriving instance HashAlgorithm h => NoThunks (Hash h a)
-deriving instance Generic (Hash h a)
-
-pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
-pattern UnsafeHash bytes <- UnsafeHashRep (fromHashRep (Proxy :: Proxy h) -> bytes)
+pattern UnsafeHash :: ShortByteString -> Hash h a
+pattern UnsafeHash bytes <- UnsafePackedHash (P.unpack -> bytes)
   where
-  UnsafeHash bytes = UnsafeHashRep (unsafeToHashRep (Proxy :: Proxy h) bytes)
+  UnsafeHash bytes = UnsafePackedHash (P.unsafePack bytes)
 
 {-# Complete UnsafeHash #-}
 
@@ -167,13 +145,13 @@ hashWithSerialiser toEnc = hashWith (serializeEncoding' . toEnc)
 -- hash is of. It is sometimes necessary to fake this and hash a value of one
 -- type and use it where as hash of a different type is expected.
 --
-castHash :: HashAlgorithm h => Hash h a -> Hash h b
-castHash (UnsafeHash h) = UnsafeHash h
+castHash :: Hash h a -> Hash h b
+castHash (UnsafePackedHash h) = UnsafePackedHash h
 
 
 -- | The representation of the hash as bytes.
 --
-hashToBytes :: HashAlgorithm h => Hash h a -> ByteString
+hashToBytes :: Hash h a -> ByteString
 hashToBytes (UnsafeHash h) = SBS.fromShort h
 
 
@@ -205,16 +183,15 @@ hashFromBytesShort bytes
 
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
 --
-hashToBytesShort :: HashAlgorithm h => Hash h a -> ShortByteString
+hashToBytesShort :: Hash h a -> ShortByteString
 hashToBytesShort (UnsafeHash h) = h
-
 
 --
 -- Rendering and parsing
 --
 
 -- | Convert the hash to hex encoding, as 'String'.
-hashToStringAsHex :: HashAlgorithm h => Hash h a -> String
+hashToStringAsHex :: Hash h a -> String
 hashToStringAsHex = Text.unpack . hashToTextAsHex
 
 -- | Make a hash from hex-encoded 'String' representation.
@@ -227,7 +204,7 @@ hashFromStringAsHex = hashFromTextAsHex . Text.pack
 
 -- | Convert the hash to hex encoding, as 'Text'.
 --
-hashToTextAsHex :: HashAlgorithm h => Hash h a -> Text
+hashToTextAsHex :: Hash h a -> Text
 hashToTextAsHex = Text.decodeUtf8 . hashToBytesAsHex
 
 -- | Make a hash from hex-encoded 'Text' representation.
@@ -240,7 +217,7 @@ hashFromTextAsHex = hashFromBytesAsHex . Text.encodeUtf8
 
 -- | Convert the hash to hex encoding, as 'ByteString'.
 --
-hashToBytesAsHex :: HashAlgorithm h => Hash h a -> ByteString
+hashToBytesAsHex :: Hash h a -> ByteString
 hashToBytesAsHex = Base16.encode . hashToBytes
 
 -- | Make a hash from hex-encoded 'ByteString' representation.
@@ -251,7 +228,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . Base16.decode
 
-instance HashAlgorithm h => Show (Hash h a) where
+instance Show (Hash h a) where
   show = show . hashToStringAsHex
 
 instance HashAlgorithm h => Read (Hash h a) where
@@ -263,20 +240,20 @@ instance HashAlgorithm h => IsString (Hash h a) where
       Just x  -> x
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
-instance HashAlgorithm h => ToJSONKey (Hash h a) where
+instance ToJSONKey (Hash h a) where
   toJSONKey = Aeson.ToJSONKeyText hashToText (Aeson.text . hashToText)
 
 instance HashAlgorithm h => FromJSONKey (Hash h a) where
   fromJSONKey = Aeson.FromJSONKeyTextParser parseHash
 
-instance HashAlgorithm h => ToJSON (Hash h a) where
+instance ToJSON (Hash h a) where
   toJSON = toJSON . hashToText
 
 instance HashAlgorithm h => FromJSON (Hash h a) where
   parseJSON = Aeson.withText "hash" parseHash
 
 -- utils used in the instances above
-hashToText :: HashAlgorithm h => Hash h a -> Text
+hashToText :: Hash h a -> Text
 hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
@@ -331,7 +308,7 @@ hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
 hash = hashWithSerialiser toCBOR
 
 {-# DEPRECATED fromHash "Use bytesToNatural . hashToBytes" #-}
-fromHash :: HashAlgorithm h => Hash h a -> Natural
+fromHash :: Hash h a -> Natural
 fromHash = foldl' f 0 . BS.unpack . hashToBytes
   where
     f :: Natural -> Word8 -> Natural
@@ -342,16 +319,16 @@ hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashRaw = hashWith
 
 {-# DEPRECATED getHash "Use hashToBytes" #-}
-getHash :: HashAlgorithm h => Hash h a -> ByteString
+getHash :: Hash h a -> ByteString
 getHash = hashToBytes
 
 {-# DEPRECATED getHashBytesAsHex "Use hashToBytesAsHex" #-}
-getHashBytesAsHex :: HashAlgorithm h => Hash h a -> ByteString
+getHashBytesAsHex :: Hash h a -> ByteString
 getHashBytesAsHex = hashToBytesAsHex
 
 -- | XOR two hashes together
 --TODO: fully deprecate this, or rename it and make it efficient.
-xor :: HashAlgorithm h => Hash h a -> Hash h a -> Hash h a
+xor :: Hash h a -> Hash h a -> Hash h a
 xor (UnsafeHash x) (UnsafeHash y) =
     UnsafeHash
   . SBS.toShort
