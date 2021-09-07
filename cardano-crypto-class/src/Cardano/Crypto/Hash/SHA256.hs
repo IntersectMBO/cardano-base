@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the SHA256 hashing algorithm.

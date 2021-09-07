@@ -309,9 +309,9 @@ mungeName basename
 --
 
 deriving instance HashAlgorithm h => Show (VerKeyKES (SumKES h d))
-deriving instance HashAlgorithm h => Eq   (VerKeyKES (SumKES h d))
+deriving instance Eq   (VerKeyKES (SumKES h d))
 
-instance (HashAlgorithm h, KESAlgorithm d) => NoThunks (SignKeyKES (SumKES h d))
+instance (KESAlgorithm d) => NoThunks (SignKeyKES (SumKES h d))
 
 instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
       => ToCBOR (VerKeyKES (SumKES h d)) where
@@ -329,7 +329,7 @@ instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
 
 deriving instance KESAlgorithm d => Show (SignKeyKES (SumKES h d))
 
-instance (HashAlgorithm h, KESAlgorithm d) => NoThunks (VerKeyKES  (SumKES h d))
+instance (KESAlgorithm d) => NoThunks (VerKeyKES  (SumKES h d))
 
 instance (KESAlgorithm d, HashAlgorithm h, Typeable d)
       => ToCBOR (SignKeyKES (SumKES h d)) where

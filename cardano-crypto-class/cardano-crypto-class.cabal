@@ -88,6 +88,8 @@ library
 
                         Cardano.Foreign
 
+  other-modules:        Cardano.Crypto.PackedBytes
+
   build-depends:        aeson
                       , base
                       , base16-bytestring >= 1
