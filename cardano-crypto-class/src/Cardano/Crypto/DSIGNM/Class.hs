@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -13,8 +15,9 @@
 module Cardano.Crypto.DSIGNM.Class
   (
     -- * DSIGNMM algorithm class
-    DSIGNMAlgorithm (..)
-  , Seed
+    DSIGNMAlgorithmBase (..)
+  , DSIGNMAlgorithm (..)
+  , MLockedSeed
   , seedSizeDSIGNM
   , sizeVerKeyDSIGNM
   , sizeSignKeyDSIGNM
@@ -50,13 +53,22 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (KnownNat, Nat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
+-- import Control.DeepSeq (NFData)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
-import Cardano.Crypto.Seed
+import Cardano.Crypto.Libsodium.MLockedBytes
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
+-- deriving instance NFData (VerKeyDSIGNM d)
+-- deriving instance NFData (SignKeyDSIGNM d)
+-- deriving instance NFData (SigDSIGNM d)
+
+-- | A seed of size @n@, stored in mlocked memory. This is required to prevent
+-- the seed from leaking to disk via swapping and reclaiming or scanning memory
+-- after its content has been moved.
+type MLockedSeed n = MLockedSizedBytes n
 
 
 class ( Typeable v
@@ -73,7 +85,7 @@ class ( Typeable v
       , KnownNat (SizeSignKeyDSIGNM v)
       , KnownNat (SizeSigDSIGNM v)
       )
-      => DSIGNMAlgorithm v where
+      => DSIGNMAlgorithmBase v where
 
   type SeedSizeDSIGNM    v :: Nat
   type SizeVerKeyDSIGNM  v :: Nat
@@ -94,11 +106,8 @@ class ( Typeable v
 
   algorithmNameDSIGNM :: proxy v -> String
 
-  deriveVerKeyDSIGNM :: SignKeyDSIGNM v -> IO (VerKeyDSIGNM v)
-
   hashVerKeyDSIGNM :: HashAlgorithm h => VerKeyDSIGNM v -> Hash h (VerKeyDSIGNM v)
   hashVerKeyDSIGNM = hashWith rawSerialiseVerKeyDSIGNM
-
 
   --
   -- Core algorithm operations
@@ -113,13 +122,6 @@ class ( Typeable v
   type Signable v :: Type -> Constraint
   type Signable v = Empty
 
-  signDSIGNM
-    :: (Signable v a, HasCallStack)
-    => ContextDSIGNM v
-    -> a
-    -> SignKeyDSIGNM v
-    -> IO (SigDSIGNM v)
-
   verifyDSIGNM
     :: (Signable v a, HasCallStack)
     => ContextDSIGNM v
@@ -128,22 +130,57 @@ class ( Typeable v
     -> SigDSIGNM v
     -> Either String ()
 
+  --
+  -- Serialisation/(de)serialisation in fixed-size raw format
+  --
+
+  rawSerialiseVerKeyDSIGNM    :: VerKeyDSIGNM v -> ByteString
+  rawSerialiseSigDSIGNM       :: SigDSIGNM v -> ByteString
+
+  rawDeserialiseVerKeyDSIGNM  :: ByteString -> Maybe (VerKeyDSIGNM v)
+  rawDeserialiseSigDSIGNM     :: ByteString -> Maybe (SigDSIGNM v)
+
+class ( DSIGNMAlgorithmBase v
+      , Monad m
+      )
+      => DSIGNMAlgorithm m v where
+
+  --
+  -- Metadata and basic key operations
+  --
+
+  deriveVerKeyDSIGNM :: SignKeyDSIGNM v -> m (VerKeyDSIGNM v)
+
+  --
+  -- Core algorithm operations
+  --
+
+  signDSIGNM
+    :: (Signable v a, HasCallStack)
+    => ContextDSIGNM v
+    -> a
+    -> SignKeyDSIGNM v
+    -> m (SigDSIGNM v)
 
   --
   -- Key generation
   --
 
-  genKeyDSIGNM :: Seed -> IO (SignKeyDSIGNM v)
+  genKeyDSIGNM :: MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
+
+  --
+  -- Secure forgetting
+  --
+
+  forgetSignKeyDSIGNM :: SignKeyDSIGNM v -> m ()
 
   --
   -- Serialisation/(de)serialisation in fixed-size raw format
   --
 
-  rawSerialiseVerKeyDSIGNM    :: VerKeyDSIGNM  v -> ByteString
-  rawSerialiseSigDSIGNM       :: SigDSIGNM     v -> ByteString
+  rawSerialiseSignKeyDSIGNM   :: SignKeyDSIGNM v -> m ByteString
 
-  rawDeserialiseVerKeyDSIGNM  :: ByteString -> Maybe (VerKeyDSIGNM  v)
-  rawDeserialiseSigDSIGNM     :: ByteString -> Maybe (SigDSIGNM     v)
+  rawDeserialiseSignKeyDSIGNM :: ByteString -> m (Maybe (SignKeyDSIGNM v))
 
 --
 -- Do not provide Ord instances for keys, see #38
@@ -161,15 +198,15 @@ instance ( TypeError ('Text "Ord not supported for verification keys, use the ha
       => Ord (VerKeyDSIGNM v) where
     compare = error "unsupported"
 
--- | The upper bound on the 'Seed' size needed by 'genKeyDSIGNM'
-seedSizeDSIGNM :: forall v proxy. DSIGNMAlgorithm v => proxy v -> Word
+-- | The upper bound on the seed size needed by 'genKeyDSIGNM'
+seedSizeDSIGNM :: forall v proxy. DSIGNMAlgorithmBase v => proxy v -> Word
 seedSizeDSIGNM _ = fromInteger (natVal (Proxy @(SeedSizeDSIGNM v)))
 
-sizeVerKeyDSIGNM    :: forall v proxy. DSIGNMAlgorithm v => proxy v -> Word
+sizeVerKeyDSIGNM    :: forall v proxy. DSIGNMAlgorithmBase v => proxy v -> Word
 sizeVerKeyDSIGNM  _ = fromInteger (natVal (Proxy @(SizeVerKeyDSIGNM v)))
-sizeSignKeyDSIGNM   :: forall v proxy. DSIGNMAlgorithm v => proxy v -> Word
+sizeSignKeyDSIGNM   :: forall v proxy. DSIGNMAlgorithmBase v => proxy v -> Word
 sizeSignKeyDSIGNM _ = fromInteger (natVal (Proxy @(SizeSignKeyDSIGNM v)))
-sizeSigDSIGNM       :: forall v proxy. DSIGNMAlgorithm v => proxy v -> Word
+sizeSigDSIGNM       :: forall v proxy. DSIGNMAlgorithmBase v => proxy v -> Word
 sizeSigDSIGNM     _ = fromInteger (natVal (Proxy @(SizeSigDSIGNM v)))
 
 --
@@ -178,13 +215,13 @@ sizeSigDSIGNM     _ = fromInteger (natVal (Proxy @(SizeSigDSIGNM v)))
 -- Implementations in terms of the raw (de)serialise
 --
 
-encodeVerKeyDSIGNM :: DSIGNMAlgorithm v => VerKeyDSIGNM v -> Encoding
+encodeVerKeyDSIGNM :: DSIGNMAlgorithmBase v => VerKeyDSIGNM v -> Encoding
 encodeVerKeyDSIGNM = encodeBytes . rawSerialiseVerKeyDSIGNM
 
-encodeSigDSIGNM :: DSIGNMAlgorithm v => SigDSIGNM v -> Encoding
+encodeSigDSIGNM :: DSIGNMAlgorithmBase v => SigDSIGNM v -> Encoding
 encodeSigDSIGNM = encodeBytes . rawSerialiseSigDSIGNM
 
-decodeVerKeyDSIGNM :: forall v s. DSIGNMAlgorithm v => Decoder s (VerKeyDSIGNM v)
+decodeVerKeyDSIGNM :: forall v s. DSIGNMAlgorithmBase v => Decoder s (VerKeyDSIGNM v)
 decodeVerKeyDSIGNM = do
     bs <- decodeBytes
     case rawDeserialiseVerKeyDSIGNM bs of
@@ -198,7 +235,7 @@ decodeVerKeyDSIGNM = do
           expected = fromIntegral (sizeVerKeyDSIGNM (Proxy :: Proxy v))
           actual   = BS.length bs
 
-decodeSigDSIGNM :: forall v s. DSIGNMAlgorithm v => Decoder s (SigDSIGNM v)
+decodeSigDSIGNM :: forall v s. DSIGNMAlgorithmBase v => Decoder s (SigDSIGNM v)
 decodeSigDSIGNM = do
     bs <- decodeBytes
     case rawDeserialiseSigDSIGNM bs of
@@ -216,22 +253,22 @@ decodeSigDSIGNM = do
 newtype SignedDSIGNM v a = SignedDSIGNM (SigDSIGNM v)
   deriving Generic
 
-deriving instance DSIGNMAlgorithm v => Show (SignedDSIGNM v a)
-deriving instance DSIGNMAlgorithm v => Eq   (SignedDSIGNM v a)
+deriving instance DSIGNMAlgorithmBase v => Show (SignedDSIGNM v a)
+deriving instance DSIGNMAlgorithmBase v => Eq   (SignedDSIGNM v a)
 
-instance DSIGNMAlgorithm v => NoThunks (SignedDSIGNM v a)
+instance DSIGNMAlgorithmBase v => NoThunks (SignedDSIGNM v a)
   -- use generic instance
 
 signedDSIGNM
-  :: (DSIGNMAlgorithm v, Signable v a)
+  :: (DSIGNMAlgorithm m v, Signable v a)
   => ContextDSIGNM v
   -> a
   -> SignKeyDSIGNM v
-  -> IO (SignedDSIGNM v a)
+  -> m (SignedDSIGNM v a)
 signedDSIGNM ctxt a key = SignedDSIGNM <$> signDSIGNM ctxt a key
 
 verifySignedDSIGNM
-  :: (DSIGNMAlgorithm v, Signable v a, HasCallStack)
+  :: (DSIGNMAlgorithmBase v, Signable v a, HasCallStack)
   => ContextDSIGNM v
   -> VerKeyDSIGNM v
   -> a
@@ -239,10 +276,10 @@ verifySignedDSIGNM
   -> Either String ()
 verifySignedDSIGNM ctxt key a (SignedDSIGNM s) = verifyDSIGNM ctxt key a s
 
-encodeSignedDSIGNM :: DSIGNMAlgorithm v => SignedDSIGNM v a -> Encoding
+encodeSignedDSIGNM :: DSIGNMAlgorithmBase v => SignedDSIGNM v a -> Encoding
 encodeSignedDSIGNM (SignedDSIGNM s) = encodeSigDSIGNM s
 
-decodeSignedDSIGNM :: DSIGNMAlgorithm v => Decoder s (SignedDSIGNM v a)
+decodeSignedDSIGNM :: DSIGNMAlgorithmBase v => Decoder s (SignedDSIGNM v a)
 decodeSignedDSIGNM = SignedDSIGNM <$> decodeSigDSIGNM
 
 --
@@ -252,7 +289,7 @@ decodeSignedDSIGNM = SignedDSIGNM <$> decodeSigDSIGNM
 -- | 'Size' expression for 'VerKeyDSIGNM' which is using 'sizeVerKeyDSIGNM'
 -- encoded as 'Size'.
 --
-encodedVerKeyDSIGNMSizeExpr :: forall v. DSIGNMAlgorithm v => Proxy (VerKeyDSIGNM v) -> Size
+encodedVerKeyDSIGNMSizeExpr :: forall v. DSIGNMAlgorithmBase v => Proxy (VerKeyDSIGNM v) -> Size
 encodedVerKeyDSIGNMSizeExpr _proxy =
       -- 'encodeBytes' envelope
       fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyDSIGNM (Proxy :: Proxy v)))
@@ -262,7 +299,7 @@ encodedVerKeyDSIGNMSizeExpr _proxy =
 -- | 'Size' expression for 'SignKeyDSIGNM' which is using 'sizeSignKeyDSIGNM'
 -- encoded as 'Size'.
 --
-encodedSignKeyDESIGNSizeExpr :: forall v. DSIGNMAlgorithm v => Proxy (SignKeyDSIGNM v) -> Size
+encodedSignKeyDESIGNSizeExpr :: forall v. DSIGNMAlgorithmBase v => Proxy (SignKeyDSIGNM v) -> Size
 encodedSignKeyDESIGNSizeExpr _proxy =
       -- 'encodeBytes' envelope
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyDSIGNM (Proxy :: Proxy v)))
@@ -272,7 +309,7 @@ encodedSignKeyDESIGNSizeExpr _proxy =
 -- | 'Size' expression for 'SigDSIGNM' which is using 'sizeSigDSIGNM' encoded as
 -- 'Size'.
 --
-encodedSigDSIGNMSizeExpr :: forall v. DSIGNMAlgorithm v => Proxy (SigDSIGNM v) -> Size
+encodedSigDSIGNMSizeExpr :: forall v. DSIGNMAlgorithmBase v => Proxy (SigDSIGNM v) -> Size
 encodedSigDSIGNMSizeExpr _proxy =
       -- 'encodeBytes' envelope
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSigDSIGNM (Proxy :: Proxy v)))

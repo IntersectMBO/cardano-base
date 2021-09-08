@@ -45,7 +45,6 @@ import           Cardano.Prelude (NFData)
 newtype Seed = Seed ByteString
   deriving (Show, Eq, Semigroup, Monoid, NoThunks, NFData)
 
-
 -- | Construct a 'Seed' deterministically from a number of bytes.
 --
 mkSeedFromBytes :: ByteString -> Seed

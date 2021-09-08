@@ -47,6 +47,7 @@ import Data.Proxy (Proxy (..))
 import GHC.TypeLits (KnownNat)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable)
+import Data.Word (Word8)
 
 {-#DEPRECATED traceMLockedForeignPtr "Do not use traceMLockedForeignPtr in production" #-}
 
@@ -62,6 +63,7 @@ class Monad m => MonadSodium m where
   mlsbFinalize :: MLockedSizedBytes n -> m ()
   mlsbCopy :: forall n. KnownNat n => MLockedSizedBytes n -> m (MLockedSizedBytes n)
   mlsbUseAsSizedPtr :: forall n r. KnownNat n => MLockedSizedBytes n -> (SizedPtr n -> m r) -> m r
+  mlsbUseAsCPtr :: forall n r. KnownNat n => MLockedSizedBytes n -> (Ptr Word8 -> m r) -> m r
 
   -- * SafePinned
   makeSafePinned :: a -> m (SP.SafePinned a)

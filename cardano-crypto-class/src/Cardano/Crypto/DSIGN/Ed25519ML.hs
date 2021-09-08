@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Ed25519 digital signatures.
 module Cardano.Crypto.DSIGN.Ed25519ML
@@ -61,7 +62,7 @@ cOrError contextDesc cFunName action = do
       errno <- getErrno
       ioException $ errnoToIOError (contextDesc ++ ": " ++ cFunName) errno Nothing Nothing
 
-instance DSIGNMAlgorithm Ed25519DSIGNM where
+instance DSIGNMAlgorithmBase Ed25519DSIGNM where
     type SeedSizeDSIGNM Ed25519DSIGNM = CRYPTO_SIGN_ED25519_SEEDBYTES
     -- | Ed25519 key size is 32 octets
     -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
@@ -104,34 +105,11 @@ instance DSIGNMAlgorithm Ed25519DSIGNM where
 
     algorithmNameDSIGNM _ = "ed25519-ml"
 
-    deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
-      VerKeyEd25519DSIGNM <$> do
-        mlsbUseAsSizedPtr sk $ \skPtr ->
-          allocaSized $ \seedPtr ->
-          psbCreateSized $ \pkPtr -> do
-              cOrError "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
-                $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
-              cOrError "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair"
-                $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr seedPtr
-
-
     --
     -- Core algorithm operations
     --
 
     type Signable Ed25519DSIGNM = SignableRepresentation
-
-    signDSIGNM () a (SignKeyEd25519DSIGNM sk) =
-      let bs = getSignableRepresentation a
-      in SigEd25519DSIGNM <$> do
-          BS.useAsCStringLen bs $ \(ptr, len) -> 
-            mlsbUseAsSizedPtr sk $ \skPtr ->
-            allocaSized $ \pkPtr -> do
-                cOrError "signDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_pk"
-                  $ c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
-                psbCreateSized $ \sigPtr -> do
-                  cOrError "signDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_detached"
-                    $ c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
 
     verifyDSIGNM () (VerKeyEd25519DSIGNM vk) a (SigEd25519DSIGNM sig) =
         let bs = getSignableRepresentation a
@@ -147,19 +125,6 @@ instance DSIGNMAlgorithm Ed25519DSIGNM where
                   return (Left  "Verification failed")
 
     --
-    -- Key generation
-    --
-
-    genKeyDSIGNM seed = SignKeyEd25519DSIGNM <$> do
-          sk <- mlsbNew
-          mlsbUseAsSizedPtr sk $ \skPtr ->
-            BS.useAsCStringLen (getSeedBytes $ seed) $ \(seedPtr, _) ->
-            allocaSized $ \pkPtr -> do
-                cOrError "genKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair"
-                  $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
-          return sk
-
-    --
     -- raw serialise/deserialise
     --
 
@@ -169,6 +134,40 @@ instance DSIGNMAlgorithm Ed25519DSIGNM where
     rawDeserialiseVerKeyDSIGNM  = fmap VerKeyEd25519DSIGNM . psbFromByteStringCheck
     rawDeserialiseSigDSIGNM     = fmap SigEd25519DSIGNM . psbFromByteStringCheck
 
+instance DSIGNMAlgorithm IO Ed25519DSIGNM where
+    deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
+      VerKeyEd25519DSIGNM <$> do
+        mlsbUseAsSizedPtr sk $ \skPtr ->
+          allocaSized $ \seedPtr ->
+          psbCreateSized $ \pkPtr -> do
+              cOrError "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
+                $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
+              cOrError "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair"
+                $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr seedPtr
+
+    signDSIGNM () a (SignKeyEd25519DSIGNM sk) =
+      let bs = getSignableRepresentation a
+      in SigEd25519DSIGNM <$> do
+          BS.useAsCStringLen bs $ \(ptr, len) -> 
+            mlsbUseAsSizedPtr sk $ \skPtr ->
+            allocaSized $ \pkPtr -> do
+                cOrError "signDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_pk"
+                  $ c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
+                psbCreateSized $ \sigPtr -> do
+                  cOrError "signDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_detached"
+                    $ c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
+
+    --
+    -- Key generation
+    --
+    genKeyDSIGNM seed = SignKeyEd25519DSIGNM <$> do
+          sk <- mlsbNew
+          mlsbUseAsSizedPtr sk $ \skPtr ->
+            mlsbUseAsCPtr seed $ \seedPtr ->
+            allocaSized $ \pkPtr -> do
+                cOrError "genKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair"
+                  $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
+          return sk
 
 instance ToCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
   toCBOR = encodeVerKeyDSIGNM
