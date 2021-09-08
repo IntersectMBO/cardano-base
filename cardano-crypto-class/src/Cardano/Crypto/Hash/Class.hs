@@ -220,7 +220,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . Base16.decode
 
-instance HashAlgorithm h => Show (Hash h a) where
+instance Show (Hash h a) where
   show = show . hashToStringAsHex
 
 instance HashAlgorithm h => Read (Hash h a) where
