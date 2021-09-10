@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MagicHash #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
@@ -80,7 +81,9 @@ import NoThunks.Class (NoThunks)
 import Cardano.Binary (Encoding, FromCBOR(..), Size, ToCBOR(..), decodeBytes,
                        serializeEncoding')
 import Cardano.Crypto.PackedBytes
+import Cardano.Prelude (HeapWords (..))
 
+import qualified Data.ByteString.Short.Internal as SBSI
 
 class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
   --TODO: eliminate this Typeable constraint needed only for the ToCBOR
@@ -220,7 +223,7 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . Base16.decode
 
-instance HashAlgorithm h => Show (Hash h a) where
+instance Show (Hash h a) where
   show = show . hashToStringAsHex
 
 instance HashAlgorithm h => Read (Hash h a) where
@@ -243,6 +246,12 @@ instance HashAlgorithm h => ToJSON (Hash h a) where
 
 instance HashAlgorithm h => FromJSON (Hash h a) where
   parseJSON = Aeson.withText "hash" parseHash
+
+instance HeapWords (Hash h a) where
+  heapWords (UnsafeHashRep (PackedBytes8 _)) = 1 + 1
+  heapWords (UnsafeHashRep (PackedBytes28 _ _ _ _)) = 1 + 4
+  heapWords (UnsafeHashRep (PackedBytes32 _ _ _ _)) = 1 + 4
+  heapWords (UnsafeHashRep (PackedBytes# ba#)) = heapWords (SBSI.SBS ba#)
 
 -- utils used in the instances above
 hashToText :: Hash h a -> Text
