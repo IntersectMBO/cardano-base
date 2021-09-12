@@ -103,6 +103,7 @@ library
                       , memory
                       , nothunks
                       , primitive
+                      , serialise
                       , text
                       , transformers
                       , vector
