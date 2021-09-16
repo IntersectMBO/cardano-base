@@ -135,6 +135,9 @@ class ( Typeable v
   -- Key generation
   --
 
+  -- | Note that this function may error (with 'SeedBytesExhausted') if the
+  -- provided seed is not long enough. Callers should ensure that the seed has
+  -- is at least 'seedSizeDSIGN' bytes long.
   genKeyDSIGN :: Seed -> SignKeyDSIGN v
 
   --

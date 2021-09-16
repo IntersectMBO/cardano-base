@@ -35,6 +35,7 @@ import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (SignableRepresentation(..))
+import Data.Proxy
 
 
 data Ed25519DSIGN
@@ -125,7 +126,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     signDSIGN () a (SignKeyEd25519DSIGN sk) =
       let bs = getSignableRepresentation a
       in SigEd25519DSIGN $ unsafeDupablePerformIO $
-            BS.useAsCStringLen bs $ \(ptr, len) -> 
+            BS.useAsCStringLen bs $ \(ptr, len) ->
             psbUseAsSizedPtr sk $ \skPtr ->
             allocaSized $ \pkPtr -> do
                 cOrError "signDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk"
@@ -152,13 +153,13 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     --
 
     genKeyDSIGN seed = SignKeyEd25519DSIGN $
-        unsafeDupablePerformIO $ do
+      let (sb, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @Ed25519DSIGN)) seed
+      in unsafeDupablePerformIO $ do
           psbCreateSized $ \skPtr ->
-            BS.useAsCStringLen (getSeedBytes $ seed) $ \(seedPtr, _) ->
+            BS.useAsCStringLen sb $ \(seedPtr, _) ->
             allocaSized $ \pkPtr -> do
                 cOrError "genKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair"
                   $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
-
     --
     -- raw serialise/deserialise
     --
