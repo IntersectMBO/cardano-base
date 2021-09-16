@@ -52,6 +52,8 @@ mkSeedFromBytes :: ByteString -> Seed
 mkSeedFromBytes = Seed
 
 
+-- | Extract the full bytes from a seed. Note that this function does not
+-- guarantee that the result is sufficiently long for the desired seed size!
 getSeedBytes :: Seed -> ByteString
 getSeedBytes (Seed s) = s
 
