@@ -20,6 +20,9 @@ module Cardano.Crypto.PackedBytes
   , xorPackedBytes
   ) where
 
+import Codec.Serialise (Serialise(..))
+import Codec.Serialise.Decoding (decodeBytes)
+import Codec.Serialise.Encoding (encodeBytes)
 import Control.DeepSeq
 import Control.Monad.Primitive
 import Data.Bits
@@ -83,6 +86,10 @@ instance NFData (PackedBytes n) where
   rnf PackedBytes28 {} = ()
   rnf PackedBytes32 {} = ()
   rnf PackedBytes#  {} = ()
+
+instance Serialise (PackedBytes n) where
+  encode = encodeBytes . unpackPinnedBytes
+  decode = packPinnedBytesN <$> decodeBytes
 
 xorPackedBytes :: PackedBytes n -> PackedBytes n -> PackedBytes n
 xorPackedBytes (PackedBytes8 x) (PackedBytes8 y) = PackedBytes8 (x `xor` y)
