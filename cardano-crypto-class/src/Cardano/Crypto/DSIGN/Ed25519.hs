@@ -109,13 +109,9 @@ instance DSIGNAlgorithm Ed25519DSIGN where
       VerKeyEd25519DSIGN $
         unsafeDupablePerformIO $
         psbUseAsSizedPtr sk $ \skPtr ->
-        allocaSized $ \seedPtr ->
-        psbCreateSized $ \pkPtr -> do
-            cOrError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_seed"
-              $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
-            cOrError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair"
-              $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr seedPtr
-
+        psbCreateSized $ \pkPtr ->
+          cOrError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk"
+            $ c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
 
     --
     -- Core algorithm operations
