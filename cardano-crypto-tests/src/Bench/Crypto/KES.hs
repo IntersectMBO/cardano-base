@@ -13,7 +13,7 @@ module Bench.Crypto.KES
 
 import Cardano.Prelude
 import Criterion
-import Cardano.Crypto.DSIGN.Ed25519
+import Cardano.Crypto.DSIGN.Ed25519ML
 import Cardano.Crypto.Hash.Blake2b
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.KES.Sum
@@ -58,8 +58,8 @@ typicalMsg = BS.pack
 
 benchmarks :: Benchmark
 benchmarks = bgroup "KES"
-  [ bench_kes @Proxy @IO @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy Proxy "Sum6KES"
-  , bench_kes @Proxy @IO @(Sum7KES Ed25519DSIGN Blake2b_256) Proxy Proxy "Sum7KES"
+  [ bench_kes @Proxy @IO @(Sum6KES Ed25519DSIGNM Blake2b_256) Proxy Proxy "Sum6KES"
+  , bench_kes @Proxy @IO @(Sum7KES Ed25519DSIGNM Blake2b_256) Proxy Proxy "Sum7KES"
   ]
 
 bench_kes :: forall (proxy :: forall k. k -> Type) m v

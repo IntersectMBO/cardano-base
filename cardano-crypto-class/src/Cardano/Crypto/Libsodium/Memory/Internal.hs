@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE CPP #-}
@@ -22,6 +24,7 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
 
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (newTChanIO, TChan, tryReadTChan, writeTChan)
+import Control.DeepSeq (NFData (..), rwhnf)
 import Control.Exception (bracket)
 import Control.Monad (when)
 import Data.Coerce (coerce)
@@ -58,6 +61,9 @@ pushAllocLogEvent = atomically . writeTChan allocLog
 -- | Foreign pointer to securely allocated memory.
 newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: ForeignPtr a }
   deriving NoThunks via OnlyCheckWhnfNamed "MLockedForeignPtr" (MLockedForeignPtr a)
+
+instance NFData (MLockedForeignPtr a) where
+  rnf = rwhnf . _unwrapMLockedForeignPtr
 
 withMLockedForeignPtr :: forall a b. MLockedForeignPtr a -> (Ptr a -> IO b) -> IO b
 withMLockedForeignPtr = coerce (withForeignPtr @a @b)

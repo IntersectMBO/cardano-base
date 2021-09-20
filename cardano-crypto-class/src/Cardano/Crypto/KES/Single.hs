@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -43,7 +44,7 @@ import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
--- import Control.DeepSeq (NFData)
+import Control.DeepSeq (NFData)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -61,9 +62,9 @@ import qualified Cardano.Crypto.MonadSodium as NaCl
 --
 data SingleKES d
 
--- deriving instance NFData (VerKeyKES (SingleKES d))
--- deriving instance NFData (SignKeyKES (SingleKES d))
--- deriving instance NFData (SigKES (SingleKES d))
+deriving instance NFData (VerKeyDSIGNM d) => NFData (VerKeyKES (SingleKES d))
+deriving instance NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (SingleKES d))
+deriving instance NFData (SigDSIGNM d) => NFData (SigKES (SingleKES d))
 
 instance (DSIGNMAlgorithmBase d, Typeable d) => KESAlgorithm (SingleKES d) where
     type SeedSizeKES (SingleKES d) = SeedSizeDSIGNM d
@@ -82,7 +83,7 @@ instance (DSIGNMAlgorithmBase d, Typeable d) => KESAlgorithm (SingleKES d) where
         deriving Generic
 
     type ContextKES (SingleKES d) = ContextDSIGNM d
-    type Signable   (SingleKES d) = DSIGNM.Signable     d
+    type Signable   (SingleKES d) = DSIGNM.SignableM     d
 
 
     --

@@ -59,14 +59,14 @@ import Test.Crypto.Instances ()
 tests :: TestTree
 tests =
   testGroup "Crypto.KES"
-  [ testKESAlloc (Proxy :: Proxy (SingleKES Ed25519DSIGN)) "SingleKES"
-  , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
+  [ testKESAlloc (Proxy :: Proxy (SingleKES Ed25519DSIGNM)) "SingleKES"
+  , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGNM Blake2b_256)) "Sum1KES"
   , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (MockKES 7))               "MockKES"
   , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (SimpleKES Ed448DSIGN 7))  "SimpleKES"
-  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (SingleKES Ed25519DSIGN))  "SingleKES"
-  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
-  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
-  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
+  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (SingleKES Ed25519DSIGNM))  "SingleKES"
+  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (Sum1KES Ed25519DSIGNM Blake2b_256)) "Sum1KES"
+  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (Sum2KES Ed25519DSIGNM Blake2b_256)) "Sum2KES"
+  , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (Sum5KES Ed25519DSIGNM Blake2b_256)) "Sum5KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
@@ -86,7 +86,7 @@ instance Show (SignKeyKES (SumKES h d)) where
 
 deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
 
-deriving instance Eq (NaCl.SodiumSignKeyDSIGN d)
+deriving instance Eq (SignKeyDSIGNM d)
                => Eq (SignKeyKES (SingleKES d))
 deriving instance (KESAlgorithm d, NaCl.SodiumHashAlgorithm h, Eq (SignKeyKES d))
                => Eq (SignKeyKES (SumKES h d))

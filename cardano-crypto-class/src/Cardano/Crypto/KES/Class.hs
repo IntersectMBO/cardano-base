@@ -40,6 +40,7 @@ module Cardano.Crypto.KES.Class
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Kind (Type)

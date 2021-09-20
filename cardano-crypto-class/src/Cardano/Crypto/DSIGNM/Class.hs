@@ -38,7 +38,7 @@ module Cardano.Crypto.DSIGNM.Class
 
     -- * Encoded 'Size' expresssions
   , encodedVerKeyDSIGNMSizeExpr
-  , encodedSignKeyDESIGNSizeExpr
+  , encodedSignKeyDSIGNMSizeExpr
   , encodedSigDSIGNMSizeExpr
   )
 where
@@ -119,11 +119,11 @@ class ( Typeable v
   type ContextDSIGNM v :: Type
   type ContextDSIGNM v = ()
 
-  type Signable v :: Type -> Constraint
-  type Signable v = Empty
+  type SignableM v :: Type -> Constraint
+  type SignableM v = Empty
 
   verifyDSIGNM
-    :: (Signable v a, HasCallStack)
+    :: (SignableM v a, HasCallStack)
     => ContextDSIGNM v
     -> VerKeyDSIGNM v
     -> a
@@ -156,7 +156,7 @@ class ( DSIGNMAlgorithmBase v
   --
 
   signDSIGNM
-    :: (Signable v a, HasCallStack)
+    :: (SignableM v a, HasCallStack)
     => ContextDSIGNM v
     -> a
     -> SignKeyDSIGNM v
@@ -260,7 +260,7 @@ instance DSIGNMAlgorithmBase v => NoThunks (SignedDSIGNM v a)
   -- use generic instance
 
 signedDSIGNM
-  :: (DSIGNMAlgorithm m v, Signable v a)
+  :: (DSIGNMAlgorithm m v, SignableM v a)
   => ContextDSIGNM v
   -> a
   -> SignKeyDSIGNM v
@@ -268,7 +268,7 @@ signedDSIGNM
 signedDSIGNM ctxt a key = SignedDSIGNM <$> signDSIGNM ctxt a key
 
 verifySignedDSIGNM
-  :: (DSIGNMAlgorithmBase v, Signable v a, HasCallStack)
+  :: (DSIGNMAlgorithmBase v, SignableM v a, HasCallStack)
   => ContextDSIGNM v
   -> VerKeyDSIGNM v
   -> a
@@ -299,8 +299,8 @@ encodedVerKeyDSIGNMSizeExpr _proxy =
 -- | 'Size' expression for 'SignKeyDSIGNM' which is using 'sizeSignKeyDSIGNM'
 -- encoded as 'Size'.
 --
-encodedSignKeyDESIGNSizeExpr :: forall v. DSIGNMAlgorithmBase v => Proxy (SignKeyDSIGNM v) -> Size
-encodedSignKeyDESIGNSizeExpr _proxy =
+encodedSignKeyDSIGNMSizeExpr :: forall v. DSIGNMAlgorithmBase v => Proxy (SignKeyDSIGNM v) -> Size
+encodedSignKeyDSIGNMSizeExpr _proxy =
       -- 'encodeBytes' envelope
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyDSIGNM (Proxy :: Proxy v)))
       -- payload

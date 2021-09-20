@@ -110,7 +110,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
     -- Core algorithm operations
     --
 
-    type Signable Ed25519DSIGNM = SignableRepresentation
+    type SignableM Ed25519DSIGNM = SignableRepresentation
 
     verifyDSIGNM () (VerKeyEd25519DSIGNM vk) a (SigEd25519DSIGNM sig) =
         let bs = getSignableRepresentation a

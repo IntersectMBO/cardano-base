@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
@@ -36,6 +38,7 @@ import qualified Data.ByteString.Internal as BSI
 
 newtype MLockedSizedBytes n = MLSB (MLockedForeignPtr (PinnedSizedBytes n))
   deriving NoThunks via OnlyCheckWhnfNamed "MLockedSizedBytes" (MLockedSizedBytes n)
+  deriving newtype NFData
 
 instance KnownNat n => Eq (MLockedSizedBytes n) where
     x == y = compare x y == EQ
@@ -53,9 +56,6 @@ instance KnownNat n => Show (MLockedSizedBytes n) where
     showsPrec d _ = showParen (d > 10)
         $ showString "_ :: MLockedSizedBytes "
         . showsPrec 11 (natVal (Proxy @n))
-
-instance NFData (MLockedSizedBytes n) where
-    rnf (MLSB p) = seq p ()
 
 -- | Note: this doesn't need to allocate mlocked memory,
 -- but we do that for consistency
