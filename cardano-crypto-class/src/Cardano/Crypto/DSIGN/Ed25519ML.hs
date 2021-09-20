@@ -8,7 +8,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
--- | Ed25519 digital signatures.
+-- | Ed25519 digital signatures. This flavor of Ed25519 stores secrets in
+-- mlocked memory to make sure they cannot leak to disk via swapping.
 module Cardano.Crypto.DSIGN.Ed25519ML
   ( Ed25519DSIGNM
   , SigDSIGNM (..)
@@ -137,13 +138,10 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 instance DSIGNMAlgorithm IO Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$> do
-        mlsbUseAsSizedPtr sk $ \skPtr ->
-          allocaSized $ \seedPtr ->
-          psbCreateSized $ \pkPtr -> do
-              cOrError "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
-                $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
-              cOrError "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair"
-                $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr seedPtr
+        mlsbUseAsSizedPtr sk $ \skPtr -> do
+          psbCreateSized $ \pkPtr ->
+            cOrError "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_pk"
+              $ c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
 
     signDSIGNM () a (SignKeyEd25519DSIGNM sk) =
       let bs = getSignableRepresentation a
