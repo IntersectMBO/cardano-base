@@ -37,7 +37,7 @@ import Cardano.Crypto.Libsodium.C
 -- import Cardano.Crypto.Libsodium.Memory.Internal
 import Cardano.Crypto.Libsodium (MLockedSizedBytes)
 -- import Cardano.Crypto.Libsodium.MLockedBytes
-import Cardano.Crypto.MonadSodium (MonadSodium (..))
+import Cardano.Crypto.MonadSodium (MonadSodium (..), mlsbToByteString, mlsbFromByteStringCheck, mlsbCopy)
 
 import Cardano.Crypto.DSIGNM.Class
 import Cardano.Crypto.Seed
@@ -166,6 +166,34 @@ instance DSIGNMAlgorithm IO Ed25519DSIGNM where
                 cOrError "genKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair"
                   $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
           return sk
+
+    --
+    -- Secure forgetting
+    --
+    forgetSignKeyDSIGNM (SignKeyEd25519DSIGNM sk) = do
+      mlsbFinalize sk
+
+    --
+    -- Ser/deser (dangerous)
+    --
+    rawSerialiseSignKeyDSIGNM   (SignKeyEd25519DSIGNM sk) = do
+      psbToByteString @(SeedSizeDSIGNM Ed25519DSIGNM) <$> do
+        let seed = psbZero
+        mlsbUseAsSizedPtr sk $ \skPtr ->
+          psbUseAsSizedPtr seed $ \seedPtr ->
+            cOrError "rawSerialiseSignKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
+              $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
+        return seed
+
+    rawDeserialiseSignKeyDSIGNM raw = do
+      let mseed = mlsbFromByteStringCheck raw
+      case mseed of
+        Nothing -> return Nothing
+        Just seed -> do
+          sk <- Just <$> genKeyDSIGNM seed
+          mlsbFinalize seed
+          return sk
+
 
 instance ToCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
   toCBOR = encodeVerKeyDSIGNM

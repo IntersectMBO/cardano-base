@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Test.Crypto.Util
   ( -- * CBOR
@@ -15,8 +16,10 @@ module Test.Crypto.Util
   , prop_cbor_valid
   , prop_cbor_roundtrip
   , prop_raw_serialise
+  , prop_raw_serialise_IO
   , prop_raw_serialise_only
   , prop_size_serialise
+  , prop_size_serialise_IO
   , prop_cbor_direct_vs_class
 
     -- * NoThunks
@@ -66,6 +69,7 @@ import Test.QuickCheck
   , property
   , shrink
   , vector
+  , ioProperty
   )
 import Formatting.Buildable (Buildable (..))
 
@@ -176,6 +180,18 @@ prop_raw_serialise serialise deserialise x =
       Just y  -> y === x
       Nothing -> property False
 
+prop_raw_serialise_IO :: forall a. (Eq a, Show a)
+                   => (a -> IO ByteString)
+                   -> (ByteString -> IO (Maybe a))
+                   -> IO a
+                   -> Property
+prop_raw_serialise_IO serialise deserialise mkX = do
+  ioProperty $ do
+    x <- mkX
+    serialise x >>= deserialise >>= \case
+      Just y  -> return (y === x)
+      Nothing -> return (property False)
+
 prop_raw_serialise_only :: (a -> ByteString)
                         -> a -> Bool
 prop_raw_serialise_only serialise x =
@@ -196,6 +212,11 @@ prop_cbor_direct_vs_class encoder x =
 prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
 prop_size_serialise serialise size x =
     BS.length (serialise x) === fromIntegral size
+
+prop_size_serialise_IO :: (a -> IO ByteString) -> Word -> a -> Property
+prop_size_serialise_IO serialise size x = ioProperty $ do
+    actual <- BS.length <$> serialise x
+    return $ actual === fromIntegral size
 
 --------------------------------------------------------------------------------
 -- NoThunks

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -12,9 +13,13 @@ module Test.Crypto.DSIGN
 where
 
 import Data.Proxy (Proxy (..))
+import Data.Word (Word8)
 
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Util (SignableRepresentation(..))
+import Cardano.Crypto.Seed (mkSeedFromBytes)
+
+import GHC.Stack (HasCallStack)
 
 import Test.Crypto.Util hiding (label)
 import Test.Crypto.Instances ()
@@ -37,6 +42,101 @@ tests =
     [ testDSIGNAlgorithm (Proxy :: Proxy MockDSIGN) "MockDSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy Ed25519DSIGN) "Ed25519DSIGN"
     , testDSIGNAlgorithm (Proxy :: Proxy Ed448DSIGN) "Ed448DSIGN"
+    , testDSIGNMAlgorithm (Proxy :: Proxy Ed25519DSIGNM) (Proxy :: Proxy Ed25519DSIGN) "Ed25519DSIGNM"
+    ]
+
+testDSIGNMAlgorithm
+  :: forall proxy v w. ( DSIGNMAlgorithm IO v
+                       , DSIGNAlgorithm w
+                       , ToCBOR (VerKeyDSIGNM v)
+                       , FromCBOR (VerKeyDSIGNM v)
+                       -- , ToCBOR (SignKeyDSIGNM v)
+                       -- , FromCBOR (SignKeyDSIGNM v)
+                       , Eq (SignKeyDSIGNM v)   -- no Eq for signing keys normally
+                       , ToCBOR (SigDSIGNM v)
+                       , FromCBOR (SigDSIGNM v)
+                       , SignableM v ~ SignableRepresentation
+                       , Signable w ~ SignableRepresentation
+                       , ContextDSIGNM v ~ ()
+                       , ContextDSIGN w ~ ()
+                       )
+  => proxy v
+  -> proxy w
+  -> String
+  -> TestTree
+testDSIGNMAlgorithm _ _ n =
+  testGroup n
+    [ testGroup "serialisation"
+      []
+      -- [ testGroup "raw"
+      --   [ testProperty "VerKey"  $ prop_raw_serialise_IO @(VerKeyDSIGNM v)
+      --                                                 (return . rawSerialiseVerKeyDSIGNM)
+      --                                                 (return . rawDeserialiseVerKeyDSIGNM)
+      --   , testProperty "SignKey" $ prop_raw_serialise_IO @(SignKeyDSIGNM v)
+      --                                                 rawSerialiseSignKeyDSIGNM
+      --                                                 rawDeserialiseSignKeyDSIGNM
+      --   , testProperty "Sig"     $ prop_raw_serialise_IO @(SigDSIGNM v)
+      --                                                 (return . rawSerialiseSigDSIGNM)
+      --                                                 (return . rawDeserialiseSigDSIGNM)
+      --   ]
+
+      -- , testGroup "size"
+      --   [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyDSIGNM v)
+      --                                                  rawSerialiseVerKeyDSIGNM
+      --                                                  (sizeVerKeyDSIGNM (Proxy @ v))
+      --   , testProperty "SignKey" $ prop_size_serialise_IO @(SignKeyDSIGNM v)
+      --                                                  rawSerialiseSignKeyDSIGNM
+      --                                                  (sizeSignKeyDSIGNM (Proxy @ v))
+      --   , testProperty "Sig"     $ prop_size_serialise @(SigDSIGNM v)
+      --                                                  rawSerialiseSigDSIGNM
+      --                                                  (sizeSigDSIGNM (Proxy @ v))
+      --   ]
+
+      -- , testGroup "direct CBOR"
+      --   [ testProperty "VerKey"  $ prop_cbor_with @(VerKeyDSIGNM v)
+      --                                             encodeVerKeyDSIGNM
+      --                                             decodeVerKeyDSIGNM
+      --   -- , testProperty "SignKey" $ prop_cbor_with @(SignKeyDSIGNM v)
+      --   --                                           encodeSignKeyDSIGNM
+      --   --                                           decodeSignKeyDSIGNM
+      --   , testProperty "Sig"     $ prop_cbor_with @(SigDSIGNM v)
+      --                                             encodeSigDSIGNM
+      --                                             decodeSigDSIGNM
+      --   ]
+
+      -- , testGroup "To/FromCBOR class"
+      --   [ testProperty "VerKey"  $ prop_cbor @(VerKeyDSIGNM v)
+      --   , testProperty "SignKey" $ prop_cbor @(SignKeyDSIGNM v)
+      --   , testProperty "Sig"     $ prop_cbor @(SigDSIGNM v)
+      --   ]
+
+      -- , testGroup "ToCBOR size"
+      --   [ testProperty "VerKey"  $ prop_cbor_size @(VerKeyDSIGNM v)
+      --   , testProperty "SignKey" $ prop_cbor_size @(SignKeyDSIGNM v)
+      --   , testProperty "Sig"     $ prop_cbor_size @(SigDSIGNM v)
+      --   ]
+
+      -- , testGroup "direct matches class"
+      --   [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyDSIGNM v)
+      --                                                        encodeVerKeyDSIGNM
+      --   -- , testProperty "SignKey" $ prop_cbor_direct_vs_class @(SignKeyDSIGNM v)
+      --   --                                                      encodeSignKeyDSIGNM
+      --   , testProperty "Sig"     $ prop_cbor_direct_vs_class @(SigDSIGNM v)
+      --                                                        encodeSigDSIGNM
+      --   ]
+      -- ]
+
+    -- , testGroup "verify"
+    --   [ testProperty "verify positive" $ prop_dsign_verify_pos @v
+    --   , testProperty "verify negative (wrong key)" $ prop_dsign_verify_neg_key @v
+    --   , testProperty "verify negative (wrong message)" $ prop_dsign_verify_neg_msg @v
+    --   ]
+
+    -- , testGroup "NoThunks"
+    --   [ testProperty "VerKey"  $ prop_no_thunks @(VerKeyDSIGNM v)
+    --   , testProperty "SignKey" $ prop_no_thunks @(SignKeyDSIGNM v)
+    --   , testProperty "Sig"     $ prop_no_thunks @(SigDSIGNM v)
+    --   ]
     ]
 
 testDSIGNAlgorithm
@@ -117,8 +217,8 @@ testDSIGNAlgorithm _ n =
 
     , testGroup "verify"
       [ testProperty "verify positive" $ prop_dsign_verify_pos @v
-      , testProperty "verify newgative (wrong key)" $ prop_dsign_verify_neg_key @v
-      , testProperty "verify newgative (wrong message)" $ prop_dsign_verify_neg_msg @v
+      , testProperty "verify negative (wrong key)" $ prop_dsign_verify_neg_key @v
+      , testProperty "verify negative (wrong message)" $ prop_dsign_verify_neg_msg @v
       ]
 
     , testGroup "NoThunks"
@@ -180,87 +280,117 @@ prop_dsign_verify_neg_msg a a' sk =
 --
 
 prop_sodium_genKey
-    :: forall v. NaCl.SodiumDSIGNAlgorithm v
+    :: forall v w.
+       ( DSIGNMAlgorithm IO v
+       , DSIGNAlgorithm w
+       )
     => Proxy v
-    -> NaCl.MLockedSizedBytes (SeedSizeDSIGN v)
+    -> Proxy w
+    -> MLockedSeed (SeedSizeDSIGNM v)
     -> Property
-prop_sodium_genKey p seed = ioProperty $ do
-    actual <- NaCl.mlsbToByteString <$> NaCl.naclGenKeyDSIGN p seed
-    let expected = rawSerialiseSignKeyDSIGN (genKeyDSIGN (mkSeedFromBytes (NaCl.mlsbToByteString seed)) :: SignKeyDSIGN v)
+prop_sodium_genKey p q seed = ioProperty $ do
+    sk <- genKeyDSIGNM seed :: IO (SignKeyDSIGNM v)
+    let sk' = genKeyDSIGN (mkSeedFromBytes $ NaCl.mlsbToByteString seed) :: SignKeyDSIGN w
+    actual <- rawSerialiseSignKeyDSIGNM sk
+    let expected = rawSerialiseSignKeyDSIGN sk'
     return (actual === expected)
 
 fromJustCS :: HasCallStack => Maybe a -> a
 fromJustCS (Just x) = x
 fromJustCS Nothing  = error "fromJustCS"
 
+-- | Given the monadic and pure flavors of the same DSIGN algorithm, show that
+-- they derive the same verkey
 prop_sodium_deriveVerKey
-    :: forall v. NaCl.SodiumDSIGNAlgorithm v
+    :: forall v w
+     . (DSIGNMAlgorithm IO v, DSIGNAlgorithm w)
     => Proxy v
-    -> NaCl.SodiumSignKeyDSIGN v
+    -> Proxy w
+    -> SignKeyDSIGNM v
     -> Property
-prop_sodium_deriveVerKey p sk = ioProperty $ do
-  actual <- psbToByteString <$> NaCl.naclDeriveVerKeyDSIGN p sk
-  let sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
-      expected = rawSerialiseVerKeyDSIGN $ deriveVerKeyDSIGN sk'
+prop_sodium_deriveVerKey p q sk = ioProperty $ do
+  Just sk' <- (rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk) :: IO (Maybe (SignKeyDSIGN w))
+  actual <- rawSerialiseVerKeyDSIGNM <$> deriveVerKeyDSIGNM sk
+  let expected = rawSerialiseVerKeyDSIGN $ deriveVerKeyDSIGN sk'
   return (actual === expected)
 
 prop_sodium_sign
-    :: forall v. (NaCl.SodiumDSIGNAlgorithm v, Signable v ~ SignableRepresentation, ContextDSIGN v ~ ())
+    :: forall v w.
+       ( DSIGNMAlgorithm IO v
+       , DSIGNAlgorithm w
+       , SignableM v ~ SignableRepresentation
+       , Signable w ~ SignableRepresentation
+       , ContextDSIGNM v ~ ()
+       , ContextDSIGN w ~ ()
+       )
     => Proxy v
-    -> NaCl.SodiumSignKeyDSIGN v
+    -> Proxy w
+    -> SignKeyDSIGNM v
     -> [Word8]
     -> Property
-prop_sodium_sign p sk bytes = actual === expected
+prop_sodium_sign p q sk bytes = ioProperty $ do
+  Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
+  actual <- rawSerialiseSigDSIGNM <$> (signDSIGNM () msg sk :: IO (SigDSIGNM v))
+  let expected = rawSerialiseSigDSIGN $ (signDSIGN () msg sk' :: SigDSIGN w)
+  return (actual === expected)
   where
     msg = BS.pack bytes
-    actual = psbToByteString $ NaCl.naclSignDSIGN p msg sk
-    sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
-    expected = rawSerialiseSigDSIGN $ signDSIGN () msg sk'
 
 prop_sodium_verify
-    :: forall v. (NaCl.SodiumDSIGNAlgorithm v, Signable v ~ SignableRepresentation, ContextDSIGN v ~ ())
+    :: forall v w.
+       ( DSIGNMAlgorithm IO v
+       , DSIGNAlgorithm w
+       , SignableM v ~ SignableRepresentation
+       , Signable w ~ SignableRepresentation
+       , ContextDSIGNM v ~ ()
+       , ContextDSIGN w ~ ()
+       )
     => Proxy v
-    -> NaCl.SodiumSignKeyDSIGN v
+    -> Proxy w
+    -> SignKeyDSIGNM v
     -> [Word8]
     -> Property
-prop_sodium_verify p sk bytes = ioProperty $ do
-    vk <- NaCl.naclDeriveVerKeyDSIGN p sk
-    let actual = NaCl.naclVerifyDSIGN p vk msg sig
+prop_sodium_verify p q sk bytes = ioProperty $ do
+    Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
+    vk <- deriveVerKeyDSIGNM sk
+    let vk' = deriveVerKeyDSIGN sk'
+    sig <- signDSIGNM () msg sk
+    let sig' = signDSIGN () msg sk' :: SigDSIGN w
+
+    let actual = verifyDSIGNM () vk msg sig
+    let expected = verifyDSIGN () vk' msg sig'
     return $ label (con expected) $ actual === expected
   where
     msg = BS.pack bytes
-    sig = NaCl.naclSignDSIGN p msg sk
-
-    sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
-    sig' = fromJustCS $ rawDeserialiseSigDSIGN $ psbToByteString sig :: SigDSIGN v
-    vk' = deriveVerKeyDSIGN sk'
-
-    expected = verifyDSIGN () vk' msg sig'
-
     con :: Either a b -> String
     con (Left _) = "Left"
     con (Right _) = "Right"
 
 prop_sodium_verify_neg
-    :: forall v. (NaCl.SodiumDSIGNAlgorithm v, Signable v ~ SignableRepresentation, ContextDSIGN v ~ ())
+    :: forall v w.
+       ( DSIGNMAlgorithm IO v
+       , DSIGNAlgorithm w
+       , SignableM v ~ SignableRepresentation
+       , Signable w ~ SignableRepresentation
+       , ContextDSIGNM v ~ ()
+       , ContextDSIGN w ~ ()
+       )
     => Proxy v
-    -> NaCl.SodiumSignKeyDSIGN v
+    -> Proxy w
+    -> SignKeyDSIGNM v
     -> [Word8]
-    -> NaCl.SodiumSigDSIGN v
+    -> SigDSIGNM v
     -> Property
-prop_sodium_verify_neg p sk bytes sig = ioProperty $ do
-    vk <- NaCl.naclDeriveVerKeyDSIGN p sk
-    let actual = NaCl.naclVerifyDSIGN p vk msg sig
+prop_sodium_verify_neg p q sk bytes sig = ioProperty $ do
+    Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
+    vk <- deriveVerKeyDSIGNM sk
+    let vk' = deriveVerKeyDSIGN sk'
+    let Just sig' = rawDeserialiseSigDSIGN $ rawSerialiseSigDSIGNM sig :: Maybe (SigDSIGN w)
+    let actual = verifyDSIGNM () vk msg sig
+    let expected = verifyDSIGN () vk' msg sig'
     return $ label (con expected) $ actual === expected
   where
     msg = BS.pack bytes
-
-    sk' = fromJustCS $ rawDeserialiseSignKeyDSIGN $ NaCl.mlsbToByteString sk :: SignKeyDSIGN v
-    sig' = fromJustCS $ rawDeserialiseSigDSIGN $ psbToByteString sig :: SigDSIGN v
-    vk' = deriveVerKeyDSIGN sk'
-
-    expected = verifyDSIGN () vk' msg sig'
-
     con :: Either a b -> String
     con (Left _) = "Left"
     con (Right _) = "Right"

@@ -274,7 +274,7 @@ decodeSignKeyKES = do
     let expected = fromIntegral (sizeSignKeyKES (Proxy @v))
         actual   = BS.length bs
     if actual /= expected then
-      fail ("decodeSigKES: wrong length, expected " ++
+      fail ("decodeSignKeyKES: wrong length, expected " ++
                show expected ++ " bytes but got " ++ show actual)
     else
       return $ rawDeserialiseSignKeyKES bs

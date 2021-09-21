@@ -79,6 +79,7 @@ instance MonadSodium IO where
   mlsbFinalize = NaCl.mlsbFinalize
   mlsbCopy = NaCl.mlsbCopy
   mlsbUseAsSizedPtr = NaCl.mlsbUseAsSizedPtr
+  mlsbUseAsCPtr = NaCl.mlsbUseAsCPtr
   makeSafePinned = SP.makeSafePinned
   releaseSafePinned = SP.releaseSafePinned
   interactSafePinned = SP.interactSafePinned
