@@ -51,7 +51,6 @@ module Cardano.Crypto.Hash.Class
   )
 where
 
-import Control.Monad (join)
 import Data.List (foldl')
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy(..))
@@ -162,7 +161,7 @@ hashToBytes (UnsafeHashRep h) = unpackPinnedBytes h
 hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytes bytes
   | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just (UnsafeHashRep (packPinnedBytes bytes))
+  = Just $! UnsafeHashRep (packPinnedBytes bytes)
 
   | otherwise
   = Nothing
@@ -175,7 +174,7 @@ hashFromBytesShort :: forall h a. HashAlgorithm h
                    => ShortByteString -> Maybe (Hash h a)
 hashFromBytesShort bytes
   | SBS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just (UnsafeHash bytes)
+  = Just $! UnsafeHash bytes
 
   | otherwise
   = Nothing
@@ -227,7 +226,9 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
 --
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
-hashFromBytesAsHex = join . either (const Nothing) (Just . hashFromBytes) . Base16.decode
+hashFromBytesAsHex bsHex = do
+  Right bs <- Just $ Base16.decode bsHex
+  hashFromBytes bs
 
 instance Show (Hash h a) where
   show = show . hashToStringAsHex
