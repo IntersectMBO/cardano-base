@@ -28,6 +28,8 @@ import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
 -- import qualified Data.ByteString.Unsafe as BS
+import Data.Proxy
+import Control.Exception (evaluate)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -167,6 +169,14 @@ instance DSIGNMAlgorithm IO Ed25519DSIGNM where
                   $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
           return sk
 
+    getSeedDSIGNM _ (SignKeyEd25519DSIGNM sk) = do
+        seed <- mlsbNew
+        mlsbUseAsSizedPtr sk $ \skPtr ->
+          mlsbUseAsSizedPtr seed $ \seedPtr ->
+            cOrError "rawSerialiseSignKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
+              $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
+        return seed
+
     --
     -- Secure forgetting
     --
@@ -176,14 +186,13 @@ instance DSIGNMAlgorithm IO Ed25519DSIGNM where
     --
     -- Ser/deser (dangerous)
     --
-    rawSerialiseSignKeyDSIGNM   (SignKeyEd25519DSIGNM sk) = do
-      psbToByteString @(SeedSizeDSIGNM Ed25519DSIGNM) <$> do
-        let seed = psbZero
-        mlsbUseAsSizedPtr sk $ \skPtr ->
-          psbUseAsSizedPtr seed $ \seedPtr ->
-            cOrError "rawSerialiseSignKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
-              $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
-        return seed
+    rawSerialiseSignKeyDSIGNM sk = do
+      seed <- getSeedDSIGNM (Proxy @Ed25519DSIGNM) sk
+      -- need to copy the seed into unsafe memory and finalize the MLSB, in
+      -- order to avoid leaking mlocked memory
+      raw <- evaluate . (BS.copy $!) . mlsbToByteString $ seed
+      mlsbFinalize seed
+      return raw
 
     rawDeserialiseSignKeyDSIGNM raw = do
       let mseed = mlsbFromByteStringCheck raw

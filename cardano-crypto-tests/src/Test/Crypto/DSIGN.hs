@@ -14,6 +14,7 @@ where
 
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
+import Control.Monad
 
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Util (SignableRepresentation(..))
@@ -67,18 +68,20 @@ testDSIGNMAlgorithm
 testDSIGNMAlgorithm _ _ n =
   testGroup n
     [ testGroup "serialisation"
-      []
-      -- [ testGroup "raw"
-      --   [ testProperty "VerKey"  $ prop_raw_serialise_IO @(VerKeyDSIGNM v)
-      --                                                 (return . rawSerialiseVerKeyDSIGNM)
-      --                                                 (return . rawDeserialiseVerKeyDSIGNM)
-      --   , testProperty "SignKey" $ prop_raw_serialise_IO @(SignKeyDSIGNM v)
-      --                                                 rawSerialiseSignKeyDSIGNM
-      --                                                 rawDeserialiseSignKeyDSIGNM
-      --   , testProperty "Sig"     $ prop_raw_serialise_IO @(SigDSIGNM v)
-      --                                                 (return . rawSerialiseSigDSIGNM)
-      --                                                 (return . rawDeserialiseSigDSIGNM)
-      --   ]
+      [ testGroup "raw"
+        [ testProperty "VerKey"  $ prop_raw_serialise_IO_from @(VerKeyDSIGNM v)
+                                                      (return . rawSerialiseVerKeyDSIGNM)
+                                                      (return . rawDeserialiseVerKeyDSIGNM)
+                                                      (genKeyDSIGNM >=> deriveVerKeyDSIGNM)
+        -- , testProperty "SignKey" $ prop_raw_serialise_IO_from @(SignKeyDSIGNM v)
+        --                                               rawSerialiseSignKeyDSIGNM
+        --                                               rawDeserialiseSignKeyDSIGNM
+        --                                               genKeyDSIGNM
+        -- , testProperty "Sig"     $ prop_raw_serialise_IO_from @(SigDSIGNM v)
+        --                                               (return . rawSerialiseSigDSIGNM)
+        --                                               (return . rawDeserialiseSigDSIGNM)
+        --                                               return
+        ]
 
       -- , testGroup "size"
       --   [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyDSIGNM v)
@@ -124,10 +127,13 @@ testDSIGNMAlgorithm _ _ n =
       --   , testProperty "Sig"     $ prop_cbor_direct_vs_class @(SigDSIGNM v)
       --                                                        encodeSigDSIGNM
       --   ]
-      -- ]
+        , testGroup "Seed/SK"
+          [ testProperty "Seed round-trip" $ prop_dsignm_seed_roundtrip (Proxy @v)
+          ]
+      ]
 
     -- , testGroup "verify"
-    --   [ testProperty "verify positive" $ prop_dsign_verify_pos @v
+    --   [ testProperty "verify positive" $ prop_dsignm_verify_pos @v
     --   , testProperty "verify negative (wrong key)" $ prop_dsign_verify_neg_key @v
     --   , testProperty "verify negative (wrong message)" $ prop_dsign_verify_neg_msg @v
     --   ]
@@ -227,6 +233,16 @@ testDSIGNAlgorithm _ n =
       , testProperty "Sig"     $ prop_no_thunks @(SigDSIGN v)
       ]
     ]
+
+prop_dsignm_seed_roundtrip
+  :: forall v. (DSIGNMAlgorithm IO v)
+  => Proxy v
+  -> MLockedSeed (SeedSizeDSIGNM v)
+  -> Property
+prop_dsignm_seed_roundtrip p seed = ioProperty $ do
+  sk <- genKeyDSIGNM seed
+  seed' <- getSeedDSIGNM p sk
+  return (seed === seed')
 
 -- | If we sign a message @a@ with the signing key, then we can verify the
 -- signature using the corresponding verification key.

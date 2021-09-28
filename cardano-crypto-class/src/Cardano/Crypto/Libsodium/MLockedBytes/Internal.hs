@@ -27,6 +27,7 @@ import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import Data.Word (Word8)
 import Control.Monad (void)
+import Text.Printf
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.Memory.Internal
@@ -53,9 +54,13 @@ instance KnownNat n => Ord (MLockedSizedBytes n) where
         size = natVal (Proxy @n)
 
 instance KnownNat n => Show (MLockedSizedBytes n) where
-    showsPrec d _ = showParen (d > 10)
-        $ showString "_ :: MLockedSizedBytes "
-        . showsPrec 11 (natVal (Proxy @n))
+    -- showsPrec d _ = showParen (d > 10)
+    --     $ showString "_ :: MLockedSizedBytes "
+    --     . showsPrec 11 (natVal (Proxy @n))
+    show mlsb =
+      let bytes = BS.unpack $ mlsbToByteString mlsb
+          hexstr = concatMap (printf "%02x") bytes
+      in "MLSB " ++ hexstr
 
 -- | Note: this doesn't need to allocate mlocked memory,
 -- but we do that for consistency

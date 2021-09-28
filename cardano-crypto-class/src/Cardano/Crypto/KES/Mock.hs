@@ -104,10 +104,9 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     rawSerialiseVerKeyKES (VerKeyMockKES vk) =
         writeBinaryWord64 vk
 
-    rawSerialiseSigKES (SigMockKES h (SignKeyMockKES k t)) =
+    rawSerialiseSigKES (SigMockKES h sk) =
         hashToBytes h
-     <> rawSerialiseVerKeyKES k
-     <> writeBinaryWord64 (fromIntegral t)
+     <> rawSerialiseSignKeyMockKES sk
 
     rawDeserialiseVerKeyKES bs
       | [vkb] <- splitsAt [8] bs
@@ -118,12 +117,10 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       = Nothing
 
     rawDeserialiseSigKES bs
-      | [hb, kb, tb] <- splitsAt [16, 8, 8] bs
+      | [hb, skb] <- splitsAt [8, 16] bs
       , Just h    <- hashFromBytes hb
-      , Just k    <- rawDeserialiseVerKeyKES kb
-      , t    <- fromIntegral (readBinaryWord64 tb)
-      = Just $! SigMockKES h (SignKeyMockKES k t)
-
+      , Just sk   <- rawDeserialiseSignKeyMockKES skb
+      = Just $! SigMockKES h sk
       | otherwise
       = Nothing
 
@@ -152,18 +149,23 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
         let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
         return $ SignKeyMockKES vk 0
 
-    rawSerialiseSignKeyKES (SignKeyMockKES vk t) = return $
-        rawSerialiseVerKeyKES vk
-     <> writeBinaryWord64 (fromIntegral t)
+    rawSerialiseSignKeyKES sk =
+      return $ rawSerialiseSignKeyMockKES sk
 
-    rawDeserialiseSignKeyKES bs
-      | [vkb, tb] <- splitsAt [8, 8] bs
-      , Just vk   <- rawDeserialiseVerKeyKES vkb
-      , let t      = fromIntegral (readBinaryWord64 tb)
-      = return . Just $! SignKeyMockKES vk t
+    rawDeserialiseSignKeyKES bs =
+      return $ rawDeserialiseSignKeyMockKES bs
 
-      | otherwise
-      = return Nothing
+rawDeserialiseSignKeyMockKES bs
+    | [vkb, tb] <- splitsAt [8, 8] bs
+    , Just vk   <- rawDeserialiseVerKeyKES vkb
+    , let t      = fromIntegral (readBinaryWord64 tb)
+    = Just $! SignKeyMockKES vk t
+    | otherwise
+    = Nothing
+
+rawSerialiseSignKeyMockKES (SignKeyMockKES vk t) =
+    rawSerialiseVerKeyKES vk
+ <> writeBinaryWord64 (fromIntegral t)
 
 instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
   toCBOR = encodeVerKeyKES

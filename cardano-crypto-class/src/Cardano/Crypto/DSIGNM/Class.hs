@@ -168,6 +168,8 @@ class ( DSIGNMAlgorithmBase v
 
   genKeyDSIGNM :: MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
 
+  getSeedDSIGNM :: Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
+
   --
   -- Secure forgetting
   --

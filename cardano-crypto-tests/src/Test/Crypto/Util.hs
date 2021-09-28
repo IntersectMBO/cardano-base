@@ -16,7 +16,7 @@ module Test.Crypto.Util
   , prop_cbor_valid
   , prop_cbor_roundtrip
   , prop_raw_serialise
-  , prop_raw_serialise_IO
+  , prop_raw_serialise_IO_from
   , prop_raw_serialise_only
   , prop_size_serialise
   , prop_size_serialise_IO
@@ -180,14 +180,15 @@ prop_raw_serialise serialise deserialise x =
       Just y  -> y === x
       Nothing -> property False
 
-prop_raw_serialise_IO :: forall a. (Eq a, Show a)
+prop_raw_serialise_IO_from :: forall a b. (Eq a, Show a)
                    => (a -> IO ByteString)
                    -> (ByteString -> IO (Maybe a))
-                   -> IO a
+                   -> (b -> IO a)
+                   -> b
                    -> Property
-prop_raw_serialise_IO serialise deserialise mkX = do
+prop_raw_serialise_IO_from serialise deserialise mkX seed = do
   ioProperty $ do
-    x <- mkX
+    x <- mkX seed
     serialise x >>= deserialise >>= \case
       Just y  -> return (y === x)
       Nothing -> return (property False)

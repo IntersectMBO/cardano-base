@@ -27,6 +27,7 @@ import Foreign.Ptr (WordPtr)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 import Data.Maybe (fromJust)
+import Text.Printf
 
 import Control.Exception (evaluate)
 import Control.Concurrent (threadDelay)
@@ -79,8 +80,12 @@ instance Eq a => Eq (SafePinned a) where
       interactSafePinned bp $ \b ->
         return (a == b)
 
-instance Show (SignKeyKES (SingleKES d)) where
-  show _ = "<SignKeySingleKES>"
+instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
+  show (SignKeySingleKES (SignKeyEd25519DSIGNM mlsb)) =
+    let bytes = BS.unpack $ NaCl.mlsbToByteString mlsb
+        hexstr = concatMap (printf "%02x") bytes
+    in "SignKeySingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
+
 instance Show (SignKeyKES (SumKES h d)) where
   show _ = "<SignKeySumKES>"
 
@@ -235,9 +240,10 @@ testKESAlgorithm _pm _pv n =
         , testProperty "Sig"     $ prop_raw_serialise @(SigKES v)
                                                       rawSerialiseSigKES
                                                       rawDeserialiseSigKES
-        , testProperty "SignKey" $ prop_raw_serialise @(SignKeyKES v)
-                                                      (unsafePerformIO . io . rawSerialiseSignKeyKES @m @v)
-                                                      (unsafePerformIO . io . rawDeserialiseSignKeyKES @m @v)
+        , testProperty "SignKey" $ prop_raw_serialise_IO_from @(SignKeyKES v)
+                                                      (io . rawSerialiseSignKeyKES @m @v)
+                                                      (io . rawDeserialiseSignKeyKES @m @v)
+                                                      (io . genKeyKES @m @v)
         ]
 
       , testGroup "size"
@@ -592,3 +598,5 @@ instance ( KESSignAlgorithm IO v
     let sig = unsafePerformIO $ signKES () 0 a sk
     return sig
   shrink = const []
+
+-- MLockedSizedBytes
