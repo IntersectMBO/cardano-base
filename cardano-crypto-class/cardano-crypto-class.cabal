@@ -88,7 +88,7 @@ library
 
                         Cardano.Foreign
 
-  other-modules:        Cardano.Crypto.PackedBytes
+                        Cardano.Crypto.PackedBytes
 
   build-depends:        aeson
                       , base
