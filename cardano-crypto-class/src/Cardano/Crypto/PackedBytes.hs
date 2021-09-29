@@ -35,7 +35,7 @@ import Data.Primitive.PrimArray (PrimArray(..), imapPrimArray, indexPrimArray)
 import Data.Typeable
 import Foreign.ForeignPtr
 import Foreign.Ptr (castPtr)
-import Foreign.Storable (peekByteOff)
+import Foreign.Storable (Storable(..))
 import GHC.Exts
 import GHC.ForeignPtr (ForeignPtr(ForeignPtr), ForeignPtrContents(PlainPtr))
 import GHC.ST
@@ -90,6 +90,30 @@ instance NFData (PackedBytes n) where
 instance Serialise (PackedBytes n) where
   encode = encodeBytes . unpackPinnedBytes
   decode = packPinnedBytesN <$> decodeBytes
+
+instance KnownNat n => Storable (PackedBytes n) where
+  sizeOf _ = fromInteger (natVal (Proxy :: Proxy n))
+  {-# INLINE sizeOf #-}
+  alignment _ = fromInteger (natVal (Proxy :: Proxy n))
+  {-# INLINE alignment #-}
+  peek = peekPtrBytes
+  {-# INLINE peek #-}
+  poke ptr pb =
+    case pb of
+      PackedBytes8 w64 -> pokeWord64BE ptr 0 w64
+      PackedBytes28 x0 x1 x2 x3 -> do
+        pokeWord64BE ptr 0  x0
+        pokeWord64BE ptr 8  x1
+        pokeWord64BE ptr 16 x2
+        pokeWord32BE ptr 24 x3
+      PackedBytes32 x0 x1 x2 x3 -> do
+        pokeWord64BE ptr 0  x0
+        pokeWord64BE ptr 8  x1
+        pokeWord64BE ptr 16 x2
+        pokeWord64BE ptr 24 x3
+      PackedBytes# ba# -> do
+        copyByteArrayToAddr (castPtr ptr) (ByteArray ba#) 0 (sizeOf pb)
+  {-# INLINE poke #-}
 
 xorPackedBytes :: PackedBytes n -> PackedBytes n -> PackedBytes n
 xorPackedBytes (PackedBytes8 x) (PackedBytes8 y) = PackedBytes8 (x `xor` y)
@@ -206,32 +230,56 @@ packBytes sbs@(SBS ba#) =
 
 
 packPinnedBytes8 :: ByteString -> PackedBytes 8
-packPinnedBytes8 bs = unsafeWithByteStringPtr bs (fmap PackedBytes8 . (`peekWord64BE` 0))
+packPinnedBytes8 bs = unsafeWithByteStringPtr bs peekPtrBytes8
 {-# INLINE packPinnedBytes8 #-}
 
+peekPtrBytes8 :: Ptr (PackedBytes 8) -> IO (PackedBytes 8)
+peekPtrBytes8 = fmap PackedBytes8 . (`peekWord64BE` 0)
+{-# INLINE peekPtrBytes8 #-}
+
+
 packPinnedBytes28 :: ByteString -> PackedBytes 28
-packPinnedBytes28 bs =
-  unsafeWithByteStringPtr bs $ \ptr ->
-    PackedBytes28
-      <$> peekWord64BE ptr 0
-      <*> peekWord64BE ptr 8
-      <*> peekWord64BE ptr 16
-      <*> peekWord32BE ptr 24
+packPinnedBytes28 bs = unsafeWithByteStringPtr bs peekPtrBytes28
 {-# INLINE packPinnedBytes28 #-}
 
+peekPtrBytes28 :: Ptr (PackedBytes 28) -> IO (PackedBytes 28)
+peekPtrBytes28 ptr =
+  PackedBytes28
+    <$> peekWord64BE ptr 0
+    <*> peekWord64BE ptr 8
+    <*> peekWord64BE ptr 16
+    <*> peekWord32BE ptr 24
+{-# INLINE peekPtrBytes28 #-}
+
+
 packPinnedBytes32 :: ByteString -> PackedBytes 32
-packPinnedBytes32 bs =
-  unsafeWithByteStringPtr bs $ \ptr -> PackedBytes32 <$> peekWord64BE ptr 0
-                                                   <*> peekWord64BE ptr 8
-                                                   <*> peekWord64BE ptr 16
-                                                   <*> peekWord64BE ptr 24
+packPinnedBytes32 bs = unsafeWithByteStringPtr bs peekPtrBytes32
 {-# INLINE packPinnedBytes32 #-}
+
+peekPtrBytes32 :: Ptr (PackedBytes 32) -> IO (PackedBytes 32)
+peekPtrBytes32 ptr =
+  PackedBytes32
+    <$> peekWord64BE ptr 0
+    <*> peekWord64BE ptr 8
+    <*> peekWord64BE ptr 16
+    <*> peekWord64BE ptr 24
+{-# INLINE peekPtrBytes32 #-}
+
 
 packPinnedBytesN :: ByteString -> PackedBytes n
 packPinnedBytesN bs =
   case toShort bs of
     SBS ba# -> PackedBytes# ba#
 {-# INLINE packPinnedBytesN #-}
+
+peekPtrBytesN ::
+     forall n. KnownNat n
+  => Ptr (PackedBytes n)
+  -> IO (PackedBytes n)
+peekPtrBytesN ptr = do
+  SBS ba# <- SBS.packCStringLen (castPtr ptr, fromInteger (natVal (Proxy :: Proxy n)))
+  pure $ PackedBytes# ba#
+{-# INLINE peekPtrBytesN #-}
 
 
 packPinnedBytes :: forall n . KnownNat n => ByteString -> PackedBytes n
@@ -251,6 +299,26 @@ packPinnedBytes bs =
 "packPinnedBytes28" packPinnedBytes = packPinnedBytes28
 "packPinnedBytes32" packPinnedBytes = packPinnedBytes32
 "packPinnedBytesN"  packPinnedBytes = packPinnedBytesN
+  #-}
+
+
+peekPtrBytes :: forall n . KnownNat n => Ptr (PackedBytes n) -> IO (PackedBytes n)
+peekPtrBytes ptr =
+  let px = Proxy :: Proxy n
+   in case sameNat px (Proxy :: Proxy 8) of
+        Just Refl -> peekPtrBytes8 ptr
+        Nothing -> case sameNat px (Proxy :: Proxy 28) of
+          Just Refl -> peekPtrBytes28 ptr
+          Nothing -> case sameNat px (Proxy :: Proxy 32) of
+            Just Refl -> peekPtrBytes32 ptr
+            Nothing   -> peekPtrBytesN ptr
+{-# INLINE[1] peekPtrBytes #-}
+
+{-# RULES
+"peekPtrBytes8"  peekPtrBytes = peekPtrBytes8
+"peekPtrBytes28" peekPtrBytes = peekPtrBytes28
+"peekPtrBytes32" peekPtrBytes = peekPtrBytes32
+"peekPtrBytesN"  peekPtrBytes = peekPtrBytesN
   #-}
 
 
@@ -274,6 +342,16 @@ peekWord64BE ptr i =
 #endif
   peekByteOff (castPtr ptr) i
 {-# INLINE peekWord64BE #-}
+
+pokeWord64BE :: Ptr a -> Int -> Word64 -> IO ()
+pokeWord64BE ptr i a =
+  pokeByteOff (castPtr ptr) i
+#ifdef WORDS_BIGENDIAN
+  a
+#else
+  (byteSwap64 a)
+#endif
+{-# INLINE pokeWord64BE #-}
 
 
 writeWord64BE :: MutableByteArray s -> Int -> Word64 -> ST s ()
@@ -300,6 +378,12 @@ peekWord64BE ptr i = do
   l <- peekWord32BE ptr (i + 4)
   pure ((fromIntegral u `shiftL` 32) .|. fromIntegral l)
 {-# INLINE peekWord64BE #-}
+
+pokeWord64BE :: Ptr a -> Int -> Word64 -> IO ()s
+pokeWord64BE ptr i w64 = do
+  pokeWord32BE ptr i (fromIntegral (w64 `shiftR` 32))
+  pokeWord32BE ptr (i + 4) (fromIntegral w64)
+{-# INLINE pokeWord64BE #-}
 
 writeWord64BE :: MutableByteArray s -> Int -> Word64 -> ST s ()
 writeWord64BE mba i w64 = do
@@ -328,6 +412,17 @@ peekWord32BE ptr i =
 #endif
   peekByteOff (castPtr ptr) i
 {-# INLINE peekWord32BE #-}
+
+
+pokeWord32BE :: Ptr a -> Int -> Word32 -> IO ()
+pokeWord32BE ptr i a =
+  pokeByteOff (castPtr ptr) i
+#ifdef WORDS_BIGENDIAN
+  a
+#else
+  (byteSwap32 a)
+#endif
+{-# INLINE pokeWord32BE #-}
 
 
 writeWord32BE :: MutableByteArray s -> Int -> Word32 -> ST s ()

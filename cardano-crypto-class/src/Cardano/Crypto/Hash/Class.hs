@@ -3,12 +3,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE MagicHash #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
@@ -55,10 +57,10 @@ import Data.List (foldl')
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
-import Data.Word (Word64)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat, natVal, sameNat)
 import Data.Type.Equality ((:~:)(Refl))
+import Foreign.Storable (Storable)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -66,7 +68,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as SBS
-import Data.Word (Word8)
+import Data.Word (Word8, Word64)
 import Numeric.Natural (Natural)
 
 import Data.String (IsString(..))
@@ -107,6 +109,8 @@ sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
 newtype Hash h a = UnsafeHashRep (PackedBytes (SizeHash h))
   deriving (Eq, Ord, Generic, NoThunks, NFData)
+
+deriving instance KnownNat (SizeHash h) => Storable (Hash h a)
 
 pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
 pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)

@@ -60,6 +60,7 @@ library
                       , formatting
                       , nothunks
                       , QuickCheck
+                      , quickcheck-classes
                       , quickcheck-instances
                       , tasty
                       , tasty-quickcheck

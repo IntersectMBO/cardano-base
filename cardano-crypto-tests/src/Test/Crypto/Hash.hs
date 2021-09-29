@@ -22,6 +22,7 @@ import Data.String (fromString)
 import GHC.TypeLits
 import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_thunks)
 import Test.QuickCheck
+import Test.QuickCheck.Classes (Laws(..), storableLaws)
 import Test.QuickCheck.Instances ()
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
@@ -84,7 +85,11 @@ testPackedBytesN h = do
     [ testProperty "roundtrip" $ prop_roundtrip h
     , testProperty "compare" $ prop_compare h
     , testProperty "xor" $ prop_xor h
+    , testGroup (lawsTypeclass hashStorableLaws) $
+      map (uncurry testProperty) (lawsProperties hashStorableLaws)
     ]
+  where
+    hashStorableLaws = storableLaws (Proxy :: Proxy (Hash (TestHash n) ()))
 
 testPackedBytes :: TestTree
 testPackedBytes =
@@ -169,7 +174,9 @@ prop_libsodium_model p bs = expected === actual
 --
 
 instance HashAlgorithm h => Arbitrary (Hash h a) where
-  arbitrary = castHash . hashWith BS.pack <$> vector 16
+  arbitrary = do
+    NonNegative n <- arbitrary
+    castHash . hashWith BS.pack <$> vector n
   shrink = const []
 
 --
@@ -181,7 +188,9 @@ data TestHash (n :: Nat) = TestHash
 instance KnownNat n => HashAlgorithm (TestHash n) where
   type SizeHash (TestHash n) = n
   hashAlgorithmName px = "TestHash " ++ show (sizeHash px)
-  digest px _ = BS.pack (replicate (fromIntegral (sizeHash px)) 0)
+  digest px d = BS.take n (d <> BS.pack (replicate n 0))
+    where
+      n = fromIntegral (sizeHash px)
 
 prop_roundtrip ::
      forall n. KnownNat n
