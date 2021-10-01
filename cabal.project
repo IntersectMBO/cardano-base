@@ -13,8 +13,8 @@ packages:
   strict-containers
 
 -- Disable tests in a dependency (which are currently broken)
--- package cardano-crypto
---   tests: False
+package cardano-crypto
+  tests: False
 
 source-repository-package
   type: git
