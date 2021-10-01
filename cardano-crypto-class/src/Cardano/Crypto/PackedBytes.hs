@@ -180,11 +180,6 @@ packBytes32 (SBS ba#) =
        (indexWord64BE ba 24)
 {-# INLINE packBytes32 #-}
 
-packBytesN :: ShortByteString -> PackedBytes n
-packBytesN (SBS ba#) = PackedBytes# ba#
-{-# INLINE packBytesN #-}
-
-
 packBytes :: forall n . KnownNat n => ShortByteString -> PackedBytes n
 packBytes sbs@(SBS ba#) =
   let px = Proxy :: Proxy n
@@ -201,7 +196,6 @@ packBytes sbs@(SBS ba#) =
 "packBytes8"  packBytes = packBytes8
 "packBytes28" packBytes = packBytes28
 "packBytes32" packBytes = packBytes32
-"packBytesN"  packBytes = packBytesN
   #-}
 
 
@@ -250,7 +244,6 @@ packPinnedBytes bs =
 "packPinnedBytes8"  packPinnedBytes = packPinnedBytes8
 "packPinnedBytes28" packPinnedBytes = packPinnedBytes28
 "packPinnedBytes32" packPinnedBytes = packPinnedBytes32
-"packPinnedBytesN"  packPinnedBytes = packPinnedBytesN
   #-}
 
 
