@@ -62,6 +62,7 @@ tests =
   testGroup "Crypto.KES"
   [ testKESAlloc (Proxy :: Proxy (SingleKES Ed25519DSIGNM)) "SingleKES"
   , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGNM Blake2b_256)) "Sum1KES"
+  , testKESAlloc (Proxy :: Proxy (Sum2KES Ed25519DSIGNM Blake2b_256)) "Sum2KES"
   , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (MockKES 7))               "MockKES"
   , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (SimpleKES Ed448DSIGN 7))  "SimpleKES"
   , testKESAlgorithm (Proxy :: Proxy IO) (Proxy :: Proxy (SingleKES Ed25519DSIGNM))  "SingleKES"

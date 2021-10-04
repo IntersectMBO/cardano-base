@@ -15,6 +15,7 @@ where
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
 import Control.Monad
+import Control.Exception (evaluate)
 
 import Cardano.Crypto.DSIGN
 import Cardano.Crypto.Util (SignableRepresentation(..))
@@ -242,7 +243,12 @@ prop_dsignm_seed_roundtrip
 prop_dsignm_seed_roundtrip p seed = ioProperty $ do
   sk <- genKeyDSIGNM seed
   seed' <- getSeedDSIGNM p sk
-  return (seed === seed')
+  bs <- evaluate $! BS.copy (NaCl.mlsbToByteString seed)
+  bs' <- evaluate $! BS.copy (NaCl.mlsbToByteString seed')
+  forgetSignKeyDSIGNM sk
+  -- NaCl.mlsbFinalize seed
+  NaCl.mlsbFinalize seed'
+  return (bs === bs')
 
 -- | If we sign a message @a@ with the signing key, then we can verify the
 -- signature using the corresponding verification key.
