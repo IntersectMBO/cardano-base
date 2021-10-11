@@ -111,7 +111,11 @@ newtype Hash h a = UnsafeHashRep (PackedBytes (SizeHash h))
 pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
 pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)
   where
-  UnsafeHash bytes = UnsafeHashRep (packBytes bytes :: PackedBytes (SizeHash h))
+  UnsafeHash bytes =
+    case hashFromBytesShort bytes of
+      Nothing ->
+        error "UnsafeHash: mismatched size of the supplied ShortByteString and the expected digest"
+      Just h -> h
 {-# COMPLETE UnsafeHash #-}
 
 --
@@ -174,7 +178,7 @@ hashFromBytesShort :: forall h a. HashAlgorithm h
                    => ShortByteString -> Maybe (Hash h a)
 hashFromBytesShort bytes
   | SBS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just $! UnsafeHash bytes
+  = Just $! UnsafeHashRep (packBytes bytes)
 
   | otherwise
   = Nothing
@@ -182,8 +186,8 @@ hashFromBytesShort bytes
 
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
 --
-hashToBytesShort :: HashAlgorithm h => Hash h a -> ShortByteString
-hashToBytesShort (UnsafeHash h) = h
+hashToBytesShort :: Hash h a -> ShortByteString
+hashToBytesShort (UnsafeHashRep h) = unpackBytes h
 
 
 --
