@@ -10,3 +10,5 @@ import Cardano.Crypto.KES.NeverUsed as X
 import Cardano.Crypto.KES.Simple as X
 import Cardano.Crypto.KES.Single as X
 import Cardano.Crypto.KES.Sum as X
+import Cardano.Crypto.KES.CompactSingle as X
+import Cardano.Crypto.KES.CompactSum as X

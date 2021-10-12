@@ -100,8 +100,10 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
                    (SignKeyMockKES vk t)
 
     verifyKES () vk t a (SigMockKES h (SignKeyMockKES vk' t'))
+      | vk /= vk'
+      = Left "KES verification failed"
+
       | t' == t
-      , vk == vk'
       , castHash (hashWith getSignableRepresentation a) == h
       = Right ()
 
@@ -109,7 +111,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       = Left "KES verification failed"
 
     totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
-
 
     --
     -- Key generation

@@ -65,6 +65,8 @@ library
                         Cardano.Crypto.KES.Simple
                         Cardano.Crypto.KES.Single
                         Cardano.Crypto.KES.Sum
+                        Cardano.Crypto.KES.CompactSingle
+                        Cardano.Crypto.KES.CompactSum
 
                         Cardano.Crypto.PinnedSizedBytes
                         Cardano.Crypto.Seed

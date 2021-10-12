@@ -16,6 +16,9 @@ module Cardano.Crypto.KES.Class
     KESAlgorithm (..)
   , Period
 
+  , OptimizedKESAlgorithm (..)
+  , verifyOptimizedKES
+
     -- * 'SignedKES' wrapper
   , SignedKES (..)
   , signedKES
@@ -113,6 +116,9 @@ class ( Typeable v
     -> SignKeyKES v
     -> SigKES v
 
+  -- | Full KES verification. This method checks that the signature itself
+  -- checks out (as per 'verifySigKES'), and also makes sure that it matches
+  -- the provided VerKey.
   verifyKES
     :: (Signable v a, HasCallStack)
     => ContextKES v
@@ -196,6 +202,48 @@ class ( Typeable v
   rawDeserialiseSignKeyKES :: ByteString -> Maybe (SignKeyKES v)
   rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
 
+-- | Subclass for KES algorithms that embed a copy of the VerKey into the
+-- signature itself, rather than relying on the externally supplied VerKey
+-- alone. Some optimizations made in the 'Cardano.Crypto.KES.CompactSingleKES'
+-- and 'Cardano.Crypto.KES.CompactSumKES' implementations require this
+-- additional interface in order to avoid redundant computations.
+class KESAlgorithm v => OptimizedKESAlgorithm v where
+  -- | Partial verification: this method only verifies the signature itself,
+  -- but it does not check it against any externally-provided VerKey. Use
+  -- 'verifyKES' for full KES verification.
+  verifySigKES
+    :: (Signable v a, HasCallStack)
+    => ContextKES v
+    -> Period  -- ^ The /current/ period for the key
+    -> a
+    -> SigKES v
+    -> Either String ()
+
+  -- | Extract a VerKey from a SigKES. Note that a VerKey embedded in or
+  -- derived from a SigKES is effectively user-supplied, so it is not enough
+  -- to validate a SigKES against this VerKey (like 'verifySigKES' does); you
+  -- must also compare the VerKey against an externally-provided key that you
+  -- want to verify against (see 'verifyKES').
+  verKeyFromSigKES
+    :: ContextKES v
+    -> Period
+    -> SigKES v
+    -> VerKeyKES v
+
+verifyOptimizedKES :: (OptimizedKESAlgorithm v, Signable v a, HasCallStack)
+                   => ContextKES v
+                   -> VerKeyKES v
+                   -> Period
+                   -> a
+                   -> SigKES v
+                   -> Either String ()
+verifyOptimizedKES ctx vk t a sig = do
+  verifySigKES ctx t a sig
+  let vk' = verKeyFromSigKES ctx t sig
+  if vk' ==  vk then
+    return ()
+  else
+    Left "KES verification failed"
 --
 -- Do not provide Ord instances for keys, see #38
 --
