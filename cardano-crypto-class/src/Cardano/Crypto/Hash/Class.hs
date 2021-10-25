@@ -27,6 +27,12 @@ module Cardano.Crypto.Hash.Class
   , hashFromBytes
   , hashToBytesShort
   , hashFromBytesShort
+  , ViewHash8 (..)
+  , unsafeMkHash8
+  , viewHash8
+  , ViewHash28 (..)
+  , unsafeMkHash28
+  , viewHash28
   , ViewHash32 (..)
   , unsafeMkHash32
   , viewHash32
@@ -55,7 +61,7 @@ import Data.List (foldl')
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
-import Data.Word (Word64)
+import Data.Word (Word64, Word32)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat, natVal, sameNat)
 import Data.Type.Equality ((:~:)(Refl))
@@ -309,6 +315,49 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
         where
           expected = sizeHash (Proxy :: Proxy h)
           actual   = BS.length bs
+
+data ViewHash8 h a where
+  ViewHash8 :: SizeHash h ~ 8
+    => Word64
+    -> ViewHash8 h a
+  ViewHashNot8 :: ViewHash8 h a
+
+viewHash8 :: forall h a. HashAlgorithm h => Hash h a -> ViewHash8 h a
+viewHash8 (UnsafeHashRep p) = go p
+  where
+    go :: forall n. PackedBytes n -> ViewHash8 h a
+    go (PackedBytes8 a) =
+      case sameNat (Proxy :: Proxy (SizeHash h)) (Proxy :: Proxy 8) of
+        Just Refl -> ViewHash8 a
+        Nothing -> ViewHashNot8
+    go _ = ViewHashNot8
+
+unsafeMkHash8 ::
+  SizeHash h ~ 8 => Word64 -> Hash h a
+unsafeMkHash8 a = UnsafeHashRep (PackedBytes8 a)
+
+data ViewHash28 h a where
+  ViewHash28 :: SizeHash h ~ 28
+    => Word64
+    -> Word64
+    -> Word64
+    -> Word32
+    -> ViewHash28 h a
+  ViewHashNot28 :: ViewHash28 h a
+
+viewHash28 :: forall h a. HashAlgorithm h => Hash h a -> ViewHash28 h a
+viewHash28 (UnsafeHashRep p) = go p
+  where
+    go :: forall n. PackedBytes n -> ViewHash28 h a
+    go (PackedBytes28 a b c d) =
+      case sameNat (Proxy :: Proxy (SizeHash h)) (Proxy :: Proxy 28) of
+        Just Refl -> ViewHash28 a b c d
+        Nothing -> ViewHashNot28
+    go _ = ViewHashNot28
+
+unsafeMkHash28 ::
+  SizeHash h ~ 28 => Word64 -> Word64 -> Word64 -> Word32 -> Hash h a
+unsafeMkHash28 a b c d = UnsafeHashRep (PackedBytes28 a b c d)
 
 data ViewHash32 h a where
   ViewHash32 :: SizeHash h ~ 32
