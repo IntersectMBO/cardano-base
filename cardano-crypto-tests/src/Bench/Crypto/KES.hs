@@ -15,6 +15,7 @@ import Cardano.Crypto.DSIGN.Ed25519
 import Cardano.Crypto.Hash.Blake2b
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.KES.Sum
+import Cardano.Crypto.KES.CompactSum
 import Cardano.Crypto.Seed
 import qualified Data.ByteString as BS (pack)
 import Data.Maybe (fromJust)
@@ -57,6 +58,8 @@ benchmarks :: Benchmark
 benchmarks = bgroup "KES"
   [ bench_kes @Proxy @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy "Sum6KES"
   , bench_kes @Proxy @(Sum7KES Ed25519DSIGN Blake2b_256) Proxy "Sum7KES"
+  , bench_kes @Proxy @(CompactSum6KES Ed25519DSIGN Blake2b_256) Proxy "CompactSum6KES"
+  , bench_kes @Proxy @(CompactSum7KES Ed25519DSIGN Blake2b_256) Proxy "CompactSum7KES"
   ]
 
 bench_kes :: forall proxy v
