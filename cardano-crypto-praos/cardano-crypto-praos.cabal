@@ -66,6 +66,7 @@ library
   import:               base, project-config
   hs-source-dirs:       src
   exposed-modules:      Cardano.Crypto.VRF.Praos
+                 ,      Cardano.Crypto.VRF.Praos09
 
   build-depends:        base
                       , bytestring

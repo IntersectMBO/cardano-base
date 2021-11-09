@@ -12,10 +12,10 @@
 
 -- | Verifiable Random Function (VRF) implemented as FFI wrappers around the
 -- implementation in https://github.com/input-output-hk/libsodium
-module Cardano.Crypto.VRF.Praos
+module Cardano.Crypto.VRF.Praos09
   (
   -- * VRFAlgorithm API
-    PraosVRF
+    Praos09VRF
 
   -- * Low-level size specifiers
   --
@@ -160,22 +160,22 @@ newtype Output = Output { unOutput :: ForeignPtr OutputValue }
 
 -- Raw low-level FFI bindings.
 --
-foreign import ccall "crypto_vrf_ietfdraft03_proofbytes" crypto_vrf_proofbytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft03_publickeybytes" crypto_vrf_publickeybytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft03_secretkeybytes" crypto_vrf_secretkeybytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft03_seedbytes" crypto_vrf_seedbytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft03_outputbytes" crypto_vrf_outputbytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft09_proofbytes" crypto_vrf_proofbytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft09_publickeybytes" crypto_vrf_publickeybytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft09_secretkeybytes" crypto_vrf_secretkeybytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft09_seedbytes" crypto_vrf_seedbytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft09_outputbytes" crypto_vrf_outputbytes :: CSize
 
-foreign import ccall "crypto_vrf_ietfdraft03_publickeybytes" io_crypto_vrf_publickeybytes :: IO CSize
-foreign import ccall "crypto_vrf_ietfdraft03_secretkeybytes" io_crypto_vrf_secretkeybytes :: IO CSize
+foreign import ccall "crypto_vrf_ietfdraft09_publickeybytes" io_crypto_vrf_publickeybytes :: IO CSize
+foreign import ccall "crypto_vrf_ietfdraft09_secretkeybytes" io_crypto_vrf_secretkeybytes :: IO CSize
 
-foreign import ccall "crypto_vrf_ietfdraft03_keypair_from_seed" crypto_vrf_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft03_sk_to_pk" crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft03_sk_to_seed" crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft03_prove" crypto_vrf_prove :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft03_verify" crypto_vrf_verify :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft09_keypair_from_seed" crypto_vrf_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft09_sk_to_pk" crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft09_sk_to_seed" crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft09_prove" crypto_vrf_prove :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft09_verify" crypto_vrf_verify :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
 
-foreign import ccall "crypto_vrf_ietfdraft03_proof_to_hash" crypto_vrf_proof_to_hash :: OutputPtr -> ProofPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft09_proof_to_hash" crypto_vrf_proof_to_hash :: OutputPtr -> ProofPtr -> IO CInt
 
 foreign import ccall "randombytes_buf" randombytes_buf :: Ptr a -> CSize -> IO ()
 
@@ -445,41 +445,41 @@ outputFromProof (Proof p) =
           0 -> return $ Just $! output
           _ -> return Nothing
 
-data PraosVRF
+data Praos09VRF
 
-instance VRFAlgorithm PraosVRF where
-  newtype VerKeyVRF PraosVRF = VerKeyPraosVRF VerKey
+instance VRFAlgorithm Praos09VRF where
+  newtype VerKeyVRF Praos09VRF = VerKeyPraos09VRF VerKey
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "VerKeyVRF PraosVRF" VerKey
+    deriving NoThunks via OnlyCheckWhnfNamed "VerKeyVRF Praos09VRF" VerKey
     deriving newtype (NFData)
 
-  newtype SignKeyVRF PraosVRF = SignKeyPraosVRF SignKey
+  newtype SignKeyVRF Praos09VRF = SignKeyPraos09VRF SignKey
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "SignKeyVRF PraosVRF" SignKey
+    deriving NoThunks via OnlyCheckWhnfNamed "SignKeyVRF Praos09VRF" SignKey
     deriving newtype (NFData)
 
-  newtype CertVRF PraosVRF = CertPraosVRF Proof
+  newtype CertVRF Praos09VRF = CertPraos09VRF Proof
     deriving stock   (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "CertKeyVRF PraosVRF" Proof
+    deriving NoThunks via OnlyCheckWhnfNamed "CertKeyVRF Praos09VRF" Proof
     deriving newtype (NFData)
 
-  type Signable PraosVRF = SignableRepresentation
+  type Signable Praos09VRF = SignableRepresentation
 
-  algorithmNameVRF = const "PraosVRF"
+  algorithmNameVRF = const "Praos09VRF"
 
   deriveVerKeyVRF = coerce skToVerKey
 
-  evalVRF = \_ msg (SignKeyPraosVRF sk) ->
+  evalVRF = \_ msg (SignKeyPraos09VRF sk) ->
     let msgBS = getSignableRepresentation msg
         proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
         output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
     in output `seq` proof `seq`
-           (OutputVRF (outputBytes output), CertPraosVRF proof)
+           (OutputVRF (outputBytes output), CertPraos09VRF proof)
 
-  verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
+  verifyVRF = \_ (VerKeyPraos09VRF pk) msg (_, CertPraos09VRF proof) ->
     isJust $! verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
@@ -488,14 +488,14 @@ instance VRFAlgorithm PraosVRF where
   genKeyPairVRF = \cryptoseed ->
     let seed = seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_seedbytes) $ cryptoseed
         (pk, sk) = keypairFromSeed seed
-    in sk `seq` pk `seq` (SignKeyPraosVRF sk, VerKeyPraosVRF pk)
+    in sk `seq` pk `seq` (SignKeyPraos09VRF sk, VerKeyPraos09VRF pk)
 
-  rawSerialiseVerKeyVRF (VerKeyPraosVRF pk) = vkBytes pk
-  rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
-  rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
-  rawDeserialiseVerKeyVRF = fmap (VerKeyPraosVRF . vkFromBytes) . assertLength verKeySizeVRF
-  rawDeserialiseSignKeyVRF = fmap (SignKeyPraosVRF . skFromBytes) . assertLength signKeySizeVRF
-  rawDeserialiseCertVRF = fmap (CertPraosVRF . proofFromBytes) . assertLength certSizeVRF
+  rawSerialiseVerKeyVRF (VerKeyPraos09VRF pk) = vkBytes pk
+  rawSerialiseSignKeyVRF (SignKeyPraos09VRF sk) = skBytes sk
+  rawSerialiseCertVRF (CertPraos09VRF proof) = proofBytes proof
+  rawDeserialiseVerKeyVRF = fmap (VerKeyPraos09VRF . vkFromBytes) . assertLength verKeySizeVRF
+  rawDeserialiseSignKeyVRF = fmap (SignKeyPraos09VRF . skFromBytes) . assertLength signKeySizeVRF
+  rawDeserialiseCertVRF = fmap (CertPraos09VRF . proofFromBytes) . assertLength certSizeVRF
 
   sizeVerKeyVRF _ = fromIntegral verKeySizeVRF
   sizeSignKeyVRF _ = fromIntegral signKeySizeVRF
