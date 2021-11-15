@@ -17,6 +17,7 @@ extra-source-files:  README.md
 
 extra-source-files:    cbits/crypto_vrf.h
                        cbits/crypto_vrf_ietfdraft03.h
+                       cbits/crypto_vrf_ietfdraft09.h
                        cbits/vrf_ietfdraft03.h
 
                        cbits/private/common.h
