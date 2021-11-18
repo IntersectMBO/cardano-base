@@ -23,10 +23,10 @@ SOFTWARE.
 #include <string.h>
 #include <stdlib.h>
 
-#include "crypto_hash_sha512.h"
+#include "sodium/crypto_hash_sha512.h"
 #include "crypto_vrf_ietfdraft09.h"
 #include "private/ed25519_ref10.h"
-#include "utils.h"
+#include "sodium/utils.h"
 #include "vrf_ietfdraft09.h"
 
 /* Utility function to convert a "secret key" (32-byte seed || 32-byte PK)
@@ -35,7 +35,7 @@ SOFTWARE.
  * Return 0 on success, -1 on failure decoding the public point Y.
  */
 static int
-vrf_expand_sk(ge25519_p3 *Y_point, unsigned char x_scalar[crypto_core_ed25519_SCALARBYTES],
+vrf_expand_sk(ge25519_p3 *Y_point, unsigned char x_scalar[32],
               unsigned char truncated_hashed_sk_string[32], const unsigned char skpk[crypto_vrf_ietfdraft09_SECRETKEYBYTES])
 {
     unsigned char h[crypto_hash_sha512_BYTES];
@@ -44,8 +44,8 @@ vrf_expand_sk(ge25519_p3 *Y_point, unsigned char x_scalar[crypto_core_ed25519_SC
     h[0] &= 248;
     h[31] &= 127;
     h[31] |= 64;
-    memmove(x_scalar, h, crypto_core_ed25519_SCALARBYTES);
-    memmove(truncated_hashed_sk_string, h + crypto_core_ed25519_SCALARBYTES, 32);
+    memmove(x_scalar, h, 32);
+    memmove(truncated_hashed_sk_string, h + 32, 32);
     sodium_memzero(h, crypto_hash_sha512_BYTES);
 
     return _vrf_ietfdraft09_string_to_point(Y_point, skpk+crypto_vrf_ietfdraft09_SEEDBYTES);
@@ -58,9 +58,9 @@ vrf_expand_sk(ge25519_p3 *Y_point, unsigned char x_scalar[crypto_core_ed25519_SC
  * Here we instead takes it as an argument, and we compute it in vrf_expand_sk
  */
 static void
-vrf_nonce_generation(unsigned char k_scalar[crypto_core_ed25519_SCALARBYTES],
+vrf_nonce_generation(unsigned char k_scalar[32],
                      const unsigned char truncated_hashed_sk_string[32],
-                     const unsigned char h_string[crypto_core_ed25519_BYTES])
+                     const unsigned char h_string[32])
 {
     crypto_hash_sha512_state hs;
     unsigned char            k_string[crypto_hash_sha512_BYTES];
@@ -68,11 +68,11 @@ vrf_nonce_generation(unsigned char k_scalar[crypto_core_ed25519_SCALARBYTES],
     /* k_string = SHA512(truncated_hashed_sk_string || h_string) */
     crypto_hash_sha512_init(&hs);
     crypto_hash_sha512_update(&hs, truncated_hashed_sk_string, 32);
-    crypto_hash_sha512_update(&hs, h_string, crypto_core_ed25519_BYTES);
+    crypto_hash_sha512_update(&hs, h_string, 32);
     crypto_hash_sha512_final(&hs, k_string);
 
     sc25519_reduce(k_string); /* k_string[0:32] = string_to_int(k_string) mod q */
-    memmove(k_scalar, k_string, crypto_core_ed25519_SCALARBYTES);
+    memmove(k_scalar, k_string, 32);
 
     sodium_memzero(k_string, sizeof k_string);
 }
@@ -88,13 +88,13 @@ vrf_nonce_generation(unsigned char k_scalar[crypto_core_ed25519_SCALARBYTES],
  */
 static void
 vrf_prove(unsigned char pi[crypto_vrf_ietfdraft09_PROOFBYTES], const ge25519_p3 *Y_point,
-          const unsigned char x_scalar[crypto_core_ed25519_SCALARBYTES],
+          const unsigned char x_scalar[32],
           const unsigned char truncated_hashed_sk_string[32],
           const unsigned char *alpha, unsigned long long alphalen)
 {
     /* c fits in 16 bytes, but we store it in a 32-byte array because
      * sc25519_muladd expects a 32-byte scalar */
-    unsigned char h_string[crypto_core_ed25519_BYTES], k_scalar[crypto_core_ed25519_SCALARBYTES], c_scalar[crypto_core_ed25519_SCALARBYTES];
+    unsigned char h_string[32], k_scalar[32], c_scalar[32];
     ge25519_p3    H_point, Gamma_point, kB_point, kH_point;
 
 #ifdef TRYANDINC
@@ -120,7 +120,7 @@ vrf_prove(unsigned char pi[crypto_vrf_ietfdraft09_PROOFBYTES], const ge25519_p3 
      * We need to pass kB and kH to bytes for the new
      * function signature
      * */
-    unsigned char kB_bytes[crypto_core_ed25519_BYTES], kH_bytes[crypto_core_ed25519_BYTES];
+    unsigned char kB_bytes[32], kH_bytes[32];
     ge25519_p3_tobytes(kB_bytes, &kB_point);
     ge25519_p3_tobytes(kH_bytes, &kH_point);
 
@@ -129,9 +129,9 @@ vrf_prove(unsigned char pi[crypto_vrf_ietfdraft09_PROOFBYTES], const ge25519_p3 
 
     /* output pi */
     _vrf_ietfdraft09_point_to_string(pi, &Gamma_point); /* pi[0:32] = point_to_string(Gamma) */
-    memmove(pi + crypto_core_ed25519_BYTES, kB_bytes, crypto_core_ed25519_BYTES); /* pi[32:64] = point_to_string(kB_point) */
-    memmove(pi + (crypto_core_ed25519_BYTES * 2), kH_bytes, crypto_core_ed25519_BYTES); /* pi[64:96] = point_to_string(kH_point) */
-    sc25519_muladd(pi + (crypto_core_ed25519_BYTES * 3), c_scalar, x_scalar, k_scalar); /* pi[96:128] = s = c*x + k (mod q) */
+    memmove(pi + 32, kB_bytes, 32); /* pi[32:64] = point_to_string(kB_point) */
+    memmove(pi + (32 * 2), kH_bytes, 32); /* pi[64:96] = point_to_string(kH_point) */
+    sc25519_muladd(pi + (32 * 3), c_scalar, x_scalar, k_scalar); /* pi[96:128] = s = c*x + k (mod q) */
 
     sodium_memzero(k_scalar, sizeof k_scalar); /* k must remain secret */
     /* erase other non-sensitive intermediate state for good measure */
@@ -161,16 +161,16 @@ crypto_vrf_ietfdraft09_prove(unsigned char proof[crypto_vrf_ietfdraft09_PROOFBYT
                              unsigned long long msglen)
 {
     ge25519_p3    Y_point;
-    unsigned char x_scalar[crypto_core_ed25519_SCALARBYTES], truncated_hashed_sk_string[32];
+    unsigned char x_scalar[32], truncated_hashed_sk_string[32];
 
     if (vrf_expand_sk(&Y_point, x_scalar, truncated_hashed_sk_string, skpk) != 0) {
-        sodium_memzero(x_scalar, crypto_core_ed25519_SCALARBYTES);
+        sodium_memzero(x_scalar, 32);
         sodium_memzero(truncated_hashed_sk_string, 32);
         sodium_memzero(&Y_point, sizeof Y_point); /* for good measure */
         return -1;
     }
     vrf_prove(proof, &Y_point, x_scalar, truncated_hashed_sk_string, msg, msglen);
-    sodium_memzero(x_scalar, crypto_core_ed25519_SCALARBYTES);
+    sodium_memzero(x_scalar, 32);
     sodium_memzero(truncated_hashed_sk_string, 32);
     sodium_memzero(&Y_point, sizeof Y_point); /* for good measure */
     return 0;

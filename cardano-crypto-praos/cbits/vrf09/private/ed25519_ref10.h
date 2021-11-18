@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "private/quirks.h"
+#include "quirks.h"
 
 /*
  fe means field element.

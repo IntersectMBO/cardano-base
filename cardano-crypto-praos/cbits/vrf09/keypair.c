@@ -1,12 +1,12 @@
 
 #include <string.h>
 
-#include "crypto_hash_sha512.h"
+#include "sodium/crypto_hash_sha512.h"
 #include "crypto_vrf_ietfdraft09.h"
-#include "crypto_core_ed25519.h"
+#include "sodium/crypto_core_ed25519.h"
 #include "private/ed25519_ref10.h"
-#include "randombytes.h"
-#include "utils.h"
+#include "sodium/randombytes.h"
+#include "sodium/utils.h"
 
 int
 crypto_vrf_ietfdraft09_keypair(unsigned char pk[crypto_vrf_ietfdraft09_PUBLICKEYBYTES],

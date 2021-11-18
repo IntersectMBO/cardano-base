@@ -29,22 +29,22 @@ static const unsigned char SUITE = 0x03; /* ECVRF-ED25519-SHA512-TAI */
 static const unsigned char SUITE = 0x04; /* ECVRF-ED25519-SHA512-ELL2 */
 #endif
 
-void _vrf_ietfdraft09_point_to_string(unsigned char string[crypto_core_ed25519_BYTES],
+void _vrf_ietfdraft09_point_to_string(unsigned char string[32],
                                       const ge25519_p3 *point);
 
 int _vrf_ietfdraft09_string_to_point(ge25519_p3 *point,
-                                     const unsigned char string[crypto_core_ed25519_BYTES]);
+                                     const unsigned char string[32]);
 
-int _vrf_ietfdraft09_decode_proof(ge25519_p3 *Gamma, unsigned char U[crypto_core_ed25519_BYTES], unsigned char V[crypto_core_ed25519_BYTES],
-                                  unsigned char s[crypto_core_ed25519_SCALARBYTES], const unsigned char pi[crypto_vrf_ietfdraft09_PROOFBYTES]);
+int _vrf_ietfdraft09_decode_proof(ge25519_p3 *Gamma, unsigned char U[32], unsigned char V[32],
+                                  unsigned char s[32], const unsigned char pi[128]);
 
 void
-_vrf_ietfdraft09_hash_to_curve_elligator2_25519(unsigned char H_string[crypto_core_ed25519_BYTES],
+_vrf_ietfdraft09_hash_to_curve_elligator2_25519(unsigned char H_string[32],
                                                 const ge25519_p3 *Y_point,
                                                 const unsigned char *alpha,
                                                 const unsigned long long alphalen);
 
-int _vrf_ietfdraft09_hash_to_curve_try_inc(unsigned char H_string[crypto_core_ed25519_BYTES],
+int _vrf_ietfdraft09_hash_to_curve_try_inc(unsigned char H_string[32],
                                             const ge25519_p3 *Y_point,
                                             const unsigned char *alpha,
                                             const unsigned long long alphalen);

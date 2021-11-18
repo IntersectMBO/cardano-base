@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "private/quirks.h"
+#include "quirks.h"
 
 #define COMPILER_ASSERT(X) (void) sizeof(char[(X) ? 1 : -1])
 

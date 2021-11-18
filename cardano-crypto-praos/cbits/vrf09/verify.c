@@ -23,9 +23,9 @@ SOFTWARE.
 #include <string.h>
 #include <stdlib.h>
 
-#include "crypto_hash_sha512.h"
+#include "sodium/crypto_hash_sha512.h"
 #include "crypto_vrf_ietfdraft09.h"
-#include "crypto_core_ed25519.h"
+#include "sodium/crypto_core_ed25519.h"
 #include "private/ed25519_ref10.h"
 #include "vrf_ietfdraft09.h"
 

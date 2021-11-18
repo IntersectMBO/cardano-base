@@ -33,6 +33,9 @@ size_t crypto_vrf_ietfdraft09_proofbytes(void);
 SODIUM_EXPORT
 size_t crypto_vrf_ietfdraft09_outputbytes(void);
 
+#define crypto_vrf_ietfdraft09_PRIMITIVE "ietfdraft09"
+SODIUM_EXPORT
+const char *crypto_vrf_primitive(void);
 // Generate a keypair.
 //
 // Thread-safe if sodium_init() has been called first.

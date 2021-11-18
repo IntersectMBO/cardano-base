@@ -1,8 +1,8 @@
 #include <string.h>
 
-#include "private/common.h"
-#include "private/quirks.h"
-#include "utils.h"
+#include "common.h"
+#include "quirks.h"
+#include "sodium/utils.h"
 
 /*
  h = 0

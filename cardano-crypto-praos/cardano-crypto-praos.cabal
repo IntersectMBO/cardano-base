@@ -101,7 +101,7 @@ library
                         cbits/vrf09/verify.c
                         cbits/vrf09/keypair.c
                         cbits/vrf09/prove.c
-                        cbits/vrf09/crypto_vrf.c
+                        cbits/vrf09/crypto_vrf_ietfdraft09_vrf.c
                         cbits/vrf09/vrf.c
                         cbits/vrf03/convert.c
                         cbits/vrf03/private/ed25519_ref10.c

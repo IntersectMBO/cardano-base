@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "crypto_verify_32.h"
-#include "private/common.h"
-#include "private/ed25519_ref10.h"
-#include "utils.h"
+#include "sodium/crypto_verify_32.h"
+#include "common.h"
+#include "ed25519_ref10.h"
+#include "sodium/utils.h"
 
 static inline uint64_t
 load_3(const unsigned char *in)
@@ -33,14 +33,7 @@ load_4(const unsigned char *in)
     return result;
 }
 
-/*
- * Field arithmetic:
- * Use 5*51 bit limbs on 64-bit systems with support for 128 bit arithmetic,
- * and 10*25.5 bit limbs elsewhere.
- *
- * Functions used elsewhere that are candidates for inlining are defined
- * via "private/curve25519_ref10.h".
- */
+
 
 #ifdef HAVE_TI_MODE
 # include "fe_51/constants.h"
@@ -49,6 +42,15 @@ load_4(const unsigned char *in)
 # include "fe_25_5/constants.h"
 # include "fe_25_5/fe.h"
 #endif
+
+/*
+ * Field arithmetic:
+ * Use 5*51 bit limbs on 64-bit systems with support for 128 bit arithmetic,
+ * and 10*25.5 bit limbs elsewhere.
+ *
+ * Functions used elsewhere that are candidates for inlining are defined
+ * via "private/curve25519_ref10.h".
+ */
 
 static inline void
 fe25519_sqmul(fe25519 s, const int n, const fe25519 a)
