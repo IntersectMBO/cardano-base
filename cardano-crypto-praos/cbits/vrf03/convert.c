@@ -24,7 +24,7 @@ SOFTWARE.
 
 #include "sodium/crypto_hash_sha512.h"
 #include "crypto_vrf_ietfdraft03.h"
-#include "private/ed25519_ref10.h"
+#include "../private/ed25519_ref10.h"
 #include "vrf_ietfdraft03.h"
 
 static const unsigned char ONE = 0x01;

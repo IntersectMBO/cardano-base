@@ -24,7 +24,7 @@ SOFTWARE.
 
 #include "sodium/crypto_hash_sha512.h"
 #include "crypto_vrf_ietfdraft03.h"
-#include "private/ed25519_ref10.h"
+#include "../private/ed25519_ref10.h"
 #include "sodium/utils.h"
 #include "vrf_ietfdraft03.h"
 
@@ -81,7 +81,7 @@ vrf_nonce_generation(unsigned char k_scalar[32],
  * truncated_hashed_sk that is used in nonce generation.
  * These are computed from the secret key using the expand_sk function.
  * Constant time in everything except alphalen (the length of the message)
- */ 
+ */
 static void
 vrf_prove(unsigned char pi[80], const ge25519_p3 *Y_point,
 	  const unsigned char x_scalar[32],
@@ -101,7 +101,7 @@ vrf_prove(unsigned char pi[80], const ge25519_p3 *Y_point,
     ge25519_scalarmult_base(&kB_point, k_scalar); /* compute k*B */
     ge25519_scalarmult(&kH_point, k_scalar, &H_point); /* compute k*H */
 
-    /* c = ECVRF_hash_points(h, gamma, k*B, k*H) 
+    /* c = ECVRF_hash_points(h, gamma, k*B, k*H)
      * (writes only to the first 16 bytes of c_scalar */
     _vrf_ietfdraft03_hash_points(c_scalar, &H_point, &Gamma_point, &kB_point, &kH_point);
     memset(c_scalar+16, 0, 16); /* zero the remaining 16 bytes of c_scalar */
