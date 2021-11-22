@@ -14,6 +14,9 @@ copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
+                     jsbits/libsodium.c
+                     jsbits/libsodium.js
+                     jsbits/wrappers.js.pp
 
 flag development
     description: Disable `-Werror`
@@ -107,6 +110,10 @@ library
                       , text
                       , transformers
                       , vector
+
+  if impl(ghcjs) || os(ghcjs)
+    js-sources:         jsbits/libsodium.js
+                        jsbits/wrappers.js.pp
 
   pkgconfig-depends:    libsodium
 
