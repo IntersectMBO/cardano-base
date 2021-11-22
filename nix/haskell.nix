@@ -7,7 +7,7 @@
 , buildPackages
 , config ? {}
 # GHC attribute name
-, compiler ? config.haskellNix.compiler or "ghc8105"
+, compiler ? config.haskellNix.compiler or "ghc8107"
 # Enable profiling
 , profiling ? config.haskellNix.profiling or false
 }:
@@ -20,9 +20,13 @@ let
 
   # This creates the Haskell package set.
   # https://input-output-hk.github.io/haskell.nix/user-guide/projects/
-  pkgSet = haskell-nix.cabalProject {
+  pkgSet = haskell-nix.cabalProject ({pkgs, ...}: {
     inherit src;
     compiler-nix-name = compiler;
+    cabalProjectLocal = lib.optionalString pkgs.stdenv.hostPlatform.isGhcjs ''
+      allow-newer:
+             stm:base
+    '';
     modules = [
 
       # Allow reinstallation of Win32
@@ -72,7 +76,44 @@ let
         packages.terminal-size.components.library.build-tools = lib.mkForce [];
         packages.network.components.library.build-tools = lib.mkForce [];
       })
+      ({ pkgs, ... }: lib.mkIf (pkgs.stdenv.hostPlatform.isGhcjs) {
+        packages =
+          let
+            runEmscripten = ''
+              patchShebangs jsbits/emscripten/build.sh
+              (cd jsbits/emscripten && PATH=${
+                  # The extra buildPackages here is for closurecompiler.
+                  # Without it we get `unknown emulation for platform: js-unknown-ghcjs` errors.
+                  lib.makeBinPath (with pkgs.buildPackages.buildPackages;
+                    [ emscripten closurecompiler coreutils python2 ])
+                }:$PATH ./build.sh)
+            '';
+            libsodium-vrf = pkgs.libsodium-vrf.overrideAttrs (attrs: {
+              nativeBuildInputs = attrs.nativeBuildInputs or [ ] ++ (with pkgs.buildPackages.buildPackages; [ emscripten python2 ]);
+              prePatch = ''
+                export HOME=$(mktemp -d)
+                export PYTHON=${pkgs.buildPackages.buildPackages.python2}/bin/python
+              '' + attrs.prePatch or "";
+              configurePhase = ''
+                emconfigure ./configure --prefix=$out --enable-minimal --disable-shared --without-pthreads --disable-ssp --disable-asm --disable-pie CFLAGS=-Os
+              '';
+              CC = "emcc";
+            });
+          in
+          {
+            cardano-crypto-praos.components.library.pkgconfig = lib.mkForce [ [ libsodium-vrf ] ];
+            cardano-crypto-class.components.library.pkgconfig = lib.mkForce [ [ libsodium-vrf ] ];
+            cardano-crypto-class.components.library.build-tools = with pkgs.buildPackages.buildPackages; [ emscripten python2 ];
+            cardano-crypto-class.components.library.preConfigure = ''
+              ls -l
+              emcc $(js-unknown-ghcjs-pkg-config --libs --cflags libsodium) jsbits/libsodium.c -o jsbits/libsodium.js -s WASM=0 \
+                -s "EXTRA_EXPORTED_RUNTIME_METHODS=['printErr']" \
+                -s "EXPORTED_FUNCTIONS=['_malloc', '_sodium_init', '_sodium_malloc', '_sodium_free', '_crypto_hash_sha256', '_crypto_hash_sha256_bytes']"
+            '';
+            # cryptonite.components.library.preConfigure = runEmscripten;
+          };
+      })
     ];
-  };
+  });
 in
   pkgSet

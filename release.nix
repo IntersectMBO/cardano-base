@@ -53,11 +53,12 @@ let
       map (drv: drv // { inherit packageName; }) (collectTests' package)
     ) ds);
 
-  inherit (systems.examples) mingwW64 musl64;
+  inherit (systems.examples) mingwW64 musl64 ghcjs;
 
   jobs = {
     native = mapTestOn (__trace (__toJSON (packagePlatforms project)) (packagePlatforms project));
     "${mingwW64.config}" = mapTestOnCross mingwW64 (packagePlatformsCross project);
+    "${ghcjs.config}" = mapTestOnCross ghcjs (packagePlatformsCross project);
     # TODO: fix broken evals
     #musl64 = mapTestOnCross musl64 (packagePlatformsCross project);
   } // (mkRequiredJob (
