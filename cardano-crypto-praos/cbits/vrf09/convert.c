@@ -25,6 +25,7 @@ SOFTWARE.
 #include "sodium/crypto_hash_sha512.h"
 #include "crypto_vrf_ietfdraft09.h"
 #include "../private/ed25519_ref10.h"
+#include "../private/hash_to_curve.h"
 #include "sodium/crypto_core_ed25519.h"
 #include "vrf_ietfdraft09.h"
 
@@ -96,7 +97,7 @@ _vrf_ietfdraft09_hash_to_curve_elligator2_25519(unsigned char H_string[crypto_co
     memmove(string_to_hash, Y_string, crypto_vrf_ietfdraft09_PUBLICKEYBYTES);
     memmove(string_to_hash + crypto_vrf_ietfdraft09_PUBLICKEYBYTES, alpha, alphalen);
 
-    crypto_core_ed25519_from_string(H_string, "ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_\4", string_to_hash, crypto_vrf_ietfdraft09_PUBLICKEYBYTES + alphalen, 2); /* elligator2 */
+    _ext_crypto_core_ed25519_from_string(H_string, "ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_\4", string_to_hash, crypto_vrf_ietfdraft09_PUBLICKEYBYTES + alphalen); /* elligator2 */
 }
 
 
