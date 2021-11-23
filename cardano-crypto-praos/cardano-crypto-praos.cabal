@@ -72,6 +72,7 @@ library
   hs-source-dirs:       src
   exposed-modules:      Cardano.Crypto.VRF.Praos
                  ,      Cardano.Crypto.VRF.Praos09
+                 ,      Cardano.Crypto.RandomBytes
 
   build-depends:        base
                       , bytestring

@@ -68,6 +68,7 @@ import Cardano.Binary
 
 import Cardano.Crypto.VRF.Class
 import Cardano.Crypto.Seed (getBytesFromSeedT)
+import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Util (SignableRepresentation(..))
 
 import Cardano.Prelude (NFData (..))
@@ -176,8 +177,6 @@ foreign import ccall "crypto_vrf_ietfdraft03_prove" crypto_vrf_prove :: ProofPtr
 foreign import ccall "crypto_vrf_ietfdraft03_verify" crypto_vrf_verify :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
 
 foreign import ccall "crypto_vrf_ietfdraft03_proof_to_hash" crypto_vrf_proof_to_hash :: OutputPtr -> ProofPtr -> IO CInt
-
-foreign import ccall "randombytes_buf" randombytes_buf :: Ptr a -> CSize -> IO ()
 
 -- Key size constants
 
