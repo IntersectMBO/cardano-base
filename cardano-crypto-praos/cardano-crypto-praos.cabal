@@ -95,6 +95,5 @@ library
                         cbits/vrf09/keypair.c
                         cbits/vrf09/prove.c
                         cbits/vrf09/vrf.c
-
                         cbits/private/hash_to_curve.c
                         cbits/private/ed25519_ref10.c
