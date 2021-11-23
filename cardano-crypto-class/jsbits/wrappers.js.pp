@@ -111,18 +111,18 @@ function h$crypto_generichash_blake2b_init(state_d, state_o, key_d, key_o, keyle
   });
 }
 // crypto_generichash_blake2b_update c_crypto_generichash_blake2b_update :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr CUChar -> CULLong -> IO Int
-function h$crypto_generichash_blake2b_update(state_d, state_o, in_d, in_o, inlen) {
+function h$crypto_generichash_blake2b_update(state_d, state_o, in_d, in_o, inlen_msw, inlen_lsw) {
   return h$sodium_withOutBuffer(state_d, state_o, CRYPTO_BLAKE2B_256_STATE_SIZE, function(state) {
-    return h$sodium_withOutBuffer(in_d, in_o, inlen, function(in_) {
-      return _crypto_generichash_blake2b_update(state, in_, inlen);
+    return h$sodium_withOutBuffer(in_d, in_o, inlen_lsw, function(in_) {
+      return _crypto_generichash_blake2b_update(state, in_, inlen_lsw, inlen_msw);
     });
   });
 }
 // crypto_hash_sha256 c_crypto_hash_sha256 :: SizedPtr CRYPTO_SHA256_BYTES -> Ptr CUChar -> CULLong -> IO Int
-function h$crypto_hash_sha256(out_d, out_o, in_d, in_o, inlen) {
+function h$crypto_hash_sha256(out_d, out_o, in_d, in_o, inlen_msw, inlen_lsw) {
   return h$sodium_withOutBuffer(out_d, out_o, CRYPTO_SHA256_BYTES, function(out) {
-    return h$sodium_withOutBuffer(in_d, in_o, inlen, function(in_) {
-      return _crypto_hash_sha256(out, in_, inlen);
+    return h$sodium_withOutBuffer(in_d, in_o, inlen_lsw, function(in_) {
+      return _crypto_hash_sha256(out, in_, inlen_lsw, inlen_msw);
     });
   });
 }
@@ -141,19 +141,19 @@ function h$crypto_hash_sha256_init(state_d, state_o) {
   });
 }
 // crypto_hash_sha256_update c_crypto_hash_sha256_update :: SizedPtr CRYPTO_SHA256_STATE_SIZE -> Ptr CUChar -> CULLong -> IO Int
-function h$crypto_hash_sha256_update(state_d, state_o, msg_d, msg_o, msglen) {
+function h$crypto_hash_sha256_update(state_d, state_o, msg_d, msg_o, msglen_msw, msglen_lsw) {
   return h$sodium_withOutBuffer(state_d, state_o, CRYPTO_SHA512_STATE_SIZE, function(state) {
-    return h$sodium_withOutBuffer(msg_d, msg_o, msglen, function(msg) {
-      return _crypto_hash_sha256_update(state, msg, msglen);
+    return h$sodium_withOutBuffer(msg_d, msg_o, msglen_lsw, function(msg) {
+      return _crypto_hash_sha256_update(state, msg, msglen_lsw, msglen_msw);
     });
   });
 }
 // crypto_sign_ed25519_detached c_crypto_sign_ed25519_detached :: SizedPtr CRYPTO_SIGN_ED25519_BYTES -> Ptr CULLong -> Ptr CUChar -> CULLong -> SizedPtr CRYPTO_SIGN_ED25519_SECRETKEYBYTES -> IO Int
-function h$crypto_sign_ed25519_detached(sig_d, sig_o, siglen, msg_d, msg_o, msglen, sk_d, sk_o) {
-  return h$sodium_withOutBuffer(sig_d, sig_o, siglen, function(sig) {
-    return h$sodium_withOutBuffer(msg_d, msg_o, msglen, function(msg) {
+function h$crypto_sign_ed25519_detached(sig_d, sig_o, siglen_msw, siglen_lsw, msg_d, msg_o, msglen_msw, msglen_lsw, sk_d, sk_o) {
+  return h$sodium_withOutBuffer(sig_d, sig_o, siglen_lsw, function(sig) {
+    return h$sodium_withOutBuffer(msg_d, msg_o, msglen_lsw, function(msg) {
       return h$sodium_withOutBuffer(sk_d, sk_o, CRYPTO_SIGN_ED25519_SECRETKEYBYTES, function(sk) {
-        return _crypto_sign_ed25519_detached(sig, siglen, msg, msglen, sk);
+        return _crypto_sign_ed25519_detached(sig, siglen_lsw, siglen_msw, msg, msglen_lsw, msglen_msw, sk);
       });
     });
   });
@@ -185,11 +185,11 @@ function h$crypto_sign_ed25519_sk_to_seed(seed_d, seed_o, sk_d, sk_o) {
   });
 }
 // crypto_sign_ed25519_verify_detached c_crypto_sign_ed25519_verify_detached :: SizedPtr CRYPTO_SIGN_ED25519_BYTES -> Ptr CUChar -> CULLong -> SizedPtr CRYPTO_SIGN_ED25519_PUBLICKEYBYTES -> IO Int
-function h$crypto_sign_ed25519_verify_detached(sig_d, sig_o, msg_d, msg_o, msglen, pk_d, pk_o) {
+function h$crypto_sign_ed25519_verify_detached(sig_d, sig_o, msg_d, msg_o, msglen_msw, msglen_lsw, pk_d, pk_o) {
   return h$sodium_withOutBuffer(sig_d, sig_o, CRYPTO_SIGN_ED25519_BYTES, function(sig) {
-    return h$sodium_withOutBuffer(msg_d, msg_o, msglen, function(msg) {
+    return h$sodium_withOutBuffer(msg_d, msg_o, msglen_lsw, function(msg) {
       return h$sodium_withOutBuffer(pk_d, pk_o, CRYPTO_SIGN_ED25519_PUBLICKEYBYTES, function(pk) {
-        return _crypto_sign_ed25519_verify_detached(sig, msg, msglen, pk);
+        return _crypto_sign_ed25519_verify_detached(sig, msg, msglen_lsw, msglen_msw, pk);
       });
     });
   });
