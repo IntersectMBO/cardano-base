@@ -17,25 +17,27 @@ extra-source-files:  README.md
 
 extra-source-files:    cbits/crypto_vrf.h
 
-                       cbits/vrf09/common.h
-                       cbits/vrf09/ed25519_ref10_fe_25_5.h
-                       cbits/vrf09/ed25519_ref10_fe_51.h
-                       cbits/vrf09/ed25519_ref10.h
-                       cbits/vrf09/fe_25_5/base2.h
-                       cbits/vrf09/fe_25_5/base.h
-                       cbits/vrf09/fe_25_5/constants.h
-                       cbits/vrf09/fe_25_5/fe.h
-                       cbits/vrf09/fe_51/base2.h
-                       cbits/vrf09/fe_51/base.h
-                       cbits/vrf09/fe_51/constants.h
-                       cbits/vrf09/fe_51/fe.h
-                       cbits/vrf09/quirks.h
-
-                       cbits/vrf09/crypto_vrf_ietfdraft09.h
-                       cbits/vrf09/vrf_ietfdraft09.
-
                        cbits/vrf03/crypto_vrf_ietfdraft03.h
                        cbits/vrf03/vrf_ietfdraft03.h
+
+                       cbits/vrf09/crypto_vrf_ietfdraft09.h
+                       cbits/vrf09/vrf_ietfdraft09.h
+
+                       cbits/private/common.h
+                       cbits/private/quirks.h
+                       cbits/private/ed25519_ref10.h
+                       cbits/private/hash_to_curve.h
+                       cbits/private/ed25519_ref10_fe_25_5.h
+                       cbits/private/ed25519_ref10_fe_51.h
+
+                       cbits/private/fe_25_5/constants.h
+                       cbits/private/fe_25_5/base.h
+                       cbits/private/fe_25_5/base2.h
+                       cbits/private/fe_25_5/fe.h
+                       cbits/private/fe_51/constants.h
+                       cbits/private/fe_51/base.h
+                       cbits/private/fe_51/base2.h
+                       cbits/private/fe_51/fe.h
 
 flag development
     description: Disable `-Werror`
@@ -81,15 +83,18 @@ library
   pkgconfig-depends: libsodium
 
   if !flag(external-libsodium-vrf)
-    c-sources:          cbits/vrf09/convert.c
+    c-sources:          cbits/crypto_vrf.c
+                        cbits/vrf03/convert.c
+                        cbits/vrf03/keypair.c
+                        cbits/vrf03/prove.c
+                        cbits/vrf03/verify.c
+                        cbits/vrf03/vrf.c
+
+                        cbits/vrf09/convert.c
                         cbits/vrf09/verify.c
                         cbits/vrf09/keypair.c
                         cbits/vrf09/prove.c
                         cbits/vrf09/vrf.c
-                        cbits/vrf03/convert.c
-                        cbits/vrf03/verify.c
-                        cbits/vrf03/keypair.c
-                        cbits/vrf03/prove.c
-                        cbits/vrf03/vrf.c
+
+                        cbits/private/hash_to_curve.c
                         cbits/private/ed25519_ref10.c
-                        cbits/crypto_vrf.c
