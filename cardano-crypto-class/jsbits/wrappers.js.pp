@@ -83,12 +83,12 @@ var CRYPTO_SIGN_ED25519_SECRETKEYBYTES = 64;
 //
 // crypto_generichash_blake2b c_crypto_generichash_blake2b :: Ptr out -> CSize -> Ptr CUChar -> CULLong -> Ptr key -> CSize -> IO Int
 function h$crypto_generichash_blake2b(out_d, out_o, outlen,
-                                      in_d, in_o, inlen,
+                                      in_d, in_o, inlen_msw, inlen_lsw,
                                       key_d, key_o, keylen) {
   return h$sodium_withOutBuffer(out_d, out_o, outlen, function(out) {
-    return h$sodium_withOutBuffer(in_d, in_o, inlen, function(in) {
-      return h$sodium_withOutBuffer(key_d, key_o, keylen, function(key)) {
-        return _crypto_generichash_blake2b(out, outlen, in, inlen, key, keylen);
+    return h$sodium_withOutBuffer(in_d, in_o, inlen_lsw, function(in_) {
+      return h$sodium_withOutBuffer(key_d, key_o, keylen, function(key) {
+        return _crypto_generichash_blake2b(out, outlen, in_, inlen_lsw, inlen_msw, key, keylen);
       });
     });
   });
@@ -113,16 +113,16 @@ function h$crypto_generichash_blake2b_init(state_d, state_o, key_d, key_o, keyle
 // crypto_generichash_blake2b_update c_crypto_generichash_blake2b_update :: SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr CUChar -> CULLong -> IO Int
 function h$crypto_generichash_blake2b_update(state_d, state_o, in_d, in_o, inlen) {
   return h$sodium_withOutBuffer(state_d, state_o, CRYPTO_BLAKE2B_256_STATE_SIZE, function(state) {
-    return h$sodium_withOutBuffer(in_d, in_o, inlen, function(in) {
-      return _crypto_generichash_blake2b_update(state, in, inlen);
+    return h$sodium_withOutBuffer(in_d, in_o, inlen, function(in_) {
+      return _crypto_generichash_blake2b_update(state, in_, inlen);
     });
   });
 }
 // crypto_hash_sha256 c_crypto_hash_sha256 :: SizedPtr CRYPTO_SHA256_BYTES -> Ptr CUChar -> CULLong -> IO Int
 function h$crypto_hash_sha256(out_d, out_o, in_d, in_o, inlen) {
   return h$sodium_withOutBuffer(out_d, out_o, CRYPTO_SHA256_BYTES, function(out) {
-    return h$sodium_withOutBuffer(in_d, in_o, inlen, function(in) {
-      return _crypto_hash_sha256(out, in, inlen);
+    return h$sodium_withOutBuffer(in_d, in_o, inlen, function(in_) {
+      return _crypto_hash_sha256(out, in_, inlen);
     });
   });
 }
