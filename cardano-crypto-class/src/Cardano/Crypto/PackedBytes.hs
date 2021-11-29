@@ -38,6 +38,9 @@ import Foreign.Ptr (castPtr)
 import Foreign.Storable (peekByteOff)
 import GHC.Exts
 import GHC.ForeignPtr (ForeignPtr(ForeignPtr), ForeignPtrContents(PlainPtr))
+#if MIN_VERSION_base(4,15,0)
+import GHC.ForeignPtr (unsafeWithForeignPtr)
+#endif
 import GHC.ST
 import GHC.TypeLits
 import GHC.Word
