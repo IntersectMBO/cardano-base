@@ -43,10 +43,10 @@ tests =
   , testKESAlgorithm (Proxy :: Proxy (Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
   , testKESAlgorithm (Proxy :: Proxy (Sum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
-  , testKESAlgorithm (Proxy :: Proxy (CompactSingleKES Ed25519DSIGN))  "SingleKES"
-  , testKESAlgorithm (Proxy :: Proxy (CompactSum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
-  , testKESAlgorithm (Proxy :: Proxy (CompactSum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
-  , testKESAlgorithm (Proxy :: Proxy (CompactSum5KES Ed25519DSIGN Blake2b_256)) "Sum5KES"
+  , testKESAlgorithm (Proxy :: Proxy (CompactSingleKES Ed25519DSIGN))  "CompactSingleKES"
+  , testKESAlgorithm (Proxy :: Proxy (CompactSum1KES Ed25519DSIGN Blake2b_256)) "CompactSum1KES"
+  , testKESAlgorithm (Proxy :: Proxy (CompactSum2KES Ed25519DSIGN Blake2b_256)) "CompactSum2KES"
+  , testKESAlgorithm (Proxy :: Proxy (CompactSum5KES Ed25519DSIGN Blake2b_256)) "CompactSum5KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
