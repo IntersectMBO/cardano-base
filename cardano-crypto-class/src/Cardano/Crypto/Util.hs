@@ -17,6 +17,9 @@ module Cardano.Crypto.Util
   -- * Low level conversions
   , bytesToNatural
   , naturalToBytes
+
+  -- * ByteString manipulation
+  , slice
   )
 where
 
@@ -122,4 +125,8 @@ bytesToInteger (BS.PS fp (GHC.I# off#) (GHC.I# len#)) =
         -- The last parmaeter (`1#`) tells the import function to use big
         -- endian encoding.
         in GMP.importIntegerFromAddr addrOff# (GHC.int2Word# len#) 1#
+
+slice :: Word -> Word -> ByteString -> ByteString
+slice offset size = BS.take (fromIntegral size)
+                  . BS.drop (fromIntegral offset)
 

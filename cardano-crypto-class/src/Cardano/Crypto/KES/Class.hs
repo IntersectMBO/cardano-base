@@ -38,11 +38,22 @@ module Cardano.Crypto.KES.Class
   , encodedVerKeyKESSizeExpr
   , encodedSignKeyKESSizeExpr
   , encodedSigKESSizeExpr
+
+    -- * Utility functions
+    -- These are used between multiple KES implementations. User code will
+    -- most likely not need these, but they are required for recursive
+    -- definitions of the SumKES algorithms, and can be expressed entirely in
+    -- terms of the KES, DSIGN and Hash typeclasses, so we keep them here for
+    -- convenience.
+  , hashPairOfVKeys
+  , zeroSeed
+  , mungeName
   )
 where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.Word (Word8)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
@@ -392,3 +403,25 @@ encodedSigKESSizeExpr _proxy =
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSigKES (Proxy :: Proxy v)))
       -- payload
     + fromIntegral (sizeSigKES (Proxy :: Proxy v))
+
+hashPairOfVKeys :: (KESAlgorithm d, HashAlgorithm h)
+                => (VerKeyKES d, VerKeyKES d)
+                -> Hash h (VerKeyKES d, VerKeyKES d)
+hashPairOfVKeys =
+    hashWith $ \(a,b) ->
+      rawSerialiseVerKeyKES a <> rawSerialiseVerKeyKES b
+
+zeroSeed :: KESAlgorithm d => Proxy d -> Seed
+zeroSeed p = mkSeedFromBytes (BS.replicate seedSize (0 :: Word8))
+  where
+    seedSize :: Int
+    seedSize = fromIntegral (seedSizeKES p)
+
+mungeName :: String -> String
+mungeName basename
+  | (name, '^':nstr) <- span (/= '^') basename
+  , [(n, "")] <- reads nstr
+  = name ++ '^' : show (n+1 :: Word)
+
+  | otherwise
+  = basename ++ "_2^1"

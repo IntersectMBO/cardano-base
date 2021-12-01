@@ -83,6 +83,7 @@ import           NoThunks.Class (NoThunks)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.Seed
+import           Cardano.Crypto.Util
 import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.CompactSingle (CompactSingleKES)
@@ -319,33 +320,6 @@ instance (KESAlgorithm (CompactSumKES h d), OptimizedKESAlgorithm d, HashAlgorit
            | otherwise = t - _T
         (vk_0, vk_1) | t < _T = (verKeyFromSigKES ctxt t' sigma, vk_other)
                      | otherwise = (vk_other, verKeyFromSigKES ctxt t' sigma)
-
-hashPairOfVKeys :: (KESAlgorithm d, HashAlgorithm h)
-                => (VerKeyKES d, VerKeyKES d)
-                -> Hash h (VerKeyKES d, VerKeyKES d)
-hashPairOfVKeys =
-    hashWith $ \(a,b) ->
-      rawSerialiseVerKeyKES a <> rawSerialiseVerKeyKES b
-
-slice :: Word -> Word -> ByteString -> ByteString
-slice offset size = BS.take (fromIntegral size)
-                  . BS.drop (fromIntegral offset)
-
-zeroSeed :: KESAlgorithm d => Proxy d -> Seed
-zeroSeed p = mkSeedFromBytes (BS.replicate seedSize (0 :: Word8))
-  where
-    seedSize :: Int
-    seedSize = fromIntegral (seedSizeKES p)
-
-mungeName :: String -> String
-mungeName basename
-  | (name, '^':nstr) <- span (/= '^') basename
-  , [(n, "")] <- reads nstr
-  = name ++ '^' : show (n+1 :: Word)
-
-  | otherwise
-  = basename ++ "_2^1"
-
 
 --
 -- VerKey instances
