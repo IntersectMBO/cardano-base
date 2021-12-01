@@ -159,10 +159,13 @@ instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
                          !(VerKeyKES d)
         deriving Generic
 
-    -- | From Figure 3: @(sigma, vk_0, vk_1)@
+    -- | Figure 3 gives: @(sigma, vk_0, vk_1)@ - however, we store only the
+    -- \"off-side\" VK in the branch, and calculate the \"on-side\" one from
+    -- the leaf VK (stored in the leaf node, see 'CompactSingleKES') and the
+    -- \"off-side\" VK's along the Merkle path.
     --
     data SigKES (CompactSumKES h d) =
-           SigCompactSumKES !(SigKES d) -- contains VerKey for this branch!
+           SigCompactSumKES !(SigKES d) -- includes VerKeys for the Merkle subpath
                      !(VerKeyKES d)
         deriving Generic
 
