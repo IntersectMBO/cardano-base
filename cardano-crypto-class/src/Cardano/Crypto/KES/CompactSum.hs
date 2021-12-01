@@ -87,8 +87,7 @@ import           Cardano.Crypto.Util
 import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.CompactSingle (CompactSingleKES)
-import Data.Word (Word8)
-import Control.DeepSeq (NFData)
+import           Control.DeepSeq (NFData)
 
 
 -- | A 2^0 period KES
