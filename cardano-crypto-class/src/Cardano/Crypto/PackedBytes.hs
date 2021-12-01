@@ -38,6 +38,9 @@ import Foreign.Ptr (castPtr)
 import Foreign.Storable (peekByteOff)
 import GHC.Exts
 import GHC.ForeignPtr (ForeignPtr(ForeignPtr), ForeignPtrContents(PlainPtr))
+#if MIN_VERSION_base(4,15,0)
+import GHC.ForeignPtr (unsafeWithForeignPtr)
+#endif
 import GHC.ST
 import GHC.TypeLits
 import GHC.Word
@@ -308,10 +311,12 @@ writeWord64BE mba i w64 = do
 indexWord32BE :: ByteArray -> Int -> Word32
 indexWord32BE (ByteArray ba#) (I# i#) =
 #ifdef WORDS_BIGENDIAN
-  W32# (indexWord8ArrayAsWord32# ba# i#)
+  w32
 #else
-  W32# (narrow32Word# (byteSwap32# (indexWord8ArrayAsWord32# ba# i#)))
+  byteSwap32 w32
 #endif
+  where
+    w32 = W32# (indexWord8ArrayAsWord32# ba# i#)
 {-# INLINE indexWord32BE #-}
 
 peekWord32BE :: Ptr a -> Int -> IO Word32
@@ -324,13 +329,13 @@ peekWord32BE ptr i =
 
 
 writeWord32BE :: MutableByteArray s -> Int -> Word32 -> ST s ()
-writeWord32BE (MutableByteArray mba#) (I# i#) (W32# w#) =
-  primitive_ (writeWord8ArrayAsWord32# mba# i# wbe#)
+writeWord32BE (MutableByteArray mba#) (I# i#) w =
+  primitive_ (writeWord8ArrayAsWord32# mba# i# w#)
   where
 #ifdef WORDS_BIGENDIAN
-    !wbe# = w#
+    !(W32# w#) = w
 #else
-    !wbe# = narrow32Word# (byteSwap32# w#)
+    !(W32# w#) = byteSwap32 w
 #endif
 {-# INLINE writeWord32BE #-}
 
