@@ -16,6 +16,9 @@ module Cardano.Crypto.KES.Class
     KESAlgorithm (..)
   , Period
 
+  , OptimizedKESAlgorithm (..)
+  , verifyOptimizedKES
+
     -- * 'SignedKES' wrapper
   , SignedKES (..)
   , signedKES
@@ -35,11 +38,22 @@ module Cardano.Crypto.KES.Class
   , encodedVerKeyKESSizeExpr
   , encodedSignKeyKESSizeExpr
   , encodedSigKESSizeExpr
+
+    -- * Utility functions
+    -- These are used between multiple KES implementations. User code will
+    -- most likely not need these, but they are required for recursive
+    -- definitions of the SumKES algorithms, and can be expressed entirely in
+    -- terms of the KES, DSIGN and Hash typeclasses, so we keep them here for
+    -- convenience.
+  , hashPairOfVKeys
+  , zeroSeed
+  , mungeName
   )
 where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.Word (Word8)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
@@ -113,6 +127,9 @@ class ( Typeable v
     -> SignKeyKES v
     -> SigKES v
 
+  -- | Full KES verification. This method checks that the signature itself
+  -- checks out (as per 'verifySigKES'), and also makes sure that it matches
+  -- the provided VerKey.
   verifyKES
     :: (Signable v a, HasCallStack)
     => ContextKES v
@@ -196,6 +213,48 @@ class ( Typeable v
   rawDeserialiseSignKeyKES :: ByteString -> Maybe (SignKeyKES v)
   rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
 
+-- | Subclass for KES algorithms that embed a copy of the VerKey into the
+-- signature itself, rather than relying on the externally supplied VerKey
+-- alone. Some optimizations made in the 'Cardano.Crypto.KES.CompactSingleKES'
+-- and 'Cardano.Crypto.KES.CompactSumKES' implementations require this
+-- additional interface in order to avoid redundant computations.
+class KESAlgorithm v => OptimizedKESAlgorithm v where
+  -- | Partial verification: this method only verifies the signature itself,
+  -- but it does not check it against any externally-provided VerKey. Use
+  -- 'verifyKES' for full KES verification.
+  verifySigKES
+    :: (Signable v a, HasCallStack)
+    => ContextKES v
+    -> Period  -- ^ The /current/ period for the key
+    -> a
+    -> SigKES v
+    -> Either String ()
+
+  -- | Extract a VerKey from a SigKES. Note that a VerKey embedded in or
+  -- derived from a SigKES is effectively user-supplied, so it is not enough
+  -- to validate a SigKES against this VerKey (like 'verifySigKES' does); you
+  -- must also compare the VerKey against an externally-provided key that you
+  -- want to verify against (see 'verifyKES').
+  verKeyFromSigKES
+    :: ContextKES v
+    -> Period
+    -> SigKES v
+    -> VerKeyKES v
+
+verifyOptimizedKES :: (OptimizedKESAlgorithm v, Signable v a, HasCallStack)
+                   => ContextKES v
+                   -> VerKeyKES v
+                   -> Period
+                   -> a
+                   -> SigKES v
+                   -> Either String ()
+verifyOptimizedKES ctx vk t a sig = do
+  verifySigKES ctx t a sig
+  let vk' = verKeyFromSigKES ctx t sig
+  if vk' ==  vk then
+    return ()
+  else
+    Left "KES verification failed"
 --
 -- Do not provide Ord instances for keys, see #38
 --
@@ -344,3 +403,25 @@ encodedSigKESSizeExpr _proxy =
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSigKES (Proxy :: Proxy v)))
       -- payload
     + fromIntegral (sizeSigKES (Proxy :: Proxy v))
+
+hashPairOfVKeys :: (KESAlgorithm d, HashAlgorithm h)
+                => (VerKeyKES d, VerKeyKES d)
+                -> Hash h (VerKeyKES d, VerKeyKES d)
+hashPairOfVKeys =
+    hashWith $ \(a,b) ->
+      rawSerialiseVerKeyKES a <> rawSerialiseVerKeyKES b
+
+zeroSeed :: KESAlgorithm d => Proxy d -> Seed
+zeroSeed p = mkSeedFromBytes (BS.replicate seedSize (0 :: Word8))
+  where
+    seedSize :: Int
+    seedSize = fromIntegral (seedSizeKES p)
+
+mungeName :: String -> String
+mungeName basename
+  | (name, '^':nstr) <- span (/= '^') basename
+  , [(n, "")] <- reads nstr
+  = name ++ '^' : show (n+1 :: Word)
+
+  | otherwise
+  = basename ++ "_2^1"
