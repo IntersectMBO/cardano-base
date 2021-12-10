@@ -13,7 +13,7 @@ where
 
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
-import Cardano.Crypto.VRF.Praos09
+import Cardano.Crypto.VRF.PraosBatchCompat
 import Cardano.Crypto.Util
 
 import qualified Data.ByteString as BS
@@ -38,7 +38,7 @@ tests =
     [ testVRFAlgorithm (Proxy :: Proxy MockVRF) "MockVRF"
     , testVRFAlgorithm (Proxy :: Proxy SimpleVRF) "SimpleVRF"
     , testVRFAlgorithm (Proxy :: Proxy PraosVRF) "PraosVRF"
-    , testVRFAlgorithm (Proxy :: Proxy Praos09VRF) "Praos09VRF"
+    , testVRFAlgorithm (Proxy :: Proxy PraosBatchCompatVRF) "PraosBatchCompatVRF"
 
     , testGroup "OutputVRF"
       [ testProperty "bytesToNatural" prop_bytesToNatural

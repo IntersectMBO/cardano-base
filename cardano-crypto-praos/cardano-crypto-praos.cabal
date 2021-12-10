@@ -20,8 +20,8 @@ extra-source-files:    cbits/crypto_vrf.h
                        cbits/vrf03/crypto_vrf_ietfdraft03.h
                        cbits/vrf03/vrf_ietfdraft03.h
 
-                       cbits/vrf09/crypto_vrf_ietfdraft09.h
-                       cbits/vrf09/vrf_ietfdraft09.h
+                       cbits/vrf_batch_compat/crypto_vrf_batch_compat_ietfdraft10.h
+                       cbits/vrf_batch_compat/vrf_batch_compat_ietfdraft10.h
 
                        cbits/private/common.h
                        cbits/private/quirks.h
@@ -71,7 +71,7 @@ library
   import:               base, project-config
   hs-source-dirs:       src
   exposed-modules:      Cardano.Crypto.VRF.Praos
-                 ,      Cardano.Crypto.VRF.Praos09
+                 ,      Cardano.Crypto.VRF.PraosBatchCompat
                  ,      Cardano.Crypto.RandomBytes
 
   build-depends:        base
@@ -96,5 +96,12 @@ library
                         cbits/vrf09/keypair.c
                         cbits/vrf09/prove.c
                         cbits/vrf09/vrf.c
+
+                        cbits/vrf_batch_compat/convert.c
+                        cbits/vrf_batch_compat/verify.c
+                        cbits/vrf_batch_compat/keypair.c
+                        cbits/vrf_batch_compat/prove.c
+                        cbits/vrf_batch_compat/vrf.c
+
                         cbits/private/hash_to_curve.c
                         cbits/private/ed25519_ref10.c
