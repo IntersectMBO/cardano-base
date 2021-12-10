@@ -23,11 +23,11 @@ SOFTWARE.
 #include <string.h>
 
 #include "sodium/crypto_hash_sha512.h"
-#include "crypto_vrf_ietfdraft09.h"
+#include "crypto_vrf_ietfdraft10.h"
 #include "../private/ed25519_ref10.h"
 #include "../private/hash_to_curve.h"
 #include "sodium/crypto_core_ed25519.h"
-#include "vrf_ietfdraft09.h"
+#include "vrf_ietfdraft10.h"
 
 static const unsigned char ZERO = 0x00;
 static const unsigned char ONE = 0x01;
@@ -56,7 +56,7 @@ multiply_by_cofactor(ge25519_p3 *point) {
  * 5.1.2.
  */
 void
-_vrf_ietfdraft09_point_to_string(unsigned char string[crypto_core_ed25519_BYTES], const ge25519_p3 *point)
+_vrf_ietfdraft10_point_to_string(unsigned char string[crypto_core_ed25519_BYTES], const ge25519_p3 *point)
 {
     ge25519_p3_tobytes(string, point);
 }
@@ -70,7 +70,7 @@ _vrf_ietfdraft09_point_to_string(unsigned char string[crypto_core_ed25519_BYTES]
  * stores decoded point in *point), nonzero if decoding fails.
  */
 int
-_vrf_ietfdraft09_string_to_point(ge25519_p3 *point, const unsigned char string[crypto_core_ed25519_BYTES])
+_vrf_ietfdraft10_string_to_point(ge25519_p3 *point, const unsigned char string[crypto_core_ed25519_BYTES])
 {
     if (ge25519_is_canonical(string) == 0 ||
         ge25519_frombytes(point, string) != 0) {
@@ -86,18 +86,18 @@ _vrf_ietfdraft09_string_to_point(ge25519_p3 *point, const unsigned char string[c
  * Runtime depends only on alphalen (the message length)
  */
 void
-_vrf_ietfdraft09_hash_to_curve_elligator2_25519(unsigned char H_string[crypto_core_ed25519_BYTES],
+_vrf_ietfdraft10_hash_to_curve_elligator2_25519(unsigned char H_string[crypto_core_ed25519_BYTES],
                                                 const ge25519_p3 *Y_point,
                                                 const unsigned char *alpha,
                                                 const unsigned long long alphalen)
 {
-    unsigned char            Y_string[crypto_vrf_ietfdraft09_PUBLICKEYBYTES], string_to_hash[crypto_vrf_ietfdraft09_PUBLICKEYBYTES + alphalen];
+    unsigned char            Y_string[crypto_vrf_ietfdraft10_PUBLICKEYBYTES], string_to_hash[crypto_vrf_ietfdraft10_PUBLICKEYBYTES + alphalen];
 
-    _vrf_ietfdraft09_point_to_string(Y_string, Y_point);
-    memmove(string_to_hash, Y_string, crypto_vrf_ietfdraft09_PUBLICKEYBYTES);
-    memmove(string_to_hash + crypto_vrf_ietfdraft09_PUBLICKEYBYTES, alpha, alphalen);
+    _vrf_ietfdraft10_point_to_string(Y_string, Y_point);
+    memmove(string_to_hash, Y_string, crypto_vrf_ietfdraft10_PUBLICKEYBYTES);
+    memmove(string_to_hash + crypto_vrf_ietfdraft10_PUBLICKEYBYTES, alpha, alphalen);
 
-    _ext_crypto_core_ed25519_from_string(H_string, "ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_\4", string_to_hash, crypto_vrf_ietfdraft09_PUBLICKEYBYTES + alphalen); /* elligator2 */
+    _ext_crypto_core_ed25519_from_string(H_string, "ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_\4", string_to_hash, crypto_vrf_ietfdraft10_PUBLICKEYBYTES + alphalen); /* elligator2 */
 }
 
 
@@ -109,14 +109,14 @@ _vrf_ietfdraft09_hash_to_curve_elligator2_25519(unsigned char H_string[crypto_co
  * the function with an infinite loop.
  */
 int
-_vrf_ietfdraft09_hash_to_curve_try_inc(unsigned char H_string[crypto_core_ed25519_BYTES],
+_vrf_ietfdraft10_hash_to_curve_try_inc(unsigned char H_string[crypto_core_ed25519_BYTES],
                                        const ge25519_p3 *Y_point,
                                        const unsigned char *alpha,
                                        const unsigned long long alphalen)
 {
-    unsigned char            Y_string[crypto_vrf_ietfdraft09_PUBLICKEYBYTES], r_string[crypto_hash_sha512_BYTES];
+    unsigned char            Y_string[crypto_vrf_ietfdraft10_PUBLICKEYBYTES], r_string[crypto_hash_sha512_BYTES];
 
-    _vrf_ietfdraft09_point_to_string(Y_string, Y_point);
+    _vrf_ietfdraft10_point_to_string(Y_string, Y_point);
 
     ge25519_p3 p3;
     int check = TAI_NR_TRIES;
@@ -126,7 +126,7 @@ _vrf_ietfdraft09_hash_to_curve_try_inc(unsigned char H_string[crypto_core_ed2551
         crypto_hash_sha512_init(&hs);
         crypto_hash_sha512_update(&hs, &SUITE, 1);
         crypto_hash_sha512_update(&hs, &ONE, 1);
-        crypto_hash_sha512_update(&hs, Y_string, crypto_vrf_ietfdraft09_PUBLICKEYBYTES);
+        crypto_hash_sha512_update(&hs, Y_string, crypto_vrf_ietfdraft10_PUBLICKEYBYTES);
         crypto_hash_sha512_update(&hs, alpha, alphalen);
         crypto_hash_sha512_update(&hs, &value, 1);
         crypto_hash_sha512_update(&hs, &ZERO, 1);
@@ -149,7 +149,7 @@ _vrf_ietfdraft09_hash_to_curve_try_inc(unsigned char H_string[crypto_core_ed2551
  * Hashes four points to a 16-byte string.
  * Constant time. For optimised calls*/
 void
-_vrf_ietfdraft09_hash_points(unsigned char c[16], const ge25519_p3 *P1,
+_vrf_ietfdraft10_hash_points(unsigned char c[16], const ge25519_p3 *P1,
                              const ge25519_p3 *P2, const unsigned char *P3,
                              const unsigned char *P4)
 {
@@ -157,8 +157,8 @@ _vrf_ietfdraft09_hash_points(unsigned char c[16], const ge25519_p3 *P1,
 
     str[0] = SUITE;
     str[1] = TWO;
-    _vrf_ietfdraft09_point_to_string(str+2+crypto_core_ed25519_BYTES*0, P1);
-    _vrf_ietfdraft09_point_to_string(str+2+crypto_core_ed25519_BYTES*1, P2);
+    _vrf_ietfdraft10_point_to_string(str+2+crypto_core_ed25519_BYTES*0, P1);
+    _vrf_ietfdraft10_point_to_string(str+2+crypto_core_ed25519_BYTES*1, P2);
     memmove(str+2+crypto_core_ed25519_BYTES*2, P3, crypto_core_ed25519_BYTES);
     memmove(str+2+crypto_core_ed25519_BYTES*3, P4, crypto_core_ed25519_BYTES);
     str[2 + crypto_core_ed25519_BYTES*4] = ZERO;
@@ -169,22 +169,26 @@ _vrf_ietfdraft09_hash_points(unsigned char c[16], const ge25519_p3 *P1,
 
 /* Decode an 128-byte batch-compatible proof pi into a point gamma, a point U, a point V, and a
  * 32-byte scalar s, as specified in IETF draft section 5.4.4.
- * Verifier does not check whether `s` is canonical, meaning that the proofs
- * are malleable.
+ * Verifier checks whether `s` is canonical.
  * Returns 0 on success, nonzero on failure.
  */
 int
-_vrf_ietfdraft09_decode_proof(ge25519_p3 *Gamma, unsigned char U[crypto_core_ed25519_BYTES], unsigned char V[crypto_core_ed25519_BYTES],
-                              unsigned char s[crypto_core_ed25519_SCALARBYTES], const unsigned char pi[crypto_vrf_ietfdraft09_PROOFBYTES])
+_vrf_ietfdraft10_decode_proof_batchcompat(ge25519_p3 *Gamma, unsigned char U[crypto_core_ed25519_BYTES], unsigned char V[crypto_core_ed25519_BYTES],
+                              unsigned char s[crypto_core_ed25519_SCALARBYTES], const unsigned char pi[crypto_vrf_ietfdraft10_PROOFBYTES_BATCHCOMPAT])
 {
     /* gamma = decode_point(pi[0:32]) */
-    if (_vrf_ietfdraft09_string_to_point(Gamma, pi) != 0) {
+    if (_vrf_ietfdraft10_string_to_point(Gamma, pi) != 0) {
         return -1;
     }
 
     memmove(U, pi+crypto_core_ed25519_BYTES, crypto_core_ed25519_BYTES);
     memmove(V, pi+crypto_core_ed25519_BYTES * 2, crypto_core_ed25519_BYTES);
     memmove(s, pi+crypto_core_ed25519_BYTES * 3, crypto_core_ed25519_SCALARBYTES);
+
+    if (s[63] & 240 &&
+        sc25519_is_canonical(s) == 0) {
+        return -1;
+    }
 
     return 0;
 }

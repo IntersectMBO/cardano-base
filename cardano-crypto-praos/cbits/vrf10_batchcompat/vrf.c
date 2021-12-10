@@ -20,34 +20,34 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "crypto_vrf_ietfdraft09.h"
+#include "crypto_vrf_ietfdraft10.h"
 
 size_t
-crypto_vrf_ietfdraft09_publickeybytes(void)
+crypto_vrf_ietfdraft10_publickeybytes(void)
 {
-    return crypto_vrf_ietfdraft09_PUBLICKEYBYTES;
+    return crypto_vrf_ietfdraft10_PUBLICKEYBYTES;
 }
 
 size_t
-crypto_vrf_ietfdraft09_secretkeybytes(void)
+crypto_vrf_ietfdraft10_secretkeybytes(void)
 {
-    return crypto_vrf_ietfdraft09_SECRETKEYBYTES;
+    return crypto_vrf_ietfdraft10_SECRETKEYBYTES;
 }
 
 size_t
-crypto_vrf_ietfdraft09_seedbytes(void)
+crypto_vrf_ietfdraft10_seedbytes(void)
 {
-    return crypto_vrf_ietfdraft09_SEEDBYTES;
+    return crypto_vrf_ietfdraft10_SEEDBYTES;
 }
 
 size_t
-crypto_vrf_ietfdraft09_proofbytes(void)
+crypto_vrf_ietfdraft10_proofbytes_batchcompat(void)
 {
-    return crypto_vrf_ietfdraft09_PROOFBYTES;
+    return crypto_vrf_ietfdraft10_PROOFBYTES_BATCHCOMPAT;
 }
 
 size_t
-crypto_vrf_ietfdraft09_outputbytes(void)
+crypto_vrf_ietfdraft10_outputbytes(void)
 {
-    return crypto_vrf_ietfdraft09_OUTPUTBYTES;
+    return crypto_vrf_ietfdraft10_OUTPUTBYTES;
 }
