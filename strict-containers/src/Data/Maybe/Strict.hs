@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -61,7 +62,9 @@ instance Monad StrictMaybe where
 
   (>>) = (*>)
 
+#if !MIN_VERSION_base(4,16,0)
   return = SJust
+#endif
 
 instance MonadFail StrictMaybe where
   fail _ = SNothing

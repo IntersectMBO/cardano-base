@@ -76,6 +76,7 @@ import Data.Aeson (FromJSON(..), FromJSONKey(..), ToJSON(..), ToJSONKey(..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encoding as Aeson
 import qualified Data.Aeson.Types as Aeson
+import qualified Data.Aeson.Key as Aeson
 
 import Control.DeepSeq (NFData)
 
@@ -254,7 +255,7 @@ instance HashAlgorithm h => IsString (Hash h a) where
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
 instance HashAlgorithm h => ToJSONKey (Hash h a) where
-  toJSONKey = Aeson.ToJSONKeyText hashToText (Aeson.text . hashToText)
+  toJSONKey = Aeson.ToJSONKeyText (Aeson.fromText . hashToText) (Aeson.text . hashToText)
 
 instance HashAlgorithm h => FromJSONKey (Hash h a) where
   fromJSONKey = Aeson.FromJSONKeyTextParser parseHash

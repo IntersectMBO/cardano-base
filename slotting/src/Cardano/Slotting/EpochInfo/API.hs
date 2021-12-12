@@ -92,17 +92,17 @@ epochInfoSlotToUTCTime ei start sl =
   (Ideally, ghc would just do this..)
 -------------------------------------------------------------------------------}
 
-epochInfoSize :: HasCallStack => EpochInfo m -> EpochNo -> m EpochSize
+epochInfoSize :: EpochInfo m -> HasCallStack => EpochNo -> m EpochSize
 epochInfoSize = epochInfoSize_
 
-epochInfoFirst :: HasCallStack => EpochInfo m -> EpochNo -> m SlotNo
+epochInfoFirst :: EpochInfo m -> HasCallStack => EpochNo -> m SlotNo
 epochInfoFirst = epochInfoFirst_
 
-epochInfoEpoch :: HasCallStack => EpochInfo m -> SlotNo -> m EpochNo
+epochInfoEpoch :: EpochInfo m -> HasCallStack => SlotNo -> m EpochNo
 epochInfoEpoch = epochInfoEpoch_
 
 epochInfoSlotToRelativeTime ::
-  HasCallStack => EpochInfo m -> SlotNo -> m RelativeTime
+  EpochInfo m -> HasCallStack => SlotNo -> m RelativeTime
 epochInfoSlotToRelativeTime = epochInfoSlotToRelativeTime_
 
 {-------------------------------------------------------------------------------

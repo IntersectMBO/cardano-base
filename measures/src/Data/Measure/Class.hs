@@ -1,6 +1,8 @@
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DerivingVia          #-}
 {-# LANGUAGE EmptyCase            #-}
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE NoImplicitPrelude    #-}
@@ -27,7 +29,9 @@ import Data.Coerce
 import Data.DerivingVia
 import Data.Word (Word8, Word16, Word32, Word64)
 import GHC.Generics
+#if !MIN_VERSION_base(4,16,0)
 import GHC.Natural (Natural)
+#endif
 import GHC.TypeLits
 import Prelude (($))
 import qualified Prelude
