@@ -24,6 +24,7 @@ SOFTWARE.
 
 #include "sodium/crypto_hash_sha512.h"
 #include "sodium/crypto_verify_16.h"
+#include "sodium/crypto_core_ed25519.h"
 #include "crypto_vrf_ietfdraft03.h"
 #include "../private/ed25519_ref10.h"
 #include "vrf_ietfdraft03.h"
@@ -116,9 +117,10 @@ vrf_verify(const ge25519_p3 *Y_point, const unsigned char pi[80],
 {
     /* Note: c fits in 16 bytes, but ge25519_scalarmult expects a 32-byte scalar.
      * Similarly, s_scalar fits in 32 bytes but sc25519_reduce takes in 64 bytes. */
-    unsigned char h_string[32], c_scalar[32], s_scalar[64], cprime[16];
+    unsigned char h_string[32], c_scalar[32], cn_scalar[32], s_scalar[64], cprime[16], U_bytes[32], V_bytes[32];
 
-    ge25519_p3     H_point, Gamma_point, U_point, V_point, tmp_p3_point;
+    ge25519_p2  U_point, V_point;
+    ge25519_p3     H_point, Gamma_point, tmp_p3_point;
     ge25519_p1p1   tmp_p1p1_point;
     ge25519_cached tmp_cached_point;
 
@@ -140,22 +142,18 @@ vrf_verify(const ge25519_p3 *Y_point, const unsigned char pi[80],
 
     _vrf_ietfdraft03_hash_to_curve_elligator2_25519(h_string, Y_point, alpha, alphalen);
     ge25519_frombytes(&H_point, h_string);
+    crypto_core_ed25519_scalar_negate(cn_scalar, c_scalar); /* negate scalar c */
 
     /* calculate U = s*B - c*Y */
-    ge25519_scalarmult(&tmp_p3_point, c_scalar, Y_point); /* tmp_p3 = c*Y */
-    ge25519_p3_to_cached(&tmp_cached_point, &tmp_p3_point); /* tmp_cached = c*Y */
-    ge25519_scalarmult_base(&tmp_p3_point, s_scalar); /* tmp_p3 = s*B */
-    ge25519_sub(&tmp_p1p1_point, &tmp_p3_point, &tmp_cached_point); /* tmp_p1p1 = tmp_p3 - tmp_cached = s*B - c*Y */
-    ge25519_p1p1_to_p3(&U_point, &tmp_p1p1_point); /* U = s*B - c*Y */
+    ge25519_double_scalarmult_vartime(&U_point, cn_scalar, Y_point, s_scalar);
 
     /* calculate V = s*H -  c*Gamma */
-    ge25519_scalarmult(&tmp_p3_point, c_scalar, &Gamma_point); /* tmp_p3 = c*Gamma */
-    ge25519_p3_to_cached(&tmp_cached_point, &tmp_p3_point); /* tmp_cached = c*Gamma */
-    ge25519_scalarmult(&tmp_p3_point, s_scalar, &H_point); /* tmp_p3 = s*H */
-    ge25519_sub(&tmp_p1p1_point, &tmp_p3_point, &tmp_cached_point); /* tmp_p1p1 = tmp_p3 - tmp_cached = s*H - c*Gamma */
-    ge25519_p1p1_to_p3(&V_point, &tmp_p1p1_point); /* V = s*H - c*Gamma */
+    ge25519_double_scalarmult_vartime_variable(&V_point, cn_scalar, &Gamma_point, s_scalar, &H_point);
 
-    _vrf_ietfdraft03_hash_points(cprime, &H_point, &Gamma_point, &U_point, &V_point);
+    ge25519_tobytes(U_bytes, &U_point);
+    ge25519_tobytes(V_bytes, &V_point);
+
+    _vrf_ietfdraft03_hash_points(cprime, &H_point, &Gamma_point, U_bytes, V_bytes);
     return crypto_verify_16(c_scalar, cprime);
 }
 

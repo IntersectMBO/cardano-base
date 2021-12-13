@@ -90,8 +90,8 @@ _vrf_ietfdraft03_hash_to_curve_elligator2_25519(unsigned char H_string[32],
  * Constant time. */
 void
 _vrf_ietfdraft03_hash_points(unsigned char c[16], const ge25519_p3 *P1,
-			     const ge25519_p3 *P2, const ge25519_p3 *P3,
-			     const ge25519_p3 *P4)
+			     const ge25519_p3 *P2, const unsigned char *P3,
+			     const unsigned char *P4)
 {
     unsigned char str[2+32*4], c1[64];
 
@@ -99,8 +99,8 @@ _vrf_ietfdraft03_hash_points(unsigned char c[16], const ge25519_p3 *P1,
     str[1] = TWO;
     _vrf_ietfdraft03_point_to_string(str+2+32*0, P1);
     _vrf_ietfdraft03_point_to_string(str+2+32*1, P2);
-    _vrf_ietfdraft03_point_to_string(str+2+32*2, P3);
-    _vrf_ietfdraft03_point_to_string(str+2+32*3, P4);
+    memmove(str+2+32*2, P3, 32);
+    memmove(str+2+32*3, P4, 32);
     crypto_hash_sha512(c1, str, sizeof str);
     memmove(c, c1, 16);
     sodium_memzero(c1, 64);

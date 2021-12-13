@@ -102,8 +102,15 @@ vrf_prove(unsigned char pi[80], const ge25519_p3 *Y_point,
     ge25519_scalarmult(&kH_point, k_scalar, &H_point); /* compute k*H */
 
     /* c = ECVRF_hash_points(h, gamma, k*B, k*H)
-     * (writes only to the first 16 bytes of c_scalar */
-    _vrf_ietfdraft03_hash_points(c_scalar, &H_point, &Gamma_point, &kB_point, &kH_point);
+		* (writes only to the first 16 bytes of c_scalar
+		* We need to pass kB and kH to bytes for the new
+		* function signature
+		* */
+		 unsigned char kB_bytes[32], kH_bytes[32];
+		 ge25519_p3_tobytes(kB_bytes, &kB_point);
+		 ge25519_p3_tobytes(kH_bytes, &kH_point);
+
+		 _vrf_ietfdraft03_hash_points(c_scalar, &H_point, &Gamma_point, kB_bytes, kH_bytes);
     memset(c_scalar+16, 0, 16); /* zero the remaining 16 bytes of c_scalar */
 
     /* output pi */
