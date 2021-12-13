@@ -15,8 +15,7 @@ category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
                      jsbits/libsodium.c
-                     jsbits/libsodium.js
-                     jsbits/wrappers.js.pp
+                     jsbits/bindings.js.pp
 
 flag development
     description: Disable `-Werror`
