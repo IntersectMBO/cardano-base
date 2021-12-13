@@ -112,8 +112,7 @@ library
                       , vector
 
   if impl(ghcjs) || os(ghcjs)
-    js-sources:         jsbits/libsodium.js
-                        jsbits/wrappers.js.pp
+    js-sources:         jsbits/bindings.js.pp
 
   pkgconfig-depends:    libsodium
 
