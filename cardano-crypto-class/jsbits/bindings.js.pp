@@ -44,6 +44,11 @@ function maybeCopyToEmscripten(d, o, len) {
 }
 
 h$sodium_withOutBuffer = function(d, o, len, cont) {
+  // if the passed in ptr is null, no point in copying anything,
+  // hand null through to the call.
+  if(d === null) {
+    return cont(null);
+  }
   var ptr = _malloc(len);
   for(var n = 0; n < len; n++) {
     HEAPU8[ptr + n] = d.u8[o + n];
