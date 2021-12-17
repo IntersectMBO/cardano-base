@@ -165,7 +165,7 @@ function h$crypto_hash_sha256_update(state_d, state_o, msg_d, msg_o, msglen_msw,
 }
 // crypto_sign_ed25519_detached c_crypto_sign_ed25519_detached :: SizedPtr CRYPTO_SIGN_ED25519_BYTES -> Ptr CULLong -> Ptr CUChar -> CULLong -> SizedPtr CRYPTO_SIGN_ED25519_SECRETKEYBYTES -> IO Int
 function h$crypto_sign_ed25519_detached(sig_d, sig_o, siglen_p_d, siglen_p_o, msg_d, msg_o, msglen_msw, msglen_lsw, sk_d, sk_o) {
-  return h$sodium_withOutBuffer(sig_d, sig_o, siglen_lsw, function(sig) {
+  return h$sodium_withOutBuffer(sig_d, sig_o, CRYPTO_SIGN_ED25519_BYTES, function(sig) {
     return h$sodium_withOutBuffer(siglen_p_d, siglen_p_o, 4, function(siglen) {
       return h$sodium_withOutBuffer(msg_d, msg_o, msglen_lsw, function(msg) {
         return h$sodium_withOutBuffer(sk_d, sk_o, CRYPTO_SIGN_ED25519_SECRETKEYBYTES, function(sk) {
