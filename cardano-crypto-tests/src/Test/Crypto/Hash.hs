@@ -75,7 +75,6 @@ testSodiumHashAlgorithm p =
     ]
     where n = hashAlgorithmName p
 
-
 testPackedBytesN :: forall n. KnownNat n => TestHash n -> TestTree
 testPackedBytesN h = do
   testGroup
@@ -124,7 +123,6 @@ testPackedBytes =
     , testPackedBytesN (TestHash :: TestHash 32)
     ]
 
-
 prop_hash_cbor :: HashAlgorithm h => Hash h Int -> Property
 prop_hash_cbor = prop_cbor
 
@@ -156,10 +154,11 @@ prop_hash_hashFromStringAsHex_hashToStringFromHash h = fromJust (hashFromStringA
 prop_libsodium_model
   :: forall h. NaCl.SodiumHashAlgorithm h
   => Proxy h -> BS.ByteString -> Property
-prop_libsodium_model p bs = expected === actual
+prop_libsodium_model p bs = ioProperty $ do
+  mlsb <- NaCl.digestMLockedBS p bs
+  let actual = NaCl.mlsbToByteString mlsb
+  return (expected === actual)
   where
-    mlsb = NaCl.digestMLockedBS p bs
-    actual = NaCl.mlsbToByteString mlsb
     expected = digest p bs
 
 

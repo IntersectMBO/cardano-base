@@ -1,4 +1,4 @@
-{ sources }: 
+{ sources }:
 # our packages overlay
 pkgs: _: with pkgs; {
   cardanoBaseHaskellPackages = import ./haskell.nix {

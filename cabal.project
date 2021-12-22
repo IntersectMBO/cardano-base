@@ -30,4 +30,3 @@ packages:
 
 -- Ensures colourized output from test runners
 test-show-details: direct
-

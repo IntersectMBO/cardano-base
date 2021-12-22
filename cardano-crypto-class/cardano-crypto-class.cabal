@@ -18,6 +18,8 @@ copyright:          2019-2021 IOHK
 category:           Currency
 build-type:         Simple
 extra-source-files: README.md
+extra-source-files: cbits/mlocked-pool.h
+                  , cbits/mlocked-pool.c
 
 flag development
   description: Disable `-Werror`
@@ -49,7 +51,9 @@ library
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.Class
     Cardano.Crypto.DSIGN.Ed25519
+    Cardano.Crypto.DSIGN.Ed25519ML
     Cardano.Crypto.DSIGN.Ed448
+    Cardano.Crypto.DSIGNM.Class
     Cardano.Crypto.DSIGN.Mock
     Cardano.Crypto.DSIGN.NeverUsed
     Cardano.Crypto.Hash
@@ -65,6 +69,7 @@ library
     Cardano.Crypto.KES.Class
     Cardano.Crypto.KES.CompactSingle
     Cardano.Crypto.KES.CompactSum
+    Cardano.Crypto.KES.ForgetMock
     Cardano.Crypto.KES.Mock
     Cardano.Crypto.KES.NeverUsed
     Cardano.Crypto.KES.Simple
@@ -80,7 +85,9 @@ library
     Cardano.Crypto.Libsodium.MLockedBytes
     Cardano.Crypto.Libsodium.MLockedBytes.Internal
     Cardano.Crypto.Libsodium.UnsafeC
+    Cardano.Crypto.MonadSodium
     Cardano.Crypto.PinnedSizedBytes
+    Cardano.Crypto.SafePinned
     Cardano.Crypto.Seed
     Cardano.Crypto.Util
     Cardano.Crypto.VRF
@@ -89,6 +96,9 @@ library
     Cardano.Crypto.VRF.NeverUsed
     Cardano.Crypto.VRF.Simple
     Cardano.Foreign
+
+  c-sources:
+    cbits/mlocked-pool.c
 
   other-modules:
     Cardano.Crypto.PackedBytes
@@ -99,16 +109,20 @@ library
     , base16-bytestring  >=1
     , bytestring
     , cardano-binary
+    , cardano-prelude
     , cardano-strict-containers
     , cryptonite
     , deepseq
     , heapwords
     , memory
+    , mtl
     , nothunks
     , primitive
+    , random
     , serialise
     , template-haskell
     , th-compat
+    , stm
     , text
     , transformers
     , vector < 0.13
