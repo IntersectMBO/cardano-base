@@ -42,52 +42,68 @@ import           Cardano.Prelude (NFData)
 --
 -- This is not itself a PRNG, but can be used to seed a PRNG.
 --
-newtype Seed = Seed ByteString
+newtype SeedOf a = Seed a
   deriving (Show, Eq, Semigroup, Monoid, NoThunks, NFData)
+
+type Seed = SeedOf ByteString
+
+class SplittableRawSeed a where
+  rawSeedLength :: a -> Word
+  rawSeedSplitAt :: Word -> a -> (a, a)
+
+instance SplittableRawSeed ByteString where
+  rawSeedLength = fromIntegral . BS.length
+  rawSeedSplitAt = BS.splitAt . fromIntegral
 
 
 -- | Construct a 'Seed' deterministically from a number of bytes.
 --
-mkSeedFromBytes :: ByteString -> Seed
+mkSeedFromBytes :: a -> SeedOf a
 mkSeedFromBytes = Seed
 
 
 -- | Extract the full bytes from a seed. Note that this function does not
 -- guarantee that the result is sufficiently long for the desired seed size!
-getSeedBytes :: Seed -> ByteString
+getSeedBytes :: SeedOf a -> a
 getSeedBytes (Seed s) = s
 
 -- | Get a number of bytes from the seed. This will fail if not enough bytes
 -- are available. This can be chained multiple times provided the seed is big
 -- enough to cover each use.
 --
-getBytesFromSeed :: Word -> Seed -> Maybe (ByteString, Seed)
+getBytesFromSeed :: SplittableRawSeed a => Word -> SeedOf a -> Maybe (a, SeedOf a)
 getBytesFromSeed n (Seed s)
-  | fromIntegral (BS.length b) == n = Just (b, Seed s')
-  | otherwise                       = Nothing
+  | rawSeedLength b == n
+  = Just (b, Seed s')
+  | otherwise
+  = Nothing
   where
-    (b, s') = BS.splitAt (fromIntegral n) s
+    (b, s') = rawSeedSplitAt n s
 
 -- | A flavor of 'getBytesFromSeed' that throws 'SeedBytesExhausted' instead of
 -- returning 'Nothing'.
-getBytesFromSeedT :: Word -> Seed -> (ByteString, Seed)
+getBytesFromSeedT :: SplittableRawSeed a => Word -> SeedOf a -> (a, SeedOf a)
 getBytesFromSeedT n (Seed s)
-  | fromIntegral (BS.length b) == n = (b, Seed s')
-  | otherwise                       = throw (SeedBytesExhausted $ BS.length b)
+  | rawSeedLength b == n
+  = (b, Seed s')
+  | otherwise
+  = throw (SeedBytesExhausted . fromIntegral $ rawSeedLength b)
   where
-    (b, s') = BS.splitAt (fromIntegral n) s
+    (b, s') = rawSeedSplitAt n s
 
 -- | Split a seed into two smaller seeds, the first of which is the given
 -- number of bytes large, and the second is the remaining. This will fail if
 -- not enough bytes are available. This can be chained multiple times provided
 -- the seed is big enough to cover each use.
 --
-splitSeed :: Word -> Seed -> Maybe (Seed, Seed)
+splitSeed :: SplittableRawSeed a => Word -> SeedOf a -> Maybe (SeedOf a, SeedOf a)
 splitSeed n (Seed s)
-  | fromIntegral (BS.length b) == n = Just (Seed b, Seed s')
-  | otherwise                       = Nothing
+  | rawSeedLength b == n
+  = Just (Seed b, Seed s')
+  | otherwise
+  = Nothing
   where
-    (b, s') = BS.splitAt (fromIntegral n) s
+    (b, s') = rawSeedSplitAt n s
 
 -- | Expand a seed into a pair of seeds using a cryptographic hash function (in
 -- the role of a crypto PRNG). The whole input seed is consumed. The output

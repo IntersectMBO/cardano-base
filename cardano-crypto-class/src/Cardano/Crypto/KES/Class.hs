@@ -8,12 +8,14 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Abstract key evolving signatures.
 module Cardano.Crypto.KES.Class
   (
     -- * KES algorithm class
     KESAlgorithm (..)
+  , KESSignAlgorithm (..)
   , Period
 
   , OptimizedKESAlgorithm (..)
@@ -27,10 +29,10 @@ module Cardano.Crypto.KES.Class
     -- * CBOR encoding and decoding
   , encodeVerKeyKES
   , decodeVerKeyKES
-  , encodeSignKeyKES
-  , decodeSignKeyKES
   , encodeSigKES
   , decodeSigKES
+  , encodeSignKeyKES
+  , decodeSignKeyKES
   , encodeSignedKES
   , decodeSignedKES
 
@@ -46,14 +48,13 @@ module Cardano.Crypto.KES.Class
     -- terms of the KES, DSIGN and Hash typeclasses, so we keep them here for
     -- convenience.
   , hashPairOfVKeys
-  , zeroSeed
   , mungeName
   )
 where
 
+-- import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.Word (Word8)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
@@ -65,15 +66,15 @@ import NoThunks.Class (NoThunks)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
-import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
+
+import qualified Cardano.Crypto.MonadSodium as NaCl
 
 
 class ( Typeable v
       , Show (VerKeyKES v)
       , Eq (VerKeyKES v)
-      , Show (SignKeyKES v)
       , Show (SigKES v)
       , Eq (SigKES v)
       , NoThunks (SigKES v)
@@ -82,33 +83,21 @@ class ( Typeable v
       , KnownNat (SeedSizeKES v)
       )
       => KESAlgorithm v where
-
-  type SeedSizeKES v :: Nat
-
   --
   -- Key and signature types
   --
-
   data VerKeyKES  v :: Type
-  data SignKeyKES v :: Type
   data SigKES     v :: Type
-
+  type SeedSizeKES v :: Nat
+  data SignKeyKES v :: Type
 
   --
   -- Metadata and basic key operations
   --
-
   algorithmNameKES :: proxy v -> String
-
-  deriveVerKeyKES :: SignKeyKES v -> VerKeyKES v
 
   hashVerKeyKES :: HashAlgorithm h => VerKeyKES v -> Hash h (VerKeyKES v)
   hashVerKeyKES = hashWith rawSerialiseVerKeyKES
-
-
-  --
-  -- Core algorithm operations
-  --
 
   -- | Context required to run the KES algorithm
   --
@@ -119,13 +108,13 @@ class ( Typeable v
   type Signable v :: Type -> Constraint
   type Signable v = Empty
 
-  signKES
-    :: (Signable v a, HasCallStack)
-    => ContextKES v
-    -> Period  -- ^ The /current/ period for the key
-    -> a
-    -> SignKeyKES v
-    -> SigKES v
+  -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
+  seedSizeKES :: proxy v -> Word
+  seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
+
+  --
+  -- Core algorithm operations
+  --
 
   -- | Full KES verification. This method checks that the signature itself
   -- checks out (as per 'verifySigKES'), and also makes sure that it matches
@@ -138,6 +127,52 @@ class ( Typeable v
     -> a
     -> SigKES v
     -> Either String ()
+
+  -- | Return the total number of KES periods supported by this algorithm. The
+  -- KES algorithm is assumed to support a fixed maximum number of periods, not
+  -- a variable number.
+  --
+  -- Do note that this is the total number of /periods/ not the total number of
+  -- evolutions. The difference is off-by-one. For example if there are 2
+  -- periods (period 0 and 1) then there is only one evolution.
+  --
+  totalPeriodsKES
+    :: proxy v -> Word
+
+  --
+  -- Serialisation/(de)serialisation in fixed-size raw format
+  --
+
+  sizeVerKeyKES  :: proxy v -> Word
+  sizeSigKES     :: proxy v -> Word
+  sizeSignKeyKES :: proxy v -> Word
+
+  rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
+  rawSerialiseSigKES       :: SigKES     v -> ByteString
+
+  rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
+  rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
+
+
+
+class ( KESAlgorithm v
+      , Monad m
+      )
+      => KESSignAlgorithm m v where
+
+  deriveVerKeyKES :: SignKeyKES v -> m (VerKeyKES v)
+
+  --
+  -- Core algorithm operations
+  --
+
+  signKES
+    :: forall a. (Signable v a, HasCallStack)
+    => ContextKES v
+    -> Period  -- ^ The /current/ period for the key
+    -> a
+    -> SignKeyKES v
+    -> m (SigKES v)
 
   -- | Update the KES signature key to the /next/ period, given the /current/
   -- period.
@@ -160,29 +195,15 @@ class ( Typeable v
     => ContextKES v
     -> SignKeyKES v
     -> Period  -- ^ The /current/ period for the key, not the target period.
-    -> Maybe (SignKeyKES v)
-
-  -- | Return the total number of KES periods supported by this algorithm. The
-  -- KES algorithm is assumed to support a fixed maximum number of periods, not
-  -- a variable number.
-  --
-  -- Do note that this is the total number of /periods/ not the total number of
-  -- evolutions. The difference is off-by-one. For example if there are 2
-  -- periods (period 0 and 1) then there is only one evolution.
-  --
-  totalPeriodsKES
-    :: proxy v -> Word
-
+    -> m (Maybe (SignKeyKES v))
 
   --
   -- Key generation
   --
 
-  genKeyKES :: Seed -> SignKeyKES v
-
-  -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
-  seedSizeKES :: proxy v -> Word
-  seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
+  genKeyKES
+    :: NaCl.MLockedSizedBytes (SeedSizeKES v)
+    -> m (SignKeyKES v)
 
   --
   -- Secure forgetting
@@ -194,24 +215,14 @@ class ( Typeable v
   --
   -- The precondition is that this key value will not be used again.
   --
-  forgetSignKeyKES :: SignKeyKES v -> IO ()
-  forgetSignKeyKES = const $ return ()
+  forgetSignKeyKES
+    :: SignKeyKES v
+    -> m ()
+  forgetSignKeyKES =
+    const $ return ()
 
-  --
-  -- Serialisation/(de)serialisation in fixed-size raw format
-  --
-
-  sizeVerKeyKES  :: proxy v -> Word
-  sizeSignKeyKES :: proxy v -> Word
-  sizeSigKES     :: proxy v -> Word
-
-  rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
-  rawSerialiseSignKeyKES   :: SignKeyKES v -> ByteString
-  rawSerialiseSigKES       :: SigKES     v -> ByteString
-
-  rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
-  rawDeserialiseSignKeyKES :: ByteString -> Maybe (SignKeyKES v)
-  rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
+  rawDeserialiseSignKeyKES  :: ByteString -> m (Maybe (SignKeyKES v))
+  rawSerialiseSignKeyKES   :: SignKeyKES v -> m ByteString
 
 -- | Subclass for KES algorithms that embed a copy of the VerKey into the
 -- signature itself, rather than relying on the externally supplied VerKey
@@ -280,11 +291,11 @@ instance ( TypeError ('Text "Ord not supported for verification keys, use the ha
 encodeVerKeyKES :: KESAlgorithm v => VerKeyKES v -> Encoding
 encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 
-encodeSignKeyKES :: KESAlgorithm v => SignKeyKES v -> Encoding
-encodeSignKeyKES = encodeBytes . rawSerialiseSignKeyKES
-
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
+
+encodeSignKeyKES :: forall v m. (KESSignAlgorithm m v) => SignKeyKES v -> m Encoding
+encodeSignKeyKES = fmap encodeBytes . rawSerialiseSignKeyKES
 
 decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
 decodeVerKeyKES = do
@@ -300,20 +311,6 @@ decodeVerKeyKES = do
           expected = fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
           actual   = BS.length bs
 
-decodeSignKeyKES :: forall v s. KESAlgorithm v => Decoder s (SignKeyKES v)
-decodeSignKeyKES = do
-    bs <- decodeBytes
-    case rawDeserialiseSignKeyKES bs of
-      Just sk -> return sk
-      Nothing
-        | actual /= expected
-                    -> fail ("decodeSignKeyKES: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeSignKeyKES: cannot decode key"
-        where
-          expected = fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
-          actual   = BS.length bs
-
 decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
 decodeSigKES = do
     bs <- decodeBytes
@@ -323,11 +320,21 @@ decodeSigKES = do
         | actual /= expected
                     -> fail ("decodeSigKES: wrong length, expected " ++
                              show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeSigKES: cannot decode key"
+        | otherwise -> fail "decodeSigKES: cannot decode signature"
         where
           expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
           actual   = BS.length bs
 
+decodeSignKeyKES :: forall v s m. (KESSignAlgorithm m v) => Decoder s (m (Maybe (SignKeyKES v)))
+decodeSignKeyKES = do
+    bs <- decodeBytes
+    let expected = fromIntegral (sizeSignKeyKES (Proxy @v))
+        actual   = BS.length bs
+    if actual /= expected then
+      fail ("decodeSignKeyKES: wrong length, expected " ++
+               show expected ++ " bytes but got " ++ show actual)
+    else
+      return $ rawDeserialiseSignKeyKES bs
 
 -- | The KES period. Periods are enumerated from zero.
 --
@@ -346,13 +353,13 @@ instance KESAlgorithm v => NoThunks (SignedKES v a)
   -- use generic instance
 
 signedKES
-  :: (KESAlgorithm v, Signable v a)
+  :: (KESSignAlgorithm m v, Signable v a)
   => ContextKES v
   -> Period
   -> a
   -> SignKeyKES v
-  -> SignedKES v a
-signedKES ctxt time a key = SignedKES (signKES ctxt time a key)
+  -> m (SignedKES v a)
+signedKES ctxt time a key = SignedKES <$> (signKES ctxt time a key)
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)
@@ -390,7 +397,7 @@ encodedVerKeyKESSizeExpr _proxy =
 encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
 encodedSignKeyKESSizeExpr _proxy =
       -- 'encodeBytes' envelope
-      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy :: Proxy v)))
+      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy @v)))
       -- payload
     + fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
 
@@ -410,12 +417,6 @@ hashPairOfVKeys :: (KESAlgorithm d, HashAlgorithm h)
 hashPairOfVKeys =
     hashWith $ \(a,b) ->
       rawSerialiseVerKeyKES a <> rawSerialiseVerKeyKES b
-
-zeroSeed :: KESAlgorithm d => Proxy d -> Seed
-zeroSeed p = mkSeedFromBytes (BS.replicate seedSize (0 :: Word8))
-  where
-    seedSize :: Int
-    seedSize = fromIntegral (seedSizeKES p)
 
 mungeName :: String -> String
 mungeName basename

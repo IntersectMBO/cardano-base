@@ -76,7 +76,6 @@ testSodiumHashAlgorithm p =
     ]
     where n = hashAlgorithmName p
 
-
 testPackedBytesN :: forall n. KnownNat n => TestHash n -> TestTree
 testPackedBytesN h = do
   testGroup
@@ -124,7 +123,6 @@ testPackedBytes =
     , testPackedBytesN (TestHash :: TestHash 31)
     , testPackedBytesN (TestHash :: TestHash 32)
     ]
-
 
 prop_hash_cbor :: HashAlgorithm h => Hash h Int -> Property
 prop_hash_cbor = prop_cbor

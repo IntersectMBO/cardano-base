@@ -138,7 +138,7 @@ instance FromCBOR (VerKeyDSIGN MockDSIGN) where
 
 instance ToCBOR (SignKeyDSIGN MockDSIGN) where
   toCBOR = encodeSignKeyDSIGN
-  encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
+  encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN MockDSIGN) where
   fromCBOR = decodeSignKeyDSIGN

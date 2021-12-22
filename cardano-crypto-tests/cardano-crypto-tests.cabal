@@ -48,6 +48,7 @@ library
 
   exposed-modules:      Test.Crypto.DSIGN
                         Test.Crypto.Hash
+                        Test.Crypto.RunIO
                         Test.Crypto.KES
                         Test.Crypto.Util
                         Test.Crypto.VRF
@@ -56,14 +57,16 @@ library
                         Bench.Crypto.KES
 
   build-depends:        base
-                      , bytestring
+                      , bytestring >=0.10.12.0
                       , cardano-binary
                       , cardano-crypto-class
                       , cardano-crypto-praos
                       , cardano-prelude
                       , cborg
+                      , containers
                       , cryptonite
                       , formatting
+                      , mtl
                       , nothunks
                       , pretty-show
                       , QuickCheck
@@ -71,6 +74,8 @@ library
                       , tasty
                       , tasty-quickcheck
                       , criterion
+                      , tasty-hunit
+                      , HUnit
 
   if flag(secp256k1-support)
     build-depends: secp256k1-haskell

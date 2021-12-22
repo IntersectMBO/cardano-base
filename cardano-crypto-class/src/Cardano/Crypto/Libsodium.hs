@@ -9,11 +9,11 @@ module Cardano.Crypto.Libsodium (
   traceMLockedForeignPtr,
   -- * MLocked bytes
   MLockedSizedBytes,
-  mlsbZero,
   mlsbFromByteString,
   mlsbFromByteStringCheck,
   mlsbToByteString,
   mlsbFinalize,
+  mlsbCopy,
   -- * Hashing
   SodiumHashAlgorithm (..),
   digestMLockedStorable,

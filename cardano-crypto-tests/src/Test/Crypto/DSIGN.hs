@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -12,6 +13,19 @@ module Test.Crypto.DSIGN
   )
 where
 
+{- HLINT ignore "Use <$>" -}
+{- HLINT ignore "Reduce duplication" -}
+
+import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property, ioProperty)
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.QuickCheck (testProperty)
+
+import qualified Data.ByteString as BS
+import qualified Cardano.Crypto.Libsodium as NaCl
+
+import Text.Show.Pretty (ppShow)
+import Control.Monad ((>=>))
+
 #ifdef SECP256K1
 import Data.ByteString (ByteString)
 import Control.Monad (replicateM)
@@ -19,13 +33,17 @@ import qualified Crypto.Secp256k1 as SECP
 import qualified GHC.Exts as GHC
 #endif
 
-import Text.Show.Pretty (ppShow)
 import qualified Test.QuickCheck.Gen as Gen
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
+
+import Control.Exception (evaluate)
+import System.IO.Unsafe (unsafePerformIO)
+
 import Cardano.Crypto.DSIGN (
   MockDSIGN, 
   Ed25519DSIGN, 
+  Ed25519DSIGNM, 
   Ed448DSIGN,
 #ifdef SECP256K1
   EcdsaSecp256k1DSIGN,
@@ -56,6 +74,39 @@ import Cardano.Crypto.DSIGN (
   verifyDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
+
+  DSIGNMAlgorithmBase (VerKeyDSIGNM,
+                      SignKeyDSIGNM,
+                      SigDSIGNM,
+                      ContextDSIGNM,
+                      SignableM,
+                      SeedSizeDSIGNM,
+                      rawSerialiseVerKeyDSIGNM,
+                      rawDeserialiseVerKeyDSIGNM,
+                      rawSerialiseSigDSIGNM,
+                      rawDeserialiseSigDSIGNM),
+  DSIGNMAlgorithm (
+                  rawSerialiseSignKeyDSIGNM,
+                  rawDeserialiseSignKeyDSIGNM),
+  sizeVerKeyDSIGNM,
+  sizeSignKeyDSIGNM,
+  sizeSigDSIGNM,
+  encodeVerKeyDSIGNM,
+  decodeVerKeyDSIGNM,
+  encodeSignKeyDSIGNM,
+  decodeSignKeyDSIGNM,
+  encodeSigDSIGNM,
+  decodeSigDSIGNM,
+  signDSIGNM,
+  deriveVerKeyDSIGNM,
+  verifyDSIGNM,
+  genKeyDSIGNM,
+  seedSizeDSIGNM,
+
+  getSeedDSIGNM,
+  forgetSignKeyDSIGNM,
+
+  MLockedSeed
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Test.Crypto.Util (
@@ -67,25 +118,39 @@ import Test.Crypto.Util (
   prop_cbor_size,
   prop_cbor_direct_vs_class,
   prop_no_thunks,
-  arbitrarySeedOfSize
+  prop_cbor_IO_from,
+  prop_cbor_IO_with,
+  prop_cbor_with_IO_from,
+  prop_cbor_with_IO_with,
+  prop_cbor_size_IO_from,
+  prop_cbor_size_IO_with,
+  prop_cbor_direct_vs_class_IO_from,
+  prop_cbor_direct_vs_class_IO_with,
+  prop_no_thunks_IO_from,
+  prop_no_thunks_IO_with,
+  prop_size_serialise_IO_from,
+  prop_size_serialise_IO_with,
+  prop_raw_serialise_IO_from,
+  prop_raw_serialise_IO_with,
+  arbitrarySeedOfSize,
+  arbitrarySeedBytesOfSize,
+  Lock, withLock
   )
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
-  (=/=), 
-  (===), 
-  Arbitrary(..), 
-  Gen, 
-  Property,
-  forAllShow
+  forAllShow,
+  generate
   )
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck (testProperty)
+
 
 mockSigGen :: Gen (SigDSIGN MockDSIGN)
 mockSigGen = defaultSigGen
 
 ed25519SigGen :: Gen (SigDSIGN Ed25519DSIGN)
 ed25519SigGen = defaultSigGen
+
+ed25519SigGenM :: Gen (IO (SigDSIGNM Ed25519DSIGNM))
+ed25519SigGenM = defaultSigGenM
 
 ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
@@ -122,14 +187,29 @@ defaultSigGen = do
   msg :: Message <- arbitrary
   signDSIGN () msg <$> defaultSignKeyGen
 
-{- HLINT ignore "Use <$>" -}
-{- HLINT ignore "Reduce duplication" -}
+defaultSignKeyGenM :: forall (a :: Type).
+  (DSIGNMAlgorithm IO a) => Gen (IO (SignKeyDSIGNM a))
+defaultSignKeyGenM = do
+  rawSeed <- arbitrarySeedBytesOfSize (seedSizeDSIGNM (Proxy :: Proxy a))
+  return $ do
+    seed <- NaCl.mlsbFromByteString @(SeedSizeDSIGNM a) rawSeed
+    genKeyDSIGNM seed
+
+defaultSigGenM :: forall (a :: Type) . 
+  (DSIGNMAlgorithm IO a, ContextDSIGNM a ~ (), SignableM a Message) => 
+  Gen (IO (SigDSIGNM a))
+defaultSigGenM = do
+  msg :: Message <- arbitrary
+  mkSK <- defaultSignKeyGenM
+  return $ do
+    sk <- mkSK
+    signDSIGNM () msg sk
 
 --
 -- The list of all tests
 --
-tests :: TestTree
-tests =
+tests :: Lock -> TestTree
+tests lock =
   testGroup "Crypto.DSIGN"
     [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
     , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
@@ -138,6 +218,7 @@ tests =
     , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "EcdsaSecp256k1DSIGN"
     , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
 #endif
+    , testDSIGNMAlgorithm lock ed25519SigGenM ed25519SigGen (arbitrary @Message) "Ed25519DSIGNM"
     ]
 
 testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
@@ -254,6 +335,141 @@ testDSIGNAlgorithm genSig genMsg name = testGroup name [
       sk <- defaultSignKeyGen
       pure (msg1, msg2, sk)
 
+testDSIGNMAlgorithm
+  :: forall v w a. ( DSIGNMAlgorithm IO v
+                 , ToCBOR (VerKeyDSIGNM v)
+                 , FromCBOR (VerKeyDSIGNM v)
+                 -- DSIGNM cannot satisfy To/FromCBOR, because those
+                 -- typeclasses assume that a non-monadic
+                 -- encoding/decoding exists.  Hence, we only test direct
+                 -- encoding/decoding for 'SignKeyDSIGNM'.
+                 -- , ToCBOR (SignKeyDSIGNM v)
+                 -- , FromCBOR (SignKeyDSIGNM v)
+                 , Eq (SignKeyDSIGNM v)   -- no Eq for signing keys normally
+                 , ToCBOR (SigDSIGNM v)
+                 , FromCBOR (SigDSIGNM v)
+                 , SignableM v a
+                 , ContextDSIGNM v ~ ()
+                 , ContextDSIGN w ~ ()
+                 , Eq a
+                 )
+  => Lock
+  -> Gen (IO (SigDSIGNM v))
+  -> Gen (SigDSIGN w)
+  -> Gen a
+  -> String
+  -> TestTree
+testDSIGNMAlgorithm lock mkSigM _ mkMsg n =
+  testGroup n
+    [ testGroup "serialisation"
+      [ testGroup "raw"
+        [ testProperty "VerKey"  $ prop_raw_serialise_IO_from @(VerKeyDSIGNM v)
+                                                      (return . rawSerialiseVerKeyDSIGNM)
+                                                      (return . rawDeserialiseVerKeyDSIGNM)
+                                                      (genKeyDSIGNM >=> deriveVerKeyDSIGNM)
+        , testProperty "SignKey" $ prop_raw_serialise_IO_from @(SignKeyDSIGNM v)
+                                                      rawSerialiseSignKeyDSIGNM
+                                                      rawDeserialiseSignKeyDSIGNM
+                                                      genKeyDSIGNM
+        , testProperty "Sig"     $ prop_raw_serialise_IO_with @(SigDSIGNM v)
+                                                      (return . rawSerialiseSigDSIGNM)
+                                                      (return . rawDeserialiseSigDSIGNM)
+                                                      mkSigM
+        ]
+
+      , testGroup "size"
+        [ testProperty "VerKey"  $ prop_size_serialise_IO_from @(VerKeyDSIGNM v)
+                                                       (return . rawSerialiseVerKeyDSIGNM)
+                                                       (sizeVerKeyDSIGNM (Proxy @ v))
+                                                       (genKeyDSIGNM >=> deriveVerKeyDSIGNM)
+        , testProperty "SignKey" $ prop_size_serialise_IO_from @(SignKeyDSIGNM v)
+                                                       rawSerialiseSignKeyDSIGNM
+                                                       (sizeSignKeyDSIGNM (Proxy @ v))
+                                                       genKeyDSIGNM
+        , testProperty "Sig"     $ prop_size_serialise_IO_with @(SigDSIGNM v)
+                                                       (return . rawSerialiseSigDSIGNM)
+                                                       (sizeSigDSIGNM (Proxy @ v))
+                                                       mkSigM
+        ]
+
+      , testGroup "direct CBOR"
+        [ testProperty "VerKey"  $ prop_cbor_with_IO_from @(VerKeyDSIGNM v)
+                                                  lock
+                                                  encodeVerKeyDSIGNM
+                                                  decodeVerKeyDSIGNM
+                                                  (genKeyDSIGNM >=> deriveVerKeyDSIGNM)
+        , testProperty "SignKey" $ prop_cbor_with_IO_from @(SignKeyDSIGNM v)
+                                                  lock
+                                                  (unsafePerformIO . encodeSignKeyDSIGNM)
+                                                  (fmap unsafePerformIO $ decodeSignKeyDSIGNM)
+                                                  genKeyDSIGNM
+        , testProperty "Sig"     $ prop_cbor_with_IO_with @(SigDSIGNM v)
+                                                  lock
+                                                  encodeSigDSIGNM
+                                                  decodeSigDSIGNM
+                                                  mkSigM
+        ]
+
+      , testGroup "To/FromCBOR class"
+        [ testProperty "VerKey"  $ prop_cbor_IO_from @(VerKeyDSIGNM v) lock genVerKeyDSIGNM
+        -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
+        -- , testProperty "SignKey" $ prop_cbor_IO_from @(SignKeyDSIGNM v) genKeyDSIGNM
+        , testProperty "Sig"     $ prop_cbor_IO_with @(SigDSIGNM v) lock mkSigM
+        ]
+
+      , testGroup "ToCBOR size"
+        [ testProperty "VerKey"  $ prop_cbor_size_IO_from @(VerKeyDSIGNM v) genVerKeyDSIGNM
+        -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
+        -- , testProperty "SignKey" $ prop_cbor_size_IO_from @(SignKeyDSIGNM v) genKeyDSIGNM
+        , testProperty "Sig"     $ prop_cbor_size_IO_with @(SigDSIGNM v) mkSigM
+        ]
+
+      , testGroup "direct matches class"
+        [ testProperty "VerKey"  $ prop_cbor_direct_vs_class_IO_from @(VerKeyDSIGNM v)
+                                                             encodeVerKeyDSIGNM
+                                                             genVerKeyDSIGNM
+        -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
+        -- , testProperty "SignKey" $ prop_cbor_direct_vs_class @(SignKeyDSIGNM v)
+        --                                                      encodeSignKeyDSIGNM
+        , testProperty "Sig"     $ prop_cbor_direct_vs_class_IO_with @(SigDSIGNM v)
+                                                             encodeSigDSIGNM
+                                                             mkSigM
+        ]
+        , testGroup "Seed/SK"
+          [ testProperty "Seed round-trip" $ prop_dsignm_seed_roundtrip lock (Proxy @v)
+          ]
+      ]
+
+    , testGroup "verify"
+      [ testProperty "verify positive" $ prop_dsignm_verify_pos @v @a lock (Proxy @v) mkMsg
+      , testProperty "verify negative (wrong key)" $ prop_dsignm_verify_neg_key @v @a lock (Proxy @v) mkMsg
+      , testProperty "verify negative (wrong message)" $ prop_dsignm_verify_neg_msg @v @a lock (Proxy @v) mkMsg
+      ]
+
+    , testGroup "NoThunks"
+      [ testProperty "VerKey"  $ prop_no_thunks_IO_from @(VerKeyDSIGNM v) lock genVerKeyDSIGNM
+      , testProperty "SignKey" $ prop_no_thunks_IO_from @(SignKeyDSIGNM v) lock genKeyDSIGNM
+      , testProperty "Sig"     $ prop_no_thunks_IO_with @(SigDSIGNM v) lock mkSigM
+      ]
+    ]
+
+
+prop_dsignm_seed_roundtrip
+  :: forall v. (DSIGNMAlgorithm IO v)
+  => Lock
+  -> Proxy v
+  -> MLockedSeed (SeedSizeDSIGNM v)
+  -> Property
+prop_dsignm_seed_roundtrip lock p seed = ioProperty . withLock lock $ do
+  sk <- genKeyDSIGNM seed
+  seed' <- getSeedDSIGNM p sk
+  bs <- evaluate $! BS.copy (NaCl.mlsbToByteString seed)
+  bs' <- evaluate $! BS.copy (NaCl.mlsbToByteString seed')
+  forgetSignKeyDSIGNM sk
+  -- NaCl.mlsbFinalize seed
+  NaCl.mlsbFinalize seed'
+  return (bs === bs')
+
 -- If we sign a message with the key, we can verify the signature with the
 -- corresponding verification key.
 prop_dsign_verify  
@@ -278,6 +494,41 @@ prop_dsign_verify_wrong_key (msg, sk, sk') =
       vk' = deriveVerKeyDSIGN sk'
     in verifyDSIGN () vk' msg signed =/= Right ()
 
+prop_dsignm_verify_pos
+  :: forall v a. (DSIGNMAlgorithm IO v, ContextDSIGNM v ~ (), SignableM v a)
+  => Lock
+  -> Proxy v
+  -> Gen a
+  -> MLockedSeed (SeedSizeDSIGNM v)
+  -> Property
+prop_dsignm_verify_pos lock _ mkMsg seed = ioProperty . withLock lock $ do
+  a <- generate $ mkMsg
+  (sk :: SignKeyDSIGNM v) <- genKeyDSIGNM seed
+  sig <- signDSIGNM () a sk
+  vk <- deriveVerKeyDSIGNM sk
+  return $ verifyDSIGNM () vk a sig === Right ()
+
+-- | If we sign a message @a@ with one signing key, if we try to verify the
+-- signature (and message @a@) using a verification key corresponding to a
+-- different signing key, then the verification fails.
+--
+prop_dsignm_verify_neg_key
+  :: forall v a. (DSIGNMAlgorithm IO v, ContextDSIGNM v ~ (), SignableM v a)
+  => Lock
+  -> Proxy v
+  -> Gen a
+  -> MLockedSeed (SeedSizeDSIGNM v)
+  -> MLockedSeed (SeedSizeDSIGNM v)
+  -> Property
+prop_dsignm_verify_neg_key lock _ mkMsg seed seed' = ioProperty . withLock lock $ do
+  a <- generate $ mkMsg
+  (sk :: SignKeyDSIGNM v) <- genKeyDSIGNM seed
+  (sk' :: SignKeyDSIGNM v) <- genKeyDSIGNM seed'
+  sig <- signDSIGNM () a sk
+  vk' <- deriveVerKeyDSIGNM sk'
+  return $ 
+    seed /= seed' ==> verifyDSIGNM () vk' a sig =/= Right ()
+
 -- If we signa a message with a key, but then try to verify with a different
 -- message, then verification fails.
 prop_dsign_verify_wrong_msg 
@@ -289,3 +540,147 @@ prop_dsign_verify_wrong_msg (msg, msg', sk) =
   let signed = signDSIGN () msg sk
       vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk msg' signed =/= Right ()
+
+prop_dsignm_verify_neg_msg
+  :: forall v a. (DSIGNMAlgorithm IO v, ContextDSIGNM v ~ (), SignableM v a, Eq a)
+  => Lock
+  -> Proxy v
+  -> Gen a
+  -> MLockedSeed (SeedSizeDSIGNM v)
+  -> Property
+prop_dsignm_verify_neg_msg lock _ mkMsg seed = ioProperty . withLock lock $ do
+  a <- generate $ mkMsg
+  a' <- generate $ mkMsg
+  (sk :: SignKeyDSIGNM v) <- genKeyDSIGNM seed
+  sig <- signDSIGNM () a sk
+  vk <- deriveVerKeyDSIGNM sk
+  return $ 
+    a /= a' ==> verifyDSIGNM () vk a' sig =/= Right ()
+--
+-- Libsodium
+--
+
+-- TODO: use these
+
+-- prop_sodium_genKey
+--     :: forall v w.
+--        ( DSIGNMAlgorithm IO v
+--        , DSIGNAlgorithm w
+--        )
+--     => Proxy v
+--     -> Proxy w
+--     -> MLockedSeed (SeedSizeDSIGNM v)
+--     -> Property
+-- prop_sodium_genKey _p _q seed = ioProperty $ do
+--     sk <- genKeyDSIGNM seed :: IO (SignKeyDSIGNM v)
+--     let sk' = genKeyDSIGN (mkSeedFromBytes $ NaCl.mlsbToByteString seed) :: SignKeyDSIGN w
+--     actual <- rawSerialiseSignKeyDSIGNM sk
+--     let expected = rawSerialiseSignKeyDSIGN sk'
+--     return (actual === expected)
+-- 
+-- fromJustCS :: HasCallStack => Maybe a -> a
+-- fromJustCS (Just x) = x
+-- fromJustCS Nothing  = error "fromJustCS"
+-- 
+-- -- | Given the monadic and pure flavors of the same DSIGN algorithm, show that
+-- -- they derive the same verkey
+-- prop_sodium_deriveVerKey
+--     :: forall v w
+--      . (DSIGNMAlgorithm IO v, DSIGNAlgorithm w)
+--     => Proxy v
+--     -> Proxy w
+--     -> SignKeyDSIGNM v
+--     -> Property
+-- prop_sodium_deriveVerKey p q sk = ioProperty $ do
+--   Just sk' <- (rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk) :: IO (Maybe (SignKeyDSIGN w))
+--   actual <- rawSerialiseVerKeyDSIGNM <$> deriveVerKeyDSIGNM sk
+--   let expected = rawSerialiseVerKeyDSIGN $ deriveVerKeyDSIGN sk'
+--   return (actual === expected)
+-- 
+-- prop_sodium_sign
+--     :: forall v w.
+--        ( DSIGNMAlgorithm IO v
+--        , DSIGNAlgorithm w
+--        , SignableM v ~ SignableRepresentation
+--        , Signable w ~ SignableRepresentation
+--        , ContextDSIGNM v ~ ()
+--        , ContextDSIGN w ~ ()
+--        )
+--     => Proxy v
+--     -> Proxy w
+--     -> SignKeyDSIGNM v
+--     -> [Word8]
+--     -> Property
+-- prop_sodium_sign p q sk bytes = ioProperty $ do
+--   Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
+--   actual <- rawSerialiseSigDSIGNM <$> (signDSIGNM () msg sk :: IO (SigDSIGNM v))
+--   let expected = rawSerialiseSigDSIGN $ (signDSIGN () msg sk' :: SigDSIGN w)
+--   return (actual === expected)
+--   where
+--     msg = BS.pack bytes
+-- 
+-- prop_sodium_verify
+--     :: forall v w.
+--        ( DSIGNMAlgorithm IO v
+--        , DSIGNAlgorithm w
+--        , SignableM v ~ SignableRepresentation
+--        , Signable w ~ SignableRepresentation
+--        , ContextDSIGNM v ~ ()
+--        , ContextDSIGN w ~ ()
+--        )
+--     => Proxy v
+--     -> Proxy w
+--     -> SignKeyDSIGNM v
+--     -> [Word8]
+--     -> Property
+-- prop_sodium_verify p q sk bytes = ioProperty $ do
+--     Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
+--     vk <- deriveVerKeyDSIGNM sk
+--     let vk' = deriveVerKeyDSIGN sk'
+--     sig <- signDSIGNM () msg sk
+--     let sig' = signDSIGN () msg sk' :: SigDSIGN w
+-- 
+--     let actual = verifyDSIGNM () vk msg sig
+--     let expected = verifyDSIGN () vk' msg sig'
+--     return $ label (con expected) $ actual === expected
+--   where
+--     msg = BS.pack bytes
+--     con :: Either a b -> String
+--     con (Left _) = "Left"
+--     con (Right _) = "Right"
+-- 
+-- prop_sodium_verify_neg
+--     :: forall v w.
+--        ( DSIGNMAlgorithm IO v
+--        , DSIGNAlgorithm w
+--        , SignableM v ~ SignableRepresentation
+--        , Signable w ~ SignableRepresentation
+--        , ContextDSIGNM v ~ ()
+--        , ContextDSIGN w ~ ()
+--        )
+--     => Proxy v
+--     -> Proxy w
+--     -> SignKeyDSIGNM v
+--     -> [Word8]
+--     -> SigDSIGNM v
+--     -> Property
+-- prop_sodium_verify_neg p q sk bytes sig = ioProperty $ do
+--     Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
+--     vk <- deriveVerKeyDSIGNM sk
+--     let vk' = deriveVerKeyDSIGN sk'
+--     let Just sig' = rawDeserialiseSigDSIGN $ rawSerialiseSigDSIGNM sig :: Maybe (SigDSIGN w)
+--     let actual = verifyDSIGNM () vk msg sig
+--     let expected = verifyDSIGN () vk' msg sig'
+--     return $ label (con expected) $ actual === expected
+--   where
+--     msg = BS.pack bytes
+--     con :: Either a b -> String
+--     con (Left _) = "Left"
+--     con (Right _) = "Right"
+
+--
+-- IO generators
+--
+
+genVerKeyDSIGNM :: (DSIGNMAlgorithm IO v) => MLockedSeed (SeedSizeDSIGNM v) -> IO (VerKeyDSIGNM v)
+genVerKeyDSIGNM = genKeyDSIGNM >=> deriveVerKeyDSIGNM

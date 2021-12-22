@@ -9,9 +9,10 @@ import qualified Data.ByteString as BS
 
 import qualified Cardano.Crypto.Libsodium as NaCl
 import Cardano.Crypto.PinnedSizedBytes
+import System.IO.Unsafe (unsafePerformIO)
 
 instance KnownNat n => Arbitrary (NaCl.MLockedSizedBytes n) where
-    arbitrary = NaCl.mlsbFromByteString . BS.pack <$> vectorOf size arbitrary
+    arbitrary = unsafePerformIO . NaCl.mlsbFromByteString . BS.pack <$> vectorOf size arbitrary
       where
         size :: Int
         size = fromInteger (natVal (Proxy :: Proxy n))
