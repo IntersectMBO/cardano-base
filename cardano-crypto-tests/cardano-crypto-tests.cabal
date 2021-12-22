@@ -48,6 +48,7 @@ library
 
   exposed-modules:      Test.Crypto.DSIGN
                         Test.Crypto.Hash
+                        Test.Crypto.RunIO
                         Test.Crypto.KES
                         Test.Crypto.Util
                         Test.Crypto.VRF
@@ -63,14 +64,17 @@ library
                         Test.Crypto.Vector.SerializationUtils
 
   build-depends:        base
-                      , bytestring
+                      , bytestring >=0.10.12.0
                       , cardano-binary
                       , cardano-crypto-class
                       , cardano-crypto-praos
+                      , cardano-prelude
                       , cborg
+                      , containers
                       , cryptonite
                       , deepseq
                       , formatting
+                      , mtl
                       , nothunks
                       , pretty-show
                       , QuickCheck
@@ -80,6 +84,8 @@ library
                       , tasty-quickcheck
                       , criterion
                       , base16-bytestring
+                      , tasty-hunit
+                      , HUnit
 
   if flag(secp256k1-support)
     cpp-options: -DSECP256K1_ENABLED
@@ -105,6 +111,7 @@ benchmark bench-crypto
   build-depends:        base
                       , cardano-crypto-class
                       , cardano-crypto-tests
+                      , cardano-prelude
                       , criterion
 
   ghc-options:          -threaded

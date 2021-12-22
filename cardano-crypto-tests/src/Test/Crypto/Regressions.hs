@@ -1,8 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
-#ifdef SECP256K1_ENABLED
 {-# LANGUAGE TypeApplications #-}
-#endif
 
 module Test.Crypto.Regressions (
   tests

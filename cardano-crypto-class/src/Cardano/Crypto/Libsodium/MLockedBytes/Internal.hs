@@ -1,15 +1,18 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     MLockedSizedBytes (..),
-    mlsbZero,
+    mlsbNew,
     mlsbFromByteString,
     mlsbFromByteStringCheck,
     mlsbToByteString,
     mlsbUseAsCPtr,
     mlsbUseAsSizedPtr,
+    mlsbCopy,
     mlsbFinalize,
 ) where
 
@@ -22,6 +25,8 @@ import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import Data.Word (Word8)
+import Control.Monad (void)
+import Text.Printf
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.Memory.Internal
@@ -31,10 +36,9 @@ import Cardano.Crypto.PinnedSizedBytes
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 
-{- HLINT ignore "Reduce duplication" -}
-
 newtype MLockedSizedBytes n = MLSB (MLockedForeignPtr (PinnedSizedBytes n))
   deriving NoThunks via OnlyCheckWhnfNamed "MLockedSizedBytes" (MLockedSizedBytes n)
+  deriving newtype NFData
 
 instance KnownNat n => Eq (MLockedSizedBytes n) where
     x == y = compare x y == EQ
@@ -49,17 +53,21 @@ instance KnownNat n => Ord (MLockedSizedBytes n) where
         size = natVal (Proxy @n)
 
 instance KnownNat n => Show (MLockedSizedBytes n) where
-    showsPrec d _ = showParen (d > 10)
-        $ showString "_ :: MLockedSizedBytes "
-        . showsPrec 11 (natVal (Proxy @n))
-
-instance NFData (MLockedSizedBytes n) where
-    rnf (MLSB p) = seq p ()
+    -- showsPrec d _ = showParen (d > 10)
+    --     $ showString "_ :: MLockedSizedBytes "
+    --     . showsPrec 11 (natVal (Proxy @n))
+    show mlsb =
+      let bytes = BS.unpack $ mlsbToByteString mlsb
+          hexstr = concatMap (printf "%02x") bytes
+      in "MLSB " ++ hexstr
 
 -- | Note: this doesn't need to allocate mlocked memory,
 -- but we do that for consistency
-mlsbZero :: forall n. KnownNat n => MLockedSizedBytes n
-mlsbZero = unsafeDupablePerformIO $ do
+-- mlsbZero :: forall n. KnownNat n => MLockedSizedBytes n
+-- mlsbZero = unsafeDupablePerformIO mlsbNew
+
+mlsbNew :: forall n. KnownNat n => IO (MLockedSizedBytes n)
+mlsbNew = do
     fptr <- allocMLockedForeignPtr
     withMLockedForeignPtr fptr $ \ptr -> do
         _ <- c_memset (castPtr ptr) 0 size
@@ -69,21 +77,30 @@ mlsbZero = unsafeDupablePerformIO $ do
     size  :: CSize
     size = fromInteger (natVal (Proxy @n))
 
-mlsbFromByteString :: forall n. KnownNat n => BS.ByteString -> MLockedSizedBytes n
-mlsbFromByteString bs = unsafeDupablePerformIO $ BS.useAsCStringLen bs $ \(ptrBS, len) -> do
+mlsbCopy :: forall n. KnownNat n => MLockedSizedBytes n -> IO (MLockedSizedBytes n)
+mlsbCopy src = mlsbUseAsCPtr src $ \ptrSrc -> do
+  dst <- allocMLockedForeignPtr
+  withMLockedForeignPtr dst $ \ptrDst -> do
+    void $ c_memcpy (castPtr ptrDst) ptrSrc size
+  return (MLSB dst)
+  where
+    size :: CSize
+    size = fromInteger (natVal (Proxy @n))
+
+mlsbFromByteString :: forall n. KnownNat n => BS.ByteString -> IO (MLockedSizedBytes n)
+mlsbFromByteString bs = BS.useAsCStringLen bs $ \(ptrBS, len) -> do
     fptr <- allocMLockedForeignPtr
     withMLockedForeignPtr fptr $ \ptr -> do
-        _ <- c_memcpy (castPtr ptr) ptrBS (fromIntegral (min len size))
-        return ()
+        void $ c_memcpy (castPtr ptr) ptrBS (fromIntegral (min len size))
     return (MLSB fptr)
   where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))
 
-mlsbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (MLockedSizedBytes n)
+mlsbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> IO (Maybe (MLockedSizedBytes n))
 mlsbFromByteStringCheck bs
-    | BS.length bs /= size = Nothing
-    | otherwise = Just $ unsafeDupablePerformIO $ BS.useAsCStringLen bs $ \(ptrBS, len) -> do
+    | BS.length bs /= size = return Nothing
+    | otherwise = fmap Just $ BS.useAsCStringLen bs $ \(ptrBS, len) -> do
     fptr <- allocMLockedForeignPtr
     withMLockedForeignPtr fptr $ \ptr -> do
         _ <- c_memcpy (castPtr ptr) ptrBS (fromIntegral (min len size))
