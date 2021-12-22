@@ -41,3 +41,4 @@ stack-local.yaml
 # ghcid
 **/.ghcid
 **/ghcid.txt
+tags

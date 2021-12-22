@@ -21,4 +21,4 @@ https://github.com/input-output-hk/libsodium/tree/tdammers/rebased-vrf
 To build fully with nix:
 > nix-build default.nix -A haskellPackages.cardano-crypto-praos
 To use nix+cabal:
-> nix-shell --run "cabal build cardano-crypto-praos" 
+> nix-shell --run "cabal build cardano-crypto-praos"

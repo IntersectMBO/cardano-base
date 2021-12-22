@@ -1,6 +1,6 @@
 {-# LANGUAGE CApiFFI             #-}
 {-# LANGUAGE DerivingStrategies  #-}
-
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Cardano.Crypto.Libsodium.C (
     -- * Initialization
     c_sodium_init,
@@ -9,6 +9,9 @@ module Cardano.Crypto.Libsodium.C (
     c_sodium_malloc,
     c_sodium_free,
     c_sodium_free_funptr,
+    c_sodium_mlock,
+    c_sodium_munlock,
+
     -- * Hashing
     -- ** SHA256
     c_crypto_hash_sha256,
@@ -79,6 +82,16 @@ foreign import capi unsafe "sodium.h sodium_free" c_sodium_free :: Ptr a -> IO (
 --
 -- <https://libsodium.gitbook.io/doc/memory_management>
 foreign import capi unsafe "sodium.h &sodium_free" c_sodium_free_funptr :: FunPtr (Ptr a -> IO ())
+
+-- | @void *sodium_mlock(void * const addr, size_t size);@
+--
+-- <https://libsodium.gitbook.io/doc/memory_management>
+foreign import capi unsafe "sodium.h sodium_mlock" c_sodium_mlock :: Ptr a -> CSize -> IO CInt
+
+-- | @void *sodium_munlock(void * const addr, size_t size);@
+--
+-- <https://libsodium.gitbook.io/doc/memory_management>
+foreign import capi unsafe "sodium.h sodium_munlock" c_sodium_munlock :: Ptr a  -> CSize-> IO CInt
 
 -------------------------------------------------------------------------------
 -- Hashing: SHA256

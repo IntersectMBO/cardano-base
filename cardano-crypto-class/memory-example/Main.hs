@@ -20,7 +20,7 @@ import           System.Posix.Process (getProcessID)
 import qualified Data.ByteString as SB
 
 import           Cardano.Crypto.Libsodium
-import           Cardano.Crypto.Libsodium.MLockedBytes.Internal (MLockedSizedBytes (..))
+import           Cardano.Crypto.Libsodium.MLockedBytes (traceMLSB)
 import           Cardano.Crypto.Hash (SHA256, Blake2b_256, digest)
 
 main :: IO ()
@@ -43,15 +43,15 @@ main = do
     -- example SHA256 hash
     do
       let input = SB.pack [0..255]
-      let MLSB hash = digestMLockedBS (Proxy @SHA256) input
-      traceMLockedForeignPtr hash
+      hash <- digestMLockedBS (Proxy @SHA256) input
+      traceMLSB hash
       print (digest (Proxy @SHA256) input)
 
     -- example Blake2b_256 hash
     do
       let input = SB.pack [0..255]
-      let MLSB hash = digestMLockedBS (Proxy @Blake2b_256) input
-      traceMLockedForeignPtr hash
+      hash <- digestMLockedBS (Proxy @Blake2b_256) input
+      traceMLSB hash
       print (digest (Proxy @Blake2b_256) input)
 
 example
@@ -72,9 +72,9 @@ example args alloc = do
     traceMLockedForeignPtr fptr
 
     -- smoke test that hashing works
-    MLSB hash <- withMLockedForeignPtr fptr $ \ptr ->
-        return $ digestMLockedStorable (Proxy @SHA256) ptr
-    traceMLockedForeignPtr hash
+    hash <- withMLockedForeignPtr fptr $ \ptr ->
+        digestMLockedStorable (Proxy @SHA256) ptr
+    traceMLSB hash
 
     -- force finalizers
     finalizeMLockedForeignPtr fptr
