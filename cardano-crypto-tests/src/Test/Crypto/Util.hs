@@ -8,6 +8,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Test.Crypto.Util
   ( -- * CBOR
@@ -20,11 +21,14 @@ module Test.Crypto.Util
   , prop_cbor_roundtrip
   , prop_raw_serialise
   , prop_raw_deserialise
+  , prop_raw_serialise_only
   , prop_size_serialise
   , prop_cbor_direct_vs_class
 
     -- * NoThunks
   , prop_no_thunks
+  , prop_no_thunks_IO_from
+  , prop_no_thunks_IO_with
 
     -- * Test Seed
   , TestSeed (..)
@@ -34,6 +38,7 @@ module Test.Crypto.Util
 
     -- * Seeds
   , arbitrarySeedOfSize
+  , arbitrarySeedBytesOfSize
 
    -- * test messages for signings
   , Message(..)
@@ -43,6 +48,10 @@ module Test.Crypto.Util
   , genBadInputFor
   , shrinkBadInputFor
   , showBadInputFor
+   -- * Locking
+  , Lock
+  , withLock
+  , newLock
   )
 where
 
@@ -99,10 +108,21 @@ import Test.QuickCheck
   , vector
   , checkCoverage
   , cover
+  , ioProperty
+  , generate
   )
-import Formatting.Buildable (build)
 import qualified Test.QuickCheck.Gen as Gen
-import Control.Monad (guard, when)
+import Control.Monad (guard, when, join)
+import Formatting.Buildable (Buildable (..), build)
+import Control.Concurrent.MVar (withMVar, MVar, newMVar)
+
+type Lock = MVar ()
+
+withLock :: Lock -> IO a -> IO a
+withLock lock = withMVar lock . const
+
+newLock :: IO Lock
+newLock = newMVar ()
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -135,7 +155,12 @@ instance Arbitrary TestSeed where
 --------------------------------------------------------------------------------
 
 arbitrarySeedOfSize :: Word -> Gen Seed
-arbitrarySeedOfSize sz = mkSeedFromBytes . BS.pack <$> vector (fromIntegral sz)
+arbitrarySeedOfSize sz =
+  mkSeedFromBytes <$> arbitrarySeedBytesOfSize sz
+
+arbitrarySeedBytesOfSize :: Word -> Gen ByteString
+arbitrarySeedBytesOfSize sz =
+  BS.pack <$> vector (fromIntegral sz)
 
 --------------------------------------------------------------------------------
 -- Messages to sign
@@ -170,7 +195,8 @@ prop_cbor_size a = counterexample (show lo ++ " ≰ " ++ show len) (lo <= len)
 prop_cbor_with :: (Eq a, Show a)
                => (a -> Encoding)
                -> (forall s. Decoder s a)
-               -> a -> Property
+               -> a
+               -> Property
 prop_cbor_with encoder decoder x =
       prop_cbor_valid     encoder         x
  .&&. prop_cbor_roundtrip encoder decoder x
@@ -198,7 +224,8 @@ prop_cbor_roundtrip encoder decoder x =
 prop_raw_serialise :: (Eq a, Show a)
                    => (a -> ByteString)
                    -> (ByteString -> Maybe a)
-                   -> a -> Property
+                   -> a
+                   -> Property
 prop_raw_serialise serialise deserialise x =
     case deserialise (serialise x) of
       Just y  -> y === x
@@ -217,6 +244,12 @@ prop_raw_deserialise deserialise (BadInputFor (forbiddenLen, bs)) =
   case deserialise bs of
     Nothing -> property True
     Just x -> counterexample (ppShow x) False
+
+prop_raw_serialise_only :: (a -> ByteString)
+                        -> a -> Bool
+prop_raw_serialise_only serialise x =
+    let y = serialise x
+    in y `seq` True
 
 -- | The crypto algorithm classes have direct encoding functions, and the key
 -- types are also typically a member of the 'ToCBOR' class. Where a 'ToCBOR'
@@ -241,6 +274,16 @@ prop_no_thunks :: NoThunks a => a -> Property
 prop_no_thunks !a = case unsafeNoThunks a of
     Nothing  -> property True
     Just msg -> counterexample (show msg) (property False)
+
+prop_no_thunks_IO_from :: NoThunks a => Lock -> (b -> IO a) -> b -> Property
+prop_no_thunks_IO_from lock mkX y = ioProperty . withLock lock $ do
+  x <- mkX y
+  return $ prop_no_thunks x
+
+prop_no_thunks_IO_with :: NoThunks a => Lock -> (Gen (IO a)) -> Property
+prop_no_thunks_IO_with lock mkX = ioProperty . withLock lock $ do
+  x <- join (generate mkX)
+  return $ prop_no_thunks x
 
 --------------------------------------------------------------------------------
 -- Helpers for property testing
