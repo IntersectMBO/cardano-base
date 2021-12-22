@@ -44,7 +44,9 @@ library
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.Class
     Cardano.Crypto.DSIGN.Ed25519
+    Cardano.Crypto.DSIGN.Ed25519ML
     Cardano.Crypto.DSIGN.Ed448
+    Cardano.Crypto.DSIGNM.Class
     Cardano.Crypto.DSIGN.Mock
     Cardano.Crypto.DSIGN.NeverUsed
     Cardano.Crypto.EllipticCurve.BLS12_381
@@ -71,12 +73,18 @@ library
     Cardano.Crypto.Libsodium.C
     Cardano.Crypto.Libsodium.Constants
     Cardano.Crypto.Libsodium.Hash
+    Cardano.Crypto.Libsodium.Hash.Class
     Cardano.Crypto.Libsodium.Init
     Cardano.Crypto.Libsodium.Memory
     Cardano.Crypto.Libsodium.Memory.Internal
     Cardano.Crypto.Libsodium.MLockedBytes
     Cardano.Crypto.Libsodium.MLockedBytes.Internal
     Cardano.Crypto.Libsodium.UnsafeC
+    Cardano.Crypto.MEqOrd
+    Cardano.Crypto.MLockedSeed
+    Cardano.Crypto.MonadSodium
+    Cardano.Crypto.MonadSodium.Class
+    Cardano.Crypto.MonadSodium.Alloc
     Cardano.Crypto.PinnedSizedBytes
     Cardano.Crypto.Seed
     Cardano.Crypto.Util
@@ -96,11 +104,14 @@ library
     , base16-bytestring  >=1
     , bytestring >= 0.11
     , cardano-binary >= 1.6
+    , cardano-mempool
     , cardano-strict-containers
     , cryptonite
     , deepseq
     , heapwords
+    , io-classes
     , memory
+    , mtl
     , nothunks
     , primitive
     , serialise
@@ -124,9 +135,6 @@ library
       Cardano.Crypto.SECP256K1.C
     pkgconfig-depends: libsecp256k1 -any
     cpp-options: -DSECP256K1_ENABLED
-
-  extra-libraries: blst
-  c-sources: cbits/blst_util.c
 
 test-suite test-memory-example
   import:         base, project-config

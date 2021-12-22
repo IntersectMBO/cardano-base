@@ -19,7 +19,8 @@ import Data.Maybe (fromJust)
 import Data.Proxy (Proxy(..))
 import Data.String (fromString)
 import GHC.TypeLits
-import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_thunks)
+import Control.Exception (bracket)
+import Test.Crypto.Util (prop_cbor, prop_cbor_size, prop_no_thunks, Lock, withLock)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Test.Tasty (TestTree, testGroup)
@@ -30,8 +31,8 @@ import qualified Cardano.Crypto.Libsodium as NaCl
 --
 -- The list of all tests
 --
-tests :: TestTree
-tests =
+tests :: Lock -> TestTree
+tests lock =
   testGroup "Crypto.Hash"
     [testHashAlgorithm (Proxy :: Proxy SHA256)
     , testHashAlgorithm (Proxy :: Proxy SHA3_256)
@@ -39,8 +40,8 @@ tests =
     , testHashAlgorithm (Proxy :: Proxy Blake2b_256)
     , testHashAlgorithm (Proxy :: Proxy Keccak256)
 
-    , testSodiumHashAlgorithm (Proxy :: Proxy SHA256)
-    , testSodiumHashAlgorithm (Proxy :: Proxy Blake2b_256)
+    , testSodiumHashAlgorithm lock (Proxy :: Proxy SHA256)
+    , testSodiumHashAlgorithm lock (Proxy :: Proxy Blake2b_256)
 
     , testPackedBytes
     ]
@@ -67,14 +68,14 @@ testHashAlgorithm p =
 
 testSodiumHashAlgorithm
   :: forall proxy h. NaCl.SodiumHashAlgorithm h
-  => proxy h
+  => Lock
+  -> proxy h
   -> TestTree
-testSodiumHashAlgorithm p =
+testSodiumHashAlgorithm lock p =
   testGroup n
-    [ testProperty "sodium and cryptonite work the same" $ prop_libsodium_model @h Proxy
+    [ testProperty "sodium and cryptonite work the same" $ prop_libsodium_model @h lock Proxy
     ]
     where n = hashAlgorithmName p
-
 
 testPackedBytesN :: forall n. KnownNat n => TestHash n -> TestTree
 testPackedBytesN h = do
@@ -124,7 +125,6 @@ testPackedBytes =
     , testPackedBytesN (TestHash :: TestHash 32)
     ]
 
-
 prop_hash_cbor :: HashAlgorithm h => Hash h Int -> Property
 prop_hash_cbor = prop_cbor
 
@@ -155,11 +155,14 @@ prop_hash_hashFromStringAsHex_hashToStringFromHash h = fromJust (hashFromStringA
 
 prop_libsodium_model
   :: forall h. NaCl.SodiumHashAlgorithm h
-  => Proxy h -> BS.ByteString -> Property
-prop_libsodium_model p bs = expected === actual
+  => Lock -> Proxy h -> BS.ByteString -> Property
+prop_libsodium_model lock p bs = ioProperty . withLock lock $ do
+  actual <- bracket
+              (NaCl.digestMLockedBS p bs)
+              NaCl.mlsbFinalize
+              NaCl.mlsbToByteString
+  return (expected === actual)
   where
-    mlsb = NaCl.digestMLockedBS p bs
-    actual = NaCl.mlsbToByteString mlsb
     expected = digest p bs
 
 

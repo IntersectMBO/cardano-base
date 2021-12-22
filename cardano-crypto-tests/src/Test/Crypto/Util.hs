@@ -9,6 +9,7 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Test.Crypto.Util
   ( -- * CBOR
@@ -26,6 +27,9 @@ module Test.Crypto.Util
 
     -- * NoThunks
   , prop_no_thunks
+  , prop_no_thunks_IO
+  , prop_no_thunks_IO_from
+  , prop_no_thunks_IO_with
 
     -- * Test Seed
   , TestSeed (..)
@@ -37,6 +41,7 @@ module Test.Crypto.Util
   , SizedSeed
   , unSizedSeed
   , arbitrarySeedOfSize
+  , arbitrarySeedBytesOfSize
 
    -- * test messages for signings
   , Message(..)
@@ -46,6 +51,18 @@ module Test.Crypto.Util
   , genBadInputFor
   , shrinkBadInputFor
   , showBadInputFor
+
+    -- * Formatting
+  , hexBS
+
+    -- * Helpers for testing IO actions
+  , noExceptionsThrown
+  , doesNotThrow
+
+    -- * Locking
+  , Lock
+  , withLock
+  , mkLock
   )
 where
 
@@ -86,7 +103,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Proxy (Proxy (Proxy))
 import Data.Word (Word64)
-import NoThunks.Class (NoThunks, unsafeNoThunks)
+import NoThunks.Class (NoThunks, unsafeNoThunks, noThunks)
 import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
@@ -102,11 +119,14 @@ import Test.QuickCheck
   , vector
   , checkCoverage
   , cover
+  , ioProperty
+  , forAllBlind
   )
-import Formatting.Buildable (build)
 import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
+import Formatting.Buildable (Buildable (..), build)
+import Control.Concurrent.MVar (MVar, withMVar, newMVar)
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -144,7 +164,12 @@ instance (KnownNat n) => Arbitrary (SizedSeed n) where
     arbitrary = SizedSeed <$> arbitrarySeedOfSize (fromIntegral $ natVal (Proxy :: Proxy n))
 
 arbitrarySeedOfSize :: Word -> Gen Seed
-arbitrarySeedOfSize sz = mkSeedFromBytes . BS.pack <$> vector (fromIntegral sz)
+arbitrarySeedOfSize sz =
+  mkSeedFromBytes <$> arbitrarySeedBytesOfSize sz
+
+arbitrarySeedBytesOfSize :: Word -> Gen ByteString
+arbitrarySeedBytesOfSize sz =
+  BS.pack <$> vector (fromIntegral sz)
 
 --------------------------------------------------------------------------------
 -- Messages to sign
@@ -179,7 +204,8 @@ prop_cbor_size a = counterexample (show lo ++ " ≰ " ++ show len) (lo <= len)
 prop_cbor_with :: (Eq a, Show a)
                => (a -> Encoding)
                -> (forall s. Decoder s a)
-               -> a -> Property
+               -> a
+               -> Property
 prop_cbor_with encoder decoder x =
       prop_cbor_valid     encoder         x
  .&&. prop_cbor_roundtrip encoder decoder x
@@ -207,7 +233,8 @@ prop_cbor_roundtrip encoder decoder x =
 prop_raw_serialise :: (Eq a, Show a)
                    => (a -> ByteString)
                    -> (ByteString -> Maybe a)
-                   -> a -> Property
+                   -> a
+                   -> Property
 prop_raw_serialise serialise deserialise x =
     case deserialise (serialise x) of
       Just y  -> y === x
@@ -250,6 +277,19 @@ prop_no_thunks :: NoThunks a => a -> Property
 prop_no_thunks !a = case unsafeNoThunks a of
     Nothing  -> property True
     Just msg -> counterexample (show msg) (property False)
+
+prop_no_thunks_IO :: NoThunks a => IO a -> IO Property
+prop_no_thunks_IO a = a >>= noThunks [] >>= \case
+  Nothing -> return $ property True
+  Just msg -> return $! counterexample (show msg) $! (property False)
+
+prop_no_thunks_IO_from :: NoThunks a => (b -> IO a) -> b -> Property
+prop_no_thunks_IO_from mkX y = ioProperty $ do
+  prop_no_thunks_IO (mkX y)
+
+prop_no_thunks_IO_with :: NoThunks a => (Gen (IO a)) -> Property
+prop_no_thunks_IO_with mkX =
+  forAllBlind mkX (ioProperty . prop_no_thunks_IO)
 
 --------------------------------------------------------------------------------
 -- Helpers for property testing
@@ -299,4 +339,30 @@ showBadInputFor ::
   BadInputFor a ->
   String
 showBadInputFor (BadInputFor (_, bs)) =
+  hexBS bs
+
+hexBS :: ByteString -> String
+hexBS bs =
   "0x" <> BS.foldr showHex "" bs <> " (length " <> show (BS.length bs) <> ")"
+
+-- | Return a property that always succeeds in some monad (typically 'IO').
+-- This is useful to express that we are only interested in whether the side
+-- effects of the preceding actions caused any exceptions or not - if they
+-- did, then the test will fail because of it, but if they did not, then
+-- 'noExceptionsThrown' will be reached, and the test will succeed.
+noExceptionsThrown :: Applicative m => m Property
+noExceptionsThrown = pure (property True)
+
+-- | Chain monadic action with 'noExceptionsThrown' to express that we only
+-- want to make sure that the action does not throw any exceptions, but we are
+-- not interested in its result.
+doesNotThrow :: Applicative m => m a -> m Property
+doesNotThrow = (*> noExceptionsThrown)
+
+newtype Lock = Lock (MVar ())
+
+withLock :: Lock -> IO a -> IO a
+withLock (Lock v) = withMVar v . const
+
+mkLock :: IO Lock
+mkLock = Lock <$> newMVar ()

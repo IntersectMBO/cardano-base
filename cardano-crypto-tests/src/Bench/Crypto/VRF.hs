@@ -1,7 +1,7 @@
-{-#LANGUAGE TypeApplications #-}
-{-#LANGUAGE ScopedTypeVariables #-}
-{-#LANGUAGE TypeFamilies #-}
-{-#LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Bench.Crypto.VRF
   ( benchmarks
   ) where

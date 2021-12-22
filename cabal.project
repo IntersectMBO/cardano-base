@@ -9,10 +9,13 @@ repository cardano-haskell-packages
     c00aae8461a256275598500ea0e187588c35a5d5d7454fb57eac18d9edb86a56
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
+-- The hackage index-state is repeated twice to work around haskell.nix
+-- limited parsing ability
+index-state: 2023-01-01T00:00:00Z
 index-state:
-  , hackage.haskell.org 2022-10-07T01:58:16Z
+  , hackage.haskell.org 2023-01-01T00:00:00Z
   -- The CHaP index-state
-  , cardano-haskell-packages 2022-10-20T01:58:16Z
+  , cardano-haskell-packages 2023-01-01T00:00:00Z
 
 packages:
   base-deriving-via
@@ -33,4 +36,3 @@ test-show-details: direct
 
 program-options
   ghc-options: -Werror
-

@@ -43,3 +43,4 @@ cardano-crypto-praos/output
 # ghcid
 **/.ghcid
 **/ghcid.txt
+tags
