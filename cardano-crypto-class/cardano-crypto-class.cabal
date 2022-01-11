@@ -31,7 +31,6 @@ common project-config
                         -Wincomplete-uni-patterns
                         -Wpartial-fields
                         -Wredundant-constraints
-                        -Wunused-packages
 
   if (!flag(development))
     ghc-options:        -Werror
@@ -106,6 +105,7 @@ library
                       , nothunks
                       , primitive
                       , serialise
+                      , secp256k1-haskell
                       , text
                       , transformers
                       , vector
