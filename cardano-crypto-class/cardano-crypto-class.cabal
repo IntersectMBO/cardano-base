@@ -98,6 +98,7 @@ library
                       , bytestring
                       , cardano-binary
                       , cardano-prelude
+                      , cereal
                       , cryptonite
                       , deepseq
                       , integer-gmp
