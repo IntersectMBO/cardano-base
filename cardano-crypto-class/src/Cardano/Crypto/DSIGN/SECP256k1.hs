@@ -20,14 +20,36 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import qualified Crypto.Secp256k1 as SECP
 import NoThunks.Class (NoThunks)
-import Cardano.Crypto.DSIGN.Class (DSIGNAlgorithm (VerKeyDSIGN, SignKeyDSIGN, SigDSIGN,
-  SeedSizeDSIGN, SizeSigDSIGN, SizeSignKeyDSIGN, SizeVerKeyDSIGN, algorithmNameDSIGN,
-  deriveVerKeyDSIGN, signDSIGN, verifyDSIGN, genKeyDSIGN, rawSerialiseSigDSIGN,
-  Signable, rawSerialiseVerKeyDSIGN, rawSerialiseSignKeyDSIGN, rawDeserialiseVerKeyDSIGN,
-  rawDeserialiseSignKeyDSIGN, rawDeserialiseSigDSIGN), encodeVerKeyDSIGN, 
-  encodedVerKeyDSIGNSizeExpr, decodeVerKeyDSIGN, encodeSignKeyDSIGN, 
-  encodedSignKeyDESIGNSizeExpr, decodeSignKeyDSIGN, encodeSigDSIGN, 
-  encodedSigDSIGNSizeExpr, decodeSigDSIGN)
+import Cardano.Crypto.DSIGN.Class (
+  DSIGNAlgorithm (VerKeyDSIGN, 
+                  SignKeyDSIGN, 
+                  SigDSIGN,
+                  SeedSizeDSIGN, 
+                  SizeSigDSIGN, 
+                  SizeSignKeyDSIGN, 
+                  SizeVerKeyDSIGN, 
+                  algorithmNameDSIGN,
+                  deriveVerKeyDSIGN, 
+                  signDSIGN, 
+                  verifyDSIGN, 
+                  genKeyDSIGN, 
+                  rawSerialiseSigDSIGN,
+                  Signable, 
+                  rawSerialiseVerKeyDSIGN, 
+                  rawSerialiseSignKeyDSIGN, 
+                  rawDeserialiseVerKeyDSIGN,
+                  rawDeserialiseSignKeyDSIGN, 
+                  rawDeserialiseSigDSIGN), 
+  encodeVerKeyDSIGN, 
+  encodedVerKeyDSIGNSizeExpr, 
+  decodeVerKeyDSIGN, 
+  encodeSignKeyDSIGN, 
+  encodedSignKeyDESIGNSizeExpr, 
+  decodeSignKeyDSIGN, 
+  encodeSigDSIGN, 
+  encodedSigDSIGNSizeExpr, 
+  decodeSigDSIGN
+  )
 
 data SECP256k1DSIGN
 
