@@ -61,9 +61,9 @@ instance NoThunks (SigDSIGN SECP256k1DSIGN)
 
 instance DSIGNAlgorithm SECP256k1DSIGN where
   type SeedSizeDSIGN SECP256k1DSIGN = 32
-  type SizeSigDSIGN SECP256k1DSIGN = 72
+  type SizeSigDSIGN SECP256k1DSIGN = 64
   type SizeSignKeyDSIGN SECP256k1DSIGN = 32
-  type SizeVerKeyDSIGN SECP256k1DSIGN = 33 -- approximate, as it's 257 bits
+  type SizeVerKeyDSIGN SECP256k1DSIGN = 64
   type Signable SECP256k1DSIGN = ((~) SECP.Msg)
   newtype VerKeyDSIGN SECP256k1DSIGN = VerKeySECP256k1 SECP.PubKey
     deriving newtype (Eq, NFData)
