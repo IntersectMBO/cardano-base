@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fno-full-laziness #-}
 
 -- | Ed25519 digital signatures.
 module Cardano.Crypto.DSIGN.Ed25519
@@ -147,7 +148,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     --
     -- Key generation
     --
-
     genKeyDSIGN seed = SignKeyEd25519DSIGN $
       let (sb, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @Ed25519DSIGN)) seed
       in unsafeDupablePerformIO $ do
