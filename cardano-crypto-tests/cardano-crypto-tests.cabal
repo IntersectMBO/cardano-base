@@ -74,6 +74,7 @@ test-suite test-crypto
                       , cardano-crypto-class
                       , cardano-crypto-tests
                       , tasty
+                      , tasty-quickcheck
 
   ghc-options:          -threaded -rtsopts -with-rtsopts=-N
 
