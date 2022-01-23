@@ -15,8 +15,10 @@ main = do
 
 tests :: TestTree
 tests =
+  -- The default QuickCheck test count is 100. This is too few to catch
+  -- anything, so we set a minimum of 1000.
   adjustOption (\(QuickCheckTests i) -> QuickCheckTests $ max i 1000) . 
-    testGroup "ouroboros-consensus" $
+    testGroup "cardano-crypto-class" $
       [ Test.Crypto.DSIGN.tests
       , Test.Crypto.Hash.tests
       , Test.Crypto.KES.tests
