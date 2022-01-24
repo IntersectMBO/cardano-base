@@ -6,6 +6,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+-- According to the documentation for unsafePerformIO:
+-- 
+-- > Make sure that the either you switch off let-floating 
+-- > (-fno-full-laziness), or that the call to unsafePerformIO cannot float 
+-- > outside a lambda.
+--
+-- If we do not switch off let-floating, our calls to unsafeDupablePerformIO for
+-- FFI functions become nondeterministic in their behaviour when run with
+-- parallelism enabled (such as -with-rtsopts=-N), possibly yielding wrong
+-- answers on a range of tasks, including serialization.
+{-# OPTIONS_GHC -fno-full-laziness #-}
 
 -- | Ed25519 digital signatures.
 module Cardano.Crypto.DSIGN.Ed25519
@@ -147,7 +158,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     --
     -- Key generation
     --
-
     genKeyDSIGN seed = SignKeyEd25519DSIGN $
       let (sb, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @Ed25519DSIGN)) seed
       in unsafeDupablePerformIO $ do
