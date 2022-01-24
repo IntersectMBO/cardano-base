@@ -76,8 +76,9 @@ test-suite test-crypto
                       , cardano-crypto-class
                       , cardano-crypto-tests
                       , tasty
+                      , tasty-quickcheck
 
-  ghc-options:          -threaded -O2
+  ghc-options:          -threaded -rtsopts -with-rtsopts=-N
 
 benchmark bench-crypto
   import:               base, project-config

@@ -1,5 +1,8 @@
 index-state: 2021-03-15T00:00:00Z
 
+-- Ensures colourized output from tasty
+test-show-details: direct
+
 packages:
   base-deriving-via
   binary
