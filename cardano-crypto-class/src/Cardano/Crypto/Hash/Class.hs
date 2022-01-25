@@ -215,7 +215,7 @@ hashFromStringAsHex = hashFromTextAsHex . Text.pack
 -- | Convert the hash to hex encoding, as 'Text'.
 --
 hashToTextAsHex :: Hash h a -> Text
-hashToTextAsHex = Text.decodeUtf8 . hashToBytesAsHex
+hashToTextAsHex = Text.decodeLatin1 . hashToBytesAsHex
 
 -- | Make a hash from hex-encoded 'Text' representation.
 --
@@ -253,13 +253,13 @@ instance HashAlgorithm h => IsString (Hash h a) where
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
 instance HashAlgorithm h => ToJSONKey (Hash h a) where
-  toJSONKey = Aeson.toJSONKeyText hashToText 
+  toJSONKey = Aeson.toJSONKeyText hashToTextAsHex
 
 instance HashAlgorithm h => FromJSONKey (Hash h a) where
   fromJSONKey = Aeson.FromJSONKeyTextParser parseHash
 
 instance HashAlgorithm h => ToJSON (Hash h a) where
-  toJSON = toJSON . hashToText
+  toJSON = toJSON . hashToTextAsHex
 
 instance HashAlgorithm h => FromJSON (Hash h a) where
   parseJSON = Aeson.withText "hash" parseHash
@@ -269,10 +269,6 @@ instance HeapWords (Hash h a) where
   heapWords (UnsafeHashRep (PackedBytes28 _ _ _ _)) = 1 + 4
   heapWords (UnsafeHashRep (PackedBytes32 _ _ _ _)) = 1 + 4
   heapWords (UnsafeHashRep (PackedBytes# ba#)) = heapWords (SBSI.SBS ba#)
-
--- utils used in the instances above
-hashToText :: Hash h a -> Text
-hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
