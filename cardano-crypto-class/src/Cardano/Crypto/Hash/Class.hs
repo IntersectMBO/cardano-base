@@ -16,6 +16,7 @@ module Cardano.Crypto.Hash.Class
   , sizeHash
   , ByteString
   , Hash(UnsafeHash)
+  , PackedBytes(PackedBytes8, PackedBytes28, PackedBytes32)
 
     -- * Core operations
   , hashWith
@@ -27,9 +28,8 @@ module Cardano.Crypto.Hash.Class
   , hashFromBytes
   , hashToBytesShort
   , hashFromBytesShort
-  , ViewHash32 (..)
-  , unsafeMkHash32
-  , viewHash32
+  , hashToPackedBytes
+  , hashFromPackedBytes
 
     -- * Rendering and parsing
   , hashToBytesAsHex
@@ -55,10 +55,8 @@ import Data.List (foldl')
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
-import Data.Word (Word64)
 import GHC.Generics (Generic)
-import GHC.TypeLits (KnownNat, Nat, natVal, sameNat)
-import Data.Type.Equality ((:~:)(Refl))
+import GHC.TypeLits (KnownNat, Nat, natVal)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -189,6 +187,15 @@ hashFromBytesShort bytes
 hashToBytesShort :: Hash h a -> ShortByteString
 hashToBytesShort (UnsafeHashRep h) = unpackBytes h
 
+-- | /O(1)/ - Get the underlying hash representation
+--
+hashToPackedBytes :: Hash h a -> PackedBytes (SizeHash h)
+hashToPackedBytes (UnsafeHashRep pb) = pb
+
+-- | /O(1)/ - Construct hash from the underlying representation
+--
+hashFromPackedBytes :: PackedBytes (SizeHash h) -> Hash h a
+hashFromPackedBytes = UnsafeHashRep
 
 --
 -- Rendering and parsing
@@ -309,29 +316,6 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
         where
           expected = sizeHash (Proxy :: Proxy h)
           actual   = BS.length bs
-
-data ViewHash32 h a where
-  ViewHash32 :: SizeHash h ~ 32
-    => Word64
-    -> Word64
-    -> Word64
-    -> Word64
-    -> ViewHash32 h a
-  ViewHashNot32 :: ViewHash32 h a
-
-viewHash32 :: forall h a. HashAlgorithm h => Hash h a -> ViewHash32 h a
-viewHash32 (UnsafeHashRep p) = go p
-  where
-    go :: forall n. PackedBytes n -> ViewHash32 h a
-    go (PackedBytes32 a b c d) =
-      case sameNat (Proxy :: Proxy (SizeHash h)) (Proxy :: Proxy 32) of
-        Just Refl -> ViewHash32 a b c d
-        Nothing -> ViewHashNot32
-    go _ = ViewHashNot32
-
-unsafeMkHash32 ::
-  SizeHash h ~ 32 => Word64 -> Word64 -> Word64 -> Word64 -> Hash h a
-unsafeMkHash32 a b c d = UnsafeHashRep (PackedBytes32 a b c d)
 
 --
 -- Deprecated
