@@ -74,36 +74,19 @@ import Test.QuickCheck (
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
--- Captures ways of generating each of the associated types of DSIGN
-data TypesMethodology (a :: Type) = 
-  TypesMethodology (Gen (VerKeyDSIGN a))
-                   (Gen (SignKeyDSIGN a))
-                   (Gen (SigDSIGN a))
+mockSigGen :: Gen (SigDSIGN MockDSIGN)
+mockSigGen = defaultSigGen
 
-mockMethodology :: TypesMethodology MockDSIGN
-mockMethodology = TypesMethodology defaultVerKeyGen 
-                                   defaultSignKeyGen 
-                                   defaultSigGen
+ed25519SigGen :: Gen (SigDSIGN Ed25519DSIGN)
+ed25519SigGen = defaultSigGen
 
-ed25519Methodology :: TypesMethodology Ed25519DSIGN
-ed25519Methodology = TypesMethodology defaultVerKeyGen 
-                                      defaultSignKeyGen 
-                                      defaultSigGen
+ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
+ed448SigGen = defaultSigGen
 
-ed448Methodology :: TypesMethodology Ed448DSIGN
-ed448Methodology = TypesMethodology defaultVerKeyGen 
-                                    defaultSignKeyGen
-                                    defaultSigGen
-
-secp256k1Methodology :: TypesMethodology SECP256k1DSIGN
-secp256k1Methodology = TypesMethodology defaultVerKeyGen
-                                        defaultSignKeyGen
-                                        go
-  where
-    go :: Gen (SigDSIGN SECP256k1DSIGN)
-    go = do
-      msg <- genSECPMsg
-      signDSIGN () msg <$> defaultSignKeyGen
+secp256k1SigGen :: Gen (SigDSIGN SECP256k1DSIGN)
+secp256k1SigGen = do 
+  msg <- genSECPMsg
+  signDSIGN () msg <$> defaultSignKeyGen
 
 genSECPMsg :: Gen SECP.Msg
 genSECPMsg = Gen.suchThatMap go SECP.msg
@@ -136,16 +119,16 @@ defaultSigGen = do
 tests :: TestTree
 tests =
   testGroup "Crypto.DSIGN"
-    [ testDSIGNAlgorithm mockMethodology (arbitrary @Message) "MockDSIGN"
-    , testDSIGNAlgorithm ed25519Methodology (arbitrary @Message) "Ed25519DSIGN"
-    , testDSIGNAlgorithm ed448Methodology (arbitrary @Message) "Ed448DSIGN"
-    , testDSIGNAlgorithm secp256k1Methodology genSECPMsg "SECP-256k1"
+    [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
+    , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
+    , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
+    , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "SECP-256k1"
     ]
 
 testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
-  (DSIGNAlgorithm v, 
-   Signable v a, 
-   ContextDSIGN v ~ (), 
+  (DSIGNAlgorithm v,
+   Signable v a,
+   ContextDSIGN v ~ (),
    Show a,
    Eq (SignKeyDSIGN v),
    Eq a,
@@ -155,80 +138,79 @@ testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
    FromCBOR (SignKeyDSIGN v),
    ToCBOR (SigDSIGN v),
    FromCBOR (SigDSIGN v)) =>
-  TypesMethodology v -> 
+  Gen (SigDSIGN v) -> 
   Gen a -> 
   String -> 
   TestTree
-testDSIGNAlgorithm (TypesMethodology genVK genSK genSig) genMsg name = 
-  testGroup name [
-    testGroup "serialisation" [
-      testGroup "raw" [
-        testProperty "VerKey" . 
-          forAllShow genVK 
-                     ppShow $
-                     prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN,
-        testProperty "SignKey" .
-          forAllShow genSK
-                     ppShow $
-                     prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN,
-        testProperty "Sig" . 
-          forAllShow genSig 
-                     ppShow $ 
-                     prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN
-        ],
-      testGroup "size" [
-        testProperty "VerKey" . 
-          forAllShow genVK 
-                     ppShow $
-                     prop_size_serialise rawSerialiseVerKeyDSIGN (sizeVerKeyDSIGN (Proxy @v)),
-        testProperty "SignKey" . 
-          forAllShow genSK
-                     ppShow $ 
-                     prop_size_serialise rawSerialiseSignKeyDSIGN (sizeSignKeyDSIGN (Proxy @v)),
-        testProperty "Sig" .
-          forAllShow genSig
-                     ppShow $ 
-                     prop_size_serialise rawSerialiseSigDSIGN (sizeSigDSIGN (Proxy @v))
-        ],
-      testGroup "direct CBOR" [
-        testProperty "VerKey" . 
-          forAllShow genVK
-                     ppShow $ 
-                     prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN,
-        testProperty "SignKey" . 
-          forAllShow genSK
-                     ppShow $ 
-                     prop_cbor_with encodeSignKeyDSIGN decodeSignKeyDSIGN,
-        testProperty "Sig" . 
-          forAllShow genSig
-                     ppShow $ 
-                     prop_cbor_with encodeSigDSIGN decodeSigDSIGN
-        ],
-      testGroup "To/FromCBOR class" [
-        testProperty "VerKey" . forAllShow genVK ppShow $ prop_cbor,
-        testProperty "SignKey" . forAllShow genSK ppShow $ prop_cbor,
-        testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor
-        ],
-      testGroup "ToCBOR size" [
-        testProperty "VerKey" . forAllShow genVK ppShow $ prop_cbor_size,
-        testProperty "SignKey" . forAllShow genSK ppShow $ prop_cbor_size,
-        testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor_size
-        ],
-      testGroup "direct matches class" [
-        testProperty "VerKey" . 
-          forAllShow genVK ppShow $ 
-          prop_cbor_direct_vs_class encodeVerKeyDSIGN,
-        testProperty "SignKey" . 
-          forAllShow genSK ppShow $ 
-          prop_cbor_direct_vs_class encodeSignKeyDSIGN,
-        testProperty "Sig" . 
-          forAllShow genSig ppShow $ 
-          prop_cbor_direct_vs_class encodeSigDSIGN
-        ]
+testDSIGNAlgorithm genSig genMsg name = testGroup name [
+  testGroup "serialization" [
+    testGroup "raw" [
+      testProperty "VerKey" .
+        forAllShow (defaultVerKeyGen @v)
+                   ppShow $ 
+                   prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN,
+      testProperty "SignKey" . 
+        forAllShow (defaultSignKeyGen @v)
+                   ppShow $ 
+                   prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN,
+      testProperty "Sig" . 
+        forAllShow genSig 
+                   ppShow $ 
+                   prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN
       ],
+    testGroup "size" [ 
+      testProperty "VerKey" . 
+        forAllShow (defaultVerKeyGen @v)
+                   ppShow $ 
+                   prop_size_serialise rawSerialiseVerKeyDSIGN (sizeVerKeyDSIGN (Proxy @v)),
+      testProperty "SignKey" .
+        forAllShow (defaultSignKeyGen @v)
+                   ppShow $ 
+                   prop_size_serialise rawSerialiseSignKeyDSIGN (sizeSignKeyDSIGN (Proxy @v)),
+      testProperty "Sig" . 
+        forAllShow genSig 
+                   ppShow $ 
+                   prop_size_serialise rawSerialiseSigDSIGN (sizeSigDSIGN (Proxy @v))
+      ],
+    testGroup "direct CBOR" [
+      testProperty "VerKey" . 
+        forAllShow (defaultVerKeyGen @v)
+                   ppShow $ 
+                   prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN,
+      testProperty "SignKey" . 
+        forAllShow (defaultSignKeyGen @v)
+                   ppShow $ 
+                   prop_cbor_with encodeSignKeyDSIGN decodeSignKeyDSIGN,
+      testProperty "Sig" . 
+        forAllShow genSig 
+                   ppShow $ 
+                   prop_cbor_with encodeSigDSIGN decodeSigDSIGN
+      ],
+    testGroup "To/FromCBOR class" [
+      testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor,
+      testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor,
+      testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor
+      ],
+    testGroup "ToCBOR size" [
+      testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor_size,
+      testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor_size,
+      testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor_size
+      ],
+    testGroup "direct matches class" [
+      testProperty "VerKey" . 
+        forAllShow (defaultVerKeyGen @v) ppShow $ 
+        prop_cbor_direct_vs_class encodeVerKeyDSIGN,
+      testProperty "SignKey" . 
+        forAllShow (defaultSignKeyGen @v) ppShow $ 
+        prop_cbor_direct_vs_class encodeSignKeyDSIGN,
+      testProperty "Sig" . 
+        forAllShow genSig ppShow $ 
+        prop_cbor_direct_vs_class encodeSigDSIGN
+      ]
+    ],
     testGroup "verify" [
       testProperty "signing and verifying with matching keys" . 
-        forAllShow ((,) <$> genMsg <*> genSK) ppShow $
+        forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @v) ppShow $
         prop_dsign_verify,
       testProperty "verifying with wrong key" . 
         forAllShow genWrongKey ppShow $
@@ -236,26 +218,26 @@ testDSIGNAlgorithm (TypesMethodology genVK genSK genSig) genMsg name =
       testProperty "verifying wrong message" . 
         forAllShow genWrongMsg ppShow $ 
         prop_dsign_verify_wrong_msg
-      ],
+    ],
     testGroup "NoThunks" [
-      testProperty "VerKey" . forAllShow genVK ppShow $ prop_no_thunks,
-      testProperty "SignKey" . forAllShow genSK ppShow $ prop_no_thunks,
+      testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_no_thunks,
+      testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_no_thunks,
       testProperty "Sig" . forAllShow genSig ppShow $ prop_no_thunks
-      ]
     ]
-    where
-      genWrongKey :: Gen (a, SignKeyDSIGN v, SignKeyDSIGN v)
-      genWrongKey = do
-        sk1 <- genSK
-        sk2 <- Gen.suchThat genSK (/= sk1)
-        msg <- genMsg
-        pure (msg, sk1, sk2)
-      genWrongMsg :: Gen (a, a, SignKeyDSIGN v)
-      genWrongMsg = do
-        msg1 <- genMsg
-        msg2 <- Gen.suchThat genMsg (/= msg1)
-        sk <- genSK
-        pure (msg1, msg2, sk)
+  ]
+  where
+    genWrongKey :: Gen (a, SignKeyDSIGN v, SignKeyDSIGN v)
+    genWrongKey = do
+      sk1 <- defaultSignKeyGen
+      sk2 <- Gen.suchThat defaultSignKeyGen (/= sk1)
+      msg <- genMsg
+      pure (msg, sk1, sk2)
+    genWrongMsg :: Gen (a, a, SignKeyDSIGN v)
+    genWrongMsg = do
+      msg1 <- genMsg
+      msg2 <- Gen.suchThat genMsg (/= msg1)
+      sk <- defaultSignKeyGen
+      pure (msg1, msg2, sk)
 
 -- If we sign a message with the key, we can verify the signature with the
 -- corresponding verification key.
