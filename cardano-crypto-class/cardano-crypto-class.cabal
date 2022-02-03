@@ -50,6 +50,7 @@ library
                         Cardano.Crypto.DSIGN.Ed448
                         Cardano.Crypto.DSIGN.Mock
                         Cardano.Crypto.DSIGN.NeverUsed
+                        Cardano.Crypto.DSIGN.SECP256k1
 
                         Cardano.Crypto.Hash.Blake2b
                         Cardano.Crypto.Hash.Class
@@ -98,6 +99,7 @@ library
                       , bytestring
                       , cardano-binary
                       , cardano-prelude
+                      , cereal
                       , cryptonite
                       , deepseq
                       , integer-gmp
@@ -106,6 +108,7 @@ library
                       , nothunks
                       , primitive
                       , serialise
+                      , secp256k1-haskell
                       , text
                       , transformers
                       , vector

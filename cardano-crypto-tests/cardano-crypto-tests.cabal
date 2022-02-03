@@ -59,8 +59,10 @@ library
                       , cryptonite
                       , formatting
                       , nothunks
+                      , pretty-show
                       , QuickCheck
                       , quickcheck-instances
+                      , secp256k1-haskell
                       , tasty
                       , tasty-quickcheck
                       , criterion
