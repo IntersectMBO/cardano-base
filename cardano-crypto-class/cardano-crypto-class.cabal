@@ -92,6 +92,7 @@ library
                         Cardano.Foreign
 
   other-modules:        Cardano.Crypto.PackedBytes
+                        Cardano.Crypto.Schnorr
 
   build-depends:        aeson
                       , base
@@ -112,8 +113,8 @@ library
                       , text
                       , transformers
                       , vector
-
-  pkgconfig-depends:    libsodium
+  
+  pkgconfig-depends:    libsodium, libsecp256k1
 
 test-suite test-memory-example
   import:               base, project-config
