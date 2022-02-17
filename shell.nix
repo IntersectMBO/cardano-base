@@ -35,6 +35,8 @@ let
       niv
       pkgconfig
       sqlite-interactive
+      pkgs.nix
+      pkgs.cacert
     ];
 
     tools = {
