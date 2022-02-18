@@ -39,6 +39,7 @@
         "version": "60fe72cf807a4ec4409a53883d5c3af77f60f721"
     },
     "nixpkgs": {
+        "builtin": true,
         "branch": "nixpkgs-unstable",
         "description": "Nix Packages collection",
         "homepage": "",
@@ -47,7 +48,7 @@
         "rev": "1882c6b7368fd284ad01b0a5b5601ef136321292",
         "sha256": "0zg7ak2mcmwzi2kg29g4v9fvbvs0viykjsg2pwaphm1fi13s7s0i",
         "type": "tarball",
-        "url": "https://github.com/nixos/nixpkgs/archive/1882c6b7368fd284ad01b0a5b5601ef136321292.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/1882c6b7368fd284ad01b0a5b5601ef136321292.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
