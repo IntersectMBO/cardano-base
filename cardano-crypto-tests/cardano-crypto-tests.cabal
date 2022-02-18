@@ -59,8 +59,10 @@ library
                       , cryptonite
                       , formatting
                       , nothunks
+                      , pretty-show
                       , QuickCheck
                       , quickcheck-instances
+                      , secp256k1-haskell
                       , tasty
                       , tasty-quickcheck
                       , criterion
@@ -74,8 +76,9 @@ test-suite test-crypto
                       , cardano-crypto-class
                       , cardano-crypto-tests
                       , tasty
+                      , tasty-quickcheck
 
-  ghc-options:          -threaded
+  ghc-options:          -threaded -rtsopts -with-rtsopts=-N
 
 benchmark bench-crypto
   import:               base, project-config

@@ -29,6 +29,7 @@ result
 
 # Local development
 stack-local.yaml
+.nvimrc
 
 # Visual Studio Code
 /.vscode
