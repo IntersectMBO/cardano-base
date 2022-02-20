@@ -5,7 +5,7 @@
 module Cardano.Crypto.Schnorr (
   schnorrNonceFunction,
   SECP256k1Context,
-  secpContextNoPrecomp,
+--  secpContextNoPrecomp,
   secpContextCreate,
   secpContextDestroy,
   SECP256k1KeyPair,
@@ -42,8 +42,10 @@ foreign import capi "secp256k1_schnorrsig.h secp256k1_nonce_function_bip340"
 
 data SECP256k1Context
 
+{-
 foreign import capi "secp256k1.h value secp256k1_context_no_precomp"
   secpContextNoPrecomp :: Ptr SECP256k1Context
+-}
 
 foreign import capi "secp256k1.h secp256k1_context_create"
   secpContextCreate :: 
@@ -82,7 +84,7 @@ foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_create"
      Ptr SECP256k1Context -- context initialized for signing
   -> Ptr SECP256k1KeyPair -- out-param for keypair to initialize
   -> Ptr CUChar -- secret key (32 bytes)
-  -> Ptr CInt -- 1 on success, 0 on failure
+  -> IO CInt -- 1 on success, 0 on failure
 
 foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign"
   secpSchnorrSigSign ::
