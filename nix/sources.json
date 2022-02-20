@@ -18,10 +18,10 @@
         "homepage": "https://input-output-hk.github.io/haskell.nix",
         "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "659b73698e06c02cc0f3029383bd383c8acdbe98",
-        "sha256": "sha256:0i91iwa11sq0v82v0zl82npnb4qqfm71y7gn3giyaixslm73kspk",
+        "rev": "8ebafe54ded2789ca67109cd712a5e53e5e9da41",
+        "sha256": "05cvahwnscapa491lck9ign6256r50q257b3s85jfl9aqmvdjy7r",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/haskell.nix/archive/659b73698e06c02cc0f3029383bd383c8acdbe98.tar.gz",
+        "url": "https://github.com/input-output-hk/haskell.nix/archive/8ebafe54ded2789ca67109cd712a5e53e5e9da41.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
         "version": "962ecfed3a4fb656b5a91d89159291e00ed766bc"
     },
@@ -37,5 +37,18 @@
         "url": "https://github.com/input-output-hk/iohk-nix/archive/266ca46a8d1cb4286b9699b4fd435066e88440ac.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
         "version": "60fe72cf807a4ec4409a53883d5c3af77f60f721"
+    },
+    "nixpkgs": {
+        "builtin": true,
+        "branch": "nixpkgs-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "1882c6b7368fd284ad01b0a5b5601ef136321292",
+        "sha256": "0zg7ak2mcmwzi2kg29g4v9fvbvs0viykjsg2pwaphm1fi13s7s0i",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/1882c6b7368fd284ad01b0a5b5601ef136321292.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
