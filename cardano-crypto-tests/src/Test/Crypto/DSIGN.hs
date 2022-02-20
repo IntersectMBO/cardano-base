@@ -23,7 +23,7 @@ import Cardano.Crypto.DSIGN (
   MockDSIGN, 
   Ed25519DSIGN, 
   Ed448DSIGN,
-  SECP256k1DSIGN,
+  EcdsaSecp256k1DSIGN,
   DSIGNAlgorithm (VerKeyDSIGN,
                   SignKeyDSIGN,
                   SigDSIGN,
@@ -83,7 +83,7 @@ ed25519SigGen = defaultSigGen
 ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
 
-secp256k1SigGen :: Gen (SigDSIGN SECP256k1DSIGN)
+secp256k1SigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
 secp256k1SigGen = do 
   msg <- genSECPMsg
   signDSIGN () msg <$> defaultSignKeyGen

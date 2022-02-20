@@ -8,7 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- need NoThunks for secp256k1-haskell types
 
-module Cardano.Crypto.DSIGN.SECP256k1 where
+module Cardano.Crypto.DSIGN.EcdsaSecp256k1 where
 
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
 import Data.ByteString (ByteString)
@@ -51,67 +51,75 @@ import Cardano.Crypto.DSIGN.Class (
   decodeSigDSIGN
   )
 
-data SECP256k1DSIGN
+data EcdsaSecp256k1DSIGN
 
-instance NoThunks (VerKeyDSIGN SECP256k1DSIGN)
+instance NoThunks (VerKeyDSIGN EcdsaSecp256k1DSIGN)
 
-instance NoThunks (SignKeyDSIGN SECP256k1DSIGN)
+instance NoThunks (SignKeyDSIGN EcdsaSecp256k1DSIGN)
 
-instance NoThunks (SigDSIGN SECP256k1DSIGN)
+instance NoThunks (SigDSIGN EcdsaSecp256k1DSIGN)
 
-instance DSIGNAlgorithm SECP256k1DSIGN where
-  type SeedSizeDSIGN SECP256k1DSIGN = 32
-  type SizeSigDSIGN SECP256k1DSIGN = 64
-  type SizeSignKeyDSIGN SECP256k1DSIGN = 32
-  type SizeVerKeyDSIGN SECP256k1DSIGN = 64
-  type Signable SECP256k1DSIGN = ((~) SECP.Msg)
-  newtype VerKeyDSIGN SECP256k1DSIGN = VerKeySECP256k1 SECP.PubKey
+instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
+  type SeedSizeDSIGN EcdsaSecp256k1DSIGN = 32
+  type SizeSigDSIGN EcdsaSecp256k1DSIGN = 64
+  type SizeSignKeyDSIGN EcdsaSecp256k1DSIGN = 32
+  type SizeVerKeyDSIGN EcdsaSecp256k1DSIGN = 64
+  type Signable EcdsaSecp256k1DSIGN = ((~) SECP.Msg)
+  newtype VerKeyDSIGN EcdsaSecp256k1DSIGN = 
+    VerKeyEcdsaSecp256k1 SECP.PubKey
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
-  newtype SignKeyDSIGN SECP256k1DSIGN = SignKeySECP256k1 SECP.SecKey
+  newtype SignKeyDSIGN EcdsaSecp256k1DSIGN = 
+    SignKeyEcdsaSecp256k1 SECP.SecKey
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
-  newtype SigDSIGN SECP256k1DSIGN = SigSECP256k1 SECP.Sig
+  newtype SigDSIGN EcdsaSecp256k1DSIGN = 
+    SigEcdsaSecp256k1 SECP.Sig
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
-  algorithmNameDSIGN _ = "secp256k1"
-  deriveVerKeyDSIGN (SignKeySECP256k1 sk) = VerKeySECP256k1 . SECP.derivePubKey $ sk
-  signDSIGN () msg (SignKeySECP256k1 k) = SigSECP256k1 . SECP.signMsg k $ msg
-  verifyDSIGN () (VerKeySECP256k1 pk) msg (SigSECP256k1 sig) = 
+  algorithmNameDSIGN _ = "ecdsa-secp256k1"
+  deriveVerKeyDSIGN (SignKeyEcdsaSecp256k1 sk) = 
+    VerKeyEcdsaSecp256k1 . SECP.derivePubKey $ sk
+  signDSIGN () msg (SignKeyEcdsaSecp256k1 k) = 
+    SigEcdsaSecp256k1 . SECP.signMsg k $ msg
+  verifyDSIGN () (VerKeyEcdsaSecp256k1 pk) msg (SigEcdsaSecp256k1 sig) = 
     if SECP.verifySig pk sig msg
     then pure ()
-    else Left "SECP256k1 signature not verified"
+    else Left "ECDSA-SECP256k1 signature not verified"
   genKeyDSIGN seed = runMonadRandomWithSeed seed $ do
     bs <- getRandomBytes 32
     case SECP.secKey bs of 
-      Nothing -> error "Failed to construct a SECP256k1 secret key unexpectedly"
-      Just sk -> pure . SignKeySECP256k1 $ sk
-  rawSerialiseSigDSIGN (SigSECP256k1 sig) = putting sig
-  rawSerialiseVerKeyDSIGN (VerKeySECP256k1 pk) = putting pk
-  rawSerialiseSignKeyDSIGN (SignKeySECP256k1 sk) = putting sk
-  rawDeserialiseVerKeyDSIGN bs = VerKeySECP256k1 <$> (eitherToMaybe . getting $ bs)
-  rawDeserialiseSignKeyDSIGN bs = SignKeySECP256k1 <$> (eitherToMaybe . getting $ bs)
-  rawDeserialiseSigDSIGN bs = SigSECP256k1 <$> (eitherToMaybe . getting $ bs)
+      Nothing -> error "Failed to construct a ECDSA-SECP256k1 secret key unexpectedly"
+      Just sk -> pure . SignKeyEcdsaSecp256k1 $ sk
+  rawSerialiseSigDSIGN (SigEcdsaSecp256k1 sig) = putting sig
+  rawSerialiseVerKeyDSIGN (VerKeyEcdsaSecp256k1 pk) = putting pk
+  rawSerialiseSignKeyDSIGN (SignKeyEcdsaSecp256k1 sk) = putting sk
+  rawDeserialiseVerKeyDSIGN bs = 
+    VerKeyEcdsaSecp256k1 <$> (eitherToMaybe . getting $ bs)
+  rawDeserialiseSignKeyDSIGN bs = 
+    SignKeyEcdsaSecp256k1 <$> (eitherToMaybe . getting $ bs)
+  rawDeserialiseSigDSIGN bs = 
+    SigEcdsaSecp256k1 <$> (eitherToMaybe . getting $ bs)
 
-instance ToCBOR (VerKeyDSIGN SECP256k1DSIGN) where
+instance ToCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
   toCBOR = encodeVerKeyDSIGN
   encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
-instance FromCBOR (VerKeyDSIGN SECP256k1DSIGN) where
+instance FromCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
   fromCBOR = decodeVerKeyDSIGN
 
-instance ToCBOR (SignKeyDSIGN SECP256k1DSIGN) where
+instance ToCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
   toCBOR = encodeSignKeyDSIGN
   encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
 
-instance FromCBOR (SignKeyDSIGN SECP256k1DSIGN) where
+instance FromCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
   fromCBOR = decodeSignKeyDSIGN
 
-instance ToCBOR (SigDSIGN SECP256k1DSIGN) where
+instance ToCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
   toCBOR = encodeSigDSIGN
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
-instance FromCBOR (SigDSIGN SECP256k1DSIGN) where
+instance FromCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
   fromCBOR = decodeSigDSIGN
 
 -- Required orphans

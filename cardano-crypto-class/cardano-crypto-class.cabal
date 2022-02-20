@@ -50,7 +50,7 @@ library
                         Cardano.Crypto.DSIGN.Ed448
                         Cardano.Crypto.DSIGN.Mock
                         Cardano.Crypto.DSIGN.NeverUsed
-                        Cardano.Crypto.DSIGN.SECP256k1
+                        Cardano.Crypto.DSIGN.EcdsaSecp256k1
 
                         Cardano.Crypto.Hash.Blake2b
                         Cardano.Crypto.Hash.Class
