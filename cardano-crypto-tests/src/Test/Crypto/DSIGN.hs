@@ -24,6 +24,7 @@ import Cardano.Crypto.DSIGN (
   Ed25519DSIGN, 
   Ed448DSIGN,
   EcdsaSecp256k1DSIGN,
+  SchnorrSecp256k1DSIGN,
   DSIGNAlgorithm (VerKeyDSIGN,
                   SignKeyDSIGN,
                   SigDSIGN,
@@ -88,6 +89,9 @@ secp256k1SigGen = do
   msg <- genSECPMsg
   signDSIGN () msg <$> defaultSignKeyGen
 
+schnorrSigGen :: Gen (SigDSIGN SchnorrSecp256k1DSIGN)
+schnorrSigGen = defaultSigGen
+
 genSECPMsg :: Gen SECP.Msg
 genSECPMsg = Gen.suchThatMap go SECP.msg
   where
@@ -122,7 +126,8 @@ tests =
     [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
     , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
     , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
-    , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "SECP-256k1"
+    , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "EcdsaSecp256k1DSIGN"
+    , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
     ]
 
 testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).

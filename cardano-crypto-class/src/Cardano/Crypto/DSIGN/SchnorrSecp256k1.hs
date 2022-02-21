@@ -28,18 +28,31 @@ import Data.Primitive.Ptr (copyPtr)
 import Crypto.Random (getRandomBytes)
 import Cardano.Crypto.Seed (runMonadRandomWithSeed)
 import Data.ByteString.Internal (toForeignPtr, memcmp)
-import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, mallocForeignPtrBytes,
-  plusForeignPtr, castForeignPtr)
+import Foreign.ForeignPtr (
+  ForeignPtr, 
+  withForeignPtr, 
+  mallocForeignPtrBytes,
+  plusForeignPtr, 
+  castForeignPtr
+  )
 import Control.Monad (when)
 import System.IO.Unsafe (unsafeDupablePerformIO, unsafePerformIO)
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
 import Foreign.C.Types (CUChar)
 import Foreign.Marshal.Alloc (allocaBytes)
-import Cardano.Crypto.Schnorr (SECP256k1XOnlyPubKey, 
-  secpKeyPairCreate, SECP256k1Context, secpKeyPairXOnlyPub,
-  SECP256k1SecKey, secpSchnorrSigVerify, secpContextSignVerify,
-  SECP256k1SchnorrSig, secpSchnorrSigSignCustom, secpContextCreate)
+import Cardano.Crypto.Schnorr (
+  SECP256k1XOnlyPubKey, 
+  secpKeyPairCreate, 
+  SECP256k1Context, 
+  secpKeyPairXOnlyPub,
+  SECP256k1SecKey, 
+  secpSchnorrSigVerify, 
+  secpContextSignVerify,
+  SECP256k1SchnorrSig, 
+  secpSchnorrSigSignCustom, 
+  secpContextCreate
+  )
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (OnlyCheckWhnfNamed))
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (VerKeyDSIGN, 
@@ -83,13 +96,19 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   type Signable SchnorrSecp256k1DSIGN = SignableRepresentation
   newtype VerKeyDSIGN SchnorrSecp256k1DSIGN = 
     VerKeySchnorr256k1 (ForeignPtr SECP256k1XOnlyPubKey)
-      deriving NoThunks via (OnlyCheckWhnfNamed "VerKeySchnorr256k1" (ForeignPtr SECP256k1XOnlyPubKey))
+      deriving NoThunks via (
+        OnlyCheckWhnfNamed "VerKeySchnorr256k1" (ForeignPtr SECP256k1XOnlyPubKey)
+        )
   newtype SignKeyDSIGN SchnorrSecp256k1DSIGN = 
     SignKeySchnorr256k1 (ForeignPtr SECP256k1SecKey)
-      deriving NoThunks via (OnlyCheckWhnfNamed "SignKeySchnorr256k1" (ForeignPtr SECP256k1SecKey))
+      deriving NoThunks via (
+        OnlyCheckWhnfNamed "SignKeySchnorr256k1" (ForeignPtr SECP256k1SecKey)
+        )
   newtype SigDSIGN SchnorrSecp256k1DSIGN = 
     SigSchnorr256k1 (ForeignPtr SECP256k1SchnorrSig)
-      deriving NoThunks via (OnlyCheckWhnfNamed "SigSchnorr256k1" (ForeignPtr SECP256k1SchnorrSig))
+      deriving NoThunks via (
+        OnlyCheckWhnfNamed "SigSchnorr256k1" (ForeignPtr SECP256k1SchnorrSig)
+        )
   algorithmNameDSIGN _ = "schnorr-secp256k1"
   {-# NOINLINE deriveVerKeyDSIGN #-}
   deriveVerKeyDSIGN (SignKeySchnorr256k1 fp) = 
@@ -164,17 +183,26 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   rawDeserialiseVerKeyDSIGN bs
     | BS.length bs == 64 = 
         let (bsFP, bsOff, _) = toForeignPtr bs in
-          pure . VerKeySchnorr256k1 . castForeignPtr . plusForeignPtr bsFP $ bsOff
+          pure . 
+          VerKeySchnorr256k1 . 
+          castForeignPtr . 
+          plusForeignPtr bsFP $ bsOff
     | otherwise = Nothing
   rawDeserialiseSignKeyDSIGN bs
     | BS.length bs == 32 = 
         let (bsFP, bsOff, _) = toForeignPtr bs in
-          pure . SignKeySchnorr256k1 . castForeignPtr . plusForeignPtr bsFP $ bsOff
+          pure . 
+          SignKeySchnorr256k1 . 
+          castForeignPtr . 
+          plusForeignPtr bsFP $ bsOff
     | otherwise = Nothing
   rawDeserialiseSigDSIGN bs
     | BS.length bs == 64 = 
         let (bsFP, bsOff, _) = toForeignPtr bs in
-          pure . SigSchnorr256k1 . castForeignPtr . plusForeignPtr bsFP $ bsOff
+          pure . 
+          SigSchnorr256k1 . 
+          castForeignPtr . 
+          plusForeignPtr bsFP $ bsOff
     | otherwise = Nothing
 
 instance Eq (VerKeyDSIGN SchnorrSecp256k1DSIGN) where

@@ -10,3 +10,4 @@ import Cardano.Crypto.DSIGN.Ed448 as X
 import Cardano.Crypto.DSIGN.Mock as X
 import Cardano.Crypto.DSIGN.NeverUsed as X
 import Cardano.Crypto.DSIGN.EcdsaSecp256k1 as X
+import Cardano.Crypto.DSIGN.SchnorrSecp256k1 as X

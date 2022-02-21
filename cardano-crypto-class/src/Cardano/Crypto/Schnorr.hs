@@ -3,7 +3,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Cardano.Crypto.Schnorr (
-  schnorrNonceFunction,
   SECP256k1Context,
   secpContextSignVerify,
   SECP256k1SchnorrExtraParams,
@@ -13,7 +12,6 @@ module Cardano.Crypto.Schnorr (
   secpContextDestroy,
   SECP256k1KeyPair,
   secpKeyPairCreate,
-  secpSchnorrSigSign,
   secpSchnorrSigSignCustom,
   SECP256k1XOnlyPubKey,
   secpKeyPairXOnlyPub,
@@ -23,18 +21,6 @@ module Cardano.Crypto.Schnorr (
 import Data.Bits ((.|.))
 import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CUChar, CSize (CSize), CInt (CInt))
-
-foreign import capi "secp256k1_schnorrsig.h secp256k1_nonce_function_bip340" 
-  schnorrNonceFunction :: 
-     Ptr CUChar -- out-param for nonce (32 bytes)
-  -> Ptr CUChar -- message being verified, only NULL when message length is 0
-  -> CSize -- message length
-  -> Ptr CUChar -- secret key (not NULL, 32 bytes)
-  -> Ptr CUChar -- serialized xonly pubkey corresponding to secret key (not NULL, 32 bytes)
-  -> Ptr CUChar -- description of algorithm (not NULL)
-  -> CSize -- length of algorithm description
-  -> Ptr CUChar -- arbitrary passthrough data
-  -> IO CInt -- 1 on success, 0 on error
 
 data SECP256k1Context
 
@@ -50,10 +36,10 @@ foreign import capi "secp256k1.h secp256k1_context_destroy"
      Ptr SECP256k1Context
   -> IO ()
 
-foreign import capi "secp256k1.h SECP256k1_CONTEXT_SIGN"
+foreign import capi "secp256k1.h value SECP256K1_CONTEXT_SIGN"
   secpContextSign :: CInt
 
-foreign import capi "secp256k1.h SECP256k1_CONTEXT_VERIFY"
+foreign import capi "secp256k1.h value SECP256K1_CONTEXT_VERIFY"
   secpContextVerify :: CInt
 
 secpContextSignVerify :: CInt
@@ -70,15 +56,6 @@ foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_create"
      Ptr SECP256k1Context -- context initialized for signing
   -> Ptr SECP256k1KeyPair -- out-param for keypair to initialize
   -> Ptr CUChar -- secret key (32 bytes)
-  -> IO CInt -- 1 on success, 0 on failure
-
-foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign"
-  secpSchnorrSigSign ::
-     Ptr SECP256k1Context -- context initialized for signing
-  -> Ptr SECP256k1SchnorrSig -- out-param for signature (64 bytes)
-  -> Ptr CUChar -- message hash to sign (32 bytes)
-  -> Ptr SECP256k1KeyPair -- initialized keypair
-  -> Ptr CUChar -- fresh randomness (32 bytes)
   -> IO CInt -- 1 on success, 0 on failure
 
 foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign_custom"
