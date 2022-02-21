@@ -5,27 +5,23 @@
 module Cardano.Crypto.Schnorr (
   schnorrNonceFunction,
   SECP256k1Context,
---  secpContextNoPrecomp,
+  secpContextSignVerify,
+  SECP256k1SchnorrExtraParams,
+  SECP256k1SecKey,
+  SECP256k1SchnorrSig,
   secpContextCreate,
   secpContextDestroy,
   SECP256k1KeyPair,
   secpKeyPairCreate,
   secpSchnorrSigSign,
+  secpSchnorrSigSignCustom,
   SECP256k1XOnlyPubKey,
+  secpKeyPairXOnlyPub,
   secpSchnorrSigVerify,
   ) where
 
-import Data.Primitive.Ptr (copyPtr)
-import Data.Word (Word8)
-import Data.Primitive.ByteArray (
-  ByteArray, 
-  newAlignedPinnedByteArray,
-  byteArrayContents,
-  mutableByteArrayContents,
-  unsafeFreezeByteArray,
-  )
-import Foreign.Storable (Storable (sizeOf, alignment, peek, poke))
-import Foreign.Ptr (Ptr, castPtr)
+import Data.Bits ((.|.))
+import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CUChar, CSize (CSize), CInt (CInt))
 
 foreign import capi "secp256k1_schnorrsig.h secp256k1_nonce_function_bip340" 
@@ -42,10 +38,7 @@ foreign import capi "secp256k1_schnorrsig.h secp256k1_nonce_function_bip340"
 
 data SECP256k1Context
 
-{-
-foreign import capi "secp256k1.h value secp256k1_context_no_precomp"
-  secpContextNoPrecomp :: Ptr SECP256k1Context
--}
+data SECP256k1SchnorrExtraParams
 
 foreign import capi "secp256k1.h secp256k1_context_create"
   secpContextCreate :: 
@@ -57,27 +50,20 @@ foreign import capi "secp256k1.h secp256k1_context_destroy"
      Ptr SECP256k1Context
   -> IO ()
 
-newtype SECP256k1KeyPair = SECP256k1KeyPair ByteArray
-  deriving (Eq, Ord) via ByteArray
-  deriving stock (Show)
+foreign import capi "secp256k1.h SECP256k1_CONTEXT_SIGN"
+  secpContextSign :: CInt
 
-instance Storable SECP256k1KeyPair where
-  {-# INLINEABLE sizeOf #-}
-  sizeOf _ = 96
-  {-# INLINEABLE alignment #-}
-  alignment _ = 96
-  {-# INLINEABLE peek #-}
-  peek p = do
-    let pBytes :: Ptr Word8 = castPtr p
-    mba <- newAlignedPinnedByteArray 96 96
-    let mbaPtr = mutableByteArrayContents mba
-    copyPtr mbaPtr pBytes 96
-    SECP256k1KeyPair <$> unsafeFreezeByteArray mba
-  {-# INLINEABLE poke #-}
-  poke p (SECP256k1KeyPair ba) = do
-    let pBytes :: Ptr Word8 = castPtr p
-    let baPtr = byteArrayContents ba
-    copyPtr pBytes baPtr 96
+foreign import capi "secp256k1.h SECP256k1_CONTEXT_VERIFY"
+  secpContextVerify :: CInt
+
+secpContextSignVerify :: CInt
+secpContextSignVerify = secpContextSign .|. secpContextVerify
+
+data SECP256k1SecKey
+
+data SECP256k1SchnorrSig
+
+data SECP256k1KeyPair
 
 foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_create"
   secpKeyPairCreate :: 
@@ -89,33 +75,31 @@ foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_create"
 foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign"
   secpSchnorrSigSign ::
      Ptr SECP256k1Context -- context initialized for signing
-  -> Ptr CUChar -- out-param for signature (64 bytes)
+  -> Ptr SECP256k1SchnorrSig -- out-param for signature (64 bytes)
   -> Ptr CUChar -- message hash to sign (32 bytes)
   -> Ptr SECP256k1KeyPair -- initialized keypair
   -> Ptr CUChar -- fresh randomness (32 bytes)
   -> IO CInt -- 1 on success, 0 on failure
 
-newtype SECP256k1XOnlyPubKey = SECP256k1XOnlyPubKey ByteArray
-  deriving (Eq, Ord) via ByteArray
-  deriving stock (Show)
+foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign_custom"
+  secpSchnorrSigSignCustom :: 
+     Ptr SECP256k1Context -- context initialized for signing
+  -> Ptr SECP256k1SchnorrSig -- out-param for signature (64 bytes)
+  -> Ptr CUChar -- message to sign
+  -> CSize -- message length in bytes
+  -> Ptr SECP256k1KeyPair -- initialized keypair
+  -> Ptr SECP256k1SchnorrExtraParams -- not used
+  -> IO CInt -- 1 on success, 0 on failure
 
-instance Storable SECP256k1XOnlyPubKey where
-  {-# INLINEABLE sizeOf #-}
-  sizeOf _ = 64
-  {-# INLINEABLE alignment #-}
-  alignment _ = 64
-  {-# INLINEABLE peek #-}
-  peek p = do
-    let pBytes :: Ptr Word8 = castPtr p
-    mba <- newAlignedPinnedByteArray 64 64
-    let mbaPtr = mutableByteArrayContents mba
-    copyPtr mbaPtr pBytes 64
-    SECP256k1XOnlyPubKey <$> unsafeFreezeByteArray mba
-  {-# INLINEABLE poke #-}
-  poke p (SECP256k1XOnlyPubKey ba) = do
-    let pBytes :: Ptr Word8 = castPtr p
-    let baPtr = byteArrayContents ba
-    copyPtr pBytes baPtr 64
+data SECP256k1XOnlyPubKey
+
+foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_xonly_pub"
+  secpKeyPairXOnlyPub :: 
+     Ptr SECP256k1Context -- an initialized context
+  -> Ptr SECP256k1XOnlyPubKey -- out-param for xonly pubkey
+  -> Ptr CInt -- parity (not used)
+  -> Ptr SECP256k1KeyPair -- keypair
+  -> IO CInt -- 1 on success, 0 on error
 
 foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
   secpSchnorrSigVerify :: 

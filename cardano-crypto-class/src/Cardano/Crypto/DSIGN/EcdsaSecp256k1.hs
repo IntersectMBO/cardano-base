@@ -8,7 +8,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-orphans #-} -- need NoThunks for secp256k1-haskell types
 
-module Cardano.Crypto.DSIGN.EcdsaSecp256k1 where
+module Cardano.Crypto.DSIGN.EcdsaSecp256k1 (
+  EcdsaSecp256k1DSIGN,
+  VerKeyDSIGN (..),
+  SignKeyDSIGN (..),
+  SigDSIGN (..)
+  ) where
 
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
 import Data.ByteString (ByteString)
