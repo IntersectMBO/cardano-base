@@ -20,7 +20,7 @@ where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Codec.Serialise (Serialise (..))
-import Control.DeepSeq (NFData)
+import Control.DeepSeq (NFData (rnf))
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Typeable (Typeable)
 import Data.Word (Word64)
@@ -68,6 +68,11 @@ instance Bounded t => Bounded (WithOrigin t) where
   minBound = Origin
   maxBound = At maxBound
 
+instance NFData a => NFData (WithOrigin a) where
+  rnf Origin = ()
+  rnf (At t) = rnf t
+
+
 at :: t -> WithOrigin t
 at = At
 
@@ -98,9 +103,9 @@ withOriginFromMaybe (Just t) = At t
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochNo
-  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON)
+  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochSize
-  deriving newtype (Enum, Num, Real, Integral, NoThunks, ToJSON, FromJSON)
+  deriving newtype (Enum, Num, Real, Integral, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
