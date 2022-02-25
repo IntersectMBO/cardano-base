@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -42,6 +43,7 @@ module Cardano.Crypto.DSIGN.Class
   )
 where
 
+import Control.DeepSeq (NFData)
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import Data.Kind (Type)
@@ -242,6 +244,8 @@ newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
 
 deriving instance DSIGNAlgorithm v => Show (SignedDSIGN v a)
 deriving instance DSIGNAlgorithm v => Eq   (SignedDSIGN v a)
+
+deriving instance NFData (SigDSIGN v) => NFData (SignedDSIGN v a)
 
 instance DSIGNAlgorithm v => NoThunks (SignedDSIGN v a)
   -- use generic instance
