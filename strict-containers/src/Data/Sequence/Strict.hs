@@ -64,6 +64,7 @@ where
 
 import Codec.Serialise (Serialise)
 import Control.Arrow ((***))
+import Control.DeepSeq (NFData)
 import Data.Foldable (foldl', toList)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -105,7 +106,7 @@ infixl 5 :|>
 -- value to WHNF.
 newtype StrictSeq a = StrictSeq {fromStrict :: Seq a}
   deriving stock (Eq, Ord, Show)
-  deriving newtype (Foldable, Monoid, Semigroup, Serialise)
+  deriving newtype (Foldable, Monoid, Semigroup, Serialise, NFData)
 
 instance Functor StrictSeq where
   fmap f (StrictSeq s) = StrictSeq . forceElemsToWHNF $ fmap f s
