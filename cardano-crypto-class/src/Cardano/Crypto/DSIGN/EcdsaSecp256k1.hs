@@ -23,7 +23,7 @@ import Data.Serialize (Serialize (get, put), runPut, runGet)
 import Data.Kind (Type)
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
-import qualified Crypto.Secp256k1 as SECP
+import qualified Crypto.Secp256k1 as ECDSA
 import NoThunks.Class (NoThunks)
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (VerKeyDSIGN, 
@@ -69,31 +69,31 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
   type SizeSigDSIGN EcdsaSecp256k1DSIGN = 64
   type SizeSignKeyDSIGN EcdsaSecp256k1DSIGN = 32
   type SizeVerKeyDSIGN EcdsaSecp256k1DSIGN = 64
-  type Signable EcdsaSecp256k1DSIGN = ((~) SECP.Msg)
+  type Signable EcdsaSecp256k1DSIGN = ((~) ECDSA.Msg)
   newtype VerKeyDSIGN EcdsaSecp256k1DSIGN = 
-    VerKeyEcdsaSecp256k1 SECP.PubKey
+    VerKeyEcdsaSecp256k1 ECDSA.PubKey
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
   newtype SignKeyDSIGN EcdsaSecp256k1DSIGN = 
-    SignKeyEcdsaSecp256k1 SECP.SecKey
+    SignKeyEcdsaSecp256k1 ECDSA.SecKey
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
   newtype SigDSIGN EcdsaSecp256k1DSIGN = 
-    SigEcdsaSecp256k1 SECP.Sig
+    SigEcdsaSecp256k1 ECDSA.Sig
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
   algorithmNameDSIGN _ = "ecdsa-secp256k1"
   deriveVerKeyDSIGN (SignKeyEcdsaSecp256k1 sk) = 
-    VerKeyEcdsaSecp256k1 . SECP.derivePubKey $ sk
+    VerKeyEcdsaSecp256k1 . ECDSA.derivePubKey $ sk
   signDSIGN () msg (SignKeyEcdsaSecp256k1 k) = 
-    SigEcdsaSecp256k1 . SECP.signMsg k $ msg
+    SigEcdsaSecp256k1 . ECDSA.signMsg k $ msg
   verifyDSIGN () (VerKeyEcdsaSecp256k1 pk) msg (SigEcdsaSecp256k1 sig) = 
-    if SECP.verifySig pk sig msg
+    if ECDSA.verifySig pk sig msg
     then pure ()
     else Left "ECDSA-SECP256k1 signature not verified"
   genKeyDSIGN seed = runMonadRandomWithSeed seed $ do
     bs <- getRandomBytes 32
-    case SECP.secKey bs of 
+    case ECDSA.secKey bs of 
       Nothing -> error "Failed to construct a ECDSA-SECP256k1 secret key unexpectedly"
       Just sk -> pure . SignKeyEcdsaSecp256k1 $ sk
   rawSerialiseSigDSIGN (SigEcdsaSecp256k1 sig) = putting sig
@@ -129,11 +129,11 @@ instance FromCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
 
 -- Required orphans
 
-instance NoThunks SECP.PubKey
+instance NoThunks ECDSA.PubKey
 
-instance NoThunks SECP.SecKey
+instance NoThunks ECDSA.SecKey
 
-instance NoThunks SECP.Sig
+instance NoThunks ECDSA.Sig
 
 -- Helpers
 

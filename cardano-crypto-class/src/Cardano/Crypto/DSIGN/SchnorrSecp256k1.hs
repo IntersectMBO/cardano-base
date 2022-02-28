@@ -98,23 +98,23 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   type SizeVerKeyDSIGN SchnorrSecp256k1DSIGN = 64
   type Signable SchnorrSecp256k1DSIGN = SignableRepresentation
   newtype VerKeyDSIGN SchnorrSecp256k1DSIGN =
-    VerKeySchnorr256k1 (PinnedSizedBytes (SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
+    VerKeySchnorrSecp256k1 (PinnedSizedBytes (SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
   newtype SignKeyDSIGN SchnorrSecp256k1DSIGN =
-    SignKeySchnorr256k1 (PinnedSizedBytes (SizeSignKeyDSIGN SchnorrSecp256k1DSIGN))
+    SignKeySchnorrSecp256k1 (PinnedSizedBytes (SizeSignKeyDSIGN SchnorrSecp256k1DSIGN))
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
   newtype SigDSIGN SchnorrSecp256k1DSIGN =
-    SigSchnorr256k1 (PinnedSizedBytes (SizeSigDSIGN SchnorrSecp256k1DSIGN))
+    SigSchnorrSecp256k1 (PinnedSizedBytes (SizeSigDSIGN SchnorrSecp256k1DSIGN))
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
   algorithmNameDSIGN _ = "schnorr-secp256k1"
   {-# NOINLINE deriveVerKeyDSIGN #-}
-  deriveVerKeyDSIGN (SignKeySchnorr256k1 psb) = 
+  deriveVerKeyDSIGN (SignKeySchnorrSecp256k1 psb) = 
     unsafeDupablePerformIO . psbUseAsCPtr psb $ \skp -> do
       let skp' :: Ptr CUChar = castPtr skp
       allocaBytes 96 $ \kpp -> do
@@ -124,9 +124,9 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
                       res' <- secpKeyPairXOnlyPub ctxPtr (castPtr xonlyp) nullPtr kpp
                       when (res' /= 1) 
                            (error "deriveVerKeyDsIGN: could not extract xonly pubkey")
-        pure . VerKeySchnorr256k1 $ xonlyPSB
+        pure . VerKeySchnorrSecp256k1 $ xonlyPSB
   {-# NOINLINE signDSIGN #-}
-  signDSIGN () msg (SignKeySchnorr256k1 skpsb) = 
+  signDSIGN () msg (SignKeySchnorrSecp256k1 skpsb) = 
     unsafeDupablePerformIO . psbUseAsCPtr skpsb $ \skp -> do
       let bs = getSignableRepresentation msg
       let skp' :: Ptr CUChar = castPtr skp
@@ -141,9 +141,9 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
                                            kpp
                                            nullPtr
           when (res' /= 1) (error "signDSIGN: Failed to sign message")
-        pure . SigSchnorr256k1 $ sigPSB
+        pure . SigSchnorrSecp256k1 $ sigPSB
   {-# NOINLINE verifyDSIGN #-}
-  verifyDSIGN () (VerKeySchnorr256k1 pubkeyPSB) msg (SigSchnorr256k1 sigPSB) =
+  verifyDSIGN () (VerKeySchnorrSecp256k1 pubkeyPSB) msg (SigSchnorrSecp256k1 sigPSB) =
     unsafeDupablePerformIO . psbUseAsCPtr pubkeyPSB $ \pkp -> 
       psbUseAsCPtr sigPSB $ \sigp -> do
         let bs = getSignableRepresentation msg
@@ -163,16 +163,16 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
     unsafeDupablePerformIO . useAsCStringLen bs $ \(bsp, _) -> do
       psb <- psbCreate $ \skp -> copyPtr skp (castPtr bsp)
                                              (fromIntegral . natVal $ Proxy @(SizeSignKeyDSIGN SchnorrSecp256k1DSIGN))
-      pure . pure . SignKeySchnorr256k1 $ psb
-  rawSerialiseSigDSIGN (SigSchnorr256k1 sigPSB) = psbToByteString sigPSB
-  rawSerialiseVerKeyDSIGN (VerKeySchnorr256k1 vkPSB) = psbToByteString vkPSB
-  rawSerialiseSignKeyDSIGN (SignKeySchnorr256k1 skPSB) = psbToByteString skPSB
+      pure . pure . SignKeySchnorrSecp256k1 $ psb
+  rawSerialiseSigDSIGN (SigSchnorrSecp256k1 sigPSB) = psbToByteString sigPSB
+  rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) = psbToByteString vkPSB
+  rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
   rawDeserialiseVerKeyDSIGN bs = 
-    VerKeySchnorr256k1 <$> psbFromByteStringCheck bs
+    VerKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
   rawDeserialiseSignKeyDSIGN bs = 
-    SignKeySchnorr256k1 <$> psbFromByteStringCheck bs
+    SignKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
   rawDeserialiseSigDSIGN bs = 
-    SigSchnorr256k1 <$> psbFromByteStringCheck bs
+    SigSchnorrSecp256k1 <$> psbFromByteStringCheck bs
 
 instance ToCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
   toCBOR = encodeVerKeyDSIGN
