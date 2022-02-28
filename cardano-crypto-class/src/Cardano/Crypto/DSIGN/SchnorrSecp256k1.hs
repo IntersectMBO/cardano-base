@@ -25,13 +25,12 @@ module Cardano.Crypto.DSIGN.SchnorrSecp256k1 (
   SigDSIGN
   ) where
 
+import Data.ByteString (useAsCStringLen)
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.Primitive.Ptr (copyPtr)
 import Crypto.Random (getRandomBytes)
 import Cardano.Crypto.Seed (runMonadRandomWithSeed)
-import Data.ByteString.Internal (toForeignPtr)
-import Foreign.ForeignPtr (withForeignPtr, plusForeignPtr)
 import Control.Monad (when)
 import System.IO.Unsafe (unsafeDupablePerformIO, unsafePerformIO)
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
@@ -131,43 +130,35 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
       allocaBytes 96 $ \kpp -> do
         res <- secpKeyPairCreate ctxPtr kpp skp'
         when (res /= 1) (error "signDSIGN: Failed to create keypair")
-        let (msgFP, msgOff, msgLen) = toForeignPtr bs
-        sigPSB <- psbCreate $ \sigp -> 
-                    withForeignPtr (plusForeignPtr msgFP msgOff) $ \msgp -> do
-                      res' <- secpSchnorrSigSignCustom ctxPtr
-                                                       (castPtr sigp)
-                                                       (castPtr msgp)
-                                                       (fromIntegral msgLen)
-                                                       kpp
-                                                       nullPtr
-                      when (res' /= 1)
-                           (error "signDSIGN: Failed to sign message")
+        sigPSB <- psbCreate $ \sigp -> useAsCStringLen bs $ \(msgp, msgLen) -> do
+          res' <- secpSchnorrSigSignCustom ctxPtr
+                                           (castPtr sigp)
+                                           (castPtr msgp)
+                                           (fromIntegral msgLen)
+                                           kpp
+                                           nullPtr
+          when (res' /= 1) (error "signDSIGN: Failed to sign message")
         pure . SigSchnorr256k1 $ sigPSB
   {-# NOINLINE verifyDSIGN #-}
   verifyDSIGN () (VerKeySchnorr256k1 pubkeyPSB) msg (SigSchnorr256k1 sigPSB) =
     unsafeDupablePerformIO . psbUseAsCPtr pubkeyPSB $ \pkp -> 
       psbUseAsCPtr sigPSB $ \sigp -> do
         let bs = getSignableRepresentation msg
-        let (msgFP, msgOff, msgLen) = toForeignPtr bs
         let sigp' :: Ptr CUChar = castPtr sigp
-        res <- withForeignPtr (plusForeignPtr msgFP msgOff) $ \msgp -> 
-          pure $
-          secpSchnorrSigVerify ctxPtr
-                               sigp'
-                               (castPtr msgp)
-                               (fromIntegral msgLen) 
-                               (castPtr pkp)
+        res <- useAsCStringLen bs $ \(msgp, msgLen) -> do
+          pure $ secpSchnorrSigVerify ctxPtr 
+                                      sigp' 
+                                      (castPtr msgp) 
+                                      (fromIntegral msgLen)
+                                      (castPtr pkp)
         pure $ if res == 0
           then Left "Schnorr signature failed to verify."
           else pure ()
   {-# NOINLINE genKeyDSIGN #-}
   genKeyDSIGN seed = runMonadRandomWithSeed seed $ do
     bs <- getRandomBytes 32
-    unsafeDupablePerformIO $ do
-      let (bsFP, bsOff, _) = toForeignPtr bs
-      psb <- withForeignPtr (plusForeignPtr bsFP bsOff) $ \bsp -> do
-        psbCreate $ \skp -> do
-          copyPtr skp bsp 32 
+    unsafeDupablePerformIO . useAsCStringLen bs $ \(bsp, _) -> do
+      psb <- psbCreate $ \skp -> copyPtr skp (castPtr bsp) 32
       pure . pure . SignKeySchnorr256k1 $ psb
   rawSerialiseSigDSIGN (SigSchnorr256k1 sigPSB) = psbToByteString sigPSB
   rawSerialiseVerKeyDSIGN (VerKeySchnorr256k1 vkPSB) = psbToByteString vkPSB
