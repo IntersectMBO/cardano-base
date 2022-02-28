@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TypeApplications #-}
 -- According to the documentation for unsafePerformIO:
 -- 
 -- > Make sure that the either you switch off let-floating 
@@ -25,6 +26,8 @@ module Cardano.Crypto.DSIGN.SchnorrSecp256k1 (
   SigDSIGN
   ) where
 
+import GHC.TypeNats (natVal)
+import Data.Proxy (Proxy (Proxy))
 import Data.ByteString (useAsCStringLen)
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
@@ -158,7 +161,8 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   genKeyDSIGN seed = runMonadRandomWithSeed seed $ do
     bs <- getRandomBytes 32
     unsafeDupablePerformIO . useAsCStringLen bs $ \(bsp, _) -> do
-      psb <- psbCreate $ \skp -> copyPtr skp (castPtr bsp) 32
+      psb <- psbCreate $ \skp -> copyPtr skp (castPtr bsp)
+                                             (fromIntegral . natVal $ Proxy @(SizeSignKeyDSIGN SchnorrSecp256k1DSIGN))
       pure . pure . SignKeySchnorr256k1 $ psb
   rawSerialiseSigDSIGN (SigSchnorr256k1 sigPSB) = psbToByteString sigPSB
   rawSerialiseVerKeyDSIGN (VerKeySchnorr256k1 vkPSB) = psbToByteString vkPSB
