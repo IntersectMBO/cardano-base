@@ -6,6 +6,7 @@ import qualified Test.Crypto.KES
 import qualified Test.Crypto.VRF
 import qualified Test.Crypto.Regressions
 import qualified Test.Crypto.Vector.Secp256k1DSIGN
+import qualified Test.Crypto.EllipticCurve
 import Test.Tasty (TestTree, adjustOption, testGroup, defaultMain)
 import Test.Tasty.QuickCheck (QuickCheckTests (QuickCheckTests))
 import Cardano.Crypto.Libsodium (sodiumInit)
@@ -26,5 +27,9 @@ tests =
       , Test.Crypto.KES.tests
       , Test.Crypto.VRF.tests
       , Test.Crypto.Regressions.tests
+<<<<<<< HEAD
       , Test.Crypto.Vector.Secp256k1DSIGN.tests
+=======
+      , Test.Crypto.EllipticCurve.tests
+>>>>>>> 8c57190 (BLS12-381 bindings)
       ]
