@@ -33,20 +33,20 @@ import Control.DeepSeq (NFData)
 import Data.Primitive.Ptr (copyPtr)
 import Cardano.Crypto.Seed (runMonadRandomWithSeed, getBytesFromSeedT)
 import Cardano.Crypto.SECP256K1.Constants
+import Cardano.Crypto.SECP256K1.C (
+  secpKeyPairCreate,
+  SECP256k1Context,
+  secpKeyPairXOnlyPub,
+  secpSchnorrSigVerify,
+  secpContextSignVerify,
+  secpSchnorrSigSignCustom,
+  secpContextCreate
+  )
 import Cardano.Foreign
 import Control.Monad (when)
 import System.IO.Unsafe (unsafeDupablePerformIO, unsafePerformIO)
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
-import Cardano.Crypto.Schnorr (
-  secpKeyPairCreate, 
-  SECP256k1Context, 
-  secpKeyPairXOnlyPub,
-  secpSchnorrSigVerify, 
-  secpContextSignVerify,
-  secpSchnorrSigSignCustom, 
-  secpContextCreate
-  )
 import NoThunks.Class (NoThunks)
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (VerKeyDSIGN,

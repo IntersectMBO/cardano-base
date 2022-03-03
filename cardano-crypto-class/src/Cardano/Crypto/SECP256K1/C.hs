@@ -2,7 +2,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Cardano.Crypto.Schnorr (
+module Cardano.Crypto.SECP256K1.C (
   SECP256k1Context,
   secpContextSignVerify,
   SECP256k1SchnorrExtraParams,
