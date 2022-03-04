@@ -38,6 +38,8 @@ let
           "hpc"
           "mtl" "parsec" "text" "transformers"
           "xhtml"
+          # Needed for ghc (which is used by hspec-core)
+          "directory" "time" "unix" "process" "terminfo"
           # "stm" "terminfo"
         ];
       }
