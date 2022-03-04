@@ -25,7 +25,7 @@ jobs:
 
     - name: Install libsodium (MacOS)
       if: matrix.os == 'macos-latest'
-      run: brew install libsodium
+      run: brew install libsodium libsecp256k1
 
     - name: Install libsodium (Linux)
       if: matrix.os == 'ubuntu-latest'
