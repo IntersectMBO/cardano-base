@@ -7,7 +7,7 @@
 , buildPackages
 , config ? {}
 # GHC attribute name
-, compiler ? config.haskellNix.compiler or "ghc8105"
+, compiler ? config.haskellNix.compiler or "ghc8107"
 # Enable profiling
 , profiling ? config.haskellNix.profiling or false
 }:
