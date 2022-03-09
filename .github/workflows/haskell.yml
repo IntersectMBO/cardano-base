@@ -16,6 +16,10 @@ jobs:
         ghc: ["8.10.7"]
         os: [ubuntu-latest, macos-latest, windows-latest]
 
+    env:
+      # current ref from: 27.02.2022
+      SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
+
     steps:
     - uses: actions/checkout@v1
 
@@ -25,15 +29,47 @@ jobs:
 
     - name: Install libsodium (MacOS)
       if: matrix.os == 'macos-latest'
-      run: brew install libsodium libsecp256k1
+      run: brew install libsodium
+
+    - name: Install secp256k1 (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install autoconf automake libtool
+        mkdir secp256k1-sources
+        cd secp256k1-sources
+        git clone https://github.com/bitcoin-core/secp256k1.git
+        cd secp256k1
+        git reset --hard $SECP256K1_REF
+        ./autogen.sh
+        ./configure --enable-module-schnorrsig --enable-experimental
+        make
+        make check
+        sudo make install
+        cd ../..
 
     - name: Install libsodium (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get -y install libsodium23 libsodium-dev libsecp256k1-dev
+        sudo apt-get -y install libsodium23 libsodium-dev
         sudo apt-get -y remove --purge software-properties-common
         sudo apt-get -y autoremove
+
+    - name: Install secp256k1 (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get -y install autoconf automake libtool
+        mkdir secp256k1-sources
+        cd secp256k1-sources
+        git clone https://github.com/bitcoin-core/secp256k1.git
+        cd secp256k1
+        git reset --hard $SECP256K1_REF
+        ./autogen.sh
+        ./configure --prefix=/usr --enable-module-schnorrsig --enable-experimental
+        make
+        make check
+        sudo make install
+        cd ../..
 
     - name: Install libsodium (Windows)
       if: matrix.os == 'windows-latest'
@@ -55,6 +91,16 @@ jobs:
         export LIBSODIUM_PATH="$(readlink -f libsodium-win64/bin | sed 's|^/d|D:|g' | tr / '\\')"
         echo "LIBSODIUM_PATH=$LIBSODIUM_PATH"
         echo "$LIBSODIUM_PATH" >> $GITHUB_PATH
+
+    - name: Install secp256k1 (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        mkdir secp256k1-sources
+        cd secp256k1-sources
+        git clone https://github.com/bitcoin-core/secp256k1.git
+        cd secp256k1
+        git reset --hard $SECP256K1_REF
+        echo "FIXME: install from sources"
 
     - uses: haskell/actions/setup@v1
       id: setup-haskell
