@@ -77,6 +77,8 @@ library
     Cardano.Crypto.Libsodium.MLockedBytes.Internal
     Cardano.Crypto.Libsodium.UnsafeC
     Cardano.Crypto.PinnedSizedBytes
+    Cardano.Crypto.SECP256K1.Constants
+    Cardano.Crypto.SECP256K1.C
     Cardano.Crypto.Seed
     Cardano.Crypto.Util
     Cardano.Crypto.VRF
@@ -88,7 +90,6 @@ library
 
   other-modules:
     Cardano.Crypto.PackedBytes
-    Cardano.Crypto.Schnorr
 
   build-depends:
     , aeson
