@@ -31,7 +31,7 @@ import Data.ByteString (useAsCStringLen)
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.Primitive.Ptr (copyPtr)
-import Cardano.Crypto.Seed (runMonadRandomWithSeed, getBytesFromSeedT)
+import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.SECP256K1.Constants
 import Cardano.Crypto.SECP256K1.C (
   secpKeyPairCreate,
@@ -76,7 +76,8 @@ import Cardano.Crypto.DSIGN.Class (
   decodeSignKeyDSIGN,
   encodeSigDSIGN,
   encodedSigDSIGNSizeExpr,
-  decodeSigDSIGN, seedSizeDSIGN
+  decodeSigDSIGN,
+  seedSizeDSIGN
   )
 import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
 import Cardano.Crypto.PinnedSizedBytes (
@@ -154,11 +155,12 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
           then Left "Schnorr signature failed to verify."
           else pure ()
   {-# NOINLINE genKeyDSIGN #-}
-  genKeyDSIGN seed = runMonadRandomWithSeed seed $ do
+  genKeyDSIGN seed = SignKeySchnorrSecp256k1 $
     let (bs, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @SchnorrSecp256k1DSIGN)) seed
-    unsafeDupablePerformIO . useAsCStringLen bs $ \(bsp, sz) -> do
-      psb <- psbCreate $ \skp -> copyPtr skp (castPtr bsp) sz
-      pure . pure . SignKeySchnorrSecp256k1 $ psb
+    in unsafeDupablePerformIO $
+         psbCreate $ \skp ->
+           useAsCStringLen bs $ \(bsp, sz) ->
+             copyPtr skp (castPtr bsp) sz
   rawSerialiseSigDSIGN (SigSchnorrSecp256k1 sigPSB) = psbToByteString sigPSB
   rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) = psbToByteString vkPSB
   rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
