@@ -9,8 +9,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 (
   -- * Unsafe Types
     ScalarPtr
-  , FrPtr
-  , FPPtr
   , PPtr
   , AffinePtr
 
@@ -38,14 +36,15 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , Affine1
   , Affine2
   , BLSTError (..)
-  , FP
-  , Fr
   , P
   , P1
   , P2
   , Scalar
 
   , unsafePFromPPtr
+
+  -- * The period of scalars
+  , scalarPeriod
 
   -- * Curve abstraction
 
@@ -66,11 +65,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
       , c_blst_from_affine
       , c_blst_affine_in_g
       , c_blst_generator
-      , c_blst_x_from_p
-      , c_blst_y_from_p
-      , c_blst_z_from_p
-      , c_blst_x_from_affine
-      , c_blst_y_from_affine
       , c_blst_p_is_equal
       , c_blst_p_is_inf
       )
@@ -116,16 +110,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , withNewScalar_
   , withNewScalar'
   , cloneScalar
-  , scalarToNat
-  , scalarFromNat
-
-  , sizeFP
-  , withFP
-  , withNewFP
-  , withNewFP_
-  , withNewFP'
-  , cloneFP
-  , fpToNat
 
   , sizeFr
   , withFr
@@ -135,9 +119,9 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , cloneFr
 
   -- * Utility
-  , natAsCStr
-  , cstrToNat
-  , natToBS
+  , integerAsCStr
+  , cstrToInteger
+  , integerToBS
 
   -- * P1/G1 operations
   , onCurve
@@ -153,9 +137,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , generator
   , isInf
 
-  , toXYZ
-  , toXY
-
   , toAffine
   , fromAffine
   , affineInG
@@ -166,8 +147,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , frFromCanonicalScalar
   , scalarFromBS
   , scalarToBS
-  , scalarFromNatural
-  , scalarToNatural
+  , scalarFromInteger
+  , scalarToInteger
   , scalarCanonical
 
   , frAdd
@@ -175,8 +156,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , frNeg
   , frInverse
   , frSqr
-  , frFromNatural
-  , frToNatural
+  , frFromInteger
+  , frToInteger
 
   -- * Pairings
   , pairingCheck
@@ -194,7 +175,6 @@ import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, nullPtr, castPtr, plusPtr)
 import Foreign.Storable (peek)
-import Numeric.Natural
 import qualified Data.ByteString as BS
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -334,12 +314,6 @@ class BLS_Curve curve where
   c_blst_affine_in_g :: AffinePtr curve -> IO Bool
   c_blst_generator :: PPtr curve
 
-  c_blst_x_from_p :: FPPtr -> PPtr curve -> IO ()
-  c_blst_y_from_p :: FPPtr -> PPtr curve -> IO ()
-  c_blst_z_from_p :: FPPtr -> PPtr curve -> IO ()
-
-  c_blst_x_from_affine :: FPPtr -> AffinePtr curve -> IO ()
-  c_blst_y_from_affine :: FPPtr -> AffinePtr curve -> IO ()
   c_blst_p_is_equal :: PPtr curve -> PPtr curve -> IO Bool
   c_blst_p_is_inf :: PPtr curve -> IO Bool
 
@@ -363,12 +337,6 @@ instance BLS_Curve Curve1 where
 
   c_blst_generator = c_blst_p1_generator
 
-  c_blst_x_from_p = c_blst_x_from_p1
-  c_blst_y_from_p = c_blst_y_from_p1
-  c_blst_z_from_p = c_blst_z_from_p1
-
-  c_blst_x_from_affine = c_blst_x_from_affine1
-  c_blst_y_from_affine = c_blst_y_from_affine1
   c_blst_p_is_equal = c_blst_p1_is_equal
   c_blst_p_is_inf = c_blst_p1_is_inf
 
@@ -392,13 +360,6 @@ instance BLS_Curve Curve2 where
 
   c_blst_generator = c_blst_p2_generator
 
-  c_blst_x_from_p = c_blst_x_from_p2
-  c_blst_y_from_p = c_blst_y_from_p2
-  c_blst_z_from_p = c_blst_z_from_p2
-
-  c_blst_x_from_affine = c_blst_x_from_affine2
-  c_blst_y_from_affine = c_blst_y_from_affine2
-
   c_blst_p_is_equal = c_blst_p2_is_equal
   c_blst_p_is_inf = c_blst_p2_is_inf
 
@@ -408,6 +369,11 @@ sizeScalar :: forall i. Num i => i
 sizeScalar = fromIntegral c_size_blst_scalar
 
 newtype Scalar = Scalar (ForeignPtr Void)
+
+withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
+withIntScalar i go = do
+  s <- scalarFromInteger i
+  withScalar s go
 
 withScalar :: Scalar -> (ScalarPtr -> IO a) -> IO a
 withScalar (Scalar p2) go = do
@@ -462,66 +428,32 @@ cloneFr (Fr a) = do
       copyBytes bp ap sizeFr
   return (Fr b)
 
----- Safe FP types / marshalling
-
-sizeFP :: forall i. Num i => i
-sizeFP = fromIntegral c_size_blst_scalar
-
-newtype FP = FP (ForeignPtr Void)
-
-withFP :: FP -> (FPPtr -> IO a) -> IO a
-withFP (FP p2) go = do
-  withForeignPtr p2 (go . FPPtr)
-
-withNewFP :: (FPPtr -> IO a) -> IO (a, FP)
-withNewFP go = do
-  p2 <- mallocForeignPtrBytes sizeFP
-  x <- withForeignPtr p2 (go . FPPtr)
-  return (x, FP p2)
-
-withNewFP_ :: (FPPtr -> IO a) -> IO a
-withNewFP_ = fmap fst . withNewFP
-
-withNewFP' :: (FPPtr -> IO a) -> IO FP
-withNewFP' = fmap snd . withNewFP
-
-cloneFP :: FP -> IO FP
-cloneFP (FP a) = do
-  b <- mallocForeignPtrBytes sizeFP
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap sizeFP
-  return (FP b)
-
-fpToNat :: FP -> IO Natural
-fpToNat fp = withFP fp $ \fpPtr -> do
-  allocaBytes 48 $ \rawPtr -> do
-    c_blst_bendian_from_fp rawPtr fpPtr
-    cstrToNat rawPtr 48
-
-scalarToNat :: Scalar -> IO Natural
-scalarToNat scalar = withScalar scalar $ \scalarPtr -> do
+scalarToInteger :: Scalar -> IO Integer
+scalarToInteger scalar = withScalar scalar $ \scalarPtr -> do
   allocaBytes sizeScalar $ \rawPtr -> do
     c_blst_bendian_from_scalar rawPtr scalarPtr
-    cstrToNat rawPtr sizeScalar
+    cstrToInteger rawPtr sizeScalar
 
-cstrToNat :: Ptr CChar -> Int -> IO Natural
-cstrToNat p l = do
+cstrToInteger :: Ptr CChar -> Int -> IO Integer
+cstrToInteger p l = do
   go l (castPtr p)
   where
-    go :: Int -> Ptr CUChar -> IO Natural
+    go :: Int -> Ptr CUChar -> IO Integer
     go 0 _ = return 0
     go n ptr = do
       val <- peek ptr
       res <- go (pred n) (plusPtr ptr 1)
       return $ shiftL res 8 .|. fromIntegral val
 
-natToBS :: Natural -> ByteString
-natToBS 0 = BS.empty
-natToBS n =
-  BS.snoc
-    (natToBS (n `shiftR` 8))
-    (fromIntegral n)
+integerToBS :: Integer -> ByteString
+integerToBS 0 = BS.empty
+integerToBS n
+  | n < 0
+  = error "Cannot convert negative Integer to ByteString"
+  | otherwise
+  = BS.snoc
+      (integerToBS (n `shiftR` 8))
+      (fromIntegral n)
 
 padBS :: Int -> ByteString -> ByteString
 padBS i b
@@ -530,27 +462,32 @@ padBS i b
   | otherwise
   = b
 
-natAsCStr :: Natural -> (Ptr CChar -> Int -> IO a) -> IO a
-natAsCStr n f = do
-  let bs = natToBS n
+integerAsCStr :: Integer -> (Ptr CChar -> Int -> IO a) -> IO a
+integerAsCStr n f = do
+  let bs = integerToBS n
   BS.useAsCStringLen bs $ uncurry f
 
-natAsCStrL :: Int -> Natural -> (Ptr CChar -> Int -> IO a) -> IO a
-natAsCStrL i n f = do
-  let bs = padBS i $ natToBS n
+integerAsCStrL :: Int -> Integer -> (Ptr CChar -> Int -> IO a) -> IO a
+integerAsCStrL i n f = do
+  let bs = padBS i $ integerToBS n
   BS.useAsCStringLen bs $ uncurry f
 
-scalarFromNat :: Natural -> IO Scalar
-scalarFromNat n = do
+scalarFromInteger :: Integer -> IO Scalar
+scalarFromInteger n = do
   withNewScalar' $ \scalarPtr -> do
-    natAsCStrL 32 n $ \str _length -> do
+    integerAsCStrL sizeScalar (n `mod` scalarPeriod) $ \str _length -> do
       c_blst_scalar_from_bendian scalarPtr str
+
+frFromInteger :: Integer -> IO Fr
+frFromInteger i = scalarFromInteger i >>= frFromScalar
+
+frToInteger :: Fr -> IO Integer
+frToInteger fr = scalarFromFr fr >>= scalarToInteger
 
 ---- Unsafe types
 
 newtype ScalarPtr = ScalarPtr (Ptr Void)
 newtype FrPtr = FrPtr (Ptr Void)
-newtype FPPtr = FPPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
 
@@ -588,13 +525,6 @@ foreign import ccall "blst_p1_in_g1" c_blst_p1_in_g1 :: P1Ptr -> IO Bool
 
 foreign import ccall "blst_p1_generator" c_blst_p1_generator :: P1Ptr
 
-foreign import ccall "blst_x_from_p1" c_blst_x_from_p1 :: FPPtr -> P1Ptr -> IO ()
-foreign import ccall "blst_y_from_p1" c_blst_y_from_p1 :: FPPtr -> P1Ptr -> IO ()
-foreign import ccall "blst_z_from_p1" c_blst_z_from_p1 :: FPPtr -> P1Ptr -> IO ()
-
-foreign import ccall "blst_x_from_affine1" c_blst_x_from_affine1 :: FPPtr -> Affine1Ptr -> IO ()
-foreign import ccall "blst_y_from_affine1" c_blst_y_from_affine1 :: FPPtr -> Affine1Ptr -> IO ()
-
 foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: P1Ptr -> P1Ptr -> IO Bool
 foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: P1Ptr -> IO Bool
 
@@ -616,13 +546,6 @@ foreign import ccall "blst_p2_deserialize" c_blst_p2_deserialize :: Affine2Ptr -
 foreign import ccall "blst_p2_in_g2" c_blst_p2_in_g2 :: P2Ptr -> IO Bool
 
 foreign import ccall "blst_p2_generator" c_blst_p2_generator :: P2Ptr
-
-foreign import ccall "blst_x_from_p2" c_blst_x_from_p2 :: FPPtr -> P2Ptr -> IO ()
-foreign import ccall "blst_y_from_p2" c_blst_y_from_p2 :: FPPtr -> P2Ptr -> IO ()
-foreign import ccall "blst_z_from_p2" c_blst_z_from_p2 :: FPPtr -> P2Ptr -> IO ()
-
-foreign import ccall "blst_x_from_affine2" c_blst_x_from_affine2 :: FPPtr -> Affine2Ptr -> IO ()
-foreign import ccall "blst_y_from_affine2" c_blst_y_from_affine2 :: FPPtr -> Affine2Ptr -> IO ()
 
 foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: P2Ptr -> P2Ptr -> IO Bool
 foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: P2Ptr -> IO Bool
@@ -659,7 +582,6 @@ foreign import ccall "blst_error_bad_scalar" c_blst_error_bad_scalar :: CInt
 ---- Utility functions
 
 foreign import ccall "memcmp" c_memcmp :: Ptr a -> Ptr a -> CSize -> IO CSize
-foreign import ccall "blst_bendian_from_fp" c_blst_bendian_from_fp :: Ptr CChar -> FPPtr -> IO ()
 foreign import ccall "blst_bendian_from_scalar" c_blst_bendian_from_scalar :: Ptr CChar -> ScalarPtr -> IO ()
 
 data BLSTError
@@ -713,7 +635,8 @@ instance Eq Scalar where
   a == b = scalarToBS a == scalarToBS b
 
 instance Eq Fr where
-  a == b = scalarFromFr a == scalarFromFr b
+  a == b = unsafePerformIO $
+    (==) <$> scalarFromFr a <*> scalarFromFr b
 
 onCurve :: BLS_Curve curve => P curve -> Bool
 onCurve p = unsafePerformIO $ withP p c_blst_on_curve
@@ -725,11 +648,11 @@ add in1 in2 = unsafePerformIO $ do
       withP in2 $ \in2p -> do
         c_blst_add outp in1p in2p
 
-mult :: (BLS_P curve, BLS_Curve curve) => P curve -> Scalar -> P curve
+mult :: (BLS_P curve, BLS_Curve curve) => P curve -> Integer -> P curve
 mult in1 inS = unsafePerformIO $ do
   withNewP' $ \outp -> do
     withP in1 $ \in1p -> do
-      withScalar inS $ \inSp -> do
+      withIntScalar inS $ \inSp -> do
         -- Multiply by 8, because blst_mult takes number of *bits*, but
         -- sizeScalar is in *bytes*
         c_blst_mult outp in1p inSp (sizeScalar * 8)
@@ -807,39 +730,6 @@ fromAffine affine = unsafePerformIO $
 isInf :: (BLS_Curve curve) => P curve -> Bool
 isInf p = unsafePerformIO $ withP p c_blst_p_is_inf
 
-getX :: (BLS_Curve curve) => P curve -> Natural
-getX p = unsafePerformIO $ fpToNat =<< do
-  withNewFP' $ \fPtr -> do
-    withP p $ \pPtr -> do
-      c_blst_x_from_p fPtr pPtr
-getY :: (BLS_Curve curve) => P curve -> Natural
-getY p = unsafePerformIO $ fpToNat =<< do
-  withNewFP' $ \fPtr -> do
-    withP p $ \pPtr -> do
-      c_blst_y_from_p fPtr pPtr
-getZ :: (BLS_Curve curve) => P curve -> Natural
-getZ p = unsafePerformIO $ fpToNat =<< do
-  withNewFP' $ \fPtr -> do
-    withP p $ \pPtr -> do
-      c_blst_z_from_p fPtr pPtr
-
-getAX :: (BLS_Curve curve) => Affine curve -> Natural
-getAX aff = unsafePerformIO $ fpToNat =<< do
-  withNewFP' $ \fPtr -> do
-    withAffine aff $ \affPtr -> do
-      c_blst_x_from_affine fPtr affPtr
-getAY :: (BLS_Curve curve) => Affine curve -> Natural
-getAY aff = unsafePerformIO $ fpToNat =<< do
-  withNewFP' $ \fPtr -> do
-    withAffine aff $ \affPtr -> do
-      c_blst_y_from_affine fPtr affPtr
-
-toXYZ :: (BLS_Curve curve) => P curve -> (Natural, Natural, Natural)
-toXYZ p = (getX p, getY p, getZ p)
-
-toXY :: (BLS_Curve curve) => Affine curve -> (Natural, Natural)
-toXY aff = (getAX aff, getAY aff)
-
 affineInG :: (BLS_Curve curve) => Affine curve -> Bool
 affineInG affine = unsafePerformIO $
   withAffine affine c_blst_affine_in_g
@@ -849,25 +739,24 @@ generator = unsafePFromPPtr c_blst_generator
 
 ---- Scalar / Fr operations
 
-scalarFromFr :: Fr -> Scalar
-scalarFromFr fr = unsafePerformIO $
+scalarFromFr :: Fr -> IO Scalar
+scalarFromFr fr =
   withNewScalar' $ \scalarPtr ->
     withFr fr $ \frPtr ->
       c_blst_scalar_from_fr scalarPtr frPtr
 
-frFromScalar :: Scalar -> Fr
+frFromScalar :: Scalar -> IO Fr
 frFromScalar scalar =
-  unsafePerformIO $
     withNewFr' $ \frPtr ->
       withScalar scalar $ \scalarPtr ->
         c_blst_fr_from_scalar frPtr scalarPtr
 
-frFromCanonicalScalar :: Scalar -> Maybe Fr
+frFromCanonicalScalar :: Scalar -> IO (Maybe Fr)
 frFromCanonicalScalar scalar
   | scalarCanonical scalar
-  = Just $ frFromScalar scalar
+  = Just <$> frFromScalar scalar
   | otherwise
-  = Nothing
+  = return Nothing
 
 scalarFromBS :: ByteString -> Either BLSTError Scalar
 scalarFromBS bs =
@@ -925,18 +814,6 @@ scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar = unsafePerformIO $
   withScalar scalar c_blst_scalar_fr_check
 
-scalarToNatural :: Scalar -> Natural
-scalarToNatural = unsafePerformIO . scalarToNat
-
-scalarFromNatural :: Natural -> Scalar
-scalarFromNatural = unsafePerformIO . scalarFromNat
-
-frFromNatural :: Natural -> Fr
-frFromNatural = frFromScalar . scalarFromNatural
-
-frToNatural :: Fr -> Natural
-frToNatural = scalarToNatural . scalarFromFr
-
 ---- Pairings
 
 pairingCheck :: (P1, P2) -> (P1, P2) -> Bool
@@ -959,3 +836,6 @@ pairingCheck (p1, p2) (q1, q2) = unsafePerformIO $ do
 withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)
 withMaybeCStringLen (Just bs) go = BS.useAsCStringLen bs go
+
+scalarPeriod :: Integer
+scalarPeriod = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
