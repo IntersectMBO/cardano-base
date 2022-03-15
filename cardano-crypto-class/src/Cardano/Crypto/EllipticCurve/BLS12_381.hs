@@ -9,9 +9,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   , P2
   , Curve1
   , Curve2
-  , Scalar
-  , Fr
-  , Affine
   , BLSTError (..)
 
   -- * Class
@@ -31,33 +28,11 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   , generator
   , isInf
 
-  , toXYZ
-  , toXY
-
-  , toAffine
-  , fromAffine
-  , affineInG
-
-  -- * Scalar / Fr operations
-  , scalarFromFr
-  , frFromScalar
-  , frFromCanonicalScalar
-  , scalarFromBS
-  , scalarToBS
-  , scalarFromNatural
-  , scalarToNatural
-  , scalarCanonical
-
-  , frAdd
-  , frMult
-  , frNeg
-  , frInverse
-  , frSqr
-  , frFromNatural
-  , frToNatural
-
   -- * Pairings
   , pairingCheck
+
+  -- * The period of scalars
+  , scalarPeriod
 )
 where
 

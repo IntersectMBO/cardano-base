@@ -25,7 +25,6 @@ import Test.Tasty.HUnit (testCase, assertBool, assertEqual)
 import Data.Proxy (Proxy (..))
 import qualified Data.ByteString as BS
 import System.IO.Unsafe (unsafePerformIO)
-import Numeric.Natural (Natural)
 
 tests :: TestTree
 tests =
@@ -42,30 +41,33 @@ tests =
 testUtil :: String -> TestTree
 testUtil name =
   testGroup name
-    [ testProperty "Natural / C-String round-trip" $
+    [ testProperty "Integer / C-String round-trip" $
         \n ->
-          n === unsafePerformIO (BLS.natAsCStr n BLS.cstrToNat)
-    , testCase "natToBS" $ do
-        assertEqual "0x1234" (BS.pack [0x12, 0x34]) (BLS.natToBS 0x1234)
-        assertEqual "0x12345678" (BS.pack [0x12, 0x34, 0x56, 0x78]) (BLS.natToBS 0x12345678)
+          n >= 0 ==>
+          n === unsafePerformIO (BLS.integerAsCStr n BLS.cstrToInteger)
+    , testCase "integerToBS" $ do
+        assertEqual "0x1234" (BS.pack [0x12, 0x34]) (BLS.integerToBS 0x1234)
+        assertEqual "0x12345678" (BS.pack [0x12, 0x34, 0x56, 0x78]) (BLS.integerToBS 0x12345678)
     ]
 
 testScalar :: String -> TestTree
 testScalar name =
   testGroup name
-    [ testProperty "self-equality" (\(a :: BLS.Scalar) -> a === a)
-    , testProperty "double negation" $ \a ->
-        BLS.scalarCanonical (BLS.scalarFromFr a) && a /= BLS.frFromNatural 0
-          ==>
-          a === BLS.frNeg (BLS.frNeg a)
-    , testProperty "double inversion" (\a -> a /= BLS.frFromNatural 0 ==> a === BLS.frInverse (BLS.frInverse a))
-    , testProperty "addition associative" (testAssoc BLS.frAdd)
-    , testProperty "addition commutative" (testCommut BLS.frAdd)
-    , testProperty "multiplication associative" (testAssoc BLS.frMult)
-    , testProperty "multiplication commutative" (testCommut BLS.frMult)
-    , testProperty "p is neutral under addition" (testNeutral (BLS.frFromScalar magicPScalar) BLS.frAdd)
-    , testProperty "sqr is equivalent to self-mult" $ \(a :: BLS.Fr) -> BLS.frMult a a === BLS.frSqr a
-    , testProperty "to/from BS round-trip" $ \s -> Right s === (BLS.scalarFromBS . BLS.scalarToBS $ s)
+    [ testProperty "self-equality" $
+        \(a :: BLS.Scalar) -> a === a
+    , testProperty "to/from BS round-trip" $
+        \s -> Right s === (BLS.scalarFromBS . BLS.scalarToBS $ s)
+    , testProperty "non-negative" $
+        \s -> (unsafePerformIO . BLS.scalarToInteger $ s) >= 0
+    , testProperty "to/from Integer round-trip" $
+        \s -> s === ((unsafePerformIO . BLS.scalarFromInteger) . (unsafePerformIO . BLS.scalarToInteger) $ s)
+    , testCase "integer from scalar" $ do
+        s <- case BLS.scalarFromBS (BS.pack [0x12, 0x34]) of
+              Left err -> error (show err)
+              Right x -> return x
+        let expected = 0x1234
+        actual <- BLS.scalarToInteger s
+        assertEqual "0x1234" expected actual
     ]
 
 testBLSCurve :: forall curve. BLS.BLS curve
@@ -90,9 +92,9 @@ testBLSCurve name _ =
     , testProperty "round-trip compression" $
         testRoundTrip @curve BLS.compress BLS.uncompress
     , testProperty "mult by p is inf" $ \(a :: BLS.P curve) ->
-        BLS.isInf (BLS.mult a magicPScalar)
+        BLS.isInf (BLS.mult a BLS.scalarPeriod)
     , testProperty "mult by p+1 is identity" $ \(a :: BLS.P curve) ->
-        BLS.mult a (BLS.scalarFromFr (BLS.frAdd (BLS.frFromScalar magicPScalar) (BLS.frFromNatural 1))) === a
+        BLS.mult a (BLS.scalarPeriod + 1) === a
     ]
 
 testPairings :: String -> TestTree
@@ -112,7 +114,7 @@ testPairings name =
           (BLS.mult p b, BLS.mult q a)
     , testProperty "shift" $ \a b p q ->
         BLS.pairingCheck
-          (BLS.mult p (BLS.scalarFromFr $ BLS.frMult (BLS.frFromScalar a) (BLS.frFromScalar b)), q)
+          (BLS.mult p (a * b), q)
           (BLS.mult p a, BLS.mult q b)
     ]
 
@@ -159,23 +161,11 @@ instance Arbitrary BLS.Scalar where
         Right v -> Just v
       )
 
-instance Arbitrary BLS.Fr where
-  arbitrary = BLS.frFromScalar <$> arbitrary
-
 instance Show BLS.Scalar where
   show = show . BLS.scalarToBS
-
-instance Show BLS.Fr where
-  show = show . BLS.scalarFromFr
 
 instance BLS.BLS curve => Show (BLS.P curve) where
   show = show . BLS.serialize
 
 instance BLS.BLS curve => Show (BLS.Affine curve) where
-  show = show . BLS.toXY
-
-instance Arbitrary Natural where
-  arbitrary = fromInteger . abs <$> arbitrary
-
-magicPScalar :: BLS.Scalar
-magicPScalar = BLS.scalarFromNatural 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
+  show = show . BLS.fromAffine
