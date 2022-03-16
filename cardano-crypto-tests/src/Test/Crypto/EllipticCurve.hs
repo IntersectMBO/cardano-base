@@ -25,6 +25,7 @@ import Test.Tasty.HUnit (testCase, assertBool, assertEqual)
 import Data.Proxy (Proxy (..))
 import qualified Data.ByteString as BS
 import System.IO.Unsafe (unsafePerformIO)
+import Data.Bits (shiftL)
 
 tests :: TestTree
 tests =
@@ -45,6 +46,15 @@ testUtil name =
         \n ->
           n >= 0 ==>
           n === unsafePerformIO (BLS.integerAsCStr n BLS.cstrToInteger)
+    , testProperty "Integer / C-String 32 round-trip" $
+        \n ->
+          n >= 0 ==>
+          n < (1 `shiftL` 32 * 8) ==>
+          n === unsafePerformIO (BLS.integerAsCStrL 32 n BLS.cstrToInteger)
+    , testProperty "padBS min length" $ \n bsw ->
+        BS.length (BLS.padBS n (BS.pack bsw)) >= n
+    , testProperty "padBS adds zeroes to front" $ \bsw ->
+        BS.index (BLS.padBS (length bsw + 1) (BS.pack bsw)) 0 === 0
     , testCase "integerToBS" $ do
         assertEqual "0x1234" (BS.pack [0x12, 0x34]) (BLS.integerToBS 0x1234)
         assertEqual "0x12345678" (BS.pack [0x12, 0x34, 0x56, 0x78]) (BLS.integerToBS 0x12345678)

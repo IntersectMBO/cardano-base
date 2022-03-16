@@ -120,8 +120,10 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 
   -- * Utility
   , integerAsCStr
+  , integerAsCStrL
   , cstrToInteger
   , integerToBS
+  , padBS
 
   -- * P1/G1 operations
   , onCurve
@@ -443,7 +445,7 @@ cstrToInteger p l = do
     go n ptr = do
       val <- peek ptr
       res <- go (pred n) (plusPtr ptr 1)
-      return $ shiftL res 8 .|. fromIntegral val
+      return $ res .|. shiftL (fromIntegral val) (8 * pred n)
 
 integerToBS :: Integer -> ByteString
 integerToBS 0 = BS.empty
