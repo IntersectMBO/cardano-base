@@ -75,11 +75,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 
   -- * Scalar functions
 
-  , c_blst_fr_add
-  , c_blst_fr_mul
-  , c_blst_fr_inverse
-  , c_blst_fr_cneg
-  , c_blst_fr_sqr
   , c_blst_scalar_fr_check
 
   , c_blst_scalar_from_fr
@@ -152,14 +147,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , scalarFromInteger
   , scalarToInteger
   , scalarCanonical
-
-  , frAdd
-  , frMult
-  , frNeg
-  , frInverse
-  , frSqr
-  , frFromInteger
-  , frToInteger
 
   -- * Pairings
   , pairingCheck
@@ -480,12 +467,6 @@ scalarFromInteger n = do
     integerAsCStrL sizeScalar (n `mod` scalarPeriod) $ \str _length -> do
       c_blst_scalar_from_bendian scalarPtr str
 
-frFromInteger :: Integer -> IO Fr
-frFromInteger i = scalarFromInteger i >>= frFromScalar
-
-frToInteger :: Fr -> IO Integer
-frToInteger fr = scalarFromFr fr >>= scalarToInteger
-
 ---- Unsafe types
 
 newtype ScalarPtr = ScalarPtr (Ptr Void)
@@ -496,11 +477,6 @@ newtype FrPtr = FrPtr (Ptr Void)
 foreign import ccall "size_blst_scalar" c_size_blst_scalar :: CSize
 foreign import ccall "size_blst_fr" c_size_blst_fr :: CSize
 
-foreign import ccall "blst_fr_add" c_blst_fr_add :: FrPtr -> FrPtr -> FrPtr -> IO ()
-foreign import ccall "blst_fr_mul" c_blst_fr_mul :: FrPtr -> FrPtr -> FrPtr -> IO ()
-foreign import ccall "blst_fr_inverse" c_blst_fr_inverse :: FrPtr -> FrPtr -> IO ()
-foreign import ccall "blst_fr_cneg" c_blst_fr_cneg :: FrPtr -> FrPtr -> IO ()
-foreign import ccall "blst_fr_sqr" c_blst_fr_sqr :: FrPtr -> FrPtr -> IO ()
 foreign import ccall "blst_scalar_fr_check" c_blst_scalar_fr_check :: ScalarPtr -> IO Bool
 
 foreign import ccall "blst_scalar_from_fr" c_blst_scalar_from_fr :: ScalarPtr -> FrPtr -> IO ()
@@ -779,38 +755,6 @@ scalarToBS scalar = unsafePerformIO $ do
     withScalar scalar $ \scalarPtr -> do
       c_blst_bendian_from_scalar cstrp scalarPtr
       BS.packCStringLen (castPtr cstrp, sizeScalar)
-
-frAdd :: Fr -> Fr -> Fr
-frAdd a b = unsafePerformIO $
-  withNewFr' $ \outPtr ->
-    withFr a $ \aPtr ->
-      withFr b $ \bPtr ->
-        c_blst_fr_add outPtr aPtr bPtr
-
-frMult :: Fr -> Fr -> Fr
-frMult a b = unsafePerformIO $
-  withNewFr' $ \outPtr ->
-    withFr a $ \aPtr ->
-      withFr b $ \bPtr ->
-        c_blst_fr_mul outPtr aPtr bPtr
-
-frNeg :: Fr -> Fr
-frNeg a = unsafePerformIO $
-  withNewFr' $ \outPtr ->
-    withFr a $ \aPtr ->
-      c_blst_fr_cneg outPtr aPtr
-
-frInverse :: Fr -> Fr
-frInverse a = unsafePerformIO $
-  withNewFr' $ \outPtr ->
-    withFr a $ \aPtr ->
-      c_blst_fr_inverse outPtr aPtr
-
-frSqr :: Fr -> Fr
-frSqr a = unsafePerformIO $
-  withNewFr' $ \outPtr ->
-    withFr a $ \aPtr ->
-      c_blst_fr_sqr outPtr aPtr
 
 scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar = unsafePerformIO $
