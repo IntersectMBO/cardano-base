@@ -197,6 +197,7 @@ instance BLS_P curve => Eq (AffinePtr curve) where
 
 ---- Safe P types / marshalling
 
+-- | A point on an elliptic curve.
 newtype P curve = P (ForeignPtr Void)
 
 type P1 = P Curve1
@@ -207,27 +208,32 @@ newtype Affine curve = Affine (ForeignPtr Void)
 type Affine1 = Affine Curve1
 type Affine2 = Affine Curve2
 
-instance BLS_P curve => Eq (Affine curve) where
-  a == b = unsafePerformIO $
-    withAffine a $ \aptr ->
-      withAffine b $ \bptr ->
-        eqAffinePtr aptr bptr
-
+-- | Sizes of various representations of elliptic curve points.
 class BLS_P curve where
   _sizeP :: Proxy curve -> CSize
   _compressedSizeP :: Proxy curve -> CSize
   _serializedSizeP :: Proxy curve -> CSize
   _sizeAffine :: Proxy curve -> CSize
 
+instance BLS_P curve => Eq (Affine curve) where
+  a == b = unsafePerformIO $
+    withAffine a $ \aptr ->
+      withAffine b $ \bptr ->
+        eqAffinePtr aptr bptr
+
+-- | Size of a curve point in memory
 sizeP :: forall curve i. (BLS_P curve, Num i) => Proxy curve -> i
 sizeP p = fromIntegral $ _sizeP p
 
+-- | Size of a curved point when serialized in compressed form
 compressedSizeP :: forall curve i. (BLS_P curve, Num i) => Proxy curve -> i
 compressedSizeP = fromIntegral . _compressedSizeP
 
+-- | Size of a curved point when serialized in uncompressed form
 serializedSizeP :: forall curve i. (BLS_P curve, Num i) => Proxy curve -> i
 serializedSizeP = fromIntegral . _serializedSizeP
 
+-- | In-memory size of the affine representation of a curve point
 sizeAffine :: forall curve i. (BLS_P curve, Num i) => Proxy curve -> i
 sizeAffine = fromIntegral . _sizeAffine
 
@@ -284,6 +290,8 @@ instance BLS_P Curve2 where
 
 ---- Curve operations
 
+-- | BLS curve operations. Class methods are low-level; user code will want to
+-- use higher-level wrappers such as 'add', 'mult', 'cneg', 'neg', etc.
 class BLS_Curve curve where
   c_blst_on_curve :: PPtr curve -> IO Bool
 
@@ -595,6 +603,7 @@ mkBLSTError e
   | otherwise
   = BLST_UNKNOWN_ERROR
 
+-- | This class represents phantom types that can be used as BLS curves.
 class (BLS_Curve a, BLS_P a) => BLS a where
 
 instance BLS Curve1 where
@@ -616,17 +625,22 @@ instance Eq Fr where
   a == b = unsafePerformIO $
     (==) <$> scalarFromFr a <*> scalarFromFr b
 
+-- | Check whether a point is on its elliptic curve.
 onCurve :: BLS_Curve curve => P curve -> Bool
 onCurve p = unsafePerformIO $ withP p c_blst_on_curve
 
-add :: (BLS_P curve, BLS_Curve curve) => P curve -> P curve -> P curve
+-- | Curve point addition.
+add :: (BLS curve) => P curve -> P curve -> P curve
 add in1 in2 = unsafePerformIO $ do
   withNewP' $ \outp -> do
     withP in1 $ \in1p -> do
       withP in2 $ \in2p -> do
         c_blst_add outp in1p in2p
 
-mult :: (BLS_P curve, BLS_Curve curve) => P curve -> Integer -> P curve
+-- | Scalar multiplication of a curve point. The scalar will be brought into
+-- the range of modular arithmetic by means of a modulo operation over the
+-- 'scalarPeriod'.
+mult :: (BLS curve) => P curve -> Integer -> P curve
 mult in1 inS = unsafePerformIO $ do
   withNewP' $ \outp -> do
     withP in1 $ \in1p -> do
@@ -635,14 +649,17 @@ mult in1 inS = unsafePerformIO $ do
         -- sizeScalar is in *bytes*
         c_blst_mult outp in1p inSp (sizeScalar * 8)
 
-cneg :: (BLS_P curve, BLS_Curve curve) => P curve -> Bool -> P curve
+-- | Conditional curve point negation.
+-- @cneg x cond = if cond then neg x else x@
+cneg :: (BLS curve) => P curve -> Bool -> P curve
 cneg in1 cond = unsafePerformIO $ do
   out1 <- cloneP in1
   withP out1 $ \out1p ->
     c_blst_cneg out1p cond
   return out1
 
-neg :: (BLS_P curve, BLS_Curve curve) => P curve -> P curve
+-- | Unconditional curve point negation
+neg :: (BLS curve) => P curve -> P curve
 neg p = cneg p True
 
 uncompress :: forall curve. (BLS_P curve, BLS_Curve curve) => ByteString -> Either BLSTError (P curve)
@@ -685,6 +702,9 @@ serialize p = unsafePerformIO $ do
       c_blst_serialize cstrp pp
       BS.packCStringLen (cstrp, serializedSizeP (Proxy @curve))
 
+-- | @hash msg mDST mAug@ generates the elliptic curve hash for the given
+-- message @msg@; @mDST@ and @mAug@ are the optional @aug@ and @dst@
+-- arguments.
 hash :: (BLS_P curve, BLS_Curve curve) => ByteString -> Maybe ByteString -> Maybe ByteString -> P curve
 hash msg mDST mAug = unsafePerformIO $
   BS.useAsCStringLen msg $ \(msgPtr, msgLen) ->
@@ -705,6 +725,7 @@ fromAffine affine = unsafePerformIO $
     withNewP' $ \pp ->
       c_blst_from_affine pp affinePtr
 
+-- | Infinity check on curve points.
 isInf :: (BLS_Curve curve) => P curve -> Bool
 isInf p = unsafePerformIO $ withP p c_blst_p_is_inf
 
@@ -762,6 +783,7 @@ scalarCanonical scalar = unsafePerformIO $
 
 ---- Pairings
 
+-- | Perform a two-miller-one-exp pairing check on two pairs of curve points.
 pairingCheck :: (P1, P2) -> (P1, P2) -> Bool
 pairingCheck (p1, p2) (q1, q2) = unsafePerformIO $ do
   withAffine a1 $ \ap1 ->
@@ -783,5 +805,6 @@ withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)
 withMaybeCStringLen (Just bs) go = BS.useAsCStringLen bs go
 
+-- | The period of scalar modulo operations.
 scalarPeriod :: Integer
 scalarPeriod = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001

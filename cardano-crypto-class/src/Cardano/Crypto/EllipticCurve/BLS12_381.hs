@@ -11,10 +11,14 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   , Curve2
   , BLSTError (..)
 
-  -- * Class
+  -- * BLS Class
   , BLS
+  , BLS_P
+  , BLS_Curve
 
-  -- * P1/G1 operations
+  -- * Point / Group operations
+  -- | These work on both curves, and take phantom parameters of type 'Curve1'
+  -- or 'Curve2' to select one of the two provided elliptic curves.
   , onCurve
   , add
   , mult
@@ -31,7 +35,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   -- * Pairings
   , pairingCheck
 
-  -- * The period of scalars
+  -- * The period (modulo) of scalars
   , scalarPeriod
 )
 where
