@@ -15,9 +15,18 @@ static const fe25519 sqrtm1 = {
     1718705420411056, 234908883556509, 2233514472574048, 2117202627021982, 765476049583133
 };
 
+/*
+ * sqrt(-486664)
+ * This uses the notation of latest master branch, mainly prefixing it with `ed25519`.
+ * */
+static const fe25519 ed25519_sqrtam2 = {
+        1693982333959686, 608509411481997, 2235573344831311, 947681270984193, 266558006233600
+};
+
 /* A = 486662 */
+#define ed25519_A_32 486662
 static const fe25519 curve25519_A = {
-    486662, 0, 0, 0, 0
+        ed25519_A_32, 0, 0, 0, 0
 };
 
 /* sqrt(ad - 1) with a = -1 (mod p) */
