@@ -11,7 +11,7 @@
 
 #include <stddef.h>
 
-#include "crypto_vrf_ietfdraft03.h"
+#include "vrf03/crypto_vrf_ietfdraft03.h"
 #include "sodium/export.h"
 
 #ifdef __cplusplus
