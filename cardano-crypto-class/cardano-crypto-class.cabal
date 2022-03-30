@@ -24,6 +24,12 @@ flag development
   default:     False
   manual:      True
 
+flag secp256k1-support
+    description: Enable support for functions from libsecp256k1. Requires
+                 a recent libsecp256k1 with support for Schnorr signatures.
+    default: True
+    manual: True
+
 common base
   build-depends: base ^>=4.14
 
@@ -43,12 +49,10 @@ library
   exposed-modules:
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.Class
-    Cardano.Crypto.DSIGN.EcdsaSecp256k1
     Cardano.Crypto.DSIGN.Ed25519
     Cardano.Crypto.DSIGN.Ed448
     Cardano.Crypto.DSIGN.Mock
     Cardano.Crypto.DSIGN.NeverUsed
-    Cardano.Crypto.DSIGN.SchnorrSecp256k1
     Cardano.Crypto.Hash
     Cardano.Crypto.Hash.Blake2b
     Cardano.Crypto.Hash.Class
@@ -77,8 +81,6 @@ library
     Cardano.Crypto.Libsodium.MLockedBytes.Internal
     Cardano.Crypto.Libsodium.UnsafeC
     Cardano.Crypto.PinnedSizedBytes
-    Cardano.Crypto.SECP256K1.Constants
-    Cardano.Crypto.SECP256K1.C
     Cardano.Crypto.Seed
     Cardano.Crypto.Util
     Cardano.Crypto.VRF
@@ -98,7 +100,6 @@ library
     , bytestring
     , cardano-binary
     , cardano-prelude
-    , cereal
     , cryptonite
     , deepseq
     , ghc-prim
@@ -106,13 +107,22 @@ library
     , memory
     , nothunks
     , primitive
-    , secp256k1-haskell
     , serialise
     , text
     , transformers
     , vector
 
-  pkgconfig-depends: libsodium -any, libsecp256k1 -any
+  pkgconfig-depends: libsodium -any
+
+  if flag(secp256k1-support)
+    exposed-modules:
+      Cardano.Crypto.DSIGN.EcdsaSecp256k1
+      Cardano.Crypto.DSIGN.SchnorrSecp256k1
+      Cardano.Crypto.SECP256K1.Constants
+      Cardano.Crypto.SECP256K1.C
+    build-depends: cereal, secp256k1-haskell
+    pkgconfig-depends: libsecp256k1 -any
+    cpp-options: -DSECP256K1
 
 test-suite test-memory-example
   import:         base, project-config

@@ -92,21 +92,20 @@ jobs:
         echo "LIBSODIUM_PATH=$LIBSODIUM_PATH"
         echo "$LIBSODIUM_PATH" >> $GITHUB_PATH
 
-    - name: Install secp256k1 (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        mkdir secp256k1-sources
-        cd secp256k1-sources
-        git clone https://github.com/bitcoin-core/secp256k1.git
-        cd secp256k1
-        git reset --hard $SECP256K1_REF
-        echo "FIXME: install from sources"
-
     - uses: haskell/actions/setup@v1
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: 3.4.0.0
+
+    - name: Configure to not use secp256k1 (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "FIXME: can't install from sources, so instead libsecp256k1 support is disabled"
+        cat >> cabal.project <<EOF
+        package cardano-crypto-class
+          flags: -secp256k1-support
+        EOF
 
     - name: Configure to use libsodium
       run: |
