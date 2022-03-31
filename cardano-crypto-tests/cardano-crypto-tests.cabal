@@ -20,6 +20,12 @@ flag development
     default: False
     manual: True
 
+flag secp256k1-support
+    description: Enable support for functions from libsecp256k1. Requires
+                 a recent libsecp256k1 with support for Schnorr signatures.
+    default: True
+    manual: True
+
 common base                         { build-depends: base                             >= 4.14       && < 4.15     }
 
 common project-config
@@ -62,10 +68,13 @@ library
                       , pretty-show
                       , QuickCheck
                       , quickcheck-instances
-                      , secp256k1-haskell
                       , tasty
                       , tasty-quickcheck
                       , criterion
+
+  if flag(secp256k1-support)
+    build-depends: secp256k1-haskell
+    cpp-options: -DSECP256K1
 
 test-suite test-crypto
   import:               base, project-config
