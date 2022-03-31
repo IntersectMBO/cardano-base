@@ -1,0 +1,124 @@
+name: Haskell CI (Windows)
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: ["8.10.7"]
+        os: [windows-latest]
+
+    env:
+      # current ref from: 27.02.2022
+      SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - uses: msys2/setup-msys2@v2
+      with:
+        update: true
+        install: >-
+          autoconf
+          automake
+          base-devel
+          git
+          mingw-w64-x86_64-toolchain
+          libtool
+
+    - name: Install secp256k1
+      run: |
+        mkdir secp256k1-sources
+        cd secp256k1-sources
+        git clone https://github.com/bitcoin-core/secp256k1.git
+        cd secp256k1
+        git reset --hard $SECP256K1_REF
+        ./autogen.sh
+        ./configure --enable-module-schnorrsig --enable-experimental
+        make
+        make check
+        make install
+
+    - name: Install libsodium (Windows)
+      run: |
+        curl -Ls \
+          --connect-timeout 5 \
+          --max-time 10 \
+          --retry 5 \
+          --retry-delay 0 \
+          --retry-max-time 40 \
+          https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-mingw.tar.gz -o libsodium-1.0.18-mingw.tar.gz
+        tar zxvf libsodium-1.0.18-mingw.tar.gz
+
+        sed -i "s|/d/a/1/s/|D:/a/cardano-base/cardano-base/|g" libsodium-win64/lib/pkgconfig/libsodium.pc
+
+        export PKG_CONFIG_PATH="$(readlink -f libsodium-win64/lib/pkgconfig)"
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+        export LIBSODIUM_PATH="$(readlink -f libsodium-win64/bin | sed 's|^/d|D:|g' | tr / '\\')"
+        echo "LIBSODIUM_PATH=$LIBSODIUM_PATH"
+        echo "$LIBSODIUM_PATH" >> $GITHUB_PATH
+
+    - uses: haskell/actions/setup@v1
+      id: setup-haskell
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: 3.6.2.0
+
+    - name: Haskell setup finalisation
+      shell: bash
+      run: |
+        echo "${{ steps.setup-haskell.output.ghc-path }}" >> $GITHUB_PATH
+        echo "${{ steps.setup-haskell.output.cabal-path }}" >> $GITHUB_PATH
+
+    - name: Configure to use libsodium
+      run: |
+        cat >> cabal.project <<EOF
+        package cardano-crypto-praos
+          flags: -external-libsodium-vrf
+        EOF
+
+    - name: Cabal update
+      run: cabal update
+
+    - name: Cabal Configure
+      run: cabal configure --enable-tests --enable-benchmarks --write-ghc-environment-files=always
+
+    - name: Record dependencies
+      run: |
+        cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
+
+    - name: Set cache version
+      run: echo "CACHE_VERSION=9w76Z3Q" >> $GITHUB_ENV
+
+    - uses: actions/cache@v2
+      name: Cache cabal store
+      with:
+        path: ${{ steps.setup-haskell.outputs.cabal-store }}
+        key: cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
+        restore-keys: |
+          cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
+          cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-
+
+    - name: Install dependencies
+      run: cabal build all --only-dependencies
+
+    - name: Build
+      run: cabal build all
+
+    - name: Git clone
+      run: git clone https://github.com/input-output-hk/cardano-mainnet-mirror
+
+    - name: Run tests
+      run: cabal test all
+
+    - name: Run benchmarks
+      run: cabal bench all

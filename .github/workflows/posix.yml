@@ -1,4 +1,4 @@
-name: Haskell CI
+name: Haskell CI (Posix)
 
 on: [push]
 
@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: ["8.10.7"]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
 
     env:
       # current ref from: 27.02.2022
@@ -22,14 +22,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-
-    - name: Install pkgconfiglite (Windows)
-      if: matrix.os == 'windows-latest'
-      run: choco install -y pkgconfiglite
-
-    - name: Install libsodium (MacOS)
-      if: matrix.os == 'macos-latest'
-      run: brew install libsodium
 
     - name: Install secp256k1 (MacOS)
       if: matrix.os == 'macos-latest'
@@ -47,14 +39,6 @@ jobs:
         sudo make install
         cd ../..
 
-    - name: Install libsodium (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get -y install libsodium23 libsodium-dev
-        sudo apt-get -y remove --purge software-properties-common
-        sudo apt-get -y autoremove
-
     - name: Install secp256k1 (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -71,41 +55,23 @@ jobs:
         sudo make install
         cd ../..
 
-    - name: Install libsodium (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Install libsodium (Linux)
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        curl -Ls \
-          --connect-timeout 5 \
-          --max-time 10 \
-          --retry 5 \
-          --retry-delay 0 \
-          --retry-max-time 40 \
-          https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-mingw.tar.gz -o libsodium-1.0.18-mingw.tar.gz
-        tar zxvf libsodium-1.0.18-mingw.tar.gz
+        sudo apt-get update
+        sudo apt-get -y install libsodium23 libsodium-dev
+        sudo apt-get -y remove --purge software-properties-common
+        sudo apt-get -y autoremove
 
-        sed -i "s|/d/a/1/s/|D:/a/cardano-base/cardano-base/|g" libsodium-win64/lib/pkgconfig/libsodium.pc
-
-        export PKG_CONFIG_PATH="$(readlink -f libsodium-win64/lib/pkgconfig)"
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-        export LIBSODIUM_PATH="$(readlink -f libsodium-win64/bin | sed 's|^/d|D:|g' | tr / '\\')"
-        echo "LIBSODIUM_PATH=$LIBSODIUM_PATH"
-        echo "$LIBSODIUM_PATH" >> $GITHUB_PATH
+    - name: Install libsodium (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: brew install libsodium
 
     - uses: haskell/actions/setup@v1
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
-        cabal-version: 3.4.0.0
-
-    - name: Configure to not use secp256k1 (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        echo "FIXME: can't install from sources, so instead libsecp256k1 support is disabled"
-        cat >> cabal.project <<EOF
-        package cardano-crypto-class
-          flags: -secp256k1-support
-        EOF
+        cabal-version: 3.6.2.0
 
     - name: Configure to use libsodium
       run: |
