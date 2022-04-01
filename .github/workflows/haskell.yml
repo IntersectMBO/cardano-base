@@ -105,6 +105,8 @@ jobs:
         cat >> cabal.project <<EOF
         package cardano-crypto-class
           flags: -secp256k1-support
+        package cardano-crypto-tests
+          flags: -secp256k1-support
         EOF
 
     - name: Configure to use libsodium
