@@ -23,13 +23,40 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
+    - name: Environment
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "$(which bash)"
+        echo "====="
+        env
+
     - name: Install pkgconfiglite (Windows)
       if: matrix.os == 'windows-latest'
       run: choco install -y pkgconfiglite
 
-    - name: Install libsodium (MacOS)
-      if: matrix.os == 'macos-latest'
-      run: brew install libsodium
+    - name: Install m4 (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        curl http://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.gz -o m4-1.4.19.tar.gz
+        tar zxvf m4-1.4.19.tar.gz
+        cd m4-1.4.19
+        # for x in $(find . -name '*.in') $(find . -name '*.mk'); do
+        #   sed -i "s|\$(SHELL)|'\$(SHELL)'|g" "$x"
+        # done
+        ./configure
+        make CONFIG_SHELL="$(which bash)"
+        make CONFIG_SHELL="$(which bash)" install
+        echo "/usr/local/bin" >> $GITHUB_PATH
+
+    - name: Install autoconf (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        curl http://ftp.gnu.org/gnu/autoconf/autoconf-2.71.tar.gz -o autoconf-2.71.tar.gz
+        tar zxvf autoconf-2.71.tar.gz
+        cd autoconf-2.71
+        ./configure
+        make
+        make install
 
     - name: Install secp256k1 (MacOS)
       if: matrix.os == 'macos-latest'
@@ -47,13 +74,31 @@ jobs:
         sudo make install
         cd ../..
 
-    - name: Install libsodium (Linux)
-      if: matrix.os == 'ubuntu-latest'
+    - name: Install secp256k1 (Windows, part 1)
+      if: matrix.os == 'windows-latest'
       run: |
-        sudo apt-get update
-        sudo apt-get -y install libsodium23 libsodium-dev
-        sudo apt-get -y remove --purge software-properties-common
-        sudo apt-get -y autoremove
+        mkdir secp256k1-sources
+        cd secp256k1-sources
+        git clone https://github.com/bitcoin-core/secp256k1.git
+        cd secp256k1
+        git reset --hard $SECP256K1_REF
+
+    - name: Install secp256k1 (Windows, part 2)
+      if: matrix.os == 'windows-latest'
+      shell: msys2 {0}
+      run: |
+        cd secp256k1-sources/secp256k1
+        ./autogen.sh
+
+    - name: Install secp256k1 (Windows, part 3)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd secp256k1-sources/secp256k1
+        ./configure --enable-module-schnorrsig --enable-experimental
+        make
+        make check
+        sudo make install
+        cd ../..
 
     - name: Install secp256k1 (Linux)
       if: matrix.os == 'ubuntu-latest'
@@ -70,6 +115,18 @@ jobs:
         make check
         sudo make install
         cd ../..
+
+    - name: Install libsodium (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get -y install libsodium23 libsodium-dev
+        sudo apt-get -y remove --purge software-properties-common
+        sudo apt-get -y autoremove
+
+    - name: Install libsodium (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: brew install libsodium
 
     - name: Install libsodium (Windows)
       if: matrix.os == 'windows-latest'
