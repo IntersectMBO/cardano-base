@@ -23,39 +23,52 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - name: Environment
-      if: matrix.os == 'windows-latest'
-      run: |
-        echo "$(which bash)"
-        echo "====="
-        env
+    # - name: Environment
+    #   if: matrix.os == 'windows-latest'
+    #   run: |
+    #     echo "$(which bash)"
+    #     echo "====="
+    #     env
 
     - name: Install pkgconfiglite (Windows)
       if: matrix.os == 'windows-latest'
       run: choco install -y pkgconfiglite
 
-    - name: Install m4 (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        curl http://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.gz -o m4-1.4.19.tar.gz
-        tar zxvf m4-1.4.19.tar.gz
-        cd m4-1.4.19
-        # for x in $(find . -name '*.in') $(find . -name '*.mk'); do
-        #   sed -i "s|\$(SHELL)|'\$(SHELL)'|g" "$x"
-        # done
-        ./configure
-        make CONFIG_SHELL="$(which bash)"
-        make CONFIG_SHELL="$(which bash)" install
-        echo "/usr/local/bin" >> $GITHUB_PATH
+    # - name: Install m4 (Windows)
+    #   if: matrix.os == 'windows-latest'
+    #   run: |
+    #     curl http://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.gz -o m4-1.4.19.tar.gz
+    #     tar zxvf m4-1.4.19.tar.gz
+    #     cd m4-1.4.19
+    #     # for x in $(find . -name '*.in') $(find . -name '*.mk'); do
+    #     #   sed -i "s|\$(SHELL)|'\$(SHELL)'|g" "$x"
+    #     # done
+    #     ./configure
+    #     make CONFIG_SHELL="$(which bash)"
+    #     make CONFIG_SHELL="$(which bash)" install
+    #     echo "/usr/local/bin" >> $GITHUB_PATH
 
-    - name: Install autoconf (Windows)
+    # - name: Install autoconf (Windows)
+    #   if: matrix.os == 'windows-latest'
+    #   run: |
+    #     curl http://ftp.gnu.org/gnu/autoconf/autoconf-2.71.tar.gz -o autoconf-2.71.tar.gz
+    #     tar zxvf autoconf-2.71.tar.gz
+    #     cd autoconf-2.71
+    #     ./configure
+    #     make
+    #     make install
+
+    - name: Install secp256k1 (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        curl http://ftp.gnu.org/gnu/autoconf/autoconf-2.71.tar.gz -o autoconf-2.71.tar.gz
-        tar zxvf autoconf-2.71.tar.gz
-        cd autoconf-2.71
-        ./configure
+        mkdir secp256k1-sources
+        cd secp256k1-sources
+        git clone https://github.com/newhoggy/secp256k1.git
+        cd secp256k1
+        git reset --hard 2a160f28e39c0a049311345ec92ce797a072c096
+        ./configure --enable-module-schnorrsig --enable-experimental
         make
+        make check
         make install
 
     - name: Install secp256k1 (MacOS)
@@ -64,36 +77,10 @@ jobs:
         brew install autoconf automake libtool
         mkdir secp256k1-sources
         cd secp256k1-sources
-        git clone https://github.com/bitcoin-core/secp256k1.git
+        git clone https://github.com/newhoggy/secp256k1.git
         cd secp256k1
         git reset --hard $SECP256K1_REF
         ./autogen.sh
-        ./configure --enable-module-schnorrsig --enable-experimental
-        make
-        make check
-        sudo make install
-        cd ../..
-
-    - name: Install secp256k1 (Windows, part 1)
-      if: matrix.os == 'windows-latest'
-      run: |
-        mkdir secp256k1-sources
-        cd secp256k1-sources
-        git clone https://github.com/bitcoin-core/secp256k1.git
-        cd secp256k1
-        git reset --hard $SECP256K1_REF
-
-    - name: Install secp256k1 (Windows, part 2)
-      if: matrix.os == 'windows-latest'
-      shell: msys2 {0}
-      run: |
-        cd secp256k1-sources/secp256k1
-        ./autogen.sh
-
-    - name: Install secp256k1 (Windows, part 3)
-      if: matrix.os == 'windows-latest'
-      run: |
-        cd secp256k1-sources/secp256k1
         ./configure --enable-module-schnorrsig --enable-experimental
         make
         make check
