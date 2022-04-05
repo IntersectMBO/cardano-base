@@ -5,6 +5,7 @@ const size_t size_blst_p1 () { return sizeof(blst_p1); }
 const size_t size_blst_p2 () { return sizeof(blst_p2); }
 const size_t size_blst_scalar () { return sizeof(blst_scalar); }
 const size_t size_blst_fr () { return sizeof(blst_fr); }
+const size_t size_blst_fp12 () { return sizeof(blst_fp12); }
 const size_t size_blst_affine1 () { return sizeof(blst_p1_affine); }
 const size_t size_blst_affine2 () { return sizeof(blst_p2_affine); }
 

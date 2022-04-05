@@ -7,6 +7,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
     P
   , P1
   , P2
+  , PT
   , Curve1
   , Curve2
   , BLSTError (..)
@@ -32,7 +33,12 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   , generator
   , isInf
 
+  -- * PT operations
+  , ptInv
+  , ptMult
+
   -- * Pairings
+  , pairing
   , pairingCheck
 
   -- * The period (modulo) of scalars
