@@ -17,6 +17,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , Affine1Ptr
   , Affine2Ptr
 
+  , PTPtr
+
   -- * Phantom Types
   , Curve1
   , Curve2
@@ -39,6 +41,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , P
   , P1
   , P2
+  , PT
   , Scalar
 
   , unsafePFromPPtr
@@ -71,7 +74,14 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 
   -- * Pairing check
 
+  , c_blst_miller_loop
   , c_blst_two_miller_one_exp
+
+  -- * FP12 functions
+  --
+  , c_blst_fp12_mul
+  , c_blst_fp12_inverse
+  , c_blst_fp12_is_equal
 
   -- * Scalar functions
 
@@ -98,6 +108,12 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , withNewAffine
   , withNewAffine_
   , withNewAffine'
+
+  , sizePT
+  , withPT
+  , withNewPT
+  , withNewPT_
+  , withNewPT'
 
   , sizeScalar
   , withScalar
@@ -138,6 +154,10 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , fromAffine
   , affineInG
 
+  -- * PT operations
+  , ptInv
+  , ptMult
+
   -- * Scalar / Fr operations
   , scalarFromFr
   , frFromScalar
@@ -149,6 +169,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , scalarCanonical
 
   -- * Pairings
+  , pairing
   , pairingCheck
 )
 where
@@ -184,6 +205,8 @@ newtype AffinePtr curve = AffinePtr (Ptr Void)
 type Affine1Ptr = AffinePtr Curve1
 type Affine2Ptr = AffinePtr Curve2
 
+newtype PTPtr = PTPtr (Ptr Void)
+
 unsafePFromPPtr :: PPtr curve -> P curve
 unsafePFromPPtr (PPtr ptr) =
   P . unsafePerformIO $ newForeignPtr_ ptr
@@ -207,6 +230,8 @@ newtype Affine curve = Affine (ForeignPtr Void)
 
 type Affine1 = Affine Curve1
 type Affine2 = Affine Curve2
+
+newtype PT = PT (ForeignPtr Void)
 
 -- | Sizes of various representations of elliptic curve points.
 class BLS_P curve where
@@ -275,6 +300,22 @@ withNewAffine_ = fmap fst . withNewAffine
 withNewAffine' :: (BLS_P curve) => (AffinePtr curve -> IO a) -> IO (Affine curve)
 withNewAffine' = fmap snd . withNewAffine
 
+
+withPT :: PT -> (PTPtr -> IO a) -> IO a
+withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
+
+withNewPT :: (PTPtr -> IO a) -> IO (a, PT)
+withNewPT go = do
+  p <- mallocForeignPtrBytes sizePT
+  x <- withForeignPtr p (go . PTPtr)
+  return (x, PT p)
+
+withNewPT_ :: (PTPtr -> IO a) -> IO a
+withNewPT_ = fmap fst . withNewPT
+
+withNewPT' :: (PTPtr -> IO a) -> IO PT
+withNewPT' = fmap snd . withNewPT
+
 instance BLS_P Curve1 where
   _sizeP _ = fromIntegral c_size_blst_p1
   _compressedSizeP _ = 48
@@ -286,6 +327,9 @@ instance BLS_P Curve2 where
   _compressedSizeP _ = 96
   _serializedSizeP _ = 192
   _sizeAffine _ = fromIntegral c_size_blst_affine2
+
+sizePT :: Num i => i
+sizePT = fromIntegral c_size_blst_fp12
 
 
 ---- Curve operations
@@ -549,6 +593,17 @@ foreign import ccall "blst_p2_from_affine" c_blst_p2_from_affine :: PPtr Curve2 
 foreign import ccall "blst_p1_affine_in_g1" c_blst_p1_affine_in_g1 :: AffinePtr Curve1 -> IO Bool
 foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: AffinePtr Curve2 -> IO Bool
 
+---- PT operations
+
+foreign import ccall "size_blst_fp12" c_size_blst_fp12 :: CSize
+foreign import ccall "blst_fp12_mul" c_blst_fp12_mul :: PTPtr -> PTPtr -> PTPtr -> IO ()
+foreign import ccall "blst_fp12_inverse" c_blst_fp12_inverse :: PTPtr -> PTPtr -> IO ()
+foreign import ccall "blst_fp12_is_equal" c_blst_fp12_is_equal :: PTPtr -> PTPtr -> IO Bool
+
+---- Pairing
+
+foreign import ccall "blst_miller_loop" c_blst_miller_loop :: PTPtr -> P1Ptr -> P2Ptr -> IO ()
+
 ---- Pairing check
 
 foreign import ccall "blst_two_miller_one_exp" c_blst_two_miller_one_exp ::
@@ -781,7 +836,38 @@ scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar = unsafePerformIO $
   withScalar scalar c_blst_scalar_fr_check
 
+---- PT operations
+
+ptInv :: PT -> PT
+ptInv a = unsafePerformIO $
+  withPT a $ \ap ->
+    withNewPT' $ \bp ->
+      c_blst_fp12_inverse bp ap
+
+ptMult :: PT -> PT -> PT
+ptMult a b = unsafePerformIO $
+  withPT a $ \ap ->
+    withPT b $ \bp ->
+      withNewPT' $ \cp ->
+        c_blst_fp12_mul cp ap bp
+
+ptEq :: PT -> PT -> Bool
+ptEq a b = unsafePerformIO $
+  withPT a $ \ap ->
+    withPT b $ \bp ->
+      c_blst_fp12_is_equal ap bp
+
+instance Eq PT where
+  (==) = ptEq
+
 ---- Pairings
+
+pairing :: P1 -> P2 -> PT
+pairing p1 p2 = unsafePerformIO $
+  withP p1 $ \pp1 ->
+    withP p2 $ \pp2 ->
+      withNewPT' $ \ppt ->
+        c_blst_miller_loop ppt pp1 pp2
 
 -- | Perform a two-miller-one-exp pairing check on two pairs of curve points.
 pairingCheck :: (P1, P2) -> (P1, P2) -> Bool
