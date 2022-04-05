@@ -35,6 +35,7 @@ tests =
         , testScalar "Scalar"
         , testBLSCurve "Curve 1" (Proxy @BLS.Curve1)
         , testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
+        , testPT "PT"
         , testPairings "Pairings"
         ]
     ]
@@ -98,13 +99,25 @@ testBLSCurve name _ =
     , testProperty "addition commutative" (testCommut (BLS.add :: BLS.P curve -> BLS.P curve -> BLS.P curve))
     , testProperty "adding negation yields infinity" (testAddNegYieldsInf @curve)
     , testProperty "round-trip serialization" $
-        testRoundTrip @curve BLS.serialize BLS.deserialize
+        testRoundTripEither @(BLS.P curve) BLS.serialize BLS.deserialize
     , testProperty "round-trip compression" $
-        testRoundTrip @curve BLS.compress BLS.uncompress
+        testRoundTripEither @(BLS.P curve) BLS.compress BLS.uncompress
     , testProperty "mult by p is inf" $ \(a :: BLS.P curve) ->
         BLS.isInf (BLS.mult a BLS.scalarPeriod)
     , testProperty "mult by p+1 is identity" $ \(a :: BLS.P curve) ->
         BLS.mult a (BLS.scalarPeriod + 1) === a
+    ]
+
+testPT :: String -> TestTree
+testPT name =
+  testGroup name
+    [ testProperty "mult associative"
+        (testAssoc BLS.ptMult)
+    , testProperty "mult commutative"
+        (testCommut BLS.ptMult)
+    , testProperty "inv reversible"
+        (testRoundTripEither BLS.ptInv (Right @() . BLS.ptInv))
+    , testProperty "self-equality" (\(a :: BLS.PT) -> a === a)
     ]
 
 testPairings :: String -> TestTree
@@ -145,12 +158,12 @@ testAddNegYieldsInf :: forall curve. BLS.BLS curve
 testAddNegYieldsInf p =
   BLS.isInf (BLS.add p (BLS.neg p))
 
-testRoundTrip :: forall curve a. BLS.BLS curve
-        => (BLS.P curve -> a)
-        -> (a -> Either BLS.BLSTError (BLS.P curve))
-        -> BLS.P curve
+testRoundTripEither :: forall p a err. (Show p, Show err, Eq p, Eq err)
+        => (p -> a)
+        -> (a -> Either err p)
+        -> p
         -> Property
-testRoundTrip encode decode p =
+testRoundTripEither encode decode p =
   Right p === (decode . encode) p
 
 instance BLS.BLS curve => Arbitrary (BLS.P curve) where
@@ -161,6 +174,12 @@ instance BLS.BLS curve => Arbitrary (BLS.P curve) where
 
 instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
+
+instance Arbitrary BLS.PT where
+  arbitrary = BLS.pairing <$> arbitrary <*> arbitrary
+
+instance Show BLS.PT where
+  show = const "<<<PT>>>"
 
 instance Arbitrary BLS.Scalar where
   arbitrary =
