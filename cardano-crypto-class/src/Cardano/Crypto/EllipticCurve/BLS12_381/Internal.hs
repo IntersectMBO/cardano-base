@@ -79,7 +79,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   -- * FP12 functions
   --
   , c_blst_fp12_mul
-  , c_blst_fp12_inverse
   , c_blst_fp12_is_equal
   , c_blst_fp12_finalverify
 
@@ -156,7 +155,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , affineInG
 
   -- * PT operations
-  , ptInv
   , ptMult
   , ptFinalVerify
 
@@ -598,7 +596,6 @@ foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: AffinePtr 
 
 foreign import ccall "size_blst_fp12" c_size_blst_fp12 :: CSize
 foreign import ccall "blst_fp12_mul" c_blst_fp12_mul :: PTPtr -> PTPtr -> PTPtr -> IO ()
-foreign import ccall "blst_fp12_inverse" c_blst_fp12_inverse :: PTPtr -> PTPtr -> IO ()
 foreign import ccall "blst_fp12_is_equal" c_blst_fp12_is_equal :: PTPtr -> PTPtr -> IO Bool
 foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr -> PTPtr -> IO Bool
 
@@ -838,12 +835,6 @@ scalarCanonical scalar = unsafePerformIO $
   withScalar scalar c_blst_scalar_fr_check
 
 ---- PT operations
-
-ptInv :: PT -> PT
-ptInv a = unsafePerformIO $
-  withPT a $ \ap ->
-    withNewPT' $ \bp ->
-      c_blst_fp12_inverse bp ap
 
 ptMult :: PT -> PT -> PT
 ptMult a b = unsafePerformIO $

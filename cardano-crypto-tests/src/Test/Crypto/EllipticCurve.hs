@@ -114,8 +114,6 @@ testPT name =
         (testAssoc BLS.ptMult)
     , testProperty "mult commutative"
         (testCommut BLS.ptMult)
-    , testProperty "inv reversible"
-        (testRoundTripEither BLS.ptInv (Right @() . BLS.ptInv))
     , testProperty "self-equality" (\(a :: BLS.PT) -> a === a)
     , testProperty "self-final-verify" (\(a :: BLS.PT) -> BLS.ptFinalVerify a a)
     ]
