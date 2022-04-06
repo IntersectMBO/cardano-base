@@ -132,15 +132,38 @@ testPT name =
 testPairing :: String -> TestTree
 testPairing name =
   testGroup name
-    [ testProperty "three pairings"
+    [ testProperty "identity" $ \a b ->
+        pairingCheck
+          (a, b)
+          (a, b)
+    , testProperty "simple" $ \a p q ->
+        pairingCheck
+          (BLS.mult p a, q)
+          (p, BLS.mult q a)
+    , testProperty "crossover" $ \a b p q ->
+        pairingCheck
+          (BLS.mult p a, BLS.mult q b)
+          (BLS.mult p b, BLS.mult q a)
+    , testProperty "shift" $ \a b p q ->
+        pairingCheck
+          (BLS.mult p (a * b), q)
+          (BLS.mult p a, BLS.mult q b)
+    , testProperty "three pairings"
         (\a b p q ->
-            let t1 = either (error . show) id $ BLS.pairing (BLS.mult p a) q
-                t2 = either (error . show) id $ BLS.pairing p (BLS.mult q b)
-                t3 = either (error . show) id $ BLS.pairing (BLS.mult p (a + b)) q
-                tt = BLS.ptMult t1 t2
-            in BLS.ptFinalVerify tt t3
+            either (const False) id $ do
+                t1 <- BLS.pairing (BLS.mult p a) q
+                t2 <- BLS.pairing p (BLS.mult q b)
+                t3 <- BLS.pairing (BLS.mult p (a + b)) q
+                let tt = BLS.ptMult t1 t2
+                return $ BLS.ptFinalVerify tt t3
         )
     ]
+    where
+      pairingCheck (a, b) (c, d) =
+        either (error . show) id $ do
+          p <- BLS.pairing a b
+          q <- BLS.pairing c d
+          return $ BLS.ptFinalVerify p q
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =
