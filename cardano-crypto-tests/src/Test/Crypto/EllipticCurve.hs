@@ -36,6 +36,7 @@ tests =
         , testBLSCurve "Curve 1" (Proxy @BLS.Curve1)
         , testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
         , testPT "PT"
+        , testPairing "Pairing"
         ]
     ]
 
@@ -86,12 +87,22 @@ testBLSCurve name _ =
   testGroup name
     [ testCase "generator on curve" $
         assertBool "" (BLS.onCurve (BLS.generator @curve))
-    , testCase "negate generator" $
+    , testCase "neg generator on curve" $
         assertBool "" (BLS.onCurve (BLS.neg (BLS.generator @curve)))
     , testCase "add generator to itself" $
         assertBool "" (BLS.onCurve (BLS.add (BLS.generator @curve) (BLS.generator @curve)))
     , testProperty "on curve" (BLS.onCurve @curve)
-    , testProperty "neg on curv" (BLS.onCurve @curve . BLS.neg)
+    , testProperty "neg on curve" (BLS.onCurve @curve . BLS.neg)
+
+    , testCase "generator in group" $
+        assertBool "" (BLS.inGroup (BLS.generator @curve))
+    , testCase "neg generator in group" $
+        assertBool "" (BLS.inGroup (BLS.neg (BLS.generator @curve)))
+    , testCase "add generator to itself" $
+        assertBool "" (BLS.inGroup (BLS.add (BLS.generator @curve) (BLS.generator @curve)))
+    , testProperty "in group" (BLS.inGroup @curve)
+    , testProperty "neg in group" (BLS.inGroup @curve . BLS.neg)
+
     , testProperty "self-equality" (\(a :: BLS.P curve) -> a === a)
     , testProperty "double negation" (\(a :: BLS.P curve) -> a === BLS.neg (BLS.neg a))
     , testProperty "addition associative" (testAssoc (BLS.add :: BLS.P curve -> BLS.P curve -> BLS.P curve))
@@ -116,6 +127,19 @@ testPT name =
         (testCommut BLS.ptMult)
     , testProperty "self-equality" (\(a :: BLS.PT) -> a === a)
     , testProperty "self-final-verify" (\(a :: BLS.PT) -> BLS.ptFinalVerify a a)
+    ]
+
+testPairing :: String -> TestTree
+testPairing name =
+  testGroup name
+    [ testProperty "three pairings"
+        (\a b p q ->
+            let t1 = either (error . show) id $ BLS.pairing (BLS.mult p a) q
+                t2 = either (error . show) id $ BLS.pairing p (BLS.mult q b)
+                t3 = either (error . show) id $ BLS.pairing (BLS.mult p (a + b)) q
+                tt = BLS.ptMult t1 t2
+            in BLS.ptFinalVerify tt t3
+        )
     ]
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
@@ -153,7 +177,7 @@ instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
 
 instance Arbitrary BLS.PT where
-  arbitrary = BLS.pairing <$> arbitrary <*> arbitrary
+  arbitrary = either (error . show) return =<< BLS.pairing <$> arbitrary <*> arbitrary
 
 instance Show BLS.PT where
   show = const "<<<PT>>>"

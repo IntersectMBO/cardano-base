@@ -601,7 +601,7 @@ foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr ->
 
 ---- Pairing
 
-foreign import ccall "blst_miller_loop" c_blst_miller_loop :: PTPtr -> P1Ptr -> P2Ptr -> IO ()
+foreign import ccall "blst_miller_loop" c_blst_miller_loop :: PTPtr -> Affine1Ptr -> Affine2Ptr -> IO ()
 
 ---- Raw BLST error constants
 
@@ -860,12 +860,17 @@ instance Eq PT where
 
 ---- Pairings
 
-pairing :: P1 -> P2 -> PT
-pairing p1 p2 = unsafePerformIO $
-  withP p1 $ \pp1 ->
-    withP p2 $ \pp2 ->
-      withNewPT' $ \ppt ->
-        c_blst_miller_loop ppt pp1 pp2
+pairing :: P1 -> P2 -> Either BLSTError PT
+pairing p1 p2 =
+  if inGroup p1 && inGroup p2 then
+    Right . unsafePerformIO $
+      withAffine (toAffine p1) $ \ap1 ->
+        withAffine (toAffine p2) $ \ap2 ->
+          withNewPT' $ \ppt ->
+            c_blst_miller_loop ppt ap1 ap2
+  else
+    Left BLST_POINT_NOT_IN_GROUP
+    
 
 ---- Utility
 
