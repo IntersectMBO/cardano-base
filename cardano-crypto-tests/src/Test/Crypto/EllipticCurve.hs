@@ -36,7 +36,6 @@ tests =
         , testBLSCurve "Curve 1" (Proxy @BLS.Curve1)
         , testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
         , testPT "PT"
-        , testPairings "Pairings"
         ]
     ]
 
@@ -118,27 +117,7 @@ testPT name =
     , testProperty "inv reversible"
         (testRoundTripEither BLS.ptInv (Right @() . BLS.ptInv))
     , testProperty "self-equality" (\(a :: BLS.PT) -> a === a)
-    ]
-
-testPairings :: String -> TestTree
-testPairings name =
-  testGroup name
-    [ testProperty "identity" $ \a b ->
-        BLS.pairingCheck
-          (a, b)
-          (a, b)
-    , testProperty "simple" $ \a p q ->
-        BLS.pairingCheck
-          (BLS.mult p a, q)
-          (p, BLS.mult q a)
-    , testProperty "crossover" $ \a b p q ->
-        BLS.pairingCheck
-          (BLS.mult p a, BLS.mult q b)
-          (BLS.mult p b, BLS.mult q a)
-    , testProperty "shift" $ \a b p q ->
-        BLS.pairingCheck
-          (BLS.mult p (a * b), q)
-          (BLS.mult p a, BLS.mult q b)
+    , testProperty "self-final-verify" (\(a :: BLS.PT) -> BLS.ptFinalVerify a a)
     ]
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property

@@ -75,13 +75,13 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   -- * Pairing check
 
   , c_blst_miller_loop
-  , c_blst_two_miller_one_exp
 
   -- * FP12 functions
   --
   , c_blst_fp12_mul
   , c_blst_fp12_inverse
   , c_blst_fp12_is_equal
+  , c_blst_fp12_finalverify
 
   -- * Scalar functions
 
@@ -138,6 +138,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 
   -- * P1/G1 operations
   , onCurve
+  , inGroup
   , add
   , mult
   , cneg
@@ -157,6 +158,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   -- * PT operations
   , ptInv
   , ptMult
+  , ptFinalVerify
 
   -- * Scalar / Fr operations
   , scalarFromFr
@@ -170,7 +172,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 
   -- * Pairings
   , pairing
-  , pairingCheck
 )
 where
 
@@ -599,15 +600,11 @@ foreign import ccall "size_blst_fp12" c_size_blst_fp12 :: CSize
 foreign import ccall "blst_fp12_mul" c_blst_fp12_mul :: PTPtr -> PTPtr -> PTPtr -> IO ()
 foreign import ccall "blst_fp12_inverse" c_blst_fp12_inverse :: PTPtr -> PTPtr -> IO ()
 foreign import ccall "blst_fp12_is_equal" c_blst_fp12_is_equal :: PTPtr -> PTPtr -> IO Bool
+foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr -> PTPtr -> IO Bool
 
 ---- Pairing
 
 foreign import ccall "blst_miller_loop" c_blst_miller_loop :: PTPtr -> P1Ptr -> P2Ptr -> IO ()
-
----- Pairing check
-
-foreign import ccall "blst_two_miller_one_exp" c_blst_two_miller_one_exp ::
-  Affine1Ptr -> Affine1Ptr -> Affine2Ptr -> Affine2Ptr -> IO Bool
 
 ---- Raw BLST error constants
 
@@ -683,6 +680,10 @@ instance Eq Fr where
 -- | Check whether a point is on its elliptic curve.
 onCurve :: BLS_Curve curve => P curve -> Bool
 onCurve p = unsafePerformIO $ withP p c_blst_on_curve
+
+-- | Check whether a point is in the group corresponding to its elliptic curve
+inGroup :: BLS_Curve curve => P curve -> Bool
+inGroup p = unsafePerformIO $ withP p c_blst_in_g
 
 -- | Curve point addition.
 add :: (BLS curve) => P curve -> P curve -> P curve
@@ -857,6 +858,12 @@ ptEq a b = unsafePerformIO $
     withPT b $ \bp ->
       c_blst_fp12_is_equal ap bp
 
+ptFinalVerify :: PT -> PT -> Bool
+ptFinalVerify a b = unsafePerformIO $
+  withPT a $ \ap ->
+    withPT b $ \bp ->
+      c_blst_fp12_finalverify ap bp
+
 instance Eq PT where
   (==) = ptEq
 
@@ -868,22 +875,6 @@ pairing p1 p2 = unsafePerformIO $
     withP p2 $ \pp2 ->
       withNewPT' $ \ppt ->
         c_blst_miller_loop ppt pp1 pp2
-
--- | Perform a two-miller-one-exp pairing check on two pairs of curve points.
-pairingCheck :: (P1, P2) -> (P1, P2) -> Bool
-pairingCheck (p1, p2) (q1, q2) = unsafePerformIO $ do
-  withAffine a1 $ \ap1 ->
-    withAffine a2 $ \ap2 ->
-      withAffine b1 $ \bp1 ->
-        withAffine b2 $ \bp2 ->
-          c_blst_two_miller_one_exp ap1 bp1 ap2 bp2
-  where
-    a1 = toAffine (neg p1)
-    a2 = toAffine p2
-    b1 = toAffine q1
-    b2 = toAffine q2
-
-
 
 ---- Utility
 

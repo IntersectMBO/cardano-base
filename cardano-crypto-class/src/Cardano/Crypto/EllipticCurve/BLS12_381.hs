@@ -21,6 +21,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   -- | These work on both curves, and take phantom parameters of type 'Curve1'
   -- or 'Curve2' to select one of the two provided elliptic curves.
   , onCurve
+  , inGroup
   , add
   , mult
   , cneg
@@ -34,12 +35,11 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   , isInf
 
   -- * PT operations
-  , ptInv
   , ptMult
+  , ptFinalVerify
 
   -- * Pairings
   , pairing
-  , pairingCheck
 
   -- * The period (modulo) of scalars
   , scalarPeriod
