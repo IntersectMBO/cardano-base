@@ -601,7 +601,7 @@ foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr ->
 
 ---- Pairing
 
-foreign import ccall "blst_miller_loop" c_blst_miller_loop :: PTPtr -> Affine1Ptr -> Affine2Ptr -> IO ()
+foreign import ccall "blst_miller_loop" c_blst_miller_loop :: PTPtr -> Affine2Ptr -> Affine1Ptr -> IO ()
 
 ---- Raw BLST error constants
 
@@ -867,7 +867,7 @@ pairing p1 p2 =
       withAffine (toAffine p1) $ \ap1 ->
         withAffine (toAffine p2) $ \ap2 ->
           withNewPT' $ \ppt ->
-            c_blst_miller_loop ppt ap1 ap2
+            c_blst_miller_loop ppt ap2 ap1
   else
     Left BLST_POINT_NOT_IN_GROUP
     
