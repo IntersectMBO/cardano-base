@@ -7,6 +7,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -14,6 +15,7 @@
 module Cardano.Crypto.PackedBytes
   ( PackedBytes(..)
   , packBytes
+  , packBytesMaybe
   , packPinnedBytes
   , unpackBytes
   , unpackPinnedBytes
@@ -24,6 +26,7 @@ import Codec.Serialise (Serialise(..))
 import Codec.Serialise.Decoding (decodeBytes)
 import Codec.Serialise.Encoding (encodeBytes)
 import Control.DeepSeq
+import Control.Monad (guard)
 import Control.Monad.Primitive
 import Data.Bits
 import Data.ByteString
@@ -157,42 +160,49 @@ unpackBytesWith _ (PackedBytes# ba#) = ByteArray ba#
 {-# INLINE unpackBytesWith #-}
 
 
-packBytes8 :: ShortByteString -> PackedBytes 8
-packBytes8 (SBS ba#) =
+packBytes8 :: ShortByteString -> Int -> PackedBytes 8
+packBytes8 (SBS ba#) offset =
   let ba = ByteArray ba#
-   in PackedBytes8 (indexWord64BE ba 0)
+   in PackedBytes8 (indexWord64BE ba offset)
 {-# INLINE packBytes8 #-}
 
-packBytes28 :: ShortByteString -> PackedBytes 28
-packBytes28 (SBS ba#) =
+packBytes28 :: ShortByteString -> Int -> PackedBytes 28
+packBytes28 (SBS ba#) offset =
   let ba = ByteArray ba#
   in PackedBytes28
-       (indexWord64BE ba 0)
-       (indexWord64BE ba 8)
-       (indexWord64BE ba 16)
-       (indexWord32BE ba 24)
+       (indexWord64BE ba offset)
+       (indexWord64BE ba (offset + 8))
+       (indexWord64BE ba (offset + 16))
+       (indexWord32BE ba (offset + 24))
 {-# INLINE packBytes28 #-}
 
-packBytes32 :: ShortByteString -> PackedBytes 32
-packBytes32 (SBS ba#) =
+packBytes32 :: ShortByteString -> Int -> PackedBytes 32
+packBytes32 (SBS ba#) offset =
   let ba = ByteArray ba#
   in PackedBytes32
-       (indexWord64BE ba 0)
-       (indexWord64BE ba 8)
-       (indexWord64BE ba 16)
-       (indexWord64BE ba 24)
+       (indexWord64BE ba offset)
+       (indexWord64BE ba (offset + 8))
+       (indexWord64BE ba (offset + 16))
+       (indexWord64BE ba (offset + 24))
 {-# INLINE packBytes32 #-}
 
-packBytes :: forall n . KnownNat n => ShortByteString -> PackedBytes n
-packBytes sbs@(SBS ba#) =
+packBytes :: forall n . KnownNat n => ShortByteString -> Int -> PackedBytes n
+packBytes sbs@(SBS ba#) offset =
   let px = Proxy :: Proxy n
+      n = fromInteger (natVal px)
+      ba = ByteArray ba#
    in case sameNat px (Proxy :: Proxy 8) of
-        Just Refl -> packBytes8 sbs
+        Just Refl -> packBytes8 sbs offset
         Nothing -> case sameNat px (Proxy :: Proxy 28) of
-          Just Refl -> packBytes28 sbs
+          Just Refl -> packBytes28 sbs offset
           Nothing -> case sameNat px (Proxy :: Proxy 32) of
-            Just Refl -> packBytes32 sbs
-            Nothing   -> PackedBytes# ba#
+            Just Refl -> packBytes32 sbs offset
+            Nothing
+              | offset == 0
+              , sizeofByteArray ba == n -> PackedBytes# ba#
+            Nothing ->
+              let !(ByteArray slice#) = cloneByteArray ba offset n
+               in PackedBytes# slice#
 {-# INLINE[1] packBytes #-}
 
 {-# RULES
@@ -200,6 +210,16 @@ packBytes sbs@(SBS ba#) =
 "packBytes28" packBytes = packBytes28
 "packBytes32" packBytes = packBytes32
   #-}
+
+-- | Construct `PackedBytes` from a `ShortByteString` and a non-negative offset
+-- in number of bytes from the beginning. This function is safe.
+packBytesMaybe :: forall n . KnownNat n => ShortByteString -> Int -> Maybe (PackedBytes n)
+packBytesMaybe bs offset = do
+  let bufferSize = SBS.length bs
+      size = fromInteger (natVal' (proxy# @n))
+  guard (offset >= 0)
+  guard (size <= bufferSize - offset)
+  Just $! packBytes bs offset
 
 
 packPinnedBytes8 :: ByteString -> PackedBytes 8
