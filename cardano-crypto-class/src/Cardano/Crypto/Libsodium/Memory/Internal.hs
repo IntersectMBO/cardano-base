@@ -115,13 +115,11 @@ sodiumMalloc size = do
     when (ptr == nullPtr) $ do
         errno <- getErrno
         ioException $ errnoToIOError "c_sodium_malloc" errno Nothing Nothing
-    -- putStrLn $ "sodiumMalloc " <> show ptr
     pushAllocLogEvent $ AllocEv (ptrToWordPtr ptr)
     return ptr
 
 sodiumFree :: Ptr a -> IO ()
 sodiumFree ptr = do
-  -- putStrLn $ "sodiumFree " <> show ptr
   pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr)
   c_sodium_free ptr
 
