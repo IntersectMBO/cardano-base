@@ -162,7 +162,9 @@ jobs:
       run: cabal build all --only-dependencies
 
     - name: Build
-      run: cabal build all
+      run: |
+        cabal build all
+        cat dist-newstyle/cache/plan.json | jq . | grep -A 10 aeson
 
     - name: Git clone
       run: git clone https://github.com/input-output-hk/cardano-mainnet-mirror
