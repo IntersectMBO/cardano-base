@@ -16,7 +16,7 @@
 // size; however, demanding more than POOL_ITEM_SIZE bytes will cause this
 // function to fail by returning NULL, and demanding less will cause it to
 // still allocate POOL_ITEM_SIZE bytes.
-void* mlocked_stack_malloc(size_t);
+void* mlocked_pool_malloc(size_t);
 
 // Free memory previously allocated with mlocked_stack_malloc.
 //
@@ -24,4 +24,4 @@ void* mlocked_stack_malloc(size_t);
 // allocated by mlocked_stack_malloc. Doing so will mark the memory you passed
 // as available for future allocations, and it will end up being returned from
 // mlocked_stack_malloc() without actually being mlocked.
-void mlocked_free(void* item);
+void mlocked_pool_free(void* item);

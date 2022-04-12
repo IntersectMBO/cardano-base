@@ -88,11 +88,13 @@ allocMLockedForeignPtr :: Storable a => IO (MLockedForeignPtr a)
 allocMLockedForeignPtr = impl undefined where
     impl :: forall b. Storable b => b -> IO (MLockedForeignPtr b)
     impl b = do
-        ptr <- sodiumMalloc size
-        let finalizer = sodiumFree ptr
+        ptr <- malloc size
+        let finalizer = free ptr
         fmap SFP (newForeignPtr ptr finalizer)
 
       where
+        (malloc, free) = getAllocator size
+
         size :: CSize
         size = fromIntegral size''
 
@@ -109,6 +111,24 @@ allocMLockedForeignPtr = impl undefined where
           where
             (q,m) = size' `divMod` align
 
+getAllocator :: CSize -> (CSize -> IO (Ptr a), Ptr a -> IO ())
+getAllocator size
+  | size <= 32
+  = (sodiumMallocSmall, sodiumFreeSmall)
+  | otherwise
+  = (sodiumMalloc, sodiumFree)
+
+mlockedAlloca :: forall a b. CSize -> (Ptr a -> IO b) -> IO b
+mlockedAlloca size =
+  bracket (malloc size) free
+  where
+    (malloc, free) = getAllocator size
+
+mlockedAllocaSized :: forall n b. KnownNat n => (SizedPtr n -> IO b) -> IO b
+mlockedAllocaSized k = mlockedAlloca size (k . SizedPtr) where
+    size :: CSize
+    size = fromInteger (natVal (Proxy @n))
+
 sodiumMalloc :: CSize -> IO (Ptr a)
 sodiumMalloc size = do
     ptr <- c_sodium_malloc size
@@ -123,10 +143,16 @@ sodiumFree ptr = do
   pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr)
   c_sodium_free ptr
 
-mlockedAlloca :: forall a b. CSize -> (Ptr a -> IO b) -> IO b
-mlockedAlloca size = bracket (sodiumMalloc size) sodiumFree
+sodiumMallocSmall :: CSize -> IO (Ptr a)
+sodiumMallocSmall size = do
+    ptr <- c_mlocked_pool_malloc size
+    when (ptr == nullPtr) $ do
+        errno <- getErrno
+        ioException $ errnoToIOError "c_mlocked_pool_malloc" errno Nothing Nothing
+    pushAllocLogEvent $ AllocEv (ptrToWordPtr ptr)
+    return ptr
 
-mlockedAllocaSized :: forall n b. KnownNat n => (SizedPtr n -> IO b) -> IO b
-mlockedAllocaSized k = mlockedAlloca size (k . SizedPtr) where
-    size :: CSize
-    size = fromInteger (natVal (Proxy @n))
+sodiumFreeSmall :: Ptr a -> IO ()
+sodiumFreeSmall ptr = do
+  pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr)
+  c_mlocked_pool_free ptr
