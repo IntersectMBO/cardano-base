@@ -4,18 +4,14 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <pthread.h>
+
+// Pool size was picked to fit one Ed25519 signing key (32 octets).
 
 #define POOL_ITEM_SIZE 32U
 
-#ifndef DEFAULT_PAGE_SIZE
-# ifdef PAGE_SIZE
-#  define DEFAULT_PAGE_SIZE PAGE_SIZE
-# else
-#  define DEFAULT_PAGE_SIZE 0x10000
-# endif
-#endif
-
+static size_t page_size = 0x10000;
 typedef struct mlocked_pool_t mlocked_pool_t;
 
 static void mlocked_pool_init();
@@ -40,9 +36,12 @@ static mlocked_pool_t global_pool;
 
 static void mlocked_pool_init()
 {
+    page_size = sysconf(_SC_PAGESIZE);
     pthread_mutex_init(&mlocked_pool_mutex, NULL);
     // fprintf(stderr, "mlocked_pool_init\n");
+    pthread_mutex_lock(&mlocked_pool_mutex);
     memset(&global_pool, 0, sizeof(mlocked_pool_t));
+    pthread_mutex_unlock(&mlocked_pool_mutex);
 }
 
 static void mlocked_pool_reset(mlocked_pool_t *p)
@@ -61,12 +60,12 @@ static void mlocked_pool_grow(mlocked_pool_t *p)
     size_t i;
     void* new_page;
 
-    // fprintf(stderr, "mlocked_pool_grow\n");
     p->pool_size++;
-    p->pool = realloc(p->pool, p->pool_size);
-    new_page = sodium_malloc(DEFAULT_PAGE_SIZE);
+    fprintf(stderr, "mlocked_pool_grow %i x %u\n", p->pool_size, page_size);
+    p->pool = realloc(p->pool, p->pool_size * sizeof(void*));
+    new_page = sodium_malloc(page_size);
     p->pool[p->pool_size - 1] = new_page;
-    for (i = 0; i < DEFAULT_PAGE_SIZE; i += POOL_ITEM_SIZE) {
+    for (i = 0; i < page_size; i += POOL_ITEM_SIZE) {
         mlocked_pool_stack_push(p, new_page + i);
     }
 }
@@ -81,7 +80,7 @@ static void mlocked_pool_stack_grow(mlocked_pool_t *p)
         p->stack_cap = 64;
     else
         p->stack_cap <<= 1;
-    // fprintf(stderr, "new size: %i\n", p->stack_cap);
+    fprintf(stderr, "mlocked_pool_stack_grow %i\n", p->stack_cap);
     p->stack = realloc(p->stack, p->stack_cap * sizeof(void*));
 }
 
@@ -105,12 +104,10 @@ static bool mlocked_pool_stack_pop(void** dst, mlocked_pool_t *p)
 
 static void mlocked_atexit()
 {
+    pthread_once(&mlocked_pool_once, mlocked_pool_init);
+    pthread_mutex_lock(&mlocked_pool_mutex);
+    fprintf(stderr, "mlocked_pool_atexit %i x %u\n", global_pool.pool_size, page_size);
     mlocked_pool_reset(&global_pool);
-}
-
-void mlocked_pool()
-{
-   /* Do work. */
     pthread_mutex_unlock(&mlocked_pool_mutex);
 }
 
@@ -129,7 +126,7 @@ void* mlocked_pool_malloc(size_t size)
     pthread_once(&mlocked_pool_once, mlocked_pool_init);
     pthread_mutex_lock(&mlocked_pool_mutex);
 
-    if (global_pool.stack_top >= global_pool.stack_cap) {
+    if (global_pool.stack_top == 0) {
         mlocked_pool_grow(&global_pool);
     }
     success = mlocked_pool_stack_pop(&item, &global_pool);
