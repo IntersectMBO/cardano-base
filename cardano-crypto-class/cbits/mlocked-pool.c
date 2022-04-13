@@ -11,7 +11,7 @@
 
 #define POOL_ITEM_SIZE 32U
 
-static size_t page_size = 0x10000;
+static size_t page_size = 4096;
 typedef struct mlocked_pool_t mlocked_pool_t;
 
 static void mlocked_pool_init();
