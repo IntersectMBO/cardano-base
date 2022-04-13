@@ -36,7 +36,9 @@ static mlocked_pool_t global_pool;
 
 static void mlocked_pool_init()
 {
+    #ifdef _SC_PAGESIZE
     page_size = sysconf(_SC_PAGESIZE);
+    #endif
     pthread_mutex_init(&mlocked_pool_mutex, NULL);
     // fprintf(stderr, "mlocked_pool_init\n");
     pthread_mutex_lock(&mlocked_pool_mutex);
