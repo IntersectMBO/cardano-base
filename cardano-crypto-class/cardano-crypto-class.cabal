@@ -19,6 +19,7 @@ category:           Currency
 build-type:         Simple
 extra-source-files: README.md
 extra-source-files: cbits/mlocked-pool.h
+                  , cbits/mlocked-pool.c
 
 flag development
   description: Disable `-Werror`

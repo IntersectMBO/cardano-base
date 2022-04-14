@@ -11,7 +11,7 @@
 
 #define POOL_ITEM_SIZE 32U
 
-static size_t page_size = 4096;
+static size_t page_size = 4096U;
 typedef struct mlocked_pool_t mlocked_pool_t;
 
 static void mlocked_pool_init();
@@ -34,16 +34,27 @@ static pthread_mutex_t mlocked_pool_mutex;
 
 static mlocked_pool_t global_pool;
 
+static void mlocked_pool_atexit()
+{
+    pthread_mutex_lock(&mlocked_pool_mutex);
+    fprintf(stderr, "mlocked_pool_atexit %i x %u\n", global_pool.pool_size, page_size);
+    mlocked_pool_reset(&global_pool);
+    pthread_mutex_unlock(&mlocked_pool_mutex);
+}
+
 static void mlocked_pool_init()
 {
+    #if 0
     #ifdef _SC_PAGESIZE
     page_size = sysconf(_SC_PAGESIZE);
+    #endif
     #endif
     pthread_mutex_init(&mlocked_pool_mutex, NULL);
     // fprintf(stderr, "mlocked_pool_init\n");
     pthread_mutex_lock(&mlocked_pool_mutex);
     memset(&global_pool, 0, sizeof(mlocked_pool_t));
     pthread_mutex_unlock(&mlocked_pool_mutex);
+    atexit(mlocked_pool_atexit);
 }
 
 static void mlocked_pool_reset(mlocked_pool_t *p)
@@ -54,7 +65,7 @@ static void mlocked_pool_reset(mlocked_pool_t *p)
         sodium_free(p->pool[i]);
     }
     free(p->pool);
-    mlocked_pool_init(p);
+    memset(&global_pool, 0, sizeof(mlocked_pool_t));
 }
 
 static void mlocked_pool_grow(mlocked_pool_t *p)
@@ -102,15 +113,6 @@ static bool mlocked_pool_stack_pop(void** dst, mlocked_pool_t *p)
         return false;
     *dst = p->stack[--(p->stack_top)];
     return true;
-}
-
-static void mlocked_atexit()
-{
-    pthread_once(&mlocked_pool_once, mlocked_pool_init);
-    pthread_mutex_lock(&mlocked_pool_mutex);
-    fprintf(stderr, "mlocked_pool_atexit %i x %u\n", global_pool.pool_size, page_size);
-    mlocked_pool_reset(&global_pool);
-    pthread_mutex_unlock(&mlocked_pool_mutex);
 }
 
 void* mlocked_pool_malloc(size_t size)
