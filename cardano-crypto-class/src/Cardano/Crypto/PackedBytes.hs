@@ -219,7 +219,7 @@ packBytesMaybe bs offset = do
       size = fromInteger (natVal' (proxy# @n))
   guard (offset >= 0)
   guard (size <= bufferSize - offset)
-  Just $! packBytes bs offset
+  Just $ packBytes bs offset
 
 
 packPinnedBytes8 :: ByteString -> PackedBytes 8
