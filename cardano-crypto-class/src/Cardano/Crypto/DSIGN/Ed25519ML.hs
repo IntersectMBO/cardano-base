@@ -173,7 +173,7 @@ instance DSIGNMAlgorithm IO Ed25519DSIGNM where
         seed <- mlsbNew
         mlsbUseAsSizedPtr sk $ \skPtr ->
           mlsbUseAsSizedPtr seed $ \seedPtr ->
-            cOrError "rawSerialiseSignKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
+            cOrError "getSeedDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
               $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
         return seed
 

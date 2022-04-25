@@ -16,7 +16,7 @@ where
 {- HLINT ignore "Use <$>" -}
 {- HLINT ignore "Reduce duplication" -}
 
-import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property, ioProperty)
+import Test.QuickCheck ((=/=), (===), (==>), Arbitrary(..), Gen, Property, ioProperty, property)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
 
@@ -24,7 +24,7 @@ import qualified Data.ByteString as BS
 import qualified Cardano.Crypto.Libsodium as NaCl
 
 import Text.Show.Pretty (ppShow)
-import Control.Monad ((>=>))
+import Control.Monad ((>=>), mzero)
 
 #ifdef SECP256K1
 import Data.ByteString (ByteString)
@@ -37,8 +37,10 @@ import qualified Test.QuickCheck.Gen as Gen
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
 
-import Control.Exception (evaluate)
+import Control.Exception (evaluate, bracket)
 import System.IO.Unsafe (unsafePerformIO)
+
+import GHC.TypeNats (KnownNat)
 
 import Cardano.Crypto.DSIGN (
   MockDSIGN, 
@@ -118,20 +120,8 @@ import Test.Crypto.Util (
   prop_cbor_size,
   prop_cbor_direct_vs_class,
   prop_no_thunks,
-  prop_cbor_IO_from,
-  prop_cbor_IO_with,
-  prop_cbor_with_IO_from,
-  prop_cbor_with_IO_with,
-  prop_cbor_size_IO_from,
-  prop_cbor_size_IO_with,
-  prop_cbor_direct_vs_class_IO_from,
-  prop_cbor_direct_vs_class_IO_with,
   prop_no_thunks_IO_from,
   prop_no_thunks_IO_with,
-  prop_size_serialise_IO_from,
-  prop_size_serialise_IO_with,
-  prop_raw_serialise_IO_from,
-  prop_raw_serialise_IO_with,
   arbitrarySeedOfSize,
   arbitrarySeedBytesOfSize,
   Lock, withLock
@@ -203,7 +193,9 @@ defaultSigGenM = do
   mkSK <- defaultSignKeyGenM
   return $ do
     sk <- mkSK
-    signDSIGNM () msg sk
+    sig <- signDSIGNM () msg sk
+    forgetSignKeyDSIGNM sk
+    return sig
 
 --
 -- The list of all tests
@@ -351,6 +343,7 @@ testDSIGNMAlgorithm
                  , SignableM v a
                  , ContextDSIGNM v ~ ()
                  , ContextDSIGN w ~ ()
+                 , KnownNat (SeedSizeDSIGNM v)
                  , Eq a
                  )
   => Lock
@@ -363,81 +356,93 @@ testDSIGNMAlgorithm lock mkSigM _ mkMsg n =
   testGroup n
     [ testGroup "serialisation"
       [ testGroup "raw"
-        [ testProperty "VerKey"  $ prop_raw_serialise_IO_from @(VerKeyDSIGNM v)
-                                                      (return . rawSerialiseVerKeyDSIGNM)
-                                                      (return . rawDeserialiseVerKeyDSIGNM)
-                                                      (genKeyDSIGNM >=> deriveVerKeyDSIGNM)
-        , testProperty "SignKey" $ prop_raw_serialise_IO_from @(SignKeyDSIGNM v)
-                                                      rawSerialiseSignKeyDSIGNM
-                                                      rawDeserialiseSignKeyDSIGNM
-                                                      genKeyDSIGNM
-        , testProperty "Sig"     $ prop_raw_serialise_IO_with @(SigDSIGNM v)
-                                                      (return . rawSerialiseSigDSIGNM)
-                                                      (return . rawDeserialiseSigDSIGNM)
-                                                      mkSigM
+        [ testProperty "VerKey" $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+              return $ (rawDeserialiseVerKeyDSIGNM . rawSerialiseVerKeyDSIGNM $ vk) === Just vk
+        , testProperty "SignKey" $
+            ioProperty . withLock lock . withNewTestSK $ \sk -> do
+              serialized <- rawSerialiseSignKeyDSIGNM sk
+              msk' <- rawDeserialiseSignKeyDSIGNM serialized
+              equals <- evaluate (Just sk == msk')
+              maybe (return ()) forgetSignKeyDSIGNM msk'
+              return equals
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+              return $ (rawDeserialiseSigDSIGNM . rawSerialiseSigDSIGNM $ sig) === Just sig
         ]
-
       , testGroup "size"
-        [ testProperty "VerKey"  $ prop_size_serialise_IO_from @(VerKeyDSIGNM v)
-                                                       (return . rawSerialiseVerKeyDSIGNM)
-                                                       (sizeVerKeyDSIGNM (Proxy @ v))
-                                                       (genKeyDSIGNM >=> deriveVerKeyDSIGNM)
-        , testProperty "SignKey" $ prop_size_serialise_IO_from @(SignKeyDSIGNM v)
-                                                       rawSerialiseSignKeyDSIGNM
-                                                       (sizeSignKeyDSIGNM (Proxy @ v))
-                                                       genKeyDSIGNM
-        , testProperty "Sig"     $ prop_size_serialise_IO_with @(SigDSIGNM v)
-                                                       (return . rawSerialiseSigDSIGNM)
-                                                       (sizeSigDSIGNM (Proxy @ v))
-                                                       mkSigM
+        [ testProperty "VerKey"  $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+              return $ (fromIntegral . BS.length . rawSerialiseVerKeyDSIGNM $ vk) === (sizeVerKeyDSIGNM (Proxy @v))
+        , testProperty "SignKey" $
+            ioProperty . withLock lock . withNewTestSK $ \sk -> do
+              serialized <- rawSerialiseSignKeyDSIGNM sk
+              equals <- evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyDSIGNM (Proxy @v)))
+              return equals
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+              return $ (fromIntegral . BS.length . rawSerialiseSigDSIGNM $ sig) === (sizeSigDSIGNM (Proxy @v))
         ]
 
       , testGroup "direct CBOR"
-        [ testProperty "VerKey"  $ prop_cbor_with_IO_from @(VerKeyDSIGNM v)
-                                                  lock
-                                                  encodeVerKeyDSIGNM
-                                                  decodeVerKeyDSIGNM
-                                                  (genKeyDSIGNM >=> deriveVerKeyDSIGNM)
-        , testProperty "SignKey" $ prop_cbor_with_IO_from @(SignKeyDSIGNM v)
-                                                  lock
-                                                  (unsafePerformIO . encodeSignKeyDSIGNM)
-                                                  (fmap unsafePerformIO $ decodeSignKeyDSIGNM)
-                                                  genKeyDSIGNM
-        , testProperty "Sig"     $ prop_cbor_with_IO_with @(SigDSIGNM v)
-                                                  lock
-                                                  encodeSigDSIGNM
-                                                  decodeSigDSIGNM
-                                                  mkSigM
+        [ testProperty "VerKey" $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+              return $ prop_cbor_with encodeVerKeyDSIGNM decodeVerKeyDSIGNM vk
+        -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
+        -- and require IO for access.
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+              return $ prop_cbor_with encodeSigDSIGNM decodeSigDSIGNM sig
         ]
 
       , testGroup "To/FromCBOR class"
-        [ testProperty "VerKey"  $ prop_cbor_IO_from @(VerKeyDSIGNM v) lock genVerKeyDSIGNM
+        [ testProperty "VerKey"  $
+              ioProperty . withLock lock $ do
+                vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+                return $ prop_cbor vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
-        -- , testProperty "SignKey" $ prop_cbor_IO_from @(SignKeyDSIGNM v) genKeyDSIGNM
-        , testProperty "Sig"     $ prop_cbor_IO_with @(SigDSIGNM v) lock mkSigM
+        , testProperty "Sig" $ property $ do
+              msg <- mkMsg
+              return . ioProperty . withLock lock $ do
+                sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+                return $ prop_cbor sig
         ]
 
       , testGroup "ToCBOR size"
-        [ testProperty "VerKey"  $ prop_cbor_size_IO_from @(VerKeyDSIGNM v) genVerKeyDSIGNM
+        [ testProperty "VerKey"  $
+              ioProperty . withLock lock $ do
+                vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+                return $ prop_cbor_size vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
-        -- , testProperty "SignKey" $ prop_cbor_size_IO_from @(SignKeyDSIGNM v) genKeyDSIGNM
-        , testProperty "Sig"     $ prop_cbor_size_IO_with @(SigDSIGNM v) mkSigM
+        , testProperty "Sig" $ property $ do
+              msg <- mkMsg
+              return . ioProperty . withLock lock $ do
+                sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+                return $ prop_cbor_size sig
         ]
 
       , testGroup "direct matches class"
-        [ testProperty "VerKey"  $ prop_cbor_direct_vs_class_IO_from @(VerKeyDSIGNM v)
-                                                             encodeVerKeyDSIGNM
-                                                             genVerKeyDSIGNM
-        -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
-        -- , testProperty "SignKey" $ prop_cbor_direct_vs_class @(SignKeyDSIGNM v)
-        --                                                      encodeSignKeyDSIGNM
-        , testProperty "Sig"     $ prop_cbor_direct_vs_class_IO_with @(SigDSIGNM v)
-                                                             encodeSigDSIGNM
-                                                             mkSigM
+        [ testProperty "VerKey" $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+              return $ prop_cbor_direct_vs_class encodeVerKeyDSIGNM vk
+        -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
+        -- and require IO for access.
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+              return $ prop_cbor_direct_vs_class encodeSigDSIGNM sig
         ]
-        , testGroup "Seed/SK"
-          [ testProperty "Seed round-trip" $ prop_dsignm_seed_roundtrip lock (Proxy @v)
-          ]
       ]
 
     , testGroup "verify"
@@ -452,7 +457,27 @@ testDSIGNMAlgorithm lock mkSigM _ mkMsg n =
       , testProperty "Sig"     $ prop_no_thunks_IO_with @(SigDSIGNM v) lock mkSigM
       ]
     ]
+  where
+    withTestSeedMLSB :: forall a. (NaCl.MLockedSizedBytes (SeedSizeDSIGNM v) -> IO a) -> IO a
+    withTestSeedMLSB action =
+      bracket
+        (NaCl.mlsbFromByteString =<< generate (arbitrarySeedBytesOfSize (seedSizeDSIGNM (Proxy :: Proxy v))))
+        NaCl.mlsbFinalize
+        action
 
+    withTestSK :: forall a. (SignKeyDSIGNM v -> IO a) -> NaCl.MLockedSizedBytes (SeedSizeDSIGNM v) -> IO a
+    withTestSK action seed =
+      bracket
+        (genKeyDSIGNM seed)
+        forgetSignKeyDSIGNM
+        action
+
+    withNewTestSK :: forall a. (SignKeyDSIGNM v -> IO a) -> IO a
+    withNewTestSK action =
+      bracket
+        (withTestSeedMLSB genKeyDSIGNM)
+        forgetSignKeyDSIGNM
+        action
 
 prop_dsignm_seed_roundtrip
   :: forall v. (DSIGNMAlgorithm IO v)
@@ -506,6 +531,7 @@ prop_dsignm_verify_pos lock _ mkMsg seed = ioProperty . withLock lock $ do
   (sk :: SignKeyDSIGNM v) <- genKeyDSIGNM seed
   sig <- signDSIGNM () a sk
   vk <- deriveVerKeyDSIGNM sk
+  forgetSignKeyDSIGNM sk
   return $ verifyDSIGNM () vk a sig === Right ()
 
 -- | If we sign a message @a@ with one signing key, if we try to verify the
@@ -526,6 +552,8 @@ prop_dsignm_verify_neg_key lock _ mkMsg seed seed' = ioProperty . withLock lock 
   (sk' :: SignKeyDSIGNM v) <- genKeyDSIGNM seed'
   sig <- signDSIGNM () a sk
   vk' <- deriveVerKeyDSIGNM sk'
+  forgetSignKeyDSIGNM sk
+  forgetSignKeyDSIGNM sk'
   return $ 
     seed /= seed' ==> verifyDSIGNM () vk' a sig =/= Right ()
 
@@ -554,6 +582,7 @@ prop_dsignm_verify_neg_msg lock _ mkMsg seed = ioProperty . withLock lock $ do
   (sk :: SignKeyDSIGNM v) <- genKeyDSIGNM seed
   sig <- signDSIGNM () a sk
   vk <- deriveVerKeyDSIGNM sk
+  forgetSignKeyDSIGNM sk
   return $ 
     a /= a' ==> verifyDSIGNM () vk a' sig =/= Right ()
 --

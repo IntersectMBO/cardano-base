@@ -11,27 +11,14 @@ module Test.Crypto.Util
     FromCBOR (..)
   , ToCBOR (..)
   , prop_cbor
-  , prop_cbor_IO_from
-  , prop_cbor_IO_with
   , prop_cbor_size
-  , prop_cbor_size_IO_from
-  , prop_cbor_size_IO_with
   , prop_cbor_with
-  , prop_cbor_with_IO_from
-  , prop_cbor_with_IO_with
   , prop_cbor_valid
   , prop_cbor_roundtrip
   , prop_raw_serialise
-  , prop_raw_serialise_IO_from
-  , prop_raw_serialise_IO_with
   , prop_raw_serialise_only
   , prop_size_serialise
-  , prop_size_serialise_IO
-  , prop_size_serialise_IO_from
-  , prop_size_serialise_IO_with
   , prop_cbor_direct_vs_class
-  , prop_cbor_direct_vs_class_IO_from 
-  , prop_cbor_direct_vs_class_IO_with
 
     -- * NoThunks
   , prop_no_thunks
@@ -162,14 +149,6 @@ prop_cbor :: (ToCBOR a, FromCBOR a, Eq a, Show a)
           => a -> Property
 prop_cbor = prop_cbor_with toCBOR fromCBOR
 
-prop_cbor_IO_from :: (ToCBOR a, FromCBOR a, Eq a, Show a)
-          => Lock -> (b -> IO a) -> b -> Property
-prop_cbor_IO_from lock = prop_cbor_with_IO_from lock toCBOR fromCBOR
-
-prop_cbor_IO_with :: (ToCBOR a, FromCBOR a, Eq a, Show a)
-          => Lock -> (Gen (IO a)) -> Property
-prop_cbor_IO_with lock = prop_cbor_with_IO_with lock toCBOR fromCBOR
-
 prop_cbor_size :: forall a. ToCBOR a => a -> Property
 prop_cbor_size a = counterexample (show lo ++ " ≰ " ++ show len) (lo <= len)
               .&&. counterexample (show len ++ " ≰ " ++ show hi) (len <= hi)
@@ -181,17 +160,6 @@ prop_cbor_size a = counterexample (show lo ++ " ≰ " ++ show len) (lo <= len)
         Right x -> x
         Left err -> error . show . build $ err
 
-prop_cbor_size_IO_from :: forall a b. ToCBOR a => (b -> IO a) -> b -> Property
-prop_cbor_size_IO_from mkX y = ioProperty $ do
-  x <- mkX y
-  return $ prop_cbor_size x
-
-prop_cbor_size_IO_with :: forall a. ToCBOR a => (Gen (IO a)) -> Property
-prop_cbor_size_IO_with mkX = ioProperty $ do
-  x <- join (generate mkX)
-  return $ prop_cbor_size x
-
-
 prop_cbor_with :: (Eq a, Show a)
                => (a -> Encoding)
                -> (forall s. Decoder s a)
@@ -200,31 +168,6 @@ prop_cbor_with :: (Eq a, Show a)
 prop_cbor_with encoder decoder x =
       prop_cbor_valid     encoder         x
  .&&. prop_cbor_roundtrip encoder decoder x
-
-prop_cbor_with_IO_from :: (Eq a, Show a)
-               => Lock
-               -> (a -> Encoding)
-               -> (forall s. Decoder s a)
-               -> (b -> IO a)
-               -> b
-               -> Property
-prop_cbor_with_IO_from lock encoder decoder mkX y =
-  ioProperty $
-  withLock lock $ do
-    x <- mkX y
-    return $ prop_cbor_with encoder decoder x
-
-prop_cbor_with_IO_with :: (Eq a, Show a)
-               => Lock
-               -> (a -> Encoding)
-               -> (forall s. Decoder s a)
-               -> (Gen (IO a))
-               -> Property
-prop_cbor_with_IO_with lock encoder decoder mkX =
-  ioProperty $ withLock lock $ do
-    x <- join (generate mkX)
-    return $ prop_cbor_with encoder decoder x
-
 
 prop_cbor_valid :: (a -> Encoding) -> a -> Property
 prop_cbor_valid encoder x =
@@ -258,31 +201,6 @@ prop_raw_serialise serialise deserialise x =
       Just y  -> y === x
       Nothing -> property False
 
-prop_raw_serialise_IO_with :: forall a. (Eq a, Show a)
-                   => (a -> IO ByteString)
-                   -> (ByteString -> IO (Maybe a))
-                   -> Gen (IO a)
-                   -> Property
-prop_raw_serialise_IO_with serialise deserialise mkX =
-  ioProperty $ do
-    x <- join (generate mkX)
-    serialise x >>= deserialise >>= \case
-      Just y  -> return (y === x)
-      Nothing -> return (property False)
-
-prop_raw_serialise_IO_from :: forall a b. (Eq a, Show a)
-                   => (a -> IO ByteString)
-                   -> (ByteString -> IO (Maybe a))
-                   -> (b -> IO a)
-                   -> b
-                   -> Property
-prop_raw_serialise_IO_from serialise deserialise mkX seed = do
-  ioProperty $ do
-    x <- mkX seed
-    serialise x >>= deserialise >>= \case
-      Just y  -> return (y === x)
-      Nothing -> return (property False)
-
 prop_raw_serialise_only :: (a -> ByteString)
                         -> a -> Bool
 prop_raw_serialise_only serialise x =
@@ -299,43 +217,9 @@ prop_cbor_direct_vs_class :: ToCBOR a
 prop_cbor_direct_vs_class encoder x =
   toFlatTerm (encoder x) === toFlatTerm (toCBOR x)
 
-prop_cbor_direct_vs_class_IO_from :: ToCBOR a
-                          => (a -> Encoding)
-                          -> (b -> IO a)
-                          -> b
-                          -> Property
-prop_cbor_direct_vs_class_IO_from encoder mkX y =
-  ioProperty $ do
-    x <- mkX y
-    return $ prop_cbor_direct_vs_class encoder x
-
-prop_cbor_direct_vs_class_IO_with :: ToCBOR a
-                          => (a -> Encoding)
-                          -> (Gen (IO a))
-                          -> Property
-prop_cbor_direct_vs_class_IO_with encoder mkX =
-  ioProperty $ do
-    x <- join (generate mkX)
-    return $ prop_cbor_direct_vs_class encoder x
-
 prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
 prop_size_serialise serialise size x =
     BS.length (serialise x) === fromIntegral size
-
-prop_size_serialise_IO :: (a -> IO ByteString) -> Word -> a -> Property
-prop_size_serialise_IO serialise size = prop_size_serialise_IO_from serialise size return
-
-prop_size_serialise_IO_from :: (a -> IO ByteString) -> Word -> (b -> IO a) -> b -> Property
-prop_size_serialise_IO_from serialise size mkX y = ioProperty $ do
-    x <- mkX y
-    actual <- BS.length <$> serialise x
-    return $ actual === fromIntegral size
-
-prop_size_serialise_IO_with :: (a -> IO ByteString) -> Word -> (Gen (IO a)) -> Property
-prop_size_serialise_IO_with serialise size mkX = ioProperty $ do
-    x <- join (generate mkX)
-    actual <- BS.length <$> serialise x
-    return $ actual === fromIntegral size
 
 --------------------------------------------------------------------------------
 -- NoThunks

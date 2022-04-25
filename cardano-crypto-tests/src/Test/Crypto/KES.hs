@@ -40,7 +40,7 @@ import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import qualified Cardano.Crypto.Libsodium as NaCl
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
-import Cardano.Prelude (ReaderT, runReaderT)
+import Cardano.Prelude (ReaderT, runReaderT, evaluate, bracket)
 import Cardano.Crypto.SafePinned
 
 import Test.QuickCheck
@@ -257,61 +257,92 @@ testKESAlgorithm lock _pm _pv n =
     , testGroup "serialisation"
 
       [ testGroup "raw ser only"
-        [ testProperty "VerKey"  $ prop_raw_serialise_only @(VerKeyKES v)
-                                                           rawSerialiseVerKeyKES
-        , testProperty "Sig"     $ prop_raw_serialise_only @(SigKES v)
-                                                           rawSerialiseSigKES
-        , testProperty "SignKey" $ prop_raw_serialise_only @(SignKeyKES v)
-                                                           (unsafePerformIO . io . rawSerialiseSignKeyKES @m @v)
+        [ testProperty "VerKey" $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
+              return $ (rawDeserialiseVerKeyKES . rawSerialiseVerKeyKES $ vk) === Just vk
+        , testProperty "SignKey" $
+            ioProperty . withLock lock . withNewTestSK $ \sk -> do
+              serialized <- rawSerialiseSignKeyKES sk
+              msk' <- rawDeserialiseSignKeyKES serialized
+              equals <- evaluate (Just sk == msk')
+              maybe (return ()) forgetSignKeyKES msk'
+              return equals
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigKES v <- withNewTestSK (signKES () 0 msg)
+              return $ (rawDeserialiseSigKES . rawSerialiseSigKES $ sig) === Just sig
         ]
-      , testGroup "raw"
-        [ testProperty "VerKey"  $ prop_raw_serialise @(VerKeyKES v)
-                                                      rawSerialiseVerKeyKES
-                                                      rawDeserialiseVerKeyKES
-        , testProperty "Sig"     $ prop_raw_serialise @(SigKES v)
-                                                      rawSerialiseSigKES
-                                                      rawDeserialiseSigKES
-        , testProperty "SignKey" $ prop_raw_serialise_IO_from @(SignKeyKES v)
-                                                      (io . rawSerialiseSignKeyKES @m @v)
-                                                      (io . rawDeserialiseSignKeyKES @m @v)
-                                                      (io . genKeyKES @m @v)
-        ]
-
       , testGroup "size"
-        [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyKES v)
-                                                       rawSerialiseVerKeyKES
-                                                       (sizeVerKeyKES (Proxy @ v))
-        , testProperty "Sig"     $ prop_size_serialise @(SigKES v)
-                                                       rawSerialiseSigKES
-                                                       (sizeSigKES (Proxy @ v))
+        [ testProperty "VerKey"  $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
+              return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === (sizeVerKeyKES (Proxy @v))
+        , testProperty "SignKey" $
+            ioProperty . withLock lock . withNewTestSK $ \sk -> do
+              serialized <- rawSerialiseSignKeyKES sk
+              equals <- evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyKES (Proxy @v)))
+              return equals
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigKES v <- withNewTestSK (signKES () 0 msg)
+              return $ (fromIntegral . BS.length . rawSerialiseSigKES $ sig) === (sizeSigKES (Proxy @v))
         ]
 
       , testGroup "direct CBOR"
-        [ testProperty "VerKey"  $ prop_cbor_with @(VerKeyKES v)
-                                                  encodeVerKeyKES
-                                                  decodeVerKeyKES
-        , testProperty "Sig"     $ prop_cbor_with @(SigKES v)
-                                                  encodeSigKES
-                                                  decodeSigKES
-        , testProperty "SignKey" $ prop_cbor_with @(SignKeyKES v)
-                                                  (unsafePerformIO . io @m . encodeSignKeyKES @v)
-                                                  (fromJust . unsafePerformIO . io @m <$> decodeSignKeyKES @v)
+        [ testProperty "VerKey" $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
+              return $ prop_cbor_with encodeVerKeyKES decodeVerKeyKES vk
+        -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
+        -- and require IO for access.
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigKES v <- withNewTestSK (signKES () 0 msg)
+              return $ prop_cbor_with encodeSigKES decodeSigKES sig
         ]
 
       , testGroup "To/FromCBOR class"
-        [ testProperty "VerKey"  $ prop_cbor @(VerKeyKES v)
-        , testProperty "Sig"     $ prop_cbor @(SigKES v)
+        [ testProperty "VerKey"  $
+              ioProperty . withLock lock $ do
+                vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
+                return $ prop_cbor vk
+        -- No To/FromCBOR for 'SignKeyKES', see above.
+        , testProperty "Sig" $ property $ do
+              msg <- mkMsg
+              return . ioProperty . withLock lock $ do
+                sig :: SigKES v <- withNewTestSK (signKES () 0 msg)
+                return $ prop_cbor sig
         ]
+
       , testGroup "ToCBOR size"
-        [ testProperty "VerKey"  $ prop_cbor_size @(VerKeyKES v)
-        , testProperty "Sig"     $ prop_cbor_size @(SigKES v)
+        [ testProperty "VerKey"  $
+              ioProperty . withLock lock $ do
+                vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
+                return $ prop_cbor_size vk
+        -- No To/FromCBOR for 'SignKeyKES', see above.
+        , testProperty "Sig" $ property $ do
+              msg <- mkMsg
+              return . ioProperty . withLock lock $ do
+                sig :: SigKES v <- withNewTestSK (signKES () 0 msg)
+                return $ prop_cbor_size sig
         ]
 
       , testGroup "direct matches class"
-        [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyKES v)
-                                                             encodeVerKeyKES
-        , testProperty "Sig"     $ prop_cbor_direct_vs_class @(SigKES v)
-                                                             encodeSigKES
+        [ testProperty "VerKey" $
+            ioProperty . withLock lock $ do
+              vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
+              return $ prop_cbor_direct_vs_class encodeVerKeyKES vk
+        -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
+        -- and require IO for access.
+        , testProperty "Sig" $ property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock $ do
+              sig :: SigKES v <- withNewTestSK (signKES () 0 msg)
+              return $ prop_cbor_direct_vs_class encodeSigKES sig
         ]
       ]
 
@@ -334,6 +365,31 @@ testKESAlgorithm lock _pm _pv n =
       , testProperty "Sig"     $ prop_no_thunks @(SigKES v)
       ]
     ]
+  where
+
+    mkMsg :: Gen Message
+    mkMsg = arbitrary
+
+    withTestSeedMLSB :: forall a. (NaCl.MLockedSizedBytes (SeedSizeKES v) -> IO a) -> IO a
+    withTestSeedMLSB action =
+      bracket
+        (NaCl.mlsbFromByteString =<< generate (arbitrarySeedBytesOfSize (seedSizeKES (Proxy :: Proxy v))))
+        NaCl.mlsbFinalize
+        action
+
+    withTestSK :: forall a. (SignKeyKES v -> IO a) -> NaCl.MLockedSizedBytes (SeedSizeKES v) -> IO a
+    withTestSK action seed =
+      bracket
+        (genKeyKES seed)
+        forgetSignKeyKES
+        action
+
+    withNewTestSK :: forall a. (SignKeyKES v -> IO a) -> IO a
+    withNewTestSK action =
+      bracket
+        (withTestSeedMLSB genKeyKES)
+        forgetSignKeyKES
+        action
 
 
 prop_onlyGenSignKeyKES
@@ -471,7 +527,8 @@ prop_verifyKES_negative_key
      , KESSignAlgorithm m v
      )
   => Lock -> Proxy m -> Proxy v
-  -> NaCl.MLockedSizedBytes (SeedSizeKES v) -> NaCl.MLockedSizedBytes (SeedSizeKES v)
+  -> NaCl.MLockedSizedBytes (SeedSizeKES v)
+  -> NaCl.MLockedSizedBytes (SeedSizeKES v)
   -> Message
   -> Property
 prop_verifyKES_negative_key lock _ _ seed seed' x =
