@@ -28,6 +28,7 @@ module Cardano.Crypto.Hash.Class
   , hashFromBytes
   , hashToBytesShort
   , hashFromBytesShort
+  , hashFromOffsetBytesShort
   , hashToPackedBytes
   , hashFromPackedBytes
 
@@ -63,7 +64,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.ByteString.Short as SBS
 import Data.Word (Word8)
 import Numeric.Natural (Natural)
 
@@ -157,28 +157,37 @@ hashToBytes (UnsafeHashRep h) = unpackPinnedBytes h
 
 -- | Make a hash from it bytes representation.
 --
--- It must be a a bytestring of the correct length, as given by 'sizeHash'.
---
-hashFromBytes :: forall h a. HashAlgorithm h => ByteString -> Maybe (Hash h a)
+hashFromBytes ::
+     forall h a. HashAlgorithm h
+  => ByteString
+  -- ^ It must have an exact length, as given by 'sizeHash'.
+  -> Maybe (Hash h a)
 hashFromBytes bytes
   | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just $! UnsafeHashRep (packPinnedBytes bytes)
+  = Just $ UnsafeHashRep (packPinnedBytes bytes)
 
   | otherwise
   = Nothing
 
 -- | Make a hash from it bytes representation, as a 'ShortByteString'.
 --
--- It must be a a bytestring of the correct length, as given by 'sizeHash'.
---
-hashFromBytesShort :: forall h a. HashAlgorithm h
-                   => ShortByteString -> Maybe (Hash h a)
-hashFromBytesShort bytes
-  | SBS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just $! UnsafeHashRep (packBytes bytes)
+hashFromBytesShort ::
+     forall h a. HashAlgorithm h
+  => ShortByteString
+  -- ^ It must be a buffer of exact length, as given by 'sizeHash'.
+  -> Maybe (Hash h a)
+hashFromBytesShort bytes = UnsafeHashRep <$> packBytesMaybe bytes 0
 
-  | otherwise
-  = Nothing
+-- | Just like `hashFromBytesShort`, but allows using a region of a 'ShortByteString'.
+--
+hashFromOffsetBytesShort ::
+     forall h a. HashAlgorithm h
+  => ShortByteString
+  -- ^ It must be a buffer that contains at least 'sizeHash' many bytes staring at an offset.
+  -> Int
+  -- ^ Offset in number of bytes
+  -> Maybe (Hash h a)
+hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packBytesMaybe bytes offset
 
 
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
@@ -215,7 +224,7 @@ hashFromStringAsHex = hashFromTextAsHex . Text.pack
 -- | Convert the hash to hex encoding, as 'Text'.
 --
 hashToTextAsHex :: Hash h a -> Text
-hashToTextAsHex = Text.decodeUtf8 . hashToBytesAsHex
+hashToTextAsHex = Text.decodeLatin1 . hashToBytesAsHex
 
 -- | Make a hash from hex-encoded 'Text' representation.
 --
@@ -253,13 +262,13 @@ instance HashAlgorithm h => IsString (Hash h a) where
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
 instance HashAlgorithm h => ToJSONKey (Hash h a) where
-  toJSONKey = Aeson.toJSONKeyText hashToText 
+  toJSONKey = Aeson.toJSONKeyText hashToTextAsHex
 
 instance HashAlgorithm h => FromJSONKey (Hash h a) where
   fromJSONKey = Aeson.FromJSONKeyTextParser parseHash
 
 instance HashAlgorithm h => ToJSON (Hash h a) where
-  toJSON = toJSON . hashToText
+  toJSON = toJSON . hashToTextAsHex
 
 instance HashAlgorithm h => FromJSON (Hash h a) where
   parseJSON = Aeson.withText "hash" parseHash
@@ -269,10 +278,6 @@ instance HeapWords (Hash h a) where
   heapWords (UnsafeHashRep (PackedBytes28 _ _ _ _)) = 1 + 4
   heapWords (UnsafeHashRep (PackedBytes32 _ _ _ _)) = 1 + 4
   heapWords (UnsafeHashRep (PackedBytes# ba#)) = heapWords (SBSI.SBS ba#)
-
--- utils used in the instances above
-hashToText :: Hash h a -> Text
-hashToText = Text.decodeLatin1 . hashToBytesAsHex
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
