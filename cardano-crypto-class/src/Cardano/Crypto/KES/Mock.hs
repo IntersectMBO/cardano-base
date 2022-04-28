@@ -148,7 +148,7 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
 
     genKeyKES seed = do
         let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
-        return $ SignKeyMockKES vk 0
+        return $! SignKeyMockKES vk 0
 
     rawSerialiseSignKeyKES sk =
       return $ rawSerialiseSignKeyMockKES sk
