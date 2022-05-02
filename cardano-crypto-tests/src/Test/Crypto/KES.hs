@@ -27,7 +27,6 @@ import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
-import Data.Maybe (fromJust)
 import Text.Printf
 
 import Control.Concurrent (threadDelay)
@@ -239,7 +238,6 @@ testKESAlgorithm
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
-     , RunIO m
      , KESSignAlgorithm m v
      , KESSignAlgorithm IO v
      )
@@ -377,13 +375,6 @@ testKESAlgorithm lock _pm _pv n =
       bracket
         (NaCl.mlsbFromByteString =<< generate (arbitrarySeedBytesOfSize (seedSizeKES (Proxy :: Proxy v))))
         NaCl.mlsbFinalize
-        action
-
-    withTestSK :: forall a. (SignKeyKES v -> IO a) -> NaCl.MLockedSizedBytes (SeedSizeKES v) -> IO a
-    withTestSK action seed =
-      bracket
-        (genKeyKES seed)
-        forgetSignKeyKES
         action
 
     withNewTestSK :: forall a. (SignKeyKES v -> IO a) -> IO a

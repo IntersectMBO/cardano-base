@@ -24,7 +24,6 @@ import qualified Data.ByteString as BS
 import qualified Cardano.Crypto.Libsodium as NaCl
 
 import Text.Show.Pretty (ppShow)
-import Control.Monad ((>=>), mzero)
 
 #ifdef SECP256K1
 import Data.ByteString (ByteString)
@@ -38,9 +37,6 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
 
 import Control.Exception (evaluate, bracket)
-import System.IO.Unsafe (unsafePerformIO)
-
-import GHC.TypeNats (KnownNat)
 
 import Cardano.Crypto.DSIGN (
   MockDSIGN, 
@@ -95,8 +91,8 @@ import Cardano.Crypto.DSIGN (
   sizeSigDSIGNM,
   encodeVerKeyDSIGNM,
   decodeVerKeyDSIGNM,
-  encodeSignKeyDSIGNM,
-  decodeSignKeyDSIGNM,
+  -- encodeSignKeyDSIGNM,
+  -- decodeSignKeyDSIGNM,
   encodeSigDSIGNM,
   decodeSigDSIGNM,
   signDSIGNM,
@@ -106,9 +102,7 @@ import Cardano.Crypto.DSIGN (
   seedSizeDSIGNM,
 
   getSeedDSIGNM,
-  forgetSignKeyDSIGNM,
-
-  MLockedSeed
+  forgetSignKeyDSIGNM
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
@@ -121,8 +115,8 @@ import Test.Crypto.Util (
   prop_cbor_size,
   prop_cbor_direct_vs_class,
   prop_no_thunks,
-  prop_no_thunks_IO_from,
-  prop_no_thunks_IO_with,
+  -- prop_no_thunks_IO_from,
+  -- prop_no_thunks_IO_with,
   arbitrarySeedOfSize,
   arbitrarySeedBytesOfSize,
   Lock, withLock
@@ -344,7 +338,6 @@ testDSIGNMAlgorithm
                  , SignableM v a
                  , ContextDSIGNM v ~ ()
                  , ContextDSIGN w ~ ()
-                 , KnownNat (SeedSizeDSIGNM v)
                  , Eq a
                  )
   => Lock
@@ -353,95 +346,96 @@ testDSIGNMAlgorithm
   -> Gen a
   -> String
   -> TestTree
-testDSIGNMAlgorithm lock mkSigM _ mkMsg n =
+testDSIGNMAlgorithm lock _ _ mkMsg n =
   testGroup n
     [ testGroup "serialisation"
       [ testGroup "raw"
-        [ testProperty "VerKey" $
-            ioProperty . withLock lock $ do
-              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+        [ testProperty "VerKey" $ \seedPSB ->
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
               return $ (rawDeserialiseVerKeyDSIGNM . rawSerialiseVerKeyDSIGNM $ vk) === Just vk
-        , testProperty "SignKey" $
-            ioProperty . withLock lock . withNewTestSK $ \sk -> do
-              serialized <- rawSerialiseSignKeyDSIGNM sk
-              msk' <- rawDeserialiseSignKeyDSIGNM serialized
-              equals <- evaluate (Just sk == msk')
-              maybe (return ()) forgetSignKeyDSIGNM msk'
-              return equals
-        , testProperty "Sig" $ property $ do
+        , testProperty "SignKey" $ \seedPSB ->
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              withSK seed $ \sk -> do
+                serialized <- rawSerialiseSignKeyDSIGNM sk
+                msk' <- rawDeserialiseSignKeyDSIGNM serialized
+                equals <- evaluate (Just sk == msk')
+                maybe (return ()) forgetSignKeyDSIGNM msk'
+                return equals
+        , testProperty "Sig" $ \seedPSB -> property $ do
             msg <- mkMsg
-            return . ioProperty . withLock lock $ do
-              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+            return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              sig :: SigDSIGNM v <- withSK seed (signDSIGNM () msg)
               return $ (rawDeserialiseSigDSIGNM . rawSerialiseSigDSIGNM $ sig) === Just sig
         ]
       , testGroup "size"
-        [ testProperty "VerKey"  $
-            ioProperty . withLock lock $ do
-              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+        [ testProperty "VerKey" $ \seedPSB -> do
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
               return $ (fromIntegral . BS.length . rawSerialiseVerKeyDSIGNM $ vk) === (sizeVerKeyDSIGNM (Proxy @v))
-        , testProperty "SignKey" $
-            ioProperty . withLock lock . withNewTestSK $ \sk -> do
-              serialized <- rawSerialiseSignKeyDSIGNM sk
+        , testProperty "SignKey" $ \seedPSB -> do
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              serialized <- withSK seed rawSerialiseSignKeyDSIGNM
               equals <- evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyDSIGNM (Proxy @v)))
               return equals
-        , testProperty "Sig" $ property $ do
+        , testProperty "Sig" $ \seedPSB -> property $ do
             msg <- mkMsg
-            return . ioProperty . withLock lock $ do
-              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+            return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              sig :: SigDSIGNM v <- withSK seed (signDSIGNM () msg)
               return $ (fromIntegral . BS.length . rawSerialiseSigDSIGNM $ sig) === (sizeSigDSIGNM (Proxy @v))
         ]
 
       , testGroup "direct CBOR"
-        [ testProperty "VerKey" $
-            ioProperty . withLock lock $ do
-              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+        [ testProperty "VerKey" $ \seedPSB ->
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
               return $ prop_cbor_with encodeVerKeyDSIGNM decodeVerKeyDSIGNM vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
-        , testProperty "Sig" $ property $ do
+        , testProperty "Sig" $ \seedPSB -> property $ do
             msg <- mkMsg
-            return . ioProperty . withLock lock $ do
-              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+            return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              sig :: SigDSIGNM v <- withSK seed (signDSIGNM () msg)
               return $ prop_cbor_with encodeSigDSIGNM decodeSigDSIGNM sig
         ]
 
       , testGroup "To/FromCBOR class"
-        [ testProperty "VerKey"  $
-              ioProperty . withLock lock $ do
-                vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
-                return $ prop_cbor vk
+        [ testProperty "VerKey"  $ \seedPSB ->
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
+              return $ prop_cbor vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
-        , testProperty "Sig" $ property $ do
-              msg <- mkMsg
-              return . ioProperty . withLock lock $ do
-                sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
-                return $ prop_cbor sig
+        , testProperty "Sig" $ \seedPSB -> property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              sig :: SigDSIGNM v <- withSK seed (signDSIGNM () msg)
+              return $ prop_cbor sig
         ]
 
       , testGroup "ToCBOR size"
-        [ testProperty "VerKey"  $
-              ioProperty . withLock lock $ do
-                vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
-                return $ prop_cbor_size vk
+        [ testProperty "VerKey"  $ \seedPSB ->
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
+              return $ prop_cbor_size vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
-        , testProperty "Sig" $ property $ do
-              msg <- mkMsg
-              return . ioProperty . withLock lock $ do
-                sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
-                return $ prop_cbor_size sig
+        , testProperty "Sig" $ \seedPSB -> property $ do
+            msg <- mkMsg
+            return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              sig :: SigDSIGNM v <- withSK seed (signDSIGNM () msg)
+              return $ prop_cbor_size sig
         ]
 
       , testGroup "direct matches class"
-        [ testProperty "VerKey" $
-            ioProperty . withLock lock $ do
-              vk :: VerKeyDSIGNM v <- withNewTestSK deriveVerKeyDSIGNM
+        [ testProperty "VerKey" $ \seedPSB ->
+            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
               return $ prop_cbor_direct_vs_class encodeVerKeyDSIGNM vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
-        , testProperty "Sig" $ property $ do
+        , testProperty "Sig" $ \seedPSB -> property $ do
             msg <- mkMsg
-            return . ioProperty . withLock lock $ do
-              sig :: SigDSIGNM v <- withNewTestSK (signDSIGNM () msg)
+            return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+              sig :: SigDSIGNM v <- withSK seed (signDSIGNM () msg)
               return $ prop_cbor_direct_vs_class encodeSigDSIGNM sig
         ]
       ]
@@ -452,6 +446,10 @@ testDSIGNMAlgorithm lock mkSigM _ mkMsg n =
       , testProperty "verify negative (wrong message)" $ prop_dsignm_verify_neg_msg @v @a lock (Proxy @v) mkMsg
       ]
 
+    , testGroup "seed extraction"
+      [ testProperty "extracted seed equals original seed" $ prop_dsignm_seed_roundtrip lock (Proxy @v)
+      ]
+
     -- , testGroup "NoThunks"
     --   [ testProperty "VerKey"  $ prop_no_thunks_IO_from @(VerKeyDSIGNM v) lock genVerKeyDSIGNM
     --   , testProperty "SignKey" $ prop_no_thunks_IO_from @(SignKeyDSIGNM v) lock genKeyDSIGNM
@@ -459,24 +457,10 @@ testDSIGNMAlgorithm lock mkSigM _ mkMsg n =
     --   ]
     ]
   where
-    withTestSeedMLSB :: forall a. (NaCl.MLockedSizedBytes (SeedSizeDSIGNM v) -> IO a) -> IO a
-    withTestSeedMLSB action =
-      bracket
-        (NaCl.mlsbFromByteString =<< generate (arbitrarySeedBytesOfSize (seedSizeDSIGNM (Proxy :: Proxy v))))
-        NaCl.mlsbFinalize
-        action
-
-    withTestSK :: forall a. (SignKeyDSIGNM v -> IO a) -> NaCl.MLockedSizedBytes (SeedSizeDSIGNM v) -> IO a
-    withTestSK action seed =
+    withSK :: forall b. NaCl.MLockedSizedBytes (SeedSizeDSIGNM v) -> (SignKeyDSIGNM v -> IO b) -> IO b
+    withSK seed action =
       bracket
         (genKeyDSIGNM seed)
-        forgetSignKeyDSIGNM
-        action
-
-    withNewTestSK :: forall a. (SignKeyDSIGNM v -> IO a) -> IO a
-    withNewTestSK action =
-      bracket
-        (withTestSeedMLSB genKeyDSIGNM)
         forgetSignKeyDSIGNM
         action
 
@@ -484,15 +468,14 @@ prop_dsignm_seed_roundtrip
   :: forall v. (DSIGNMAlgorithm IO v)
   => Lock
   -> Proxy v
-  -> MLockedSeed (SeedSizeDSIGNM v)
+  -> PinnedSizedBytes (SeedSizeDSIGNM v)
   -> Property
-prop_dsignm_seed_roundtrip lock p seed = ioProperty . withLock lock $ do
+prop_dsignm_seed_roundtrip lock p seedPSB = ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
   sk <- genKeyDSIGNM seed
   seed' <- getSeedDSIGNM p sk
   bs <- evaluate $! BS.copy (NaCl.mlsbToByteString seed)
   bs' <- evaluate $! BS.copy (NaCl.mlsbToByteString seed')
   forgetSignKeyDSIGNM sk
-  -- NaCl.mlsbFinalize seed
   NaCl.mlsbFinalize seed'
   return (bs === bs')
 
@@ -707,10 +690,3 @@ prop_dsignm_verify_neg_msg lock _ mkMsg seed = ioProperty . withLock lock $ do
 --     con :: Either a b -> String
 --     con (Left _) = "Left"
 --     con (Right _) = "Right"
-
---
--- IO generators
---
-
-genVerKeyDSIGNM :: (DSIGNMAlgorithm IO v) => MLockedSeed (SeedSizeDSIGNM v) -> IO (VerKeyDSIGNM v)
-genVerKeyDSIGNM = genKeyDSIGNM >=> deriveVerKeyDSIGNM
