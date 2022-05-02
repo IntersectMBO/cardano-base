@@ -159,7 +159,7 @@ instance ( KESAlgorithm (SimpleKES d t)
          KESSignAlgorithm m (SimpleKES d t) where
 
     deriveVerKeyKES (SignKeySimpleKES sks) =
-        return $ VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)
+        return $! VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)
 
 
     signKES ctxt j a (SignKeySimpleKES sks) =
@@ -184,7 +184,7 @@ instance ( KESAlgorithm (SimpleKES d t)
                      . map mkSeedFromBytes
                      $ unfoldr (getBytesFromSeed seedSize) seed
             sks      = map genKeyDSIGN seeds
-         in return $ SignKeySimpleKES (Vec.fromList sks)
+         in return $! SignKeySimpleKES (Vec.fromList sks)
 
 
     --

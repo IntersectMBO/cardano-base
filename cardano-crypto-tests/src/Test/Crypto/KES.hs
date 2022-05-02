@@ -390,7 +390,8 @@ prop_onlyGenSignKeyKES
       KESSignAlgorithm IO v
   => Lock -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_onlyGenSignKeyKES lock _ seedPSB = ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
-  _ <- genKeyKES @IO @v seed
+  sk <- genKeyKES @IO @v seed
+  forgetSignKeyKES sk
   return True
 
 prop_onlyGenVerKeyKES
@@ -400,6 +401,7 @@ prop_onlyGenVerKeyKES
 prop_onlyGenVerKeyKES lock _ seedPSB = ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
   sk <- genKeyKES @IO @v seed
   _ <- deriveVerKeyKES sk
+  forgetSignKeyKES sk
   return True
 
 prop_oneUpdateSignKeyKES 
