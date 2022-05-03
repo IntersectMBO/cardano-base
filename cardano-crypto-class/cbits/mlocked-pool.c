@@ -7,11 +7,54 @@
 #include <unistd.h>
 #include <pthread.h>
 
+/**
+ * A custom allocator for mlocked memory, using a memory pool.
+ *
+ * This allocator is necessary because we need to allocate many individual
+ * chunks of mlocked memory for storing KES/DSIGN keys. These keys are 32
+ * octets in size, but mlocked memory can only be allocated in multiples of
+ * the OS page size (typically 4096 octets). Mlocked memory is a scarce
+ * resource; the OS will not allow us to allocate large numbers of these, and
+ * the number of keys we need for higher levels of KES can become prohibitive.
+ * Hence, we need a way of allocating mlocked memory at a finer granularity,
+ * and that is what this allocator achieves.
+ *
+ * It works as follows:
+ *
+ * - Behind the scenes, a pool of mlocked memory pages is maintained. This pool
+ *   is initially empty, but it can grow dynamically when more mlocked memory
+ *   is demanded.
+ * - A global stack of available 32-octet chunks is also maintained. This stack
+ *   is also initially empty.
+ * - When the pool grows, we allocate a new page of mlocked memory, add it to
+ *   the pool, split it up into 32-octet chunks, and push those onto the stack.
+ * - The custom allocator (mlocked_pool_alloc) will first attempt to pop an
+ *   available block of memory from the stack. If none is available, it will
+ *   grow the pool, and try again.
+ * - The custom deallocator (mlocked_pool_free) simply pushes its argument back
+ *   onto the stack. It will however zero it out before it does so.
+ * - No garbage collection is performed; during the lifetime of the program,
+ *   the pool can only ever grow. This is considered acceptable, because a
+ *   typical program will hold on to a roughly constant amount of mlocked
+ *   memory throughout its lifespan, so once the pool has grown large enough to
+ *   support the required amount, it will remain at a fixed size.
+ * - The stack and pool are cleaned up at program exit via an atexit()
+ *   callback.
+ *
+ * The allocator, while global, has been carefully designed to be thread-safe.
+ */
+
 // Pool size was picked to fit one Ed25519 signing key (32 octets).
 
 #define POOL_ITEM_SIZE 32U
 
+
+// Page size was picked to match the most common page size on the platforms we
+// use. Libsodium uses a more elaborate method, but it seems to only check
+// page sizes at compile time, which means that it's not perfect either, so for
+// simplicity's sake, we simply use a hard-coded number here.
 static size_t page_size = 4096U;
+
 typedef struct mlocked_pool_t mlocked_pool_t;
 
 static void mlocked_pool_init();
