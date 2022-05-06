@@ -23,7 +23,6 @@ import Data.Word (Word8)
 import Data.Type.Equality ((:~:)(..))
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits
-import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import qualified Data.ByteString as BS
 
@@ -52,14 +51,14 @@ class HashAlgorithm h => SodiumHashAlgorithm h where
 
 digestMLockedStorable
     :: forall h a proxy. (SodiumHashAlgorithm h, Storable a)
-    => proxy h -> Ptr a -> MLockedSizedBytes (SizeHash h)
-digestMLockedStorable p ptr = unsafeDupablePerformIO $
+    => proxy h -> Ptr a -> IO (MLockedSizedBytes (SizeHash h))
+digestMLockedStorable p ptr =
     naclDigestPtr p ptr ((sizeOf (undefined :: a)))
 
 digestMLockedBS
     :: forall h proxy. (SodiumHashAlgorithm h)
-    => proxy h -> BS.ByteString -> MLockedSizedBytes (SizeHash h)
-digestMLockedBS p bs = unsafeDupablePerformIO $
+    => proxy h -> BS.ByteString -> IO (MLockedSizedBytes (SizeHash h))
+digestMLockedBS p bs =
     BS.useAsCStringLen bs $ \(ptr, len) ->
     naclDigestPtr p (castPtr ptr) len
 
@@ -71,8 +70,8 @@ expandHash
     :: forall h proxy. SodiumHashAlgorithm h
     => proxy h
     -> (MLockedSizedBytes (SizeHash h))
-    -> (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
-expandHash h (MLSB sfptr) = unsafeDupablePerformIO $ do
+    -> IO (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
+expandHash h (MLSB sfptr) = do
     withMLockedForeignPtr sfptr $ \ptr -> do
         l <- mlockedAlloca size1 $ \ptr' -> do
             poke ptr' (1 :: Word8)

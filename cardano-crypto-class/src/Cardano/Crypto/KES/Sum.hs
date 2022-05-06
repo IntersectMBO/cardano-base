@@ -267,7 +267,7 @@ instance ( KESSignAlgorithm m d
     --
 
     genKeyKES r = do
-      let (rr0, rr1) = NaCl.expandHash (Proxy :: Proxy h) r
+      (rr0, rr1) <- NaCl.expandHash (Proxy :: Proxy h) r
       r0 <- NaCl.makeSafePinned rr0
       r1 <- NaCl.makeSafePinned rr1
       sk_0 <- NaCl.interactSafePinned r0 genKeyKES
