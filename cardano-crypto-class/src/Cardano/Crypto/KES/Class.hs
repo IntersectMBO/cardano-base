@@ -81,6 +81,9 @@ class ( Typeable v
       , NoThunks (SignKeyKES v)
       , NoThunks (VerKeyKES v)
       , KnownNat (SeedSizeKES v)
+      , KnownNat (SizeVerKeyKES v)
+      , KnownNat (SizeSignKeyKES v)
+      , KnownNat (SizeSigKES v)
       )
       => KESAlgorithm v where
   --
@@ -88,8 +91,12 @@ class ( Typeable v
   --
   data VerKeyKES  v :: Type
   data SigKES     v :: Type
-  type SeedSizeKES v :: Nat
   data SignKeyKES v :: Type
+
+  type SeedSizeKES    v :: Nat
+  type SizeVerKeyKES  v :: Nat
+  type SizeSignKeyKES v :: Nat
+  type SizeSigKES     v :: Nat
 
   --
   -- Metadata and basic key operations
@@ -144,8 +151,13 @@ class ( Typeable v
   --
 
   sizeVerKeyKES  :: proxy v -> Word
+  sizeVerKeyKES _ = fromInteger (natVal (Proxy @(SizeVerKeyKES v)))
+
   sizeSigKES     :: proxy v -> Word
+  sizeSigKES _ = fromInteger (natVal (Proxy @(SizeSigKES v)))
+
   sizeSignKeyKES :: proxy v -> Word
+  sizeSignKeyKES _ = fromInteger (natVal (Proxy @(SizeSignKeyKES v)))
 
   rawSerialiseVerKeyKES    :: VerKeyKES  v -> ByteString
   rawSerialiseSigKES       :: SigKES     v -> ByteString

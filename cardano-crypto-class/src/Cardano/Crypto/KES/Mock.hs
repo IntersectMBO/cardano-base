@@ -74,9 +74,9 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     algorithmNameKES proxy = "mock_" ++ show (totalPeriodsKES proxy)
 
-    sizeVerKeyKES  _ = 8
-    sizeSignKeyKES _ = 16
-    sizeSigKES     _ = 24
+    type SizeVerKeyKES  (MockKES t) = 8
+    type SizeSignKeyKES (MockKES t) = 16
+    type SizeSigKES     (MockKES t) = 24
 
 
     --

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -7,8 +8,10 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoStarIsType #-}
 
 -- | A key evolving signatures implementation.
 --
@@ -60,6 +63,8 @@ import qualified Cardano.Crypto.MonadSodium as NaCl
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import Control.DeepSeq (NFData)
 
+import GHC.TypeLits (KnownNat, type (+), type (*))
+
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
 
@@ -105,6 +110,8 @@ instance ( KESAlgorithm d
          , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
          , Typeable d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
+         , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
+         , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
          )
       => KESAlgorithm (SumKES h d) where
 
@@ -177,12 +184,12 @@ instance ( KESAlgorithm d
     -- raw serialise/deserialise
     --
 
-    sizeVerKeyKES  _ = sizeHash       (Proxy :: Proxy h)
-    sizeSignKeyKES _ = sizeSignKeyKES (Proxy :: Proxy d)
-                     + seedSizeKES    (Proxy :: Proxy d)
-                     + sizeVerKeyKES  (Proxy :: Proxy d) * 2
-    sizeSigKES     _ = sizeSigKES     (Proxy :: Proxy d)
-                     + sizeVerKeyKES  (Proxy :: Proxy d) * 2
+    type SizeVerKeyKES (SumKES h d) = SizeHash h
+    type SizeSignKeyKES (SumKES h d) = SizeSignKeyKES d
+                                       + SeedSizeKES d
+                                       + 2 * SizeVerKeyKES d
+    type SizeSigKES (SumKES h d) = SizeSigKES d
+                                   + SizeVerKeyKES d * 2
 
     rawSerialiseVerKeyKES  (VerKeySumKES  vk) = hashToBytes vk
 
@@ -219,6 +226,8 @@ instance ( KESSignAlgorithm m d
          , Typeable d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
          , NaCl.MonadSodium m
+         , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
+         , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
          )
       => KESSignAlgorithm m (SumKES h d) where
 

@@ -65,9 +65,9 @@ instance
 
     totalPeriodsKES _ = totalPeriodsKES (Proxy @k)
 
-    sizeVerKeyKES _ = sizeVerKeyKES (Proxy @k)
-    sizeSignKeyKES _ = sizeSignKeyKES (Proxy @k)
-    sizeSigKES _ = sizeSigKES (Proxy @k)
+    type SizeVerKeyKES (ForgetMockKES k) = SizeVerKeyKES k
+    type SizeSignKeyKES (ForgetMockKES k) = SizeSignKeyKES k
+    type SizeSigKES (ForgetMockKES k) = SizeSigKES k
 
     rawSerialiseVerKeyKES (VerKeyForgetMockKES k) = rawSerialiseVerKeyKES k
     rawSerialiseSigKES (SigForgetMockKES k) = rawSerialiseSigKES k

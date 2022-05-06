@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -7,8 +8,10 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoStarIsType #-}
 
 -- | A key evolving signatures implementation.
 --
@@ -78,6 +81,7 @@ module Cardano.Crypto.KES.CompactSum (
 import           Data.Proxy (Proxy(..))
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
+import           GHC.TypeLits (KnownNat, type (+), type (*))
 import qualified Data.ByteString as BS
 import           Control.Monad (guard)
 import           Control.Monad.Trans (lift)
@@ -140,6 +144,9 @@ instance ( OptimizedKESAlgorithm d
          , Typeable d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
          , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
          )
       => KESAlgorithm (CompactSumKES h d) where
 
@@ -215,12 +222,12 @@ instance ( OptimizedKESAlgorithm d
     -- raw serialise/deserialise
     --
 
-    sizeVerKeyKES  _ = sizeHash       (Proxy :: Proxy h)
-    sizeSignKeyKES _ = sizeSignKeyKES (Proxy :: Proxy d)
-                     + seedSizeKES    (Proxy :: Proxy d)
-                     + sizeVerKeyKES  (Proxy :: Proxy d) * 2
-    sizeSigKES     _ = sizeSigKES     (Proxy :: Proxy d)
-                     + sizeVerKeyKES  (Proxy :: Proxy d)
+    type SizeVerKeyKES  _ = SizeHash       h
+    type SizeSignKeyKES _ = SizeSignKeyKES d
+                          + SeedSizeKES    d
+                          + SizeVerKeyKES  d * 2
+    type SizeSigKES     _ = SizeSigKES     d
+                          + SizeVerKeyKES  d
 
     rawSerialiseVerKeyKES  (VerKeyCompactSumKES  vk) = hashToBytes vk
 
@@ -255,6 +262,9 @@ instance ( OptimizedKESAlgorithm d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
          , NaCl.MonadSodium m
          , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
          )
       => KESSignAlgorithm m (CompactSumKES h d) where
 
@@ -384,6 +394,9 @@ instance ( OptimizedKESAlgorithm d
          , Typeable d
          , SizeHash h ~ SeedSizeKES d
          , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
          )
       => ToCBOR (VerKeyKES (CompactSumKES h d)) where
   toCBOR = encodeVerKeyKES
@@ -394,6 +407,9 @@ instance ( OptimizedKESAlgorithm d
          , Typeable d
          , SizeHash h ~ SeedSizeKES d
          , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
          )
       => FromCBOR (VerKeyKES (CompactSumKES h d)) where
   fromCBOR = decodeVerKeyKES
@@ -431,6 +447,9 @@ instance ( OptimizedKESAlgorithm d
          , Typeable d
          , SizeHash h ~ SeedSizeKES d
          , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
          )
       => ToCBOR (SigKES (CompactSumKES h d)) where
   toCBOR = encodeSigKES
@@ -441,6 +460,9 @@ instance ( OptimizedKESAlgorithm d
          , Typeable d
          , SizeHash h ~ SeedSizeKES d
          , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
          )
       => FromCBOR (SigKES (CompactSumKES h d)) where
   fromCBOR = decodeSigKES

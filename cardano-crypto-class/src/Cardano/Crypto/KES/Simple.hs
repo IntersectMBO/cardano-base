@@ -66,8 +66,14 @@ pattern SignKeySimpleKES v <- ThunkySignKeySimpleKES v
 
 {-# COMPLETE SignKeySimpleKES #-}
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t)) =>
-         KESAlgorithm (SimpleKES d t) where
+instance ( DSIGNAlgorithm d
+         , Typeable d
+         , KnownNat t
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
+         )
+         => KESAlgorithm (SimpleKES d t) where
 
     type SeedSizeKES (SimpleKES d t) = SeedSizeDSIGN d * t
 
@@ -121,15 +127,9 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
     -- raw serialise/deserialise
     --
 
-    sizeVerKeyKES  _ = sizeVerKeyDSIGN  (Proxy :: Proxy d) * duration
-      where
-        duration = fromIntegral (natVal (Proxy @t))
-
-    sizeSignKeyKES _ = sizeSignKeyDSIGN (Proxy :: Proxy d) * duration
-      where
-        duration = fromIntegral (natVal (Proxy @t))
-
-    sizeSigKES     _ = sizeSigDSIGN     (Proxy :: Proxy d)
+    type SizeVerKeyKES  (SimpleKES d t) = SizeVerKeyDSIGN d * t
+    type SizeSignKeyKES (SimpleKES d t) = SizeSignKeyDSIGN d * t
+    type SizeSigKES     (SimpleKES d t) = SizeSigDSIGN d
 
     rawSerialiseVerKeyKES (VerKeySimpleKES vks) =
         BS.concat [ rawSerialiseVerKeyDSIGN vk | vk <- Vec.toList vks ]
@@ -153,7 +153,12 @@ instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * 
 
 
 instance ( KESAlgorithm (SimpleKES d t)
-         , DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t)
+         , DSIGNAlgorithm d
+         , Typeable d
+         , KnownNat t
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
          , Monad m
          ) =>
          KESSignAlgorithm m (SimpleKES d t) where
@@ -218,21 +223,45 @@ instance DSIGNAlgorithm d => NoThunks (SigKES     (SimpleKES d t))
 instance DSIGNAlgorithm d => NoThunks (SignKeyKES (SimpleKES d t))
 instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SimpleKES d t))
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance ( DSIGNAlgorithm d
+         , Typeable d
+         , KnownNat t
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
+         )
       => ToCBOR (VerKeyKES (SimpleKES d t)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance ( DSIGNAlgorithm d
+         , Typeable d
+         , KnownNat t
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
+         )
       => FromCBOR (VerKeyKES (SimpleKES d t)) where
   fromCBOR = decodeVerKeyKES
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance ( DSIGNAlgorithm d
+         , Typeable d
+         , KnownNat t
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
+         )
       => ToCBOR (SigKES (SimpleKES d t)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance (DSIGNAlgorithm d
+         , Typeable d
+         , KnownNat t
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
+         )
       => FromCBOR (SigKES (SimpleKES d t)) where
   fromCBOR = decodeSigKES
 

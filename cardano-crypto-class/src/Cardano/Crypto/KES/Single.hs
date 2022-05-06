@@ -98,9 +98,9 @@ instance (DSIGNMAlgorithmBase d, Typeable d) => KESAlgorithm (SingleKES d) where
     -- raw serialise/deserialise
     --
 
-    sizeVerKeyKES  _ = sizeVerKeyDSIGNM  (Proxy :: Proxy d)
-    sizeSignKeyKES _ = sizeSignKeyDSIGNM (Proxy :: Proxy d)
-    sizeSigKES     _ = sizeSigDSIGNM     (Proxy :: Proxy d)
+    type SizeVerKeyKES (SingleKES d) = SizeVerKeyDSIGNM d
+    type SizeSignKeyKES (SingleKES d) = SizeSignKeyDSIGNM d
+    type SizeSigKES (SingleKES d) = SizeSigDSIGNM d
 
     hashVerKeyKES (VerKeySingleKES vk) =
         castHash (hashVerKeyDSIGNM vk)
