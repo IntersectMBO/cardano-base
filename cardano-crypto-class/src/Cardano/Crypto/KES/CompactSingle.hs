@@ -179,7 +179,7 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
     genKeyKES seed = SignKeyCompactSingleKES <$> genKeyDSIGNM seed
 
     rawSerialiseSignKeyKES (SignKeyCompactSingleKES sk) = rawSerialiseSignKeyDSIGNM sk
-    rawDeserialiseSignKeyKES bs = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNM bs
+    rawDeserialiseSignKeyKES mlsb offset = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNM mlsb offset
 
     --
     -- forgetting

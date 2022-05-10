@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -23,6 +24,7 @@ import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
+import qualified Data.ByteString as BS
 
 import Control.Exception (assert)
 
@@ -32,7 +34,14 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Crypto.MonadSodium (mlsbToByteString)
+import Cardano.Crypto.MonadSodium
+  ( MonadSodium
+  , mlsbToByteString
+  , mlsbAsByteString
+  , mlsbFromByteString
+  , mlsbMemcpy
+  , mlsbFinalize
+  )
 
 data MockKES (t :: Nat)
 
@@ -125,7 +134,9 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
-instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
+instance ( MonadSodium m
+         , KnownNat t
+         ) => KESSignAlgorithm m (MockKES t) where
     deriveVerKeyKES (SignKeyMockKES vk _) = return vk
 
     updateKES () (SignKeyMockKES vk t') t =
@@ -147,14 +158,17 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
     --
 
     genKeyKES seed = do
-        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
+        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbAsByteString seed) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
-    rawSerialiseSignKeyKES sk =
-      return $ rawSerialiseSignKeyMockKES sk
+    rawSerialiseSignKeyKES sk mlsb offset = do
+      mlsbSK <- mlsbFromByteString @m @(SizeSignKeyKES (MockKES t)) $ rawSerialiseSignKeyMockKES sk
+      mlsbMemcpy mlsb offset mlsbSK 0 (sizeSignKeyKES (Proxy @(MockKES t)))
+      mlsbFinalize mlsbSK
 
-    rawDeserialiseSignKeyKES bs =
-      return $ rawDeserialiseSignKeyMockKES bs
+    rawDeserialiseSignKeyKES mlsb offset = do
+      bs <- mlsbToByteString mlsb
+      return $ rawDeserialiseSignKeyMockKES (BS.drop (fromIntegral offset) bs)
 
 rawDeserialiseSignKeyMockKES :: KnownNat t
                              => ByteString

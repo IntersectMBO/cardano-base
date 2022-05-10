@@ -60,5 +60,5 @@ instance Monad m => KESSignAlgorithm m NeverKES where
 
   genKeyKES       _ = return NeverUsedSignKeyKES
 
-  rawSerialiseSignKeyKES _ = return mempty
-  rawDeserialiseSignKeyKES _ = return $ Just NeverUsedSignKeyKES
+  rawSerialiseSignKeyKES _ _ = error "KES not available"
+  rawDeserialiseSignKeyKES _ _ = return $ Just NeverUsedSignKeyKES

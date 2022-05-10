@@ -7,6 +7,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -31,8 +32,6 @@ module Cardano.Crypto.KES.Class
   , decodeVerKeyKES
   , encodeSigKES
   , decodeSigKES
-  , encodeSignKeyKES
-  , decodeSignKeyKES
   , encodeSignedKES
   , decodeSignedKES
 
@@ -40,6 +39,10 @@ module Cardano.Crypto.KES.Class
   , encodedVerKeyKESSizeExpr
   , encodedSignKeyKESSizeExpr
   , encodedSigKESSizeExpr
+
+    -- * Safe (MLocked) ser/deser of sign keys
+  , safeSerialiseSignKeyKES
+  , safeDeserialiseSignKeyKES
 
     -- * Utility functions
     -- These are used between multiple KES implementations. User code will
@@ -233,8 +236,35 @@ class ( KESAlgorithm v
   forgetSignKeyKES =
     const $ return ()
 
-  rawDeserialiseSignKeyKES  :: ByteString -> m (Maybe (SignKeyKES v))
-  rawSerialiseSignKeyKES   :: SignKeyKES v -> m ByteString
+  --
+  -- Serialisation/(de)serialisation in fixed-size raw format
+  --
+  rawSerialiseSignKeyKES   :: forall targetSize.
+                              ( KnownNat targetSize
+                              )
+                           => SignKeyKES v -> NaCl.MLockedSizedBytes targetSize -> Word -> m ()
+
+  rawDeserialiseSignKeyKES :: forall targetSize.
+                              ( KnownNat targetSize
+                              )
+                           => NaCl.MLockedSizedBytes targetSize -> Word -> m (Maybe (SignKeyKES v))
+
+safeSerialiseSignKeyKES :: ( NaCl.MonadSodium m
+                           , KESSignAlgorithm m d
+                           )
+                        => SignKeyKES d
+                        -> m (NaCl.MLockedSizedBytes (SizeSignKeyKES d))
+safeSerialiseSignKeyKES sk = do
+  ptr <- NaCl.mlsbNew
+  rawSerialiseSignKeyKES sk ptr 0
+  return ptr
+
+safeDeserialiseSignKeyKES :: ( KESSignAlgorithm m d
+                                )
+                           => NaCl.MLockedSizedBytes (SizeSignKeyKES d)
+                           -> m (Maybe (SignKeyKES d))
+safeDeserialiseSignKeyKES mlsb = do
+  rawDeserialiseSignKeyKES mlsb 0
 
 -- | Subclass for KES algorithms that embed a copy of the VerKey into the
 -- signature itself, rather than relying on the externally supplied VerKey
@@ -306,9 +336,6 @@ encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
-encodeSignKeyKES :: forall v m. (KESSignAlgorithm m v) => SignKeyKES v -> m Encoding
-encodeSignKeyKES = fmap encodeBytes . rawSerialiseSignKeyKES
-
 decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
 decodeVerKeyKES = do
     bs <- decodeBytes
@@ -336,17 +363,6 @@ decodeSigKES = do
         where
           expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
           actual   = BS.length bs
-
-decodeSignKeyKES :: forall v s m. (KESSignAlgorithm m v) => Decoder s (m (Maybe (SignKeyKES v)))
-decodeSignKeyKES = do
-    bs <- decodeBytes
-    let expected = fromIntegral (sizeSignKeyKES (Proxy @v))
-        actual   = BS.length bs
-    if actual /= expected then
-      fail ("decodeSignKeyKES: wrong length, expected " ++
-               show expected ++ " bytes but got " ++ show actual)
-    else
-      return $ rawDeserialiseSignKeyKES bs
 
 -- | The KES period. Periods are enumerated from zero.
 --

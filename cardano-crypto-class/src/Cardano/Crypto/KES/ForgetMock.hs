@@ -110,10 +110,11 @@ instance
           liftIO $ writeLog ("UPD: ---")
           return Nothing
 
-    rawSerialiseSignKeyKES (SignKeyForgetMockKES _ k) = lift $ rawSerialiseSignKeyKES k
+    rawSerialiseSignKeyKES (SignKeyForgetMockKES _ sk) target offset =
+      lift $ rawSerialiseSignKeyKES sk target offset
 
-    rawDeserialiseSignKeyKES bs = do
-      msk <- lift $ rawDeserialiseSignKeyKES bs
+    rawDeserialiseSignKeyKES src offset = do
+      msk <- lift $ rawDeserialiseSignKeyKES src offset
       nonce :: Word <- liftIO $ randomRIO (10000000, 99999999)
       return $ fmap (SignKeyForgetMockKES nonce) msk
 

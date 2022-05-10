@@ -50,6 +50,7 @@ import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
 import           Control.Monad (guard)
+import           Control.Monad.Trans (lift)
 import           NoThunks.Class (NoThunks)
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -63,7 +64,7 @@ import qualified Cardano.Crypto.MonadSodium as NaCl
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import Control.DeepSeq (NFData)
 
-import GHC.TypeLits (KnownNat, type (+), type (*))
+import GHC.TypeLits (KnownNat, type (+), type (*), type (<=))
 
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
@@ -225,6 +226,7 @@ instance ( KESSignAlgorithm m d
          , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
          , Typeable d
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
+         , SizeSignKeyKES d <= SizeSignKeyKES (SumKES h d)
          , NaCl.MonadSodium m
          , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
          , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
@@ -289,39 +291,59 @@ instance ( KESSignAlgorithm m d
     -- raw serialise/deserialise
     --
 
-    rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) = do
-      ssk <- rawSerialiseSignKeyKES sk
-      rr1 <- NaCl.interactSafePinned r_1 return
-      return $ mconcat
-                  [ ssk
-                  , NaCl.mlsbToByteString rr1
-                  , rawSerialiseVerKeyKES vk_0
-                  , rawSerialiseVerKeyKES vk_1
-                  ]
+    rawSerialiseSignKeyKES = rawSerialiseSignKeySumKES
+    rawDeserialiseSignKeyKES = rawDeserialiseSignKeySumKES
 
-    rawDeserialiseSignKeyKES b = runMaybeT $ do
-        guard (BS.length b == fromIntegral size_total)
-        sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
-        rr <- MaybeT $ NaCl.mlsbFromByteStringCheck b_r
-        r <- MaybeT . fmap Just $ NaCl.makeSafePinned rr
-        vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk0
-        vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk1
-        return (SignKeySumKES sk r vk_0 vk_1)
-      where
-        b_sk  = slice off_sk  size_sk b
-        b_r   = slice off_r   size_r  b
-        b_vk0 = slice off_vk0 size_vk b
-        b_vk1 = slice off_vk1 size_vk b
+rawSerialiseSignKeySumKES   :: forall targetSize d m h.
+                            ( KESSignAlgorithm m d
+                            , KnownNat targetSize
+                            , NaCl.MonadSodium m
+                            )
+                         => SignKeyKES (SumKES h d) -> NaCl.MLockedSizedBytes targetSize -> Word -> m ()
 
-        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
-        size_r     = seedSizeKES    (Proxy :: Proxy d)
-        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
-        size_total = sizeSignKeyKES (Proxy :: Proxy (SumKES h d))
+rawSerialiseSignKeySumKES (SignKeySumKES sk r_1 vk_0 vk_1) target offset = do
+  rawSerialiseSignKeyKES sk target offset
 
-        off_sk     = 0 :: Word
-        off_r      = size_sk
-        off_vk0    = off_r + size_r
-        off_vk1    = off_vk0 + size_vk
+  NaCl.interactSafePinned r_1 $ \rr1 ->
+    NaCl.mlsbMemcpy target (offset + sizeSignKeyKES @d Proxy) rr1 0 (seedSizeKES @d Proxy)
+
+  mlsb_vk_0 <- NaCl.mlsbFromByteString @m @(SizeVerKeyKES d) (rawSerialiseVerKeyKES vk_0)
+  NaCl.mlsbMemcpy target (offset + sizeSignKeyKES @d Proxy + seedSizeKES @d Proxy) mlsb_vk_0 0 (sizeVerKeyKES @d Proxy)
+  NaCl.mlsbFinalize mlsb_vk_0
+
+  mlsb_vk_1 <- NaCl.mlsbFromByteString @m @(SizeVerKeyKES d) (rawSerialiseVerKeyKES vk_1)
+  NaCl.mlsbMemcpy target (offset + sizeSignKeyKES @d Proxy + seedSizeKES @d Proxy + seedSizeKES @d Proxy) mlsb_vk_1 0 (sizeVerKeyKES @d Proxy)
+  NaCl.mlsbFinalize mlsb_vk_1
+
+rawDeserialiseSignKeySumKES :: forall targetSize d m h.
+                            ( KESSignAlgorithm m d
+                            , KnownNat targetSize
+                            , NaCl.MonadSodium m
+                            )
+                         => NaCl.MLockedSizedBytes targetSize -> Word -> m (Maybe (SignKeyKES (SumKES h d)))
+rawDeserialiseSignKeySumKES mlsb off = runMaybeT $ do
+    sk <- MaybeT $ rawDeserialiseSignKeyKES mlsb off_sk
+    r <- lift $ NaCl.mlsbNew
+    lift $ NaCl.mlsbMemcpy r 0 mlsb off_r size_r
+    rr <- lift $ NaCl.makeSafePinned r
+
+    mlsb_vk <- lift $ NaCl.mlsbNew @m @(SizeVerKeyKES d)
+    lift $ NaCl.mlsbMemcpy mlsb_vk 0 mlsb off_vk0 size_vk
+    vk_0 <- MaybeT $ rawDeserialiseVerKeyKES <$> NaCl.mlsbToByteString mlsb_vk
+    lift $ NaCl.mlsbMemcpy mlsb_vk 0 mlsb off_vk1 size_vk
+    vk_1 <- MaybeT $ rawDeserialiseVerKeyKES <$> NaCl.mlsbToByteString mlsb_vk
+    lift $ NaCl.mlsbFinalize mlsb_vk
+
+    return (SignKeySumKES sk rr vk_0 vk_1)
+  where
+    size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
+    size_r     = seedSizeKES    (Proxy :: Proxy d)
+    size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
+
+    off_sk     = off
+    off_r      = off + size_sk
+    off_vk0    = off + off_r + size_r
+    off_vk1    = off + off_vk0 + size_vk
 
 
 --

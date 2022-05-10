@@ -143,8 +143,8 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =
       rawSerialiseSignKeyDSIGNM sk
 
-    rawDeserialiseSignKeyKES bs =
-      fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNM bs
+    rawDeserialiseSignKeyKES mlsb p =
+      fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNM mlsb p
 
 --
 -- VerKey instances

@@ -30,7 +30,6 @@ import qualified Data.Vector as Vec
 import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 import           NoThunks.Class (NoThunks)
-import           Control.Monad.Trans.Maybe
 
 import           Cardano.Prelude (forceElemsToWHNF)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -40,7 +39,7 @@ import qualified Cardano.Crypto.DSIGN as DSIGN
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
-import           Cardano.Crypto.MonadSodium (mlsbToByteString)
+import           Cardano.Crypto.MonadSodium (MonadSodium (..))
 
 
 data SimpleKES d (t :: Nat)
@@ -159,7 +158,7 @@ instance ( KESAlgorithm (SimpleKES d t)
          , KnownNat (SeedSizeDSIGN d * t)
          , KnownNat (SizeVerKeyDSIGN d * t)
          , KnownNat (SizeSignKeyDSIGN d * t)
-         , Monad m
+         , MonadSodium m
          ) =>
          KESSignAlgorithm m (SimpleKES d t) where
 
@@ -181,36 +180,45 @@ instance ( KESAlgorithm (SimpleKES d t)
     -- Key generation
     --
 
-    genKeyKES mlsb =
-        let seed     = mkSeedFromBytes $ mlsbToByteString mlsb
-            seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+    genKeyKES mlsb = do
+        seed <- mkSeedFromBytes <$> mlsbToByteString mlsb
+        let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
             duration = fromIntegral (natVal (Proxy @ t))
             seeds    = take duration
                      . map mkSeedFromBytes
                      $ unfoldr (getBytesFromSeed seedSize) seed
             sks      = map genKeyDSIGN seeds
-         in return $! SignKeySimpleKES (Vec.fromList sks)
+        return $! SignKeySimpleKES (Vec.fromList sks)
 
 
     --
     -- raw serialise/deserialise
     --
 
-    rawSerialiseSignKeyKES (SignKeySimpleKES sks) =
-        return $ BS.concat [ rawSerialiseSignKeyDSIGN sk | sk <- Vec.toList sks ]
+    rawSerialiseSignKeyKES (SignKeySimpleKES sksVec) mlsb offset = do
+      buf <- mlsbFromByteString @m @(SizeSignKeyKES (SimpleKES d t)) bs
+      mlsbMemcpy mlsb offset buf 0 (sizeSignKeyKES (Proxy @(SimpleKES d t)))
+      mlsbFinalize buf
+      where
+        sks = Vec.toList sksVec
+        bs = BS.concat (map rawSerialiseSignKeyDSIGN sks)
 
 
-    rawDeserialiseSignKeyKES bs
-      | let duration = fromIntegral (natVal (Proxy :: Proxy t))
-            sizeKey  = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
-      , skbs     <- splitsAt (replicate duration sizeKey) bs
-      , length skbs == duration
-      = runMaybeT $ do
-          sks <- mapM (MaybeT . return . rawDeserialiseSignKeyDSIGN) skbs
-          return $! SignKeySimpleKES (Vec.fromList sks)
-
-      | otherwise
-      = return Nothing
+    rawDeserialiseSignKeyKES mlsb offset = do
+      buf <- mlsbNew @m @(SizeSignKeyDSIGN d)
+      sks <- mapM
+              (\o -> do
+                      mlsbMemcpy buf 0 mlsb o sizeKey
+                      bs <- mlsbToByteString buf
+                      return $ rawDeserialiseSignKeyDSIGN bs
+              )
+              offsets
+      mlsbFinalize buf
+      return $ SignKeySimpleKES . Vec.fromList <$> sequence sks
+      where
+        duration = fromIntegral (natVal (Proxy :: Proxy t))
+        sizeKey  = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
+        offsets  = [ offset + x * sizeKey | x <- [0..duration-1] ]
 
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SimpleKES d t))

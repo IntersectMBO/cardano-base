@@ -4,15 +4,19 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     MLockedSizedBytes (..),
     mlsbNew,
     mlsbFromByteString,
     mlsbFromByteStringCheck,
     mlsbToByteString,
+    mlsbAsByteString,
     mlsbUseAsCPtr,
     mlsbUseAsSizedPtr,
     mlsbCopy,
+    mlsbMemcpy,
     mlsbFinalize,
 ) where
 
@@ -20,12 +24,12 @@ import Control.DeepSeq (NFData (..))
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types (CSize (..))
 import Foreign.ForeignPtr (castForeignPtr)
-import Foreign.Ptr (Ptr, castPtr)
+import Foreign.Ptr (Ptr, castPtr, plusPtr)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import Data.Word (Word8)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Text.Printf
 
 import Cardano.Foreign
@@ -57,7 +61,7 @@ instance KnownNat n => Show (MLockedSizedBytes n) where
     --     $ showString "_ :: MLockedSizedBytes "
     --     . showsPrec 11 (natVal (Proxy @n))
     show mlsb =
-      let bytes = BS.unpack $ mlsbToByteString mlsb
+      let bytes = BS.unpack $ mlsbAsByteString mlsb
           hexstr = concatMap (printf "%02x") bytes
       in "MLSB " ++ hexstr
 
@@ -87,6 +91,26 @@ mlsbCopy src = mlsbUseAsCPtr src $ \ptrSrc -> do
     size :: CSize
     size = fromInteger (natVal (Proxy @n))
 
+mlsbMemcpy :: forall srcSize dstSize.
+              ( KnownNat srcSize
+              , KnownNat dstSize
+              )
+           => MLockedSizedBytes dstSize
+           -> Word
+           -> MLockedSizedBytes srcSize
+           -> Word
+           -> Word
+           -> IO ()
+mlsbMemcpy dst dstOffset src srcOffset cpySize = do
+  when (dstOffset + cpySize > fromIntegral (natVal (Proxy @dstSize))) (error "mlsbMemcpy: Invalid destination size or offset")
+  when (srcOffset + cpySize > fromIntegral (natVal (Proxy @srcSize))) (error "mlsbMemcpy: Invalid source size or offset")
+  mlsbUseAsCPtr dst $ \dstPtr ->
+    mlsbUseAsCPtr src $ \srcPtr ->
+      void $ c_memcpy
+        (plusPtr dstPtr $ fromIntegral dstOffset)
+        (plusPtr srcPtr $ fromIntegral srcOffset)
+        (fromIntegral cpySize)
+
 mlsbFromByteString :: forall n. KnownNat n => BS.ByteString -> IO (MLockedSizedBytes n)
 mlsbFromByteString bs = BS.useAsCStringLen bs $ \(ptrBS, len) -> do
     fptr <- allocMLockedForeignPtr
@@ -113,8 +137,18 @@ mlsbFromByteStringCheck bs
 -- | /Note:/ the resulting 'BS.ByteString' will still refer to secure memory,
 -- but the types don't prevent it from be exposed.
 --
-mlsbToByteString :: forall n. KnownNat n => MLockedSizedBytes n -> BS.ByteString
-mlsbToByteString (MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size where
+mlsbAsByteString :: forall n. KnownNat n => MLockedSizedBytes n -> BS.ByteString
+mlsbAsByteString (MLSB (SFP fptr)) =
+  BSI.PS (castForeignPtr fptr) 0 size
+  where
+    size  :: Int
+    size = fromInteger (natVal (Proxy @n))
+
+mlsbToByteString :: forall n. KnownNat n => MLockedSizedBytes n -> IO BS.ByteString
+mlsbToByteString mlsb =
+  mlsbUseAsCPtr mlsb $ \ptr ->
+    BS.packCStringLen (castPtr ptr, size)
+  where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))
 

@@ -327,40 +327,59 @@ instance ( OptimizedKESAlgorithm d
     -- raw serialise/deserialise
     --
 
-    rawSerialiseSignKeyKES (SignKeyCompactSumKES sk r_1 vk_0 vk_1) = do
-      ssk <- rawSerialiseSignKeyKES sk
-      rr1 <- NaCl.interactSafePinned r_1 return
-      return $ mconcat
-                  [ ssk
-                  , NaCl.mlsbToByteString rr1
-                  , rawSerialiseVerKeyKES vk_0
-                  , rawSerialiseVerKeyKES vk_1
-                  ]
+    rawSerialiseSignKeyKES = rawSerialiseSignKeyCompactSumKES
+    rawDeserialiseSignKeyKES = rawDeserialiseSignKeyCompactSumKES
 
-    rawDeserialiseSignKeyKES b = runMaybeT $ do
-        guard (BS.length b == fromIntegral size_total)
-        sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
-        rr <- MaybeT $ NaCl.mlsbFromByteStringCheck b_r
-        r <- MaybeT . fmap Just $ NaCl.makeSafePinned rr
-        vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk0
-        vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk1
-        return (SignKeyCompactSumKES sk r vk_0 vk_1)
-      where
-        b_sk  = slice off_sk  size_sk b
-        b_r   = slice off_r   size_r  b
-        b_vk0 = slice off_vk0 size_vk b
-        b_vk1 = slice off_vk1 size_vk b
+rawSerialiseSignKeyCompactSumKES   :: forall targetSize d m h.
+                            ( KESSignAlgorithm m d
+                            , KnownNat targetSize
+                            , NaCl.MonadSodium m
+                            )
+                         => SignKeyKES (CompactSumKES h d) -> NaCl.MLockedSizedBytes targetSize -> Word -> m ()
 
-        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
-        size_r     = seedSizeKES    (Proxy :: Proxy d)
-        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
-        size_total = sizeSignKeyKES (Proxy :: Proxy (CompactSumKES h d))
+rawSerialiseSignKeyCompactSumKES (SignKeyCompactSumKES sk r_1 vk_0 vk_1) target offset = do
+  rawSerialiseSignKeyKES sk target offset
 
-        off_sk     = 0 :: Word
-        off_r      = size_sk
-        off_vk0    = off_r + size_r
-        off_vk1    = off_vk0 + size_vk
+  NaCl.interactSafePinned r_1 $ \rr1 ->
+    NaCl.mlsbMemcpy target (offset + sizeSignKeyKES @d Proxy) rr1 0 (seedSizeKES @d Proxy)
 
+  mlsb_vk_0 <- NaCl.mlsbFromByteString @m @(SizeVerKeyKES d) (rawSerialiseVerKeyKES vk_0)
+  NaCl.mlsbMemcpy target (offset + sizeSignKeyKES @d Proxy + seedSizeKES @d Proxy) mlsb_vk_0 0 (sizeVerKeyKES @d Proxy)
+  NaCl.mlsbFinalize mlsb_vk_0
+
+  mlsb_vk_1 <- NaCl.mlsbFromByteString @m @(SizeVerKeyKES d) (rawSerialiseVerKeyKES vk_1)
+  NaCl.mlsbMemcpy target (offset + sizeSignKeyKES @d Proxy + seedSizeKES @d Proxy + seedSizeKES @d Proxy) mlsb_vk_1 0 (sizeVerKeyKES @d Proxy)
+  NaCl.mlsbFinalize mlsb_vk_1
+
+rawDeserialiseSignKeyCompactSumKES :: forall targetSize d m h.
+                            ( KESSignAlgorithm m d
+                            , KnownNat targetSize
+                            , NaCl.MonadSodium m
+                            )
+                         => NaCl.MLockedSizedBytes targetSize -> Word -> m (Maybe (SignKeyKES (CompactSumKES h d)))
+rawDeserialiseSignKeyCompactSumKES mlsb off = runMaybeT $ do
+    sk <- MaybeT $ rawDeserialiseSignKeyKES mlsb off_sk
+    r <- lift $ NaCl.mlsbNew
+    lift $ NaCl.mlsbMemcpy r 0 mlsb off_r size_r
+    rr <- lift $ NaCl.makeSafePinned r
+
+    mlsb_vk <- lift $ NaCl.mlsbNew @m @(SizeVerKeyKES d)
+    lift $ NaCl.mlsbMemcpy mlsb_vk 0 mlsb off_vk0 size_vk
+    vk_0 <- MaybeT $ rawDeserialiseVerKeyKES <$> NaCl.mlsbToByteString mlsb_vk
+    lift $ NaCl.mlsbMemcpy mlsb_vk 0 mlsb off_vk1 size_vk
+    vk_1 <- MaybeT $ rawDeserialiseVerKeyKES <$> NaCl.mlsbToByteString mlsb_vk
+    lift $ NaCl.mlsbFinalize mlsb_vk
+
+    return (SignKeyCompactSumKES sk rr vk_0 vk_1)
+  where
+    size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
+    size_r     = seedSizeKES    (Proxy :: Proxy d)
+    size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
+
+    off_sk     = off
+    off_r      = off + size_sk
+    off_vk0    = off + off_r + size_r
+    off_vk1    = off + off_vk0 + size_vk
 
 
 instance (KESAlgorithm (CompactSumKES h d), OptimizedKESAlgorithm d, HashAlgorithm h) =>

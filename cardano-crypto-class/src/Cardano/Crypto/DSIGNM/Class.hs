@@ -9,6 +9,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -34,8 +35,6 @@ module Cardano.Crypto.DSIGNM.Class
   , decodeVerKeyDSIGNM
   , encodeSigDSIGNM
   , decodeSigDSIGNM
-  , encodeSignKeyDSIGNM
-  , decodeSignKeyDSIGNM
   , encodeSignedDSIGNM
   , decodeSignedDSIGNM
 
@@ -43,6 +42,10 @@ module Cardano.Crypto.DSIGNM.Class
   , encodedVerKeyDSIGNMSizeExpr
   , encodedSignKeyDSIGNMSizeExpr
   , encodedSigDSIGNMSizeExpr
+
+    -- * Safe (MLocked) ser/deser of sign keys
+  , safeSerialiseSignKeyDSIGNM
+  , safeDeserialiseSignKeyDSIGNM
   )
 where
 
@@ -63,6 +66,7 @@ import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWo
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Libsodium.MLockedBytes
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
+import qualified Cardano.Crypto.MonadSodium as NaCl
 
 -- deriving instance NFData (VerKeyDSIGNM d)
 -- deriving instance NFData (SignKeyDSIGNM d)
@@ -182,10 +186,33 @@ class ( DSIGNMAlgorithmBase v
   --
   -- Serialisation/(de)serialisation in fixed-size raw format
   --
+  rawSerialiseSignKeyDSIGNM   :: forall targetSize.
+                                 ( KnownNat targetSize
+                                 )
+                              => SignKeyDSIGNM v -> NaCl.MLockedSizedBytes targetSize -> Word -> m ()
 
-  rawSerialiseSignKeyDSIGNM   :: SignKeyDSIGNM v -> m ByteString
+  rawDeserialiseSignKeyDSIGNM :: forall targetSize.
+                                 ( KnownNat targetSize
+                                 )
+                              => NaCl.MLockedSizedBytes targetSize -> Word -> m (Maybe (SignKeyDSIGNM v))
 
-  rawDeserialiseSignKeyDSIGNM :: ByteString -> m (Maybe (SignKeyDSIGNM v))
+safeSerialiseSignKeyDSIGNM :: ( NaCl.MonadSodium m
+                              , DSIGNMAlgorithm m d
+                              )
+                           => SignKeyDSIGNM d
+                           -> m (NaCl.MLockedSizedBytes (SizeSignKeyDSIGNM d))
+safeSerialiseSignKeyDSIGNM sk = do
+  ptr <- NaCl.mlsbNew
+  rawSerialiseSignKeyDSIGNM sk ptr 0
+  return ptr
+
+safeDeserialiseSignKeyDSIGNM :: ( DSIGNMAlgorithm m d
+                                )
+                           => NaCl.MLockedSizedBytes (SizeSignKeyDSIGNM d)
+                           -> m (Maybe (SignKeyDSIGNM d))
+safeDeserialiseSignKeyDSIGNM mlsb = do
+  rawDeserialiseSignKeyDSIGNM mlsb 0
+
 
 --
 -- Do not provide Ord instances for keys, see #38
@@ -223,9 +250,6 @@ sizeSigDSIGNM     _ = fromInteger (natVal (Proxy @(SizeSigDSIGNM v)))
 encodeVerKeyDSIGNM :: DSIGNMAlgorithmBase v => VerKeyDSIGNM v -> Encoding
 encodeVerKeyDSIGNM = encodeBytes . rawSerialiseVerKeyDSIGNM
 
-encodeSignKeyDSIGNM :: DSIGNMAlgorithm m v => SignKeyDSIGNM v -> m Encoding
-encodeSignKeyDSIGNM = fmap encodeBytes . rawSerialiseSignKeyDSIGNM
-
 encodeSigDSIGNM :: DSIGNMAlgorithmBase v => SigDSIGNM v -> Encoding
 encodeSigDSIGNM = encodeBytes . rawSerialiseSigDSIGNM
 
@@ -241,20 +265,6 @@ decodeVerKeyDSIGNM = do
         | otherwise -> fail "decodeVerKeyDSIGNM: cannot decode key"
         where
           expected = fromIntegral (sizeVerKeyDSIGNM (Proxy :: Proxy v))
-          actual   = BS.length bs
-
-decodeSignKeyDSIGNM :: forall m v s. DSIGNMAlgorithm m v => Decoder s (m (SignKeyDSIGNM v))
-decodeSignKeyDSIGNM = do
-    bs <- decodeBytes
-    return $ rawDeserialiseSignKeyDSIGNM bs >>= \case
-      Just vk -> return vk
-      Nothing
-        | actual /= expected
-                    -> error ("decodeSignKeyDSIGNM: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> error "decodeSignKeyDSIGNM: cannot decode key"
-        where
-          expected = fromIntegral (sizeSignKeyDSIGNM (Proxy :: Proxy v))
           actual   = BS.length bs
 
 decodeSigDSIGNM :: forall v s. DSIGNMAlgorithmBase v => Decoder s (SigDSIGNM v)

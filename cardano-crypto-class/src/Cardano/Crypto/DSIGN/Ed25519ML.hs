@@ -23,26 +23,22 @@ import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import GHC.IO.Exception (ioException)
+-- import GHC.TypeNats (Nat, KnownNat, natVal)
 import Control.Monad (unless)
 import Foreign.C.Error (errnoToIOError, getErrno)
-import Foreign.Ptr (castPtr, nullPtr)
+import Foreign.Ptr (castPtr, nullPtr, plusPtr)
 import qualified Data.ByteString as BS
--- import qualified Data.ByteString.Unsafe as BS
-import Data.Proxy
-import Control.Exception (evaluate)
+-- import Data.Proxy
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Foreign
 import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.C
--- import Cardano.Crypto.Libsodium.Memory.Internal
 import Cardano.Crypto.Libsodium (MLockedSizedBytes)
--- import Cardano.Crypto.Libsodium.MLockedBytes
-import Cardano.Crypto.MonadSodium (MonadSodium (..), mlsbToByteString, mlsbFromByteStringCheck)
+import Cardano.Crypto.MonadSodium (MonadSodium (..))
 
 import Cardano.Crypto.DSIGNM.Class
--- import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (SignableRepresentation(..))
 
 
@@ -186,22 +182,25 @@ instance DSIGNMAlgorithm IO Ed25519DSIGNM where
     --
     -- Ser/deser (dangerous)
     --
-    rawSerialiseSignKeyDSIGNM sk = do
-      seed <- getSeedDSIGNM (Proxy @Ed25519DSIGNM) sk
-      -- need to copy the seed into unsafe memory and finalize the MLSB, in
-      -- order to avoid leaking mlocked memory
-      raw <- evaluate . (BS.copy $!) . mlsbToByteString $ seed
-      mlsbFinalize seed
-      return raw
+    rawSerialiseSignKeyDSIGNM (SignKeyEd25519DSIGNM sk) target offset =
+      mlsbUseAsSizedPtr sk $ \skPtr ->
+        mlsbUseAsCPtr target $ \targetPtr ->
+          cOrError "rawSerialiseSignKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_seed"
+              $ c_crypto_sign_ed25519_sk_to_seed
+                (SizedPtr $ plusPtr targetPtr (fromIntegral offset))
+                skPtr
 
-    rawDeserialiseSignKeyDSIGNM raw = do
-      mseed <- mlsbFromByteStringCheck raw
-      case mseed of
-        Nothing -> return Nothing
-        Just seed -> do
-          sk <- Just <$> genKeyDSIGNM seed
-          mlsbFinalize seed
-          return sk
+    rawDeserialiseSignKeyDSIGNM src offset = do
+        sk <- mlsbNew
+        mlsbUseAsSizedPtr sk $ \skPtr ->
+          mlsbUseAsCPtr src $ \srcPtr ->
+            allocaSized $ \pkPtr -> do
+                cOrError "genKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair"
+                  $ c_crypto_sign_ed25519_seed_keypair
+                      pkPtr
+                      skPtr
+                      (SizedPtr . castPtr $ plusPtr srcPtr (fromIntegral offset))
+        return . Just $ SignKeyEd25519DSIGNM sk
 
 
 instance ToCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
