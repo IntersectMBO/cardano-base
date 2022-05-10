@@ -43,16 +43,18 @@ main = do
     -- example SHA256 hash
     do
       let input = SB.pack [0..255]
-      let MLSB hash = digestMLockedBS (Proxy @SHA256) input
+      mlsb@(MLSB hash) <- digestMLockedBS (Proxy @SHA256) input
       traceMLockedForeignPtr hash
       print (digest (Proxy @SHA256) input)
+      mlsbFinalize mlsb
 
     -- example Blake2b_256 hash
     do
       let input = SB.pack [0..255]
-      let MLSB hash = digestMLockedBS (Proxy @Blake2b_256) input
+      mlsb@(MLSB hash) <- digestMLockedBS (Proxy @Blake2b_256) input
       traceMLockedForeignPtr hash
       print (digest (Proxy @Blake2b_256) input)
+      mlsbFinalize mlsb
 
 example
     :: [String]
@@ -72,8 +74,9 @@ example args alloc = do
     traceMLockedForeignPtr fptr
 
     -- smoke test that hashing works
-    MLSB hash <- withMLockedForeignPtr fptr $ \ptr ->
-        return $ digestMLockedStorable (Proxy @SHA256) ptr
+    mlsb@(MLSB hash) <- withMLockedForeignPtr fptr $ \ptr ->
+        digestMLockedStorable (Proxy @SHA256) ptr
+    mlsbFinalize mlsb
     traceMLockedForeignPtr hash
 
     -- force finalizers
