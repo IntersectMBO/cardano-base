@@ -87,7 +87,7 @@ instance Eq a => Eq (SafePinned a) where
 
 instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
   show (SignKeySingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = BS.unpack $ NaCl.mlsbToByteString mlsb
+    let bytes = BS.unpack $ NaCl.mlsbAsByteString mlsb
         hexstr = concatMap (printf "%02x") bytes
     in "SignKeySingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
 
@@ -96,7 +96,7 @@ instance Show (SignKeyKES (SumKES h d)) where
 
 instance Show (SignKeyKES (CompactSingleKES Ed25519DSIGNM)) where
   show (SignKeyCompactSingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = BS.unpack $ NaCl.mlsbToByteString mlsb
+    let bytes = BS.unpack $ NaCl.mlsbAsByteString mlsb
         hexstr = concatMap (printf "%02x") bytes
     in "SignKeyCompactSingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
 
@@ -263,8 +263,9 @@ testKESAlgorithm lock _pm _pv n =
               return $ (rawDeserialiseVerKeyKES . rawSerialiseVerKeyKES $ vk) === Just vk
         , testProperty "SignKey" $
             ioProperty . withLock lock . withNewTestSK $ \sk -> do
-              serialized <- rawSerialiseSignKeyKES sk
-              msk' <- rawDeserialiseSignKeyKES serialized
+              serialized <- safeSerialiseSignKeyKES sk
+              msk' <- safeDeserialiseSignKeyKES serialized
+              NaCl.mlsbFinalize serialized
               equals <- evaluate (Just sk == msk')
               maybe (return ()) forgetSignKeyKES msk'
               return equals
@@ -279,11 +280,7 @@ testKESAlgorithm lock _pm _pv n =
             ioProperty . withLock lock $ do
               vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
               return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === (sizeVerKeyKES (Proxy @v))
-        , testProperty "SignKey" $
-            ioProperty . withLock lock . withNewTestSK $ \sk -> do
-              serialized <- rawSerialiseSignKeyKES sk
-              equals <- evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyKES (Proxy @v)))
-              return equals
+        -- SignKey test is redundant, because we are enforcing lengths statically
         , testProperty "Sig" $ property $ do
             msg <- mkMsg
             return . ioProperty . withLock lock $ do

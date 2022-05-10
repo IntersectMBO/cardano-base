@@ -83,11 +83,10 @@ import Cardano.Crypto.DSIGN (
                       rawDeserialiseVerKeyDSIGNM,
                       rawSerialiseSigDSIGNM,
                       rawDeserialiseSigDSIGNM),
-  DSIGNMAlgorithm (
-                  rawSerialiseSignKeyDSIGNM,
-                  rawDeserialiseSignKeyDSIGNM),
+  DSIGNMAlgorithm,
+  safeSerialiseSignKeyDSIGNM,
+  safeDeserialiseSignKeyDSIGNM,
   sizeVerKeyDSIGNM,
-  sizeSignKeyDSIGNM,
   sizeSigDSIGNM,
   encodeVerKeyDSIGNM,
   decodeVerKeyDSIGNM,
@@ -357,8 +356,9 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
         , testProperty "SignKey" $ \seedPSB ->
             ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
               withSK seed $ \sk -> do
-                serialized <- rawSerialiseSignKeyDSIGNM sk
-                msk' <- rawDeserialiseSignKeyDSIGNM serialized
+                serialized <- safeSerialiseSignKeyDSIGNM sk
+                msk' <- safeDeserialiseSignKeyDSIGNM serialized
+                NaCl.mlsbFinalize serialized
                 equals <- evaluate (Just sk == msk')
                 maybe (return ()) forgetSignKeyDSIGNM msk'
                 return equals
@@ -373,11 +373,7 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
             ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
               vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
               return $ (fromIntegral . BS.length . rawSerialiseVerKeyDSIGNM $ vk) === (sizeVerKeyDSIGNM (Proxy @v))
-        , testProperty "SignKey" $ \seedPSB -> do
-            ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
-              serialized <- withSK seed rawSerialiseSignKeyDSIGNM
-              equals <- evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyDSIGNM (Proxy @v)))
-              return equals
+        -- SignKey test is redundant, size enforced statically
         , testProperty "Sig" $ \seedPSB -> property $ do
             msg <- mkMsg
             return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
@@ -473,8 +469,8 @@ prop_dsignm_seed_roundtrip
 prop_dsignm_seed_roundtrip lock p seedPSB = ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
   sk <- genKeyDSIGNM seed
   seed' <- getSeedDSIGNM p sk
-  bs <- evaluate $! BS.copy (NaCl.mlsbToByteString seed)
-  bs' <- evaluate $! BS.copy (NaCl.mlsbToByteString seed')
+  bs <- NaCl.mlsbToByteString seed
+  bs' <- NaCl.mlsbToByteString seed'
   forgetSignKeyDSIGNM sk
   NaCl.mlsbFinalize seed'
   return (bs === bs')
