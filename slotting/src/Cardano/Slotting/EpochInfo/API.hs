@@ -11,6 +11,7 @@ module Cardano.Slotting.EpochInfo.API
     epochInfoRange,
     epochInfoSlotToRelativeTime,
     epochInfoSlotToUTCTime,
+    epochInfoSlotLength,
 
     -- * Utility
     hoistEpochInfo,
@@ -19,7 +20,7 @@ module Cardano.Slotting.EpochInfo.API
 where
 
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
-import Cardano.Slotting.Time (RelativeTime, SystemStart, fromRelativeTime)
+import Cardano.Slotting.Time (RelativeTime, SystemStart, fromRelativeTime, SlotLength)
 import Control.Monad.Morph (generalize)
 import Data.Functor.Identity
 import Data.Time.Clock (UTCTime)
@@ -59,7 +60,10 @@ data EpochInfo m
         --
         -- See also 'epochInfoSlotToUTCTime'.
         epochInfoSlotToRelativeTime_ ::
-          HasCallStack => SlotNo -> m RelativeTime
+          HasCallStack => SlotNo -> m RelativeTime,
+        -- | Return the length of the specified slot.
+        epochInfoSlotLength_ ::
+          HasCallStack => SlotNo -> m SlotLength
       }
   deriving NoThunks via OnlyCheckWhnfNamed "EpochInfo" (EpochInfo m)
 
@@ -105,6 +109,10 @@ epochInfoSlotToRelativeTime ::
   HasCallStack => EpochInfo m -> SlotNo -> m RelativeTime
 epochInfoSlotToRelativeTime = epochInfoSlotToRelativeTime_
 
+epochInfoSlotLength ::
+  HasCallStack => EpochInfo m -> SlotNo -> m SlotLength
+epochInfoSlotLength = epochInfoSlotLength_
+
 {-------------------------------------------------------------------------------
   Utility
 -------------------------------------------------------------------------------}
@@ -114,7 +122,8 @@ hoistEpochInfo f ei = EpochInfo
   { epochInfoSize_ = f . epochInfoSize ei,
     epochInfoFirst_ = f . epochInfoFirst ei,
     epochInfoEpoch_ = f . epochInfoEpoch ei,
-    epochInfoSlotToRelativeTime_ = f . epochInfoSlotToRelativeTime ei
+    epochInfoSlotToRelativeTime_ = f . epochInfoSlotToRelativeTime ei,
+    epochInfoSlotLength_ = f . epochInfoSlotLength ei
   }
 
 generalizeEpochInfo :: Monad m => EpochInfo Identity -> EpochInfo m

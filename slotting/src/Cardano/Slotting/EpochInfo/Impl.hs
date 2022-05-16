@@ -20,7 +20,8 @@ fixedEpochInfo (EpochSize size) slotLength = EpochInfo
     epochInfoFirst_ = \e -> return $ fixedEpochInfoFirst (EpochSize size) e,
     epochInfoEpoch_ = \sl -> return $ fixedEpochInfoEpoch (EpochSize size) sl,
     epochInfoSlotToRelativeTime_ = \(SlotNo slot) ->
-      return $ RelativeTime (fromIntegral slot * getSlotLength slotLength)
+      return $ RelativeTime (fromIntegral slot * getSlotLength slotLength),
+    epochInfoSlotLength_ = const $ pure slotLength
   }
 
 -- | The pure computation underlying 'epochInfoFirst' applied to
