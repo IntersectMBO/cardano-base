@@ -11,7 +11,10 @@ module Cardano.Slotting.Time (
   , addRelativeTime
   , diffRelativeTime
   , fromRelativeTime
+  , multRelativeTime
   , toRelativeTime
+    -- * Nominal diff time
+  , multNominalDiffTime
     -- * Slot length
   , getSlotLength
   , mkSlotLength
@@ -28,7 +31,14 @@ import           Cardano.Binary (FromCBOR(..), ToCBOR(..))
 import           Codec.Serialise
 import           Control.Exception (assert)
 import           Data.Fixed
-import           Data.Time (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime)
+import           Data.Time
+                  ( NominalDiffTime,
+                    UTCTime,
+                    addUTCTime,
+                    diffUTCTime,
+                    nominalDiffTimeToSeconds,
+                    secondsToNominalDiffTime,
+                  )
 import           GHC.Generics (Generic)
 import           NoThunks.Class (InspectHeap (..), NoThunks)
 import           Quiet
@@ -69,6 +79,16 @@ toRelativeTime (SystemStart t) t' = assert (t' >= t) $
 
 fromRelativeTime :: SystemStart -> RelativeTime -> UTCTime
 fromRelativeTime (SystemStart t) (RelativeTime t') = addUTCTime t' t
+
+multRelativeTime :: Integral f => RelativeTime -> f -> RelativeTime
+multRelativeTime (RelativeTime t) =
+  RelativeTime . multNominalDiffTime t
+
+multNominalDiffTime :: Integral f => NominalDiffTime -> f -> NominalDiffTime
+multNominalDiffTime t f =
+  secondsToNominalDiffTime $
+    nominalDiffTimeToSeconds t * fromIntegral f
+
 
 {-------------------------------------------------------------------------------
   SlotLength
