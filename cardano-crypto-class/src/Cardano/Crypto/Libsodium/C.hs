@@ -13,6 +13,10 @@ module Cardano.Crypto.Libsodium.C (
     c_mlocked_pool_malloc,
     c_mlocked_pool_free,
 
+    -- * Mlocked direct fd I/O
+    c_mlocked_fd_read,
+    c_mlocked_fd_write,
+
     -- * Hashing
     -- ** SHA256
     c_crypto_hash_sha256,
@@ -93,6 +97,13 @@ foreign import ccall unsafe "mlocked_pool_malloc" c_mlocked_pool_malloc :: CSize
 
 -- | @void mlocked_pool_free(void *ptr);@
 foreign import ccall unsafe "mlocked_pool_free" c_mlocked_pool_free :: (Ptr a) -> IO ()
+
+-------------------------------------------------------------------------------
+-- Direct FD-based mlocked I/O
+-------------------------------------------------------------------------------
+
+foreign import capi unsafe "unistd.h read" c_mlocked_fd_read :: CInt -> Ptr a -> CSize -> IO CInt
+foreign import capi unsafe "unistd.h write" c_mlocked_fd_write :: CInt -> Ptr a -> CSize -> IO CInt
 
 -------------------------------------------------------------------------------
 -- Hashing: SHA256

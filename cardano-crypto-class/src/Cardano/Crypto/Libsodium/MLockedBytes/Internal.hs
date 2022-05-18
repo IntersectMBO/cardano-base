@@ -18,6 +18,10 @@ module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     mlsbCopy,
     mlsbMemcpy,
     mlsbFinalize,
+
+    mlsbReadFd,
+    mlsbReadFromFd,
+    mlsbWriteFd,
 ) where
 
 import Control.DeepSeq (NFData (..))
@@ -31,6 +35,7 @@ import System.IO.Unsafe (unsafeDupablePerformIO)
 import Data.Word (Word8)
 import Control.Monad (void, when)
 import Text.Printf
+import System.Posix.Types (Fd (..))
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.Memory.Internal
@@ -163,3 +168,53 @@ mlsbUseAsSizedPtr (MLSB x) k = withMLockedForeignPtr x (k . ptrPsbToSizedPtr)
 --
 mlsbFinalize :: MLockedSizedBytes n -> IO ()
 mlsbFinalize (MLSB ptr) = finalizeMLockedForeignPtr ptr
+
+-- | Write an 'MLockedSizedBytes' value directly to a file descriptor. This
+-- will not allocate any intermediate variables; as long as the file descriptor
+-- itself does not write anything to disk or unprotected memory, the mlocked
+-- memory is safe.
+mlsbWriteFd :: forall n. KnownNat n => Fd -> MLockedSizedBytes n -> IO ()
+mlsbWriteFd (Fd fd) mlsb =
+  mlsbUseAsCPtr mlsb $ \ptr ->
+    go ptr $ fromIntegral (natVal (Proxy @n))
+  where
+    go ptr size = do
+      bytesWritten <- c_mlocked_fd_write fd ptr size
+      when (bytesWritten < 0) (error "Failed to write MLSB")
+      if fromIntegral bytesWritten == size then
+        return ()
+      else
+        go (plusPtr ptr $ fromIntegral bytesWritten) (size - fromIntegral bytesWritten)
+
+-- | Read an 'MLockedSizedBytes' value directly from a file descriptor. This
+-- will not allocate any intermediate variables; as long as the file descriptor
+-- itself does not write anything to disk or unprotected memory, the mlocked
+-- memory is safe.
+-- You have to provide a sufficiently sized 'MLockedSizedBytes' yourself; the
+-- size parameter determines the number of bytes read from the descriptor.
+mlsbReadFd :: forall n. KnownNat n => Fd -> MLockedSizedBytes n -> IO ()
+mlsbReadFd (Fd fd) mlsb =
+  mlsbUseAsCPtr mlsb $ \ptr ->
+    go ptr $ fromIntegral (natVal (Proxy @n))
+  where
+    go ptr size = do
+      bytesRead <- c_mlocked_fd_read fd ptr size
+      when (bytesRead < 0) (error "Failed to write MLSB")
+      if fromIntegral bytesRead == size then
+        return ()
+      else
+        go (plusPtr ptr $ fromIntegral bytesRead) (size - fromIntegral bytesRead)
+
+-- | Read an 'MLockedSizedBytes' value directly from a file descriptor. This
+-- will not allocate any intermediate variables; as long as the file descriptor
+-- itself does not write anything to disk or unprotected memory, the mlocked
+-- memory is safe.
+-- A sufficiently sized 'MLockedSizedBytes' will be created for you; the
+-- size parameter determines the number of bytes read from the descriptor. The
+-- caller is responsible for calling 'mlsbFinalize' on the resulting value
+-- when it is no longer used.
+mlsbReadFromFd :: forall n. KnownNat n => Fd -> IO (MLockedSizedBytes n)
+mlsbReadFromFd fd = do
+  mlsb <- mlsbNew
+  mlsbReadFd fd mlsb
+  return mlsb
