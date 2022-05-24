@@ -58,7 +58,9 @@ library
                       , cborg              >= 0.2.2 && < 0.3
                       , containers
                       , data-fix
+                      , deepseq
                       , formatting
+                      , ghc-prim
                       , nothunks
                       , primitive
                       , recursion-schemes  >= 5.1   && < 5.3
@@ -102,3 +104,4 @@ test-suite test
 
   ghc-options:          -threaded
                         -rtsopts
+

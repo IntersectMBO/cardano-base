@@ -5,7 +5,10 @@ module Cardano.Binary.Raw
   )
 where
 
-import Cardano.Prelude
+import Prelude
+
+import Control.DeepSeq (NFData)
+import Data.ByteString ( ByteString )
 
 import Cardano.Binary.FromCBOR (FromCBOR)
 import Cardano.Binary.ToCBOR (ToCBOR)

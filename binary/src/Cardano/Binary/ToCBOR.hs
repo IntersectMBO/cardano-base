@@ -37,9 +37,13 @@ module Cardano.Binary.ToCBOR
   )
 where
 
+import Prelude hiding ((.))
+import Cardano.Prelude(panic)
 
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.ByteArray.Sliced as BAS
+import Control.Category (Category((.)))
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Short.Internal as SBS
@@ -50,21 +54,28 @@ import Data.Fix ( Fix(..) )
 #else
 import Data.Functor.Foldable (Fix(..))
 #endif
+import Data.Foldable (toList)
 import Data.Functor.Foldable (cata, project)
+import Data.Int (Int32, Int64)
+import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Map as M
+import Data.Ratio ( Ratio, denominator, numerator )
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
 import qualified Data.Text as Text
+import Data.Text (Text)
 import Data.Text.Lazy.Builder (Builder)
 import Data.Time.Calendar.OrdinalDate ( toOrdinalDate )
 import Data.Time.Clock (NominalDiffTime, UTCTime(..), diffTimeToPicoseconds)
+import Data.Typeable ( Typeable, typeRep, TypeRep, Proxy(..) )
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
+import Data.Void (Void, absurd)
+import Data.Word ( Word8, Word16, Word32, Word64 )
 import Foreign.Storable (sizeOf)
 import Formatting (bprint, build, shown, stext)
 import qualified Formatting.Buildable as B (Buildable(..))
-
-import Cardano.Prelude
+import Numeric.Natural (Natural)
 
 class Typeable a => ToCBOR a where
   toCBOR :: a -> Encoding
@@ -286,7 +297,7 @@ apMono n f = \case
 
 -- | Greedily compute the size bounds for a type, using the given context to
 --   override sizes for specific types.
-szWithCtx :: (ToCBOR a) => Map TypeRep SizeOverride -> Proxy a -> Size
+szWithCtx :: (ToCBOR a) => M.Map TypeRep SizeOverride -> Proxy a -> Size
 szWithCtx ctx pxy = case M.lookup (typeRep pxy) ctx of
   Nothing       -> normal
   Just override -> case override of
@@ -559,10 +570,10 @@ instance
     + size (Proxy @f)
     + size (Proxy @g)
 
-instance ToCBOR ByteString where
+instance ToCBOR BS.ByteString where
   toCBOR = E.encodeBytes
   encodedSizeExpr size _ =
-    let len = size (Proxy @(LengthOf ByteString))
+    let len = size (Proxy @(LengthOf BS.ByteString))
     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
 
 instance ToCBOR Text.Text where
@@ -637,7 +648,7 @@ encodeMapSkel size foldrWithKey = encodeContainerSkel
   (\k v b -> toCBOR k <> toCBOR v <> b)
 {-# INLINE encodeMapSkel #-}
 
-instance (Ord k, ToCBOR k, ToCBOR v) => ToCBOR (Map k v) where
+instance (Ord k, ToCBOR k, ToCBOR v) => ToCBOR (M.Map k v) where
   toCBOR = encodeMapSkel M.size M.foldrWithKey
 
 encodeSetSkel
@@ -666,7 +677,7 @@ setTag = 258
 encodeSetTag :: E.Encoding
 encodeSetTag = E.encodeTag setTag
 
-instance (Ord a, ToCBOR a) => ToCBOR (Set a) where
+instance (Ord a, ToCBOR a) => ToCBOR (S.Set a) where
   toCBOR = encodeSetSkel S.size S.foldr
 
 -- | Generic encoder for vectors. Its intended use is to allow easy
