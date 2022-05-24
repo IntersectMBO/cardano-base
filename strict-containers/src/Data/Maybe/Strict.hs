@@ -107,7 +107,6 @@ fromSMaybe :: a -> StrictMaybe a -> a
 fromSMaybe d SNothing = d
 fromSMaybe _ (SJust x) = x
 
-
 -- | Same as `Data.Maybe.isNothing`
 isSNothing :: StrictMaybe a -> Bool
 isSNothing SNothing = True
@@ -121,7 +120,6 @@ isSJust = not . isSNothing
 strictMaybe :: a -> (b -> a) -> StrictMaybe b -> a
 strictMaybe x _ SNothing = x
 strictMaybe _ f (SJust y) = f y
-
 
 instance Default (StrictMaybe t) where
   def = SNothing

@@ -1,6 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
-module Cardano.Crypto.RandomBytes
-where
+
+module Cardano.Crypto.RandomBytes where
 
 import Foreign.C.Types
 import Foreign.Ptr

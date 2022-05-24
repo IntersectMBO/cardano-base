@@ -1,5 +1,5 @@
-module Cardano.Crypto.Libsodium.MLockedBytes (
-    MLockedSizedBytes,
+module Cardano.Crypto.Libsodium.MLockedBytes
+  ( MLockedSizedBytes,
     mlsbZero,
     mlsbFromByteString,
     mlsbFromByteStringCheck,
@@ -7,6 +7,7 @@ module Cardano.Crypto.Libsodium.MLockedBytes (
     mlsbUseAsCPtr,
     mlsbUseAsSizedPtr,
     mlsbFinalize,
-) where
+  )
+where
 
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal

@@ -25,13 +25,13 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.Typeable (Typeable)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
-import Quiet (Quiet (..))
 import NoThunks.Class (NoThunks)
+import Quiet (Quiet (..))
 
 -- | The 0-based index for the Ourboros time slot.
 newtype SlotNo = SlotNo {unSlotNo :: Word64}
   deriving stock (Eq, Ord, Generic)
-  deriving Show via Quiet SlotNo
+  deriving (Show) via Quiet SlotNo
   deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoThunks, ToJSON, FromJSON)
 
 instance ToCBOR SlotNo where
@@ -72,7 +72,6 @@ instance NFData a => NFData (WithOrigin a) where
   rnf Origin = ()
   rnf (At t) = rnf t
 
-
 at :: t -> WithOrigin t
 at = At
 
@@ -102,10 +101,10 @@ withOriginFromMaybe (Just t) = At t
 -- | An epoch, i.e. the number of the epoch.
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Generic)
-  deriving Show via Quiet EpochNo
+  deriving (Show) via Quiet EpochNo
   deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Generic)
-  deriving Show via Quiet EpochSize
+  deriving (Show) via Quiet EpochSize
   deriving newtype (Enum, Num, Real, Integral, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)

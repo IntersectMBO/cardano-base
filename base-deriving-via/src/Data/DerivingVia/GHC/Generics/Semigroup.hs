@@ -1,16 +1,16 @@
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE EmptyCase            #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -Wno-unticked-promoted-constructors #-}
 
 -- | "GHC.Generics" definition of '<>'
 module Data.DerivingVia.GHC.Generics.Semigroup
-  ( GSemigroup (..)
+  ( GSemigroup (..),
   )
 where
 
@@ -35,10 +35,13 @@ instance GSemigroup U1 where
 instance (GSemigroup l, GSemigroup r) => GSemigroup (l :*: r) where
   gsappend (l1 :*: r1) (l2 :*: r2) = gsappend l1 l2 :*: gsappend r1 r2
 
-instance TypeError (     Text "No Generics definition of "
-                    :<>: ShowType Semigroup
-                    :<>: Text " for types with multiple constructors "
-                    :<>: ShowType (l :+: r)
-                   )
-      => GSemigroup (l :+: r) where
+instance
+  TypeError
+    ( Text "No Generics definition of "
+        :<>: ShowType Semigroup
+        :<>: Text " for types with multiple constructors "
+        :<>: ShowType (l :+: r)
+    ) =>
+  GSemigroup (l :+: r)
+  where
   gsappend = error "GSemigroup :+:"

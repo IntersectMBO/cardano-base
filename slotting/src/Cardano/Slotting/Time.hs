@@ -1,47 +1,53 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Cardano.Slotting.Time (
-    -- * System time
-    SystemStart (..)
-    -- * Relative time
-  , RelativeTime (..)
-  , addRelativeTime
-  , diffRelativeTime
-  , fromRelativeTime
-  , multRelativeTime
-  , toRelativeTime
-    -- * Nominal diff time
-  , multNominalDiffTime
-    -- * Slot length
-  , getSlotLength
-  , mkSlotLength
-    -- ** Conversions
-  , slotLengthFromMillisec
-  , slotLengthFromSec
-  , slotLengthToMillisec
-  , slotLengthToSec
-    -- ** opaque
-  , SlotLength
-  ) where
+module Cardano.Slotting.Time
+  ( -- * System time
+    SystemStart (..),
 
-import           Cardano.Binary (FromCBOR(..), ToCBOR(..))
-import           Codec.Serialise
-import           Control.Exception (assert)
-import           Data.Fixed
-import           Data.Time
-                  ( NominalDiffTime,
-                    UTCTime,
-                    addUTCTime,
-                    diffUTCTime,
-                    nominalDiffTimeToSeconds,
-                    secondsToNominalDiffTime,
-                  )
-import           GHC.Generics (Generic)
-import           NoThunks.Class (InspectHeap (..), NoThunks)
-import           Quiet
+    -- * Relative time
+    RelativeTime (..),
+    addRelativeTime,
+    diffRelativeTime,
+    fromRelativeTime,
+    multRelativeTime,
+    toRelativeTime,
+
+    -- * Nominal diff time
+    multNominalDiffTime,
+
+    -- * Slot length
+    getSlotLength,
+    mkSlotLength,
+
+    -- ** Conversions
+    slotLengthFromMillisec,
+    slotLengthFromSec,
+    slotLengthToMillisec,
+    slotLengthToSec,
+
+    -- ** opaque
+    SlotLength,
+  )
+where
+
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Codec.Serialise
+import Control.Exception (assert)
+import Data.Fixed
+import Data.Time
+  ( NominalDiffTime,
+    UTCTime,
+    addUTCTime,
+    diffUTCTime,
+    nominalDiffTimeToSeconds,
+    secondsToNominalDiffTime,
+  )
+import GHC.Generics (Generic)
+import NoThunks.Class (InspectHeap (..), NoThunks)
+import Quiet
 
 {-------------------------------------------------------------------------------
   System start
@@ -50,11 +56,11 @@ import           Quiet
 -- | System start
 --
 -- Slots are counted from the system start.
-newtype SystemStart = SystemStart { getSystemStart :: UTCTime }
+newtype SystemStart = SystemStart {getSystemStart :: UTCTime}
   deriving (Eq, Generic)
-  deriving NoThunks via InspectHeap SystemStart
-  deriving Show via Quiet SystemStart
-  deriving newtype Serialise
+  deriving (NoThunks) via InspectHeap SystemStart
+  deriving (Show) via Quiet SystemStart
+  deriving newtype (Serialise)
   deriving newtype (ToCBOR, FromCBOR)
 
 {-------------------------------------------------------------------------------
@@ -62,10 +68,10 @@ newtype SystemStart = SystemStart { getSystemStart :: UTCTime }
 -------------------------------------------------------------------------------}
 
 -- | 'RelativeTime' is time relative to the 'SystemStart'
-newtype RelativeTime = RelativeTime { getRelativeTime :: NominalDiffTime }
-  deriving stock   (Eq, Ord, Generic)
+newtype RelativeTime = RelativeTime {getRelativeTime :: NominalDiffTime}
+  deriving stock (Eq, Ord, Generic)
   deriving newtype (NoThunks)
-  deriving Show via Quiet RelativeTime
+  deriving (Show) via Quiet RelativeTime
 
 addRelativeTime :: NominalDiffTime -> RelativeTime -> RelativeTime
 addRelativeTime delta (RelativeTime t) = RelativeTime (t + delta)
@@ -74,8 +80,9 @@ diffRelativeTime :: RelativeTime -> RelativeTime -> NominalDiffTime
 diffRelativeTime (RelativeTime t) (RelativeTime t') = t - t'
 
 toRelativeTime :: SystemStart -> UTCTime -> RelativeTime
-toRelativeTime (SystemStart t) t' = assert (t' >= t) $
-                                      RelativeTime (diffUTCTime t' t)
+toRelativeTime (SystemStart t) t' =
+  assert (t' >= t) $
+    RelativeTime (diffUTCTime t' t)
 
 fromRelativeTime :: SystemStart -> RelativeTime -> UTCTime
 fromRelativeTime (SystemStart t) (RelativeTime t') = addUTCTime t' t
@@ -89,15 +96,14 @@ multNominalDiffTime t f =
   secondsToNominalDiffTime $
     nominalDiffTimeToSeconds t * fromIntegral f
 
-
 {-------------------------------------------------------------------------------
   SlotLength
 -------------------------------------------------------------------------------}
 
 -- | Slot length
-newtype SlotLength = SlotLength { getSlotLength :: NominalDiffTime }
+newtype SlotLength = SlotLength {getSlotLength :: NominalDiffTime}
   deriving (Eq, Generic, NoThunks)
-  deriving Show via Quiet SlotLength
+  deriving (Show) via Quiet SlotLength
 
 -- | Constructor for 'SlotLength'
 mkSlotLength :: NominalDiffTime -> SlotLength
@@ -115,9 +121,10 @@ slotLengthFromMillisec = mkSlotLength . conv
     -- Explicit type annotation here means that /if/ we change the precision,
     -- we are forced to reconsider this code.
     conv :: Integer -> NominalDiffTime
-    conv = (realToFrac :: Pico -> NominalDiffTime)
-         . (/ 1000)
-         . (fromInteger :: Integer -> Pico)
+    conv =
+      (realToFrac :: Pico -> NominalDiffTime)
+        . (/ 1000)
+        . (fromInteger :: Integer -> Pico)
 
 slotLengthToMillisec :: SlotLength -> Integer
 slotLengthToMillisec = conv . getSlotLength
@@ -125,9 +132,10 @@ slotLengthToMillisec = conv . getSlotLength
     -- Explicit type annotation here means that /if/ we change the precision,
     -- we are forced to reconsider this code.
     conv :: NominalDiffTime -> Integer
-    conv = truncate
-         . (* 1000)
-         . (realToFrac :: NominalDiffTime -> Pico)
+    conv =
+      truncate
+        . (* 1000)
+        . (realToFrac :: NominalDiffTime -> Pico)
 
 {-------------------------------------------------------------------------------
   Serialisation

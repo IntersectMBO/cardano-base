@@ -65,7 +65,7 @@ where
 import Codec.Serialise (Serialise)
 import Control.Arrow ((***))
 import Control.DeepSeq (NFData)
-import Data.Aeson (FromJSON(..), ToJSON(..))
+import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Foldable (foldl', toList)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq

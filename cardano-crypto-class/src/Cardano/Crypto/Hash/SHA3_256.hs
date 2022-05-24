@@ -4,7 +4,7 @@
 
 -- | Implementation of the SHA3_256 hashing algorithm.
 module Cardano.Crypto.Hash.SHA3_256
-  ( SHA3_256
+  ( SHA3_256,
   )
 where
 

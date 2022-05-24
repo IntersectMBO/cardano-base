@@ -12,27 +12,24 @@
 
 -- | Mock implementations of verifiable random functions.
 module Cardano.Crypto.VRF.Simple
-  ( SimpleVRF
-  , pointFromMaybe
+  ( SimpleVRF,
+    pointFromMaybe,
   )
 where
 
-import           Control.DeepSeq (force)
-import           Data.Proxy (Proxy (..))
-import           GHC.Generics (Generic)
-import           NoThunks.Class (NoThunks, InspectHeap(..))
-import           Numeric.Natural (Natural)
-
-import           Cardano.Prelude (NFData)
-import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
-
+import Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
+import Cardano.Crypto.Hash
+import Cardano.Crypto.Seed
+import Cardano.Crypto.Util
+import Cardano.Crypto.VRF.Class
+import Cardano.Prelude (NFData)
+import Control.DeepSeq (force)
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
-
-import           Cardano.Crypto.Hash
-import           Cardano.Crypto.Seed
-import           Cardano.Crypto.Util
-import           Cardano.Crypto.VRF.Class
+import Data.Proxy (Proxy (..))
+import GHC.Generics (Generic)
+import NoThunks.Class (InspectHeap (..), NoThunks)
+import Numeric.Natural (Natural)
 
 data SimpleVRF
 
@@ -40,6 +37,7 @@ type H = ShortHash
 
 curve :: C.Curve
 curve = C.getCurveByName C.SEC_t113r1
+
 -- C.curveSizeBits curve = 113 bits, 15 bytes
 
 q :: Integer
@@ -47,8 +45,8 @@ q = C.ecc_n $ C.common_curve curve
 
 newtype Point = ThunkyPoint C.Point
   deriving (Eq, Generic)
-  deriving NoThunks via InspectHeap C.Point
-  deriving newtype NFData
+  deriving (NoThunks) via InspectHeap C.Point
+  deriving newtype (NFData)
 
 -- | Smart constructor for @Point@ that evaluates the wrapped 'C.Point' to
 -- normal form. This is needed because 'C.Point' has a constructor with two
@@ -97,28 +95,26 @@ h' :: Encoding -> Integer -> Point
 h' enc l = pow $ mod (l * (fromIntegral . bytesToNatural $ h enc)) q
 
 instance VRFAlgorithm SimpleVRF where
-
   --
   -- Key and signature types
   --
 
   newtype VerKeyVRF SimpleVRF = VerKeySimpleVRF Point
-    deriving stock   (Show, Eq, Generic)
+    deriving stock (Show, Eq, Generic)
     deriving newtype (NoThunks)
     deriving anyclass (NFData)
 
   newtype SignKeyVRF SimpleVRF = SignKeySimpleVRF C.PrivateNumber
-    deriving stock   (Show, Eq, Generic)
-    deriving NoThunks via InspectHeap C.PrivateNumber
+    deriving stock (Show, Eq, Generic)
+    deriving (NoThunks) via InspectHeap C.PrivateNumber
     deriving anyclass (NFData)
 
-  data CertVRF SimpleVRF
-    = CertSimpleVRF
-        { certU :: !Point    -- 15 byte point numbers, round up to 16
-        , certC :: !Natural  -- md5 hash, so 16 bytes
-        , certS :: !Integer  -- at most q, so 15 bytes, round up to 16
-        }
-    deriving stock    (Show, Eq, Generic)
+  data CertVRF SimpleVRF = CertSimpleVRF
+    { certU :: !Point, -- 15 byte point numbers, round up to 16
+      certC :: !Natural, -- md5 hash, so 16 bytes
+      certS :: !Integer -- at most q, so 15 bytes, round up to 16
+    }
+    deriving stock (Show, Eq, Generic)
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
 
@@ -131,10 +127,9 @@ instance VRFAlgorithm SimpleVRF where
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
 
-  sizeVerKeyVRF  _ = 32
+  sizeVerKeyVRF _ = 32
   sizeSignKeyVRF _ = 16
-  sizeCertVRF    _ = 64
-
+  sizeCertVRF _ = 64
 
   --
   -- Core algorithm operations
@@ -151,7 +146,7 @@ instance VRFAlgorithm SimpleVRF where
         r = fromIntegral (bytesToNatural y) `mod` q
         c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
         s = mod (r + k * fromIntegral (bytesToNatural c)) q
-    in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
+     in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
 
   verifyVRF () (VerKeySimpleVRF v) a' (OutputVRF y, cert) =
     let a = getSignableRepresentation a'
@@ -161,23 +156,23 @@ instance VRFAlgorithm SimpleVRF where
         s = certS cert
         b1 = y == h (toCBOR a <> toCBOR u)
         rhs =
-          h $ toCBOR a <>
-            toCBOR v <>
-            toCBOR (pow s <> pow' v c') <>
-            toCBOR (h' (toCBOR a) s <> pow' u c')
-    in b1 && c == bytesToNatural rhs
+          h $
+            toCBOR a
+              <> toCBOR v
+              <> toCBOR (pow s <> pow' v c')
+              <> toCBOR (h' (toCBOR a) s <> pow' u c')
+     in b1 && c == bytesToNatural rhs
 
   sizeOutputVRF _ = sizeHash (Proxy :: Proxy H)
-
 
   --
   -- Key generation
   --
 
-  seedSizeVRF _  = 16 * 100 -- size of SEC_t113r1 * up to 100 iterations
-  genKeyVRF seed = SignKeySimpleVRF
-                     (runMonadRandomWithSeed seed (C.scalarGenerate curve))
-
+  seedSizeVRF _ = 16 * 100 -- size of SEC_t113r1 * up to 100 iterations
+  genKeyVRF seed =
+    SignKeySimpleVRF
+      (runMonadRandomWithSeed seed (C.scalarGenerate curve))
 
   --
   -- raw serialise/deserialise
@@ -186,49 +181,46 @@ instance VRFAlgorithm SimpleVRF where
   -- All the integers here are 15 or 16 bytes big, we round up to 16.
 
   rawSerialiseVerKeyVRF (VerKeySimpleVRF (Point C.PointO)) =
-      error "rawSerialiseVerKeyVRF: Point at infinity"
+    error "rawSerialiseVerKeyVRF: Point at infinity"
   rawSerialiseVerKeyVRF (VerKeySimpleVRF (Point (C.Point p1 p2))) =
-      writeBinaryNatural 16 (fromInteger p1)
-   <> writeBinaryNatural 16 (fromInteger p2)
+    writeBinaryNatural 16 (fromInteger p1)
+      <> writeBinaryNatural 16 (fromInteger p2)
 
   rawSerialiseSignKeyVRF (SignKeySimpleVRF sk) =
-      writeBinaryNatural 16 (fromInteger sk)
+    writeBinaryNatural 16 (fromInteger sk)
 
   rawSerialiseCertVRF (CertSimpleVRF (Point C.PointO) _ _) =
-      error "rawSerialiseCertVRF: Point at infinity"
+    error "rawSerialiseCertVRF: Point at infinity"
   rawSerialiseCertVRF (CertSimpleVRF (Point (C.Point p1 p2)) c s) =
-      writeBinaryNatural 16 (fromInteger p1)
-   <> writeBinaryNatural 16 (fromInteger p2)
-   <> writeBinaryNatural 16 c
-   <> writeBinaryNatural 16 (fromInteger s)
+    writeBinaryNatural 16 (fromInteger p1)
+      <> writeBinaryNatural 16 (fromInteger p2)
+      <> writeBinaryNatural 16 c
+      <> writeBinaryNatural 16 (fromInteger s)
 
   rawDeserialiseVerKeyVRF bs
-    | [p1b, p2b] <- splitsAt [16,16] bs
-    , let p1 = toInteger (readBinaryNatural p1b)
-          p2 = toInteger (readBinaryNatural p2b)
-    = Just $! VerKeySimpleVRF (Point (C.Point p1 p2))
-
-    | otherwise
-    = Nothing
+    | [p1b, p2b] <- splitsAt [16, 16] bs,
+      let p1 = toInteger (readBinaryNatural p1b)
+          p2 = toInteger (readBinaryNatural p2b) =
+        Just $! VerKeySimpleVRF (Point (C.Point p1 p2))
+    | otherwise =
+        Nothing
 
   rawDeserialiseSignKeyVRF bs
-    | [skb] <- splitsAt [16] bs
-    , let sk = toInteger (readBinaryNatural skb)
-    = Just $! SignKeySimpleVRF sk
-
-    | otherwise
-    = Nothing
+    | [skb] <- splitsAt [16] bs,
+      let sk = toInteger (readBinaryNatural skb) =
+        Just $! SignKeySimpleVRF sk
+    | otherwise =
+        Nothing
 
   rawDeserialiseCertVRF bs
-    | [p1b, p2b, cb, sb] <- splitsAt [16,16,16,16] bs
-    , let p1 = toInteger (readBinaryNatural p1b)
+    | [p1b, p2b, cb, sb] <- splitsAt [16, 16, 16, 16] bs,
+      let p1 = toInteger (readBinaryNatural p1b)
           p2 = toInteger (readBinaryNatural p2b)
-          c  =            readBinaryNatural cb
-          s  = toInteger (readBinaryNatural sb)
-    = Just $! CertSimpleVRF (Point (C.Point p1 p2)) c s
-
-    | otherwise
-    = Nothing
+          c = readBinaryNatural cb
+          s = toInteger (readBinaryNatural sb) =
+        Just $! CertSimpleVRF (Point (C.Point p1 p2)) c s
+    | otherwise =
+        Nothing
 
 instance ToCBOR (VerKeyVRF SimpleVRF) where
   toCBOR = encodeVerKeyVRF

@@ -1,5 +1,5 @@
 module Cardano.Binary
-  ( module X
+  ( module X,
   )
 where
 

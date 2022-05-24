@@ -4,7 +4,7 @@
 
 -- | Implementation of the Keccak256 hashing algorithm.
 module Cardano.Crypto.Hash.Keccak256
-  ( Keccak256
+  ( Keccak256,
   )
 where
 

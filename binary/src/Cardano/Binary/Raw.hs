@@ -1,15 +1,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Cardano.Binary.Raw
-  ( Raw(..)
+  ( Raw (..),
   )
 where
 
-import Cardano.Prelude
-
 import Cardano.Binary.FromCBOR (FromCBOR)
 import Cardano.Binary.ToCBOR (ToCBOR)
-
+import Cardano.Prelude
 
 -- | A wrapper over 'ByteString' for signalling that a bytestring should be
 --   processed as a sequence of bytes, not as a separate entity. It's used in

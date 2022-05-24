@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+
 module Cardano.Crypto.Hash.NeverUsed (NeverHash) where
 
 import Cardano.Crypto.Hash.Class

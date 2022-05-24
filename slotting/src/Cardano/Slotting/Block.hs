@@ -3,7 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Cardano.Slotting.Block
-  ( BlockNo (..)
+  ( BlockNo (..),
   )
 where
 
@@ -20,7 +20,7 @@ import Quiet (Quiet (..))
 -- for every slot where N <= SlotNo.
 newtype BlockNo = BlockNo {unBlockNo :: Word64}
   deriving stock (Eq, Ord, Generic)
-  deriving Show via Quiet BlockNo
+  deriving (Show) via Quiet BlockNo
   deriving newtype (Enum, Bounded, Num, Serialise, NoThunks, NFData)
 
 instance ToCBOR BlockNo where

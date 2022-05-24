@@ -1,7 +1,8 @@
 {-# LANGUAGE CPP #-}
+
 -- | Digital signatures.
 module Cardano.Crypto.DSIGN
-  ( module X
+  ( module X,
   )
 where
 

@@ -1,19 +1,16 @@
-{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module Test.Cardano.Binary.Failure
-  (tests)
-  where
+module Test.Cardano.Binary.Failure (tests) where
 
 import Cardano.Binary hiding (Range)
 import Cardano.Prelude
 import qualified Codec.CBOR.Read as CR
- 
-import Hedgehog 
+import Hedgehog
 import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
 import Hedgehog.Internal.Property (failWith)
+import qualified Hedgehog.Range as Range
 
 {- HLINT ignore "Use record patterns" -}
 
@@ -24,7 +21,7 @@ tests = checkParallel $$(discover)
 -------------------------   Generators   -----------------------------
 
 genInvalidNonEmptyCBOR :: Gen Encoding -- NonEmpty Bool
-genInvalidNonEmptyCBOR  = pure (toCBOR ([] :: [Bool]))
+genInvalidNonEmptyCBOR = pure (toCBOR ([] :: [Bool]))
 
 genInvalidEitherCBOR :: Gen Encoding -- Either Bool Bool
 genInvalidEitherCBOR = do
@@ -62,9 +59,10 @@ prop_shouldFailSetTag = property $ do
 prop_shouldFailSet :: Property
 prop_shouldFailSet = property $ do
   ls <- forAll $ Gen.list (Range.constant 0 20) (Gen.int Range.constantBounded)
-  let set = encodeTag 258
+  let set =
+        encodeTag 258
           <> encodeListLen (fromIntegral (length ls + 2))
-          <> mconcat (toCBOR <$> (4:3:ls))
+          <> mconcat (toCBOR <$> (4 : 3 : ls))
   assertIsLeft (decode set :: Either DecoderError (Set Int))
 
 prop_shouldFailNegativeNatural :: Property
@@ -79,16 +77,15 @@ assertIsLeft :: (HasCallStack, MonadTest m) => Either DecoderError b -> m ()
 assertIsLeft (Right _) = withFrozenCallStack $ failWith Nothing "This should have Left : failed"
 assertIsLeft (Left !x) = case x of
   DecoderErrorDeserialiseFailure _ (CR.DeserialiseFailure _ str) | not (null str) -> success
-  DecoderErrorCanonicityViolation _  -> success
-  DecoderErrorCustom _  _            -> success 
-  DecoderErrorEmptyList _            -> success
-  DecoderErrorLeftover _ _           -> success
-  DecoderErrorSizeMismatch _ _ _     -> success
+  DecoderErrorCanonicityViolation _ -> success
+  DecoderErrorCustom _ _ -> success
+  DecoderErrorEmptyList _ -> success
+  DecoderErrorLeftover _ _ -> success
+  DecoderErrorSizeMismatch _ _ _ -> success
   DecoderErrorUnknownTag _ i | i > 0 -> success
-  _                                  -> success
+  _ -> success
 
 decode :: FromCBOR a => Encoding -> Either DecoderError a
-decode enc = 
- let encoded = serializeEncoding enc
- in decodeFull encoded
-
+decode enc =
+  let encoded = serializeEncoding enc
+   in decodeFull encoded

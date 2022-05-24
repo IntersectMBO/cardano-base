@@ -1,7 +1,9 @@
-{-# LANGUAGE CApiFFI             #-}
-module Cardano.Crypto.Libsodium.UnsafeC (
-    c_sodium_compare_unsafe,
-    ) where
+{-# LANGUAGE CApiFFI #-}
+
+module Cardano.Crypto.Libsodium.UnsafeC
+  ( c_sodium_compare_unsafe,
+  )
+where
 
 import Foreign.C.Types (CSize (..))
 import Foreign.Ptr (Ptr)

@@ -1,46 +1,47 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleInstances  #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving  #-}
-{-# LANGUAGE Rank2Types         #-}
-{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Cardano.Binary.Annotated
-  ( Annotated(..)
-  , ByteSpan(..)
-  , Decoded(..)
-  , annotationBytes
-  , annotatedDecoder
-  , slice
-  , fromCBORAnnotated
-  , decodeFullAnnotatedBytes
-  , reAnnotate
-  , Annotator (..)
-  , annotatorSlice
-  , decodeAnnotator
-  , withSlice
-  , FullByteString (..)
+  ( Annotated (..),
+    ByteSpan (..),
+    Decoded (..),
+    annotationBytes,
+    annotatedDecoder,
+    slice,
+    fromCBORAnnotated,
+    decodeFullAnnotatedBytes,
+    reAnnotate,
+    Annotator (..),
+    annotatorSlice,
+    decodeAnnotator,
+    withSlice,
+    FullByteString (..),
   )
 where
 
-import Cardano.Prelude
-
-import Codec.CBOR.Read (ByteOffset)
-import Data.Aeson (FromJSON(..), ToJSON(..))
-import qualified Data.ByteString.Lazy as BSL
-import NoThunks.Class (NoThunks)
-
 import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR
-  (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan)
-import Cardano.Binary.ToCBOR
-  (ToCBOR)
+  ( Decoder,
+    DecoderError,
+    FromCBOR (..),
+    decodeWithByteSpan,
+  )
 import Cardano.Binary.Serialize (serialize')
-
-
+import Cardano.Binary.ToCBOR
+  ( ToCBOR,
+  )
+import Cardano.Prelude
+import Codec.CBOR.Read (ByteOffset)
+import Data.Aeson (FromJSON (..), ToJSON (..))
+import qualified Data.ByteString.Lazy as BSL
+import NoThunks.Class (NoThunks)
 
 -- | Extract a substring of a given ByteString corresponding to the offsets.
 slice :: BSL.ByteString -> ByteSpan -> LByteString
@@ -52,9 +53,9 @@ data ByteSpan = ByteSpan !ByteOffset !ByteOffset
   deriving (Generic, Show)
 
 -- Used for debugging purposes only.
-instance ToJSON ByteSpan where
+instance ToJSON ByteSpan
 
-data Annotated b a = Annotated { unAnnotated :: !b, annotation :: !a }
+data Annotated b a = Annotated {unAnnotated :: !b, annotation :: !a}
   deriving (Eq, Show, Functor, Generic)
   deriving anyclass (NFData, NoThunks)
 
@@ -74,8 +75,9 @@ instance FromJSON b => FromJSON (Annotated b ()) where
 -- | A decoder for a value paired with an annotation specifying the start and end
 -- of the consumed bytes.
 annotatedDecoder :: Decoder s a -> Decoder s (Annotated a ByteSpan)
-annotatedDecoder d = decodeWithByteSpan d
-  <&> \(x, start, end) -> Annotated x (ByteSpan start end)
+annotatedDecoder d =
+  decodeWithByteSpan d
+    <&> \(x, start, end) -> Annotated x (ByteSpan start end)
 
 -- | A decoder for a value paired with an annotation specifying the start and end
 -- of the consumed bytes.
@@ -87,12 +89,12 @@ annotationBytes bytes = fmap (BSL.toStrict . slice bytes)
 
 -- | Decodes a value from a ByteString, requiring that the full ByteString is consumed, and
 -- replaces ByteSpan annotations with the corresponding substrings of the input string.
-decodeFullAnnotatedBytes
-  :: Functor f
-  => Text
-  -> (forall s . Decoder s (f ByteSpan))
-  -> LByteString
-  -> Either DecoderError (f ByteString)
+decodeFullAnnotatedBytes ::
+  Functor f =>
+  Text ->
+  (forall s. Decoder s (f ByteSpan)) ->
+  LByteString ->
+  Either DecoderError (f ByteString)
 decodeFullAnnotatedBytes lbl decoder bytes =
   annotationBytes bytes <$> decodeFullDecoder lbl decoder bytes
 
@@ -118,14 +120,14 @@ newtype FullByteString = Full LByteString
 
 -- | A value of type `Annotator a` is one that needs access to the entire
 -- | bytestring used during decoding to finish construction.
-newtype Annotator a = Annotator { runAnnotator :: FullByteString -> a }
+newtype Annotator a = Annotator {runAnnotator :: FullByteString -> a}
   deriving newtype (Monad, Applicative, Functor)
 
 -- | The argument is a decoder for a annotator that needs access to the bytes that
 -- | were decoded. This function constructs and supplies the relevant piece.
 annotatorSlice :: Decoder s (Annotator (LByteString -> a)) -> Decoder s (Annotator a)
 annotatorSlice dec = do
-  (k,bytes) <- withSlice dec
+  (k, bytes) <- withSlice dec
   pure $ k <*> bytes
 
 -- | Pairs the decoder result with an annotator.
@@ -134,8 +136,8 @@ withSlice dec = do
   (r, start, end) <- decodeWithByteSpan dec
   return (r, Annotator $ sliceOffsets start end)
   where
-  sliceOffsets :: ByteOffset -> ByteOffset -> FullByteString -> LByteString
-  sliceOffsets start end (Full b) = (BSL.take (end - start) . BSL.drop start) b
+    sliceOffsets :: ByteOffset -> ByteOffset -> FullByteString -> LByteString
+    sliceOffsets start end (Full b) = (BSL.take (end - start) . BSL.drop start) b
 
 -- | Supplies the bytestring argument to both the decoder and the produced annotator.
 decodeAnnotator :: Text -> (forall s. Decoder s (Annotator a)) -> LByteString -> Either DecoderError a

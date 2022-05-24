@@ -1,6 +1,6 @@
 -- | Verifiable random functions.
 module Cardano.Crypto.VRF
-  ( module X
+  ( module X,
   )
 where
 

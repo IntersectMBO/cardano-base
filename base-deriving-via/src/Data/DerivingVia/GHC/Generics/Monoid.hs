@@ -1,14 +1,14 @@
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -Wno-unticked-promoted-constructors #-}
 
 -- | "GHC.Generics" definition of 'mempty'
 module Data.DerivingVia.GHC.Generics.Monoid
-  ( GMonoid (..)
+  ( GMonoid (..),
   )
 where
 
@@ -33,10 +33,13 @@ instance GMonoid U1 where
 instance (GMonoid l, GMonoid r) => GMonoid (l :*: r) where
   gmempty = gmempty :*: gmempty
 
-instance TypeError (     Text "No Generics definition of "
-                    :<>: ShowType Monoid
-                    :<>: Text " for types with multiple constructors "
-                    :<>: ShowType (l :+: r)
-                   )
-      => GMonoid (l :+: r) where
+instance
+  TypeError
+    ( Text "No Generics definition of "
+        :<>: ShowType Monoid
+        :<>: Text " for types with multiple constructors "
+        :<>: ShowType (l :+: r)
+    ) =>
+  GMonoid (l :+: r)
+  where
   gmempty = error "GMonoid :+:"

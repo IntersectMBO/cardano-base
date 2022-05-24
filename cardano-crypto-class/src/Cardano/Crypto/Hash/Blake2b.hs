@@ -3,24 +3,23 @@
 
 -- | Implementation of the Blake2b hashing algorithm, with various sizes.
 module Cardano.Crypto.Hash.Blake2b
-  ( Blake2b_224
-  , Blake2b_256
-  , blake2b_libsodium -- Used for Hash.Short
+  ( Blake2b_224,
+    Blake2b_256,
+    blake2b_libsodium, -- Used for Hash.Short
   )
 where
 
-import Control.Monad (unless)
+import Cardano.Crypto.Hash.Class (HashAlgorithm (..), SizeHash, digest, hashAlgorithmName)
 import Cardano.Crypto.Libsodium.C (c_crypto_generichash_blake2b)
-
-import Cardano.Crypto.Hash.Class (HashAlgorithm (..), SizeHash, hashAlgorithmName, digest)
-import Foreign.Ptr (castPtr, nullPtr)
-import Foreign.C.Error (errnoToIOError, getErrno)
-import GHC.IO.Exception (ioException)
-
+import Control.Monad (unless)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
+import Foreign.C.Error (errnoToIOError, getErrno)
+import Foreign.Ptr (castPtr, nullPtr)
+import GHC.IO.Exception (ioException)
 
 data Blake2b_224
+
 data Blake2b_256
 
 instance HashAlgorithm Blake2b_224 where

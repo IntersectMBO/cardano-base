@@ -1,23 +1,22 @@
-{-# LANGUAGE NumDecimals      #-}
-{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE NumDecimals #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Cardano.Binary.RoundTrip
-  ( tests
+  ( tests,
   )
 where
 
 import Cardano.Prelude
-import Test.Cardano.Prelude
-
-import Data.Fixed (E9, Fixed(..))
+import Data.Fixed (E9, Fixed (..))
 import Hedgehog (Property, Range, checkParallel)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-
 import Test.Cardano.Binary.Helpers.GoldenRoundTrip
-  (roundTripsCBORBuildable, roundTripsCBORShow)
-
+  ( roundTripsCBORBuildable,
+    roundTripsCBORShow,
+  )
+import Test.Cardano.Prelude
 
 tests :: IO Bool
 tests = checkParallel $$discoverRoundTrip
@@ -30,10 +29,11 @@ roundTripBoolBi = eachOf 10 Gen.bool roundTripsCBORBuildable
 
 -- | Tests up to 'Integer's with multiple machine words using large upper bound
 roundTripIntegerBi :: Property
-roundTripIntegerBi = eachOf
-  1000
-  (Gen.integral (Range.linearFrom 0 (-1e40) 1e40 :: Range Integer))
-  roundTripsCBORBuildable
+roundTripIntegerBi =
+  eachOf
+    1000
+    (Gen.integral (Range.linearFrom 0 (-1e40) 1e40 :: Range Integer))
+    roundTripsCBORBuildable
 
 roundTripWordBi :: Property
 roundTripWordBi =
@@ -75,39 +75,43 @@ roundTripRatioBi :: Property
 roundTripRatioBi =
   eachOf
     1000
-    ((%)
-      <$> Gen.int Range.constantBounded
-      <*> Gen.int Range.constantBounded
+    ( (%)
+        <$> Gen.int Range.constantBounded
+        <*> Gen.int Range.constantBounded
     )
     roundTripsCBORBuildable
 
 roundTripNanoBi :: Property
-roundTripNanoBi = eachOf
-  1000
-  ((MkFixed :: Integer -> Fixed E9) <$> Gen.integral (Range.constantFrom 0 (-1e12) 1e12))
-  roundTripsCBORShow
+roundTripNanoBi =
+  eachOf
+    1000
+    ((MkFixed :: Integer -> Fixed E9) <$> Gen.integral (Range.constantFrom 0 (-1e12) 1e12))
+    roundTripsCBORShow
 
 roundTripMapBi :: Property
-roundTripMapBi = eachOf
-  100
-  (Gen.map
-    (Range.constant 0 50)
-    ((,) <$> Gen.int Range.constantBounded <*> Gen.int Range.constantBounded)
-  )
-  roundTripsCBORShow
+roundTripMapBi =
+  eachOf
+    100
+    ( Gen.map
+        (Range.constant 0 50)
+        ((,) <$> Gen.int Range.constantBounded <*> Gen.int Range.constantBounded)
+    )
+    roundTripsCBORShow
 
 roundTripSetBi :: Property
-roundTripSetBi = eachOf
-  100
-  (Gen.set (Range.constant 0 50) (Gen.int Range.constantBounded))
-  roundTripsCBORShow
+roundTripSetBi =
+  eachOf
+    100
+    (Gen.set (Range.constant 0 50) (Gen.int Range.constantBounded))
+    roundTripsCBORShow
 
 roundTripByteStringBi :: Property
 roundTripByteStringBi =
   eachOf 100 (Gen.bytes $ Range.constant 0 100) roundTripsCBORShow
 
 roundTripTextBi :: Property
-roundTripTextBi = eachOf
-  100
-  (Gen.text (Range.constant 0 100) Gen.unicode)
-  roundTripsCBORBuildable
+roundTripTextBi =
+  eachOf
+    100
+    (Gen.text (Range.constant 0 100) Gen.unicode)
+    roundTripsCBORBuildable

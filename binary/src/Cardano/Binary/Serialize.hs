@@ -1,37 +1,39 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Serialization primitives built on top of the @ToCBOR@ typeclass
-
 module Cardano.Binary.Serialize
-  ( serialize
-  , serialize'
-  , serializeBuilder
-  , serializeEncoding
-  , serializeEncoding'
+  ( serialize,
+    serialize',
+    serializeBuilder,
+    serializeEncoding,
+    serializeEncoding',
 
-  -- * CBOR in CBOR
-  , encodeNestedCbor
-  , encodeNestedCborBytes
-  , nestedCborSizeExpr
-  , nestedCborBytesSizeExpr
+    -- * CBOR in CBOR
+    encodeNestedCbor,
+    encodeNestedCborBytes,
+    nestedCborSizeExpr,
+    nestedCborBytesSizeExpr,
   )
 where
 
+import Cardano.Binary.ToCBOR
+  ( Encoding,
+    Size,
+    ToCBOR (..),
+    apMono,
+    encodeTag,
+    withWordSize,
+  )
 import Cardano.Prelude
-
 import qualified Codec.CBOR.Write as CBOR.Write
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder.Extra as Builder
 import qualified Data.ByteString.Lazy as BSL
-
-import Cardano.Binary.ToCBOR
-  (Encoding, Size, ToCBOR(..), apMono, encodeTag, withWordSize)
-
 
 -- | Serialize a Haskell value with a 'ToCBOR' instance to an external binary
 --   representation.
@@ -64,12 +66,11 @@ serializeEncoding =
     -- 1024 is the size of the first buffer, 4096 is the size of subsequent
     -- buffers. Chosen because they seem to give good performance. They are not
     -- sacred.
-        strategy = Builder.safeStrategy 1024 4096
+    strategy = Builder.safeStrategy 1024 4096
 
 -- | A strict version of 'serializeEncoding'
 serializeEncoding' :: Encoding -> ByteString
 serializeEncoding' = BSL.toStrict . serializeEncoding
-
 
 --------------------------------------------------------------------------------
 -- Nested CBOR-in-CBOR
@@ -94,4 +95,3 @@ nestedCborSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
 
 nestedCborBytesSizeExpr :: Size -> Size
 nestedCborBytesSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
-

@@ -1,21 +1,22 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Test.Data.Measure
-  ( tests
+  ( tests,
   )
 where
 
+import qualified Data.Measure as M
 import GHC.Natural
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
-import qualified Data.Measure as M
-
 tests :: TestTree
-tests = testGroup "Data.Measure"
-  [ testProperty "uncurry (++) undoes splitAt"       prop_idAppendSplitAt
-  , testProperty "take and drop agrees with splitAt" prop_eqTakeDropSplitAt
-  ]
+tests =
+  testGroup
+    "Data.Measure"
+    [ testProperty "uncurry (++) undoes splitAt" prop_idAppendSplitAt,
+      testProperty "take and drop agrees with splitAt" prop_eqTakeDropSplitAt
+    ]
 
 --------------------------------------------------------------------------------
 -- A nice measure to run tests with
@@ -32,12 +33,12 @@ itemToInteger (Item n) = naturalToInteger n
 
 instance Arbitrary Item where
   arbitrary = fmap (integerToItem . getSmall) arbitrary
-  shrink    =
-      fmap (integerToItem . getSmall)
-    . filter (>= 0)
-    . shrink
-    . Small
-    . itemToInteger
+  shrink =
+    fmap (integerToItem . getSmall)
+      . filter (>= 0)
+      . shrink
+      . Small
+      . itemToInteger
 
 --------------------------------------------------------------------------------
 -- Required properties
@@ -46,12 +47,12 @@ instance Arbitrary Item where
 -- | @uncurry (++)@ undoes 'M.splitAt'
 prop_idAppendSplitAt :: Item -> [Item] -> Property
 prop_idAppendSplitAt limit es =
-    l ++ r === es
+  l ++ r === es
   where
     (l, r) = M.splitAt id limit es
 
 -- | 'M.take' and 'M.drop' are the components of 'M.splitAt'
 prop_eqTakeDropSplitAt :: Item -> [Item] -> Property
 prop_eqTakeDropSplitAt limit es =
-        (M.take id limit es, M.drop id limit es)
+  (M.take id limit es, M.drop id limit es)
     === M.splitAt id limit es

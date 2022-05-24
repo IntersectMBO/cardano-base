@@ -1,21 +1,20 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
+
 module Cardano.Crypto.KES.NeverUsed
-  ( NeverKES
-  , VerKeyKES (..)
-  , SignKeyKES (..)
-  , SigKES (..)
+  ( NeverKES,
+    VerKeyKES (..),
+    SignKeyKES (..),
+    SigKES (..),
   )
 where
 
+import Cardano.Crypto.KES.Class
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
-
-import Cardano.Crypto.KES.Class
-
 
 -- | KES never used
 --
@@ -26,36 +25,35 @@ data NeverKES
 instance KESAlgorithm NeverKES where
   type SeedSizeKES NeverKES = 0
 
-  data VerKeyKES  NeverKES = NeverUsedVerKeyKES
-      deriving (Show, Eq, Generic, NoThunks)
+  data VerKeyKES NeverKES = NeverUsedVerKeyKES
+    deriving (Show, Eq, Generic, NoThunks)
 
   data SignKeyKES NeverKES = NeverUsedSignKeyKES
-      deriving (Show, Eq, Generic, NoThunks)
+    deriving (Show, Eq, Generic, NoThunks)
 
-  data SigKES     NeverKES = NeverUsedSigKES
-      deriving (Show, Eq, Generic, NoThunks)
+  data SigKES NeverKES = NeverUsedSigKES
+    deriving (Show, Eq, Generic, NoThunks)
 
   algorithmNameKES _ = "never"
 
   deriveVerKeyKES _ = NeverUsedVerKeyKES
 
-  signKES   = error "KES not available"
+  signKES = error "KES not available"
   verifyKES = error "KES not available"
   updateKES = error "KES not available"
 
   totalPeriodsKES _ = 0
 
-  genKeyKES       _ = NeverUsedSignKeyKES
+  genKeyKES _ = NeverUsedSignKeyKES
 
-  sizeVerKeyKES  _ = 0
+  sizeVerKeyKES _ = 0
   sizeSignKeyKES _ = 0
-  sizeSigKES     _ = 0
+  sizeSigKES _ = 0
 
-  rawSerialiseVerKeyKES  _ = mempty
+  rawSerialiseVerKeyKES _ = mempty
   rawSerialiseSignKeyKES _ = mempty
-  rawSerialiseSigKES     _ = mempty
+  rawSerialiseSigKES _ = mempty
 
-  rawDeserialiseVerKeyKES  _ = Just NeverUsedVerKeyKES
+  rawDeserialiseVerKeyKES _ = Just NeverUsedVerKeyKES
   rawDeserialiseSignKeyKES _ = Just NeverUsedSignKeyKES
-  rawDeserialiseSigKES     _ = Just NeverUsedSigKES
-
+  rawDeserialiseSigKES _ = Just NeverUsedSigKES
