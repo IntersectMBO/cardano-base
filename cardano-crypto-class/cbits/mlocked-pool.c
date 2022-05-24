@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#define DEBUG_DUMP_ALLOCATIONS 0
+#define DEBUG_DUMP_POOL_OPERATIONS 0
+
 /**
  * A custom allocator for mlocked memory, using a memory pool.
  *
@@ -80,7 +83,9 @@ static mlocked_pool_t global_pool;
 static void mlocked_pool_atexit()
 {
     pthread_mutex_lock(&mlocked_pool_mutex);
-    // fprintf(stderr, "mlocked_pool_atexit %i x %u\n", global_pool.pool_size, page_size);
+    #if DEBUG_DUMP_POOL_OPERATIONS
+    fprintf(stderr, "mlocked_pool_atexit %i x %u\n", global_pool.pool_size, page_size);
+    #endif
     mlocked_pool_reset(&global_pool);
     pthread_mutex_unlock(&mlocked_pool_mutex);
 }
@@ -93,7 +98,9 @@ static void mlocked_pool_init()
     #endif
     #endif
     pthread_mutex_init(&mlocked_pool_mutex, NULL);
-    // fprintf(stderr, "mlocked_pool_init\n");
+    #if DEBUG_DUMP_POOL_OPERATIONS
+    fprintf(stderr, "mlocked_pool_init\n");
+    #endif
     pthread_mutex_lock(&mlocked_pool_mutex);
     memset(&global_pool, 0, sizeof(mlocked_pool_t));
     pthread_mutex_unlock(&mlocked_pool_mutex);
@@ -102,7 +109,9 @@ static void mlocked_pool_init()
 
 static void mlocked_pool_reset(mlocked_pool_t *p)
 {
-    // fprintf(stderr, "mlocked_pool_reset\n");
+    #if DEBUG_DUMP_POOL_OPERATIONS
+    fprintf(stderr, "mlocked_pool_reset\n");
+    #endif
     free(p->stack);
     for (size_t i = 0; i < p->pool_size; ++i) {
         sodium_free(p->pool[i]);
@@ -117,7 +126,9 @@ static void mlocked_pool_grow(mlocked_pool_t *p)
     void* new_page;
 
     p->pool_size++;
-    // fprintf(stderr, "mlocked_pool_grow %i x %u\n", p->pool_size, page_size);
+    #if DEBUG_DUMP_POOL_OPERATIONS
+    fprintf(stderr, "mlocked_pool_grow %i x %u\n", p->pool_size, page_size);
+    #endif
     p->pool = realloc(p->pool, p->pool_size * sizeof(void*));
     new_page = sodium_malloc(page_size);
     p->pool[p->pool_size - 1] = new_page;
@@ -130,19 +141,25 @@ static void mlocked_pool_stack_grow(mlocked_pool_t *p)
 {
     size_t i;
 
-    // fprintf(stderr, "mlocked_pool_stack_grow\n");
+    #if DEBUG_DUMP_POOL_OPERATIONS
+    fprintf(stderr, "mlocked_pool_stack_grow\n");
+    #endif
     // Just pick a reasonable lower limit for the size.
     if (p->stack_cap < 64)
         p->stack_cap = 64;
     else
         p->stack_cap <<= 1;
-    // fprintf(stderr, "mlocked_pool_stack_grow %i\n", p->stack_cap);
+    #if DEBUG_DUMP_POOL_OPERATIONS
+    fprintf(stderr, "mlocked_pool_stack_grow %i\n", p->stack_cap);
+    #endif
     p->stack = realloc(p->stack, p->stack_cap * sizeof(void*));
 }
 
 static void mlocked_pool_stack_push(mlocked_pool_t *p, void* val)
 {
-    // fprintf(stderr, "mlocked_pool_stack_push\n");
+    #if DEBUG_DUMP_ALLOCATIONS
+    fprintf(stderr, "mlocked_pool_stack_push\n");
+    #endif
     if (p->stack_top >= p->stack_cap) {
         mlocked_pool_stack_grow(p);
     }
@@ -151,7 +168,9 @@ static void mlocked_pool_stack_push(mlocked_pool_t *p, void* val)
 
 static bool mlocked_pool_stack_pop(void** dst, mlocked_pool_t *p)
 {
-    // fprintf(stderr, "mlocked_pool_stack_pop\n");
+    #if DEBUG_DUMP_ALLOCATIONS
+    fprintf(stderr, "mlocked_pool_stack_pop\n");
+    #endif
     if (p->stack_top == 0)
         return false;
     *dst = p->stack[--(p->stack_top)];
@@ -165,7 +184,9 @@ void* mlocked_pool_malloc(size_t size)
 
     assert(size <= POOL_ITEM_SIZE);
 
-    // fprintf(stderr, "mlocked_pool_malloc(%i)\n", size);
+    #if DEBUG_DUMP_ALLOCATIONS
+    fprintf(stderr, "mlocked_pool_malloc(%i)\n", size);
+    #endif
 
     if (size > POOL_ITEM_SIZE)
         return NULL;
@@ -188,7 +209,9 @@ void mlocked_pool_free(void* item)
 {
     pthread_once(&mlocked_pool_once, mlocked_pool_init);
     pthread_mutex_lock(&mlocked_pool_mutex);
-    // fprintf(stderr, "mlocked_pool_free(%p)\n", item);
+    #if DEBUG_DUMP_ALLOCATIONS
+    fprintf(stderr, "mlocked_pool_free(%p)\n", item);
+    #endif
     sodium_memzero(item, POOL_ITEM_SIZE);
     mlocked_pool_stack_push(&global_pool, item);
     pthread_mutex_unlock(&mlocked_pool_mutex);

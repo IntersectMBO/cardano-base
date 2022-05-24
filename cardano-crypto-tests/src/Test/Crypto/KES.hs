@@ -28,6 +28,7 @@ import Foreign.Ptr (WordPtr)
 import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 import Text.Printf
+import System.Posix.IO (createPipe)
 
 import Control.Concurrent (threadDelay)
 import Control.Monad (void)
@@ -40,7 +41,8 @@ import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import qualified Cardano.Crypto.Libsodium as NaCl
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
-import Cardano.Prelude (ReaderT, runReaderT, evaluate, bracket)
+import qualified Cardano.Crypto.Libsodium.MLockedBytes as NaCl
+import Cardano.Prelude (ReaderT, runReaderT, evaluate, bracket, concurrently)
 import Cardano.Crypto.SafePinned
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 
@@ -274,6 +276,20 @@ testKESAlgorithm lock _pm _pv n =
             return . ioProperty . withLock lock $ do
               sig :: SigKES v <- withNewTestSK (signKES () 0 msg)
               return $ (rawDeserialiseSigKES . rawSerialiseSigKES $ sig) === Just sig
+        ]
+      , testGroup "raw ser through pipe"
+        [ testProperty "SignKey" $
+            ioProperty . withLock lock . withNewTestSK $ \sk -> do
+              serialized <- safeSerialiseSignKeyKES sk
+              (readFd, writeFd) <- createPipe
+              piped :: NaCl.MLockedSizedBytes (SizeSignKeyKES v) <- NaCl.mlsbNew
+              _ <- concurrently (NaCl.mlsbReadFd readFd piped) (NaCl.mlsbWriteFd writeFd serialized)
+              NaCl.mlsbFinalize serialized
+              deserialized :: Maybe (SignKeyKES v) <- safeDeserialiseSignKeyKES piped
+              NaCl.mlsbFinalize piped
+              equals <- evaluate $! (Just sk == deserialized)
+              maybe (return ()) forgetSignKeyKES deserialized
+              return equals
         ]
       , testGroup "size"
         [ testProperty "VerKey"  $

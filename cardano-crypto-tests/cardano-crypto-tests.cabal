@@ -73,6 +73,7 @@ library
                       , quickcheck-instances
                       , tasty
                       , tasty-quickcheck
+                      , unix
                       , criterion
                       , tasty-hunit
                       , HUnit
