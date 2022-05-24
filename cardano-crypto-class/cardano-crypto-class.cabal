@@ -109,6 +109,7 @@ library
     , nothunks
     , primitive
     , serialise
+    , strict-containers
     , text
     , transformers
     , vector

@@ -29,7 +29,6 @@ import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 import           NoThunks.Class (NoThunks)
 
-import           Cardano.Prelude (forceElemsToWHNF)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.DSIGN
@@ -37,6 +36,7 @@ import qualified Cardano.Crypto.DSIGN as DSIGN
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
+import           Data.Unit.Strict (forceElemsToWHNF)
 
 
 data SimpleKES d (t :: Nat)
