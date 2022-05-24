@@ -8,6 +8,7 @@
 }:
 with pkgs;
 let
+  ormolu = import pkgs.commonLib.sources.ormolu {};
   # This provides a development environment that can be used with nix-shell or
   # lorri. See https://input-output-hk.github.io/haskell.nix/user-guide/development/
   shell = cardanoBaseHaskellPackages.shellFor {
@@ -33,6 +34,7 @@ let
       weeder
       nix
       niv
+      ormolu.ormolu
       pkgconfig
       sqlite-interactive
     ];
