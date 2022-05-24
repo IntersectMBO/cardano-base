@@ -10,6 +10,7 @@ packages:
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
+  heapwords
   measures
   orphans-deriving-via
   slotting

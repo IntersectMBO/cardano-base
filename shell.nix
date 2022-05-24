@@ -21,6 +21,7 @@ let
        cardano-crypto-class
        cardano-crypto-praos
        cardano-slotting
+       heapwords
        measures
        orphans-deriving-via
     ];

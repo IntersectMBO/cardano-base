@@ -23,6 +23,9 @@ cradle:
 
     - path: "cardano-crypto-tests/test"
       component: "cardano-crypto-tests:test:test-crypto"
+    
+    - path: "heapwords"
+      component: "lib:heapwords"
 
     - path: "measures/src"
       component: "lib:measures"
