@@ -24,8 +24,6 @@ module Test.Cardano.Binary.Helpers
   )
 where
 
-import Prelude
-
 import Codec.CBOR.FlatTerm (toFlatTerm, validFlatTerm)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS

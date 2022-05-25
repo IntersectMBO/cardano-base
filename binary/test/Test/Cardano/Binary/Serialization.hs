@@ -6,8 +6,6 @@ module Test.Cardano.Binary.Serialization
   (tests)
   where
 
-import Prelude
-
 import Cardano.Binary hiding (Range)
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.Decoding as D

@@ -26,8 +26,6 @@ module Cardano.Binary.Deserialize
   )
 where
 
-import Prelude
-
 import qualified Codec.CBOR.Decoding as D
 import qualified Codec.CBOR.Read as Read
 import qualified Codec.CBOR.Write as CBOR.Write

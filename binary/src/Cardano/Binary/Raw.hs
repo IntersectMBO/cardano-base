@@ -5,8 +5,6 @@ module Cardano.Binary.Raw
   )
 where
 
-import Prelude
-
 import Control.DeepSeq (NFData)
 import Data.ByteString ( ByteString )
 

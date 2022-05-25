@@ -7,7 +7,6 @@ module Test.Cardano.Binary.RoundTrip
   )
 where
 
-import Prelude
 import Test.Cardano.Prelude ( eachOf, discoverRoundTrip )
 
 import Data.Ratio ((%))

@@ -15,7 +15,6 @@ module Test.Cardano.Binary.Helpers.GoldenRoundTrip
   )
 where
 
-import Prelude
 import Test.Cardano.Prelude
     (decodeBase16, encodeWithIndex, trippingBuildable)
 

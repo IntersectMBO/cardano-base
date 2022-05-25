@@ -54,8 +54,6 @@ module Cardano.Binary.Annotated
   )
 where
 
-import Prelude
-
 import Codec.CBOR.Read (ByteOffset)
 import Data.Aeson (FromJSON(..), ToJSON(..))
 import qualified Data.ByteString.Lazy as BSL

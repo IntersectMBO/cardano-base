@@ -1,15 +1,12 @@
 {-#LANGUAGE DataKinds #-}
 {-#LANGUAGE TypeApplications #-}
 {-#LANGUAGE ScopedTypeVariables #-}
-{-#LANGUAGE NoImplicitPrelude #-}
 {-#LANGUAGE TypeFamilies #-}
 {-#LANGUAGE FlexibleContexts #-}
 {-#LANGUAGE OverloadedStrings #-}
 module Bench.Crypto.KES
   ( benchmarks
   ) where
-
-import Prelude
 
 import Criterion
 import Cardano.Crypto.DSIGN.Ed25519

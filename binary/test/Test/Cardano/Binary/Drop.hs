@@ -5,8 +5,6 @@ module Test.Cardano.Binary.Drop
   (tests)
   where
 
-import Prelude
-
 import Data.ByteString  (ByteString)
 import Data.Int (Int32)
 import Data.Word (Word8, Word64)

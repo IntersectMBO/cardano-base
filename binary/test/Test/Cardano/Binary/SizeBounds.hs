@@ -6,8 +6,6 @@ module Test.Cardano.Binary.SizeBounds
   )
 where
 
-import Prelude
-
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M

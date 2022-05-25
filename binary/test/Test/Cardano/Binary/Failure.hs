@@ -6,8 +6,6 @@ module Test.Cardano.Binary.Failure
   (tests)
   where
 
-import Prelude
-
 import qualified Codec.CBOR.Read as CR
 
 import Data.List.NonEmpty (NonEmpty)

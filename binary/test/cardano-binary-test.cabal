@@ -21,7 +21,6 @@ common base                         { build-depends: base                       
 
 common project-config
   default-language:     Haskell2010
-  default-extensions:   NoImplicitPrelude
 
   ghc-options:          -Wall
                         -Wcompat

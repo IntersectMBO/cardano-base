@@ -18,8 +18,6 @@ module Cardano.Binary.Drop
   )
 where
 
-import Prelude
-
 import Control.Monad (replicateM_)
 import Data.Functor (void)
 import qualified Codec.CBOR.Decoding as D

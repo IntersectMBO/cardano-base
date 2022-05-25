@@ -1,6 +1,5 @@
 {-#LANGUAGE TypeApplications #-}
 {-#LANGUAGE ScopedTypeVariables #-}
-{-#LANGUAGE NoImplicitPrelude #-}
 {-#LANGUAGE TypeFamilies #-}
 {-#LANGUAGE FlexibleContexts #-}
 {-#LANGUAGE OverloadedStrings #-}
@@ -8,7 +7,6 @@ module Bench.Crypto.VRF
   ( benchmarks
   ) where
 
-import Prelude
 import Criterion
 import Cardano.Crypto.VRF.Class
 import Cardano.Crypto.VRF.Simple
