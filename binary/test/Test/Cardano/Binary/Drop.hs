@@ -5,9 +5,13 @@ module Test.Cardano.Binary.Drop
   (tests)
   where
 
-import Cardano.Binary
+import Prelude
 
-import Cardano.Prelude
+import Data.ByteString  (ByteString)
+import Data.Int (Int32)
+import Data.Word (Word8, Word64)
+
+import Cardano.Binary
 
 import Hedgehog 
 import qualified Hedgehog.Gen as Gen

@@ -6,17 +6,24 @@ module Test.Cardano.Binary.Serialization
   (tests)
   where
 
+import Prelude
+
 import Cardano.Binary hiding (Range)
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.Decoding as D
 
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as BS.Short
+import Data.Int (Int32, Int64)
+import Data.List.NonEmpty (NonEmpty)
+import Data.Map (Map)
+import Data.Set (Set)
+import Data.Text (Text)
 import qualified Data.Time as Time
 import qualified Data.Time.Calendar.OrdinalDate as Time
 import qualified Data.Vector as V
-
-import Cardano.Prelude
+import Data.Word (Word16, Word32, Word64, Word8)
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -43,7 +50,7 @@ data TestStruct = TestStruct
   , tsTupleBoolBool         :: !(Bool, Bool)
   , tsTupleBoolBoolBool     :: !(Bool, Bool, Bool)
   , tsTupleBoolBoolBoolBool :: !(Bool, Bool, Bool, Bool)
-  , tsByteString            :: !ByteString
+  , tsByteString            :: !BS.ByteString
   , tsText                  :: !Text
   , tsListBool              :: ![Bool]
   , tsEitherBoolBool        :: !(Either Bool Bool)

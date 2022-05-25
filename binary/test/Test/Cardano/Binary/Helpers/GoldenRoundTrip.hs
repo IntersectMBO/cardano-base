@@ -15,12 +15,18 @@ module Test.Cardano.Binary.Helpers.GoldenRoundTrip
   )
 where
 
-import Cardano.Prelude
+import Prelude
 import Test.Cardano.Prelude
+    (decodeBase16, encodeWithIndex, trippingBuildable)
 
 import qualified Codec.CBOR.Decoding as D
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.Text (Text)
+import Data.Proxy (Proxy(Proxy))
 import Formatting.Buildable (Buildable(..))
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Hedgehog
   (MonadTest, Property, eval, property, success, tripping, withTests, (===))
 import Hedgehog.Internal.Property (failWith)
@@ -38,11 +44,10 @@ import Cardano.Binary
   , serialize
   , serializeEncoding
   )
-import qualified Prelude
 import Text.Show.Pretty (Value(..))
 
 
-type HexDump = LByteString
+type HexDump = BSL.ByteString
 
 type HexDumpDiff = [LineDiff]
 
@@ -113,7 +118,7 @@ goldenTestCBORExplicit
 goldenTestCBORExplicit eLabel enc dec =
   goldenTestExplicit (serializeEncoding . enc) fullDecoder
   where
-  fullDecoder :: LByteString -> Either DecoderError a
+  fullDecoder :: BSL.ByteString -> Either DecoderError a
   fullDecoder = decodeFullDecoder eLabel dec
 
 goldenTestExplicit

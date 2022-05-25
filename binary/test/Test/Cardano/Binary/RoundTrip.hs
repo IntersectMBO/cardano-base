@@ -7,9 +7,10 @@ module Test.Cardano.Binary.RoundTrip
   )
 where
 
-import Cardano.Prelude
-import Test.Cardano.Prelude
+import Prelude
+import Test.Cardano.Prelude ( eachOf, discoverRoundTrip )
 
+import Data.Ratio ((%))
 import Data.Fixed (E9, Fixed(..))
 import Hedgehog (Property, Range, checkParallel)
 import qualified Hedgehog.Gen as Gen

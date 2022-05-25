@@ -24,16 +24,19 @@ module Test.Cardano.Binary.Helpers
   )
 where
 
-import Cardano.Prelude
+import Prelude
 
 import Codec.CBOR.FlatTerm (toFlatTerm, validFlatTerm)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
-import Data.String (String)
 import Data.Text.Lazy (unpack)
 import Data.Text.Lazy.Builder (toLazyText)
+import Data.Typeable (TypeRep)
+import Data.Word (Word8)
 import Formatting (Buildable, bprint, build)
+import Numeric.Natural (Natural)
+
 import Hedgehog (annotate, failure, forAllWith, success)
 import qualified Hedgehog as HH
 import qualified Hedgehog.Gen as HH.Gen
@@ -178,8 +181,8 @@ data SizeTestConfig a = SizeTestConfig
     { debug       :: a -> String     -- ^ Pretty-print values
     , gen         :: HH.Gen a        -- ^ Generator
     , precise     :: Bool            -- ^ Must estimates be exact?
-    , addlCtx     :: Map TypeRep SizeOverride -- ^ Additional size overrides
-    , computedCtx :: a -> Map TypeRep SizeOverride
+    , addlCtx     :: M.Map TypeRep SizeOverride -- ^ Additional size overrides
+    , computedCtx :: a -> M.Map TypeRep SizeOverride
       -- ^ Size overrides computed from a concrete instance.
     }
 
@@ -242,7 +245,7 @@ data ComparisonResult
 
 -- | For a given value @x :: a@ with @ToCBOR a@, check that the encoded size
 --   of @x@ falls within the statically-computed size range for @a@.
-szVerify :: ToCBOR a => Map TypeRep SizeOverride -> a -> ComparisonResult
+szVerify :: ToCBOR a => M.Map TypeRep SizeOverride -> a -> ComparisonResult
 szVerify ctx x = case szSimplify (szWithCtx ctx (pure x)) of
   Left bounds -> BoundsAreSymbolic bounds
   Right range | lo range <= sz && sz <= hi range ->

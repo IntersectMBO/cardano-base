@@ -6,13 +6,16 @@ module Test.Cardano.Binary.SizeBounds
   )
 where
 
-import Cardano.Prelude
+import Prelude
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
+import Data.Proxy (Proxy(Proxy))
 import Data.Tagged (Tagged(..))
+import Data.Typeable (typeRep)
 import qualified Data.Text as T
+import Data.Word (Word32, Word8)
 
 import Cardano.Binary
 
@@ -81,7 +84,7 @@ tests
           { debug       = show . (BS.unpack :: BS.ByteString -> [Word8])
           , gen         = Gen.bytes (Range.linear 0 1000)
           , computedCtx = \bs -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf ByteString))
+            [ ( typeRep (Proxy @(LengthOf BS.ByteString))
               , SizeConstant $ fromIntegral $ BS.length bs
               )
             ]
@@ -104,7 +107,7 @@ tests
         , sizeTest $ cfg
           { gen         = Gen.text (Range.linear 0 1000) Gen.latin1
           , computedCtx = \bs -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf Text))
+            [ ( typeRep (Proxy @(LengthOf T.Text))
               , SizeConstant $ fromIntegral $ T.length bs
               )
             ]
@@ -114,7 +117,7 @@ tests
         , sizeTest $ cfg
           { gen         = Gen.text (Range.linear 0 1000) Gen.unicode
           , computedCtx = \bs -> M.fromList
-            [ ( typeRep (Proxy @(LengthOf Text))
+            [ ( typeRep (Proxy @(LengthOf T.Text))
               , SizeConstant $ fromIntegral $ T.length bs
               )
             ]

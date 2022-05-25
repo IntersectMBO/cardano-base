@@ -6,9 +6,16 @@ module Test.Cardano.Binary.Failure
   (tests)
   where
 
-import Cardano.Binary hiding (Range)
-import Cardano.Prelude
+import Prelude
+
 import qualified Codec.CBOR.Read as CR
+
+import Data.List.NonEmpty (NonEmpty)
+import Data.Set (Set)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
+import Numeric.Natural (Natural)
+
+import Cardano.Binary hiding (Range)
  
 import Hedgehog 
 import qualified Hedgehog.Gen as Gen
