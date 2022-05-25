@@ -9,7 +9,8 @@ module Bench.Crypto.KES
   ( benchmarks
   ) where
 
-import Cardano.Prelude
+import Prelude
+
 import Criterion
 import Cardano.Crypto.DSIGN.Ed25519
 import Cardano.Crypto.Hash.Blake2b
@@ -17,8 +18,11 @@ import Cardano.Crypto.KES.Class
 import Cardano.Crypto.KES.Sum
 import Cardano.Crypto.KES.CompactSum
 import Cardano.Crypto.Seed
-import qualified Data.ByteString as BS (pack)
+import Control.DeepSeq (NFData(..))
+import qualified Data.ByteString as BS (ByteString, pack)
 import Data.Maybe (fromJust)
+import Data.Typeable (Proxy(Proxy))
+import Data.Word (Word8)
 
 {- HLINT ignore "Use camelCase" -}
 
@@ -46,7 +50,7 @@ testBytes = [
     0xd7, 0x51, 0x22, 0xa8, 0x84, 0x29, 0x23, 0x5e, 0x1a, 0x55, 0xb0, 0xe8, 0xf9, 0x82, 0xb8, 0xf4
   ]
 
-typicalMsg :: ByteString
+typicalMsg :: BS.ByteString
 typicalMsg = BS.pack
   [ 0x00, 0x1b, 0xbc, 0x93, 0x95, 0x38, 0x05, 0x8e
   , 0xaa, 0x88, 0xa2, 0x62, 0xd9, 0x69, 0xfb, 0x36
@@ -65,7 +69,7 @@ benchmarks = bgroup "KES"
 bench_kes :: forall proxy v
            . ( KESAlgorithm v
              , ContextKES v ~ ()
-             , Signable v ByteString
+             , Signable v BS.ByteString
              , NFData (SignKeyKES v)
              , NFData (SigKES v)
              )
