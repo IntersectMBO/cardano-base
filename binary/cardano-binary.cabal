@@ -54,7 +54,6 @@ library
   build-depends:        base
                       , aeson
                       , bytestring
-                      , cardano-prelude
                       , cborg              >= 0.2.2 && < 0.3
                       , containers
                       , data-fix
@@ -87,7 +86,6 @@ test-suite test
   build-depends:        base
                       , bytestring
                       , cardano-binary
-                      , cardano-prelude
                       , cardano-prelude-test
                       , cborg
                       , containers

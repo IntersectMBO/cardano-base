@@ -38,7 +38,6 @@ module Cardano.Binary.ToCBOR
 where
 
 import Prelude hiding ((.))
-import Cardano.Prelude(panic)
 
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.ByteArray.Sliced as BAS
@@ -90,7 +89,7 @@ class Typeable a => ToCBOR a where
 newtype LengthOf xs = LengthOf xs
 
 instance Typeable xs => ToCBOR (LengthOf xs) where
-  toCBOR = panic "The `LengthOf` type cannot be encoded!"
+  toCBOR = error "The `LengthOf` type cannot be encoded!"
 
 -- | Default size expression for a list type.
 defaultEncodedListSizeExpr
