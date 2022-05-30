@@ -29,7 +29,6 @@ import Text.Show.Pretty (ppShow)
 import Data.ByteString (ByteString)
 import Control.Monad (replicateM)
 import qualified Crypto.Secp256k1 as SECP
-import qualified GHC.Exts as GHC
 #endif
 
 import qualified Test.QuickCheck.Gen as Gen
@@ -152,7 +151,7 @@ genSECPMsg :: Gen SECP.Msg
 genSECPMsg = Gen.suchThatMap go SECP.msg
   where
     go :: Gen ByteString
-    go = GHC.fromListN 32 <$> replicateM 32 arbitrary
+    go = BS.pack <$> replicateM 32 arbitrary
 #endif
 
 defaultVerKeyGen :: forall (a :: Type) . 

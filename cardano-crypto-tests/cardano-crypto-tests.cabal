@@ -57,7 +57,7 @@ library
                         Bench.Crypto.KES
 
   build-depends:        base
-                      , bytestring >=0.10.12.0
+                      , bytestring >=0.10
                       , cardano-binary
                       , cardano-crypto-class
                       , cardano-crypto-praos
