@@ -20,9 +20,11 @@ let
        cardano-binary
        cardano-crypto-class
        cardano-crypto-praos
+       cardano-crypto-tests
        cardano-slotting
        measures
        orphans-deriving-via
+       strict-containers
     ];
 
     nativeBuildInputs = [ cabalWrapped ];
