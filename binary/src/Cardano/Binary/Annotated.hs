@@ -125,17 +125,14 @@ newtype Annotator a = Annotator { runAnnotator :: FullByteString -> a }
 -- | were decoded. This function constructs and supplies the relevant piece.
 annotatorSlice :: Decoder s (Annotator (LByteString -> a)) -> Decoder s (Annotator a)
 annotatorSlice dec = do
-  (k,bytes) <- withSlice dec
+  (k, bytes) <- withSlice dec
   pure $ k <*> bytes
 
 -- | Pairs the decoder result with an annotator.
 withSlice :: Decoder s a -> Decoder s (a, Annotator LByteString)
 withSlice dec = do
-  (r, start, end) <- decodeWithByteSpan dec
-  return (r, Annotator $ sliceOffsets start end)
-  where
-  sliceOffsets :: ByteOffset -> ByteOffset -> FullByteString -> LByteString
-  sliceOffsets start end (Full b) = (BSL.take (end - start) . BSL.drop start) b
+  Annotated r byteSpan <- annotatedDecoder dec
+  return (r, Annotator (\(Full bsl) -> slice bsl byteSpan))
 
 -- | Supplies the bytestring argument to both the decoder and the produced annotator.
 decodeAnnotator :: Text -> (forall s. Decoder s (Annotator a)) -> LByteString -> Either DecoderError a
