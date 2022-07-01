@@ -9,21 +9,9 @@
 with pkgs;
 let
   # This provides a development environment that can be used with nix-shell or
-  # lorri. See https://input-output-hk.github.io/haskell.nix/user-guide/development/
+  # lorri. See https://input-output-hk.github.io/haskell.nix/tutorials/development.html
   shell = cardanoBaseHaskellPackages.shellFor {
     name = "cabal-dev-shell";
-
-    # If shellFor default local packages selection is wrong,
-    # then list all local packages then include source-repository-package that cabal complains about:
-    packages = ps: with ps; [
-       base-deriving-via
-       cardano-binary
-       cardano-crypto-class
-       cardano-crypto-praos
-       cardano-slotting
-       measures
-       orphans-deriving-via
-    ];
 
     # These programs will be available inside the nix-shell.
     buildInputs = with haskellPackages; [
@@ -38,7 +26,7 @@ let
     ];
 
     tools = {
-      cabal = "3.2.0.0";
+      cabal = "3.6.2.0";
       haskell-language-server = "latest";
     };
 
