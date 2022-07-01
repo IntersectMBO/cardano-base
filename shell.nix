@@ -11,15 +11,14 @@ let
   inherit (pkgs.haskell-nix) haskellLib;
 
   # This provides a development environment that can be used with nix-shell or
-  # lorri. See https://input-output-hk.github.io/haskell.nix/user-guide/development/
+  # lorri. See https://input-output-hk.github.io/haskell.nix/tutorials/development.html
   shell = cardanoBaseHaskellPackages.shellFor {
     name = "cabal-dev-shell";
 
-    # If shellFor default local packages selection is wrong,
-    # then list all local packages then include source-repository-package that cabal complains about:
     packages = ps: builtins.attrValues (haskellLib.selectProjectPackages ps);
 
     nativeBuildInputs = [ cabalWrapped ];
+
     # These programs will be available inside the nix-shell.
     buildInputs = with haskellPackages; [
       ghcid
@@ -33,7 +32,7 @@ let
     ];
 
     tools = {
-      cabal = "3.2.0.0";
+      cabal = "3.6.2.0";
       haskell-language-server = "latest";
     };
 
