@@ -40,9 +40,6 @@ let
     # *all* dependencies are provided by Nix.
     exactDeps = false;
 
-    NIX_SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-    SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
-
     inherit withHoogle;
   };
 
