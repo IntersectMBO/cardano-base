@@ -8,6 +8,32 @@
 {-# LANGUAGE TypeFamilies       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | The CBOR class 'FromCBOR' does not support access to the original bytestring that is being deserialized.
+--   The 'Annotated' module recovers this ability by introducing several newtypes types that,
+--   along with some new operations, recover this ability.
+--
+-- 1. 'ByteSpan'  A pair of indexes into a bytestring, indicating a substring.
+-- 2. 'Annotated'  Used in practice to pair a value with a 'ByteSpan'.
+-- 3. 'FullByteString' A newtype (around a bytestring) used to store the original bytestring being deserialized.
+-- 4. 'Annotator' An explict reader monad whose environment is a 'FullByteString'
+--
+-- The basic idea is, for a given type @t@, where we need the original bytestring, either
+--
+-- 1. To complete the deserialization, or
+-- 2. To combine the deserialized answer with the original bytestring.
+--
+-- We should proceed as follows: Define instances
+-- @(FromCBOR (Annotator t))@ instead of @(FromCBOR t)@. When making this instance we may freely use
+-- that both 'Decoder' and 'Annotator' are both monads, and that functions 'withSlice' and 'annotatorSlice'
+-- provide access to the original bytes, or portions thereof, inside of decoders.
+-- Then, to actually decode a value of type @t@, we use something similar to the following code fragment.
+--
+-- @
+-- howToUseFullBytes bytes = do
+--   Annotator f <- decodeFullDecoder \"DecodingAnnotator\" (fromCBOR :: forall s. Decoder s (Annotator t)) bytes
+--   pure (f (Full bytes))
+-- @
+-- Decode the bytes to get an @(Annotator f)@ where f is a function that when given original bytes produces a value of type @t@, then apply @f@ to @(Full bytes)@ to get the answer.
 module Cardano.Binary.Annotated
   ( Annotated(..)
   , ByteSpan(..)
@@ -23,6 +49,8 @@ module Cardano.Binary.Annotated
   , decodeAnnotator
   , withSlice
   , FullByteString (..)
+  , serializeEncoding
+  , encodePreEncoded
   )
 where
 
@@ -37,8 +65,9 @@ import Cardano.Binary.Deserialize (decodeFullDecoder)
 import Cardano.Binary.FromCBOR
   (Decoder, DecoderError, FromCBOR(..), decodeWithByteSpan)
 import Cardano.Binary.ToCBOR
-  (ToCBOR)
-import Cardano.Binary.Serialize (serialize')
+  (ToCBOR(..))
+import Cardano.Binary.Serialize (serialize',serializeEncoding)
+import Codec.CBOR.Encoding(encodePreEncoded)
 
 
 
@@ -113,11 +142,55 @@ instance Decoded (Annotated b ByteString) where
 -------------------------------------------------------------------------
 
 -- | This marks the entire bytestring used during decoding, rather than the
--- | piece we need to finish constructing our value.
+--   piece we need to finish constructing our value.
 newtype FullByteString = Full LByteString
 
--- | A value of type `Annotator a` is one that needs access to the entire
--- | bytestring used during decoding to finish construction.
+-- | A value of type @(Annotator a)@ is one that needs access to the entire
+--   bytestring used during decoding to finish construction of a vaue of type @a@. A typical use
+--   is some type that stores the bytes that were used to deserialize it.
+--   For example the type @Inner@ below is constructed using the helper function @makeInner@
+--   which serializes and stores its bytes (using 'serializeEncoding').
+--   Note how we build the
+--   'Annotator' by abstracting over the full bytes, and
+--   using those original bytes to fill the bytes field of the constructor @Inner@.
+--   The 'ToCBOR' instance just reuses the stored bytes to produce an encoding
+--   (using 'encodePreEncoded').
+--
+-- @
+-- data Inner = Inner Int Bool LByteString
+--
+-- makeInner :: Int -> Bool -> Inner
+-- makeInner i b = Inner i b (serializeEncoding (toCBOR i <> toCBOR b))
+--
+-- instance ToCBOR Inner where
+--   toCBOR (Inner _ _ bytes) = encodePreEncoded bytes
+--
+-- instance FromCBOR (Annotator Inner) where
+--   fromCBOR = do
+--      int <- fromCBOR
+--      trueOrFalse <- fromCBOR
+--      pure (Annotator (\(Full bytes) -> Inner int trueOrFalse bytes))
+-- @
+--
+-- if an @Outer@ type has a field of type @Inner@, with a @(ToCBOR (Annotator Inner))@ instance,
+-- the @Outer@ type must also have a @(ToCBOR (Annotator Outer))@ instance.
+-- The key to writing that instance is to use the operation @withSlice@ which returns a pair.
+-- The first component is an @Annotator@ that can build @Inner@, the second is an @Annotator@ that given the
+-- full bytes, extracts just the bytes needed to decode @Inner@.
+--
+-- @
+-- data Outer = Outer Text Inner
+--
+-- instance ToCBOR Outer where
+--   toCBOR (Outer t i) = toCBOR t <> toCBOR i
+--
+-- instance FromCBOR (Annotator Outer) where
+--   fromCBOR = do
+--     t <- fromCBOR
+--     (Annotator mkInner, Annotator extractInnerBytes) <- withSlice fromCBOR
+--     pure (Annotator (\ full -> Outer t (mkInner (Full (extractInnerBytes full)))))
+-- @
+--
 newtype Annotator a = Annotator { runAnnotator :: FullByteString -> a }
   deriving newtype (Monad, Applicative, Functor)
 
@@ -128,7 +201,7 @@ annotatorSlice dec = do
   (k,bytes) <- withSlice dec
   pure $ k <*> bytes
 
--- | Pairs the decoder result with an annotator.
+-- | Pairs the decoder result with an annotator that can be used to construct the exact bytes used to decode the result.
 withSlice :: Decoder s a -> Decoder s (a, Annotator LByteString)
 withSlice dec = do
   (r, start, end) <- decodeWithByteSpan dec
