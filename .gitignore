@@ -5,6 +5,7 @@ dist-newstyle/
 .ghc.environment.x86_64-linux-8.6.5
 stack.yaml.lock
 cabal.project.local
+.nix-shell-cabal.project
 
 # Editors
 TAGS
