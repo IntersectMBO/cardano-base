@@ -8,6 +8,8 @@
 }:
 with pkgs;
 let
+  inherit (pkgs.haskell-nix) haskellLib;
+
   # This provides a development environment that can be used with nix-shell or
   # lorri. See https://input-output-hk.github.io/haskell.nix/user-guide/development/
   shell = cardanoBaseHaskellPackages.shellFor {
@@ -15,16 +17,9 @@ let
 
     # If shellFor default local packages selection is wrong,
     # then list all local packages then include source-repository-package that cabal complains about:
-    packages = ps: with ps; [
-       base-deriving-via
-       cardano-binary
-       cardano-crypto-class
-       cardano-crypto-praos
-       cardano-slotting
-       measures
-       orphans-deriving-via
-    ];
+    packages = ps: builtins.attrValues (haskellLib.selectProjectPackages ps);
 
+    nativeBuildInputs = [ cabalWrapped ];
     # These programs will be available inside the nix-shell.
     buildInputs = with haskellPackages; [
       ghcid
