@@ -33,10 +33,10 @@ import Control.DeepSeq (NFData)
 import Data.Primitive.Ptr (copyPtr)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.SECP256K1.Constants (
-  SECP256K1_PRIVKEY_BYTES,
+  SECP256K1_SCHNORR_PRIVKEY_BYTES,
   SECP256K1_SCHNORR_SIGNATURE_BYTES,
-  SECP256K1_XONLY_PUBKEY_BYTES,
-  SECP256K1_PUBKEY_BYTES,
+  SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL,
+  SECP256K1_SCHNORR_PUBKEY_BYTES,
   )
 import Cardano.Crypto.SECP256K1.C (
   secpKeyPairCreate,
@@ -99,13 +99,13 @@ import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 data SchnorrSecp256k1DSIGN
 
 instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
-  type SeedSizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_PRIVKEY_BYTES
+  type SeedSizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
   type SizeSigDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_SIGNATURE_BYTES
-  type SizeSignKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_PRIVKEY_BYTES
-  type SizeVerKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_PUBKEY_BYTES
+  type SizeSignKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
+  type SizeVerKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PUBKEY_BYTES
   type Signable SchnorrSecp256k1DSIGN = SignableRepresentation
   newtype VerKeyDSIGN SchnorrSecp256k1DSIGN =
-    VerKeySchnorrSecp256k1 (PinnedSizedBytes SECP256K1_XONLY_PUBKEY_BYTES)
+    VerKeySchnorrSecp256k1 (PinnedSizedBytes SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL)
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)

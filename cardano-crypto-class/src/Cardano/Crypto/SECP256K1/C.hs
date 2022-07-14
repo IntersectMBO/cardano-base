@@ -24,11 +24,11 @@ import Data.Word (Word8)
 import Foreign.C.Types (CUChar, CSize (CSize), CInt (CInt))
 import Cardano.Foreign (SizedPtr (SizedPtr))
 import Cardano.Crypto.SECP256K1.Constants (
-  SECP256K1_KEYPAIR_BYTES,
-  SECP256K1_PRIVKEY_BYTES,
+  SECP256K1_SCHNORR_KEYPAIR_BYTES,
+  SECP256K1_SCHNORR_PRIVKEY_BYTES,
   SECP256K1_SCHNORR_SIGNATURE_BYTES,
-  SECP256K1_XONLY_PUBKEY_BYTES,
-  SECP256K1_PUBKEY_BYTES,
+  SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL,
+  SECP256K1_SCHNORR_PUBKEY_BYTES,
   )
 
 data SECP256k1Context
@@ -67,8 +67,8 @@ secpContextSignVerify = secpContextSign .|. secpContextVerify
 foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_create"
   secpKeyPairCreate :: 
      Ptr SECP256k1Context -- context initialized for signing
-  -> SizedPtr SECP256K1_KEYPAIR_BYTES -- out-param for keypair to initialize
-  -> SizedPtr SECP256K1_PRIVKEY_BYTES -- secret key (32 bytes)
+  -> SizedPtr SECP256K1_SCHNORR_KEYPAIR_BYTES -- out-param for keypair to initialize
+  -> SizedPtr SECP256K1_SCHNORR_PRIVKEY_BYTES -- secret key (32 bytes)
   -> IO CInt -- 1 on success, 0 on failure
 
 foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign_custom"
@@ -77,16 +77,16 @@ foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign_custom"
   -> SizedPtr SECP256K1_SCHNORR_SIGNATURE_BYTES -- out-param for signature (64 bytes)
   -> Ptr CUChar -- message to sign
   -> CSize -- message length in bytes
-  -> SizedPtr SECP256K1_KEYPAIR_BYTES -- initialized keypair
+  -> SizedPtr SECP256K1_SCHNORR_KEYPAIR_BYTES -- initialized keypair
   -> Ptr SECP256k1SchnorrExtraParams -- not used
   -> IO CInt -- 1 on success, 0 on failure
 
 foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_xonly_pub"
   secpKeyPairXOnlyPub :: 
      Ptr SECP256k1Context -- an initialized context
-  -> SizedPtr SECP256K1_XONLY_PUBKEY_BYTES -- out-param for xonly pubkey
+  -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- out-param for xonly pubkey
   -> Ptr CInt -- parity (not used)
-  -> SizedPtr SECP256K1_KEYPAIR_BYTES -- keypair
+  -> SizedPtr SECP256K1_SCHNORR_KEYPAIR_BYTES -- keypair
   -> IO CInt -- 1 on success, 0 on error
 
 foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
@@ -95,19 +95,19 @@ foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
   -> SizedPtr SECP256K1_SCHNORR_SIGNATURE_BYTES -- signature to verify (64 bytes)
   -> Ptr CUChar -- message to verify
   -> CSize -- message length in bytes
-  -> SizedPtr SECP256K1_XONLY_PUBKEY_BYTES -- pubkey to verify with
+  -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- pubkey to verify with
   -> CInt -- 1 on success, 0 on failure
 
 foreign import capi "secp256k1_extrakeys.h secp256k1_xonly_pubkey_serialize"
   secpXOnlyPubkeySerialize :: 
      Ptr SECP256k1Context -- an initialized context
-  -> SizedPtr SECP256K1_PUBKEY_BYTES -- out-param for serialized representation
-  -> SizedPtr SECP256K1_XONLY_PUBKEY_BYTES -- the xonly pubkey to serialize
+  -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES -- out-param for serialized representation
+  -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- the xonly pubkey to serialize
   -> IO CInt -- 1 on success, 0 on error
 
 foreign import capi "secp256k1_extrakeys.h secp256k1_xonly_pubkey_parse"
   secpXOnlyPubkeyParse ::
      Ptr SECP256k1Context -- an initialized context
-  -> SizedPtr SECP256K1_XONLY_PUBKEY_BYTES -- out-param for deserialized representation
+  -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- out-param for deserialized representation
   -> Ptr Word8 -- bytes to deserialize
   -> IO CInt -- 1 if the parse succeeded, 0 if the parse failed (due to invalid representation)
