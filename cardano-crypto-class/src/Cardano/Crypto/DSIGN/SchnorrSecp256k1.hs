@@ -32,17 +32,24 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.Primitive.Ptr (copyPtr)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
-import Cardano.Crypto.SECP256K1.Constants
+import Cardano.Crypto.SECP256K1.Constants (
+  SECP256K1_PRIVKEY_BYTES,
+  SECP256K1_SCHNORR_SIGNATURE_BYTES,
+  SECP256K1_XONLY_PUBKEY_BYTES,
+  SECP256K1_PUBKEY_BYTES,
+  )
 import Cardano.Crypto.SECP256K1.C (
   secpKeyPairCreate,
+  secpXOnlyPubkeySerialize,
   SECP256k1Context,
   secpKeyPairXOnlyPub,
+  secpXOnlyPubkeyParse,
   secpSchnorrSigVerify,
   secpContextSignVerify,
   secpSchnorrSigSignCustom,
   secpContextCreate
   )
-import Cardano.Foreign
+import Cardano.Foreign (allocaSized)
 import Control.Monad (when)
 import System.IO.Unsafe (unsafeDupablePerformIO, unsafePerformIO)
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
@@ -81,13 +88,15 @@ import Cardano.Crypto.DSIGN.Class (
   )
 import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
 import Cardano.Crypto.PinnedSizedBytes (
-  PinnedSizedBytes, 
+  PinnedSizedBytes,
+  psbZero,
   psbUseAsSizedPtr,
   psbCreate,
   psbCreateSized,
   psbToByteString,
   psbFromByteStringCheck,
   )
+import Data.ByteString.Unsafe (unsafeUseAsCStringLen) 
 
 data SchnorrSecp256k1DSIGN
 
@@ -95,10 +104,10 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   type SeedSizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_PRIVKEY_BYTES
   type SizeSigDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_SIGNATURE_BYTES
   type SizeSignKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_PRIVKEY_BYTES
-  type SizeVerKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_XONLY_PUBKEY_BYTES
+  type SizeVerKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_PUBKEY_BYTES
   type Signable SchnorrSecp256k1DSIGN = SignableRepresentation
   newtype VerKeyDSIGN SchnorrSecp256k1DSIGN =
-    VerKeySchnorrSecp256k1 (PinnedSizedBytes (SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
+    VerKeySchnorrSecp256k1 (PinnedSizedBytes SECP256K1_XONLY_PUBKEY_BYTES)
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
@@ -162,10 +171,23 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
            useAsCStringLen bs $ \(bsp, sz) ->
              copyPtr skp (castPtr bsp) sz
   rawSerialiseSigDSIGN (SigSchnorrSecp256k1 sigPSB) = psbToByteString sigPSB
-  rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) = psbToByteString vkPSB
+  {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
+  rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) = 
+    unsafeDupablePerformIO . psbUseAsSizedPtr vkPSB $ \pkbPtr -> do
+      res <- psbCreateSized $ \bsPtr -> do
+        res' <- secpXOnlyPubkeySerialize ctxPtr bsPtr pkbPtr
+        when (res' /= 1) (error "rawSerialiseVerKeyDSIGN: Failed to serialise.")
+      pure . psbToByteString $ res
   rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
+  {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs = 
-    VerKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
+    unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, _) -> do
+      let dataPtr = castPtr ptr
+      let loc = psbZero
+      res <- psbUseAsSizedPtr loc $ \outPtr -> do
+        res' <- secpXOnlyPubkeyParse ctxPtr outPtr dataPtr 
+        pure $ if res' == 1 then Just loc else Nothing
+      pure $ VerKeySchnorrSecp256k1 <$> res
   rawDeserialiseSignKeyDSIGN bs = 
     SignKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
   rawDeserialiseSigDSIGN bs = 

@@ -12,13 +12,22 @@ module Cardano.Crypto.SECP256K1.C (
   secpSchnorrSigSignCustom,
   secpKeyPairXOnlyPub,
   secpSchnorrSigVerify,
+  secpXOnlyPubkeySerialize,
+  secpXOnlyPubkeyParse,
   ) where
 
 import Data.Bits ((.|.))
 import Foreign.Ptr (Ptr)
+import Data.Word (Word8)
 import Foreign.C.Types (CUChar, CSize (CSize), CInt (CInt))
-import Cardano.Foreign
-import Cardano.Crypto.SECP256K1.Constants
+import Cardano.Foreign (SizedPtr (SizedPtr))
+import Cardano.Crypto.SECP256K1.Constants (
+  SECP256K1_KEYPAIR_BYTES,
+  SECP256K1_PRIVKEY_BYTES,
+  SECP256K1_SCHNORR_SIGNATURE_BYTES,
+  SECP256K1_XONLY_PUBKEY_BYTES,
+  SECP256K1_PUBKEY_BYTES,
+  )
 
 data SECP256k1Context
 
@@ -76,3 +85,17 @@ foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
   -> CSize -- message length in bytes
   -> SizedPtr SECP256K1_XONLY_PUBKEY_BYTES -- pubkey to verify with
   -> CInt -- 1 on success, 0 on failure
+
+foreign import capi "secp256k1_extrakeys.h secp256k1_xonly_pubkey_serialize"
+  secpXOnlyPubkeySerialize :: 
+     Ptr SECP256k1Context -- an initialized context
+  -> SizedPtr SECP256K1_PUBKEY_BYTES -- out-param for serialized representation
+  -> SizedPtr SECP256K1_XONLY_PUBKEY_BYTES -- the xonly pubkey to serialize
+  -> IO CInt -- 1 on success, 0 on error
+
+foreign import capi "secp256k1_extrakeys.h secp256k1_xonly_pubkey_parse"
+  secpXOnlyPubkeyParse ::
+     Ptr SECP256k1Context -- an initialized context
+  -> SizedPtr SECP256K1_XONLY_PUBKEY_BYTES -- out-param for deserialized representation
+  -> Ptr Word8 -- bytes to deserialize
+  -> IO CInt -- 1 if the parse succeeded, 0 if the parse failed (due to invalid representation)
