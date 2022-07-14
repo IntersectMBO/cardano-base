@@ -41,19 +41,17 @@ import Cardano.Crypto.SECP256K1.Constants (
 import Cardano.Crypto.SECP256K1.C (
   secpKeyPairCreate,
   secpXOnlyPubkeySerialize,
-  SECP256k1Context,
   secpKeyPairXOnlyPub,
   secpXOnlyPubkeyParse,
   secpSchnorrSigVerify,
-  secpContextSignVerify,
   secpSchnorrSigSignCustom,
-  secpContextCreate
+  secpCtxPtr,
   )
 import Cardano.Foreign (allocaSized)
 import Control.Monad (when)
-import System.IO.Unsafe (unsafeDupablePerformIO, unsafePerformIO)
+import System.IO.Unsafe (unsafeDupablePerformIO)
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
-import Foreign.Ptr (Ptr, castPtr, nullPtr)
+import Foreign.Ptr (castPtr, nullPtr)
 import NoThunks.Class (NoThunks)
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (VerKeyDSIGN,
@@ -126,10 +124,10 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   deriveVerKeyDSIGN (SignKeySchnorrSecp256k1 psb) = 
     unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \skp -> do
       allocaSized $ \kpp -> do
-        res <- secpKeyPairCreate ctxPtr kpp skp
+        res <- secpKeyPairCreate secpCtxPtr kpp skp
         when (res /= 1) (error "deriveVerKeyDSIGN: Failed to create keypair")
         xonlyPSB <- psbCreateSized $ \xonlyp -> do
-                      res' <- secpKeyPairXOnlyPub ctxPtr xonlyp nullPtr kpp
+                      res' <- secpKeyPairXOnlyPub secpCtxPtr xonlyp nullPtr kpp
                       when (res' /= 1) 
                            (error "deriveVerKeyDsIGN: could not extract xonly pubkey")
         pure . VerKeySchnorrSecp256k1 $ xonlyPSB
@@ -138,10 +136,10 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
     unsafeDupablePerformIO . psbUseAsSizedPtr skpsb $ \skp -> do
       let bs = getSignableRepresentation msg
       allocaSized $ \kpp -> do
-        res <- secpKeyPairCreate ctxPtr kpp skp
+        res <- secpKeyPairCreate secpCtxPtr kpp skp
         when (res /= 1) (error "signDSIGN: Failed to create keypair")
         sigPSB <- psbCreateSized $ \sigp -> useAsCStringLen bs $ \(msgp, msgLen) -> do
-          res' <- secpSchnorrSigSignCustom ctxPtr
+          res' <- secpSchnorrSigSignCustom secpCtxPtr
                                            sigp
                                            (castPtr msgp)
                                            (fromIntegral msgLen)
@@ -155,7 +153,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
       psbUseAsSizedPtr sigPSB $ \sigp -> do
         let bs = getSignableRepresentation msg
         res <- useAsCStringLen bs $ \(msgp, msgLen) -> do
-          pure $ secpSchnorrSigVerify ctxPtr 
+          pure $ secpSchnorrSigVerify secpCtxPtr 
                                       sigp
                                       (castPtr msgp) 
                                       (fromIntegral msgLen)
@@ -175,7 +173,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) = 
     unsafeDupablePerformIO . psbUseAsSizedPtr vkPSB $ \pkbPtr -> do
       res <- psbCreateSized $ \bsPtr -> do
-        res' <- secpXOnlyPubkeySerialize ctxPtr bsPtr pkbPtr
+        res' <- secpXOnlyPubkeySerialize secpCtxPtr bsPtr pkbPtr
         when (res' /= 1) (error "rawSerialiseVerKeyDSIGN: Failed to serialise.")
       pure . psbToByteString $ res
   rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
@@ -185,7 +183,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
       let dataPtr = castPtr ptr
       let loc = psbZero
       res <- psbUseAsSizedPtr loc $ \outPtr -> do
-        res' <- secpXOnlyPubkeyParse ctxPtr outPtr dataPtr 
+        res' <- secpXOnlyPubkeyParse secpCtxPtr outPtr dataPtr 
         pure $ if res' == 1 then Just loc else Nothing
       pure $ VerKeySchnorrSecp256k1 <$> res
   rawDeserialiseSignKeyDSIGN bs = 
@@ -213,15 +211,3 @@ instance ToCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
 
 instance FromCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
   fromCBOR = decodeSigDSIGN
-
--- Helpers
-
--- We follow the lead of secp256k1-haskell by creating (once) a context for both
--- signing and verification which we use everywhere, but do not export. This
--- saves considerable time, and is safe, provided nobody else gets to touch it.
---
--- We do _not_ make this dupable, as the whole point is _not_ to compute it more
--- than once!
-{-# NOINLINE ctxPtr #-}
-ctxPtr :: Ptr SECP256k1Context
-ctxPtr = unsafePerformIO . secpContextCreate $ secpContextSignVerify

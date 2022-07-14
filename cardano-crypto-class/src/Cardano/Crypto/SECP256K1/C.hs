@@ -14,10 +14,12 @@ module Cardano.Crypto.SECP256K1.C (
   secpSchnorrSigVerify,
   secpXOnlyPubkeySerialize,
   secpXOnlyPubkeyParse,
+  secpCtxPtr,
   ) where
 
 import Data.Bits ((.|.))
 import Foreign.Ptr (Ptr)
+import System.IO.Unsafe (unsafePerformIO)
 import Data.Word (Word8)
 import Foreign.C.Types (CUChar, CSize (CSize), CInt (CInt))
 import Cardano.Foreign (SizedPtr (SizedPtr))
@@ -32,6 +34,16 @@ import Cardano.Crypto.SECP256K1.Constants (
 data SECP256k1Context
 
 data SECP256k1SchnorrExtraParams
+
+-- We create a single context for both signing and verifying, which we use
+-- everywhere. This saves considerable time, and is safe, provided nobody
+-- outside cardano-base gets to touch it.
+--
+-- We do _not_ make this dupable, as the whole point is _not_ to compute it more
+-- than once!
+{-# NOINLINE secpCtxPtr #-}
+secpCtxPtr :: Ptr SECP256k1Context
+secpCtxPtr = unsafePerformIO . secpContextCreate $ secpContextSignVerify
 
 foreign import capi "secp256k1.h secp256k1_context_create"
   secpContextCreate :: 
