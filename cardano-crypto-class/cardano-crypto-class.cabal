@@ -120,7 +120,6 @@ library
       Cardano.Crypto.DSIGN.SchnorrSecp256k1
       Cardano.Crypto.SECP256K1.Constants
       Cardano.Crypto.SECP256K1.C
-    build-depends: cereal, secp256k1-haskell
     pkgconfig-depends: libsecp256k1 -any
     cpp-options: -DSECP256K1
 

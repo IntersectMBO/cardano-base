@@ -13,9 +13,7 @@ module Test.Crypto.DSIGN
 where
 
 #ifdef SECP256K1
-import Data.ByteString (ByteString)
 import Control.Monad (replicateM)
-import qualified Crypto.Secp256k1 as SECP
 import qualified GHC.Exts as GHC
 #endif
 
@@ -30,6 +28,8 @@ import Cardano.Crypto.DSIGN (
 #ifdef SECP256K1
   EcdsaSecp256k1DSIGN,
   SchnorrSecp256k1DSIGN,
+  MessageHash,
+  toMessageHash,
 #endif
   DSIGNAlgorithm (VerKeyDSIGN,
                   SignKeyDSIGN,
@@ -99,11 +99,16 @@ secp256k1SigGen = do
 schnorrSigGen :: Gen (SigDSIGN SchnorrSecp256k1DSIGN)
 schnorrSigGen = defaultSigGen
 
-genSECPMsg :: Gen SECP.Msg
+genSECPMsg :: Gen MessageHash
+genSECPMsg = 
+  Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary) 
+                  toMessageHash
+{-
 genSECPMsg = Gen.suchThatMap go SECP.msg
   where
     go :: Gen ByteString
     go = GHC.fromListN 32 <$> replicateM 32 arbitrary
+-}
 #endif
 
 defaultVerKeyGen :: forall (a :: Type) . 

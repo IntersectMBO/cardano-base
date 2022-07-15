@@ -73,7 +73,6 @@ library
                       , criterion
 
   if flag(secp256k1-support)
-    build-depends: secp256k1-haskell
     cpp-options: -DSECP256K1
 
 test-suite test-crypto

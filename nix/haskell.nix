@@ -54,7 +54,7 @@ let
         packages.binary.configureFlags = [ "--ghc-option=-Werror" ];
         #packages.binary/test.configureFlags = [ "--ghc-option=-Werror" ];
         packages.cardano-crypto-class.configureFlags = [ "--ghc-option=-Werror" ];
-        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ buildPackages.libsodium-vrf ]];
+        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ buildPackages.libsodium-vrf buildPackages.secp256k1 ]];
         packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
       }
