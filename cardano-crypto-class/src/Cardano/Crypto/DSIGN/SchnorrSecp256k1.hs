@@ -87,8 +87,8 @@ import Cardano.Crypto.DSIGN.Class (
 import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
 import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
-  psbZero,
   psbUseAsSizedPtr,
+  psbCreateSizedResult,
   psbCreate,
   psbCreateSized,
   psbToByteString,
@@ -183,11 +183,11 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   rawDeserialiseVerKeyDSIGN bs = 
     unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, _) -> do
       let dataPtr = castPtr ptr
-      let loc = psbZero
-      res <- psbUseAsSizedPtr loc $ \outPtr -> do
-        res' <- secpXOnlyPubkeyParse secpCtxPtr outPtr dataPtr 
-        pure $ if res' == 1 then Just loc else Nothing
-      pure $ VerKeySchnorrSecp256k1 <$> res
+      (vkPsb, res) <- psbCreateSizedResult $ \outPtr -> 
+          secpXOnlyPubkeyParse secpCtxPtr outPtr dataPtr
+      pure $ case res of 
+        1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
+        _ -> Nothing
   rawDeserialiseSignKeyDSIGN bs = 
     SignKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
   rawDeserialiseSigDSIGN bs = 

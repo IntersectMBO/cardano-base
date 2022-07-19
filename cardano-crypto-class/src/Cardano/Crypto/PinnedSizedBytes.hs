@@ -6,6 +6,7 @@
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UnboxedTuples              #-}
+{-# LANGUAGE TypeApplications           #-}
 
 -- for pinnedByteArrayFromListN
 {-# OPTIONS_GHC -Wno-missing-local-signatures #-}
@@ -22,12 +23,18 @@ module Cardano.Crypto.PinnedSizedBytes
     psbToByteString,
     -- * C usage
     psbUseAsCPtr,
+    psbUseAsCPtrLen,
     psbUseAsSizedPtr,
     psbCreate,
+    psbCreateLen,
     psbCreateSized,
+    psbCreateResult,
+    psbCreateResultLen,
+    psbCreateSizedResult,
     ptrPsbToSizedPtr,
   ) where
 
+import Data.Kind (Type)
 import Control.DeepSeq (NFData)
 import Control.Monad.ST (runST)
 import Control.Monad.Primitive  (primitive_, touch)
@@ -182,6 +189,7 @@ psbFromByteStringCheck bs
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
 
+{-# DEPRECATED psbZero "This is not referentially transparent" #-}
 psbZero :: KnownNat n =>  PinnedSizedBytes n
 psbZero = psbFromBytes []
 
@@ -202,27 +210,133 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
             size = fromInteger (natVal (Proxy :: Proxy n))
         copyByteArrayToAddr (castPtr p) arr 0 size
 
-psbUseAsCPtr :: PinnedSizedBytes n -> (Ptr Word8 -> IO r) -> IO r
-psbUseAsCPtr (PSB ba) k = do
-    r <- k (byteArrayContents ba)
-    r <$ touch ba
+-- | Use a 'PinnedSizedBytes' in a setting where its size is \'forgotten\'
+-- temporarily.
+--
+-- = Note
+--
+-- The 'Ptr' given to the function argument /must not/ be used as the result of
+-- type @r@.
+psbUseAsCPtr :: 
+  forall (n :: Nat) (r :: Type) .
+  PinnedSizedBytes n -> 
+  (Ptr Word8 -> IO r) -> 
+  IO r
+psbUseAsCPtr (PSB ba) = runAndTouch ba
 
-psbUseAsSizedPtr :: PinnedSizedBytes n -> (SizedPtr n -> IO r) -> IO r
+-- | As 'psbUseAsCPtr', but also gives the function argument the size we are
+-- allowed to use as a 'CSize'.
+--
+-- This is mostly boilerplate removal, as it is quite common for C APIs to take
+-- a combination of a pointer to some data and its length. A possible use case
+-- (and one we run into) is where we know that we can expect a certain data
+-- length (using 'PinnedSizedBytes' as its representation), but the C API allows
+-- any length we like, provided we give the right argument to indicate this.
+-- Therefore, having a helper like this one allows us to avoid having to
+-- manually 'natVal' a 'Proxy', as well as ensuring we don't get mismatches
+-- accidentally.
+--
+-- The same caveats apply to the use of this function as to the use of
+-- 'psbUseAsCPtr'.
+psbUseAsCPtrLen :: 
+  forall (n :: Nat) (r :: Type) . 
+  (KnownNat n) => 
+  PinnedSizedBytes n ->
+  (Ptr Word8 -> CSize -> IO r) -> 
+  IO r
+psbUseAsCPtrLen (PSB ba) f = do
+  let len :: CSize = fromIntegral . natVal $ Proxy @n
+  runAndTouch ba (`f` len)
+
+-- | As 'psbUseAsCPtr', but does not \'forget\' the size.
+--
+-- The same caveats apply to this use of this function as to the use of
+-- 'psbUseAsCPtr'.
+psbUseAsSizedPtr :: 
+  forall (n :: Nat) (r :: Type) . 
+  PinnedSizedBytes n -> 
+  (SizedPtr n -> IO r) -> 
+  IO r
 psbUseAsSizedPtr (PSB ba) k = do
     r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
     r <$ touch ba
 
-psbCreate :: forall n. KnownNat n => (Ptr Word8 -> IO ()) -> IO (PinnedSizedBytes n)
-psbCreate k = do
-    let size :: Int
-        size = fromInteger (natVal (Proxy :: Proxy n))
-    mba <- newPinnedByteArray size
-    k (mutableByteArrayContents mba)
-    arr <- unsafeFreezeByteArray mba
-    return (PSB arr)
+-- | As 'psbCreateResult', but presumes that no useful value is produced: that
+-- is, the function argument is run only for its side effects.
+psbCreate :: 
+  forall (n :: Nat) . 
+  (KnownNat n) => 
+  (Ptr Word8 -> IO ()) -> 
+  IO (PinnedSizedBytes n)
+psbCreate f = fst <$> psbCreateResult f
 
-psbCreateSized :: forall n. KnownNat n => (SizedPtr n -> IO ()) -> IO (PinnedSizedBytes n)
+-- | As 'psbCreateResultLen', but presumes that no useful value is produced:
+-- that is, the function argument is run only for its side effects.
+psbCreateLen :: 
+  forall (n :: Nat) . 
+  (KnownNat n) => 
+  (Ptr Word8 -> CSize -> IO ()) -> 
+  IO (PinnedSizedBytes n)
+psbCreateLen f = fst <$> psbCreateResultLen f
+
+-- | Given an \'initialization action\', which also produces some result, allocate
+-- new pinned memory of the specified size, perform the action, then return the
+-- result together with the initialized pinned memory (as a 'PinnedSizedBytes').
+--
+-- = Note
+--
+-- It is essential that @r@ is not the 'Ptr' given to the function argument:
+-- returning this would be extremely unsafe, as it would break referential
+-- transparency guarantees by allowing us to alias supposedly immutable memory.
+psbCreateResult :: 
+  forall (n :: Nat) (r :: Type) . 
+  (KnownNat n) => 
+  (Ptr Word8 -> IO r) -> 
+  IO (PinnedSizedBytes n, r)
+psbCreateResult f = psbCreateResultLen (\p _ -> f p)
+
+-- | As 'psbCreateResult', but also gives the number of bytes we are allowed to
+-- operate on as a 'CSize'.
+--
+-- This function is provided for two reasons:
+--
+-- * It is a common practice in C libraries to pass a pointer to data plus a
+-- length. While /our/ use case might know the size we expect, the C function we
+-- are calling might be more general. This simplifies calling such functions.
+-- * We avoid 'natVal'ing a 'Proxy' /twice/, since we have to do it anyway.
+--
+-- The same caveats apply to this function as to 'psbCreateResult': the 'Ptr'
+-- given to the function argument /must not/ be returned as @r@.
+psbCreateResultLen :: 
+  forall (n :: Nat) (r :: Type) . 
+  (KnownNat n) => 
+  (Ptr Word8 -> CSize -> IO r) -> 
+  IO (PinnedSizedBytes n, r)
+psbCreateResultLen f = do
+  let len :: Int = fromIntegral . natVal $ Proxy @n
+  mba <- newPinnedByteArray len
+  res <- f (mutableByteArrayContents mba) (fromIntegral len)
+  arr <- unsafeFreezeByteArray mba
+  pure (PSB arr, res)
+
+-- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
+-- that is, the function argument is run only for its side effects.
+psbCreateSized :: 
+  forall (n :: Nat). 
+  (KnownNat n) => 
+  (SizedPtr n -> IO ()) -> 
+  IO (PinnedSizedBytes n)
 psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
+
+-- | As 'psbCreateResult', but gives a 'SizedPtr' to the function argument. The
+-- same caveats apply to this function as to 'psbCreateResult': the 'SizedPtr'
+-- given to the function argument /must not/ be resulted as @r@.
+psbCreateSizedResult :: 
+  forall (n :: Nat) (r :: Type) . 
+  (KnownNat n) => 
+  (SizedPtr n -> IO r) -> 
+  IO (PinnedSizedBytes n, r)
+psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)
 
 ptrPsbToSizedPtr :: Ptr (PinnedSizedBytes n) -> SizedPtr n
 ptrPsbToSizedPtr = SizedPtr . castPtr
@@ -252,3 +366,13 @@ pinnedByteArrayFromListN n ys = runST $ do
 
 die :: String -> String -> a
 die fun problem = error $ "PinnedSizedBytes." ++ fun ++ ": " ++ problem
+
+-- Wrapper that combines applying a function, then touching
+runAndTouch :: 
+  forall (a :: Type) . 
+  ByteArray -> 
+  (Ptr Word8 -> IO a) ->
+  IO a
+runAndTouch ba f = do
+  r <- f (byteArrayContents ba)
+  r <$ touch ba

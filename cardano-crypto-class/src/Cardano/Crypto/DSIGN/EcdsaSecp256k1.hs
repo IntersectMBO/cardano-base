@@ -35,14 +35,12 @@ module Cardano.Crypto.DSIGN.EcdsaSecp256k1 (
   ) where
 
 import Foreign.Storable (poke, peek)
-import GHC.TypeNats (natVal)
-import Cardano.Foreign (SizedPtr (SizedPtr))
 import Foreign.C.Types (CSize)
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (castPtr, nullPtr, Ptr)
 import Control.Monad (when, void, unless)
 import Cardano.Crypto.Hash.Class (HashAlgorithm (SizeHash, digest))
-import Data.Proxy (Proxy (Proxy))
+import Data.Proxy (Proxy)
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
 import Data.ByteString (ByteString)
 import Crypto.Random (getRandomBytes)
@@ -94,6 +92,9 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbCreateSized,
   psbFromByteStringCheck,
   psbToByteString,
+  psbCreateLen,
+  psbCreateSizedResult,
+  psbUseAsCPtrLen,
   )
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import Cardano.Crypto.SECP256K1.C (
@@ -194,10 +195,9 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
             void $ secpEcdsaSignatureSerializeCompact secpCtxPtr dstp psp
     {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
     rawSerialiseVerKeyDSIGN (VerKeyEcdsaSecp256k1 psb) = 
-      psbToByteString . unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp -> 
-        psbCreateSized @SECP256K1_ECDSA_PUBKEY_BYTES $ \(SizedPtr ptr) -> do
+      psbToByteString . unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp ->
+        psbCreateLen @SECP256K1_ECDSA_PUBKEY_BYTES $ \ptr len -> do
           let dstp = castPtr ptr
-          let len :: CSize = fromIntegral . natVal $ Proxy @SECP256K1_ECDSA_PUBKEY_BYTES
           -- This is necessary because of how the C API handles checking writes:
           -- maximum permissible length is given as a pointer, which is
           -- overwritten to indicate the number of bytes we actually wrote; if
@@ -218,16 +218,8 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
           PinnedSizedBytes SECP256K1_ECDSA_SIGNATURE_BYTES -> 
           Maybe (PinnedSizedBytes SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL)
         go psb = unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp -> do
-          -- This is a slightly odd order of operations, but it's forced on us,
-          -- as psbCreateSized only allows an initialization that returns the
-          -- trivial value. Instead, we allocate (but do not initialize) a
-          -- PinnedSizedBytes of the right size, then try using it. This is
-          -- safe, as if deserialization fails, then we never get to see the
-          -- PinnedSizedBytes this would produce (ostensibly full of junk), and
-          -- if deserialization succeeds, it'll overwrite the contents anyway.
-          sigPsb <- psbCreateSized (\_ -> pure ())
-          res <- psbUseAsSizedPtr sigPsb $ \sigp -> 
-                  secpEcdsaSignatureParseCompact secpCtxPtr sigp psp
+          (sigPsb, res) <- psbCreateSizedResult $ \sigp -> 
+            secpEcdsaSignatureParseCompact secpCtxPtr sigp psp
           pure $ case res of 
             1 -> pure sigPsb
             _ -> Nothing
@@ -235,19 +227,13 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
     rawDeserialiseVerKeyDSIGN bs = 
       VerKeyEcdsaSecp256k1 <$> (psbFromByteStringCheck bs >>= go)
       where
-        -- In addition to the same weirdness as above, here we also have to
-        -- 'forget' our size temporarily, as the underlying C API allows
-        -- compression to _any_ size, not just our particular one. This is still
-        -- safe, but it requires 'unwrapping' a SizedPtr.
         go :: 
           PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES -> 
           Maybe (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
-        go psb = unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \(SizedPtr p) -> do
+        go psb = unsafeDupablePerformIO . psbUseAsCPtrLen psb $ \p srcLen -> do
           let srcp = castPtr p
-          let srcLen :: CSize = fromIntegral . natVal $ Proxy @SECP256K1_ECDSA_PUBKEY_BYTES
-          vkPsb <- psbCreateSized (\_ -> pure ())
-          res <- psbUseAsSizedPtr vkPsb $ \vkp -> 
-                  secpEcPubkeyParse secpCtxPtr vkp srcp srcLen
+          (vkPsb, res) <- psbCreateSizedResult $ \vkp -> 
+            secpEcPubkeyParse secpCtxPtr vkp srcp srcLen
           pure $ case res of 
             1 -> pure vkPsb
             _ -> Nothing
