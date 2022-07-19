@@ -162,14 +162,16 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
       VerKeyEcdsaSecp256k1 <$> unsafeDupablePerformIO . psbUseAsSizedPtr skBytes $ 
         \skp -> psbCreateSized $ \vkp -> do
           res <- secpEcPubkeyCreate secpCtxPtr vkp skp
-          when (res /= 1) (error "deriveVerKeyDSIGN: Failed to derive pubkey")
+          when (res /= 1) 
+               (error "deriveVerKeyDSIGN: Failed to derive VerKeyDSIGN EcdsaSecp256k1DSIGN")
     {-# NOINLINE signDSIGN #-}
     signDSIGN () (MH psb) (SignKeyEcdsaSecp256k1 skBytes) = 
       SigEcdsaSecp256k1 <$> unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp -> do
         psbUseAsSizedPtr skBytes $ \skp ->
           psbCreateSized $ \sigp -> do
             res <- secpEcdsaSign secpCtxPtr sigp psp skp nullPtr nullPtr
-            when (res /= 1) (error "signDSIGN: Failed to sign message")
+            when (res /= 1) 
+                 (error "signDSIGN: Failed to sign EcdsaSecp256k1DSIGN message")
     {-# NOINLINE verifyDSIGN #-}
     verifyDSIGN () (VerKeyEcdsaSecp256k1 vkBytes) (MH psb) (SigEcdsaSecp256k1 sigBytes) = 
       unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp -> do
@@ -177,12 +179,12 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
           psbUseAsSizedPtr vkBytes $ \vkp -> do
             let res = secpEcdsaVerify secpCtxPtr sigp psp vkp
             pure $ case res of 
-              0 -> Left "verifyDSIGN: Incorrect or unparseable signature"
+              0 -> Left "verifyDSIGN: Incorrect or unparseable SigDSIGN EcdsaSecp256k1DSIGN"
               _ -> Right ()
     genKeyDSIGN seed = runMonadRandomWithSeed seed $ do
       bs <- getRandomBytes 32
       case psbFromByteStringCheck bs of 
-        Nothing -> error "genKeyDSIGN: Failed to generate key unexpectedly"
+        Nothing -> error "genKeyDSIGN: Failed to generate SignKeyDSIGN EcdsaSecp256k1DSIGN unexpectedly"
         Just psb -> pure $ SignKeyEcdsaSecp256k1 psb
     {-# NOINLINE rawSerialiseSigDSIGN #-}
     rawSerialiseSigDSIGN (SigEcdsaSecp256k1 psb) = 
@@ -205,7 +207,8 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
             poke lenPtr len
             void $ secpEcPubkeySerialize secpCtxPtr dstp lenPtr psp secpEcCompressed
             writtenLen <- peek lenPtr
-            unless (writtenLen == len) (error "rawSerializeVerKeyDSIGN: Did not write correct length")
+            unless (writtenLen == len) 
+                   (error "rawSerializeVerKeyDSIGN: Did not write correct length for VerKeyDSIGN EcdsaSecp256k1DSIGN")
     rawSerialiseSignKeyDSIGN (SignKeyEcdsaSecp256k1 psb) = psbToByteString psb
     {-# NOINLINE rawDeserialiseSigDSIGN #-}
     rawDeserialiseSigDSIGN bs = 

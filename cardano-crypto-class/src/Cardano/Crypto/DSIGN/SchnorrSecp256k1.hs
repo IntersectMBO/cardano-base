@@ -125,11 +125,12 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
     unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \skp -> do
       allocaSized $ \kpp -> do
         res <- secpKeyPairCreate secpCtxPtr kpp skp
-        when (res /= 1) (error "deriveVerKeyDSIGN: Failed to create keypair")
+        when (res /= 1) 
+             (error "deriveVerKeyDSIGN: Failed to create keypair for SchnorrSecp256k1DSIGN")
         xonlyPSB <- psbCreateSized $ \xonlyp -> do
                       res' <- secpKeyPairXOnlyPub secpCtxPtr xonlyp nullPtr kpp
                       when (res' /= 1) 
-                           (error "deriveVerKeyDsIGN: could not extract xonly pubkey")
+                           (error "deriveVerKeyDSIGN: could not extract xonly pubkey for SchnorrSecp256k1DSIGN")
         pure . VerKeySchnorrSecp256k1 $ xonlyPSB
   {-# NOINLINE signDSIGN #-}
   signDSIGN () msg (SignKeySchnorrSecp256k1 skpsb) = 
@@ -137,7 +138,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
       let bs = getSignableRepresentation msg
       allocaSized $ \kpp -> do
         res <- secpKeyPairCreate secpCtxPtr kpp skp
-        when (res /= 1) (error "signDSIGN: Failed to create keypair")
+        when (res /= 1) (error "signDSIGN: Failed to create keypair for SchnorrSecp256k1DSIGN")
         sigPSB <- psbCreateSized $ \sigp -> useAsCStringLen bs $ \(msgp, msgLen) -> do
           res' <- secpSchnorrSigSignCustom secpCtxPtr
                                            sigp
@@ -145,7 +146,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
                                            (fromIntegral msgLen)
                                            kpp
                                            nullPtr
-          when (res' /= 1) (error "signDSIGN: Failed to sign message")
+          when (res' /= 1) (error "signDSIGN: Failed to sign SchnorrSecp256k1DSIGN message")
         pure . SigSchnorrSecp256k1 $ sigPSB
   {-# NOINLINE verifyDSIGN #-}
   verifyDSIGN () (VerKeySchnorrSecp256k1 pubkeyPSB) msg (SigSchnorrSecp256k1 sigPSB) =
@@ -159,7 +160,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
                                       (fromIntegral msgLen)
                                       pkp
         pure $ if res == 0
-          then Left "Schnorr signature failed to verify."
+          then Left "SigDSIGN SchnorrSecp256k1DSIGN failed to verify."
           else pure ()
   {-# NOINLINE genKeyDSIGN #-}
   genKeyDSIGN seed = SignKeySchnorrSecp256k1 $
@@ -174,7 +175,8 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
     unsafeDupablePerformIO . psbUseAsSizedPtr vkPSB $ \pkbPtr -> do
       res <- psbCreateSized $ \bsPtr -> do
         res' <- secpXOnlyPubkeySerialize secpCtxPtr bsPtr pkbPtr
-        when (res' /= 1) (error "rawSerialiseVerKeyDSIGN: Failed to serialise.")
+        when (res' /= 1) 
+             (error "rawSerialiseVerKeyDSIGN: Failed to serialise VerKeyDSIGN SchnorrSecp256k1DSIGN")
       pure . psbToByteString $ res
   rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
