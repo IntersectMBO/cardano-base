@@ -29,7 +29,6 @@ module Cardano.Crypto.SECP256K1.C (
 import Data.Bits ((.|.))
 import Foreign.Ptr (Ptr)
 import System.IO.Unsafe (unsafePerformIO)
-import Data.Word (Word8)
 import Foreign.C.Types (CUChar, CSize (CSize), CInt (CInt), CUInt (CUInt))
 import Cardano.Foreign (SizedPtr (SizedPtr))
 import Cardano.Crypto.SECP256K1.Constants (
@@ -59,12 +58,12 @@ data SECP256k1SchnorrExtraParams
 secpCtxPtr :: Ptr SECP256k1Context
 secpCtxPtr = unsafePerformIO . secpContextCreate $ secpContextSignVerify
 
-foreign import capi "secp256k1.h secp256k1_context_create"
+foreign import ccall unsafe "secp256k1.h secp256k1_context_create"
   secpContextCreate :: 
      CUInt -- flags
   -> IO (Ptr SECP256k1Context)
 
-foreign import capi "secp256k1.h secp256k1_context_destroy"
+foreign import ccall unsafe "secp256k1.h secp256k1_context_destroy"
   secpContextDestroy :: 
      Ptr SECP256k1Context
   -> IO ()
@@ -81,14 +80,14 @@ secpContextSignVerify = secpContextSign .|. secpContextVerify
 foreign import capi "secp256k1.h value SECP256K1_EC_COMPRESSED"
   secpEcCompressed :: CUInt
 
-foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_create"
+foreign import ccall unsafe "secp256k1_extrakeys.h secp256k1_keypair_create"
   secpKeyPairCreate :: 
      Ptr SECP256k1Context -- context initialized for signing
   -> SizedPtr SECP256K1_SCHNORR_KEYPAIR_BYTES -- out-param for keypair to initialize
   -> SizedPtr SECP256K1_SCHNORR_PRIVKEY_BYTES -- secret key (32 bytes)
   -> IO CInt -- 1 on success, 0 on failure
 
-foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign_custom"
+foreign import ccall unsafe "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign_custom"
   secpSchnorrSigSignCustom :: 
      Ptr SECP256k1Context -- context initialized for signing
   -> SizedPtr SECP256K1_SCHNORR_SIGNATURE_BYTES -- out-param for signature (64 bytes)
@@ -98,7 +97,7 @@ foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_sign_custom"
   -> Ptr SECP256k1SchnorrExtraParams -- not used
   -> IO CInt -- 1 on success, 0 on failure
 
-foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_xonly_pub"
+foreign import ccall unsafe "secp256k1_extrakeys.h secp256k1_keypair_xonly_pub"
   secpKeyPairXOnlyPub :: 
      Ptr SECP256k1Context -- an initialized context
   -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- out-param for xonly pubkey
@@ -106,7 +105,7 @@ foreign import capi "secp256k1_extrakeys.h secp256k1_keypair_xonly_pub"
   -> SizedPtr SECP256K1_SCHNORR_KEYPAIR_BYTES -- keypair
   -> IO CInt -- 1 on success, 0 on error
 
-foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
+foreign import ccall unsafe "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
   secpSchnorrSigVerify :: 
      Ptr SECP256k1Context -- context initialized for verifying
   -> SizedPtr SECP256K1_SCHNORR_SIGNATURE_BYTES -- signature to verify (64 bytes)
@@ -115,28 +114,28 @@ foreign import capi "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
   -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- pubkey to verify with
   -> CInt -- 1 on success, 0 on failure
 
-foreign import capi "secp256k1_extrakeys.h secp256k1_xonly_pubkey_serialize"
+foreign import ccall unsafe "secp256k1_extrakeys.h secp256k1_xonly_pubkey_serialize"
   secpXOnlyPubkeySerialize :: 
      Ptr SECP256k1Context -- an initialized context
   -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES -- out-param for serialized representation
   -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- the xonly pubkey to serialize
   -> IO CInt -- 1 on success, 0 on error
 
-foreign import capi "secp256k1_extrakeys.h secp256k1_xonly_pubkey_parse"
+foreign import ccall unsafe "secp256k1_extrakeys.h secp256k1_xonly_pubkey_parse"
   secpXOnlyPubkeyParse ::
      Ptr SECP256k1Context -- an initialized context
   -> SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -- out-param for deserialized representation
-  -> Ptr Word8 -- bytes to deserialize
+  -> Ptr CUChar -- bytes to deserialize
   -> IO CInt -- 1 if the parse succeeded, 0 if the parse failed (due to invalid representation)
 
-foreign import capi "secp256k1.h secp256k1_ec_pubkey_create" 
+foreign import ccall unsafe "secp256k1.h secp256k1_ec_pubkey_create" 
   secpEcPubkeyCreate :: 
      Ptr SECP256k1Context -- an initialized context
   -> SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL -- out-param for generated key
   -> SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES -- seed private key
   -> IO CInt -- 1 on success, 0 on error
 
-foreign import capi "secp256k1.h secp256k1_ecdsa_sign"
+foreign import ccall unsafe "secp256k1.h secp256k1_ecdsa_sign"
   secpEcdsaSign :: 
      Ptr SECP256k1Context -- context initialized for signing
   -> SizedPtr SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL -- out-param for signature
@@ -146,7 +145,7 @@ foreign import capi "secp256k1.h secp256k1_ecdsa_sign"
   -> Ptr CUChar -- pointer to arbitrary data for nonce generation (not used)
   -> IO CInt -- 1 on success, 0 on error
 
-foreign import capi "secp256k1.h secp256k1_ecdsa_verify"
+foreign import ccall unsafe "secp256k1.h secp256k1_ecdsa_verify"
   secpEcdsaVerify :: 
      Ptr SECP256k1Context -- context initialized for verification
   -> SizedPtr SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL -- signature to verify
@@ -154,7 +153,7 @@ foreign import capi "secp256k1.h secp256k1_ecdsa_verify"
   -> SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL -- public key to verify with
   -> CInt -- 1 if valid, 0 if invalid or malformed signature
 
-foreign import capi "secp256k1.h secp256k1_ec_pubkey_serialize"
+foreign import ccall unsafe "secp256k1.h secp256k1_ec_pubkey_serialize"
   secpEcPubkeySerialize :: 
      Ptr SECP256k1Context -- an initialized context
   -> Ptr CUChar -- allocated buffer to write to
@@ -163,21 +162,21 @@ foreign import capi "secp256k1.h secp256k1_ec_pubkey_serialize"
   -> CUInt -- flags (only secpEcCompressed available)
   -> IO CInt -- always 1
 
-foreign import capi "secp256k1.h secp256k1_ecdsa_signature_serialize_compact"
+foreign import ccall unsafe "secp256k1.h secp256k1_ecdsa_signature_serialize_compact"
   secpEcdsaSignatureSerializeCompact :: 
      Ptr SECP256k1Context -- an initialized context
   -> SizedPtr SECP256K1_ECDSA_SIGNATURE_BYTES -- allocated buffer to write to
   -> SizedPtr SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL -- signature to serialize
   -> IO CInt -- always 1
 
-foreign import capi "secp256k1.h secp256k1_ecdsa_signature_parse_compact"
+foreign import ccall unsafe "secp256k1.h secp256k1_ecdsa_signature_parse_compact"
   secpEcdsaSignatureParseCompact :: 
      Ptr SECP256k1Context -- an initialized context
   -> SizedPtr SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL -- allocated buffer to write to
   -> SizedPtr SECP256K1_ECDSA_SIGNATURE_BYTES -- signature to deserialize
   -> IO CInt -- 1 if parsed successfully, 0 if parse failed
 
-foreign import capi "secp256k1.h secp256k1_ec_pubkey_parse"
+foreign import ccall unsafe "secp256k1.h secp256k1_ec_pubkey_parse"
   secpEcPubkeyParse :: 
      Ptr SECP256k1Context -- an initialized context
   -> SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL -- allocated buffer to write to
