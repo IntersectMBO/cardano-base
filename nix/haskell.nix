@@ -54,11 +54,11 @@ let
         packages.binary.configureFlags = [ "--ghc-option=-Werror" ];
         #packages.binary/test.configureFlags = [ "--ghc-option=-Werror" ];
         packages.cardano-crypto-class.configureFlags = [ "--ghc-option=-Werror" ];
-        -- We need to override the pkgconfig libraries so that we can provide our fork of
-        -- libsodium instead of the one from nixpkgs, which is what haskell.nix would
-        -- otherwise choose. Unfortunately, this means that we also override any other 
-        -- pkgconfig libraries that haskell.nix would pick for us. So we also need to 
-        -- manually include those here.
+        # We need to override the pkgconfig libraries so that we can provide our fork of
+        # libsodium instead of the one from nixpkgs, which is what haskell.nix would
+        # otherwise choose. Unfortunately, this means that we also override any other 
+        # pkgconfig libraries that haskell.nix would pick for us. So we also need to 
+        # manually include those here.
         packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ buildPackages.libsodium-vrf buildPackages.secp256k1 ]];
         packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
