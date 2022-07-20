@@ -160,6 +160,7 @@ psbToByteString = BS.pack . psbToBytes
 -- >>> psbToBytes . (id @(PinnedSizedBytes 4)) . psbFromBytes $ [1,2,3,4,5,6]
 -- [3,4,5,6]
 -- 
+{-# DEPRECATED psbFromBytes "This is not referentially transparent" #-}
 psbFromBytes :: forall n. KnownNat n => [Word8] -> PinnedSizedBytes n
 psbFromBytes ws0 = PSB (pinnedByteArrayFromListN size ws)
   where
