@@ -8,7 +8,7 @@ module Cardano.Crypto.SECP256K1.C (
   secpContextSignVerify,
   SECP256k1SchnorrExtraParams,
   secpContextCreate,
-  secpContextDestroy,
+--  secpContextDestroy,
   secpKeyPairCreate,
   secpSchnorrSigSignCustom,
   secpKeyPairXOnlyPub,
@@ -26,7 +26,9 @@ module Cardano.Crypto.SECP256K1.C (
   secpEcPubkeyParse,
   ) where
 
+import Control.Exception (mask_)
 import Data.Bits ((.|.))
+import Foreign.ForeignPtr (ForeignPtr, FinalizerPtr, newForeignPtr)
 import Foreign.Ptr (Ptr)
 import System.IO.Unsafe (unsafePerformIO)
 import Foreign.C.Types (CUChar, CSize (CSize), CInt (CInt), CUInt (CUInt))
@@ -55,18 +57,18 @@ data SECP256k1SchnorrExtraParams
 -- We do _not_ make this dupable, as the whole point is _not_ to compute it more
 -- than once!
 {-# NOINLINE secpCtxPtr #-}
-secpCtxPtr :: Ptr SECP256k1Context
-secpCtxPtr = unsafePerformIO . secpContextCreate $ secpContextSignVerify
+secpCtxPtr :: ForeignPtr SECP256k1Context
+secpCtxPtr = unsafePerformIO . mask_ $ do
+  ctx <- secpContextCreate secpContextSignVerify
+  newForeignPtr secpContextDestroy ctx
+
+foreign import ccall unsafe "secp256k1.h &secp256k1_context_destroy"
+  secpContextDestroy :: FinalizerPtr SECP256k1Context
 
 foreign import ccall unsafe "secp256k1.h secp256k1_context_create"
   secpContextCreate :: 
      CUInt -- flags
   -> IO (Ptr SECP256k1Context)
-
-foreign import ccall unsafe "secp256k1.h secp256k1_context_destroy"
-  secpContextDestroy :: 
-     Ptr SECP256k1Context
-  -> IO ()
 
 foreign import capi "secp256k1.h value SECP256K1_CONTEXT_SIGN"
   secpContextSign :: CUInt
