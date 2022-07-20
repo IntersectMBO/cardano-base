@@ -96,6 +96,7 @@ instance (Eq a, Ord b) => Ord (Annotated b a) where
 
 instance ToJSON b => ToJSON (Annotated b a) where
   toJSON = toJSON . unAnnotated
+  toEncoding = toEncoding . unAnnotated
 
 instance FromJSON b => FromJSON (Annotated b ()) where
   parseJSON j = flip Annotated () <$> parseJSON j

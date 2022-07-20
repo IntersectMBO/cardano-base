@@ -269,6 +269,7 @@ instance HashAlgorithm h => FromJSONKey (Hash h a) where
 
 instance HashAlgorithm h => ToJSON (Hash h a) where
   toJSON = toJSON . hashToTextAsHex
+  toEncoding = toEncoding . hashToTextAsHex
 
 instance HashAlgorithm h => FromJSON (Hash h a) where
   parseJSON = Aeson.withText "hash" parseHash

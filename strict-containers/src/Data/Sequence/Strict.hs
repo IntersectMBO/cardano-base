@@ -128,6 +128,7 @@ instance FromJSON a => FromJSON (StrictSeq a) where
 
 instance ToJSON a => ToJSON (StrictSeq a) where
   toJSON = toJSON . toList
+  toEncoding = toEncoding . toList
 
 -- | A helper function for the ':<|' pattern.
 viewFront :: StrictSeq a -> Maybe (a, StrictSeq a)
