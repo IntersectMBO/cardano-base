@@ -170,6 +170,9 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
       SigEcdsaSecp256k1 <$> unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp -> do
         psbUseAsSizedPtr skBytes $ \skp ->
           psbCreateSized $ \sigp -> do
+            -- The two nullPtr arguments correspond to nonces and extra nonce
+            -- data. We use neither, so we pass nullPtrs to indicate this to the
+            -- C API.
             res <- secpEcdsaSign secpCtxPtr sigp psp skp nullPtr nullPtr
             when (res /= 1) 
                  (error "signDSIGN: Failed to sign EcdsaSecp256k1DSIGN message")
