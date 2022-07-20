@@ -90,6 +90,7 @@ instance FromCBOR a => FromCBOR (StrictMaybe a) where
 
 instance ToJSON a => ToJSON (StrictMaybe a) where
   toJSON = toJSON . strictMaybeToMaybe
+  toEncoding = toEncoding . strictMaybeToMaybe
 
 instance FromJSON a => FromJSON (StrictMaybe a) where
   parseJSON v = maybeToStrictMaybe <$> parseJSON v
