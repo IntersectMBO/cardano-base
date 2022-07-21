@@ -1,12 +1,16 @@
+{-# LANGUAGE CPP #-}
+
 -- | Initialization for the library's functionality
 module Cardano.Crypto.Init (
   cryptoInit
   ) where
 
-import Control.Monad (void)
-import Control.Exception (evaluate)
 import Cardano.Crypto.Libsodium.Init (sodiumInit)
+#if defined(SECP256K1_ENABLED)
+import Control.Monad (void)
 import Cardano.Crypto.SECP256K1.C (secpCtxPtr)
+import Control.Exception (evaluate)
+#endif
 
 -- | Initialize all the functionality provided by this library. This should be
 -- called at least once /before/ you use anything this library provides, in
@@ -18,4 +22,8 @@ import Cardano.Crypto.SECP256K1.C (secpCtxPtr)
 --
 -- This includes a call to 'sodiumInit'. 
 cryptoInit :: IO ()
-cryptoInit = void (sodiumInit >> evaluate secpCtxPtr)
+cryptoInit = do
+  sodiumInit
+#if defined(SECP256K1_ENABLED)
+  void . evaluate $ secpCtxPtr
+#endif

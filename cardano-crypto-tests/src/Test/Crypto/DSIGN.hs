@@ -12,7 +12,7 @@ module Test.Crypto.DSIGN
   )
 where
 
-#ifdef SECP256K1
+#ifdef SECP256K1_ENABLED
 import Control.Monad (replicateM)
 import qualified GHC.Exts as GHC
 #endif
@@ -25,7 +25,7 @@ import Cardano.Crypto.DSIGN (
   MockDSIGN, 
   Ed25519DSIGN, 
   Ed448DSIGN,
-#ifdef SECP256K1
+#ifdef SECP256K1_ENABLED
   EcdsaSecp256k1DSIGN,
   SchnorrSecp256k1DSIGN,
   MessageHash,
@@ -90,7 +90,7 @@ ed25519SigGen = defaultSigGen
 ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
 
-#ifdef SECP256K1
+#ifdef SECP256K1_ENABLED
 secp256k1SigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
 secp256k1SigGen = do 
   msg <- genSECPMsg
@@ -139,7 +139,7 @@ tests =
     [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
     , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
     , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
-#ifdef SECP256K1
+#ifdef SECP256K1_ENABLED
     , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "EcdsaSecp256k1DSIGN"
     , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
 #endif
