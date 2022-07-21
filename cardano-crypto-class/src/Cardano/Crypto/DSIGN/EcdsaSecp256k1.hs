@@ -86,6 +86,7 @@ import Cardano.Crypto.SECP256K1.Constants (
   SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL,
   SECP256K1_ECDSA_PUBKEY_BYTES,
   SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL,
+  SECP256K1_ECDSA_MESSAGE_BYTES,
   )
 import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
@@ -113,8 +114,8 @@ import Cardano.Crypto.SECP256K1.C (
 -- | As ECDSA signatures on the SECP256k1 curve sign 32-byte hashes, rather than
 -- whole messages, we provide a helper (opaque) newtype to ensure that the size
 -- of the input for signing and verification is strictly bounded.
-newtype MessageHash = MH (PinnedSizedBytes 32)
-  deriving Eq via (PinnedSizedBytes 32)
+newtype MessageHash = MH (PinnedSizedBytes SECP256K1_ECDSA_MESSAGE_BYTES)
+  deriving Eq via (PinnedSizedBytes SECP256K1_ECDSA_MESSAGE_BYTES)
   deriving stock Show
 
 -- | Take a blob of bytes (which is presumed to be a 32-byte hash), verify its
@@ -128,7 +129,7 @@ fromMessageHash (MH psb) = psbToByteString psb
 
 -- | A helper to use with the 'HashAlgorithm' API, as this can ensure sizing.
 hashAndPack :: forall (h :: Type) . 
-  (HashAlgorithm h, SizeHash h ~ 32) => 
+  (HashAlgorithm h, SizeHash h ~ SECP256K1_ECDSA_MESSAGE_BYTES) => 
   Proxy h -> ByteString -> MessageHash
 hashAndPack p bs = case psbFromByteStringCheck . digest p $ bs of 
   Nothing -> error $ "hashAndPack: unexpected mismatch of guaranteed hash length\n" <>
@@ -252,22 +253,22 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
       SignKeyEcdsaSecp256k1 <$> psbFromByteStringCheck bs
 
 instance ToCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
-    toCBOR = encodeVerKeyDSIGN
-    encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
+  toCBOR = encodeVerKeyDSIGN
+  encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
-    fromCBOR = decodeVerKeyDSIGN
+  fromCBOR = decodeVerKeyDSIGN
 
 instance ToCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
-    toCBOR = encodeSignKeyDSIGN
-    encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
+  toCBOR = encodeSignKeyDSIGN
+  encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
-    fromCBOR = decodeSignKeyDSIGN
+  fromCBOR = decodeSignKeyDSIGN
 
 instance ToCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
-    toCBOR = encodeSigDSIGN
-    encodedSizeExpr _ = encodedSigDSIGNSizeExpr
+  toCBOR = encodeSigDSIGN
+  encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
-    fromCBOR = decodeSigDSIGN
+  fromCBOR = decodeSigDSIGN

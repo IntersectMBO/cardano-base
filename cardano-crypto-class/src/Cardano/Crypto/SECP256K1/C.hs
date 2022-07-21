@@ -8,7 +8,6 @@ module Cardano.Crypto.SECP256K1.C (
   secpContextSignVerify,
   SECP256k1SchnorrExtraParams,
   secpContextCreate,
---  secpContextDestroy,
   secpKeyPairCreate,
   secpSchnorrSigSignCustom,
   secpKeyPairXOnlyPub,

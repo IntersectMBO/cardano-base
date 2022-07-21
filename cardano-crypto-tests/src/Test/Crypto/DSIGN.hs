@@ -103,12 +103,6 @@ genSECPMsg :: Gen MessageHash
 genSECPMsg = 
   Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary) 
                   toMessageHash
-{-
-genSECPMsg = Gen.suchThatMap go SECP.msg
-  where
-    go :: Gen ByteString
-    go = GHC.fromListN 32 <$> replicateM 32 arbitrary
--}
 #endif
 
 defaultVerKeyGen :: forall (a :: Type) . 
