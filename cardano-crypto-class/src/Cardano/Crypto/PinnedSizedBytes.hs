@@ -286,9 +286,15 @@ psbCreateLen f = fst <$> psbCreateResultLen f
 --
 -- = Note
 --
--- It is essential that @r@ is not the 'Ptr' given to the function argument:
--- returning this would be extremely unsafe, as it would break referential
--- transparency guarantees by allowing us to alias supposedly immutable memory.
+-- It is essential that @r@ is not the 'Ptr' given to the function argument.
+-- Returning this 'Ptr' is /extremely/ unsafe:
+--
+-- * It breaks referential transparency guarantees by aliasing supposedly
+-- immutable memory; and
+-- * This 'Ptr' could refer to memory which has already been garbage collected,
+-- which can lead to segfaults or out-of-bounds reads.
+--
+-- This poses both correctness /and/ security risks, so please don't do it.
 psbCreateResult :: 
   forall (n :: Nat) (r :: Type) . 
   (KnownNat n) => 
