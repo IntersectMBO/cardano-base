@@ -114,6 +114,13 @@ import Cardano.Crypto.SECP256K1.C (
 -- | As ECDSA signatures on the SECP256k1 curve sign 32-byte hashes, rather than
 -- whole messages, we provide a helper (opaque) newtype to ensure that the size
 -- of the input for signing and verification is strictly bounded.
+--
+-- = Important note
+--
+-- If you are verifying a message using the algorithm provided here, you should
+-- hash the message yourself before verifying. Specifically, the sender should
+-- give you the message itself to verify, rather than the hash of the message 
+-- used to compute the signature.
 newtype MessageHash = MH (PinnedSizedBytes SECP256K1_ECDSA_MESSAGE_BYTES)
   deriving Eq via (PinnedSizedBytes SECP256K1_ECDSA_MESSAGE_BYTES)
   deriving stock Show
