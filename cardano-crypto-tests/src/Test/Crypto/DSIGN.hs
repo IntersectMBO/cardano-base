@@ -12,10 +12,8 @@ module Test.Crypto.DSIGN
   )
 where
 
-#ifdef SECP256K1
-import Data.ByteString (ByteString)
+#ifdef SECP256K1_ENABLED
 import Control.Monad (replicateM)
-import qualified Crypto.Secp256k1 as SECP
 import qualified GHC.Exts as GHC
 #endif
 
@@ -27,9 +25,11 @@ import Cardano.Crypto.DSIGN (
   MockDSIGN, 
   Ed25519DSIGN, 
   Ed448DSIGN,
-#ifdef SECP256K1
+#ifdef SECP256K1_ENABLED
   EcdsaSecp256k1DSIGN,
   SchnorrSecp256k1DSIGN,
+  MessageHash,
+  toMessageHash,
 #endif
   DSIGNAlgorithm (VerKeyDSIGN,
                   SignKeyDSIGN,
@@ -90,7 +90,7 @@ ed25519SigGen = defaultSigGen
 ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
 
-#ifdef SECP256K1
+#ifdef SECP256K1_ENABLED
 secp256k1SigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
 secp256k1SigGen = do 
   msg <- genSECPMsg
@@ -99,11 +99,10 @@ secp256k1SigGen = do
 schnorrSigGen :: Gen (SigDSIGN SchnorrSecp256k1DSIGN)
 schnorrSigGen = defaultSigGen
 
-genSECPMsg :: Gen SECP.Msg
-genSECPMsg = Gen.suchThatMap go SECP.msg
-  where
-    go :: Gen ByteString
-    go = GHC.fromListN 32 <$> replicateM 32 arbitrary
+genSECPMsg :: Gen MessageHash
+genSECPMsg = 
+  Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary) 
+                  toMessageHash
 #endif
 
 defaultVerKeyGen :: forall (a :: Type) . 
@@ -134,7 +133,7 @@ tests =
     [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
     , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
     , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
-#ifdef SECP256K1
+#ifdef SECP256K1_ENABLED
     , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "EcdsaSecp256k1DSIGN"
     , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
 #endif
