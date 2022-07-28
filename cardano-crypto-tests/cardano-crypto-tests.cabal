@@ -51,6 +51,7 @@ library
                         Test.Crypto.KES
                         Test.Crypto.Util
                         Test.Crypto.VRF
+                        Test.Crypto.Regressions
                         Test.Crypto.Instances
                         Bench.Crypto.VRF
                         Bench.Crypto.KES
@@ -69,11 +70,12 @@ library
                       , QuickCheck
                       , quickcheck-instances
                       , tasty
+                      , tasty-hunit
                       , tasty-quickcheck
                       , criterion
 
   if flag(secp256k1-support)
-    cpp-options: -DSECP256K1
+    cpp-options: -DSECP256K1_ENABLED
 
 test-suite test-crypto
   import:               base, project-config
