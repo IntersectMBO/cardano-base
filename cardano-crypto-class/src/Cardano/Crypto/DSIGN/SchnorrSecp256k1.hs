@@ -26,6 +26,7 @@ module Cardano.Crypto.DSIGN.SchnorrSecp256k1 (
   SigDSIGN
   ) where
 
+import GHC.TypeNats (natVal)
 import Foreign.ForeignPtr (withForeignPtr)
 import Data.Proxy (Proxy (Proxy))
 import Data.ByteString (useAsCStringLen)
@@ -186,14 +187,17 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs = 
-    unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, _) -> do
-      let dataPtr = castPtr ptr
-      (vkPsb, res) <- psbCreateSizedResult $ \outPtr ->
-        withForeignPtr secpCtxPtr $ \ctx -> 
-          secpXOnlyPubkeyParse ctx outPtr dataPtr
-      pure $ case res of 
-        1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
-        _ -> Nothing
+    unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, len) ->
+      if len /= (fromIntegral . natVal $ Proxy @(SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
+      then pure Nothing
+      else do
+        let dataPtr = castPtr ptr
+        (vkPsb, res) <- psbCreateSizedResult $ \outPtr ->
+          withForeignPtr secpCtxPtr $ \ctx -> 
+            secpXOnlyPubkeyParse ctx outPtr dataPtr
+        pure $ case res of 
+          1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
+          _ -> Nothing
   rawDeserialiseSignKeyDSIGN bs = 
     SignKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
   rawDeserialiseSigDSIGN bs = 

@@ -1,9 +1,10 @@
 module Main (main) where
 
-import qualified Test.Crypto.DSIGN (tests)
-import qualified Test.Crypto.Hash (tests)
-import qualified Test.Crypto.KES (tests)
-import qualified Test.Crypto.VRF (tests)
+import qualified Test.Crypto.DSIGN
+import qualified Test.Crypto.Hash
+import qualified Test.Crypto.KES
+import qualified Test.Crypto.VRF 
+import qualified Test.Crypto.Regressions
 import Test.Tasty (TestTree, adjustOption, testGroup, defaultMain)
 import Test.Tasty.QuickCheck (QuickCheckTests (QuickCheckTests))
 import Cardano.Crypto.Libsodium (sodiumInit)
@@ -23,4 +24,5 @@ tests =
       , Test.Crypto.Hash.tests
       , Test.Crypto.KES.tests
       , Test.Crypto.VRF.tests
+      , Test.Crypto.Regressions.tests
       ]
