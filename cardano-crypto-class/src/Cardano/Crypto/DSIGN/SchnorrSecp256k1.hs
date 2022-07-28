@@ -26,6 +26,7 @@ module Cardano.Crypto.DSIGN.SchnorrSecp256k1 (
   SigDSIGN
   ) where
 
+import GHC.TypeNats (natVal)
 import Foreign.ForeignPtr (withForeignPtr)
 import Data.Proxy (Proxy (Proxy))
 import Data.ByteString (useAsCStringLen)
@@ -187,7 +188,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs = 
     unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, len) ->
-      if len /= 32
+      if len /= (fromIntegral . natVal $ Proxy @(SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
       then pure Nothing
       else do
         let dataPtr = castPtr ptr
