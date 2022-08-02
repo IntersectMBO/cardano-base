@@ -1,17 +1,15 @@
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE UnboxedTuples              #-}
 {-# LANGUAGE TypeApplications           #-}
 
--- for pinnedByteArrayFromListN
-{-# OPTIONS_GHC -Wno-missing-local-signatures #-}
 module Cardano.Crypto.PinnedSizedBytes
   (
     PinnedSizedBytes,
+    -- * Quasiquoter
+    psbHex,
     -- * Conversions
     psbToBytes,
     psbFromByteStringCheck,
@@ -29,13 +27,16 @@ module Cardano.Crypto.PinnedSizedBytes
     ptrPsbToSizedPtr,
   ) where
 
+import Cardano.Crypto.PinnedSizedBytes.Internal (
+  PinnedSizedBytes (PSB),
+  runAndTouch,
+  psbUseAsCPtr,
+  )
+import Cardano.Crypto.PinnedSizedBytes.TH (psbHex)
 import Data.Kind (Type)
-import Control.DeepSeq (NFData)
 import Control.Monad.Primitive  (primitive_, touch)
 import Data.Primitive.ByteArray
-          ( ByteArray
-          , MutableByteArray (MutableByteArray)
-          , copyByteArrayToAddr
+          ( MutableByteArray (MutableByteArray)
           , newPinnedByteArray
           , unsafeFreezeByteArray
           , foldrByteArray
@@ -45,11 +46,8 @@ import Data.Primitive.ByteArray
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
 import Foreign.C.Types (CSize)
-import Foreign.Ptr (FunPtr, castPtr)
-import Foreign.Storable (Storable (sizeOf, alignment, peek, poke))
+import Foreign.Ptr (castPtr)
 import GHC.TypeLits (KnownNat, Nat, natVal)
-import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (OnlyCheckWhnfNamed))
-import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import GHC.Exts (Int (I#))
 import GHC.Prim (copyAddrToByteArray#)
@@ -57,7 +55,6 @@ import GHC.Ptr (Ptr (Ptr))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Cardano.Foreign (SizedPtr (SizedPtr))
-import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 
 {- HLINT ignore "Reduce duplication" -}
 
@@ -65,48 +62,6 @@ import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 -- >>> :set -XDataKinds -XTypeApplications -XOverloadedStrings
 -- >>> import Cardano.Crypto.PinnedSizedBytes
 
--- | @n@ bytes. 'Storable'.
---
--- We have two @*Bytes@ types:
---
--- * @PinnedSizedBytes@ is backed by pinned ByteArray.
--- * @MLockedSizedBytes@ is backed by ForeignPtr to @mlock@-ed memory region.
---
--- The 'ByteString' is pinned datatype, but it's represented by
--- 'ForeignPtr' + offset (and size).
---
--- I'm sorry for adding more types for bytes. :(
---
-newtype PinnedSizedBytes (n :: Nat) = PSB ByteArray
-  deriving NoThunks via OnlyCheckWhnfNamed "PinnedSizedBytes" (PinnedSizedBytes n)
-  deriving NFData
-
-instance Show (PinnedSizedBytes n) where
-    showsPrec _ (PSB ba)
-        = showChar '"'
-        . foldrByteArray (\w acc -> show8 w . acc) id ba
-        . showChar '"'
-      where
-        show8 :: Word8 -> ShowS
-        show8 w | w < 16    = showChar '0' . showHex w
-                | otherwise = showHex w
-
--- | The comparison is done in constant time for a given size @n@.
-instance KnownNat n => Eq (PinnedSizedBytes n) where
-    x == y = compare x y == EQ
-
-instance KnownNat n => Ord (PinnedSizedBytes n) where
-    compare x y =
-        unsafeDupablePerformIO $
-            psbUseAsCPtr x $ \xPtr ->
-                psbUseAsCPtr y $ \yPtr -> do
-                    res <- c_sodium_compare xPtr yPtr size
-                    return (compare res 0)
-      where
-        size :: CSize
-        size = fromInteger (natVal (Proxy :: Proxy n))
-
--- | See 'psbFromBytes'.
 psbToBytes :: PinnedSizedBytes n -> [Word8]
 psbToBytes (PSB ba) = foldrByteArray (:) [] ba
 
@@ -126,37 +81,6 @@ psbFromByteStringCheck bs
   where
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
-
-instance KnownNat n => Storable (PinnedSizedBytes n) where
-    sizeOf _          = fromInteger (natVal (Proxy :: Proxy n))
-    alignment _       = alignment (undefined :: FunPtr (Int -> Int))
-
-    peek (Ptr addr#) = do
-        let size :: Int
-            size = fromInteger (natVal (Proxy :: Proxy n))
-        marr@(MutableByteArray marr#) <- newPinnedByteArray size
-        primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
-        arr <- unsafeFreezeByteArray marr
-        return (PSB arr)
-
-    poke p (PSB arr) = do
-        let size :: Int
-            size = fromInteger (natVal (Proxy :: Proxy n))
-        copyByteArrayToAddr (castPtr p) arr 0 size
-
--- | Use a 'PinnedSizedBytes' in a setting where its size is \'forgotten\'
--- temporarily.
---
--- = Note
---
--- The 'Ptr' given to the function argument /must not/ be used as the result of
--- type @r@.
-psbUseAsCPtr :: 
-  forall (n :: Nat) (r :: Type) .
-  PinnedSizedBytes n -> 
-  (Ptr Word8 -> IO r) -> 
-  IO r
-psbUseAsCPtr (PSB ba) = runAndTouch ba
 
 -- | As 'psbUseAsCPtr', but also gives the function argument the size we are
 -- allowed to use as a 'CSize'.
@@ -280,17 +204,3 @@ psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)
 
 ptrPsbToSizedPtr :: Ptr (PinnedSizedBytes n) -> SizedPtr n
 ptrPsbToSizedPtr = SizedPtr . castPtr
-
--------------------------------------------------------------------------------
--- derivative from primitive
--------------------------------------------------------------------------------
-
--- Wrapper that combines applying a function, then touching
-runAndTouch :: 
-  forall (a :: Type) . 
-  ByteArray -> 
-  (Ptr Word8 -> IO a) ->
-  IO a
-runAndTouch ba f = do
-  r <- f (byteArrayContents ba)
-  r <$ touch ba

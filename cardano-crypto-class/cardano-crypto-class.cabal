@@ -93,6 +93,8 @@ library
 
   other-modules:
     Cardano.Crypto.PackedBytes
+    Cardano.Crypto.PinnedSizedBytes.TH
+    Cardano.Crypto.PinnedSizedBytes.Internal
 
   build-depends:
     , aeson
@@ -100,6 +102,7 @@ library
     , base16-bytestring  >=1
     , bytestring
     , cardano-binary
+    , template-haskell
     , cardano-prelude
     , cryptonite
     , deepseq
