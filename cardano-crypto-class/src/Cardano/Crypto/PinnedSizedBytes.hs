@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -13,12 +12,8 @@
 module Cardano.Crypto.PinnedSizedBytes
   (
     PinnedSizedBytes,
-    -- * Initialization
-    psbZero,
     -- * Conversions
-    psbFromBytes,
     psbToBytes,
-    psbFromByteString,
     psbFromByteStringCheck,
     psbToByteString,
     -- * C usage
@@ -36,39 +31,32 @@ module Cardano.Crypto.PinnedSizedBytes
 
 import Data.Kind (Type)
 import Control.DeepSeq (NFData)
-import Control.Monad.ST (runST)
 import Control.Monad.Primitive  (primitive_, touch)
-import Data.Char (ord)
 import Data.Primitive.ByteArray
-          ( ByteArray (..)
-          , MutableByteArray (..)
+          ( ByteArray
+          , MutableByteArray (MutableByteArray)
           , copyByteArrayToAddr
           , newPinnedByteArray
           , unsafeFreezeByteArray
           , foldrByteArray
           , byteArrayContents
-          , writeByteArray
           , mutableByteArrayContents
           )
 import Data.Proxy (Proxy (..))
-import Data.String (IsString (..))
 import Data.Word (Word8)
 import Foreign.C.Types (CSize)
 import Foreign.Ptr (FunPtr, castPtr)
-import Foreign.Storable (Storable (..))
+import Foreign.Storable (Storable (sizeOf, alignment, peek, poke))
 import GHC.TypeLits (KnownNat, Nat, natVal)
-import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (OnlyCheckWhnfNamed))
 import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
-
-import GHC.Exts (Int (..))
+import GHC.Exts (Int (I#))
 import GHC.Prim (copyAddrToByteArray#)
-import GHC.Ptr (Ptr (..))
-
-import qualified Data.Primitive as Prim
+import GHC.Ptr (Ptr (Ptr))
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-
-import Cardano.Foreign
+import Cardano.Foreign (SizedPtr (SizedPtr))
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 
 {- HLINT ignore "Reduce duplication" -}
@@ -118,66 +106,15 @@ instance KnownNat n => Ord (PinnedSizedBytes n) where
         size :: CSize
         size = fromInteger (natVal (Proxy :: Proxy n))
 
--- |
---
--- If given 'String' is too long, it is truncated,
--- If it is too short, it is padded with zeros.
---
--- Padding and truncation make it behave like an integer mod @n*8@.
---
--- >>> "abcdef" :: PinnedSizedBytes 4
--- "63646566"
---
--- >>> "foo" :: PinnedSizedBytes 8
--- "0000000000666f6f"
---
--- Non-ASCII codepoints are silently truncated to 0..255 range.
---
--- >>> "\x1234\x5678" :: PinnedSizedBytes 2
--- "3478"
---
--- 'PinnedSizedBytes' created with 'fromString' contains /unpinned/
--- 'ByteArray'.
---
-instance KnownNat n => IsString (PinnedSizedBytes n) where
-    fromString s = psbFromBytes (map (fromIntegral . ord) s)
-
 -- | See 'psbFromBytes'.
 psbToBytes :: PinnedSizedBytes n -> [Word8]
 psbToBytes (PSB ba) = foldrByteArray (:) [] ba
 
-psbToByteString :: PinnedSizedBytes n -> BS.ByteString
+psbToByteString :: PinnedSizedBytes n -> ByteString
 psbToByteString = BS.pack . psbToBytes
 
--- | See @'IsString' ('PinnedSizedBytes' n)@ instance.
---
--- >>> psbToBytes . (id @(PinnedSizedBytes 4)) . psbFromBytes $ [1,2,3,4]
--- [1,2,3,4]
---
--- >>> psbToBytes . (id @(PinnedSizedBytes 4)) . psbFromBytes $ [1,2]
--- [0,0,1,2]
---
--- >>> psbToBytes . (id @(PinnedSizedBytes 4)) . psbFromBytes $ [1,2,3,4,5,6]
--- [3,4,5,6]
--- 
-{-# DEPRECATED psbFromBytes "This is not referentially transparent" #-}
-psbFromBytes :: forall n. KnownNat n => [Word8] -> PinnedSizedBytes n
-psbFromBytes ws0 = PSB (pinnedByteArrayFromListN size ws)
-  where
-    size :: Int
-    size = fromInteger (natVal (Proxy :: Proxy n))
-
-    ws :: [Word8]
-    ws = reverse
-        $ take size
-        $ (++ repeat 0)
-        $ reverse ws0
-
--- This is not efficient, but we don't use this in non-tests
-psbFromByteString :: KnownNat n => BS.ByteString -> PinnedSizedBytes n
-psbFromByteString = psbFromBytes . BS.unpack
-
-psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
+psbFromByteStringCheck :: forall (n :: Nat) . 
+  (KnownNat n) => ByteString -> Maybe (PinnedSizedBytes n)
 psbFromByteStringCheck bs 
     | BS.length bs == size = Just $ unsafeDupablePerformIO $
         BS.useAsCStringLen bs $ \(Ptr addr#, _) -> do
@@ -189,10 +126,6 @@ psbFromByteStringCheck bs
   where
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
-
-{-# DEPRECATED psbZero "This is not referentially transparent" #-}
-psbZero :: KnownNat n =>  PinnedSizedBytes n
-psbZero = psbFromBytes []
 
 instance KnownNat n => Storable (PinnedSizedBytes n) where
     sizeOf _          = fromInteger (natVal (Proxy :: Proxy n))
@@ -351,28 +284,6 @@ ptrPsbToSizedPtr = SizedPtr . castPtr
 -------------------------------------------------------------------------------
 -- derivative from primitive
 -------------------------------------------------------------------------------
-
--- | Create a 'ByteArray' from a list of a known length. If the length
---   of the list does not match the given length, or if the length is zero,
---   then this throws an exception.
-pinnedByteArrayFromListN :: forall a. Prim.Prim a => Int -> [a] -> ByteArray
-pinnedByteArrayFromListN 0 _ =
-    die "pinnedByteArrayFromListN" "list length zero"
-pinnedByteArrayFromListN n ys = runST $ do
-    marr <- newPinnedByteArray (n * Prim.sizeOf (head ys))
-    let go !ix [] = if ix == n
-          then return ()
-          else die "pinnedByteArrayFromListN" "list length less than specified size"
-        go !ix (x : xs) = if ix < n
-          then do
-            writeByteArray marr ix x
-            go (ix + 1) xs
-          else die "pinnedByteArrayFromListN" "list length greater than specified size"
-    go 0 ys
-    unsafeFreezeByteArray marr
-
-die :: String -> String -> a
-die fun problem = error $ "PinnedSizedBytes." ++ fun ++ ": " ++ problem
 
 -- Wrapper that combines applying a function, then touching
 runAndTouch :: 
