@@ -1,13 +1,12 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
-{-# OPTIONS_GHC -ddump-splices #-}
 
 module Main (main) where
 
-import Cardano.Crypto.PinnedSizedBytes (psbHex, psbUseAsCPtr)
+import Cardano.Crypto.PinnedSizedBytes (psbHex)
 import Test.Tasty (defaultMain, testGroup)
-import Test.Tasty.HUnit (testCase, assertEqual, assertBool)
+import Test.Tasty.HUnit (testCase, assertEqual)
 
 main :: IO ()
 main = defaultMain . testGroup "PinnedSizedBytes quasiquoter" $ [
@@ -15,10 +14,7 @@ main = defaultMain . testGroup "PinnedSizedBytes quasiquoter" $ [
     let stringRep = "abcd1234"
     let psb = [psbHex| 0xabcd1234 |]
     assertEqual "" (show stringRep) . show $ psb,
-  testCase "different addresses for same literal" $ do
-    let psb = [psbHex| 0xabcd1234 |]
-    let psb' = [psbHex| 0xabcd1234 |]
-    psbUseAsCPtr psb $ \psp -> 
-      psbUseAsCPtr psb' $ \psp' -> 
-        assertBool "Matching pointers" $ psp /= psp'
+  testCase "empty PSB parse" $ do
+    let emptyPSB = [psbHex| 0x_ |]
+    assertEqual "" "\"\"" . show $ emptyPSB
   ]
