@@ -19,6 +19,8 @@ category:           Currency
 build-type:         Simple
 extra-source-files: README.md
 
+-- Flags
+
 flag development
   description: Disable `-Werror`
   default:     False
@@ -30,10 +32,10 @@ flag secp256k1-support
     default: True
     manual: True
 
-common base
-  build-depends: base ^>=4.14
+-- Common stanzas
 
-common project-config
+common lang
+  build-depends: base ^>=4.14
   default-language: Haskell2010
   ghc-options:
     -Wall -Wcompat -Wincomplete-record-updates
@@ -43,8 +45,15 @@ common project-config
   if !flag(development)
     ghc-options: -Werror
 
+common test-lang
+  import: lang
+  build-depends: cardano-crypto-class
+  ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
+
+-- Library
+
 library
-  import:            base, project-config
+  import:            lang
   hs-source-dirs:    src
   exposed-modules:
     Cardano.Crypto.DSIGN
@@ -98,7 +107,6 @@ library
 
   build-depends:
     , aeson
-    , base
     , base16-bytestring  >=1
     , bytestring
     , cardano-binary
@@ -127,15 +135,23 @@ library
     pkgconfig-depends: libsecp256k1 -any
     cpp-options: -DSECP256K1_ENABLED
 
+-- Tests
+
 test-suite test-memory-example
-  import:         base, project-config
+  import:         test-lang
   type:           exitcode-stdio-1.0
-  hs-source-dirs: memory-example
+  hs-source-dirs: test/memory-example
   main-is:        Main.hs
-  build-depends:
-    , base
-    , bytestring
-    , cardano-crypto-class
+  build-depends:  bytestring
 
   if (os(linux) || os(osx))
     build-depends: unix
+
+test-suite test-psb-qq
+  import:         test-lang
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test/psb-qq
+  main-is:        Main.hs
+  build-depends:
+    , tasty
+    , tasty-hunit

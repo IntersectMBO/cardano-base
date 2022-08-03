@@ -1,5 +1,7 @@
 index-state: 2022-02-18T00:00:00Z
 
+tests: True
+
 -- Ensures colourized output from tasty
 test-show-details: direct
 

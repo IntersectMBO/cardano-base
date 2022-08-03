@@ -2,11 +2,30 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
+-- Until we can upgrade primitive, we need this for an orphan Lift
+-- This is necessary to avoid various awful grime from identical literals ending
+-- up having identical addresses, which breaks referential transparency very
+-- hard.
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Cardano.Crypto.PinnedSizedBytes.TH (
   psbHex
   ) where
 
+import Control.Monad.Primitive (PrimMonad (PrimState), primitive_)
+import Data.Primitive.Types (Prim (sizeOf#))
+import System.IO.Unsafe (unsafePerformIO, unsafeDupablePerformIO)
+import GHC.Exts (
+  toList, 
+  Addr#,
+  inline,
+  Ptr (Ptr), 
+  Int (I#), 
+  copyAddrToByteArray#,
+  (*#),
+  )
 import Text.Read (readMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -14,7 +33,15 @@ import qualified Data.Kind as Haskell
 import Cardano.Crypto.PinnedSizedBytes.Internal (
   PinnedSizedBytes (PSB)
   )
-import Data.Primitive.ByteArray (emptyByteArray, byteArrayFromList)
+import Data.Primitive.ByteArray (
+  emptyByteArray, 
+  byteArrayFromListN, 
+  ByteArray,
+  sizeofByteArray,
+  MutableByteArray (MutableByteArray),
+  newPinnedByteArray,
+  unsafeFreezeByteArray,
+  )
 import Language.Haskell.TH.Quote (
   QuasiQuoter (
     QuasiQuoter, 
@@ -24,12 +51,13 @@ import Language.Haskell.TH.Quote (
     quoteDec
     )
   )
-import Language.Haskell.TH.Syntax (lift)
+import Language.Haskell.TH.Syntax (Lift (lift, liftTyped), unsafeTExpCoerce)
 import Language.Haskell.TH (
   Q, 
   Exp (AppTypeE, AppE, ConE, VarE), 
   Type (LitT),
   TyLit (NumTyLit),
+  appE, litE, stringPrimL,
   )
 import Control.Monad.Trans.State.Strict (runStateT, StateT, get, modify)
 import Data.Word (Word8)
@@ -57,6 +85,10 @@ import Data.Functor (($>))
 -- * @['psbHex'| 0x_ |]@ produces a 'PinnedByteString' of length 0.
 -- * @['psbHex' | 0xafbc |]@ produces a 'PinnedByteString of length 2; the 
 -- first byte is @0xaf@, and the second is @0xbc@.
+--
+-- = Note
+--
+-- To use this quasiquoter, @DataKinds@ and @TypeApplications@ need to be on.
 psbHex :: QuasiQuoter
 psbHex = QuasiQuoter {
   quoteExp = mkHexLiteral,
@@ -76,18 +108,17 @@ mkHexLiteral input = do
       Nothing -> fail "No hexits or underscore after \"0x\"."
       Just ('_', rest') -> 
         if Text.null rest'
-        then pure $ 
-          AppTypeE (AppE (ConE 'PSB) (VarE 'emptyByteArray)) . 
-          LitT . 
-          NumTyLit $ 0
+        -- This is a non-problematic overlap: we can't modify the empty byte
+        -- array anyway.
+        then pure $ AppE (AppTypeE (ConE 'PSB) (natLiteral 0)) . VarE $ 'emptyByteArray
         else fail "Extra data after _."
       _ -> do
         (bytes, len) <- runStateT (traverse decodeAndCount . Text.chunksOf 2 $ rest) 0
-        baExp <- AppE (VarE 'byteArrayFromList) <$> lift bytes
-        pure $ 
-          AppTypeE (AppE (ConE 'PSB) baExp) . 
-          LitT . 
-          NumTyLit $ len
+        let bytes' = byteArrayFromListN (fromIntegral len) bytes
+        AppE (AppTypeE (ConE 'PSB) (natLiteral len)) <$> lift bytes'
+
+natLiteral :: Integer -> Type
+natLiteral = LitT . NumTyLit
 
 decodeAndCount :: Text -> StateT Integer Q Word8
 decodeAndCount chunk
@@ -104,3 +135,54 @@ qqUseError :: forall (a :: Haskell.Type) .
   Q a
 qqUseError context _ = 
   fail $ "Cannot use psbHex in a " <> context <> " context."
+
+-- Borrowed from primitive's latest version temporarily
+--
+-- Unlike that version, we _force_ a pin.
+
+instance Lift ByteArray where
+  lift ba = appE (if small 
+                  then [| fromLitAddrSmall# len |] 
+                  else [| fromLitAddrLarge# len |]) 
+                 (litE . stringPrimL . toList $ ba)
+    where
+      small :: Bool
+      small = len <= 2048
+      len :: Int
+      len = sizeofByteArray ba
+  liftTyped = unsafeTExpCoerce . lift
+
+{-# NOINLINE fromLitAddrSmall# #-}
+fromLitAddrSmall# :: Int -> Addr# -> ByteArray
+fromLitAddrSmall# len ptr = inline (fromLitAddr# True len ptr)
+
+{-# NOINLINE fromLitAddrLarge# #-}
+fromLitAddrLarge# :: Int -> Addr# -> ByteArray
+fromLitAddrLarge# len ptr = inline (fromLitAddr# False len ptr)
+
+fromLitAddr# :: Bool -> Int -> Addr# -> ByteArray
+fromLitAddr# small !len !ptr = upIO $ do
+  mba <- newPinnedByteArray len
+  copyPtrToMutableByteArray mba 0 (Ptr ptr :: Ptr Word8) len
+  unsafeFreezeByteArray mba
+  where
+    -- We don't care too much about duplication if the byte arrays are
+    -- small. If they're large, we do. Since we don't allocate while
+    -- we copy (we do it with a primop!), I don't believe the thunk
+    -- deduplication mechanism can help us if two threads just happen
+    -- to try to build the ByteArray at the same time.
+    upIO
+      | small = unsafeDupablePerformIO
+      | otherwise = unsafePerformIO 
+
+{-# INLINE copyPtrToMutableByteArray #-}
+copyPtrToMutableByteArray :: forall m a. (PrimMonad m, Prim a)
+  => MutableByteArray (PrimState m) -- ^ destination array
+  -> Int   -- ^ destination offset given in elements of type @a@
+  -> Ptr a -- ^ source pointer
+  -> Int   -- ^ number of elements
+  -> m ()
+copyPtrToMutableByteArray (MutableByteArray ba#) (I# doff#) (Ptr addr#) (I# n#) =
+  primitive_ (copyAddrToByteArray# addr# ba# (doff# *# siz#) (n# *# siz#))
+  where
+  siz# = sizeOf# (undefined :: a) 
