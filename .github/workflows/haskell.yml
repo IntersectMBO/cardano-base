@@ -3,6 +3,28 @@ name: Haskell CI
 on: [push]
 
 jobs:
+  whitespace:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Traing whitespace check
+      if: matrix.os != 'windows-latest'
+      run: |
+        offenders="$(git grep "\s$" -- *.hs *.c *.h *.nix *.yml *.md || true)";
+        if [ -n "${offenders}" ]; then
+          echo -e "Fix trailing whitespace in:\n"
+          echo -n "${offenders}"
+          exit 1
+        fi
   build:
     runs-on: ${{ matrix.os }}
 
