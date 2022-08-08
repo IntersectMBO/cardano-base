@@ -7,9 +7,6 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UnboxedTuples              #-}
 {-# LANGUAGE TypeApplications           #-}
-
--- for pinnedByteArrayFromListN
-{-# OPTIONS_GHC -Wno-missing-local-signatures #-}
 module Cardano.Crypto.PinnedSizedBytes
   (
     PinnedSizedBytes,
