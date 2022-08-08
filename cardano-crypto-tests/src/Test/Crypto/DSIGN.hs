@@ -22,8 +22,8 @@ import qualified Test.QuickCheck.Gen as Gen
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
 import Cardano.Crypto.DSIGN (
-  MockDSIGN, 
-  Ed25519DSIGN, 
+  MockDSIGN,
+  Ed25519DSIGN,
   Ed448DSIGN,
 #ifdef SECP256K1_ENABLED
   EcdsaSecp256k1DSIGN,
@@ -71,10 +71,10 @@ import Test.Crypto.Util (
   )
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
-  (=/=), 
-  (===), 
-  Arbitrary(..), 
-  Gen, 
+  (=/=),
+  (===),
+  Arbitrary(..),
+  Gen,
   Property,
   forAllShow
   )
@@ -92,7 +92,7 @@ ed448SigGen = defaultSigGen
 
 #ifdef SECP256K1_ENABLED
 secp256k1SigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
-secp256k1SigGen = do 
+secp256k1SigGen = do
   msg <- genSECPMsg
   signDSIGN () msg <$> defaultSignKeyGen
 
@@ -100,22 +100,22 @@ schnorrSigGen :: Gen (SigDSIGN SchnorrSecp256k1DSIGN)
 schnorrSigGen = defaultSigGen
 
 genSECPMsg :: Gen MessageHash
-genSECPMsg = 
-  Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary) 
+genSECPMsg =
+  Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary)
                   toMessageHash
 #endif
 
-defaultVerKeyGen :: forall (a :: Type) . 
+defaultVerKeyGen :: forall (a :: Type) .
   (DSIGNAlgorithm a) => Gen (VerKeyDSIGN a)
 defaultVerKeyGen = deriveVerKeyDSIGN <$> defaultSignKeyGen @a
 
 defaultSignKeyGen :: forall (a :: Type).
   (DSIGNAlgorithm a) => Gen (SignKeyDSIGN a)
-defaultSignKeyGen = 
+defaultSignKeyGen =
   genKeyDSIGN <$> arbitrarySeedOfSize (seedSizeDSIGN (Proxy :: Proxy a))
 
-defaultSigGen :: forall (a :: Type) . 
-  (DSIGNAlgorithm a, ContextDSIGN a ~ (), Signable a Message) => 
+defaultSigGen :: forall (a :: Type) .
+  (DSIGNAlgorithm a, ContextDSIGN a ~ (), Signable a Message) =>
   Gen (SigDSIGN a)
 defaultSigGen = do
   msg :: Message <- arbitrary
@@ -152,52 +152,52 @@ testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
    FromCBOR (SignKeyDSIGN v),
    ToCBOR (SigDSIGN v),
    FromCBOR (SigDSIGN v)) =>
-  Gen (SigDSIGN v) -> 
-  Gen a -> 
-  String -> 
+  Gen (SigDSIGN v) ->
+  Gen a ->
+  String ->
   TestTree
 testDSIGNAlgorithm genSig genMsg name = testGroup name [
   testGroup "serialization" [
     testGroup "raw" [
       testProperty "VerKey" .
         forAllShow (defaultVerKeyGen @v)
-                   ppShow $ 
+                   ppShow $
                    prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN,
-      testProperty "SignKey" . 
+      testProperty "SignKey" .
         forAllShow (defaultSignKeyGen @v)
-                   ppShow $ 
+                   ppShow $
                    prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN,
-      testProperty "Sig" . 
-        forAllShow genSig 
-                   ppShow $ 
+      testProperty "Sig" .
+        forAllShow genSig
+                   ppShow $
                    prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN
       ],
-    testGroup "size" [ 
-      testProperty "VerKey" . 
+    testGroup "size" [
+      testProperty "VerKey" .
         forAllShow (defaultVerKeyGen @v)
-                   ppShow $ 
+                   ppShow $
                    prop_size_serialise rawSerialiseVerKeyDSIGN (sizeVerKeyDSIGN (Proxy @v)),
       testProperty "SignKey" .
         forAllShow (defaultSignKeyGen @v)
-                   ppShow $ 
+                   ppShow $
                    prop_size_serialise rawSerialiseSignKeyDSIGN (sizeSignKeyDSIGN (Proxy @v)),
-      testProperty "Sig" . 
-        forAllShow genSig 
-                   ppShow $ 
+      testProperty "Sig" .
+        forAllShow genSig
+                   ppShow $
                    prop_size_serialise rawSerialiseSigDSIGN (sizeSigDSIGN (Proxy @v))
       ],
     testGroup "direct CBOR" [
-      testProperty "VerKey" . 
+      testProperty "VerKey" .
         forAllShow (defaultVerKeyGen @v)
-                   ppShow $ 
+                   ppShow $
                    prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN,
-      testProperty "SignKey" . 
+      testProperty "SignKey" .
         forAllShow (defaultSignKeyGen @v)
-                   ppShow $ 
+                   ppShow $
                    prop_cbor_with encodeSignKeyDSIGN decodeSignKeyDSIGN,
-      testProperty "Sig" . 
-        forAllShow genSig 
-                   ppShow $ 
+      testProperty "Sig" .
+        forAllShow genSig
+                   ppShow $
                    prop_cbor_with encodeSigDSIGN decodeSigDSIGN
       ],
     testGroup "To/FromCBOR class" [
@@ -211,26 +211,26 @@ testDSIGNAlgorithm genSig genMsg name = testGroup name [
       testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor_size
       ],
     testGroup "direct matches class" [
-      testProperty "VerKey" . 
-        forAllShow (defaultVerKeyGen @v) ppShow $ 
+      testProperty "VerKey" .
+        forAllShow (defaultVerKeyGen @v) ppShow $
         prop_cbor_direct_vs_class encodeVerKeyDSIGN,
-      testProperty "SignKey" . 
-        forAllShow (defaultSignKeyGen @v) ppShow $ 
+      testProperty "SignKey" .
+        forAllShow (defaultSignKeyGen @v) ppShow $
         prop_cbor_direct_vs_class encodeSignKeyDSIGN,
-      testProperty "Sig" . 
-        forAllShow genSig ppShow $ 
+      testProperty "Sig" .
+        forAllShow genSig ppShow $
         prop_cbor_direct_vs_class encodeSigDSIGN
       ]
     ],
     testGroup "verify" [
-      testProperty "signing and verifying with matching keys" . 
+      testProperty "signing and verifying with matching keys" .
         forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @v) ppShow $
         prop_dsign_verify,
-      testProperty "verifying with wrong key" . 
+      testProperty "verifying with wrong key" .
         forAllShow genWrongKey ppShow $
         prop_dsign_verify_wrong_key,
-      testProperty "verifying wrong message" . 
-        forAllShow genWrongMsg ppShow $ 
+      testProperty "verifying wrong message" .
+        forAllShow genWrongMsg ppShow $
         prop_dsign_verify_wrong_msg
     ],
     testGroup "NoThunks" [
@@ -255,12 +255,12 @@ testDSIGNAlgorithm genSig genMsg name = testGroup name [
 
 -- If we sign a message with the key, we can verify the signature with the
 -- corresponding verification key.
-prop_dsign_verify  
-  :: forall (v :: Type) (a :: Type) . 
-  (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v a) 
+prop_dsign_verify
+  :: forall (v :: Type) (a :: Type) .
+  (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v a)
   => (a, SignKeyDSIGN v)
   -> Property
-prop_dsign_verify (msg, sk) = 
+prop_dsign_verify (msg, sk) =
   let signed = signDSIGN () msg sk
       vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk msg signed === Right ()
@@ -269,22 +269,22 @@ prop_dsign_verify (msg, sk) =
 -- verification fails.
 prop_dsign_verify_wrong_key
   :: forall (v :: Type) (a :: Type) .
-  (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ()) 
-  => (a, SignKeyDSIGN v, SignKeyDSIGN v) 
+  (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
+  => (a, SignKeyDSIGN v, SignKeyDSIGN v)
   -> Property
-prop_dsign_verify_wrong_key (msg, sk, sk') = 
+prop_dsign_verify_wrong_key (msg, sk, sk') =
   let signed = signDSIGN () msg sk
       vk' = deriveVerKeyDSIGN sk'
     in verifyDSIGN () vk' msg signed =/= Right ()
 
 -- If we signa a message with a key, but then try to verify with a different
 -- message, then verification fails.
-prop_dsign_verify_wrong_msg 
+prop_dsign_verify_wrong_msg
   :: forall (v :: Type) (a :: Type) .
   (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
   => (a, a, SignKeyDSIGN v)
   -> Property
-prop_dsign_verify_wrong_msg (msg, msg', sk) = 
+prop_dsign_verify_wrong_msg (msg, msg', sk) =
   let signed = signDSIGN () msg sk
       vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk msg' signed =/= Right ()

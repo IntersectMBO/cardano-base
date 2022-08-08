@@ -18,16 +18,16 @@ module Cardano.Crypto.SECP256K1.Constants (
 
 -- ECDSA-related constants
 
-type SECP256K1_ECDSA_PRIVKEY_BYTES = 32 
+type SECP256K1_ECDSA_PRIVKEY_BYTES = 32
 -- As we do not want to serialize the internal state used by ECDSA directly, we
 -- define _two_ values: one for the 'external' representation size, and one for
 -- the 'internal' representation size.
 type SECP256K1_ECDSA_PUBKEY_BYTES = 33
-type SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL = 64 
+type SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL = 64
 -- Same as here. They happen to be the same, but by using different tags, we can
 -- ensure we don't mix them up on accident.
 type SECP256K1_ECDSA_SIGNATURE_BYTES = 64
-type SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL = 64 
+type SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL = 64
 -- Since the ECDSA scheme signs hashes, not whole messages, we define this for
 -- clarity.
 type SECP256K1_ECDSA_MESSAGE_BYTES = 32

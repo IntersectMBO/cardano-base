@@ -20,7 +20,7 @@ import Control.Exception (evaluate)
 --
 -- = Note
 --
--- This includes a call to 'sodiumInit'. 
+-- This includes a call to 'sodiumInit'.
 cryptoInit :: IO ()
 cryptoInit = do
   sodiumInit
