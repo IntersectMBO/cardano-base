@@ -222,10 +222,14 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
           alloca $ \(lenPtr :: Ptr CSize) -> do
             poke lenPtr len
             withForeignPtr secpCtxPtr $ \ctx -> do
-              void $ secpEcPubkeySerialize ctx dstp lenPtr psp secpEcCompressed
+              ret <- secpEcPubkeySerialize ctx dstp lenPtr psp secpEcCompressed
               writtenLen <- peek lenPtr
               unless (writtenLen == len)
                      (error "rawSerializeVerKeyDSIGN: Did not write correct length for VerKeyDSIGN EcdsaSecp256k1DSIGN")
+              -- This should never happen, since `secpEcPubkeySerialize` in the current
+              -- version of `secp256k1` library always returns 1:
+              unless (ret == 1)
+                     (error "rawSerializeVerKeyDSIGN: Failed for unknown reason")
     rawSerialiseSignKeyDSIGN (SignKeyEcdsaSecp256k1 psb) = psbToByteString psb
     {-# NOINLINE rawDeserialiseSigDSIGN #-}
     rawDeserialiseSigDSIGN bs =
