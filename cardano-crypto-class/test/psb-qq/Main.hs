@@ -15,6 +15,10 @@ main = defaultMain . testGroup "PinnedSizedBytes quasiquoter" $ [
     let psb = [psbHex| 0xabcd1234 |]
     assertEqual "" (show stringRep) . show $ psb,
   testCase "empty PSB parse" $ do
-    let emptyPSB = [psbHex| 0x_ |]
-    assertEqual "" "\"\"" . show $ emptyPSB
+    let emptyPSB = [psbHex| 0x |]
+    assertEqual "" "\"\"" . show $ emptyPSB,
+  testCase "letter case does not matter" $ do
+    let psb = [psbHex| 0xAbCd1234 |]
+    let psb' = [psbHex| 0xabcd1234 |]
+    assertEqual "" psb psb'
   ]
