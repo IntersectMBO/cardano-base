@@ -49,24 +49,26 @@ import Data.Foldable (traverse_)
 -- 'PinnedSizedBytes', as well as computing its length at the type level.
 --
 -- The syntax accepted by this quasiquoter only works in an expression context.
--- A valid input consists of the literal sequence @0x@ followed by an even
--- number of /hexits/. A hexit is either a digit (@0@ through @9@) or a letter
--- (@a@ through @f@ or @A@ through @F@). It is acceptable to mix upper-case and
--- lower-case letters in the same input. We allow any amount of leading or
--- trailing whitespace, but no internal whitespace is allowed.
+-- A valid input consists of the following:
+--
+-- * An optional @0x@;
+-- * An even number of /hexits/, which are either digits (@0@ through @9@) or
+-- letters (@a@ through @f@ or @A@ through @F@).
+--
+-- It is acceptable to mix upper-case and lower-case letters in the same input.
+-- We allow any amount of leading or trailing whitespace, but no internal
+-- whitespace.
 --
 -- This syntax produces a 'PinnedSizedBytes', of length equal to half the number
 -- of hexits, where the hexit pairs define a byte at that position. 
 --
--- The first option produces the empty 'PinnedSizedBytes'; the second produces a
--- 'PinnedSizedBytes' of length equal to half the number of hexits, where the
--- hexit pairs define a byte at that position.
---
 -- = Examples
 --
--- * @['psbHex'| 0x |]@ produces a 'PinnedByteString' of length 0.
--- * @['psbHex' | 0xaFBc |]@ produces a 'PinnedByteString of length 2; the 
--- first byte is @0xaf@, and the second is @0xbc@.
+-- * @['psbHex'| 0x |]@ produces a 'PinnedByteString' of length 0. This can also
+-- be written @['psbHex'|  |]@ or @['psbHex'|                |]@.
+-- * @['psbHex' | 0xafbc |]@ produces a 'PinnedByteString of length 2; the 
+-- first byte is @0xaf@, and the second is @0xbc@. This can also be written
+-- @['psbHex'| afbc |]@, @['psbHex'| AfBc |]@ or @['psbHex'|     Afbc    |]@.
 --
 -- = Note
 --
@@ -85,12 +87,15 @@ mkHexLiteral :: String -> Q Exp
 mkHexLiteral input = do
   let asStrippedText = Text.strip . Text.pack $ input
   case Text.stripPrefix "0x" asStrippedText of 
-    Nothing -> fail "No leading \"0x\" provided."
+    Nothing -> go asStrippedText
     Just rest -> case Text.uncons rest of 
       Nothing -> pure $ AppE (AppTypeE (ConE 'PSB) (natLiteral 0)) . VarE $ 'emptyByteArray
-      _ -> do
-        (bytes, len) <- runStateT (traverse decodeAndCount . Text.chunksOf 2 $ rest) 0
-        AppE (AppTypeE (ConE 'PSB) (natLiteral len)) <$> [| mkPSB bytes len |]
+      _ -> go rest
+  where
+    go :: Text -> Q Exp
+    go hexits = do
+      (bytes, len) <- runStateT (traverse decodeAndCount . Text.chunksOf 2 $ hexits) 0
+      AppE (AppTypeE (ConE 'PSB) (natLiteral len)) <$> [| mkPSB bytes len |]
 
 {-# NOINLINE mkPSB #-}
 mkPSB :: [Word8] -> Int -> ByteArray

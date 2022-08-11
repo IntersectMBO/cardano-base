@@ -20,5 +20,17 @@ main = defaultMain . testGroup "PinnedSizedBytes quasiquoter" $ [
   testCase "letter case does not matter" $ do
     let psb = [psbHex| 0xAbCd1234 |]
     let psb' = [psbHex| 0xabcd1234 |]
+    assertEqual "" psb psb',
+  testCase "0x is optional" $ do
+    let psb = [psbHex| 0xabcd1234 |]
+    let psb' = [psbHex| abcd1234 |]
+    assertEqual "" psb psb',
+  testCase "Leading whitespace does not matter" $ do
+    let psb = [psbHex| 0xabcd1234 |]
+    let psb' = [psbHex|           0xabcd1234 |]
+    assertEqual "" psb psb',
+  testCase "Trailing whitespace does not matter" $ do
+    let psb = [psbHex| 0xabcd1234 |]
+    let psb' = [psbHex| 0xabcd1234           |]
     assertEqual "" psb psb'
   ]
