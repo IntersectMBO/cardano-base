@@ -73,11 +73,8 @@ infixl 5 |>
 -- wrap the original "Data.FingerTree" functions while forcing the provided
 -- value to WHNF.
 newtype StrictFingerTree v a = SFT {fromStrict :: FT.FingerTree v a}
-  deriving (Eq, Ord, Show)
-
-deriving newtype instance Foldable (StrictFingerTree v)
-
-deriving newtype instance (Measured v a) => Measured v (StrictFingerTree v a)
+  deriving stock (Eq, Ord, Show)
+  deriving newtype (Foldable, Semigroup, Monoid, Measured v)
 
 instance NoThunks a => NoThunks (StrictFingerTree v a) where
   showTypeOf _ = "StrictFingerTree"
