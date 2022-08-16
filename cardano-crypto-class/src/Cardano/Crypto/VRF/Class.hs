@@ -43,6 +43,7 @@ module Cardano.Crypto.VRF.Class
 )
 where
 
+import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
@@ -56,7 +57,6 @@ import Numeric.Natural (Natural)
 
 import qualified Data.ByteString as BS
 
-import Cardano.Prelude (NFData)
 import Cardano.Binary
          (Decoder, Encoding, FromCBOR (..), ToCBOR (..), Size,
           encodeListLen, enforceSize, decodeBytes, encodeBytes,

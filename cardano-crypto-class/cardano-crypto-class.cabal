@@ -100,15 +100,16 @@ library
     , base16-bytestring  >=1
     , bytestring
     , cardano-binary
-    , cardano-prelude
     , cryptonite
     , deepseq
     , ghc-prim
+    , heapwords
     , integer-gmp
     , memory
     , nothunks
     , primitive
     , serialise
+    , strict-containers
     , text
     , transformers
     , vector

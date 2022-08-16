@@ -22,9 +22,11 @@ module Cardano.Binary.Serialize
   )
 where
 
-import Cardano.Prelude
+import Prelude hiding ((.))
 
 import qualified Codec.CBOR.Write as CBOR.Write
+import Control.Category ((.))
+import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder.Extra as Builder
 import qualified Data.ByteString.Lazy as BSL
@@ -38,13 +40,13 @@ import Cardano.Binary.ToCBOR
 --
 --   The output is represented as a lazy 'LByteString' and is constructed
 --   incrementally.
-serialize :: ToCBOR a => a -> LByteString
+serialize :: ToCBOR a => a -> BSL.ByteString
 serialize = serializeEncoding . toCBOR
 
 -- | Serialize a Haskell value to an external binary representation.
 --
 --   The output is represented as a strict 'ByteString'.
-serialize' :: ToCBOR a => a -> ByteString
+serialize' :: ToCBOR a => a -> BS.ByteString
 serialize' = BSL.toStrict . serialize
 
 -- | Serialize into a Builder. Useful if you want to throw other ByteStrings
@@ -57,7 +59,7 @@ serializeBuilder = CBOR.Write.toBuilder . toCBOR
 --
 --   The output is represented as an 'LByteString' and is constructed
 --   incrementally.
-serializeEncoding :: Encoding -> LByteString
+serializeEncoding :: Encoding -> BSL.ByteString
 serializeEncoding =
   Builder.toLazyByteStringWith strategy mempty . CBOR.Write.toBuilder
   where
@@ -67,7 +69,7 @@ serializeEncoding =
         strategy = Builder.safeStrategy 1024 4096
 
 -- | A strict version of 'serializeEncoding'
-serializeEncoding' :: Encoding -> ByteString
+serializeEncoding' :: Encoding -> BS.ByteString
 serializeEncoding' = BSL.toStrict . serializeEncoding
 
 
@@ -86,7 +88,7 @@ encodeNestedCbor = encodeNestedCborBytes . serialize
 --   input object, so that it must be passed as a binary `ByteString` blob. It's
 --   the caller responsibility to ensure the input `ByteString` correspond
 --   indeed to valid, previously-serialised CBOR data.
-encodeNestedCborBytes :: LByteString -> Encoding
+encodeNestedCborBytes :: BSL.ByteString -> Encoding
 encodeNestedCborBytes x = encodeTag 24 <> toCBOR x
 
 nestedCborSizeExpr :: Size -> Size

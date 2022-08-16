@@ -1,5 +1,5 @@
-import Cardano.Prelude
-import Test.Cardano.Prelude
+import Prelude
+import Test.Cardano.Prelude (runTests)
 
 import qualified Test.Cardano.Binary.RoundTrip
 import qualified Test.Cardano.Binary.SizeBounds

@@ -61,9 +61,9 @@ library
                       , cardano-binary
                       , cardano-crypto-class
                       , cardano-crypto-praos
-                      , cardano-prelude
                       , cborg
                       , cryptonite
+                      , deepseq
                       , formatting
                       , nothunks
                       , pretty-show
