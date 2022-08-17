@@ -13,7 +13,7 @@ module Cardano.Crypto.PinnedSizedBytes
     psbFromByteStringCheck,
     psbToByteString,
     -- * C usage
-    psbUseAsCPtr,
+    unsafePsbUseAsCPtr,
     psbUseAsCPtrLen,
     psbUseAsSizedPtr,
     psbCreate,
@@ -28,7 +28,7 @@ module Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.PinnedSizedBytes.Internal (
   PinnedSizedBytes (PSB),
   runAndTouch,
-  psbUseAsCPtr,
+  unsafePsbUseAsCPtr,
   )
 import Data.Kind (Type)
 import Control.Monad.Primitive  (primitive_, touch)

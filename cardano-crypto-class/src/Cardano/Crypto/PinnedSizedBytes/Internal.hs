@@ -6,7 +6,7 @@
 
 module Cardano.Crypto.PinnedSizedBytes.Internal (
   PinnedSizedBytes (..),
-  psbUseAsCPtr,
+  unsafePsbUseAsCPtr,
   runAndTouch,
   ) where
 
@@ -67,8 +67,8 @@ instance KnownNat n => Eq (PinnedSizedBytes n) where
 instance KnownNat n => Ord (PinnedSizedBytes n) where
     compare x y =
         unsafeDupablePerformIO $
-            psbUseAsCPtr x $ \xPtr ->
-                psbUseAsCPtr y $ \yPtr -> do
+            unsafePsbUseAsCPtr x $ \xPtr ->
+                unsafePsbUseAsCPtr y $ \yPtr -> do
                     res <- c_sodium_compare xPtr yPtr size
                     return (compare res 0)
       where
@@ -96,13 +96,15 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
 -- = Note
 --
 -- The 'Ptr' given to the function argument /must not/ be used as the result of
--- type @r@.
-psbUseAsCPtr :: 
+-- type @r@. Furthermore, you must not use the 'Ptr' given to the function
+-- argument to mutate the data in-place. Both of these things are dangerous, and
+-- can break referential transparency, cause out-of-bounds reads, or worse.
+unsafePsbUseAsCPtr :: 
   forall (n :: Nat) (r :: Type) .
   PinnedSizedBytes n -> 
   (Ptr Word8 -> IO r) -> 
   IO r
-psbUseAsCPtr (PSB ba) = runAndTouch ba
+unsafePsbUseAsCPtr (PSB ba) = runAndTouch ba
 
 -- Wrapper that combines applying a function, then touching
 runAndTouch :: 
