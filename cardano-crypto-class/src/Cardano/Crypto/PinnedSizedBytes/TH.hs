@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Cardano.Crypto.PinnedSizedBytes.TH (
+  -- * Quasiquoter
   psbHex
   ) where
 

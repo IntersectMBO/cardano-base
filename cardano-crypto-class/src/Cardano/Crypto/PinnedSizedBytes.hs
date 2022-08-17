@@ -8,8 +8,6 @@
 module Cardano.Crypto.PinnedSizedBytes
   (
     PinnedSizedBytes,
-    -- * Quasiquoter
-    psbHex,
     -- * Conversions
     psbToBytes,
     psbFromByteStringCheck,
@@ -32,7 +30,6 @@ import Cardano.Crypto.PinnedSizedBytes.Internal (
   runAndTouch,
   psbUseAsCPtr,
   )
-import Cardano.Crypto.PinnedSizedBytes.TH (psbHex)
 import Data.Kind (Type)
 import Control.Monad.Primitive  (primitive_, touch)
 import Data.Primitive.ByteArray

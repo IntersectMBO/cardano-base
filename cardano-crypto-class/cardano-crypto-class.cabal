@@ -91,6 +91,7 @@ library
     Cardano.Crypto.Libsodium.MLockedBytes.Internal
     Cardano.Crypto.Libsodium.UnsafeC
     Cardano.Crypto.PinnedSizedBytes
+    Cardano.Crypto.PinnedSizedBytes.TH
     Cardano.Crypto.Seed
     Cardano.Crypto.Util
     Cardano.Crypto.VRF
@@ -102,7 +103,6 @@ library
 
   other-modules:
     Cardano.Crypto.PackedBytes
-    Cardano.Crypto.PinnedSizedBytes.TH
     Cardano.Crypto.PinnedSizedBytes.Internal
 
   build-depends:

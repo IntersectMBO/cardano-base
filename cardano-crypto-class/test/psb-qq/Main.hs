@@ -4,7 +4,7 @@
 
 module Main (main) where
 
-import Cardano.Crypto.PinnedSizedBytes (psbHex)
+import Cardano.Crypto.PinnedSizedBytes.TH (psbHex)
 import Test.Tasty (defaultMain, testGroup)
 import Test.Tasty.HUnit (testCase, assertEqual)
 
