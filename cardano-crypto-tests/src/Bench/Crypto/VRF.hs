@@ -1,6 +1,5 @@
 {-#LANGUAGE TypeApplications #-}
 {-#LANGUAGE ScopedTypeVariables #-}
-{-#LANGUAGE NoImplicitPrelude #-}
 {-#LANGUAGE TypeFamilies #-}
 {-#LANGUAGE FlexibleContexts #-}
 {-#LANGUAGE OverloadedStrings #-}
@@ -8,13 +7,15 @@ module Bench.Crypto.VRF
   ( benchmarks
   ) where
 
-import Cardano.Prelude
 import Criterion
 import Cardano.Crypto.VRF.Class
 import Cardano.Crypto.VRF.Simple
 import Cardano.Crypto.VRF.Praos hiding (Seed)
 import Cardano.Crypto.Seed
-import qualified Data.ByteString as BS (pack)
+import Control.DeepSeq (NFData)
+import qualified Data.ByteString as BS (ByteString, pack)
+import Data.Word (Word8)
+import Data.Typeable (Proxy(Proxy))
 
 {- HLINT ignore "Use camelCase" -}
 
@@ -42,7 +43,7 @@ testBytes = [
     0xd7, 0x51, 0x22, 0xa8, 0x84, 0x29, 0x23, 0x5e, 0x1a, 0x55, 0xb0, 0xe8, 0xf9, 0x82, 0xb8, 0xf4
   ]
 
-typicalMsg :: ByteString
+typicalMsg :: BS.ByteString
 typicalMsg = BS.pack
   [ 0x00, 0x1b, 0xbc, 0x93, 0x95, 0x38, 0x05, 0x8e
   , 0xaa, 0x88, 0xa2, 0x62, 0xd9, 0x69, 0xfb, 0x36
@@ -60,7 +61,7 @@ benchmarks =
 bench_vrf :: forall proxy v
            . ( VRFAlgorithm v
              , ContextVRF v ~ ()
-             , Signable v ByteString
+             , Signable v BS.ByteString
              , NFData (CertVRF v)
              , NFData (SignKeyVRF v)
              , NFData (VerKeyVRF v)

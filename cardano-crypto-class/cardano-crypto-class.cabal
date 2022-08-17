@@ -111,15 +111,16 @@ library
     , bytestring
     , cardano-binary
     , template-haskell
-    , cardano-prelude
     , cryptonite
     , deepseq
     , ghc-prim
+    , heapwords
     , integer-gmp
     , memory
     , nothunks
     , primitive
     , serialise
+    , strict-containers
     , text
     , transformers
     , vector

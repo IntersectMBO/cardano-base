@@ -19,6 +19,7 @@ module Cardano.Crypto.DSIGN.Mock
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
 import GHC.TypeLits (type (+))
@@ -26,7 +27,6 @@ import Data.Proxy (Proxy (..))
 import GHC.Stack
 import NoThunks.Class (NoThunks)
 
-import Cardano.Prelude (NFData)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class

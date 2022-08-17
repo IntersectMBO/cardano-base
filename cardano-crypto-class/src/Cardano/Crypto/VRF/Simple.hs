@@ -17,13 +17,12 @@ module Cardano.Crypto.VRF.Simple
   )
 where
 
-import           Control.DeepSeq (force)
+import           Control.DeepSeq (NFData, force)
 import           Data.Proxy (Proxy (..))
 import           GHC.Generics (Generic)
 import           NoThunks.Class (NoThunks, InspectHeap(..))
 import           Numeric.Natural (Natural)
 
-import           Cardano.Prelude (NFData)
 import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 
 import qualified Crypto.PubKey.ECC.Prim as C

@@ -71,7 +71,7 @@ import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Util (SignableRepresentation(..))
 
-import Cardano.Prelude (NFData (..))
+import Control.DeepSeq (NFData (..))
 import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS

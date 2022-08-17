@@ -83,7 +83,7 @@ import NoThunks.Class (NoThunks)
 import Cardano.Binary (Encoding, FromCBOR(..), Size, ToCBOR(..), decodeBytes,
                        serializeEncoding')
 import Cardano.Crypto.PackedBytes
-import Cardano.Prelude (HeapWords (..))
+import Cardano.HeapWords (HeapWords (..))
 
 import qualified Data.ByteString.Short.Internal as SBSI
 

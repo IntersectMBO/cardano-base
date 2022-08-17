@@ -23,6 +23,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import           Data.ByteArray as BA (convert)
 
+import           Control.DeepSeq (NFData)
 import           Control.Exception (Exception(..), throw)
 
 import           Data.Functor.Identity
@@ -33,8 +34,6 @@ import           NoThunks.Class (NoThunks)
 import           Crypto.Random (MonadRandom(..))
 import           Crypto.Random.Entropy (getEntropy)
 import           Cardano.Crypto.Hash.Class (HashAlgorithm(digest))
-
-import           Cardano.Prelude (NFData)
 
 
 -- | A seed contains a finite number of bytes, and is used for seeding

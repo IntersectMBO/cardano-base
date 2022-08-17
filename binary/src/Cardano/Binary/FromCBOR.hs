@@ -16,28 +16,45 @@ module Cardano.Binary.FromCBOR
   , decodeListWith
     -- * Helper tools to build instances
   , decodeMapSkel
+  , cborError
+  , toCborError
   )
 where
 
-import Cardano.Prelude
+import Prelude hiding ((.))
 
 import Codec.CBOR.Decoding as D
-import Codec.CBOR.ByteArray as BA
+import Codec.CBOR.ByteArray as BA ( ByteArray(BA) )
+import Control.Category (Category((.)))
+import Control.Exception (Exception)
+import Control.Monad (when)
 import qualified Codec.CBOR.Read as CBOR.Read
-import qualified Data.ByteString.Lazy as BS.Lazy
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Short.Internal as SBS
-import qualified Data.Primitive.ByteArray as Prim
 import Data.Fixed (Fixed(..), Nano, Pico)
+import Data.Int (Int32, Int64)
+import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.Map as M
+import qualified Data.Primitive.ByteArray as Prim
+import Data.Ratio ( Ratio, (%) )
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
+import Data.Text (Text)
+import qualified Data.Text  as T
 import Data.Time.Calendar.OrdinalDate ( fromOrdinalDate )
 import Data.Time.Clock (NominalDiffTime, UTCTime(..), picosecondsToDiffTime)
+import Data.Typeable ( Typeable, typeRep, Proxy )
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
-import Formatting (bprint, int, shown, stext)
+import Data.Void (Void)
+import Data.Word ( Word8, Word16, Word32, Word64 )
+import Formatting
+    ( bprint, int, shown, stext, build, formatToString )
 import qualified Formatting.Buildable as B (Buildable(..))
+import Numeric.Natural (Natural)
+
 
 {- HLINT ignore "Reduce duplication" -}
 {- HLINT ignore "Redundant <$>" -}
@@ -50,7 +67,7 @@ class Typeable a => FromCBOR a where
   fromCBOR :: D.Decoder s a
 
   label :: Proxy a -> Text
-  label = show . typeRep
+  label = T.pack . show . typeRep
 
 
 --------------------------------------------------------------------------------
@@ -63,7 +80,7 @@ data DecoderError
   -- ^ Custom decoding error, usually due to some validation failure
   | DecoderErrorDeserialiseFailure Text CBOR.Read.DeserialiseFailure
   | DecoderErrorEmptyList Text
-  | DecoderErrorLeftover Text ByteString
+  | DecoderErrorLeftover Text BS.ByteString
   | DecoderErrorSizeMismatch Text Int Int
   -- ^ A size mismatch @DecoderErrorSizeMismatch label expectedSize actualSize@
   | DecoderErrorUnknownTag Text Word8
@@ -285,14 +302,14 @@ instance
     !g <- fromCBOR
     return (a, b, c, d, e, f, g)
 
-instance FromCBOR ByteString where
+instance FromCBOR BS.ByteString where
   fromCBOR = D.decodeBytes
 
 instance FromCBOR Text where
   fromCBOR = D.decodeString
 
-instance FromCBOR LByteString where
-  fromCBOR = BS.Lazy.fromStrict <$> fromCBOR
+instance FromCBOR BSL.ByteString where
+  fromCBOR = BSL.fromStrict <$> fromCBOR
 
 instance FromCBOR SBS.ShortByteString where
   fromCBOR = do
@@ -407,7 +424,7 @@ decodeMapSkel fromDistinctAscList = do
       else cborError $ DecoderErrorCanonicityViolation "Map"
 {-# INLINE decodeMapSkel #-}
 
-instance (Ord k, FromCBOR k, FromCBOR v) => FromCBOR (Map k v) where
+instance (Ord k, FromCBOR k, FromCBOR v) => FromCBOR (M.Map k v) where
   fromCBOR = decodeMapSkel M.fromDistinctAscList
 
 -- We stitch a `258` in from of a (Hash)Set, so that tools which
@@ -447,7 +464,7 @@ decodeSetSkel fromDistinctAscList = do
       else cborError $ DecoderErrorCanonicityViolation "Set"
 {-# INLINE decodeSetSkel #-}
 
-instance (Ord a, FromCBOR a) => FromCBOR (Set a) where
+instance (Ord a, FromCBOR a) => FromCBOR (S.Set a) where
   fromCBOR = decodeSetSkel S.fromDistinctAscList
 
 -- | Generic decoder for vectors. Its intended use is to allow easy
@@ -477,3 +494,11 @@ instance FromCBOR UTCTime where
     return $ UTCTime
       (fromOrdinalDate year dayOfYear)
       (picosecondsToDiffTime timeOfDayPico)
+
+-- | Convert an 'Either'-encoded failure to a 'cborg' decoder failure
+toCborError :: B.Buildable e => Either e a -> D.Decoder s a
+toCborError = either cborError pure
+
+-- | Convert a @Buildable@ error into a 'cborg' decoder error
+cborError :: B.Buildable e => e -> D.Decoder s a
+cborError = fail . formatToString build
