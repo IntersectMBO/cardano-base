@@ -25,7 +25,7 @@ let
     compiler-nix-name = compiler;
     modules = [
 
-      {
+      ({pkgs, ...}: {
         # Packages we wish to ignore version bounds of.
         # This is similar to jailbreakCabal, however it
         # does not require any messing with cabal files.
@@ -40,10 +40,10 @@ let
         # otherwise choose. Unfortunately, this means that we also override any other 
         # pkgconfig libraries that haskell.nix would pick for us. So we also need to 
         # manually include those here.
-        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ buildPackages.libsodium-vrf buildPackages.secp256k1 ]];
+        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ pkgs.libsodium-vrf pkgs.secp256k1 ]];
         packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
-      }
+      })
       (lib.optionalAttrs stdenv.hostPlatform.isWindows {
         # Disable cabal-doctest tests by turning off custom setups
         packages.comonad.package.buildType = lib.mkForce "Simple";
