@@ -33,8 +33,7 @@ let
 
         # split data output for ekg to reduce closure size
         packages.ekg.components.library.enableSeparateDataOutput = true;
-        packages.binary.configureFlags = [ "--ghc-option=-Werror" ];
-        #packages.binary/test.configureFlags = [ "--ghc-option=-Werror" ];
+        packages.cardano-binary.configureFlags = [ "--ghc-option=-Werror" ];
         packages.cardano-crypto-class.configureFlags = [ "--ghc-option=-Werror" ];
         # We need to override the pkgconfig libraries so that we can provide our fork of
         # libsodium instead of the one from nixpkgs, which is what haskell.nix would
