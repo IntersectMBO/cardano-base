@@ -32,7 +32,6 @@ let
     ];
 
     tools = {
-      cabal = "3.6.2.0";
       haskell-language-server = "latest";
     };
 
