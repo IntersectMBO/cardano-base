@@ -42,12 +42,12 @@
         "builtin": true,
         "description": "Nix Packages collection",
         "homepage": "",
-        "owner": "nixos",
+        "owner": "NixOS",
         "repo": "nixpkgs",
         "rev": "65fae659e31098ca4ac825a6fef26d890aaf3f4e",
         "sha256": "07rawld6gqd0zq4j4fnrq4w3si0hi53l1yvczavzagaka2h0jz0s",
         "type": "tarball",
-        "url": "https://github.com/nixos/nixpkgs/archive/65fae659e31098ca4ac825a6fef26d890aaf3f4e.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/65fae659e31098ca4ac825a6fef26d890aaf3f4e.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
