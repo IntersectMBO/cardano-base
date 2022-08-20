@@ -147,7 +147,9 @@ jobs:
     - uses: actions/cache@v3
       name: Cache cabal store
       with:
-        path: ${{ steps.setup-haskell.outputs.cabal-store }}
+        path: |
+          ${{ steps.setup-haskell.outputs.cabal-store }}
+          dist-newstyle
         key: cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
         restore-keys: |
           cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
