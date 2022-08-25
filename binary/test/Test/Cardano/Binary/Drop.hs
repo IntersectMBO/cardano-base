@@ -11,7 +11,7 @@ import Data.Word (Word8, Word64)
 
 import Cardano.Binary
 
-import Hedgehog 
+import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
@@ -37,7 +37,7 @@ genWord64 = Gen.word64 Range.exponentialBounded
 prop_dropMap :: Property
 prop_dropMap = property $ do
   mp <- forAll $ Gen.map (Range.constant 0 10)
-      ((,) <$> genInt32 
+      ((,) <$> genInt32
            <*> Gen.list (Range.constant 0 10) genWord8
       )
   let encodedBs = serialize mp

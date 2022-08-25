@@ -7,9 +7,6 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UnboxedTuples              #-}
 {-# LANGUAGE TypeApplications           #-}
-
--- for pinnedByteArrayFromListN
-{-# OPTIONS_GHC -Wno-missing-local-signatures #-}
 module Cardano.Crypto.PinnedSizedBytes
   (
     PinnedSizedBytes,
@@ -159,7 +156,7 @@ psbToByteString = BS.pack . psbToBytes
 --
 -- >>> psbToBytes . (id @(PinnedSizedBytes 4)) . psbFromBytes $ [1,2,3,4,5,6]
 -- [3,4,5,6]
--- 
+--
 {-# DEPRECATED psbFromBytes "This is not referentially transparent" #-}
 psbFromBytes :: forall n. KnownNat n => [Word8] -> PinnedSizedBytes n
 psbFromBytes ws0 = PSB (pinnedByteArrayFromListN size ws)
@@ -178,7 +175,7 @@ psbFromByteString :: KnownNat n => BS.ByteString -> PinnedSizedBytes n
 psbFromByteString = psbFromBytes . BS.unpack
 
 psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
-psbFromByteStringCheck bs 
+psbFromByteStringCheck bs
     | BS.length bs == size = Just $ unsafeDupablePerformIO $
         BS.useAsCStringLen bs $ \(Ptr addr#, _) -> do
             marr@(MutableByteArray marr#) <- newPinnedByteArray size
@@ -218,10 +215,10 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
 --
 -- The 'Ptr' given to the function argument /must not/ be used as the result of
 -- type @r@.
-psbUseAsCPtr :: 
+psbUseAsCPtr ::
   forall (n :: Nat) (r :: Type) .
-  PinnedSizedBytes n -> 
-  (Ptr Word8 -> IO r) -> 
+  PinnedSizedBytes n ->
+  (Ptr Word8 -> IO r) ->
   IO r
 psbUseAsCPtr (PSB ba) = runAndTouch ba
 
@@ -239,11 +236,11 @@ psbUseAsCPtr (PSB ba) = runAndTouch ba
 --
 -- The same caveats apply to the use of this function as to the use of
 -- 'psbUseAsCPtr'.
-psbUseAsCPtrLen :: 
-  forall (n :: Nat) (r :: Type) . 
-  (KnownNat n) => 
+psbUseAsCPtrLen ::
+  forall (n :: Nat) (r :: Type) .
+  (KnownNat n) =>
   PinnedSizedBytes n ->
-  (Ptr Word8 -> CSize -> IO r) -> 
+  (Ptr Word8 -> CSize -> IO r) ->
   IO r
 psbUseAsCPtrLen (PSB ba) f = do
   let len :: CSize = fromIntegral . natVal $ Proxy @n
@@ -253,10 +250,10 @@ psbUseAsCPtrLen (PSB ba) f = do
 --
 -- The same caveats apply to this use of this function as to the use of
 -- 'psbUseAsCPtr'.
-psbUseAsSizedPtr :: 
-  forall (n :: Nat) (r :: Type) . 
-  PinnedSizedBytes n -> 
-  (SizedPtr n -> IO r) -> 
+psbUseAsSizedPtr ::
+  forall (n :: Nat) (r :: Type) .
+  PinnedSizedBytes n ->
+  (SizedPtr n -> IO r) ->
   IO r
 psbUseAsSizedPtr (PSB ba) k = do
     r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
@@ -264,19 +261,19 @@ psbUseAsSizedPtr (PSB ba) k = do
 
 -- | As 'psbCreateResult', but presumes that no useful value is produced: that
 -- is, the function argument is run only for its side effects.
-psbCreate :: 
-  forall (n :: Nat) . 
-  (KnownNat n) => 
-  (Ptr Word8 -> IO ()) -> 
+psbCreate ::
+  forall (n :: Nat) .
+  (KnownNat n) =>
+  (Ptr Word8 -> IO ()) ->
   IO (PinnedSizedBytes n)
 psbCreate f = fst <$> psbCreateResult f
 
 -- | As 'psbCreateResultLen', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
-psbCreateLen :: 
-  forall (n :: Nat) . 
-  (KnownNat n) => 
-  (Ptr Word8 -> CSize -> IO ()) -> 
+psbCreateLen ::
+  forall (n :: Nat) .
+  (KnownNat n) =>
+  (Ptr Word8 -> CSize -> IO ()) ->
   IO (PinnedSizedBytes n)
 psbCreateLen f = fst <$> psbCreateResultLen f
 
@@ -295,10 +292,10 @@ psbCreateLen f = fst <$> psbCreateResultLen f
 -- which can lead to segfaults or out-of-bounds reads.
 --
 -- This poses both correctness /and/ security risks, so please don't do it.
-psbCreateResult :: 
-  forall (n :: Nat) (r :: Type) . 
-  (KnownNat n) => 
-  (Ptr Word8 -> IO r) -> 
+psbCreateResult ::
+  forall (n :: Nat) (r :: Type) .
+  (KnownNat n) =>
+  (Ptr Word8 -> IO r) ->
   IO (PinnedSizedBytes n, r)
 psbCreateResult f = psbCreateResultLen (\p _ -> f p)
 
@@ -314,10 +311,10 @@ psbCreateResult f = psbCreateResultLen (\p _ -> f p)
 --
 -- The same caveats apply to this function as to 'psbCreateResult': the 'Ptr'
 -- given to the function argument /must not/ be returned as @r@.
-psbCreateResultLen :: 
-  forall (n :: Nat) (r :: Type) . 
-  (KnownNat n) => 
-  (Ptr Word8 -> CSize -> IO r) -> 
+psbCreateResultLen ::
+  forall (n :: Nat) (r :: Type) .
+  (KnownNat n) =>
+  (Ptr Word8 -> CSize -> IO r) ->
   IO (PinnedSizedBytes n, r)
 psbCreateResultLen f = do
   let len :: Int = fromIntegral . natVal $ Proxy @n
@@ -328,20 +325,20 @@ psbCreateResultLen f = do
 
 -- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
-psbCreateSized :: 
-  forall (n :: Nat). 
-  (KnownNat n) => 
-  (SizedPtr n -> IO ()) -> 
+psbCreateSized ::
+  forall (n :: Nat).
+  (KnownNat n) =>
+  (SizedPtr n -> IO ()) ->
   IO (PinnedSizedBytes n)
 psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
 
 -- | As 'psbCreateResult', but gives a 'SizedPtr' to the function argument. The
 -- same caveats apply to this function as to 'psbCreateResult': the 'SizedPtr'
 -- given to the function argument /must not/ be resulted as @r@.
-psbCreateSizedResult :: 
-  forall (n :: Nat) (r :: Type) . 
-  (KnownNat n) => 
-  (SizedPtr n -> IO r) -> 
+psbCreateSizedResult ::
+  forall (n :: Nat) (r :: Type) .
+  (KnownNat n) =>
+  (SizedPtr n -> IO r) ->
   IO (PinnedSizedBytes n, r)
 psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)
 
@@ -375,9 +372,9 @@ die :: String -> String -> a
 die fun problem = error $ "PinnedSizedBytes." ++ fun ++ ": " ++ problem
 
 -- Wrapper that combines applying a function, then touching
-runAndTouch :: 
-  forall (a :: Type) . 
-  ByteArray -> 
+runAndTouch ::
+  forall (a :: Type) .
+  ByteArray ->
   (Ptr Word8 -> IO a) ->
   IO a
 runAndTouch ba f = do

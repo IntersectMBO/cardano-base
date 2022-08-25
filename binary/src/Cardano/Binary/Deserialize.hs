@@ -30,7 +30,7 @@ import qualified Codec.CBOR.Decoding as D
 import qualified Codec.CBOR.Read as Read
 import qualified Codec.CBOR.Write as CBOR.Write
 import Control.Exception.Safe (impureThrow)
-import Control.Monad (when) 
+import Control.Monad (when)
 import Control.Monad.ST (ST, runST)
 import Data.Bifunctor (bimap)
 import qualified Data.ByteString as BS

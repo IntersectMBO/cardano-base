@@ -3,7 +3,7 @@ module Main (main) where
 import qualified Test.Crypto.DSIGN
 import qualified Test.Crypto.Hash
 import qualified Test.Crypto.KES
-import qualified Test.Crypto.VRF 
+import qualified Test.Crypto.VRF
 import qualified Test.Crypto.Regressions
 import Test.Tasty (TestTree, adjustOption, testGroup, defaultMain)
 import Test.Tasty.QuickCheck (QuickCheckTests (QuickCheckTests))
@@ -18,7 +18,7 @@ tests :: TestTree
 tests =
   -- The default QuickCheck test count is 100. This is too few to catch
   -- anything, so we set a minimum of 1000.
-  adjustOption (\(QuickCheckTests i) -> QuickCheckTests $ max i 1000) . 
+  adjustOption (\(QuickCheckTests i) -> QuickCheckTests $ max i 1000) .
     testGroup "cardano-crypto-class" $
       [ Test.Crypto.DSIGN.tests
       , Test.Crypto.Hash.tests

@@ -26,7 +26,7 @@ instance KnownNat n => Arbitrary (NaCl.MLockedSizedBytes n) where
 instance KnownNat n => Arbitrary (PinnedSizedBytes n) where
     arbitrary = do
       let size :: Int = fromIntegral . natVal $ Proxy @n
-      Gen.suchThatMap (fromListN size <$> Gen.vectorOf size arbitrary) 
+      Gen.suchThatMap (fromListN size <$> Gen.vectorOf size arbitrary)
                       psbFromByteStringCheck
-    shrink psb = case toList . psbToByteString $ psb of 
+    shrink psb = case toList . psbToByteString $ psb of
       bytes -> mapMaybe (psbFromByteStringCheck . fromList) . shrink $ bytes

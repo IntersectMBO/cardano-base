@@ -8,9 +8,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TypeApplications #-}
 -- According to the documentation for unsafePerformIO:
--- 
--- > Make sure that the either you switch off let-floating 
--- > (-fno-full-laziness), or that the call to unsafePerformIO cannot float 
+--
+-- > Make sure that the either you switch off let-floating
+-- > (-fno-full-laziness), or that the call to unsafePerformIO cannot float
 -- > outside a lambda.
 --
 -- If we do not switch off let-floating, our calls to unsafeDupablePerformIO for
@@ -96,7 +96,7 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbToByteString,
   psbFromByteStringCheck,
   )
-import Data.ByteString.Unsafe (unsafeUseAsCStringLen) 
+import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 
 data SchnorrSecp256k1DSIGN
 
@@ -123,23 +123,23 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
     deriving anyclass (NoThunks)
   algorithmNameDSIGN _ = "schnorr-secp256k1"
   {-# NOINLINE deriveVerKeyDSIGN #-}
-  deriveVerKeyDSIGN (SignKeySchnorrSecp256k1 psb) = 
+  deriveVerKeyDSIGN (SignKeySchnorrSecp256k1 psb) =
     unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \skp ->
-      allocaSized $ \kpp -> 
+      allocaSized $ \kpp ->
         withForeignPtr secpCtxPtr $ \ctx -> do
           res <- secpKeyPairCreate ctx kpp skp
-          when (res /= 1) 
+          when (res /= 1)
                (error "deriveVerKeyDSIGN: Failed to create keypair for SchnorrSecp256k1DSIGN")
           xonlyPSB <- psbCreateSized $ \xonlyp -> do
                         res' <- secpKeyPairXOnlyPub ctx xonlyp nullPtr kpp
-                        when (res' /= 1) 
+                        when (res' /= 1)
                              (error "deriveVerKeyDSIGN: could not extract xonly pubkey for SchnorrSecp256k1DSIGN")
           pure . VerKeySchnorrSecp256k1 $ xonlyPSB
   {-# NOINLINE signDSIGN #-}
-  signDSIGN () msg (SignKeySchnorrSecp256k1 skpsb) = 
+  signDSIGN () msg (SignKeySchnorrSecp256k1 skpsb) =
     unsafeDupablePerformIO . psbUseAsSizedPtr skpsb $ \skp -> do
       let bs = getSignableRepresentation msg
-      allocaSized $ \kpp -> 
+      allocaSized $ \kpp ->
         withForeignPtr secpCtxPtr $ \ctx -> do
           res <- secpKeyPairCreate ctx kpp skp
           when (res /= 1) (error "signDSIGN: Failed to create keypair for SchnorrSecp256k1DSIGN")
@@ -158,10 +158,10 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
       psbUseAsSizedPtr sigPSB $ \sigp -> do
         let bs = getSignableRepresentation msg
         res <- useAsCStringLen bs $ \(msgp, msgLen) ->
-          withForeignPtr secpCtxPtr $ \ctx -> 
+          withForeignPtr secpCtxPtr $ \ctx ->
             pure $ secpSchnorrSigVerify ctx
                                         sigp
-                                        (castPtr msgp) 
+                                        (castPtr msgp)
                                         (fromIntegral msgLen)
                                         pkp
         pure $ if res == 0
@@ -176,31 +176,31 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
              copyPtr skp (castPtr bsp) sz
   rawSerialiseSigDSIGN (SigSchnorrSecp256k1 sigPSB) = psbToByteString sigPSB
   {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
-  rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) = 
+  rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) =
     unsafeDupablePerformIO . psbUseAsSizedPtr vkPSB $ \pkbPtr -> do
-      res <- psbCreateSized $ \bsPtr -> 
+      res <- psbCreateSized $ \bsPtr ->
         withForeignPtr secpCtxPtr $ \ctx -> do
           res' <- secpXOnlyPubkeySerialize ctx bsPtr pkbPtr
-          when (res' /= 1) 
+          when (res' /= 1)
                (error "rawSerialiseVerKeyDSIGN: Failed to serialise VerKeyDSIGN SchnorrSecp256k1DSIGN")
       pure . psbToByteString $ res
   rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
-  rawDeserialiseVerKeyDSIGN bs = 
+  rawDeserialiseVerKeyDSIGN bs =
     unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, len) ->
       if len /= (fromIntegral . natVal $ Proxy @(SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
       then pure Nothing
       else do
         let dataPtr = castPtr ptr
         (vkPsb, res) <- psbCreateSizedResult $ \outPtr ->
-          withForeignPtr secpCtxPtr $ \ctx -> 
+          withForeignPtr secpCtxPtr $ \ctx ->
             secpXOnlyPubkeyParse ctx outPtr dataPtr
-        pure $ case res of 
+        pure $ case res of
           1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
           _ -> Nothing
-  rawDeserialiseSignKeyDSIGN bs = 
+  rawDeserialiseSignKeyDSIGN bs =
     SignKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
-  rawDeserialiseSigDSIGN bs = 
+  rawDeserialiseSigDSIGN bs =
     SigSchnorrSecp256k1 <$> psbFromByteStringCheck bs
 
 instance ToCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where

@@ -209,7 +209,7 @@ instance (Prelude.Bounded a, Prelude.Monoid a, Prelude.Ord a)
 
 instance (Prelude.Eq a, Generic a, GMeasure (Rep a))
       => Measure (InstantiatedAt Generic a) where
-  zero = coerce $     to @a gzero 
+  zero = coerce $     to @a gzero
   plus = coerce $ gbinop @a gplus
   min  = coerce $ gbinop @a gmin
   max  = coerce $ gbinop @a gmax
