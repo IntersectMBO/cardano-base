@@ -54,7 +54,7 @@ module Cardano.Crypto.VRF.Praos
   -- * Core VRF operations
   , prove
   , verify
-  
+
   , SignKeyVRF (..)
   , VerKeyVRF (..)
   , CertVRF (..)

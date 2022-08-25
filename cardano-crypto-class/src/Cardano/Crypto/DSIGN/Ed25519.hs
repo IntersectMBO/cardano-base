@@ -7,9 +7,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
 -- According to the documentation for unsafePerformIO:
--- 
--- > Make sure that the either you switch off let-floating 
--- > (-fno-full-laziness), or that the call to unsafePerformIO cannot float 
+--
+-- > Make sure that the either you switch off let-floating
+-- > (-fno-full-laziness), or that the call to unsafePerformIO cannot float
 -- > outside a lambda.
 --
 -- If we do not switch off let-floating, our calls to unsafeDupablePerformIO for
@@ -173,8 +173,8 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     rawSerialiseVerKeyDSIGN   (VerKeyEd25519DSIGN vk) = psbToByteString vk
     rawSerialiseSignKeyDSIGN  (SignKeyEd25519DSIGN sk) =
         psbToByteString @(SeedSizeDSIGN Ed25519DSIGN) $ unsafeDupablePerformIO $ do
-          psbCreateSized $ \seedPtr -> 
-            psbUseAsSizedPtr sk $ \skPtr -> 
+          psbCreateSized $ \seedPtr ->
+            psbUseAsSizedPtr sk $ \skPtr ->
               cOrError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_seed"
                 $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
 
