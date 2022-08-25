@@ -1,14 +1,16 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE MagicHash #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class
@@ -71,6 +73,7 @@ import Data.String (IsString(..))
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
+import Language.Haskell.TH.Syntax (Q, TExp(..))
 
 import Data.Aeson (FromJSON(..), FromJSONKey(..), ToJSON(..), ToJSONKey(..))
 import qualified Data.Aeson as Aeson
@@ -83,6 +86,7 @@ import NoThunks.Class (NoThunks)
 import Cardano.Binary (Encoding, FromCBOR(..), Size, ToCBOR(..), decodeBytes,
                        serializeEncoding')
 import Cardano.Crypto.PackedBytes
+import Cardano.Crypto.Util (decodeHexString)
 import Cardano.HeapWords (HeapWords (..))
 
 import qualified Data.ByteString.Short.Internal as SBSI
@@ -104,6 +108,39 @@ sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
 newtype Hash h a = UnsafeHashRep (PackedBytes (SizeHash h))
   deriving (Eq, Ord, Generic, NoThunks, NFData)
+
+-- | This instance is meant to be used with @TemplateHaskell@
+--
+-- >>> import Cardano.Crypto.Hash.Class (Hash)
+-- >>> import Cardano.Crypto.Hash.Short (ShortHash)
+-- >>> :set -XTemplateHaskell
+-- >>> :set -XOverloadedStrings
+-- >>>  let hash = $$("0xBADC0FFEE0DDF00D") :: Hash ShortHash ()
+-- >>> print hash
+-- "badc0ffee0ddf00d"
+-- >>> let hash = $$("0123456789abcdef") :: Hash ShortHash ()
+-- >>> print hash
+-- "0123456789abcdef"
+-- >>> let hash = $$("deadbeef") :: Hash ShortHash ()
+-- <interactive>:5:15: error:
+--     • <Hash blake2b_prefix_8>: Expected in decoded form to be: 8 bytes, but got: 4
+--     • In the Template Haskell splice $$("deadbeef")
+--       In the expression: $$("deadbeef") :: Hash ShortHash ()
+--       In an equation for ‘hash’:
+--           hash = $$("deadbeef") :: Hash ShortHash ()
+-- >>> let hash = $$("123") :: Hash ShortHash ()
+-- <interactive>:6:15: error:
+--     • <Hash blake2b_prefix_8>: Malformed hex: invalid bytestring size
+--     • In the Template Haskell splice $$("123")
+--       In the expression: $$("123") :: Hash ShortHash ()
+--       In an equation for ‘hash’: hash = $$("123") :: Hash ShortHash ()
+instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
+  fromString hexStr = do
+    let n = fromInteger $ natVal (Proxy @(SizeHash h))
+    case decodeHexString hexStr n of
+      Left err -> fail $ "<Hash " ++ hashAlgorithmName (Proxy :: Proxy h) ++ ">: " ++ err
+      Right _  -> [|| either error (UnsafeHashRep . packPinnedBytes) (decodeHexString hexStr n) ||]
+
 
 pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
 pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)

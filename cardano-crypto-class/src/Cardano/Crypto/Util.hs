@@ -31,6 +31,7 @@ module Cardano.Crypto.Util
 where
 
 import           Control.Monad (unless)
+import           Data.Bifunctor (first)
 import           Data.Char (isAscii)
 import           Data.Word
 import           Numeric.Natural
@@ -145,22 +146,24 @@ slice offset size = BS.take (fromIntegral size)
 -- | Decode base16 ByteString, while ensuring expected length.
 decodeHexByteString :: ByteString -> Int -> Either String ByteString
 decodeHexByteString bsHex lenExpected = do
-  bs <- BS16.decode bsHex
+  bs <- first ("Malformed hex: " ++) $ BS16.decode bsHex
   let lenActual = BS.length bs
   unless (lenExpected == lenActual) $
-    Left $ "Incorrect hex length. Expected: " ++
-           show lenExpected ++ " but got: " ++ show lenActual
+    Left $ "Expected in decoded form to be: " ++
+           show lenExpected ++ " bytes, but got: " ++ show lenActual
   pure bs
 
 
 -- | Decode base16 String, while ensuring expected length. Unlike
 -- `decodeHexByteString` this function expects a '0x' prefix.
 decodeHexString :: String -> Int -> Either String ByteString
-decodeHexString ('0':'x':hexStr) lenExpected = do
-  unless (all isAscii hexStr) $ Left $ "Input string contrains invalid characters: " ++ hexStr
+decodeHexString hexStr' lenExpected = do
+  let hexStr =
+        case hexStr' of
+          '0':'x':str -> str
+          str -> str
+  unless (all isAscii hexStr) $ Left $ "Input string contains invalid characters: " ++ hexStr
   decodeHexByteString (BSC8.pack hexStr) lenExpected
-decodeHexString hexStr _lenExpected =
-  Left $ "Expected a hex encoded string to be prefixed with '0x', instead got: " ++ show hexStr
 
 -- | Decode a `String` with Hex characters, while ensuring expected length.
 decodeHexStringQ :: String -> Int -> Q Exp

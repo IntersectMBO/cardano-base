@@ -120,32 +120,29 @@ instance KnownNat n => Ord (PinnedSizedBytes n) where
         size = fromInteger (natVal (Proxy :: Proxy n))
 
 
--- | This instance meant to be used with TemplateHaskell
+-- | This instance is meant to be used with @TemplateHaskell@
 --
 -- >>> import Cardano.Crypto.PinnedSizedBytes
 -- >>> :set -XTemplateHaskell
 -- >>> :set -XOverloadedStrings
 -- >>> :set -XDataKinds
--- >>> let psb = $$("0xdeadbeef") :: PinnedSizedBytes 4
--- >>> print psb
+-- >>> print ($$("0xdeadbeef") :: PinnedSizedBytes 4)
 -- "deadbeef"
--- >>> let badPsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
-
--- <interactive>:8:17: error:
---     • <PinnedSizedBytes>: Incorrect hex length. Expected: 5 but got: 4
+-- >>> print ($$("deadbeef") :: PinnedSizedBytes 4)
+-- "deadbeef"
+-- >>> let bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- <interactive>:9:14: error:
+--     • <PinnedSizedBytes>: Expected in decoded form to be: 5 bytes, but got: 4
 --     • In the Template Haskell splice $$("0xdeadbeef")
 --       In the expression: $$("0xdeadbeef") :: PinnedSizedBytes 5
---       In an equation for ‘badPsb’:
---           badPsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
--- >>> let badPsb = $$("deadbeef") :: PinnedSizedBytes 4
-
--- <interactive>:9:17: error:
---     • <PinnedSizedBytes>: Expected a hex encoded string to be prefixed with '0x', instead got: "deadbeef"
---     • In the Template Haskell splice $$("deadbeef")
---       In the expression: $$("deadbeef") :: PinnedSizedBytes 4
---       In an equation for ‘badPsb’:
---           badPsb = $$("deadbeef") :: PinnedSizedBytes 4
-
+--       In an equation for ‘bsb’:
+--           bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- >>> let bsb = $$("nogood") :: PinnedSizedBytes 5
+-- <interactive>:11:14: error:
+--     • <PinnedSizedBytes>: Malformed hex: invalid character at offset: 0
+--     • In the Template Haskell splice $$("nogood")
+--       In the expression: $$("nogood") :: PinnedSizedBytes 5
+--       In an equation for ‘bsb’: bsb = $$("nogood") :: PinnedSizedBytes 5
 instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
     fromString hexStr = do
       let n = fromInteger $ natVal (Proxy :: Proxy n)
