@@ -110,6 +110,7 @@ library
     , primitive
     , serialise
     , strict-containers
+    , template-haskell
     , text
     , transformers
     , vector

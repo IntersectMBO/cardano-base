@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Cardano.Crypto.Util
   ( Empty
@@ -20,15 +22,25 @@ module Cardano.Crypto.Util
 
   -- * ByteString manipulation
   , slice
+
+  -- * Base16 conversion
+  , decodeHexByteString
+  , decodeHexString
+  , decodeHexStringQ
   )
 where
 
+import           Control.Monad (unless)
+import           Data.Char (isAscii)
 import           Data.Word
 import           Numeric.Natural
 import           Data.Bits
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.ByteString.Internal as BS
 import           Data.ByteString (ByteString)
+import           Data.ByteString.Base16 as BS16
+import           Language.Haskell.TH
 
 import qualified GHC.Exts    as GHC
 import qualified GHC.IO      as GHC (unsafeDupablePerformIO)
@@ -129,4 +141,31 @@ bytesToInteger (BS.PS fp (GHC.I# off#) (GHC.I# len#)) =
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size = BS.take (fromIntegral size)
                   . BS.drop (fromIntegral offset)
+
+-- | Decode base16 ByteString, while ensuring expected length.
+decodeHexByteString :: ByteString -> Int -> Either String ByteString
+decodeHexByteString bsHex lenExpected = do
+  bs <- BS16.decode bsHex
+  let lenActual = BS.length bs
+  unless (lenExpected == lenActual) $
+    Left $ "Incorrect hex length. Expected: " ++
+           show lenExpected ++ " but got: " ++ show lenActual
+  pure bs
+
+
+-- | Decode base16 String, while ensuring expected length. Unlike
+-- `decodeHexByteString` this function expects a '0x' prefix.
+decodeHexString :: String -> Int -> Either String ByteString
+decodeHexString ('0':'x':hexStr) lenExpected = do
+  unless (all isAscii hexStr) $ Left $ "Input string contrains invalid characters: " ++ hexStr
+  decodeHexByteString (BSC8.pack hexStr) lenExpected
+decodeHexString hexStr _lenExpected =
+  Left $ "Expected a hex encoded string to be prefixed with '0x', instead got: " ++ show hexStr
+
+-- | Decode a `String` with Hex characters, while ensuring expected length.
+decodeHexStringQ :: String -> Int -> Q Exp
+decodeHexStringQ hexStr n = do
+  case decodeHexString hexStr n of
+    Left err -> fail $ "<decodeHexByteString>: " ++ err
+    Right _  -> [| either error id (decodeHexString hexStr n) |]
 
