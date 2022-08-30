@@ -135,7 +135,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , padBS
 
   -- * P1/G1 operations
-  , onCurve
   , inGroup
   , addOrDouble
   , mult
@@ -667,10 +666,6 @@ instance Eq Scalar where
 instance Eq Fr where
   a == b = unsafePerformIO $
     (==) <$> scalarFromFr a <*> scalarFromFr b
-
--- | Check whether a point is on its elliptic curve.
-onCurve :: BLS_Curve curve => P curve -> Bool
-onCurve p = unsafePerformIO $ withP p c_blst_on_curve
 
 -- | Check whether a point is in the group corresponding to its elliptic curve
 inGroup :: BLS_Curve curve => P curve -> Bool
