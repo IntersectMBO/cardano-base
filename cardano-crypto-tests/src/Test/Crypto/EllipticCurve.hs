@@ -43,11 +43,7 @@ tests =
 testUtil :: String -> TestTree
 testUtil name =
   testGroup name
-    [ testProperty "Integer / C-String round-trip" $
-        \n ->
-          n >= 0 ==>
-          n === unsafePerformIO (BLS.integerAsCStr n BLS.cstrToInteger)
-    , testProperty "Integer / C-String 32 round-trip" $
+    [ testProperty "Integer / C-String 32 round-trip" $
         \n ->
           n >= 0 ==>
           n < (1 `shiftL` 32 * 8) ==>

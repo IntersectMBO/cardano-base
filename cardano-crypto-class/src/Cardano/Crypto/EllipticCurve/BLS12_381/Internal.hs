@@ -129,7 +129,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , cloneFr
 
   -- * Utility
-  , integerAsCStr
   , integerAsCStrL
   , cstrToInteger
   , integerToBS
@@ -501,11 +500,6 @@ padBS i b
   = BS.replicate (i - BS.length b) 0 <> b
   | otherwise
   = b
-
-integerAsCStr :: Integer -> (Ptr CChar -> Int -> IO a) -> IO a
-integerAsCStr n f = do
-  let bs = integerToBS n
-  BS.useAsCStringLen bs $ uncurry f
 
 integerAsCStrL :: Int -> Integer -> (Ptr CChar -> Int -> IO a) -> IO a
 integerAsCStrL i n f = do
