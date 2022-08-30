@@ -22,7 +22,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   -- or 'Curve2' to select one of the two provided elliptic curves.
   , onCurve
   , inGroup
-  , add
+  , addOrDouble
   , mult
   , cneg
   , neg

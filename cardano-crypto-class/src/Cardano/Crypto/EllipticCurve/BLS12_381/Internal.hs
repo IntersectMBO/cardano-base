@@ -55,7 +55,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 
   , BLS_Curve
       ( c_blst_on_curve
-      , c_blst_add
+      , c_blst_add_or_double
       , c_blst_mult
       , c_blst_cneg
       , c_blst_hash
@@ -137,7 +137,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   -- * P1/G1 operations
   , onCurve
   , inGroup
-  , add
+  , addOrDouble
   , mult
   , cneg
   , neg
@@ -333,11 +333,11 @@ sizePT = fromIntegral c_size_blst_fp12
 ---- Curve operations
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
--- use higher-level wrappers such as 'add', 'mult', 'cneg', 'neg', etc.
+-- use higher-level wrappers such as 'addOrDouble', 'mult', 'cneg', 'neg', etc.
 class BLS_Curve curve where
   c_blst_on_curve :: PPtr curve -> IO Bool
 
-  c_blst_add :: PPtr curve -> PPtr curve -> PPtr curve -> IO ()
+  c_blst_add_or_double :: PPtr curve -> PPtr curve -> PPtr curve -> IO ()
   c_blst_mult :: PPtr curve -> PPtr curve -> ScalarPtr -> CInt -> IO ()
   c_blst_cneg :: PPtr curve -> Bool -> IO ()
 
@@ -359,7 +359,7 @@ class BLS_Curve curve where
 instance BLS_Curve Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
 
-  c_blst_add = c_blst_p1_add
+  c_blst_add_or_double = c_blst_p1_add_or_double
   c_blst_mult = c_blst_p1_mult
   c_blst_cneg = c_blst_p1_cneg
 
@@ -382,7 +382,7 @@ instance BLS_Curve Curve1 where
 instance BLS_Curve Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
 
-  c_blst_add = c_blst_p2_add
+  c_blst_add_or_double = c_blst_p2_add_or_double
   c_blst_mult = c_blst_p2_mult
   c_blst_cneg = c_blst_p2_cneg
 
@@ -534,7 +534,7 @@ foreign import ccall "blst_scalar_from_bendian" c_blst_scalar_from_bendian :: Sc
 foreign import ccall "size_blst_p1" c_size_blst_p1 :: CSize
 foreign import ccall "blst_p1_on_curve" c_blst_p1_on_curve :: P1Ptr -> IO Bool
 
-foreign import ccall "blst_p1_add_or_double" c_blst_p1_add :: P1Ptr -> P1Ptr -> P1Ptr -> IO ()
+foreign import ccall "blst_p1_add_or_double" c_blst_p1_add_or_double :: P1Ptr -> P1Ptr -> P1Ptr -> IO ()
 foreign import ccall "blst_p1_mult" c_blst_p1_mult :: P1Ptr -> P1Ptr -> ScalarPtr -> CInt -> IO ()
 foreign import ccall "blst_p1_cneg" c_blst_p1_cneg :: P1Ptr -> Bool -> IO ()
 
@@ -556,7 +556,7 @@ foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: P1Ptr -> IO Bool
 foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
 foreign import ccall "blst_p2_on_curve" c_blst_p2_on_curve :: P2Ptr -> IO Bool
 
-foreign import ccall "blst_p2_add_or_double" c_blst_p2_add :: P2Ptr -> P2Ptr -> P2Ptr -> IO ()
+foreign import ccall "blst_p2_add_or_double" c_blst_p2_add_or_double :: P2Ptr -> P2Ptr -> P2Ptr -> IO ()
 foreign import ccall "blst_p2_mult" c_blst_p2_mult :: P2Ptr -> P2Ptr -> ScalarPtr -> CInt -> IO ()
 foreign import ccall "blst_p2_cneg" c_blst_p2_cneg :: P2Ptr -> Bool -> IO ()
 
@@ -677,12 +677,12 @@ inGroup :: BLS_Curve curve => P curve -> Bool
 inGroup p = unsafePerformIO $ withP p c_blst_in_g
 
 -- | Curve point addition.
-add :: (BLS curve) => P curve -> P curve -> P curve
-add in1 in2 = unsafePerformIO $ do
+addOrDouble :: (BLS curve) => P curve -> P curve -> P curve
+addOrDouble in1 in2 = unsafePerformIO $ do
   withNewP' $ \outp -> do
     withP in1 $ \in1p -> do
       withP in2 $ \in2p -> do
-        c_blst_add outp in1p in2p
+        c_blst_add_or_double outp in1p in2p
 
 -- | Scalar multiplication of a curve point. The scalar will be brought into
 -- the range of modular arithmetic by means of a modulo operation over the
