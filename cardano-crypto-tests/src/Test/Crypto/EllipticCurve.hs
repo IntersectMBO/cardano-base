@@ -10,14 +10,11 @@ import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
---   (=/=), 
     (===), 
     (==>), 
     Arbitrary(..), 
     Property,
     suchThatMap,
---   Gen, 
---   forAllShow
   )
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty)
