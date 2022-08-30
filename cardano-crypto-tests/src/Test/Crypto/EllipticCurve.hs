@@ -86,7 +86,7 @@ testBLSCurve name _ =
     , testCase "neg generator on curve" $
         assertBool "" (BLS.onCurve (BLS.neg (BLS.generator @curve)))
     , testCase "add generator to itself" $
-        assertBool "" (BLS.onCurve (BLS.add (BLS.generator @curve) (BLS.generator @curve)))
+        assertBool "" (BLS.onCurve (BLS.addOrDouble (BLS.generator @curve) (BLS.generator @curve)))
     , testProperty "on curve" (BLS.onCurve @curve)
     , testProperty "neg on curve" (BLS.onCurve @curve . BLS.neg)
 
@@ -95,14 +95,14 @@ testBLSCurve name _ =
     , testCase "neg generator in group" $
         assertBool "" (BLS.inGroup (BLS.neg (BLS.generator @curve)))
     , testCase "add generator to itself" $
-        assertBool "" (BLS.inGroup (BLS.add (BLS.generator @curve) (BLS.generator @curve)))
+        assertBool "" (BLS.inGroup (BLS.addOrDouble (BLS.generator @curve) (BLS.generator @curve)))
     , testProperty "in group" (BLS.inGroup @curve)
     , testProperty "neg in group" (BLS.inGroup @curve . BLS.neg)
 
     , testProperty "self-equality" (\(a :: BLS.P curve) -> a === a)
     , testProperty "double negation" (\(a :: BLS.P curve) -> a === BLS.neg (BLS.neg a))
-    , testProperty "addition associative" (testAssoc (BLS.add :: BLS.P curve -> BLS.P curve -> BLS.P curve))
-    , testProperty "addition commutative" (testCommut (BLS.add :: BLS.P curve -> BLS.P curve -> BLS.P curve))
+    , testProperty "addition associative" (testAssoc (BLS.addOrDouble :: BLS.P curve -> BLS.P curve -> BLS.P curve))
+    , testProperty "addition commutative" (testCommut (BLS.addOrDouble :: BLS.P curve -> BLS.P curve -> BLS.P curve))
     , testProperty "adding negation yields infinity" (testAddNegYieldsInf @curve)
     , testProperty "round-trip serialization" $
         testRoundTripEither @(BLS.P curve) BLS.serialize BLS.deserialize
@@ -172,7 +172,7 @@ testCommut f a b =
 testAddNegYieldsInf :: forall curve. BLS.BLS curve
         => BLS.P curve -> Bool
 testAddNegYieldsInf p =
-  BLS.isInf (BLS.add p (BLS.neg p))
+  BLS.isInf (BLS.addOrDouble p (BLS.neg p))
 
 testRoundTripEither :: forall p a err. (Show p, Show err, Eq p, Eq err)
         => (p -> a)

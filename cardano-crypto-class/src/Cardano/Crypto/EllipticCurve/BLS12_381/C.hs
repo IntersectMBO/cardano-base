@@ -50,7 +50,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.C
 
 , BLS_Curve
     ( c_blst_on_curve
-    , c_blst_add
+    , c_blst_add_or_double
     , c_blst_mult
     , c_blst_cneg
     , c_blst_hash
@@ -272,7 +272,7 @@ instance BLS_P Curve2 where
 class BLS_Curve curve where
   c_blst_on_curve :: PPtr curve -> IO Bool
 
-  c_blst_add :: PPtr curve -> PPtr curve -> PPtr curve -> IO ()
+  c_blst_add_or_double :: PPtr curve -> PPtr curve -> PPtr curve -> IO ()
   c_blst_mult :: PPtr curve -> PPtr curve -> ScalarPtr -> CSize -> IO ()
   c_blst_cneg :: PPtr curve -> Bool -> IO ()
 
@@ -300,7 +300,7 @@ class BLS_Curve curve where
 instance BLS_Curve Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
 
-  c_blst_add = c_blst_p1_add
+  c_blst_add_or_double = c_blst_p1_add_or_double
   c_blst_mult = c_blst_p1_mult
   c_blst_cneg = c_blst_p1_cneg
 
@@ -329,7 +329,7 @@ instance BLS_Curve Curve1 where
 instance BLS_Curve Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
 
-  c_blst_add = c_blst_p2_add
+  c_blst_add_or_double = c_blst_p2_add_or_double
   c_blst_mult = c_blst_p2_mult
   c_blst_cneg = c_blst_p2_cneg
 
@@ -529,7 +529,7 @@ foreign import ccall "blst_scalar_from_bendian" c_blst_scalar_from_bendian :: Sc
 foreign import ccall "size_blst_p1" c_size_blst_p1 :: CSize
 foreign import ccall "blst_p1_on_curve" c_blst_p1_on_curve :: P1Ptr -> IO Bool
 
-foreign import ccall "blst_p1_add_or_double" c_blst_p1_add :: P1Ptr -> P1Ptr -> P1Ptr -> IO ()
+foreign import ccall "blst_p1_add_or_double" c_blst_p1_add_or_double :: P1Ptr -> P1Ptr -> P1Ptr -> IO ()
 foreign import ccall "blst_p1_mult" c_blst_p1_mult :: P1Ptr -> P1Ptr -> ScalarPtr -> CSize -> IO ()
 foreign import ccall "blst_p1_cneg" c_blst_p1_cneg :: P1Ptr -> Bool -> IO ()
 
@@ -558,7 +558,7 @@ foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: P1Ptr -> IO Bool
 foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
 foreign import ccall "blst_p2_on_curve" c_blst_p2_on_curve :: P2Ptr -> IO Bool
 
-foreign import ccall "blst_p2_add_or_double" c_blst_p2_add :: P2Ptr -> P2Ptr -> P2Ptr -> IO ()
+foreign import ccall "blst_p2_add_or_double" c_blst_p2_add_or_double :: P2Ptr -> P2Ptr -> P2Ptr -> IO ()
 foreign import ccall "blst_p2_mult" c_blst_p2_mult :: P2Ptr -> P2Ptr -> ScalarPtr -> CSize -> IO ()
 foreign import ccall "blst_p2_cneg" c_blst_p2_cneg :: P2Ptr -> Bool -> IO ()
 
