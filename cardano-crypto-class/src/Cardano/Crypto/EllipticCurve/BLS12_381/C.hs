@@ -419,7 +419,7 @@ cloneFr (Fr a) = do
 ---- Safe FP types / marshalling
 
 sizeFP :: forall i. Num i => i
-sizeFP = fromIntegral c_size_blst_scalar
+sizeFP = fromIntegral c_size_blst_fp12
 
 newtype FP = FP (ForeignPtr Void)
 
