@@ -17,10 +17,10 @@ let
 
     packages = ps: builtins.attrValues (haskellLib.selectProjectPackages ps);
 
-    nativeBuildInputs = [ cabalWrapped ];
+    nativeBuildInputs = [ buildPackages.cabalWrapped ];
 
     # These programs will be available inside the nix-shell.
-    buildInputs = with haskellPackages; [
+    buildInputs = with buildPackages; with haskellPackages; [
       ghcid
       gitAndTools.git
       hlint
