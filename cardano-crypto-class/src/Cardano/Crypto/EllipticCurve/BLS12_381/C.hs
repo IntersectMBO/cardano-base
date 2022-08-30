@@ -587,13 +587,13 @@ foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: P2Ptr -> IO Bool
 foreign import ccall "size_blst_affine1" c_size_blst_affine1 :: CSize
 foreign import ccall "size_blst_affine2" c_size_blst_affine2 :: CSize
 
-foreign import ccall "blst_p1_to_affine" c_blst_p1_to_affine :: AffinePtr Curve1 -> PPtr Curve1 -> IO ()
-foreign import ccall "blst_p2_to_affine" c_blst_p2_to_affine :: AffinePtr Curve2 -> PPtr Curve2 -> IO ()
-foreign import ccall "blst_p1_from_affine" c_blst_p1_from_affine :: PPtr Curve1 -> AffinePtr Curve1 -> IO ()
-foreign import ccall "blst_p2_from_affine" c_blst_p2_from_affine :: PPtr Curve2 -> AffinePtr Curve2 -> IO ()
+foreign import ccall "blst_p1_to_affine" c_blst_p1_to_affine :: Affine1Ptr -> P1Ptr -> IO ()
+foreign import ccall "blst_p2_to_affine" c_blst_p2_to_affine :: Affine2Ptr -> P2Ptr -> IO ()
+foreign import ccall "blst_p1_from_affine" c_blst_p1_from_affine :: P1Ptr -> Affine1Ptr -> IO ()
+foreign import ccall "blst_p2_from_affine" c_blst_p2_from_affine :: P2Ptr -> Affine2Ptr -> IO ()
 
-foreign import ccall "blst_p1_affine_in_g1" c_blst_p1_affine_in_g1 :: AffinePtr Curve1 -> IO Bool
-foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: AffinePtr Curve2 -> IO Bool
+foreign import ccall "blst_p1_affine_in_g1" c_blst_p1_affine_in_g1 :: Affine1Ptr -> IO Bool
+foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: Affine2Ptr -> IO Bool
 
 ---- Pairing check
 
