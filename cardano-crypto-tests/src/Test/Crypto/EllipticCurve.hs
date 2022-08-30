@@ -81,16 +81,7 @@ testBLSCurve :: forall curve. BLS.BLS curve
              => String -> Proxy curve -> TestTree
 testBLSCurve name _ =
   testGroup name
-    [ testCase "generator on curve" $
-        assertBool "" (BLS.onCurve (BLS.generator @curve))
-    , testCase "neg generator on curve" $
-        assertBool "" (BLS.onCurve (BLS.neg (BLS.generator @curve)))
-    , testCase "add generator to itself" $
-        assertBool "" (BLS.onCurve (BLS.addOrDouble (BLS.generator @curve) (BLS.generator @curve)))
-    , testProperty "on curve" (BLS.onCurve @curve)
-    , testProperty "neg on curve" (BLS.onCurve @curve . BLS.neg)
-
-    , testCase "generator in group" $
+    [ testCase "generator in group" $
         assertBool "" (BLS.inGroup (BLS.generator @curve))
     , testCase "neg generator in group" $
         assertBool "" (BLS.inGroup (BLS.neg (BLS.generator @curve)))
