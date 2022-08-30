@@ -173,10 +173,6 @@ testCommut :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> Property
 testCommut f a b =
   f a b === f b a
 
-testNeutral :: (Show a, Eq a) => a -> (a -> a -> a) -> a -> Property
-testNeutral z f x =
-  f x z === x
-
 testAddNegYieldsInf :: forall curve. BLS.BLS curve
         => BLS.P curve -> Bool
 testAddNegYieldsInf p =
