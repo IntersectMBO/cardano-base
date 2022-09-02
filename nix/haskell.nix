@@ -25,25 +25,7 @@ let
     compiler-nix-name = compiler;
     modules = [
 
-      # Allow reinstallation of Win32
-      { nonReinstallablePkgs =
-        [ "rts" "ghc-heap" "ghc-prim" "integer-gmp" "integer-simple" "base"
-          "deepseq" "array" "ghc-boot-th" "pretty" "template-haskell"
-          # ghcjs custom packages
-          "ghcjs-prim" "ghcjs-th"
-          "ghc-boot"
-          "ghc" "array" "binary" "bytestring" "containers"
-          "filepath" "ghc-boot" "ghc-compact" "ghc-prim"
-          # "ghci" "haskeline"
-          "hpc"
-          "mtl" "parsec" "text" "transformers"
-          "xhtml"
-          # Needed for ghc (which is used by hspec-core)
-          "directory" "time" "unix" "process" "terminfo"
-          # "stm" "terminfo"
-        ];
-      }
-      {
+      ({pkgs, ...}: {
         # Packages we wish to ignore version bounds of.
         # This is similar to jailbreakCabal, however it
         # does not require any messing with cabal files.
@@ -51,18 +33,18 @@ let
 
         # split data output for ekg to reduce closure size
         packages.ekg.components.library.enableSeparateDataOutput = true;
-        packages.binary.configureFlags = [ "--ghc-option=-Werror" ];
-        #packages.binary/test.configureFlags = [ "--ghc-option=-Werror" ];
+        packages.cardano-binary.configureFlags = [ "--ghc-option=-Werror" ];
         packages.cardano-crypto-class.configureFlags = [ "--ghc-option=-Werror" ];
         # We need to override the pkgconfig libraries so that we can provide our fork of
         # libsodium instead of the one from nixpkgs, which is what haskell.nix would
         # otherwise choose. Unfortunately, this means that we also override any other 
         # pkgconfig libraries that haskell.nix would pick for us. So we also need to 
         # manually include those here.
-        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ buildPackages.libsodium-vrf buildPackages.secp256k1 ]];
+        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ pkgs.libsodium-vrf pkgs.secp256k1 ]];
+        packages.cardano-crypto-praos.components.library.pkgconfig = lib.mkForce [[ pkgs.libsodium-vrf ]];
         packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
-      }
+      })
       (lib.optionalAttrs stdenv.hostPlatform.isWindows {
         # Disable cabal-doctest tests by turning off custom setups
         packages.comonad.package.buildType = lib.mkForce "Simple";
