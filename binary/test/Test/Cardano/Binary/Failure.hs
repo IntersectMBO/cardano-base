@@ -14,8 +14,8 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Numeric.Natural (Natural)
 
 import Cardano.Binary hiding (Range)
- 
-import Hedgehog 
+
+import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Hedgehog.Internal.Property (failWith)
@@ -85,7 +85,7 @@ assertIsLeft (Right _) = withFrozenCallStack $ failWith Nothing "This should hav
 assertIsLeft (Left !x) = case x of
   DecoderErrorDeserialiseFailure _ (CR.DeserialiseFailure _ str) | not (null str) -> success
   DecoderErrorCanonicityViolation _  -> success
-  DecoderErrorCustom _  _            -> success 
+  DecoderErrorCustom _  _            -> success
   DecoderErrorEmptyList _            -> success
   DecoderErrorLeftover _ _           -> success
   DecoderErrorSizeMismatch _ _ _     -> success
@@ -93,7 +93,6 @@ assertIsLeft (Left !x) = case x of
   _                                  -> success
 
 decode :: FromCBOR a => Encoding -> Either DecoderError a
-decode enc = 
+decode enc =
  let encoded = serializeEncoding enc
  in decodeFull encoded
-

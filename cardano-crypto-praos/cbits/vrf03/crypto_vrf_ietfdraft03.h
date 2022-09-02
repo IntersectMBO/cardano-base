@@ -72,7 +72,7 @@ int crypto_vrf_ietfdraft03_is_valid_key(const unsigned char *pk)
 // Generate a VRF proof for a message using a secret key.
 //
 // The VRF output hash can be obtained by calling crypto_vrf_proof_to_hash(proof).
-// 
+//
 // Returns 0 on success, -1 on error decoding the (augmented) secret key
 //
 // This runs in time constant with respect to sk and, fixing a value of mlen,
