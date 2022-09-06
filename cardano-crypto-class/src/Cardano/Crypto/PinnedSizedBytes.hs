@@ -1,12 +1,15 @@
 {-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE UnboxedTuples              #-}
 {-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE UnboxedTuples              #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module Cardano.Crypto.PinnedSizedBytes
   (
     PinnedSizedBytes,
@@ -35,7 +38,6 @@ import Data.Kind (Type)
 import Control.DeepSeq (NFData)
 import Control.Monad.ST (runST)
 import Control.Monad.Primitive  (primitive_, touch)
-import Data.Char (ord)
 import Data.Primitive.ByteArray
           ( ByteArray (..)
           , MutableByteArray (..)
@@ -55,6 +57,7 @@ import Foreign.Ptr (FunPtr, castPtr)
 import Foreign.Storable (Storable (..))
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
+import Language.Haskell.TH.Syntax (Q, TExp(..))
 import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -67,6 +70,7 @@ import qualified Data.ByteString as BS
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
+import Cardano.Crypto.Util (decodeHexString)
 
 {- HLINT ignore "Reduce duplication" -}
 
@@ -115,29 +119,37 @@ instance KnownNat n => Ord (PinnedSizedBytes n) where
         size :: CSize
         size = fromInteger (natVal (Proxy :: Proxy n))
 
--- |
+
+-- | This instance is meant to be used with @TemplateHaskell@
 --
--- If given 'String' is too long, it is truncated,
--- If it is too short, it is padded with zeros.
---
--- Padding and truncation make it behave like an integer mod @n*8@.
---
--- >>> "abcdef" :: PinnedSizedBytes 4
--- "63646566"
---
--- >>> "foo" :: PinnedSizedBytes 8
--- "0000000000666f6f"
---
--- Non-ASCII codepoints are silently truncated to 0..255 range.
---
--- >>> "\x1234\x5678" :: PinnedSizedBytes 2
--- "3478"
---
--- 'PinnedSizedBytes' created with 'fromString' contains /unpinned/
--- 'ByteArray'.
---
-instance KnownNat n => IsString (PinnedSizedBytes n) where
-    fromString s = psbFromBytes (map (fromIntegral . ord) s)
+-- >>> import Cardano.Crypto.PinnedSizedBytes
+-- >>> :set -XTemplateHaskell
+-- >>> :set -XOverloadedStrings
+-- >>> :set -XDataKinds
+-- >>> print ($$("0xdeadbeef") :: PinnedSizedBytes 4)
+-- "deadbeef"
+-- >>> print ($$("deadbeef") :: PinnedSizedBytes 4)
+-- "deadbeef"
+-- >>> let bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- <interactive>:9:14: error:
+--     • <PinnedSizedBytes>: Expected in decoded form to be: 5 bytes, but got: 4
+--     • In the Template Haskell splice $$("0xdeadbeef")
+--       In the expression: $$("0xdeadbeef") :: PinnedSizedBytes 5
+--       In an equation for ‘bsb’:
+--           bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- >>> let bsb = $$("nogood") :: PinnedSizedBytes 5
+-- <interactive>:11:14: error:
+--     • <PinnedSizedBytes>: Malformed hex: invalid character at offset: 0
+--     • In the Template Haskell splice $$("nogood")
+--       In the expression: $$("nogood") :: PinnedSizedBytes 5
+--       In an equation for ‘bsb’: bsb = $$("nogood") :: PinnedSizedBytes 5
+instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
+    fromString hexStr = do
+      let n = fromInteger $ natVal (Proxy :: Proxy n)
+      case decodeHexString hexStr n of
+        Left err -> fail $ "<PinnedSizedBytes>: " ++ err
+        Right _  -> [|| either error psbFromByteString (decodeHexString hexStr n) ||]
+
 
 -- | See 'psbFromBytes'.
 psbToBytes :: PinnedSizedBytes n -> [Word8]
@@ -170,9 +182,13 @@ psbFromBytes ws0 = PSB (pinnedByteArrayFromListN size ws)
         $ (++ repeat 0)
         $ reverse ws0
 
--- This is not efficient, but we don't use this in non-tests
+-- | Convert a ByteString into PinnedSizedBytes. Input should contain the exact
+-- number of bytes as expected by type level @n@ size, otherwise error.
 psbFromByteString :: KnownNat n => BS.ByteString -> PinnedSizedBytes n
-psbFromByteString = psbFromBytes . BS.unpack
+psbFromByteString bs =
+  case psbFromByteStringCheck bs of
+    Nothing -> error $ "psbFromByteString: Size mismatch, got: " ++ show (BS.length bs)
+    Just psb -> psb
 
 psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
 psbFromByteStringCheck bs
