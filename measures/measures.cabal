@@ -38,7 +38,7 @@ library
                         Data.Measure
                         Data.Measure.Class
 
-  build-depends:        base >= 4.14
+  build-depends:        base
                       , base-deriving-via
 
 test-suite test

@@ -32,7 +32,7 @@ import qualified Codec.CBOR.Read as CBOR.Read
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Short as SBS
-import qualified Data.ByteString.Short.Internal as SBS
+import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import Data.Fixed (Fixed(..), Nano, Pico)
 import Data.Int (Int32, Int64)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
@@ -314,7 +314,7 @@ instance FromCBOR BSL.ByteString where
 instance FromCBOR SBS.ShortByteString where
   fromCBOR = do
     BA.BA (Prim.ByteArray ba) <- D.decodeByteArray
-    return $ SBS.SBS ba
+    return $ SBS ba
 
 instance FromCBOR a => FromCBOR [a] where
   fromCBOR = decodeListWith fromCBOR

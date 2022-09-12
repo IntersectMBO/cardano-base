@@ -33,11 +33,15 @@ library
       -Werror
   exposed-modules:      Cardano.HeapWords
   build-depends:        array
-                      , base >= 4.14
+                      , base
                       , bytestring
                       , containers
                       , ghc-prim
-                      , integer-gmp
                       , text
                       , time
                       , vector
+
+
+  if impl(ghc < 9.0.0)
+    build-depends:
+      integer-gmp

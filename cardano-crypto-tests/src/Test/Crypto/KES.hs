@@ -97,13 +97,13 @@ testKESAlgorithm _p n =
       , testGroup "size"
         [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyKES v)
                                                        rawSerialiseVerKeyKES
-                                                       (sizeVerKeyKES (Proxy @ v))
+                                                       (sizeVerKeyKES (Proxy @v))
         , testProperty "SignKey" $ prop_size_serialise @(SignKeyKES v)
                                                        rawSerialiseSignKeyKES
-                                                       (sizeSignKeyKES (Proxy @ v))
+                                                       (sizeSignKeyKES (Proxy @v))
         , testProperty "Sig"     $ prop_size_serialise @(SigKES v)
                                                        rawSerialiseSigKES
-                                                       (sizeSigKES (Proxy @ v))
+                                                       (sizeSigKES (Proxy @v))
         ]
 
       , testGroup "direct CBOR"
@@ -298,7 +298,7 @@ prop_serialise_VerKeyKES sk_0 =
        .&. prop_cbor_with encodeVerKeyKES
                           decodeVerKeyKES vk
        .&. prop_size_serialise rawSerialiseVerKeyKES
-                               (sizeVerKeyKES (Proxy @ v)) vk
+                               (sizeVerKeyKES (Proxy @v)) vk
       | (t, vk) <- zip [0..] (map deriveVerKeyKES (allUpdatesKES sk_0)) ]
 
 
@@ -318,7 +318,7 @@ prop_serialise_SignKeyKES sk_0 =
        .&. prop_cbor_with encodeSignKeyKES
                           decodeSignKeyKES sk
        .&. prop_size_serialise rawSerialiseSignKeyKES
-                               (sizeSignKeyKES (Proxy @ v)) sk
+                               (sizeSignKeyKES (Proxy @v)) sk
       | (t, sk) <- zip [0..] (allUpdatesKES sk_0) ]
 
 
@@ -339,7 +339,7 @@ prop_serialise_SigKES sk_0 x =
        .&. prop_cbor_with encodeSigKES
                           decodeSigKES sig
        .&. prop_size_serialise rawSerialiseSigKES
-                               (sizeSigKES (Proxy @ v)) sig
+                               (sizeSigKES (Proxy @v)) sig
       | (t, sk) <- zip [0..] (allUpdatesKES sk_0)
       , let sig = signKES () t x sk
       ]

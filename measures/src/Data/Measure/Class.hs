@@ -1,6 +1,8 @@
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DerivingVia          #-}
 {-# LANGUAGE EmptyCase            #-}
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE NoImplicitPrelude    #-}
@@ -27,7 +29,10 @@ import Data.Coerce
 import Data.DerivingVia
 import Data.Word (Word8, Word16, Word32, Word64)
 import GHC.Generics
+#if __GLASGOW_HASKELL__ < 900
+-- Use the GHC version here because this is compiler dependent, and only indirectly lib dependent.
 import GHC.Natural (Natural)
+#endif
 import GHC.TypeLits
 import Prelude (($))
 import qualified Prelude

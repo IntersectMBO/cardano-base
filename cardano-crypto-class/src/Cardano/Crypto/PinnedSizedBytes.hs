@@ -58,11 +58,11 @@ import Foreign.Storable (Storable (..))
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import Language.Haskell.TH.Syntax (Q, TExp(..))
+import Language.Haskell.TH.Syntax.Compat (examineSplice)
 import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
-import GHC.Exts (Int (..))
-import GHC.Prim (copyAddrToByteArray#)
+import GHC.Exts (Int (..), copyAddrToByteArray#)
 import GHC.Ptr (Ptr (..))
 
 import qualified Data.Primitive as Prim
@@ -148,7 +148,7 @@ instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
       let n = fromInteger $ natVal (Proxy :: Proxy n)
       case decodeHexString hexStr n of
         Left err -> fail $ "<PinnedSizedBytes>: " ++ err
-        Right _  -> [|| either error psbFromByteString (decodeHexString hexStr n) ||]
+        Right _  -> examineSplice [|| either error psbFromByteString (decodeHexString hexStr n) ||]
 
 
 -- | See 'psbFromBytes'.

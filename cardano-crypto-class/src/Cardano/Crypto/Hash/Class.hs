@@ -74,6 +74,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Language.Haskell.TH.Syntax (Q, TExp(..))
+import Language.Haskell.TH.Syntax.Compat (examineSplice)
 
 import Data.Aeson (FromJSON(..), FromJSONKey(..), ToJSON(..), ToJSONKey(..))
 import qualified Data.Aeson as Aeson
@@ -139,7 +140,7 @@ instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
     let n = fromInteger $ natVal (Proxy @(SizeHash h))
     case decodeHexString hexStr n of
       Left err -> fail $ "<Hash " ++ hashAlgorithmName (Proxy :: Proxy h) ++ ">: " ++ err
-      Right _  -> [|| either error (UnsafeHashRep . packPinnedBytes) (decodeHexString hexStr n) ||]
+      Right _  -> examineSplice [|| either error (UnsafeHashRep . packPinnedBytes) (decodeHexString hexStr n) ||]
 
 
 pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a

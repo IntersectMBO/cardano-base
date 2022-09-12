@@ -34,7 +34,7 @@ library
                         Data.Sequence.Strict
                         Data.Unit.Strict
   build-depends:        aeson
-                      , base >= 4.14
+                      , base
                       , cardano-binary
                       , cborg
                       , containers

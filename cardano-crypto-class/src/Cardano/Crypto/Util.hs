@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module Cardano.Crypto.Util
   ( Empty
@@ -43,14 +45,21 @@ import           Data.ByteString (ByteString)
 import           Data.ByteString.Base16 as BS16
 import           Language.Haskell.TH
 
+import           GHC.Exts (Addr#, Int#, Word#)
 import qualified GHC.Exts    as GHC
-import qualified GHC.IO      as GHC (unsafeDupablePerformIO)
 import qualified GHC.Natural as GHC
-import qualified GHC.Integer.GMP.Internals as GMP
 import           Foreign.ForeignPtr (withForeignPtr)
 
 import           Crypto.Random (MonadRandom (..))
 
+#if __GLASGOW_HASKELL__ >= 900
+-- Use the GHC version here because this is compiler dependent, and only indirectly lib dependent.
+import           GHC.Num.Integer (integerFromAddr)
+import           GHC.IO (unsafeDupablePerformIO)
+#else
+import qualified GHC.Integer.GMP.Internals as GMP
+import           GHC.IO (unsafeDupablePerformIO)
+#endif
 
 class Empty a
 instance Empty a
@@ -132,12 +141,20 @@ bytesToInteger (BS.PS fp (GHC.I# off#) (GHC.I# len#)) =
     -- This should be safe since we're simply reading from ByteString (which is
     -- immutable) and GMP allocates a new memory for the Integer, i.e., there is
     -- no mutation involved.
-    GHC.unsafeDupablePerformIO $
+    unsafeDupablePerformIO $
       withForeignPtr fp $ \(GHC.Ptr addr#) ->
         let addrOff# = addr# `GHC.plusAddr#` off#
         -- The last parmaeter (`1#`) tells the import function to use big
         -- endian encoding.
-        in GMP.importIntegerFromAddr addrOff# (GHC.int2Word# len#) 1#
+        in importIntegerFromAddr addrOff# (GHC.int2Word# len#) 1#
+  where
+    importIntegerFromAddr :: Addr# -> Word# -> Int# -> IO Integer
+#if __GLASGOW_HASKELL__ >= 900
+-- Use the GHC version here because this is compiler dependent, and only indirectly lib dependent.
+    importIntegerFromAddr addr sz = integerFromAddr sz addr
+#else
+    importIntegerFromAddr = GMP.importIntegerFromAddr
+#endif
 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size = BS.take (fromIntegral size)
