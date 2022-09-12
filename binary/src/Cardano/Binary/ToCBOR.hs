@@ -42,7 +42,7 @@ import Codec.CBOR.Encoding as E
 import Codec.CBOR.ByteArray.Sliced as BAS
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
-import qualified Data.ByteString.Short.Internal as SBS
+import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import qualified Data.Primitive.ByteArray as Prim
 import Data.Fixed (E12, Fixed(..), Nano, Pico, resolution)
 #if MIN_VERSION_recursion_schemes(5,2,0)
@@ -574,7 +574,7 @@ instance ToCBOR Text.Text where
     in bsLength + apMono "withWordSize" withWordSize bsLength
 
 instance ToCBOR SBS.ShortByteString where
-  toCBOR sbs@(SBS.SBS ba) =
+  toCBOR sbs@(SBS ba) =
     E.encodeByteArray $ BAS.SBA (Prim.ByteArray ba) 0 (SBS.length sbs)
 
   encodedSizeExpr size _ =

@@ -51,11 +51,12 @@ import Foreign.Ptr (FunPtr, castPtr)
 import Foreign.Storable (Storable (..))
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
+import Language.Haskell.TH.Syntax (Q, TExp(..))
+import Language.Haskell.TH.Syntax.Compat (examineSplice)
 import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
-import GHC.Exts (Int (..))
-import GHC.Prim (copyAddrToByteArray#)
+import GHC.Exts (Int (..), copyAddrToByteArray#)
 import GHC.Ptr (Ptr (..))
 
 import qualified Data.Primitive as Prim
@@ -134,6 +135,34 @@ instance KnownNat n => Ord (PinnedSizedBytes n) where
 --
 instance KnownNat n => IsString (PinnedSizedBytes n) where
     fromString s = psbFromBytes (map (fromIntegral . ord) s)
+
+-- >>> import Cardano.Crypto.PinnedSizedBytes
+-- >>> :set -XTemplateHaskell
+-- >>> :set -XOverloadedStrings
+-- >>> :set -XDataKinds
+-- >>> print ($$("0xdeadbeef") :: PinnedSizedBytes 4)
+-- "deadbeef"
+-- >>> print ($$("deadbeef") :: PinnedSizedBytes 4)
+-- "deadbeef"
+-- >>> let bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- <interactive>:9:14: error:
+--     • <PinnedSizedBytes>: Expected in decoded form to be: 5 bytes, but got: 4
+--     • In the Template Haskell splice $$("0xdeadbeef")
+--       In the expression: $$("0xdeadbeef") :: PinnedSizedBytes 5
+--       In an equation for ‘bsb’:
+--           bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- >>> let bsb = $$("nogood") :: PinnedSizedBytes 5
+-- <interactive>:11:14: error:
+--     • <PinnedSizedBytes>: Malformed hex: invalid character at offset: 0
+--     • In the Template Haskell splice $$("nogood")
+--       In the expression: $$("nogood") :: PinnedSizedBytes 5
+--       In an equation for ‘bsb’: bsb = $$("nogood") :: PinnedSizedBytes 5
+instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
+    fromString hexStr = do
+      let n = fromInteger $ natVal (Proxy :: Proxy n)
+      case decodeHexString hexStr n of
+        Left err -> fail $ "<PinnedSizedBytes>: " ++ err
+        Right _  -> examineSplice [|| either error psbFromByteString (decodeHexString hexStr n) ||]
 
 -- | See 'psbFromBytes'.
 psbToBytes :: PinnedSizedBytes n -> [Word8]

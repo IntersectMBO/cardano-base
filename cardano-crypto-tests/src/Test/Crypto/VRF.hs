@@ -81,13 +81,13 @@ testVRFAlgorithm _ n =
       , testGroup "size"
         [ testProperty "VerKey"  $ prop_size_serialise @(VerKeyVRF v)
                                                        rawSerialiseVerKeyVRF
-                                                       (sizeVerKeyVRF (Proxy @ v))
+                                                       (sizeVerKeyVRF (Proxy @v))
         , testProperty "SignKey" $ prop_size_serialise @(SignKeyVRF v)
                                                        rawSerialiseSignKeyVRF
-                                                       (sizeSignKeyVRF (Proxy @ v))
+                                                       (sizeSignKeyVRF (Proxy @v))
         , testProperty "Cert"    $ prop_size_serialise @(CertVRF v)
                                                        rawSerialiseCertVRF
-                                                       (sizeCertVRF (Proxy @ v))
+                                                       (sizeCertVRF (Proxy @v))
         ]
 
       , testGroup "direct CBOR"

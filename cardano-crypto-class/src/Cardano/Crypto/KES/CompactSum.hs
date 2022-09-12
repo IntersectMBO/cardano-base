@@ -74,7 +74,6 @@ module Cardano.Crypto.KES.CompactSum (
   ) where
 
 import           Data.Proxy (Proxy(..))
-import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
 import           Control.Monad (guard)
@@ -131,7 +130,7 @@ instance (NFData (SigKES d), NFData (VerKeyKES d)) =>
 instance (NFData (SignKeyKES d), NFData (VerKeyKES d)) =>
   NFData (SignKeyKES (CompactSumKES h d)) where
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (OptimizedKESAlgorithm d, HashAlgorithm h)
       => KESAlgorithm (CompactSumKES h d) where
 
     type SeedSizeKES (CompactSumKES h d) = SeedSizeKES d
@@ -329,12 +328,12 @@ deriving instance Eq   (VerKeyKES (CompactSumKES h d))
 
 instance (KESAlgorithm d) => NoThunks (SignKeyKES (CompactSumKES h d))
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (OptimizedKESAlgorithm d, HashAlgorithm h)
       => ToCBOR (VerKeyKES (CompactSumKES h d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (OptimizedKESAlgorithm d, HashAlgorithm h)
       => FromCBOR (VerKeyKES (CompactSumKES h d)) where
   fromCBOR = decodeVerKeyKES
 
@@ -347,12 +346,12 @@ deriving instance KESAlgorithm d => Show (SignKeyKES (CompactSumKES h d))
 
 instance (OptimizedKESAlgorithm d) => NoThunks (VerKeyKES  (CompactSumKES h d))
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (OptimizedKESAlgorithm d, HashAlgorithm h)
       => ToCBOR (SignKeyKES (CompactSumKES h d)) where
   toCBOR = encodeSignKeyKES
   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (OptimizedKESAlgorithm d, HashAlgorithm h)
       => FromCBOR (SignKeyKES (CompactSumKES h d)) where
   fromCBOR = decodeSignKeyKES
 
@@ -366,11 +365,11 @@ deriving instance KESAlgorithm d => Eq   (SigKES (CompactSumKES h d))
 
 instance KESAlgorithm d => NoThunks (SigKES (CompactSumKES h d))
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (OptimizedKESAlgorithm d, HashAlgorithm h)
       => ToCBOR (SigKES (CompactSumKES h d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h, Typeable d)
+instance (OptimizedKESAlgorithm d, HashAlgorithm h)
       => FromCBOR (SigKES (CompactSumKES h d)) where
   fromCBOR = decodeSigKES

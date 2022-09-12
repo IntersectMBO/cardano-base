@@ -28,6 +28,7 @@ import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Short.Internal as SBS
 import qualified Data.Primitive.ByteArray as Prim
+import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import Data.Fixed (Fixed(..), Nano, Pico)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -297,7 +298,7 @@ instance FromCBOR LByteString where
 instance FromCBOR SBS.ShortByteString where
   fromCBOR = do
     BA.BA (Prim.ByteArray ba) <- D.decodeByteArray
-    return $ SBS.SBS ba
+    return $ SBS ba
 
 instance FromCBOR a => FromCBOR [a] where
   fromCBOR = decodeListWith fromCBOR
@@ -477,3 +478,11 @@ instance FromCBOR UTCTime where
     return $ UTCTime
       (fromOrdinalDate year dayOfYear)
       (picosecondsToDiffTime timeOfDayPico)
+
+-- | Convert an 'Either'-encoded failure to a 'cborg' decoder failure
+toCborError :: B.Buildable e => Either e a -> D.Decoder s a
+toCborError = either cborError pure
+
+-- | Convert a @Buildable@ error into a 'cborg' decoder error
+cborError :: B.Buildable e => e -> D.Decoder s a
+cborError = fail . formatToString build

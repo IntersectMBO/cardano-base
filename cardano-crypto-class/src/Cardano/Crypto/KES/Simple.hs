@@ -21,7 +21,6 @@ where
 
 import           Data.List (unfoldr)
 import           Data.Proxy (Proxy (..))
-import           Data.Typeable (Typeable)
 import qualified Data.ByteString as BS
 import           Data.Vector ((!?), Vector)
 import qualified Data.Vector as Vec
@@ -62,7 +61,7 @@ pattern SignKeySimpleKES v <- ThunkySignKeySimpleKES v
 
 {-# COMPLETE SignKeySimpleKES #-}
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t)) =>
+instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t)) =>
          KESAlgorithm (SimpleKES d t) where
 
     type SeedSizeKES (SimpleKES d t) = SeedSizeDSIGN d * t
@@ -196,31 +195,31 @@ instance DSIGNAlgorithm d => NoThunks (SigKES     (SimpleKES d t))
 instance DSIGNAlgorithm d => NoThunks (SignKeyKES (SimpleKES d t))
 instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SimpleKES d t))
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (VerKeyKES (SimpleKES d t)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (VerKeyKES (SimpleKES d t)) where
   fromCBOR = decodeVerKeyKES
 
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (SignKeyKES (SimpleKES d t)) where
   toCBOR = encodeSignKeyKES
   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (SignKeyKES (SimpleKES d t)) where
   fromCBOR = decodeSignKeyKES
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (SigKES (SimpleKES d t)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (DSIGNAlgorithm d, Typeable d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
+instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (SigKES (SimpleKES d t)) where
   fromCBOR = decodeSigKES
 
