@@ -1,7 +1,4 @@
-index-state: 2022-08-15T00:00:00Z
-
--- Ensures colourized output from tasty
-test-show-details: direct
+index-state: 2022-09-21T00:00:00Z
 
 packages:
   base-deriving-via
@@ -16,11 +13,20 @@ packages:
   orphans-deriving-via
   slotting
 
+-- Ensures colourized output from test runners
+test-show-details: direct
+
+source-repository-package
+  type: git
+  location: https://github.com/input-output-hk/nothunks
+  tag: 1c66f8d4d771cc5e5f1ce0a009bdf011cb68817c
+  --sha256: 1hla15iy6n436gv68injgmwmq2jhszn66p10i80d0cylhg6s2bmj
+
 source-repository-package
   type: git
   location: https://github.com/input-output-hk/cardano-prelude
-  tag: 533aec85c1ca05c7d171da44b89341fb736ecfe5
-  --sha256: 0z2y3wzppc12bpn9bl48776ms3nszw8j58xfsdxf97nzjgrmd62g
+  tag: c6b7c68361656361adad4b480e1c4acd787985d7
+  --sha256: 1m7gjci31j3nvyaqb49k8sc1fg5xv1vc2nyn4hi6dappfkv5fz6s
   subdir:
     cardano-prelude
     cardano-prelude-test
