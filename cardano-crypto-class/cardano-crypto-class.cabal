@@ -115,9 +115,9 @@ library
     , transformers
     , vector
 
- if impl(ghc < 9.0.0)
-   build-depends:
-     integer-gmp
+  if impl(ghc < 9.0.0)
+    build-depends:
+      integer-gmp
 
   pkgconfig-depends: libsodium -any
 
