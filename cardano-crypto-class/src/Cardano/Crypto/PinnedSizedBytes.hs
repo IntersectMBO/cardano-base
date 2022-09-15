@@ -1,10 +1,12 @@
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE UnboxedTuples              #-}
 
 -- for pinnedByteArrayFromListN
@@ -64,6 +66,8 @@ import qualified Data.ByteString as BS
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
+
+import Cardano.Crypto.Util (decodeHexString)
 
 {- HLINT ignore "Reduce duplication" -}
 

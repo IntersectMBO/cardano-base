@@ -26,7 +26,6 @@ import Codec.CBOR.ByteArray as BA
 import qualified Codec.CBOR.Read as CBOR.Read
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
-import qualified Data.ByteString.Short.Internal as SBS
 import qualified Data.Primitive.ByteArray as Prim
 import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import Data.Fixed (Fixed(..), Nano, Pico)
@@ -479,10 +478,10 @@ instance FromCBOR UTCTime where
       (fromOrdinalDate year dayOfYear)
       (picosecondsToDiffTime timeOfDayPico)
 
--- | Convert an 'Either'-encoded failure to a 'cborg' decoder failure
-toCborError :: B.Buildable e => Either e a -> D.Decoder s a
-toCborError = either cborError pure
+-- -- | Convert an 'Either'-encoded failure to a 'cborg' decoder failure
+-- toCborError :: B.Buildable e => Either e a -> D.Decoder s a
+-- toCborError = either cborError pure
 
--- | Convert a @Buildable@ error into a 'cborg' decoder error
-cborError :: B.Buildable e => e -> D.Decoder s a
-cborError = fail . formatToString build
+-- -- | Convert a @Buildable@ error into a 'cborg' decoder error
+-- cborError :: B.Buildable e => e -> D.Decoder s a
+-- cborError = fail . formatToString build

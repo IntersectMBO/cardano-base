@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -89,6 +91,8 @@ import Cardano.Prelude (HeapWords (..))
 
 import qualified Data.ByteString.Short.Internal as SBSI
 
+import Cardano.Crypto.Util (decodeHexString)
+
 class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
   --TODO: eliminate this Typeable constraint needed only for the ToCBOR
   -- the ToCBOR should not need it either
@@ -144,6 +148,7 @@ pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
 pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)
   where
   UnsafeHash bytes =
+    
     case hashFromBytesShort bytes of
       Nothing ->
         error "UnsafeHash: mismatched size of the supplied ShortByteString and the expected digest"

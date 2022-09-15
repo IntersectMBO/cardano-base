@@ -101,14 +101,14 @@ library
     , cardano-prelude
     , cryptonite
     , deepseq
-    , ghc-prim
-    , integer-gmp
-    , heapwords
+    -- , ghc-prim
+    -- , integer-gmp
+    -- , heapwords
     , memory
     , nothunks
     , primitive
     , serialise
-    , strict-containers
+    -- , strict-containers
     , template-haskell
     , th-compat
     , text
