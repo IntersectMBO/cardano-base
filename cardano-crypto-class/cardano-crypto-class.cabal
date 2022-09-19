@@ -103,7 +103,7 @@ library
     , deepseq
     -- , ghc-prim
     -- , integer-gmp
-    -- , heapwords
+    , heapwords
     , memory
     , nothunks
     , primitive
