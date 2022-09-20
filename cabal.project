@@ -10,11 +10,11 @@ packages:
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
+  cardano-strict-containers
   heapwords
   measures
   orphans-deriving-via
   slotting
-  strict-containers
 
 source-repository-package
   type: git

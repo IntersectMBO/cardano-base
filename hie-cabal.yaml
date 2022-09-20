@@ -23,7 +23,7 @@ cradle:
 
     - path: "cardano-crypto-tests/test"
       component: "cardano-crypto-tests:test:test-crypto"
-    
+
     - path: "heapwords"
       component: "lib:heapwords"
 
@@ -39,5 +39,5 @@ cradle:
     - path: "slotting/src"
       component: "lib:cardano-slotting"
 
-    - path: "strict-containers"
-      component: "lib:strict-containers"
+    - path: "cardano-strict-containers"
+      component: "lib:cardano-strict-containers"
