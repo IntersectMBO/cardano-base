@@ -100,6 +100,7 @@ library
     , base16-bytestring  >=1
     , bytestring
     , cardano-binary
+    , cardano-strict-containers
     , cryptonite
     , deepseq
     , ghc-prim
@@ -109,7 +110,6 @@ library
     , nothunks
     , primitive
     , serialise
-    , strict-containers
     , template-haskell
     , text
     , transformers

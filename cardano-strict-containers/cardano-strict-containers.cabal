@@ -1,6 +1,6 @@
 cabal-version:       >=1.10
 
-name:                strict-containers
+name:                cardano-strict-containers
 version:             0.1.0.0
 synopsis:            Various strict container types
 license:             Apache-2.0
