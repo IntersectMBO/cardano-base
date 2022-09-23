@@ -37,7 +37,6 @@ module Cardano.Crypto.KES.Single (
   ) where
 
 import Data.Proxy (Proxy(..))
-import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
@@ -61,7 +60,7 @@ deriving instance NFData (VerKeyDSIGN d) => NFData (VerKeyKES (SingleKES d))
 deriving instance NFData (SignKeyDSIGN d) => NFData (SignKeyKES (SingleKES d))
 deriving instance NFData (SigDSIGN d) => NFData (SigKES (SingleKES d))
 
-instance (DSIGNAlgorithm d, Typeable d) => KESAlgorithm (SingleKES d) where
+instance DSIGNAlgorithm d => KESAlgorithm (SingleKES d) where
     type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
 
     --

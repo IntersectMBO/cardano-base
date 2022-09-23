@@ -38,7 +38,7 @@ library
                         Data.DerivingVia.DeepSeq
                         Data.DerivingVia.NoThunks
 
-  build-depends:        base >= 4.14
+  build-depends:        base
                       , base-deriving-via
                       , deepseq
                       , nothunks

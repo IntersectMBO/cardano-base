@@ -61,7 +61,7 @@ instance Monad StrictMaybe where
 
   (>>) = (*>)
 
-  return = SJust
+  return = pure
 
 instance MonadFail StrictMaybe where
   fail _ = SNothing

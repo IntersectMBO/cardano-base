@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
 
@@ -41,10 +42,17 @@ import Data.Text as Text
 import Data.Time (Day, UTCTime)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as V.U
-import GHC.Integer.GMP.Internals (BigNat(BN#), Integer(S#, Jn#, Jp#))
 import GHC.Natural (Natural(NatS#, NatJ#))
 import GHC.Prim (ByteArray#, sizeofByteArray#)
 import GHC.Types (Int(I#))
+
+#if __GLASGOW_HASKELL__ >= 900
+-- Use the GHC version here because this is compiler dependent, and only indirectly lib dependent.
+import GHC.Num.BigNat (BigNat (BN#))
+import GHC.Num.Integer (Integer (IS, IP, IN))
+#else
+import GHC.Integer.GMP.Internals (BigNat(BN#), Integer(S#, Jn#, Jp#))
+#endif
 
 --------------------------------------------------------------------------------
 
@@ -399,7 +407,23 @@ instance HeapWords Bool where
   heapWords _ = 0
 
 instance HeapWords Integer where
-  heapWords (S# _)
+#if __GLASGOW_HASKELL__ >= 900
+  heapWords (IS _) = 2
+    -- We have
+    --
+    -- > IS !Int#
+    --
+    -- so @(IS !Int)@ requires:
+    --
+    -- - 1 word for the 'IS' object header
+    -- - 1 word for the single 'IS' unboxed field, of type 'Int#'
+    --
+    -- ┌──┬──────┐
+    -- │IS│ Int# │
+    -- └──┴──────┘
+    --
+#else
+  heapWords (S# _) = 2
     -- We have
     --
     -- > S# !Int#
@@ -413,8 +437,37 @@ instance HeapWords Integer where
     -- │S#│ Int# │
     -- └──┴──────┘
     --
-    = 2
-  heapWords (Jp# bigNat)
+#endif
+
+#if __GLASGOW_HASKELL__ >= 900
+  heapWords (IP bigNat) = 4 + I# (sizeofByteArray# bigNat)
+    -- We have
+    --
+    -- > IP !BigNat#
+    -- > type BigNat# = WordArray#
+    -- > type WordArray# = ByteArray#
+    --
+    -- so @IP !BigNat#@ requires:
+    --
+    -- - 1 word for the 'IP' object header
+    -- - 1 word for the pointer to the byte array object
+    -- - 1 word for the byte array object header
+    -- - 1 word for the size of the byte array payload in bytes
+    -- - the heap words required for the byte array payload
+    --
+    -- Note that for the sake of uniformity, we use 'heapWordsUnpacked' to
+    -- account for the level of indirection removed by the @UNPACK@ pragma.
+    --
+    -- ┌──┬───┐
+    -- │IP│ ◉ │
+    -- └──┴─╂─┘
+    --      ▼
+    --     ┌───┬───┬───┬─┈   ┈─┬───┐
+    --     │BA#│ sz│   │       │   │   2 + n Words
+    --     └───┴───┴───┴─┈   ┈─┴───┘
+    --
+#else
+  heapWords (Jp# bigNat) = 2 + heapWordsUnpacked bigNat
     -- We have
     --
     -- > Jp# {-# UNPACK #-} !BigNat
@@ -439,8 +492,34 @@ instance HeapWords Integer where
     --      │BA#│ sz│   │       │   │   2 + n Words
     --      └───┴───┴───┴─┈   ┈─┴───┘
     --
-    = 2 + heapWordsUnpacked bigNat
-  heapWords (Jn# bigNat)
+#endif
+
+#if __GLASGOW_HASKELL__ >= 900
+  heapWords (IN bigNat) = 4 + I# (sizeofByteArray# bigNat)
+    -- We have
+    --
+    -- > IN !BigNat#
+    -- > type BigNat# = WordArray#
+    -- > type WordArray# = ByteArray#
+    --
+    -- so @IN !BigNat#@ requires:
+    --
+    -- - 1 word for the 'IN' object header
+    -- - 1 word for the pointer to the byte array object
+    -- - 1 word for the byte array object header
+    -- - 1 word for the size of the byte array payload in bytes
+    -- - the heap words required for the byte array payload
+    --
+    -- ┌──┬───┐
+    -- │IN│ ◉ │
+    -- └──┴─╂─┘
+    --      ▼
+    --     ┌───┬───┬───┬─┈   ┈─┬───┐
+    --     │BA#│ sz│   │       │   │   2 + n Words
+    --     └───┴───┴───┴─┈   ┈─┴───┘
+    --
+#else
+  heapWords (Jn# bigNat) = 2 + heapWordsUnpacked bigNat
     -- We have
     --
     -- > Jn# {-# UNPACK #-} !BigNat
@@ -465,7 +544,7 @@ instance HeapWords Integer where
     --      │BA#│ sz│   │       │   │   2 + n Words
     --      └───┴───┴───┴─┈   ┈─┴───┘
     --
-    = 2 + heapWordsUnpacked bigNat
+#endif
 
 instance HeapWords Float where
   heapWords _ = 2
