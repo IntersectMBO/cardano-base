@@ -1,7 +1,7 @@
 cabal-version:       >=1.10
 
 name:                orphans-deriving-via
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            Orphan instances for the base-deriving-via hooks
 license:             Apache-2.0
 license-files:

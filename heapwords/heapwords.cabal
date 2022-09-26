@@ -1,7 +1,7 @@
 cabal-version:       >=1.10
 
 name:                heapwords
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            Heapwords
 license:             Apache-2.0
 license-files:
