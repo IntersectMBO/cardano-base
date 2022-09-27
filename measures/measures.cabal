@@ -1,7 +1,7 @@
 cabal-version:       >=1.10
 
 name:                measures
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            An abstraction for (tuples of) measured quantities
 license:             Apache-2.0
 license-files:
