@@ -38,7 +38,7 @@ module Cardano.Crypto.DSIGN.Class
 
     -- * Encoded 'Size' expresssions
   , encodedVerKeyDSIGNSizeExpr
-  , encodedSignKeyDESIGNSizeExpr
+  , encodedSignKeyDSIGNSizeExpr
   , encodedSigDSIGNSizeExpr
   )
 where
@@ -290,8 +290,8 @@ encodedVerKeyDSIGNSizeExpr _proxy =
 -- | 'Size' expression for 'SignKeyDSIGN' which is using 'sizeSignKeyDSIGN'
 -- encoded as 'Size'.
 --
-encodedSignKeyDESIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SignKeyDSIGN v) -> Size
-encodedSignKeyDESIGNSizeExpr _proxy =
+encodedSignKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SignKeyDSIGN v) -> Size
+encodedSignKeyDSIGNSizeExpr _proxy =
       -- 'encodeBytes' envelope
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyDSIGN (Proxy :: Proxy v)))
       -- payload

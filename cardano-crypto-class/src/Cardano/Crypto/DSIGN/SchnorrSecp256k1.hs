@@ -79,7 +79,7 @@ import Cardano.Crypto.DSIGN.Class (
   encodedVerKeyDSIGNSizeExpr,
   decodeVerKeyDSIGN,
   encodeSignKeyDSIGN,
-  encodedSignKeyDESIGNSizeExpr,
+  encodedSignKeyDSIGNSizeExpr,
   decodeSignKeyDSIGN,
   encodeSigDSIGN,
   encodedSigDSIGNSizeExpr,
@@ -212,7 +212,7 @@ instance FromCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
 
 instance ToCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
   toCBOR = encodeSignKeyDSIGN
-  encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
+  encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
   fromCBOR = decodeSignKeyDSIGN
