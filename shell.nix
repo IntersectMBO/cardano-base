@@ -15,12 +15,9 @@ let
   shell = cardanoBaseHaskellPackages.shellFor {
     name = "cabal-dev-shell";
 
-    packages = ps: builtins.attrValues (haskellLib.selectProjectPackages ps);
-
-    nativeBuildInputs = [ buildPackages.cabalWrapped ];
-
     # These programs will be available inside the nix-shell.
-    buildInputs = with buildPackages; with haskellPackages; [
+    nativeBuildInputs = with buildPackages; with haskellPackages; [
+      cabal-install
       ghcid
       gitAndTools.git
       hlint
@@ -34,10 +31,6 @@ let
     tools = {
       haskell-language-server = "latest";
     };
-
-    # Prevents cabal from choosing alternate plans, so that
-    # *all* dependencies are provided by Nix.
-    exactDeps = false;
 
     inherit withHoogle;
   };

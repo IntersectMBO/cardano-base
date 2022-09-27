@@ -5,6 +5,7 @@
 , stdenv
 , haskell-nix
 , buildPackages
+, sources
 , config ? {}
 # GHC attribute name
 , compiler ? config.haskellNix.compiler or "ghc8107"
@@ -23,6 +24,7 @@ let
   pkgSet = haskell-nix.cabalProject {
     inherit src;
     compiler-nix-name = compiler;
+    inputMap = { "https://input-output-hk.github.io/cardano-haskell-packages" = sources.cardano-haskell-packages; };
     modules = [
 
       ({pkgs, ...}: {
