@@ -115,7 +115,7 @@ instance FromCBOR (VerKeyDSIGN Ed448DSIGN) where
 
 instance ToCBOR (SignKeyDSIGN Ed448DSIGN) where
   toCBOR = encodeSignKeyDSIGN
-  encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
+  encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN Ed448DSIGN) where
   fromCBOR = decodeSignKeyDSIGN
