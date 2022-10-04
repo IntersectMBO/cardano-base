@@ -182,7 +182,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
     rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd25519DSIGN . psbFromByteStringCheck
     rawDeserialiseSignKeyDSIGN bs = do
-      guard (BS.length bs == 32)
+      guard (fromIntegral (BS.length bs) == seedSizeDSIGN (Proxy @Ed25519DSIGN))
       pure . genKeyDSIGN . mkSeedFromBytes $ bs
     rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN . psbFromByteStringCheck
 

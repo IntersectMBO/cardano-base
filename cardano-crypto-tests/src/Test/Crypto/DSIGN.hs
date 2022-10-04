@@ -97,16 +97,16 @@ ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
 
 #ifdef SECP256K1_ENABLED
-secp256k1SigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
-secp256k1SigGen = do
-  msg <- genSECPMsg
+ecdsaSigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
+ecdsaSigGen = do
+  msg <- genEcdsaMsg
   signDSIGN () msg <$> defaultSignKeyGen
 
 schnorrSigGen :: Gen (SigDSIGN SchnorrSecp256k1DSIGN)
 schnorrSigGen = defaultSigGen
 
-genSECPMsg :: Gen MessageHash
-genSECPMsg =
+genEcdsaMsg :: Gen MessageHash
+genEcdsaMsg =
   Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary)
                   toMessageHash
 #endif
@@ -140,7 +140,7 @@ tests =
     , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
     , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
 #ifdef SECP256K1_ENABLED
-    , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "EcdsaSecp256k1DSIGN"
+    , testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
     , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
 #endif
     ]
