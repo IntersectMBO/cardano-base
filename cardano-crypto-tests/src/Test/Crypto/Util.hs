@@ -216,7 +216,7 @@ prop_raw_deserialise deserialise (BadInputFor (forbiddenLen, bs)) =
   cover 50.0 (BS.length bs < forbiddenLen) "too short" $
   case deserialise bs of 
     Nothing -> property True
-    Just x -> counterexample (ppShow x) . property $ False
+    Just x -> counterexample (ppShow x) False
 
 -- | The crypto algorithm classes have direct encoding functions, and the key
 -- types are also typically a member of the 'ToCBOR' class. Where a 'ToCBOR'
@@ -249,8 +249,7 @@ prop_no_thunks !a = case unsafeNoThunks a of
 -- Essentially a ByteString carrying around the length it's not allowed to be.
 -- This is annoying, but so's QuickCheck sometimes.
 newtype BadInputFor (a :: Type) = BadInputFor (Int, ByteString)
-  deriving (Eq) via (Int, ByteString)
-  deriving stock (Show)
+  deriving (Eq, Show)
 
 -- Coercion around a phantom parameter here is dangerous, as there's an implicit
 -- relation between it and the forbidden length. We ensure this is impossible.
@@ -263,7 +262,7 @@ genBadInputFor ::
   Int -> 
   Gen (BadInputFor a)
 genBadInputFor forbiddenLen = 
-  BadInputFor . (forbiddenLen,) <$> Gen.oneof [tooLow, tooHigh]
+  BadInputFor . (,) forbiddenLen <$> Gen.oneof [tooLow, tooHigh]
   where
     tooLow :: Gen ByteString
     tooLow = do
@@ -281,7 +280,7 @@ shrinkBadInputFor ::
   BadInputFor a -> 
   [BadInputFor a]
 shrinkBadInputFor (BadInputFor (len, bs)) = BadInputFor . (len,) <$> do
-  bs' <- fromList <$> (shrink . toList $ bs)
+  bs' <- fromList <$> shrink (toList bs)
   when (BS.length bs > len) (guard (BS.length bs' > len))
   pure bs'
 
@@ -291,4 +290,4 @@ showBadInputFor ::
   BadInputFor a -> 
   String
 showBadInputFor (BadInputFor (_, bs)) = 
-  "0x" <> BS.foldr showHex "" bs <> " (length " <> (show . BS.length $ bs) <> ")"
+  "0x" <> BS.foldr showHex "" bs <> " (length " <> show (BS.length bs) <> ")"
