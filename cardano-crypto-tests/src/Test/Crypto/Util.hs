@@ -51,16 +51,16 @@ import GHC.Exts (fromListN, fromList, toList)
 import Text.Show.Pretty (ppShow)
 import Data.Kind (Type)
 import Cardano.Binary (
-  FromCBOR (fromCBOR), 
+  FromCBOR (fromCBOR),
   ToCBOR (toCBOR),
-  Encoding, 
-  Decoder, 
+  Encoding,
+  Decoder,
   Range (Range),
-  decodeFullDecoder, 
-  serializeEncoding, 
-  szGreedy, 
+  decodeFullDecoder,
+  serializeEncoding,
+  szGreedy,
   szSimplify,
-  lo, 
+  lo,
   hi,
   encodedSizeExpr
   )
@@ -204,17 +204,17 @@ prop_raw_serialise serialise deserialise x =
       Just y  -> y === x
       Nothing -> property False
 
-prop_raw_deserialise :: 
+prop_raw_deserialise ::
   forall (a :: Type) .
   (Show a) =>
-  (ByteString -> Maybe a) -> 
-  BadInputFor a -> 
+  (ByteString -> Maybe a) ->
+  BadInputFor a ->
   Property
-prop_raw_deserialise deserialise (BadInputFor (forbiddenLen, bs)) = 
-  checkCoverage . 
+prop_raw_deserialise deserialise (BadInputFor (forbiddenLen, bs)) =
+  checkCoverage .
   cover 50.0 (BS.length bs > forbiddenLen) "too long" .
   cover 50.0 (BS.length bs < forbiddenLen) "too short" $
-  case deserialise bs of 
+  case deserialise bs of
     Nothing -> property True
     Just x -> counterexample (ppShow x) False
 
@@ -257,11 +257,11 @@ type role BadInputFor nominal
 
 -- Needed instead of an Arbitrary instance, as there's no (good) way of knowing
 -- what our forbidden (i.e. correct) length is.
-genBadInputFor :: 
-  forall (a :: Type) . 
-  Int -> 
+genBadInputFor ::
+  forall (a :: Type) .
+  Int ->
   Gen (BadInputFor a)
-genBadInputFor forbiddenLen = 
+genBadInputFor forbiddenLen =
   BadInputFor . (,) forbiddenLen <$> Gen.oneof [tooLow, tooHigh]
   where
     tooLow :: Gen ByteString
@@ -275,9 +275,9 @@ genBadInputFor forbiddenLen =
 
 -- This ensures we don't \'shrink out of case\': we shrink too-longs to
 -- (smaller) too-longs, and too-shorts to (smaller) too-shorts.
-shrinkBadInputFor :: 
-  forall (a :: Type) . 
-  BadInputFor a -> 
+shrinkBadInputFor ::
+  forall (a :: Type) .
+  BadInputFor a ->
   [BadInputFor a]
 shrinkBadInputFor (BadInputFor (len, bs)) = BadInputFor . (len,) <$> do
   bs' <- fromList <$> shrink (toList bs)
@@ -285,9 +285,9 @@ shrinkBadInputFor (BadInputFor (len, bs)) = BadInputFor . (len,) <$> do
   pure bs'
 
 -- This shows only the ByteString, in hex.
-showBadInputFor :: 
-  forall (a :: Type) . 
-  BadInputFor a -> 
+showBadInputFor ::
+  forall (a :: Type) .
+  BadInputFor a ->
   String
-showBadInputFor (BadInputFor (_, bs)) = 
+showBadInputFor (BadInputFor (_, bs)) =
   "0x" <> BS.foldr showHex "" bs <> " (length " <> show (BS.length bs) <> ")"

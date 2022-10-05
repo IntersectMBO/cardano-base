@@ -27,9 +27,9 @@ import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
 import Test.Crypto.Util (
-  ToCBOR, 
-  FromCBOR, 
-  Message, 
+  ToCBOR,
+  FromCBOR,
+  Message,
   prop_raw_serialise,
   prop_size_serialise,
   prop_cbor_with,
