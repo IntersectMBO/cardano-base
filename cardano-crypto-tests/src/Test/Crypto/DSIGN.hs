@@ -4,8 +4,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 module Test.Crypto.DSIGN
   ( tests
@@ -31,17 +30,19 @@ import Cardano.Crypto.DSIGN (
   MessageHash,
   toMessageHash,
 #endif
-  DSIGNAlgorithm (VerKeyDSIGN,
-                  SignKeyDSIGN,
-                  SigDSIGN,
-                  ContextDSIGN,
-                  Signable,
-                  rawSerialiseVerKeyDSIGN,
-                  rawDeserialiseVerKeyDSIGN,
-                  rawSerialiseSignKeyDSIGN,
-                  rawDeserialiseSignKeyDSIGN,
-                  rawSerialiseSigDSIGN,
-                  rawDeserialiseSigDSIGN),
+  DSIGNAlgorithm (
+    VerKeyDSIGN,
+    SignKeyDSIGN,
+    SigDSIGN,
+    ContextDSIGN,
+    Signable,
+    rawSerialiseVerKeyDSIGN,
+    rawDeserialiseVerKeyDSIGN,
+    rawSerialiseSignKeyDSIGN,
+    rawDeserialiseSignKeyDSIGN,
+    rawSerialiseSigDSIGN,
+    rawDeserialiseSigDSIGN
+    ),
   sizeVerKeyDSIGN,
   sizeSignKeyDSIGN,
   sizeSigDSIGN,
@@ -61,13 +62,17 @@ import Cardano.Binary (FromCBOR, ToCBOR)
 import Test.Crypto.Util (
   Message,
   prop_raw_serialise,
+  prop_raw_deserialise,
   prop_size_serialise,
   prop_cbor_with,
   prop_cbor,
   prop_cbor_size,
   prop_cbor_direct_vs_class,
   prop_no_thunks,
-  arbitrarySeedOfSize
+  arbitrarySeedOfSize,
+  genBadInputFor,
+  shrinkBadInputFor,
+  showBadInputFor,
   )
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
@@ -76,10 +81,11 @@ import Test.QuickCheck (
   Arbitrary(..),
   Gen,
   Property,
-  forAllShow
+  forAllShow,
+  forAllShrinkShow,
   )
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck (testProperty)
+import Test.Tasty (TestTree, testGroup, adjustOption)
+import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
 
 mockSigGen :: Gen (SigDSIGN MockDSIGN)
 mockSigGen = defaultSigGen
@@ -91,16 +97,16 @@ ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
 
 #ifdef SECP256K1_ENABLED
-secp256k1SigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
-secp256k1SigGen = do
-  msg <- genSECPMsg
+ecdsaSigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
+ecdsaSigGen = do
+  msg <- genEcdsaMsg
   signDSIGN () msg <$> defaultSignKeyGen
 
 schnorrSigGen :: Gen (SigDSIGN SchnorrSecp256k1DSIGN)
 schnorrSigGen = defaultSigGen
 
-genSECPMsg :: Gen MessageHash
-genSECPMsg =
+genEcdsaMsg :: Gen MessageHash
+genEcdsaMsg =
   Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary)
                   toMessageHash
 #endif
@@ -134,7 +140,7 @@ tests =
     , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
     , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
 #ifdef SECP256K1_ENABLED
-    , testDSIGNAlgorithm secp256k1SigGen genSECPMsg "EcdsaSecp256k1DSIGN"
+    , testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
     , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
 #endif
     ]
@@ -156,21 +162,36 @@ testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
   Gen a ->
   String ->
   TestTree
-testDSIGNAlgorithm genSig genMsg name = testGroup name [
+testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name $ [
   testGroup "serialization" [
     testGroup "raw" [
-      testProperty "VerKey" .
+      testProperty "VerKey serialization" .
         forAllShow (defaultVerKeyGen @v)
                    ppShow $
                    prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN,
-      testProperty "SignKey" .
+      testProperty "VerKey deserialization (wrong length)" .
+        forAllShrinkShow (genBadInputFor . expectedVKLen $ expected)
+                         (shrinkBadInputFor @(VerKeyDSIGN v))
+                         showBadInputFor $
+                         prop_raw_deserialise rawDeserialiseVerKeyDSIGN,
+      testProperty "SignKey serialization" .
         forAllShow (defaultSignKeyGen @v)
                    ppShow $
                    prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN,
-      testProperty "Sig" .
+      testProperty "SignKey deserialization (wrong length)" .
+        forAllShrinkShow (genBadInputFor . expectedSKLen $ expected)
+                         (shrinkBadInputFor @(SignKeyDSIGN v))
+                         showBadInputFor $
+                         prop_raw_deserialise rawDeserialiseSignKeyDSIGN,
+      testProperty "Sig serialization" .
         forAllShow genSig
                    ppShow $
-                   prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN
+                   prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN,
+      testProperty "Sig deserialization (wrong length)" .
+        forAllShrinkShow (genBadInputFor . expectedSigLen $ expected)
+                         (shrinkBadInputFor @(SigDSIGN v))
+                         showBadInputFor $
+                         prop_raw_deserialise rawDeserialiseSigDSIGN
       ],
     testGroup "size" [
       testProperty "VerKey" .
@@ -240,6 +261,8 @@ testDSIGNAlgorithm genSig genMsg name = testGroup name [
     ]
   ]
   where
+    expected :: ExpectedLengths v
+    expected = defaultExpected
     genWrongKey :: Gen (a, SignKeyDSIGN v, SignKeyDSIGN v)
     genWrongKey = do
       sk1 <- defaultSignKeyGen
@@ -252,6 +275,8 @@ testDSIGNAlgorithm genSig genMsg name = testGroup name [
       msg2 <- Gen.suchThat genMsg (/= msg1)
       sk <- defaultSignKeyGen
       pure (msg1, msg2, sk)
+    testEnough :: QuickCheckTests -> QuickCheckTests
+    testEnough = max 10_000
 
 -- If we sign a message with the key, we can verify the signature with the
 -- corresponding verification key.
@@ -277,7 +302,7 @@ prop_dsign_verify_wrong_key (msg, sk, sk') =
       vk' = deriveVerKeyDSIGN sk'
     in verifyDSIGN () vk' msg signed =/= Right ()
 
--- If we signa a message with a key, but then try to verify with a different
+-- If we sign a a message with a key, but then try to verify with a different
 -- message, then verification fails.
 prop_dsign_verify_wrong_msg
   :: forall (v :: Type) (a :: Type) .
@@ -288,3 +313,20 @@ prop_dsign_verify_wrong_msg (msg, msg', sk) =
   let signed = signDSIGN () msg sk
       vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk msg' signed =/= Right ()
+
+data ExpectedLengths (v :: Type) =
+  ExpectedLengths {
+    expectedVKLen :: Int,
+    expectedSKLen :: Int,
+    expectedSigLen :: Int
+    }
+
+defaultExpected ::
+  forall (v :: Type) .
+  (DSIGNAlgorithm v) =>
+  ExpectedLengths v
+defaultExpected = ExpectedLengths {
+  expectedVKLen = fromIntegral . sizeVerKeyDSIGN $ Proxy @v,
+  expectedSKLen = fromIntegral . sizeSignKeyDSIGN $ Proxy @v,
+  expectedSigLen = fromIntegral . sizeSigDSIGN $ Proxy @v
+  }

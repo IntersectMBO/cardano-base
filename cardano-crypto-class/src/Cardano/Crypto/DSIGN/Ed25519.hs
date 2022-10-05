@@ -32,7 +32,7 @@ import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import GHC.IO.Exception (ioException)
-import Control.Monad (unless)
+import Control.Monad (unless, guard)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
@@ -181,7 +181,9 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     rawSerialiseSigDSIGN      (SigEd25519DSIGN sig) = psbToByteString sig
 
     rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd25519DSIGN . psbFromByteStringCheck
-    rawDeserialiseSignKeyDSIGN = Just . genKeyDSIGN . mkSeedFromBytes
+    rawDeserialiseSignKeyDSIGN bs = do
+      guard (fromIntegral (BS.length bs) == seedSizeDSIGN (Proxy @Ed25519DSIGN))
+      pure . genKeyDSIGN . mkSeedFromBytes $ bs
     rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN . psbFromByteStringCheck
 
 

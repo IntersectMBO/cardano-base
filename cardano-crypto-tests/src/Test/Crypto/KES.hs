@@ -26,7 +26,19 @@ import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
-import Test.Crypto.Util hiding (label)
+import Test.Crypto.Util (
+  ToCBOR,
+  FromCBOR,
+  Message,
+  prop_raw_serialise,
+  prop_size_serialise,
+  prop_cbor_with,
+  prop_cbor,
+  prop_cbor_size,
+  prop_cbor_direct_vs_class,
+  prop_no_thunks,
+  arbitrarySeedOfSize,
+  )
 import Test.Crypto.Instances ()
 
 {- HLINT ignore "Reduce duplication" -}
