@@ -21,6 +21,10 @@ module Cardano.Crypto.KES.Class
   , OptimizedKESAlgorithm (..)
   , verifyOptimizedKES
 
+    -- * 'SignKeyWithPeriodKES' wrapper
+  , SignKeyWithPeriodKES (..)
+  , updateKESWithPeriod
+
     -- * 'SignedKES' wrapper
   , SignedKES (..)
   , signedKES
@@ -71,6 +75,7 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
+import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
@@ -396,6 +401,30 @@ encodeSignedKES (SignedKES s) = encodeSigKES s
 
 decodeSignedKES :: KESAlgorithm v => Decoder s (SignedKES v a)
 decodeSignedKES = SignedKES <$> decodeSigKES
+
+-- | A sign key bundled with its associated period.
+data SignKeyWithPeriodKES v =
+  SignKeyWithPeriodKES
+    { skWithoutPeriodKES :: !(SignKeyKES v)
+    , periodKES :: !Period
+    }
+    deriving (Generic)
+
+deriving instance (KESAlgorithm v, Eq (SignKeyKES v)) => Eq (SignKeyWithPeriodKES v)
+
+deriving instance (KESAlgorithm v, Show (SignKeyKES v)) => Show (SignKeyWithPeriodKES v)
+
+instance KESAlgorithm v => NoThunks (SignKeyWithPeriodKES v)
+  -- use generic instance
+
+updateKESWithPeriod
+    :: (HasCallStack, KESSignAlgorithm m v)
+    => ContextKES v
+    -> (SignKeyWithPeriodKES v)
+    -> m (Maybe (SignKeyWithPeriodKES v))
+updateKESWithPeriod c (SignKeyWithPeriodKES sk t) = runMaybeT $ do
+  sk' <- MaybeT $ updateKES c sk t
+  return $ SignKeyWithPeriodKES sk' (succ t)
 
 --
 -- 'Size' expressions for 'ToCBOR' instances.

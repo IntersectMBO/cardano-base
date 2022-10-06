@@ -6,7 +6,7 @@
 {-# OPTIONS_GHC -Wno-deprecations #-}
 module Test.Crypto.AllocLog where
 
-import Cardano.Crypto.MonadSodium
+import Cardano.Crypto.MonadMLock
 import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 import Control.Tracer
 import Control.Monad.Reader
@@ -56,10 +56,8 @@ pushLogEvent event = do
 pushAllocLogEvent :: Monad m => AllocEvent -> LogT AllocEvent m ()
 pushAllocLogEvent = pushLogEvent
 
--- | Automatically log all mlocked allocation events (allocate and free) via
--- 'mlockedAlloca', 'mlockedMalloc', and associated finalizers.
-instance (MonadIO m, MonadThrow m, MonadSodium m, MonadST m, RunIO m)
-         => MonadSodium (LogT AllocEvent m) where
+instance (MonadIO m, MonadThrow m, MonadMLock m, MonadST m, RunIO m)
+         => MonadMLock (LogT AllocEvent m) where
   withMLockedForeignPtr fptr action = LogT $ do
     tracer <- ask
     lift $ withMLockedForeignPtr fptr (\ptr -> (runReaderT . unLogT) (action ptr) tracer)
@@ -79,17 +77,40 @@ instance (MonadIO m, MonadThrow m, MonadSodium m, MonadST m, RunIO m)
         (io . runLogT tracer . pushAllocLogEvent $ FreeEv addr)
     return fptr
 
+instance (MonadIO m, MonadMLock m)
+         => MonadUnmanagedMemory (LogT AllocEvent m) where
   zeroMem addr size = lift $ zeroMem addr size
   copyMem dst src size = lift $ copyMem dst src size
 
+  allocaBytes len action = LogT $ do
+    tracer <- ask
+    lift $ allocaBytes len (\ptr -> (runReaderT . unLogT) (action ptr) tracer)
+
+instance (MonadIO m, MonadByteStringMemory m)
+         => MonadByteStringMemory (LogT AllocEvent m) where
+  useByteStringAsCStringLen b action = LogT $ do
+    tracer <- ask
+    lift $ useByteStringAsCStringLen b (\csl -> (runReaderT . unLogT) (action csl) tracer)
+
+instance (MonadIO m, MonadPSB m)
+         => MonadPSB (LogT AllocEvent m) where
+  psbUseAsCPtrLen psb action = LogT $ do
+    tracer <- ask
+    lift $ psbUseAsCPtrLen psb (\ptr len -> (runReaderT . unLogT) (action ptr len) tracer)
+
+  psbCreateResultLen action = LogT $ do
+    tracer <- ask
+    lift $ psbCreateResultLen (\ptr len -> (runReaderT . unLogT) (action ptr len) tracer)
+    
+
 -- | Newtype wrapper over an arbitrary event; we use this to write the generic
--- 'MonadSodium' instance below while avoiding overlapping instances.
+-- 'MonadMLock' instance below while avoiding overlapping instances.
 newtype GenericEvent e = GenericEvent { concreteEvent :: e }
 
 -- | Generic instance, log nothing automatically. Log entries can be triggered
 -- manually using 'pushLogEvent'.
-instance MonadSodium m => MonadSodium (LogT (GenericEvent e) m) where
-  withMLockedForeignPtr fptr (action) = LogT $ do
+instance MonadMLock m => MonadMLock (LogT (GenericEvent e) m) where
+  withMLockedForeignPtr fptr action = LogT $ do
     tracer <- ask
     lift $ withMLockedForeignPtr fptr (\ptr -> (runReaderT . unLogT) (action ptr) tracer)
 
@@ -97,5 +118,23 @@ instance MonadSodium m => MonadSodium (LogT (GenericEvent e) m) where
   traceMLockedForeignPtr = lift . traceMLockedForeignPtr
   mlockedMalloc size = lift (mlockedMalloc size)
 
+instance MonadUnmanagedMemory m => MonadUnmanagedMemory (LogT (GenericEvent e) m) where
   zeroMem addr size = lift $ zeroMem addr size
   copyMem dst src size = lift $ copyMem dst src size
+  allocaBytes len action = LogT $ do
+    tracer <- ask
+    lift $ allocaBytes len (\ptr -> (runReaderT . unLogT) (action ptr) tracer)
+
+instance MonadByteStringMemory m => MonadByteStringMemory (LogT (GenericEvent e) m) where
+  useByteStringAsCStringLen b action = LogT $ do
+    tracer <- ask
+    lift $ useByteStringAsCStringLen b (\csl -> (runReaderT . unLogT) (action csl) tracer)
+
+instance MonadPSB m => MonadPSB (LogT (GenericEvent e) m) where
+  psbUseAsCPtrLen psb action = LogT $ do
+    tracer <- ask
+    lift $ psbUseAsCPtrLen psb (\ptr len -> (runReaderT . unLogT) (action ptr len) tracer)
+
+  psbCreateResultLen action = LogT $ do
+    tracer <- ask
+    lift $ psbCreateResultLen (\ptr len -> (runReaderT . unLogT) (action ptr len) tracer)

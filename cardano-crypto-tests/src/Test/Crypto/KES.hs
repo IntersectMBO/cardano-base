@@ -27,26 +27,27 @@ import Data.List (foldl')
 import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Foreign.Ptr (WordPtr)
+import Foreign.Ptr (WordPtr, plusPtr)
 import Data.IORef
 import Data.Foldable (traverse_)
-import GHC.TypeNats (KnownNat)
+import GHC.TypeNats (KnownNat, natVal)
 
 import Control.Tracer
-import Control.Monad (void)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Class.MonadThrow
+import Control.Concurrent.MVar (newMVar, takeMVar, putMVar)
 import Control.Monad.Class.MonadST
+import Control.Monad.Class.MonadThrow
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad (void, when)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
 import Cardano.Crypto.KES.ForgetMock
+import Cardano.Crypto.DirectSerialise (DirectSerialise, directSerialise, DirectDeserialise)
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import Cardano.Crypto.MLockedSeed
 import qualified Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
-import Cardano.Crypto.MonadSodium
+import Cardano.Crypto.MonadMLock
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
@@ -69,12 +70,15 @@ import Test.Crypto.Util (
   noExceptionsThrown,
   Lock,
   withLock,
+  directSerialiseToBS,
+  directDeserialiseFromBS,
   )
 import Test.Crypto.RunIO (RunIO (..))
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
 import Test.Crypto.AllocLog
 
 {- HLINT ignore "Reduce duplication" -}
+{- HLINT ignore "Use head" -}
 
 --
 -- The list of all tests
@@ -122,7 +126,7 @@ deriving via (PureMEq (SignKeyKES (MockKES t))) instance Applicative m => MEq m 
 
 deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SingleKES d))
 
-instance ( MonadSodium m
+instance ( MonadMLock m
          , MonadST m
          , MEq m (SignKeyKES d)
          , Eq (VerKeyKES d)
@@ -133,7 +137,7 @@ instance ( MonadSodium m
 
 deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (CompactSingleKES d))
 
-instance ( MonadSodium m
+instance ( MonadMLock m
          , MonadST m
          , MEq m (SignKeyKES d)
          , Eq (VerKeyKES d)
@@ -144,7 +148,7 @@ instance ( MonadSodium m
 
 testKESAlloc
   :: forall v.
-     ( (forall m. (MonadSodium m, MonadThrow m, MonadST m) => KESSignAlgorithm m v)
+     ( (forall m. (MonadMLock m, MonadThrow m, MonadST m, MonadPSB m) => KESSignAlgorithm m v)
      , ContextKES v ~ ()
      )
   => Proxy v
@@ -259,6 +263,10 @@ testKESAlgorithm
      , KESSignAlgorithm m v
      -- , KESSignAlgorithm IO v -- redundant for now
      , UnsoundKESSignAlgorithm IO v
+     , DirectSerialise IO (SignKeyKES v)
+     , DirectSerialise IO (VerKeyKES v)
+     , DirectDeserialise IO (SignKeyKES v)
+     , DirectDeserialise IO (VerKeyKES v)
      )
   => Lock
   -> Proxy m
@@ -288,9 +296,34 @@ testKESAlgorithm lock _pm _pv n =
       , testProperty "Sig"     $ \seedPSB (msg :: Message) ->
           ioProperty $ withLock lock $ fmap conjoin $ withAllUpdatesKES @IO @v seedPSB $ \t sk -> do
             prop_no_thunks_IO (signKES () t msg sk)
+
+      , testProperty "VerKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "SignKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "VerKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
+            prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
+      , testProperty "SignKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            bracket
+              (directDeserialiseFromBS @IO @(SignKeyKES v) $! direct)
+              forgetSignKeyKES
+              (prop_no_thunks_IO . return)
       ]
 
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES (Proxy @IO) (Proxy @v)
+    , testProperty "no forgotten chunks in signkey" $ prop_noErasedBlocksInKey (Proxy @v)
+
+
     , testGroup "serialisation"
 
       [ testGroup "raw ser only"
@@ -301,12 +334,24 @@ testKESAlgorithm lock _pm _pv n =
         , testProperty "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               serialized <- rawSerialiseSignKeyKES sk
-              equals <- bracket
+              (equals, skSer, msk'Ser) <- bracket
                           (rawDeserialiseSignKeyKES serialized)
                           (maybe (return ()) forgetSignKeyKES)
-                          (\msk' -> Just sk ==! msk')
+                          (\(msk' :: Maybe (SignKeyKES v)) -> do
+                            skSer <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+                            msk'Ser <- mapM (directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v))) msk'
+                            equals <- Just sk ==! msk'
+                            return
+                                  ( equals
+                                  , skSer
+                                  , msk'Ser
+                                  )
+                          )
               return $
-                counterexample (show serialized) equals
+                counterexample (show serialized) $
+                counterexample (show skSer) $
+                counterexample (show msk'Ser) $
+                equals
         , testProperty "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigKES v <- signKES () 0 msg sk
@@ -376,6 +421,37 @@ testKESAlgorithm lock _pm _pv n =
               sig :: SigKES v <- signKES () 0 msg sk
               return $ prop_cbor_direct_vs_class encodeSigKES sig
         ]
+      , testGroup "DirectSerialise"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyKES v <- deriveVerKeyKES sk
+              serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              vk' <- directDeserialiseFromBS serialized
+              return $ vk === vk'
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              equals <- bracket
+                          (directDeserialiseFromBS serialized)
+                          forgetSignKeyKES
+                          (\sk' -> sk ==! sk')
+              return $
+                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
+                equals
+        ]
+      , testGroup "DirectSerialise matches raw"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyKES v <- deriveVerKeyKES sk
+              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              let raw = rawSerialiseVerKeyKES vk
+              return $ direct === raw
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              raw <- rawSerialiseSignKeyKES sk
+              return $ direct === raw
+        ]
       ]
 
     , testGroup "verify"
@@ -405,7 +481,7 @@ testKESAlgorithm lock _pm _pv n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: ( MonadSodium m
+withSK :: ( MonadMLock m
           , MonadST m
           , MonadThrow m
           , KESSignAlgorithm m v
@@ -453,6 +529,59 @@ ioPropertyWithSK lock action seedPSB =
 --
 --     return (before =/= after)
 
+withNullSeed :: forall m n a. (MonadThrow m, MonadMLock m, MonadST m, KnownNat n) => (MLockedSeed n -> m a) -> m a
+withNullSeed = bracket
+  (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral $ natVal (Proxy @n)) 0))
+  mlockedSeedFinalize
+
+withNullSK :: forall m v a. (KESSignAlgorithm m v, MonadThrow m, MonadMLock m, MonadST m)
+           => (SignKeyKES v -> m a) -> m a
+withNullSK = bracket
+  (withNullSeed genKeyKES)
+  forgetSignKeyKES
+
+
+-- | This test detects whether a sign key contains references to pool-allocated
+-- blocks of memory that have been forgotten by the time the key is complete.
+-- We do this based on the fact that the pooled allocator erases memory blocks
+-- by overwriting them with series of 0xff bytes; thus we cut the serialized
+-- key up into chunks of 16 bytes, and if any of those chunks is entirely
+-- filled with 0xff bytes, we assume that we're looking at erased memory.
+prop_noErasedBlocksInKey
+  :: forall v.
+     UnsoundKESSignAlgorithm IO v
+  => DirectSerialise IO (SignKeyKES v)
+  => Proxy v
+  -> Property
+prop_noErasedBlocksInKey kesAlgorithm =
+  ioProperty . withNullSK @IO @v $ \sk -> do
+    let size :: Int = fromIntegral $ sizeSignKeyKES kesAlgorithm
+    serialized <- allocaBytes size $ \ptr -> do
+      positionVar <- newMVar (0 :: Int)
+      directSerialise (\buf nCSize -> do
+          let n = fromIntegral nCSize :: Int
+          bracket
+            (takeMVar positionVar)
+            (putMVar positionVar . (+ n))
+            (\position -> do
+              when (n + position > size) (error "Buffer size exceeded")
+              copyMem (plusPtr ptr position) buf (fromIntegral n)
+            )
+        )
+        sk
+      packByteStringCStringLen (ptr, size)
+    forgetSignKeyKES sk
+    return $ counterexample (hexBS serialized) $ not (hasLongRunOfFF serialized)
+
+hasLongRunOfFF :: ByteString -> Bool
+hasLongRunOfFF bs
+  | BS.length bs < 16
+  = False
+  | otherwise
+  = let first16 = BS.take 16 bs
+        remainder = BS.drop 16 bs
+    in (BS.all (== 0xFF) first16) || hasLongRunOfFF remainder
+
 prop_onlyGenSignKeyKES
   :: forall v.
       KESSignAlgorithm IO v
@@ -472,7 +601,7 @@ prop_oneUpdateSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadFail m
-        , MonadSodium m
+        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -491,7 +620,7 @@ prop_allUpdatesSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadSodium m
+        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -510,7 +639,7 @@ prop_totalPeriodsKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadSodium m
+        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -537,7 +666,7 @@ prop_deriveVerKeyKES
       ( ContextKES v ~ ()
       , RunIO m
       , MonadIO m
-      , MonadSodium m
+      , MonadMLock m
       , MonadST m
       , MonadThrow m
       , KESSignAlgorithm m v
@@ -567,7 +696,7 @@ prop_verifyKES_positive
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -604,7 +733,7 @@ prop_verifyKES_negative_key
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -636,7 +765,7 @@ prop_verifyKES_negative_message
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -668,7 +797,7 @@ prop_verifyKES_negative_period
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -703,7 +832,7 @@ prop_serialise_VerKeyKES
      ( ContextKES v ~ ()
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -735,7 +864,7 @@ prop_serialise_SigKES
      , Show (SignKeyKES v)
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -766,7 +895,7 @@ prop_serialise_SigKES _ _ seedPSB x =
 withAllUpdatesKES_ :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadSodium m
+                  , MonadMLock m
                   , MonadST m
                   , MonadThrow m
                   )
@@ -779,7 +908,7 @@ withAllUpdatesKES_ seedPSB f = do
 withAllUpdatesKES :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadSodium m
+                  , MonadMLock m
                   , MonadST m
                   , MonadThrow m
                   )

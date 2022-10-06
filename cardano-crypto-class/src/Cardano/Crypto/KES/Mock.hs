@@ -26,6 +26,7 @@ import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
+import Control.Monad.Class.MonadST (MonadST (..))
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -34,7 +35,15 @@ import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
 import Cardano.Crypto.MLockedSeed
-import Cardano.Crypto.MonadSodium (mlsbAsByteString)
+import Cardano.Crypto.MonadMLock
+  ( MonadMLock (..)
+  , MonadUnmanagedMemory (..)
+  , MonadByteStringMemory (..)
+  , mlsbAsByteString
+  , useByteStringAsCStringLen
+  , packByteStringCStringLen
+  )
+import Cardano.Crypto.DirectSerialise
 
 data MockKES (t :: Nat)
 
@@ -178,6 +187,34 @@ rawSerialiseSignKeyMockKES :: KnownNat t
 rawSerialiseSignKeyMockKES (SignKeyMockKES vk t) =
     rawSerialiseVerKeyKES vk
  <> writeBinaryWord64 (fromIntegral t)
+
+instance (MonadByteStringMemory m, KnownNat t) => DirectSerialise m (SignKeyKES (MockKES t)) where
+  directSerialise put sk = do
+    let bs = rawSerialiseSignKeyMockKES sk
+    useByteStringAsCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+
+instance (MonadMLock m, MonadST m, KnownNat t) => DirectDeserialise m (SignKeyKES (MockKES t)) where
+  directDeserialise pull = do
+    let len = fromIntegral $ sizeSignKeyKES (Proxy @(MockKES t))
+    bs <- allocaBytes len $ \cstr -> do
+        pull cstr (fromIntegral len)
+        packByteStringCStringLen (cstr, len)
+    maybe (error "directDeserialise @(SignKeyKES (MockKES t))") return $
+        rawDeserialiseSignKeyMockKES bs
+
+instance (MonadByteStringMemory m, KnownNat t) => DirectSerialise m (VerKeyKES (MockKES t)) where
+  directSerialise put sk = do
+    let bs = rawSerialiseVerKeyKES sk
+    useByteStringAsCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+
+instance (MonadMLock m, MonadST m, KnownNat t) => DirectDeserialise m (VerKeyKES (MockKES t)) where
+  directDeserialise pull = do
+    let len = fromIntegral $ sizeVerKeyKES (Proxy @(MockKES t))
+    bs <- allocaBytes len $ \cstr -> do
+        pull cstr (fromIntegral len)
+        packByteStringCStringLen (cstr, len)
+    maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
+        rawDeserialiseVerKeyKES bs
 
 instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
   toCBOR = encodeVerKeyKES

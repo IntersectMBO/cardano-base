@@ -63,6 +63,10 @@ module Test.Crypto.Util
   , Lock
   , withLock
   , mkLock
+
+  -- * Direct ser/deser helpers
+  , directSerialiseToBS
+  , directDeserialiseFromBS
   )
 where
 
@@ -126,7 +130,13 @@ import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import Formatting.Buildable (Buildable (..), build)
-import Control.Concurrent.MVar (MVar, withMVar, newMVar)
+import Foreign.Ptr (Ptr, plusPtr)
+import Foreign.C.Types (CChar, CSize)
+import Control.Monad.Class.MonadMVar
+import Control.Monad.Class.MonadST
+import Cardano.Crypto.MonadMLock
+
+import Cardano.Crypto.DirectSerialise
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -359,10 +369,51 @@ noExceptionsThrown = pure (property True)
 doesNotThrow :: Applicative m => m a -> m Property
 doesNotThrow = (*> noExceptionsThrown)
 
-newtype Lock = Lock (MVar ())
+newtype Lock = Lock (MVar IO ())
 
 withLock :: Lock -> IO a -> IO a
 withLock (Lock v) = withMVar v . const
 
 mkLock :: IO Lock
 mkLock = Lock <$> newMVar ()
+
+--------------------------------------------------------------------------------
+-- Helpers for direct ser/deser
+--------------------------------------------------------------------------------
+
+directSerialiseToBS :: forall m a.
+                       DirectSerialise m a
+                    => MonadMLock m
+                    => MonadMVar m
+                    => MonadST m
+                    => Int -> a -> m ByteString
+directSerialiseToBS dstsize val = do
+  allocaBytes dstsize $ \dst -> do
+    posVar <- newMVar 0
+    let pusher :: Ptr CChar -> CSize -> m ()
+        pusher src srcsize = do
+          pos <- takeMVar posVar
+          let pos' = pos + fromIntegral srcsize
+          when (pos' > dstsize) (error "Buffer overrun")
+          copyMem (plusPtr dst pos) src (fromIntegral srcsize)
+          putMVar posVar pos'
+    directSerialise pusher val
+    packByteStringCStringLen (dst, fromIntegral dstsize)
+
+directDeserialiseFromBS :: forall m a.
+                           DirectDeserialise m a
+                        => MonadMLock m
+                        => MonadByteStringMemory m
+                        => MonadMVar m
+                        => ByteString -> m a
+directDeserialiseFromBS bs = do
+  useByteStringAsCStringLen bs $ \(src, srcsize) -> do
+    posVar <- newMVar 0
+    let puller :: Ptr CChar -> CSize -> m ()
+        puller dst dstsize = do
+          pos <- takeMVar posVar
+          let pos' = pos + fromIntegral dstsize
+          when (pos' > srcsize) (error "Buffer overrun")
+          copyMem dst (plusPtr src pos) (fromIntegral dstsize)
+          putMVar posVar pos'
+    directDeserialise puller

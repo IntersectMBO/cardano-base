@@ -31,7 +31,7 @@ import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
 import Data.Proxy
 import Control.Monad ((<$!>))
-import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO)
+import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO, bracket)
 import Control.Monad.Class.MonadST (MonadST (..))
 import Control.Monad.ST (ST, stToIO)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
@@ -39,11 +39,11 @@ import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Foreign
-import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium (MLockedSizedBytes)
-import Cardano.Crypto.MonadSodium
-  ( MonadSodium (..)
+import Cardano.Crypto.MonadMLock
+  ( MonadMLock (..)
+  , MonadPSB (..)
   , mlsbToByteString
   , mlsbFromByteStringCheck
   , mlsbUseAsSizedPtr
@@ -51,11 +51,18 @@ import Cardano.Crypto.MonadSodium
   , mlsbFinalize
   , mlsbCopy
   , MEq (..)
+  , PinnedSizedBytes
+  , psbUseAsSizedPtr
+  , psbToByteString
+  , psbFromByteStringCheck
+  , psbCreateSizedResult
+  , psbCreate
   )
 
 import Cardano.Crypto.DSIGNM.Class
 import Cardano.Crypto.MLockedSeed
 import Cardano.Crypto.Util (SignableRepresentation(..))
+import Cardano.Crypto.DirectSerialise
 
 data Ed25519DSIGNM
 
@@ -171,7 +178,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 -- reflects this.
 --
 -- Various libsodium primitives, particularly 'MLockedSizedBytes' primitives,
--- are used via the 'MonadSodium' typeclass, which is responsible for
+-- are used via the 'MonadMLock' typeclass, which is responsible for
 -- guaranteeing orderly execution of these actions. We avoid using these
 -- primitives inside 'unsafeIOToST', as well as any 'IO' actions that would be
 -- unsafe to use inside 'unsafePerformIO'.
@@ -188,12 +195,13 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 --   we use 'getErrno', so this is fine.
 -- - 'BS.useAsCStringLen', which is fine and shouldn't require 'IO' to begin
 --   with, but unfortunately, for historical reasons, does.
-instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
+instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$!> do
         mlsbUseAsSizedPtr sk $ \skPtr -> do
-          (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
-              psbCreateSizedResult $ \pkPtr ->
+          (psb, maybeErrno) <- 
+            psbCreateSizedResult $ \pkPtr ->
+              withLiftST $ \fromST -> fromST $ do
                 cOrError $ unsafeIOToST $
                   c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
           throwOnErrno "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
@@ -204,8 +212,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       let bs = getSignableRepresentation a
       in SigEd25519DSIGNM <$!> do
           mlsbUseAsSizedPtr sk $ \skPtr -> do
-            (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
-                psbCreateSizedResult $ \sigPtr -> do
+            (psb, maybeErrno) <-
+              psbCreateSizedResult $ \sigPtr -> do
+                withLiftST $ \fromST -> fromST $ do
                   cOrError $ unsafeIOToST $ do
                     BS.useAsCStringLen bs $ \(ptr, len) ->
                       c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
@@ -251,9 +260,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       mlsbFinalize sk
 
 deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance (MonadST m, MonadSodium m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
+  instance (MonadST m, MonadMLock m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
 
-instance (MonadST m, MonadSodium m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
+instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
     --
     -- Ser/deser (dangerous - do not use in production code)
     --
@@ -274,6 +283,62 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed
           sk <- Just <$> genKeyDSIGNM seed
           mlockedSeedFinalize seed
           return sk
+
+instance ( MonadThrow m
+         , MonadST m
+         , MonadMLock m
+         , MonadPSB m
+         ) => DirectSerialise m (SignKeyDSIGNM Ed25519DSIGNM) where
+  -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. The
+  -- latter contains both the seed and the 32-byte verification key, which is
+  -- convenient, but redundant, since we can always reconstruct it from the
+  -- seed. This is also reflected in the 'SizeSignKeyDSIGNM', which equals
+  -- 'SeedSizeDSIGNM' == 32, rather than reporting the in-memory size of 64.
+  directSerialise push sk = do
+    bracket
+      (getSeedDSIGNM (Proxy @Ed25519DSIGNM) sk)
+      mlockedSeedFinalize
+      (\seed -> mlockedSeedUseAsCPtr seed $ \ptr ->
+          push
+            (castPtr ptr)
+            (fromIntegral $ seedSizeDSIGNM (Proxy @Ed25519DSIGNM)))
+
+instance ( MonadThrow m
+         , MonadST m
+         , MonadPSB m
+         , MonadMLock m
+         ) => DirectDeserialise m (SignKeyDSIGNM Ed25519DSIGNM) where
+  -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. See
+  -- the DirectSerialise m instance above.
+  directDeserialise pull = do
+    bracket
+      mlockedSeedNew
+      mlockedSeedFinalize
+      (\seed -> do
+          mlockedSeedUseAsCPtr seed $ \ptr -> do
+            pull
+              (castPtr ptr)
+              (fromIntegral $ seedSizeDSIGNM (Proxy @Ed25519DSIGNM))
+          genKeyDSIGNM seed
+      )
+
+instance ( MonadPSB m
+         ) => DirectSerialise m (VerKeyDSIGNM Ed25519DSIGNM) where
+  directSerialise push (VerKeyEd25519DSIGNM psb) = do
+    psbUseAsCPtrLen psb $ \ptr _ ->
+      push
+        (castPtr ptr)
+        (fromIntegral $ sizeVerKeyDSIGNM (Proxy @Ed25519DSIGNM))
+
+instance ( MonadThrow m
+         , MonadPSB m
+         ) => DirectDeserialise m (VerKeyDSIGNM Ed25519DSIGNM) where
+  directDeserialise pull = do
+    psb <- psbCreate $ \ptr ->
+      pull
+        (castPtr ptr)
+        (fromIntegral $ sizeVerKeyDSIGNM (Proxy @Ed25519DSIGNM))
+    return $! VerKeyEd25519DSIGNM $! psb
 
 instance ToCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
   toCBOR = encodeVerKeyDSIGNM

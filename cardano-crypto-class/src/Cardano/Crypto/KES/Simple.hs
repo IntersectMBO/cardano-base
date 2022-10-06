@@ -39,8 +39,9 @@ import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.MLockedSeed
 import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
+import           Cardano.Crypto.DirectSerialise (DirectSerialise (..), DirectDeserialise (..))
 import           Data.Unit.Strict (forceElemsToWHNF)
-import           Cardano.Crypto.MonadSodium (MonadSodium (..), MEq (..))
+import           Cardano.Crypto.MonadMLock (MonadMLock (..), MEq (..))
 
 
 data SimpleKES d (t :: Nat)
@@ -143,7 +144,7 @@ instance ( KESAlgorithm (SimpleKES d t)
          , KnownNat t
          , KnownNat (SeedSizeDSIGNM d * t)
          , MonadEvaluate m
-         , MonadSodium m
+         , MonadMLock m
          , MonadST m
          ) =>
          KESSignAlgorithm m (SimpleKES d t) where
@@ -187,7 +188,6 @@ instance ( KESAlgorithm (SimpleKES d t)
     forgetSignKeyKES (SignKeySimpleKES sks) = Vec.mapM_ forgetSignKeyDSIGNM sks
 
 
-
 instance ( UnsoundDSIGNMAlgorithm m d, KnownNat t, KESSignAlgorithm m (SimpleKES d t))
          => UnsoundKESSignAlgorithm m (SimpleKES d t) where
     --
@@ -209,6 +209,26 @@ instance ( UnsoundDSIGNMAlgorithm m d, KnownNat t, KESSignAlgorithm m (SimpleKES
 
       | otherwise
       = return Nothing
+
+instance (Monad m, DirectSerialise m (VerKeyDSIGNM d)) => DirectSerialise m (VerKeyKES (SimpleKES d t)) where
+  directSerialise push (VerKeySimpleKES vks) =
+    mapM_ (directSerialise push) vks
+
+instance (Monad m, DirectDeserialise m (VerKeyDSIGNM d), KnownNat t) => DirectDeserialise m (VerKeyKES (SimpleKES d t)) where
+  directDeserialise pull = do
+    let duration = fromIntegral (natVal (Proxy :: Proxy t))
+    vks <- Vec.replicateM duration (directDeserialise pull)
+    return $! VerKeySimpleKES $! vks
+
+instance (Monad m, DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (SimpleKES d t)) where
+  directSerialise push (SignKeySimpleKES sks) =
+    mapM_ (directSerialise push) sks
+
+instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d), KnownNat t) => DirectDeserialise m (SignKeyKES (SimpleKES d t)) where
+  directDeserialise pull = do
+    let duration = fromIntegral (natVal (Proxy :: Proxy t))
+    sks <- Vec.replicateM duration (directDeserialise pull)
+    return $! SignKeySimpleKES $! sks
 
 deriving instance DSIGNMAlgorithmBase d => Show (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNMAlgorithmBase d => Show (SignKeyKES (SimpleKES d t))

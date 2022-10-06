@@ -60,6 +60,7 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGNM.Class as DSIGNM
 import Cardano.Crypto.KES.Class
+import Cardano.Crypto.DirectSerialise
 
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
@@ -230,3 +231,19 @@ instance (DSIGNMAlgorithmBase d, KnownNat (SizeSigKES (CompactSingleKES d))) => 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size = BS.take (fromIntegral size)
                   . BS.drop (fromIntegral offset)
+
+--
+-- Direct ser/deser
+--
+
+instance (DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (CompactSingleKES d)) where
+  directSerialise push (SignKeyCompactSingleKES sk) = directSerialise push sk
+
+instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d)) => DirectDeserialise m (SignKeyKES (CompactSingleKES d)) where
+  directDeserialise pull = SignKeyCompactSingleKES <$!> directDeserialise pull
+
+instance (DirectSerialise m (VerKeyDSIGNM d)) => DirectSerialise m (VerKeyKES (CompactSingleKES d)) where
+  directSerialise push (VerKeyCompactSingleKES sk) = directSerialise push sk
+
+instance (Monad m, DirectDeserialise m (VerKeyDSIGNM d)) => DirectDeserialise m (VerKeyKES (CompactSingleKES d)) where
+  directDeserialise pull = VerKeyCompactSingleKES <$!> directDeserialise pull
