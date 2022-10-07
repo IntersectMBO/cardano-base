@@ -25,6 +25,7 @@ import Cardano.Binary
     decodeListLenOrIndef,
     encodeListLen,
   )
+import Control.Applicative (Alternative(..))
 import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Default.Class (Default (..))
@@ -126,3 +127,18 @@ strictMaybe _ f (SJust y) = f y
 
 instance Default (StrictMaybe t) where
   def = SNothing
+
+
+
+instance Semigroup a => Semigroup (StrictMaybe a) where
+  SNothing <> x = x
+  x <> SNothing = x
+  SJust x <> SJust y = SJust (x <> y)
+
+instance Semigroup a => Monoid (StrictMaybe a) where
+  mempty = SNothing
+
+instance Alternative StrictMaybe where
+  empty = SNothing
+  SNothing <|> r = r
+  l        <|> _ = l
