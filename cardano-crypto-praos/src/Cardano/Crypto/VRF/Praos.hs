@@ -58,6 +58,12 @@ module Cardano.Crypto.VRF.Praos
   , SignKeyVRF (..)
   , VerKeyVRF (..)
   , CertVRF (..)
+
+  -- * Internal types
+  , Proof
+  , SignKey
+  , VerKey
+  , Output
   )
 where
 
