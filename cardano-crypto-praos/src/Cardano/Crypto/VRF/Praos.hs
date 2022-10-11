@@ -2,16 +2,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | Verifiable Random Function (VRF) implemented as FFI wrappers around the
--- implementation in https://github.com/input-output-hk/libsodium
+-- implementation in <https://github.com/input-output-hk/libsodium>
 module Cardano.Crypto.VRF.Praos
   (
   -- * VRFAlgorithm API
@@ -27,9 +27,6 @@ module Cardano.Crypto.VRF.Praos
   , crypto_vrf_secretkeybytes
   , crypto_vrf_seedbytes
   , crypto_vrf_outputbytes
-
-  , io_crypto_vrf_publickeybytes
-  , io_crypto_vrf_secretkeybytes
 
   -- * Key sizes
   , certSizeVRF
@@ -51,6 +48,11 @@ module Cardano.Crypto.VRF.Praos
   , skToVerKey
   , skToSeed
 
+  , proofFromBytes
+  , skFromBytes
+  , vkFromBytes
+
+
   -- * Core VRF operations
   , prove
   , verify
@@ -71,18 +73,17 @@ import Cardano.Binary
   ( FromCBOR (..)
   , ToCBOR (..)
   )
-
-import Cardano.Crypto.VRF.Class
-import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.RandomBytes (randombytes_buf)
-import Cardano.Crypto.Util (SignableRepresentation(..))
-
+import Cardano.Crypto.Seed (getBytesFromSeedT)
+import Cardano.Crypto.Util (SignableRepresentation (..))
+import Cardano.Crypto.VRF.Class
 import Control.DeepSeq (NFData (..))
 import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
-import Data.Maybe (isJust, fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types
 import Foreign.ForeignPtr
@@ -168,18 +169,23 @@ newtype Output = Output { unOutput :: ForeignPtr OutputValue }
 -- Raw low-level FFI bindings.
 --
 foreign import ccall "crypto_vrf_ietfdraft03_proofbytes" crypto_vrf_proofbytes :: CSize
+
 foreign import ccall "crypto_vrf_ietfdraft03_publickeybytes" crypto_vrf_publickeybytes :: CSize
+
 foreign import ccall "crypto_vrf_ietfdraft03_secretkeybytes" crypto_vrf_secretkeybytes :: CSize
+
 foreign import ccall "crypto_vrf_ietfdraft03_seedbytes" crypto_vrf_seedbytes :: CSize
+
 foreign import ccall "crypto_vrf_ietfdraft03_outputbytes" crypto_vrf_outputbytes :: CSize
 
-foreign import ccall "crypto_vrf_ietfdraft03_publickeybytes" io_crypto_vrf_publickeybytes :: IO CSize
-foreign import ccall "crypto_vrf_ietfdraft03_secretkeybytes" io_crypto_vrf_secretkeybytes :: IO CSize
-
 foreign import ccall "crypto_vrf_ietfdraft03_keypair_from_seed" crypto_vrf_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
+
 foreign import ccall "crypto_vrf_ietfdraft03_sk_to_pk" crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
+
 foreign import ccall "crypto_vrf_ietfdraft03_sk_to_seed" crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
+
 foreign import ccall "crypto_vrf_ietfdraft03_prove" crypto_vrf_prove :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
+
 foreign import ccall "crypto_vrf_ietfdraft03_verify" crypto_vrf_verify :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
 
 foreign import ccall "crypto_vrf_ietfdraft03_proof_to_hash" crypto_vrf_proof_to_hash :: OutputPtr -> ProofPtr -> IO CInt
@@ -197,12 +203,6 @@ verKeySizeVRF = fromIntegral $! crypto_vrf_publickeybytes
 
 vrfKeySizeVRF :: Int
 vrfKeySizeVRF = fromIntegral $! crypto_vrf_outputbytes
-
-ioSignKeySizeVRF :: IO Int
-ioSignKeySizeVRF = fromIntegral <$> io_crypto_vrf_secretkeybytes
-
-ioVerKeySizeVRF :: IO Int
-ioVerKeySizeVRF = fromIntegral <$> io_crypto_vrf_publickeybytes
 
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
@@ -232,14 +232,14 @@ genSeed = do
 copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
 copyFromByteString ptr bs lenExpected =
   BS.useAsCStringLen bs $ \(cstr, lenActual) ->
-    if lenActual >= lenExpected then
-      copyBytes (castPtr ptr) cstr lenExpected
-    else
-      error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
+    if lenActual >= lenExpected
+      then copyBytes (castPtr ptr) cstr lenExpected
+      else error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
 
 seedFromBytes :: ByteString -> Seed
-seedFromBytes bs | BS.length bs < fromIntegral crypto_vrf_seedbytes =
-  error "Not enough bytes for seed"
+seedFromBytes bs
+  | BS.length bs < fromIntegral crypto_vrf_seedbytes =
+      error "Not enough bytes for seed"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
@@ -288,8 +288,7 @@ instance ToCBOR Proof where
     encodedSizeExpr (\_ -> fromIntegral certSizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR Proof where
-  fromCBOR = proofFromBytes <$> fromCBOR
-
+  fromCBOR = fromCBOR >>= proofFromBytes
 
 instance Show SignKey where
   show = show . skBytes
@@ -303,8 +302,7 @@ instance ToCBOR SignKey where
     encodedSizeExpr (\_ -> fromIntegral signKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR SignKey where
-  fromCBOR = skFromBytes <$> fromCBOR
-
+  fromCBOR = fromCBOR >>= skFromBytes
 
 instance Show VerKey where
   show = show . vkBytes
@@ -318,7 +316,7 @@ instance ToCBOR VerKey where
     encodedSizeExpr (\_ -> fromIntegral verKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR VerKey where
-  fromCBOR = vkFromBytes <$> fromCBOR
+  fromCBOR = fromCBOR >>= vkFromBytes
 
 -- | Allocate a Verification Key and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -335,24 +333,33 @@ mkSignKey = fmap SignKey $ newForeignPtr finalizerFree =<< mallocBytes signKeySi
 mkProof :: IO Proof
 mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 
-proofFromBytes :: ByteString -> Proof
+proofFromBytes :: MonadFail m => ByteString -> m Proof
 proofFromBytes bs
-  | BS.length bs /= certSizeVRF
-  = error "Invalid proof length"
-  | otherwise
-  = unsafePerformIO $ do
+  | bsLen /= certSizeVRF =
+    fail $
+      "Invalid proof length "
+        <> show @Int bsLen
+        <> ", expecting "
+        <> show @Int certSizeVRF
+  | otherwise = pure $! unsafePerformIO $ do
       proof <- mkProof
       withForeignPtr (unProof proof) $ \ptr ->
         copyFromByteString ptr bs certSizeVRF
       return proof
+    where
+      bsLen = BS.length bs
 
-skFromBytes :: ByteString -> SignKey
-skFromBytes bs = unsafePerformIO $ do
+
+skFromBytes :: MonadFail m => ByteString -> m SignKey
+skFromBytes bs = do
   if bsLen /= signKeySizeVRF
-    then do
-      ioSize <- ioSignKeySizeVRF
-      error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF <> " or " <> show @Int ioSize)
-    else do
+    then
+      fail $
+        "Invalid SignKey length "
+          <> show @Int bsLen
+          <> ", expecting "
+          <> show @Int signKeySizeVRF
+    else pure $! unsafePerformIO $ do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
         copyFromByteString ptr bs signKeySizeVRF
@@ -360,17 +367,21 @@ skFromBytes bs = unsafePerformIO $ do
   where
     bsLen = BS.length bs
 
-vkFromBytes :: ByteString -> VerKey
-vkFromBytes bs = unsafePerformIO $ do
-  if BS.length bs /= verKeySizeVRF
-    then do
-      ioSize <- ioVerKeySizeVRF
-      error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF <> " or " <> show @Int ioSize)
-    else do
-      pk <- mkVerKey
-      withForeignPtr (unVerKey pk) $ \ptr ->
-        copyFromByteString ptr bs verKeySizeVRF
-      return pk
+vkFromBytes :: MonadFail m => ByteString -> m VerKey
+vkFromBytes bs = do
+  if bsLen /= verKeySizeVRF
+    then
+      fail $
+        "Invalid VerKey length "
+          <> show @Int bsLen
+          <> ", expecting "
+          <> show @Int verKeySizeVRF
+    else
+      pure $! unsafePerformIO $ do
+        pk <- mkVerKey
+        withForeignPtr (unVerKey pk) $ \ptr ->
+          copyFromByteString ptr bs verKeySizeVRF
+        return pk
   where
     bsLen = BS.length bs
 
@@ -481,8 +492,9 @@ instance VRFAlgorithm PraosVRF where
     let msgBS = getSignableRepresentation msg
         proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
         output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
-    in output `seq` proof `seq`
-           (OutputVRF (outputBytes output), CertPraosVRF proof)
+     in output `seq`
+          proof `seq`
+            (OutputVRF (outputBytes output), CertPraosVRF proof)
 
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
     isJust $! verify pk proof (getSignableRepresentation msg)
@@ -492,23 +504,16 @@ instance VRFAlgorithm PraosVRF where
 
   genKeyPairVRF = \cryptoseed ->
     let seed = seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_seedbytes) $ cryptoseed
-        (pk, sk) = keypairFromSeed seed
-    in sk `seq` pk `seq` (SignKeyPraosVRF sk, VerKeyPraosVRF pk)
+        !(!pk, !sk) = keypairFromSeed seed
+     in (SignKeyPraosVRF sk, VerKeyPraosVRF pk)
 
   rawSerialiseVerKeyVRF (VerKeyPraosVRF pk) = vkBytes pk
   rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
   rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
-  rawDeserialiseVerKeyVRF = fmap (VerKeyPraosVRF . vkFromBytes) . assertLength verKeySizeVRF
-  rawDeserialiseSignKeyVRF = fmap (SignKeyPraosVRF . skFromBytes) . assertLength signKeySizeVRF
-  rawDeserialiseCertVRF = fmap (CertPraosVRF . proofFromBytes) . assertLength certSizeVRF
+  rawDeserialiseVerKeyVRF = fmap VerKeyPraosVRF . vkFromBytes
+  rawDeserialiseSignKeyVRF = fmap SignKeyPraosVRF . skFromBytes
+  rawDeserialiseCertVRF = fmap CertPraosVRF . proofFromBytes
 
   sizeVerKeyVRF _ = fromIntegral verKeySizeVRF
   sizeSignKeyVRF _ = fromIntegral signKeySizeVRF
   sizeCertVRF _ = fromIntegral certSizeVRF
-
-assertLength :: Int -> ByteString -> Maybe ByteString
-assertLength l bs
-  | BS.length bs == l
-  = Just bs
-  | otherwise
-  = Nothing
