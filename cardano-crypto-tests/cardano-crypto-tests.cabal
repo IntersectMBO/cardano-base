@@ -53,6 +53,7 @@ library
                         Test.Crypto.VRF
                         Test.Crypto.Regressions
                         Test.Crypto.Instances
+                        Bench.Crypto.DSIGN
                         Bench.Crypto.VRF
                         Bench.Crypto.KES
                         Bench.Crypto.BenchData
