@@ -23,17 +23,15 @@ import Criterion
 
 import Bench.Crypto.BenchData
 
-{- HLINT ignore "Use camelCase" -}
-
 
 benchmarks :: Benchmark
 benchmarks = bgroup "DSIGN"
-  [ bench_dsign (Proxy :: Proxy Ed25519DSIGN) "Ed25519"
-  , bench_dsign (Proxy :: Proxy EcdsaSecp256k1DSIGN) "EcdsaSecp256k1"
-  , bench_dsign (Proxy :: Proxy SchnorrSecp256k1DSIGN) "SchnorrSecp256k1"
+  [ benchDSIGN (Proxy :: Proxy Ed25519DSIGN) "Ed25519"
+  , benchDSIGN (Proxy :: Proxy EcdsaSecp256k1DSIGN) "EcdsaSecp256k1"
+  , benchDSIGN (Proxy :: Proxy SchnorrSecp256k1DSIGN) "SchnorrSecp256k1"
   ]
 
-bench_dsign :: forall v a
+benchDSIGN :: forall v a
            . ( DSIGNAlgorithm v
              , ContextDSIGN v ~ ()
              , Signable v a
@@ -45,7 +43,7 @@ bench_dsign :: forall v a
           => Proxy v
           -> String
           -> Benchmark
-bench_dsign _ lbl =
+benchDSIGN _ lbl =
   bgroup lbl
     [ bench "genKeyDSIGN" $
         nf (genKeyDSIGN @v) testSeed

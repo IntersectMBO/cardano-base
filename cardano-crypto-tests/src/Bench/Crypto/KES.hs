@@ -22,27 +22,25 @@ import Criterion
 
 import Bench.Crypto.BenchData
 
-{- HLINT ignore "Use camelCase" -}
-
 
 benchmarks :: Benchmark
 benchmarks = bgroup "KES"
-  [ bench_kes @Proxy @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy "Sum6KES"
-  , bench_kes @Proxy @(CompactSum6KES Ed25519DSIGN Blake2b_256) Proxy "CompactSum6KES"
+  [ benchKES @Proxy @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy "Sum6KES"
+  , benchKES @Proxy @(CompactSum6KES Ed25519DSIGN Blake2b_256) Proxy "CompactSum6KES"
   ]
 
-bench_kes :: forall proxy v
-           . ( KESAlgorithm v
-             , ContextKES v ~ ()
-             , Signable v ByteString
-             , NFData (SignKeyKES v)
-             , NFData (VerKeyKES v)
-             , NFData (SigKES v)
-             )
-          => proxy v
-          -> [Char]
-          -> Benchmark
-bench_kes _ lbl =
+benchKES :: forall proxy v
+          . ( KESAlgorithm v
+            , ContextKES v ~ ()
+            , Signable v ByteString
+            , NFData (SignKeyKES v)
+            , NFData (VerKeyKES v)
+            , NFData (SigKES v)
+            )
+         => proxy v
+         -> [Char]
+         -> Benchmark
+benchKES _ lbl =
   bgroup lbl
     [ bench "genKey" $
         nf (genKeyKES @v) testSeed

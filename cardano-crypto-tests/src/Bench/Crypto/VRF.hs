@@ -19,28 +19,26 @@ import Criterion
 
 import Bench.Crypto.BenchData
 
-{- HLINT ignore "Use camelCase" -}
-
 
 benchmarks :: Benchmark
 benchmarks =
   bgroup "VRF"
-    [ bench_vrf (Proxy @SimpleVRF) "SimpleVRF"
-    , bench_vrf (Proxy @PraosVRF) "PraosVRF"
+    [ benchVRF (Proxy @SimpleVRF) "SimpleVRF"
+    , benchVRF (Proxy @PraosVRF) "PraosVRF"
     ]
 
-bench_vrf :: forall proxy v
-           . ( VRFAlgorithm v
-             , ContextVRF v ~ ()
-             , Signable v ByteString
-             , NFData (CertVRF v)
-             , NFData (SignKeyVRF v)
-             , NFData (VerKeyVRF v)
-             )
-          => proxy v
-          -> [Char]
-          -> Benchmark
-bench_vrf _ lbl =
+benchVRF :: forall proxy v
+          . ( VRFAlgorithm v
+            , ContextVRF v ~ ()
+            , Signable v ByteString
+            , NFData (CertVRF v)
+            , NFData (SignKeyVRF v)
+            , NFData (VerKeyVRF v)
+            )
+         => proxy v
+         -> [Char]
+         -> Benchmark
+benchVRF _ lbl =
   bgroup lbl
     [ bench "genKey" $
         nf (genKeyVRF @v) testSeed
