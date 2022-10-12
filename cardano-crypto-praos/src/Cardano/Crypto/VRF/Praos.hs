@@ -30,7 +30,6 @@ module Cardano.Crypto.VRF.Praos
   , keypairFromSeed
 
   -- * Conversions
-  , unsafeRawSeed
   , outputBytes
   , proofBytes
   , skBytes
@@ -240,15 +239,6 @@ seedFromBytes bs = unsafePerformIO $ do
   withForeignPtr (unSeed seed) $ \ptr ->
     copyFromByteString ptr bs (fromIntegral crypto_vrf_seedbytes)
   return seed
-
--- | Convert an opaque 'Seed' into a 'ByteString' that we can inspect.
--- Note that this will copy the seed into RTS-managed memory; this is not
--- currently a problem, but if at any point we decide that we want to make
--- sure the seed is properly mlocked, then this function will leak such a
--- secured seed into non-locked (swappable) memory.
-unsafeRawSeed :: Seed -> IO ByteString
-unsafeRawSeed (Seed fp) = withForeignPtr fp $ \ptr ->
-  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_seedbytes)
 
 -- | Convert a proof verification output hash into a 'ByteString' that we can
 -- inspect.
