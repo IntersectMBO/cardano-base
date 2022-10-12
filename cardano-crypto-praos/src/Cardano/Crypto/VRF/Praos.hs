@@ -18,17 +18,6 @@ module Cardano.Crypto.VRF.Praos
   -- * VRFAlgorithm API
     PraosVRF
 
-  -- * Low-level size specifiers
-  --
-  -- Sizes of various value types involved in the VRF calculations. Users of
-  -- this module will not need these, we are only exporting them for unit
-  -- testing purposes.
-  , crypto_vrf_proofbytes
-  , crypto_vrf_publickeybytes
-  , crypto_vrf_secretkeybytes
-  , crypto_vrf_seedbytes
-  , crypto_vrf_outputbytes
-
   -- * Key sizes
   , certSizeVRF
   , signKeySizeVRF
