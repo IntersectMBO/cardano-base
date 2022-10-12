@@ -179,17 +179,23 @@ foreign import ccall "crypto_vrf_ietfdraft03_seedbytes" crypto_vrf_seedbytes :: 
 
 foreign import ccall "crypto_vrf_ietfdraft03_outputbytes" crypto_vrf_outputbytes :: CSize
 
-foreign import ccall "crypto_vrf_ietfdraft03_keypair_from_seed" crypto_vrf_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft03_keypair_from_seed"
+  crypto_vrf_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
 
-foreign import ccall "crypto_vrf_ietfdraft03_sk_to_pk" crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO ()
+foreign import ccall "crypto_vrf_ietfdraft03_sk_to_pk"
+  crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO ()
 
-foreign import ccall "crypto_vrf_ietfdraft03_sk_to_seed" crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO ()
+foreign import ccall "crypto_vrf_ietfdraft03_sk_to_seed"
+  crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO ()
 
-foreign import ccall "crypto_vrf_ietfdraft03_prove" crypto_vrf_prove :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft03_prove"
+  crypto_vrf_prove :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
 
-foreign import ccall "crypto_vrf_ietfdraft03_verify" crypto_vrf_verify :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft03_verify"
+  crypto_vrf_verify :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
 
-foreign import ccall "crypto_vrf_ietfdraft03_proof_to_hash" crypto_vrf_proof_to_hash :: OutputPtr -> ProofPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft03_proof_to_hash"
+  crypto_vrf_proof_to_hash :: OutputPtr -> ProofPtr -> IO CInt
 
 -- Key size constants
 
