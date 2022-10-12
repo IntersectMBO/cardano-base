@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
@@ -180,9 +181,9 @@ foreign import ccall "crypto_vrf_ietfdraft03_outputbytes" crypto_vrf_outputbytes
 
 foreign import ccall "crypto_vrf_ietfdraft03_keypair_from_seed" crypto_vrf_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
 
-foreign import ccall "crypto_vrf_ietfdraft03_sk_to_pk" crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft03_sk_to_pk" crypto_vrf_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO ()
 
-foreign import ccall "crypto_vrf_ietfdraft03_sk_to_seed" crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft03_sk_to_seed" crypto_vrf_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO ()
 
 foreign import ccall "crypto_vrf_ietfdraft03_prove" crypto_vrf_prove :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
 
@@ -231,15 +232,14 @@ genSeed = do
 
 copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
 copyFromByteString ptr bs lenExpected =
-  BS.useAsCStringLen bs $ \(cstr, lenActual) ->
+  BS.unsafeUseAsCStringLen bs $ \(cstr, lenActual) ->
     if lenActual >= lenExpected
       then copyBytes (castPtr ptr) cstr lenExpected
-      else error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
+      else error $
+           "Invalid input size, expected at least " <>
+           show lenExpected <> ", but got " <> show lenActual
 
 seedFromBytes :: ByteString -> Seed
-seedFromBytes bs
-  | BS.length bs < fromIntegral crypto_vrf_seedbytes =
-      error "Not enough bytes for seed"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
@@ -407,7 +407,7 @@ skToVerKey sk =
   unsafePerformIO $ withForeignPtr (unSignKey sk) $ \skPtr -> do
     pk <- mkVerKey
     withForeignPtr (unVerKey pk) $ \pkPtr -> do
-      void $ crypto_vrf_sk_to_pk pkPtr skPtr
+      crypto_vrf_sk_to_pk pkPtr skPtr
     return pk
 
 -- | Get the seed used to generate a given Signing Key
@@ -415,7 +415,7 @@ skToSeed :: SignKey -> Seed
 skToSeed sk =
   unsafePerformIO $ withForeignPtr (unSignKey sk) $ \skPtr -> do
     seed <- mkSeed
-    _ <- withForeignPtr (unSeed seed) $ \seedPtr -> do
+    withForeignPtr (unSeed seed) $ \seedPtr ->
       crypto_vrf_sk_to_seed seedPtr skPtr
     return seed
 
@@ -490,11 +490,9 @@ instance VRFAlgorithm PraosVRF where
 
   evalVRF = \_ msg (SignKeyPraosVRF sk) ->
     let msgBS = getSignableRepresentation msg
-        proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
-        output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
-     in output `seq`
-          proof `seq`
-            (OutputVRF (outputBytes output), CertPraosVRF proof)
+        !proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
+        !output = maybe (error "Invalid Proof") outputBytes $ outputFromProof proof
+     in (OutputVRF output, CertPraosVRF proof)
 
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
     isJust $! verify pk proof (getSignableRepresentation msg)
