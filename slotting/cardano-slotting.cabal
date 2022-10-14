@@ -55,7 +55,7 @@ library
                       , nothunks
                       , quiet
                       , serialise
-                      , time             >=1.9.1 && <1.11
+                      , time
 
 test-suite tests
   import:               base, project-config
