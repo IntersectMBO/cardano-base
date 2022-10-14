@@ -1,7 +1,7 @@
 cabal-version: 3.0
 
 name:                cardano-slotting
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Key slotting types for cardano libraries
 -- description:
 -- bug-reports:
@@ -55,7 +55,7 @@ library
                       , nothunks
                       , quiet
                       , serialise
-                      , time             >=1.9.1 && <1.11
+                      , time
 
 test-suite tests
   import:               base, project-config
