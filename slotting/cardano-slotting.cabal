@@ -3,8 +3,6 @@ cabal-version: 3.0
 name:                cardano-slotting
 version:             0.1.0.2
 synopsis:            Key slotting types for cardano libraries
--- description:
--- bug-reports:
 license:             Apache-2.0
 license-files:
   LICENSE
@@ -12,7 +10,6 @@ license-files:
 author:              IOHK Formal Methods Team
 maintainer:          formal.methods@iohk.io
 copyright:           IOHK
--- category:
 build-type:          Simple
 
 flag development
