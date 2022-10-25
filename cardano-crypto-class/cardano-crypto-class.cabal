@@ -111,7 +111,7 @@ library
     , th-compat
     , text
     , transformers
-    , vector
+    , vector < 0.13
 
   if impl(ghc < 9.0.0)
     build-depends:
