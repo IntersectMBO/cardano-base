@@ -32,20 +32,21 @@
     })
     (flakeOutputTasks ["hydraJobs" system] { outputs.hydraJobs.${system} = cell.hydraJobs; });
 
-  # make sure the aggregate is built last
-  ciTasksSeqOrder = let
-    required = "hydraJobs.${system}.required";
-    all = __attrNames ciTasks;
-  in
-    assert __elem required all;
-      lib.remove required all ++ [required];
-
-  ciTasksSeq = taskSequence "ci/" ciTasks ciTasksSeqOrder;
+  ciTasksSeq = taskSequence "ci/" ciTasks (
+    # make sure the aggregate is built last
+    let
+      required = "hydraJobs.${system}.required";
+      all = __attrNames ciTasks;
+    in
+      assert __elem required all;
+        lib.remove required all ++ [required]
+  );
 in
-  ciTasksSeq # for running in an arbitrary sequence
+  ciTasks # for running separately
+  // ciTasksSeq # for running in an arbitrary sequence
   // {
     "ci" = {lib, ...}: {
       imports = [common];
-      after = ["ci/${lib.last ciTasksSeqOrder}"];
+      after = __attrNames ciTasksSeq;
     };
   }

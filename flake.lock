@@ -368,11 +368,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1666350887,
-        "narHash": "sha256-MiDYWJGFGMcNI9oXNXrqsdmnPyXG3OoXeGV76bFoO34=",
+        "lastModified": 1666853863,
+        "narHash": "sha256-hr2WE/+qrXbEuLds5TFu791I7dEeuN3H3x35aqMfc00=",
         "owner": "input-output-hk",
         "repo": "tullia",
-        "rev": "565de3f76098aa0a3f13a4ef8c11f43eabdb196d",
+        "rev": "70af83b77604313561d8e14e2f27a8173e8a888b",
         "type": "github"
       },
       "original": {
