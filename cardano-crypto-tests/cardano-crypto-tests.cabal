@@ -111,7 +111,6 @@ benchmark bench-crypto
   build-depends:        base
                       , cardano-crypto-class
                       , cardano-crypto-tests
-                      , cardano-prelude
                       , criterion
 
   ghc-options:          -threaded
