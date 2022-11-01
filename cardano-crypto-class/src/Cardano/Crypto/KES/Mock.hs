@@ -96,7 +96,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Left "KES verification failed"
 
-    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
+    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @t))
 
     --
     -- raw serialise/deserialise
@@ -130,7 +130,7 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
 
     updateKES () (SignKeyMockKES vk t') t =
         assert (t == t') $
-         if t+1 < totalPeriodsKES (Proxy @ (MockKES t))
+         if t+1 < totalPeriodsKES (Proxy @(MockKES t))
            then return $ Just (SignKeyMockKES vk (t+1))
            else return Nothing
 
