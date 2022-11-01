@@ -220,12 +220,12 @@ instance ( OptimizedKESAlgorithm d
     -- raw serialise/deserialise
     --
 
-    type SizeVerKeyKES  _ = SizeHash       h
-    type SizeSignKeyKES _ = SizeSignKeyKES d
-                          + SeedSizeKES    d
-                          + SizeVerKeyKES  d * 2
-    type SizeSigKES     _ = SizeSigKES     d
-                          + SizeVerKeyKES  d
+    type SizeVerKeyKES  (CompactSumKES h d) = SizeHash       h
+    type SizeSignKeyKES (CompactSumKES h d) = SizeSignKeyKES d
+                                            + SeedSizeKES    d
+                                            + SizeVerKeyKES  d * 2
+    type SizeSigKES     (CompactSumKES h d) = SizeSigKES     d
+                                            + SizeVerKeyKES  d
 
     rawSerialiseVerKeyKES  (VerKeyCompactSumKES  vk) = hashToBytes vk
 

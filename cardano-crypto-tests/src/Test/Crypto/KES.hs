@@ -173,8 +173,7 @@ testForgetGenKeyKES lock _p = withLock lock $ do
 
 testForgetUpdateKeyKES
   :: forall v.
-     ( KESAlgorithm v
-     , KESSignAlgorithm IO v
+     ( KESSignAlgorithm IO v
      , ContextKES v ~ ()
      )
   => Lock
@@ -218,8 +217,7 @@ matchAllocLog evs = foldl' (flip go) Set.empty evs
 
 testMLockGenKeyKES
   :: forall v.
-     ( KESAlgorithm v
-     , KESSignAlgorithm IO v
+     ( KESSignAlgorithm IO v
      )
   => Lock
   -> Proxy v
@@ -244,8 +242,7 @@ testMLockGenKeyKES lock _p = withLock lock $ do
 
 testKESAlgorithm
   :: forall m v.
-     ( KESAlgorithm v
-     , ToCBOR (VerKeyKES v)
+     ( ToCBOR (VerKeyKES v)
      , FromCBOR (VerKeyKES v)
      , Eq (SignKeyKES v)   -- no Eq for signing keys normally
      , Show (SignKeyKES v) -- fake instance defined locally
@@ -530,7 +527,7 @@ prop_verifyKES_positive lock _ _ seedPSB = do
     totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
 
 
--- | If we sign a message @a@ with one list of signing key evolutions, if we
+-- | If we sign a message @a@with one list of signing key evolutions, if we
 -- try to verify the signature (and message @a@) using a verification key
 -- corresponding to a different signing key, then the verification fails.
 --
@@ -559,7 +556,7 @@ prop_verifyKES_negative_key lock _ _ seedPSB seedPSB' x =
             counterexample ("period " ++ show t) $
             verResult =/= Right ()
 
--- | If we sign a message @a@ with one list of signing key evolutions, if we
+-- | If we sign a message @a@with one list of signing key evolutions, if we
 -- try to verify the signature with a message other than @a@, then the
 -- verification fails.
 --
@@ -587,7 +584,7 @@ prop_verifyKES_negative_message lock _ _ seedPSB x x' =
             counterexample ("period " ++ show t) $
             verResult =/= Right ()
 
--- | If we sign a message @a@ with one list of signing key evolutions, if we
+-- | If we sign a message @a@with one list of signing key evolutions, if we
 -- try to verify the signature (and message @a@) using the right verification
 -- key but at a different period than the key used for signing, then the
 -- verification fails.
@@ -647,7 +644,7 @@ prop_serialise_VerKeyKES lock _ _ seedPSB =
                 .&. prop_cbor_with encodeVerKeyKES
                                    decodeVerKeyKES vk
                 .&. prop_size_serialise rawSerialiseVerKeyKES
-                                        (sizeVerKeyKES (Proxy @ v)) vk
+                                        (sizeVerKeyKES (Proxy @v)) vk
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
 -- for 'SigKES' on /all/ the KES key evolutions.
@@ -678,7 +675,7 @@ prop_serialise_SigKES lock _ _ seedPSB x =
               .&. prop_cbor_with encodeSigKES
                                  decodeSigKES sig
               .&. prop_size_serialise rawSerialiseSigKES
-                                      (sizeSigKES (Proxy @ v)) sig
+                                      (sizeSigKES (Proxy @v)) sig
 
 --
 -- KES test utils
