@@ -112,7 +112,8 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
 
 
 instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
-         , Monad m) => KESSignAlgorithm m (SingleKES d) where
+         , Monad m
+         ) => KESSignAlgorithm m (SingleKES d) where
     deriveVerKeyKES (SignKeySingleKES v) =
       VerKeySingleKES <$> deriveVerKeyDSIGNM v
 
