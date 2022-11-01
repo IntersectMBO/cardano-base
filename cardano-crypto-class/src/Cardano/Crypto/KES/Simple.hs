@@ -98,7 +98,7 @@ instance ( DSIGNAlgorithm d
 
     algorithmNameKES proxy = "simple_" ++ show (totalPeriodsKES proxy)
 
-    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @ t))
+    totalPeriodsKES  _ = fromIntegral (natVal (Proxy @t))
 
     --
     -- Core algorithm operations
@@ -170,7 +170,7 @@ instance ( KESAlgorithm (SimpleKES d t)
           Just sk -> return $ SigSimpleKES (signDSIGN ctxt a sk)
 
     updateKES _ sk t
-      | t+1 < fromIntegral (natVal (Proxy @ t)) = return $ Just sk
+      | t+1 < fromIntegral (natVal (Proxy @t)) = return $ Just sk
       | otherwise                               = return Nothing
 
 
@@ -181,7 +181,7 @@ instance ( KESAlgorithm (SimpleKES d t)
     genKeyKES mlsb =
         let seed     = mkSeedFromBytes $ mlsbToByteString mlsb
             seedSize = seedSizeDSIGN (Proxy :: Proxy d)
-            duration = fromIntegral (natVal (Proxy @ t))
+            duration = fromIntegral (natVal (Proxy @t))
             seeds    = take duration
                      . map mkSeedFromBytes
                      $ unfoldr (getBytesFromSeed seedSize) seed

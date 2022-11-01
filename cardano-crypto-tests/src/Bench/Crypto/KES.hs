@@ -49,8 +49,7 @@ benchmarks = bgroup "KES"
 
 
 benchKES :: forall (proxy :: forall k. k -> Type) m v
-           . ( KESAlgorithm v
-             , KESSignAlgorithm m v
+           . ( KESSignAlgorithm m v
              , ContextKES v ~ ()
              , Signable v BS.ByteString
              , NFData (SignKeyKES v)
