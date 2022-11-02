@@ -1,12 +1,13 @@
 cabal-version:       >=1.10
 
 name:                cardano-strict-containers
-version:             0.1.0.1
+version:             0.1.1.0
 synopsis:            Various strict container types
 license:             Apache-2.0
 license-files:
   LICENSE
   NOTICE
+extra-source-files:  CHANGELOG.md
 author:              IOHK
 maintainer:          operations@iohk.io
 copyright:           IOHK
