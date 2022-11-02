@@ -132,6 +132,8 @@ defaultSigGen = do
   msg :: Message <- arbitrary
   signDSIGN () msg <$> defaultSignKeyGen
 
+-- Used for adjusting no of quick check tests
+-- By default up to 100 tests are performed which may not be enough to catch hidden bugs
 defaultTestEnough :: QuickCheckTests -> QuickCheckTests
 defaultTestEnough = max 10_000
 
