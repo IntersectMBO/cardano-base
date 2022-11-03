@@ -22,6 +22,7 @@ packages:
   cardano-crypto-praos
   cardano-crypto-tests
   cardano-strict-containers
+  cardano-mempool
   heapwords
   measures
   orphans-deriving-via
