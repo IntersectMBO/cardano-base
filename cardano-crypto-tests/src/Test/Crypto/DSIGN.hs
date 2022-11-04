@@ -57,10 +57,11 @@ import Cardano.Crypto.DSIGN (
   verifyDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
+  hashAndPack
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Test.Crypto.Util (
-  Message,
+  Message (messageBytes),
   prop_raw_serialise,
   prop_raw_deserialise,
   prop_size_serialise,
@@ -86,6 +87,9 @@ import Test.QuickCheck (
   )
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
+import Cardano.Crypto.SECP256K1.Constants (SECP256K1_ECDSA_MESSAGE_BYTES)
+import GHC.TypeLits (natVal)
+import Cardano.Crypto.Hash (SHA3_256, HashAlgorithm (SizeHash), Blake2b_256, SHA256, Keccak256)
 
 mockSigGen :: Gen (SigDSIGN MockDSIGN)
 mockSigGen = defaultSigGen
@@ -127,6 +131,11 @@ defaultSigGen = do
   msg :: Message <- arbitrary
   signDSIGN () msg <$> defaultSignKeyGen
 
+-- Used for adjusting no of quick check tests
+-- By default up to 100 tests are performed which may not be enough to catch hidden bugs
+defaultTestEnough :: QuickCheckTests -> QuickCheckTests
+defaultTestEnough = max 10_000
+
 {- HLINT ignore "Use <$>" -}
 {- HLINT ignore "Reduce duplication" -}
 
@@ -142,6 +151,12 @@ tests =
 #ifdef SECP256K1_ENABLED
     , testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
     , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
+    -- Specific tests related only to ecdsa
+    , testEcdsaInvalidMessageHash "EcdsaSecp256k1InvalidMessageHash"
+    , testEcdsaWithHashAlgorithm (Proxy @SHA3_256) "EcdsaSecp256k1WithSHA3_256"
+    , testEcdsaWithHashAlgorithm (Proxy @Blake2b_256) "EcdsaSecp256k1WithBlake2b_256"
+    , testEcdsaWithHashAlgorithm (Proxy @SHA256) "EcdsaSecp256k1WithSHA256"
+    , testEcdsaWithHashAlgorithm (Proxy @Keccak256) "EcdsaSecp256k1WithKeccak256"
 #endif
     ]
 
@@ -330,3 +345,27 @@ defaultExpected = ExpectedLengths {
   expectedSKLen = fromIntegral . sizeSignKeyDSIGN $ Proxy @v,
   expectedSigLen = fromIntegral . sizeSigDSIGN $ Proxy @v
   }
+
+testEcdsaInvalidMessageHash :: String -> TestTree
+testEcdsaInvalidMessageHash name = adjustOption defaultTestEnough . testGroup name $ [
+    testProperty "MessageHash deserialization (wrong length)" .
+      forAllShrinkShow (genBadInputFor expectedMHLen)
+                       (shrinkBadInputFor @MessageHash)
+                       showBadInputFor $ prop_raw_deserialise toMessageHash
+  ]
+  where
+    expectedMHLen :: Int
+    expectedMHLen = fromIntegral $ natVal $ Proxy @SECP256K1_ECDSA_MESSAGE_BYTES
+
+testEcdsaWithHashAlgorithm ::
+  forall (h :: Type).
+  (HashAlgorithm h, SizeHash h ~ SECP256K1_ECDSA_MESSAGE_BYTES) =>
+  Proxy h -> String -> TestTree
+testEcdsaWithHashAlgorithm _ name = adjustOption defaultTestEnough . testGroup name $ [
+    testProperty "Ecdsa sign and verify" .
+    forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @EcdsaSecp256k1DSIGN) ppShow $
+      prop_dsign_verify
+  ]
+  where
+    genMsg :: Gen MessageHash
+    genMsg = hashAndPack (Proxy @h) . messageBytes <$> arbitrary
