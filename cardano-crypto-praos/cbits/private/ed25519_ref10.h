@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "quirks.h"
-
 /*
  fe means field element.
  Here the field is \Z/(2^255-19).
@@ -85,6 +83,10 @@ int ge25519_frombytes_negate_vartime(ge25519_p3 *h, const unsigned char *s);
 
 void ge25519_p3_to_cached(ge25519_cached *r, const ge25519_p3 *p);
 
+void ge25519_p2_dbl(ge25519_p1p1 *r, const ge25519_p2 *p);
+
+void ge25519_p3_dbl(ge25519_p1p1 *r, const ge25519_p3 *p);
+
 void ge25519_p1p1_to_p2(ge25519_p2 *r, const ge25519_p1p1 *p);
 
 void ge25519_p1p1_to_p3(ge25519_p3 *r, const ge25519_p1p1 *p);
@@ -100,7 +102,13 @@ void ge25519_double_scalarmult_vartime(ge25519_p2 *r, const unsigned char *a,
                                        const unsigned char *b);
 
 void ge25519_double_scalarmult_vartime_variable(ge25519_p2 *r, const unsigned char *a,
-                                           const ge25519_p3 *A, const unsigned char *b, const ge25519_p3 *B);
+                                                const ge25519_p3 *A, const unsigned char *b, const ge25519_p3 *B);
+
+int crypto_core_ed25519_from_string(unsigned char *p,
+                                const char *ctx, const unsigned char *msg,
+                                size_t msg_len, int hash_alg);
+
+void ge25519_clear_cofactor(ge25519_p3 *p3);
 
 void ge25519_scalarmult(ge25519_p3 *h, const unsigned char *a,
                         const ge25519_p3 *p);

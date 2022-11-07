@@ -22,14 +22,14 @@ module Cardano.Crypto.VRF.PraosBatchCompat
   -- Sizes of various value types involved in the VRF calculations. Users of
   -- this module will not need these, we are only exporting them for unit
   -- testing purposes.
-  , crypto_vrf_ietfdraft10_proofbytes_batchcompat
-  , crypto_vrf_ietfdraft10_publickeybytes
-  , crypto_vrf_ietfdraft10_secretkeybytes
-  , crypto_vrf_ietfdraft10_seedbytes
-  , crypto_vrf_ietfdraft10_outputbytes
+  , crypto_vrf_ietfdraft13_proofbytes_batchcompat
+  , crypto_vrf_ietfdraft13_publickeybytes
+  , crypto_vrf_ietfdraft13_secretkeybytes
+  , crypto_vrf_ietfdraft13_seedbytes
+  , crypto_vrf_ietfdraft13_outputbytes
 
-  , io_crypto_vrf_ietfdraft10_publickeybytes
-  , io_crypto_vrf_ietfdraft10_secretkeybytes
+  , io_crypto_vrf_ietfdraft13_publickeybytes
+  , io_crypto_vrf_ietfdraft13_secretkeybytes
 
   -- * Key sizes
   , certSizeVRF
@@ -161,47 +161,47 @@ newtype Output = Output { unOutput :: ForeignPtr OutputValue }
 
 -- Raw low-level FFI bindings.
 --
-foreign import ccall "crypto_vrf_ietfdraft10_proofbytes_batchcompat" crypto_vrf_ietfdraft10_proofbytes_batchcompat :: CSize
-foreign import ccall "crypto_vrf_ietfdraft10_publickeybytes" crypto_vrf_ietfdraft10_publickeybytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft10_secretkeybytes" crypto_vrf_ietfdraft10_secretkeybytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft10_seedbytes" crypto_vrf_ietfdraft10_seedbytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft10_outputbytes" crypto_vrf_ietfdraft10_outputbytes :: CSize
+foreign import ccall "crypto_vrf_batchcompat_ietfdraft13_bytes" crypto_vrf_ietfdraft13_proofbytes_batchcompat :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes" crypto_vrf_ietfdraft13_publickeybytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes" crypto_vrf_ietfdraft13_secretkeybytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_seedbytes" crypto_vrf_ietfdraft13_seedbytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_outputbytes" crypto_vrf_ietfdraft13_outputbytes :: CSize
 
-foreign import ccall "crypto_vrf_ietfdraft10_publickeybytes" io_crypto_vrf_ietfdraft10_publickeybytes :: IO CSize
-foreign import ccall "crypto_vrf_ietfdraft10_secretkeybytes" io_crypto_vrf_ietfdraft10_secretkeybytes :: IO CSize
+foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes" io_crypto_vrf_ietfdraft13_publickeybytes :: IO CSize
+foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes" io_crypto_vrf_ietfdraft13_secretkeybytes :: IO CSize
 
-foreign import ccall "crypto_vrf_ietfdraft10_keypair_from_seed" crypto_vrf_ietfdraft10_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft10_sk_to_pk" crypto_vrf_ietfdraft10_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft10_sk_to_seed" crypto_vrf_ietfdraft10_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft10_prove_batchcompat" crypto_vrf_ietfdraft10_prove_batchcompat :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft10_verify_batchcompat" crypto_vrf_ietfdraft10_verify_batchcompat :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_seed_keypair" crypto_vrf_ietfdraft13_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
+foreign import ccall "crypto_vrf_sk_to_pk" crypto_vrf_ietfdraft13_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_sk_to_seed" crypto_vrf_ietfdraft13_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft13_prove_batchcompat" crypto_vrf_ietfdraft13_prove_batchcompat :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft13_verify_batchcompat" crypto_vrf_ietfdraft13_verify_batchcompat :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
 
-foreign import ccall "crypto_vrf_ietfdraft10_proof_to_hash_batchcompat" crypto_vrf_ietfdraft10_proof_to_hash_batchcompat :: OutputPtr -> ProofPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft13_proof_to_hash_batchcompat" crypto_vrf_ietfdraft13_proof_to_hash_batchcompat :: OutputPtr -> ProofPtr -> IO CInt
 
 -- Key size constants
 
 certSizeVRF :: Int
-certSizeVRF = fromIntegral $! crypto_vrf_ietfdraft10_proofbytes_batchcompat
+certSizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_proofbytes_batchcompat
 
 signKeySizeVRF :: Int
-signKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft10_secretkeybytes
+signKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_secretkeybytes
 
 verKeySizeVRF :: Int
-verKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft10_publickeybytes
+verKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_publickeybytes
 
 vrfKeySizeVRF :: Int
-vrfKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft10_outputbytes
+vrfKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_outputbytes
 
 ioSignKeySizeVRF :: IO Int
-ioSignKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft10_secretkeybytes
+ioSignKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_secretkeybytes
 
 ioVerKeySizeVRF :: IO Int
-ioVerKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft10_publickeybytes
+ioVerKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_publickeybytes
 
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
 mkSeed = do
-  ptr <- mallocBytes (fromIntegral crypto_vrf_ietfdraft10_seedbytes)
+  ptr <- mallocBytes (fromIntegral crypto_vrf_ietfdraft13_seedbytes)
   Seed <$> newForeignPtr finalizerFree ptr
 
 -- | Generate a random seed.
@@ -220,7 +220,7 @@ genSeed :: IO Seed
 genSeed = do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
-    randombytes_buf ptr crypto_vrf_ietfdraft10_seedbytes
+    randombytes_buf ptr crypto_vrf_ietfdraft13_seedbytes
   return seed
 
 copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
@@ -232,12 +232,12 @@ copyFromByteString ptr bs lenExpected =
       error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
 
 seedFromBytes :: ByteString -> Seed
-seedFromBytes bs | BS.length bs < fromIntegral crypto_vrf_ietfdraft10_seedbytes =
+seedFromBytes bs | BS.length bs < fromIntegral crypto_vrf_ietfdraft13_seedbytes =
   error "Not enough bytes for seed"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
-    copyFromByteString ptr bs (fromIntegral crypto_vrf_ietfdraft10_seedbytes)
+    copyFromByteString ptr bs (fromIntegral crypto_vrf_ietfdraft13_seedbytes)
   return seed
 
 -- | Convert an opaque 'Seed' into a 'ByteString' that we can inspect.
@@ -247,13 +247,13 @@ seedFromBytes bs = unsafePerformIO $ do
 -- secured seed into non-locked (swappable) memory.
 unsafeRawSeed :: Seed -> IO ByteString
 unsafeRawSeed (Seed fp) = withForeignPtr fp $ \ptr ->
-  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft10_seedbytes)
+  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft13_seedbytes)
 
 -- | Convert a proof verification output hash into a 'ByteString' that we can
 -- inspect.
 outputBytes :: Output -> ByteString
 outputBytes (Output op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
-  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft10_outputbytes)
+  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft13_outputbytes)
 
 -- | Convert a proof into a 'ByteString' that we can inspect.
 proofBytes :: Proof -> ByteString
@@ -371,7 +371,7 @@ vkFromBytes bs = unsafePerformIO $ do
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
 mkOutput :: IO Output
-mkOutput = fmap Output $ newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft10_outputbytes)
+mkOutput = fmap Output $ newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft13_outputbytes)
 
 -- | Derive a key pair (Sign + Verify) from a seed.
 keypairFromSeed :: Seed -> (VerKey, SignKey)
@@ -381,7 +381,7 @@ keypairFromSeed seed =
     sk <- mkSignKey
     withForeignPtr (unVerKey pk) $ \pkPtr -> do
       withForeignPtr (unSignKey sk) $ \skPtr -> do
-        void $ crypto_vrf_ietfdraft10_keypair_from_seed pkPtr skPtr sptr
+        void $ crypto_vrf_ietfdraft13_keypair_from_seed pkPtr skPtr sptr
     return $ pk `seq` sk `seq` (pk, sk)
 
 -- | Derive a Verification Key from a Signing Key.
@@ -390,7 +390,7 @@ skToVerKey sk =
   unsafePerformIO $ withForeignPtr (unSignKey sk) $ \skPtr -> do
     pk <- mkVerKey
     withForeignPtr (unVerKey pk) $ \pkPtr -> do
-      void $ crypto_vrf_ietfdraft10_sk_to_pk pkPtr skPtr
+      void $ crypto_vrf_ietfdraft13_sk_to_pk pkPtr skPtr
     return pk
 
 -- | Get the seed used to generate a given Signing Key
@@ -399,7 +399,7 @@ skToSeed sk =
   unsafePerformIO $ withForeignPtr (unSignKey sk) $ \skPtr -> do
     seed <- mkSeed
     _ <- withForeignPtr (unSeed seed) $ \seedPtr -> do
-      crypto_vrf_ietfdraft10_sk_to_seed seedPtr skPtr
+      crypto_vrf_ietfdraft13_sk_to_seed seedPtr skPtr
     return seed
 
 -- | Construct a proof from a Signing Key and a message.
@@ -412,7 +412,7 @@ prove sk msg =
       proof <- mkProof
       BS.useAsCStringLen msg $ \(m, mlen) -> do
         withForeignPtr (unProof proof) $ \proofPtr -> do
-          crypto_vrf_ietfdraft10_prove_batchcompat proofPtr skPtr m (fromIntegral mlen) >>= \case
+          crypto_vrf_ietfdraft13_prove_batchcompat proofPtr skPtr m (fromIntegral mlen) >>= \case
             0 -> return $ Just $! proof
             _ -> return Nothing
 
@@ -430,7 +430,7 @@ verify pk proof msg =
         output <- mkOutput
         BS.useAsCStringLen msg $ \(m, mlen) -> do
           withForeignPtr (unOutput output) $ \outputPtr -> do
-            crypto_vrf_ietfdraft10_verify_batchcompat outputPtr pkPtr proofPtr m (fromIntegral mlen) >>= \case
+            crypto_vrf_ietfdraft13_verify_batchcompat outputPtr pkPtr proofPtr m (fromIntegral mlen) >>= \case
               0 -> return $ Just $! output
               _ -> return Nothing
 
@@ -440,7 +440,7 @@ outputFromProof (Proof p) =
     withForeignPtr p $ \ptr -> do
       output <- mkOutput
       withForeignPtr (unOutput output) $ \outputPtr -> do
-        crypto_vrf_ietfdraft10_proof_to_hash_batchcompat outputPtr ptr >>= \case
+        crypto_vrf_ietfdraft13_proof_to_hash_batchcompat outputPtr ptr >>= \case
           0 -> return $ Just $! output
           _ -> return Nothing
 
@@ -481,11 +481,11 @@ instance VRFAlgorithm PraosBatchCompatVRF where
   verifyVRF = \_ (VerKeyPraosBatchCompatVRF pk) msg (_, CertPraosBatchCompatVRF proof) ->
     isJust $! verify pk proof (getSignableRepresentation msg)
 
-  sizeOutputVRF _ = fromIntegral crypto_vrf_ietfdraft10_outputbytes
-  seedSizeVRF _ = fromIntegral crypto_vrf_ietfdraft10_seedbytes
+  sizeOutputVRF _ = fromIntegral crypto_vrf_ietfdraft13_outputbytes
+  seedSizeVRF _ = fromIntegral crypto_vrf_ietfdraft13_seedbytes
 
   genKeyPairVRF = \cryptoseed ->
-    let seed = seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_ietfdraft10_seedbytes) $ cryptoseed
+    let seed = seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_ietfdraft13_seedbytes) $ cryptoseed
         (pk, sk) = keypairFromSeed seed
     in sk `seq` pk `seq` (SignKeyPraosBatchCompatVRF sk, VerKeyPraosBatchCompatVRF pk)
 

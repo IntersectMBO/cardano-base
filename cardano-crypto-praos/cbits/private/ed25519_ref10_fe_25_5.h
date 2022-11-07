@@ -1,7 +1,6 @@
 #include <string.h>
 
 #include "common.h"
-#include "quirks.h"
 #include "sodium/utils.h"
 
 /*
@@ -525,7 +524,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
     int64_t h8 = f0g8 + f1g7_2 + f2g6 + f3g5_2 + f4g4 + f5g3_2 + f6g2 + f7g1_2 +
                  f8g0 + f9g9_38;
     int64_t h9 =
-        f0g9 + f1g8 + f2g7 + f3g6 + f4g5 + f5g4 + f6g3 + f7g2 + f8g1 + f9g0;
+            f0g9 + f1g8 + f2g7 + f3g6 + f4g5 + f5g4 + f6g3 + f7g2 + f8g1 + f9g0;
 
     int64_t carry0;
     int64_t carry1;
@@ -981,77 +980,6 @@ fe25519_sq2(fe25519 h, const fe25519 f)
 
 static void
 fe25519_scalar_product(fe25519 h, const fe25519 f, uint32_t n)
-{
-    int64_t sn = (int64_t) n;
-    int32_t f0 = f[0];
-    int32_t f1 = f[1];
-    int32_t f2 = f[2];
-    int32_t f3 = f[3];
-    int32_t f4 = f[4];
-    int32_t f5 = f[5];
-    int32_t f6 = f[6];
-    int32_t f7 = f[7];
-    int32_t f8 = f[8];
-    int32_t f9 = f[9];
-    int64_t h0 = f0 * sn;
-    int64_t h1 = f1 * sn;
-    int64_t h2 = f2 * sn;
-    int64_t h3 = f3 * sn;
-    int64_t h4 = f4 * sn;
-    int64_t h5 = f5 * sn;
-    int64_t h6 = f6 * sn;
-    int64_t h7 = f7 * sn;
-    int64_t h8 = f8 * sn;
-    int64_t h9 = f9 * sn;
-    int64_t carry0, carry1, carry2, carry3, carry4, carry5, carry6, carry7,
-            carry8, carry9;
-
-    carry9 = (h9 + ((int64_t) 1 << 24)) >> 25;
-    h0 += carry9 * 19;
-    h9 -= carry9 * ((int64_t) 1 << 25);
-    carry1 = (h1 + ((int64_t) 1 << 24)) >> 25;
-    h2 += carry1;
-    h1 -= carry1 * ((int64_t) 1 << 25);
-    carry3 = (h3 + ((int64_t) 1 << 24)) >> 25;
-    h4 += carry3;
-    h3 -= carry3 * ((int64_t) 1 << 25);
-    carry5 = (h5 + ((int64_t) 1 << 24)) >> 25;
-    h6 += carry5;
-    h5 -= carry5 * ((int64_t) 1 << 25);
-    carry7 = (h7 + ((int64_t) 1 << 24)) >> 25;
-    h8 += carry7;
-    h7 -= carry7 * ((int64_t) 1 << 25);
-
-    carry0 = (h0 + ((int64_t) 1 << 25)) >> 26;
-    h1 += carry0;
-    h0 -= carry0 * ((int64_t) 1 << 26);
-    carry2 = (h2 + ((int64_t) 1 << 25)) >> 26;
-    h3 += carry2;
-    h2 -= carry2 * ((int64_t) 1 << 26);
-    carry4 = (h4 + ((int64_t) 1 << 25)) >> 26;
-    h5 += carry4;
-    h4 -= carry4 * ((int64_t) 1 << 26);
-    carry6 = (h6 + ((int64_t) 1 << 25)) >> 26;
-    h7 += carry6;
-    h6 -= carry6 * ((int64_t) 1 << 26);
-    carry8 = (h8 + ((int64_t) 1 << 25)) >> 26;
-    h9 += carry8;
-    h8 -= carry8 * ((int64_t) 1 << 26);
-
-    h[0] = (int32_t) h0;
-    h[1] = (int32_t) h1;
-    h[2] = (int32_t) h2;
-    h[3] = (int32_t) h3;
-    h[4] = (int32_t) h4;
-    h[5] = (int32_t) h5;
-    h[6] = (int32_t) h6;
-    h[7] = (int32_t) h7;
-    h[8] = (int32_t) h8;
-    h[9] = (int32_t) h9;
-}
-
-static inline void
-fe25519_mul32(fe25519 h, const fe25519 f, uint32_t n)
 {
     int64_t sn = (int64_t) n;
     int32_t f0 = f[0];

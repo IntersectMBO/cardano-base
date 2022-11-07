@@ -4,7 +4,9 @@
 #include <string.h>
 
 #include "sodium/crypto_verify_32.h"
+#include "sodium/crypto_core_ed25519.h"
 #include "common.h"
+#include "core_h2c.h"
 #include "ed25519_ref10.h"
 #include "sodium/utils.h"
 
@@ -49,17 +51,6 @@ load_4(const unsigned char *in)
 # include "fe_25_5/constants.h"
 # include "fe_25_5/fe.h"
 #endif
-
-static inline void
-fe25519_sqmul(fe25519 s, const int n, const fe25519 a)
-{
-    int i;
-
-    for (i = 0; i < n; i++) {
-        fe25519_sq(s, s);
-    }
-    fe25519_mul(s, s, a);
-}
 
 void
 fe25519_invert(fe25519 out, const fe25519 z)
@@ -205,7 +196,34 @@ fe25519_sqrt(fe25519 x, const fe25519 x2)
     return fe25519_iszero(check) - 1;
 }
 
-static int
+static inline void
+fe25519_cneg(fe25519 h, const fe25519 f, unsigned int b)
+{
+    fe25519 negf;
+
+    fe25519_neg(negf, f);
+    fe25519_copy(h, f);
+    fe25519_cmov(h, negf, b);
+}
+
+static inline void
+fe25519_abs(fe25519 h, const fe25519 f)
+{
+    fe25519_cneg(h, f, fe25519_isnegative(f));
+}
+
+static inline void
+fe25519_sqmul(fe25519 s, const int n, const fe25519 a)
+{
+    int i;
+
+    for (i = 0; i < n; i++) {
+        fe25519_sq(s, s);
+    }
+    fe25519_mul(s, s, a);
+}
+
+static unsigned int
 fe25519_notsquare(const fe25519 x)
 {
     fe25519       _10, _11, _1100, _1111, _11110000, _11111111;
@@ -241,22 +259,6 @@ fe25519_notsquare(const fe25519 x)
     fe25519_tobytes(s, t);
 
     return s[1] & 1;
-}
-
-static inline void
-fe25519_cneg(fe25519 h, const fe25519 f, unsigned int b)
-{
-    fe25519 negf;
-
-    fe25519_neg(negf, f);
-    fe25519_copy(h, f);
-    fe25519_cmov(h, negf, b);
-}
-
-static inline void
-fe25519_abs(fe25519 h, const fe25519 f)
-{
-    fe25519_cneg(h, f, fe25519_isnegative(f));
 }
 
 /*
@@ -493,7 +495,7 @@ ge25519_p2_0(ge25519_p2 *h)
  r = 2 * p
  */
 
-static void
+void
 ge25519_p2_dbl(ge25519_p1p1 *r, const ge25519_p2 *p)
 {
     fe25519 t0;
@@ -587,7 +589,7 @@ ge25519_p3_tobytes(unsigned char *s, const ge25519_p3 *h)
  r = 2 * p
  */
 
-static void
+void
 ge25519_p3_dbl(ge25519_p1p1 *r, const ge25519_p3 *p)
 {
     ge25519_p2 q;
@@ -782,6 +784,44 @@ void point_precomputation(ge25519_cached cached[8], const ge25519_p3 *base) {
     ge25519_p3_to_cached(&cached[7], &u);
 }
 
+/*
+ * This will eventually stability in upstream:stable
+ */
+#define HASH_GE_L 48
+static int
+_string_to_points(unsigned char * const px, const size_t n,
+                  const char *ctx, const unsigned char *msg, size_t msg_len,
+                  int hash_alg)
+{
+    unsigned char h[crypto_core_ed25519_HASHBYTES];
+    unsigned char h_be[2U * HASH_GE_L];
+    size_t        i, j;
+
+    if (n > 2U) {
+        abort(); /* LCOV_EXCL_LINE */
+    }
+    if (core_h2c_string_to_hash(h_be, n * HASH_GE_L, ctx, msg, msg_len,
+                                hash_alg) != 0) {
+        return -1;
+    }
+    COMPILER_ASSERT(sizeof h >= HASH_GE_L);
+    for (i = 0U; i < n; i++) {
+        for (j = 0U; j < HASH_GE_L; j++) {
+            h[j] = h_be[i * HASH_GE_L + HASH_GE_L - 1U - j];
+        }
+        memset(&h[j], 0, (sizeof h) - j);
+        ge25519_from_hash(&px[i * crypto_core_ed25519_BYTES], h);
+    }
+    return 0;
+}
+
+int
+crypto_core_ed25519_from_string(unsigned char p[crypto_core_ed25519_BYTES],
+                                const char *ctx, const unsigned char *msg,
+                                size_t msg_len, int hash_alg)
+{
+    return _string_to_points(p, 1, ctx, msg, msg_len, hash_alg);
+}
 
 /*
  r = a * A + b * B
@@ -933,6 +973,21 @@ ge25519_double_scalarmult_vartime_variable(ge25519_p2 *r, const unsigned char *a
 
         ge25519_p1p1_to_p2(r, &t);
     }
+}
+
+/* multiply by the cofactor */
+void
+ge25519_clear_cofactor(ge25519_p3 *p3)
+{
+    ge25519_p1p1 p1;
+    ge25519_p2   p2;
+
+    ge25519_p3_dbl(&p1, p3);
+    ge25519_p1p1_to_p2(&p2, &p1);
+    ge25519_p2_dbl(&p1, &p2);
+    ge25519_p1p1_to_p2(&p2, &p1);
+    ge25519_p2_dbl(&p1, &p2);
+    ge25519_p1p1_to_p3(p3, &p1);
 }
 
 /*
@@ -1094,7 +1149,7 @@ static void
 ge25519_mul_l(ge25519_p3 *r, const ge25519_p3 *A)
 {
     static const signed char aslide[253] = {
-        13, 0, 0, 0, 0, -1, 0, 0, 0, 0, -11, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0, -3, 0, 0, 0, 0, -13, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, -13, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, -13, 0, 0, 0, 0, 0, 0, -3, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 3, 0, 0, 0, 0, -11, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+            13, 0, 0, 0, 0, -1, 0, 0, 0, 0, -11, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 0, 0, 0, -3, 0, 0, 0, 0, -13, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, -13, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, -13, 0, 0, 0, 0, 0, 0, -3, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 3, 0, 0, 0, 0, -11, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
     };
     ge25519_cached Ai[8];
     ge25519_p1p1   t;
@@ -1201,36 +1256,36 @@ ge25519_has_small_order(const unsigned char s[32])
 {
     CRYPTO_ALIGN(16)
     static const unsigned char blacklist[][32] = {
-        /* 0 (order 4) */
-        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-        /* 1 (order 1) */
-        { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-        /* 2707385501144840649318225287225658788936804267575313519463743609750303402022
-           (order 8) */
-        { 0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4,
-          0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5, 0xdf, 0xac, 0x05, 0xd3, 0xc6,
-          0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05 },
-        /* 55188659117513257062467267217118295137698188065244968500265048394206261417927
-           (order 8) */
-        { 0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b,
-          0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a, 0x20, 0x53, 0xfa, 0x2c, 0x39,
-          0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a },
-        /* p-1 (order 2) */
-        { 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f },
-        /* p (=0, order 4) */
-        { 0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f },
-        /* p+1 (=1, order 1) */
-        { 0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f }
+            /* 0 (order 4) */
+            { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+            /* 1 (order 1) */
+            { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+            /* 2707385501144840649318225287225658788936804267575313519463743609750303402022
+               (order 8) */
+            { 0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4,
+                    0x89, 0xf2, 0xef, 0x98, 0xf0, 0xd5, 0xdf, 0xac, 0x05, 0xd3, 0xc6,
+                    0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53, 0xfc, 0x05 },
+            /* 55188659117513257062467267217118295137698188065244968500265048394206261417927
+               (order 8) */
+            { 0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b,
+                    0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a, 0x20, 0x53, 0xfa, 0x2c, 0x39,
+                    0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a },
+            /* p-1 (order 2) */
+            { 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f },
+            /* p (=0, order 4) */
+            { 0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f },
+            /* p+1 (=1, order 1) */
+            { 0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f }
     };
     unsigned char c[7] = { 0 };
     unsigned int  k;
@@ -1366,7 +1421,7 @@ sc25519_mul(unsigned char s[32], const unsigned char a[32], const unsigned char 
     s15 = a4 * b11 + a5 * b10 + a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6 +
           a10 * b5 + a11 * b4;
     s16 =
-        a5 * b11 + a6 * b10 + a7 * b9 + a8 * b8 + a9 * b7 + a10 * b6 + a11 * b5;
+            a5 * b11 + a6 * b10 + a7 * b9 + a8 * b8 + a9 * b7 + a10 * b6 + a11 * b5;
     s17 = a6 * b11 + a7 * b10 + a8 * b9 + a9 * b8 + a10 * b7 + a11 * b6;
     s18 = a7 * b11 + a8 * b10 + a9 * b9 + a10 * b8 + a11 * b7;
     s19 = a8 * b11 + a9 * b10 + a10 * b9 + a11 * b8;
@@ -1854,7 +1909,7 @@ sc25519_muladd(unsigned char s[32], const unsigned char a[32],
     s15 = a4 * b11 + a5 * b10 + a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6 +
           a10 * b5 + a11 * b4;
     s16 =
-        a5 * b11 + a6 * b10 + a7 * b9 + a8 * b8 + a9 * b7 + a10 * b6 + a11 * b5;
+            a5 * b11 + a6 * b10 + a7 * b9 + a8 * b8 + a9 * b7 + a10 * b6 + a11 * b5;
     s17 = a6 * b11 + a7 * b10 + a8 * b9 + a9 * b8 + a10 * b7 + a11 * b6;
     s18 = a7 * b11 + a8 * b10 + a9 * b9 + a10 * b8 + a11 * b7;
     s19 = a8 * b11 + a9 * b10 + a10 * b9 + a11 * b8;
@@ -2253,7 +2308,7 @@ void
 sc25519_invert(unsigned char recip[32], const unsigned char s[32])
 {
     unsigned char _10[32], _100[32], _11[32], _101[32], _111[32],
-        _1001[32], _1011[32], _1111[32];
+            _1001[32], _1011[32], _1111[32];
 
     sc25519_sq(_10, s);
     sc25519_sq(_100, _10);
@@ -2633,9 +2688,9 @@ sc25519_is_canonical(const unsigned char s[32])
 {
     /* 2^252+27742317777372353535851937790883648493 */
     static const unsigned char L[32] = {
-        0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7,
-        0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10
+            0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7,
+            0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10
     };
     unsigned char c = 0;
     unsigned char n = 1;
@@ -2648,62 +2703,6 @@ sc25519_is_canonical(const unsigned char s[32])
     } while (i != 0);
 
     return (c != 0);
-}
-
-static void
-chi25519(fe25519 out, const fe25519 z)
-{
-    fe25519 t0, t1, t2, t3;
-    int     i;
-
-    fe25519_sq(t0, z);
-    fe25519_mul(t1, t0, z);
-    fe25519_sq(t0, t1);
-    fe25519_sq(t2, t0);
-    fe25519_sq(t2, t2);
-    fe25519_mul(t2, t2, t0);
-    fe25519_mul(t1, t2, z);
-    fe25519_sq(t2, t1);
-
-    for (i = 1; i < 5; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t1, t2, t1);
-    fe25519_sq(t2, t1);
-    for (i = 1; i < 10; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t2, t2, t1);
-    fe25519_sq(t3, t2);
-    for (i = 1; i < 20; i++) {
-        fe25519_sq(t3, t3);
-    }
-    fe25519_mul(t2, t3, t2);
-    fe25519_sq(t2, t2);
-    for (i = 1; i < 10; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t1, t2, t1);
-    fe25519_sq(t2, t1);
-    for (i = 1; i < 50; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t2, t2, t1);
-    fe25519_sq(t3, t2);
-    for (i = 1; i < 100; i++) {
-        fe25519_sq(t3, t3);
-    }
-    fe25519_mul(t2, t3, t2);
-    fe25519_sq(t2, t2);
-    for (i = 1; i < 50; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t1, t2, t1);
-    fe25519_sq(t1, t1);
-    for (i = 1; i < 4; i++) {
-        fe25519_sq(t1, t1);
-    }
-    fe25519_mul(out, t1, t0);
 }
 
 /* montgomery to edwards */
@@ -2741,26 +2740,11 @@ ge25519_xmont_to_ymont(fe25519 y, const fe25519 x)
 
     fe25519_sq(x2, x);
     fe25519_mul(x3, x, x2);
-    fe25519_mul32(x2, x2, ed25519_A_32);
+    fe25519_scalar_product(x2, x2, ed25519_A_32);
     fe25519_add(y, x3, x);
     fe25519_add(y, y, x2);
 
     return fe25519_sqrt(y, y);
-}
-
-/* multiply by the cofactor */
-static void
-ge25519_clear_cofactor(ge25519_p3 *p3)
-{
-    ge25519_p1p1 p1;
-    ge25519_p2   p2;
-
-    ge25519_p3_dbl(&p1, p3);
-    ge25519_p1p1_to_p2(&p2, &p1);
-    ge25519_p2_dbl(&p1, &p2);
-    ge25519_p1p1_to_p2(&p2, &p1);
-    ge25519_p2_dbl(&p1, &p2);
-    ge25519_p1p1_to_p3(p3, &p1);
 }
 
 static void
@@ -2775,12 +2759,12 @@ ge25519_elligator2(fe25519 x, fe25519 y, const fe25519 r, int *notsquare_p)
     fe25519_sq2(rr2, r);
     rr2[0]++;
     fe25519_invert(rr2, rr2);
-    fe25519_mul32(x, rr2, ed25519_A_32);
+    fe25519_scalar_product(x, rr2, ed25519_A_32);
     fe25519_neg(x, x); /* x=x1 */
 
     fe25519_sq(x2, x);
     fe25519_mul(x3, x, x2);
-    fe25519_mul32(x2, x2, ed25519_A_32); /* x2 = A*x1^2 */
+    fe25519_scalar_product(x2, x2, ed25519_A_32); /* x2 = A*x1^2 */
     fe25519_add(gx1, x3, x);
     fe25519_add(gx1, gx1, x2); /* gx1 = x1^3 + A*x1^2 + x1 */
 
@@ -2916,6 +2900,7 @@ ristretto255_is_canonical(const unsigned char *s)
 {
     unsigned char c;
     unsigned char d;
+    unsigned char e;
     unsigned int  i;
 
     c = (s[31] & 0x7f) ^ 0x7f;
@@ -2924,8 +2909,9 @@ ristretto255_is_canonical(const unsigned char *s)
     }
     c = (((unsigned int) c) - 1U) >> 8;
     d = (0xed - 1U - (unsigned int) s[0]) >> 8;
+    e = s[31] >> 7;
 
-    return 1 - (((c & d) | s[0]) & 1);
+    return 1 - (((c & d) | e | s[0]) & 1);
 }
 
 int
@@ -3014,7 +3000,7 @@ ristretto255_p3_tobytes(unsigned char *s, const ge25519_p3 *h)
 
     fe25519_mul(ix, h->X, sqrtm1);     /* ix = X*sqrt(-1) */
     fe25519_mul(iy, h->Y, sqrtm1);     /* iy = Y*sqrt(-1) */
-    fe25519_mul(eden, den1, invsqrtamd); /* eden = den1*sqrt(a-d) */
+    fe25519_mul(eden, den1, invsqrtamd); /* eden = den1/sqrt(a-d) */
 
     fe25519_mul(t_z_inv, h->T, z_inv); /* t_z_inv = T*z_inv */
     rotate = fe25519_isnegative(t_z_inv);
@@ -3057,7 +3043,7 @@ ristretto255_elligator(ge25519_p3 *p, const fe25519 t)
     fe25519_mul(u, u, onemsqd);        /* u = (r+1)*(1-d^2) */
     fe25519_1(c);
     fe25519_neg(c, c);                 /* c = -1 */
-    fe25519_add(rpd, r, d);            /* rpd = r*d */
+    fe25519_add(rpd, r, d);            /* rpd = r+d */
     fe25519_mul(v, r, d);              /* v = r*d */
     fe25519_sub(v, c, v);              /* v = c-r*d */
     fe25519_mul(v, v, rpd);            /* v = (c-r*d)*(r+d) */
