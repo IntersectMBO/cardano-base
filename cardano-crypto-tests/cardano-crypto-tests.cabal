@@ -57,6 +57,10 @@ library
                         Bench.Crypto.VRF
                         Bench.Crypto.KES
                         Bench.Crypto.BenchData
+                        Test.Crypto.Vector.Secp256k1DSIGN
+                        Test.Crypto.Vector.Vectors
+                        Test.Crypto.Vector.StringConstants
+                        Test.Crypto.Vector.SerializationUtils
 
   build-depends:        base
                       , bytestring
@@ -75,6 +79,7 @@ library
                       , tasty-hunit
                       , tasty-quickcheck
                       , criterion
+                      , base16-bytestring
 
   if flag(secp256k1-support)
     cpp-options: -DSECP256K1_ENABLED
