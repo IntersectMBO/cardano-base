@@ -14,7 +14,7 @@ where
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
 -- TODO: re-enable once the audit is complete:
--- import Cardano.Crypto.VRF.PraosBatchCompat
+import Cardano.Crypto.VRF.PraosBatchCompat
 import Cardano.Crypto.Util
 
 import qualified Data.ByteString as BS
@@ -39,8 +39,7 @@ tests =
     [ testVRFAlgorithm (Proxy :: Proxy MockVRF) "MockVRF"
     , testVRFAlgorithm (Proxy :: Proxy SimpleVRF) "SimpleVRF"
     , testVRFAlgorithm (Proxy :: Proxy PraosVRF) "PraosVRF"
-    -- Disabled until VRF10 audit is copmplete:
-    -- , testVRFAlgorithm (Proxy :: Proxy PraosBatchCompatVRF) "PraosBatchCompatVRF"
+    , testVRFAlgorithm (Proxy :: Proxy PraosBatchCompatVRF) "PraosBatchCompatVRF"
 
     , testGroup "OutputVRF"
       [ testProperty "bytesToNatural" prop_bytesToNatural
