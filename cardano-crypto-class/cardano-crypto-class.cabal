@@ -18,8 +18,6 @@ copyright:          2019-2021 IOHK
 category:           Currency
 build-type:         Simple
 extra-source-files: README.md
-extra-source-files: cbits/mlocked-pool.h
-                  , cbits/mlocked-pool.c
 
 flag development
   description: Disable `-Werror`
@@ -97,9 +95,6 @@ library
     Cardano.Crypto.VRF.Simple
     Cardano.Foreign
 
-  c-sources:
-    cbits/mlocked-pool.c
-
   other-modules:
     Cardano.Crypto.PackedBytes
 
@@ -109,6 +104,7 @@ library
     , base16-bytestring  >=1
     , bytestring
     , cardano-binary
+    , cardano-mempool
     , cardano-prelude
     , cardano-strict-containers
     , cryptonite

@@ -102,6 +102,7 @@ test-suite test-crypto
                       , tasty-quickcheck
 
   ghc-options:          -threaded -rtsopts -with-rtsopts=-N
+  -- ghc-options:          -rtsopts
 
 benchmark bench-crypto
   import:               base, project-config
