@@ -151,7 +151,7 @@ grabNextPageWithAllocator Page {..} allocator = do
     -- set to True. This is not a problem because that memory will be recovered as soon as
     -- any other Block in the Page is finalized
     --
-    -- TODO: Potentially verify that first Word in pageBitArray is still maxBound, in
+    -- TODO: Potentially verify that first Int in pageBitArray has all bits set, in
     -- order to prevent the degenerate case of all Blocks beeing finalized right before
     -- the page is marked as full.
     Nothing -> Nothing <$ atomicWriteIntPVar pageFull 1
@@ -162,10 +162,10 @@ grabNextPageWithAllocator Page {..} allocator = do
                 plusPtr pagePtr $ ix * blockByteCount (Block :: Block n)
            in allocator blockPtr $ do
                 let !(!q, !r) = ix `quotRem` ixBitSize
-                    !pageBitMask = clearBit maxBound r
+                    !pageBitMask = clearBit (complement 0) r
                 touch pageMemory
                 atomicAndIntMutablePrimArray pageBitArray q pageBitMask
-                atomicWriteIntPVar pageFull 1
+                atomicWriteIntPVar pageFull 0
 {-# INLINE grabNextPageWithAllocator #-}
 
 
