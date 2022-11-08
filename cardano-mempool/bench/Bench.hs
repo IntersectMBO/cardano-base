@@ -32,7 +32,7 @@ main = do
   let n = 10240
       blockSize = 32
   defaultMain
-    [ bgroup "Optimal"
+    [ bgroup "Sequential"
       [ env (initHaskellPool @32 (n `div` 64)) $ \pool ->
           bench "ForeignPtr (Pool)" $ nfIO (replicateM n (grabNextBlock pool))
       , bench "ForeignPtr (ByteArray)" $

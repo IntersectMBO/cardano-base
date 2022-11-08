@@ -1,12 +1,12 @@
 name:                cardano-mempool
 version:             0.1.0.0
 synopsis:            Short description
-description:         Package for managin large chunks of memory at a small block granularity
+description:         Lock-free threadsafe pinned memory pool
 homepage:            https://github.com/input-output-hk/cardano-base
 license:             BSD3
 author:              IOHK
 maintainer:          operations@iohk.io
-copyright:           2019-2021 IOHK
+copyright:           2022 IOHK
 category:            Memory
 build-type:          Simple
 extra-source-files:  README.md
@@ -35,15 +35,15 @@ test-suite tests
   hs-source-dirs:     tests
   main-is:            Main.hs
   other-modules:      Common
-                    , Test.Cardano.Memory.PoolSpec
-                    , Spec
-  build-tool-depends: hspec-discover:hspec-discover
+                    , Test.Cardano.Memory.PoolTests
   build-depends:      base
                     , async
                     , cardano-mempool
                     , primitive
                     , pvar
-                    , hspec
+                    , tasty
+                    , tasty-quickcheck
+                    , tasty-hunit
                     , QuickCheck
 
   default-language:   Haskell2010
