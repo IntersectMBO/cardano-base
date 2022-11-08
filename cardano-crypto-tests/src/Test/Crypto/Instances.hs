@@ -34,7 +34,7 @@ import Control.Exception (bracket)
 --         size :: Int
 --         size = fromInteger (natVal (Proxy :: Proxy n))
 
-mlsbFromPSB :: (KnownNat n) => PinnedSizedBytes n -> IO (NaCl.MLockedSizedBytes n)
+mlsbFromPSB :: KnownNat n => PinnedSizedBytes n -> IO (NaCl.MLockedSizedBytes n)
 mlsbFromPSB = NaCl.mlsbFromByteString . psbToByteString
 
 withMLSBFromPSB :: (KnownNat n, MonadIO m, RunIO m) => PinnedSizedBytes n -> (NaCl.MLockedSizedBytes n -> m a) -> m a
