@@ -34,7 +34,7 @@ main = do
   defaultMain
     [ bgroup "Optimal"
       [ env (initHaskellPool @32 (n `div` 64)) $ \pool ->
-          bench "ForeignPtr (Pool)" $ nfIO (replicateM n (grabNextPoolForeignPtr pool))
+          bench "ForeignPtr (Pool)" $ nfIO (replicateM n (grabNextBlock pool))
       , bench "ForeignPtr (ByteArray)" $
           nfIO (replicateM n (mallocForeignPtrBytes blockSize))
       , bench "ForeignPtr (malloc)" $
@@ -42,7 +42,7 @@ main = do
       ]
     , bgroup "Concurrent"
       [ env (initHaskellPool @32 (n `div` 64)) $ \pool ->
-          bench "ForeignPtr (Pool)" $ nfIO (pooledReplicateConcurrently n (grabNextPoolForeignPtr pool))
+          bench "ForeignPtr (Pool)" $ nfIO (pooledReplicateConcurrently n (grabNextBlock pool))
       , bench "ForeignPtr (ByteArray)" $
           nfIO (pooledReplicateConcurrently n (mallocForeignPtrBytes blockSize))
       , bench "ForeignPtr (malloc)" $

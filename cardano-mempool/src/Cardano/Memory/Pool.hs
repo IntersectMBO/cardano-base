@@ -8,7 +8,26 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-module Cardano.Memory.Pool where
+-- | The goal of this Memory Pool is to provide the ability to allocate big chunks of
+-- memory that can fit many `Block`s. Some memory allocators out there have a fairly large
+-- minimal size requirement, which would be wasteful if many chunks of small size (eg. 32
+-- bytes) are needed at once. Memory pool will allocate one page at a time as more blocks
+-- is needed.
+--
+-- Currently there is no functionality for releasing unused pages. So, once a page is
+-- allocated, it will be re-used when more `Block`s is needed, but it will not be GCed
+-- until the whole `Pool` is GCed.
+module Cardano.Memory.Pool
+  ( -- * Pool
+    Pool
+  , initPool
+  -- * Block
+  , Block(..)
+  , blockByteCount
+  , grabNextBlock
+  -- * Helpers
+  , findNextZeroIndex
+  ) where
 
 import Control.Monad
 import Control.Monad.Primitive
@@ -27,30 +46,51 @@ import GHC.Int
 import GHC.IO
 import GHC.Exts (fetchAndIntArray#)
 
+-- | This is just a proxy type that carries information at the type level about the size
+-- of the block in bytes supported by a particular instance of a `Pool`. Use
+-- `blockByteCount` to get the byte size at the value level.
 data Block (n :: Nat) = Block
 
+-- | Number of bytes in a `Block`
 blockByteCount :: KnownNat n => Block n -> Int
 blockByteCount = fromInteger . natVal
 
+-- | Internal helper type that manages each individual page. This is essentailly a mutable
+-- linked list, which contains a memory buffer, a bit array that tracks which blocks in
+-- the buffere are free and which ones are taken.
 data Page n =
   Page
     { pageMemory :: !(ForeignPtr (Block n))
-    , pageBitArray :: !(MutablePrimArray RealWorld Int) -- Need to use Int, since there are
-                                                        -- no built-in atomic ops for Word
+    -- ^ Contiguous memory buffer that holds all the blocks in the page.
+    , pageBitArray :: !(MutablePrimArray RealWorld Int)
+    -- ^ We use an Int array, because there are no built-in atomic primops for Word.
     , pageFull :: !(PVar Int RealWorld)
+    -- ^ This is a boolean flag which indicates when a page is full. It here as
+    -- optimization only, because it allows us to skip iteration of the above bit
+    -- array. It is an `Int` instead of a `Bool`, because GHC provides atomic primops for
+    -- ByteArray, whcih is what `PVar` is based on.
     , pageNextPage :: !(IORef (Maybe (Page n)))
+    -- ^ Link to the next page. Last page when this IORef contains `Nothing`
     }
 
+-- | Thread-safe lock-free memory pool for managing large memory pages that contain of
+-- many small `Block`s.
 data Pool n =
   Pool
     { poolFirstPage :: !(Page n)
+    -- ^ Initial page, which itself contains references to subsequent pages
     , poolPageInitializer :: !(IO (Page n))
+    -- ^ Page initializing action
     , poolBlockFinalizer :: !(Ptr (Block n) -> IO ())
+    -- ^ Finilizer that will be attached to each individual `ForeignPtr` of a reserved
+    -- `Block`.
     }
 
 ixBitSize :: Int
 ixBitSize = finiteBitSize (0 :: Word)
 
+-- | Initilizes the `Pool` that can be used for further allocation of @`ForeignPtr`
+-- `Block` n@ with `grabNextBlock`.
 initPool ::
      forall n. KnownNat n
   => Int
@@ -87,11 +127,17 @@ initPool groupsPerPage memAlloc blockFinalizer = do
       , poolBlockFinalizer = blockFinalizer
       }
 
-grabNextPoolForeignPtr :: KnownNat n => Pool n -> IO (ForeignPtr (Block n))
-grabNextPoolForeignPtr = grabNextPoolBlockWith grabNextPageForeignPtr
-{-# INLINE grabNextPoolForeignPtr #-}
+-- | Reserve a `ForeignPtr` of the `blockByteCount` size in the `Pool`. There is a default
+-- finalizer attached to the `ForeignPtr` that will run `Block` pointer finalizer and
+-- release that memory for re-use by other blocks allocated in the future. It is safe to
+-- add more Haskell finalizers with `addForeignPtrConcFinalizer` if necessary.
+grabNextBlock :: KnownNat n => Pool n -> IO (ForeignPtr (Block n))
+grabNextBlock = grabNextPoolBlockWith grabNextPageForeignPtr
+{-# INLINE grabNextBlock #-}
 
-
+-- | This is a helper function that will allocate a `Page` if the current `Page` in the
+-- `Pool` is full. Whenever there are still block slots are available then supplied
+-- @grabNext@ function will be used to reserve the slot in that `Page`.
 grabNextPoolBlockWith ::
      (Page n -> (Ptr (Block n) -> IO ()) -> IO (Maybe (ForeignPtr (Block n))))
   -> Pool n
@@ -125,12 +171,15 @@ intToBool :: Int -> Bool
 intToBool 0 = False
 intToBool _ = True
 
+-- | This is a helper function that will attempt to find the next available slot for the
+-- `Block` and create a `ForeignPtr` with the size of `Block` in the `Page`. In case when
+-- `Page` is full it will return `Nothing`.
 grabNextPageForeignPtr ::
      forall n.
      KnownNat n
   -- | Page to grab the block from
   => Page n
-  -- | Finalizer to run, once the `FMAddr` to the block is no longer used
+  -- | Finalizer to run, once the `ForeignPtr` holding on to `Ptr` `Block` is no longer used
   -> (Ptr (Block n) -> IO ())
   -> IO (Maybe (ForeignPtr (Block n)))
 grabNextPageForeignPtr page finalizer =
@@ -168,17 +217,21 @@ grabNextPageWithAllocator Page {..} allocator = do
                 atomicWriteIntPVar pageFull 0
 {-# INLINE grabNextPageWithAllocator #-}
 
-
+-- | Atomically AND an element of the array
 atomicAndIntMutablePrimArray :: MutablePrimArray RealWorld Int -> Int -> Int -> IO ()
 atomicAndIntMutablePrimArray (MutablePrimArray mba#) (I# i#) (I# m#) =
   IO $ \s# ->
     case fetchAndIntArray# mba# i# m# s# of
       (# s'#, _ #) -> (# s'#, () #)
+{-# INLINE atomicAndIntMutablePrimArray #-}
 
+-- | Atomically modify an element of the array
 atomicModifyMutablePrimArray :: MutablePrimArray RealWorld Int -> Int -> (Int -> (Int, a)) -> IO a
 atomicModifyMutablePrimArray (MutablePrimArray mba#) (I# i#) f =
   IO $ atomicModifyIntArray# mba# i# (\x# -> case f (I# x#) of (I# y#, a) -> (# y#, a #))
+{-# INLINE atomicModifyMutablePrimArray #-}
 
+-- | Helper function that finds an index of the left-most bit that is not set.
 findNextZeroIndex :: forall b. FiniteBits b => b -> Maybe Int
 findNextZeroIndex b =
   let !i0 = countTrailingZeros b
@@ -191,6 +244,10 @@ findNextZeroIndex b =
         else Just (i0 - 1)
 {-# INLINE findNextZeroIndex #-}
 
+-- | Finds an index of the next bit that is not set in the bit array and flips it
+-- atomically. In case when all bits are set, then `Nothing` is returned. It is possible
+-- that while search is ongoing bits that where checked get cleared. This is totally fine
+-- for our implementation of mempool.
 setNextZero :: MutablePrimArray RealWorld Int -> IO (Maybe Int)
 setNextZero ma = ifindAtomicMutablePrimArray ma f
   where

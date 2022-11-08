@@ -66,7 +66,7 @@ propPool block (Positive n) numBlocks16 preFillByte fillByte = do
       setPtr (castPtr ptr) (blockByteCount block) fillByte
       () <$ atomicAddIntPVar countRef 1
   fmps :: [ForeignPtr (Block n)] <-
-    replicateConcurrently numBlocks (grabNextPoolForeignPtr pool)
+    replicateConcurrently numBlocks (grabNextBlock pool)
   touch fmps
   -- Here we return just the pointers and let the GC collect the ForeignPtrs
   ptrsFPtrs <- forM fmps $ \fma ->
