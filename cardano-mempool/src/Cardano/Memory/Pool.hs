@@ -3,6 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -26,6 +27,9 @@ module Cardano.Memory.Pool
   , blockByteCount
   , grabNextBlock
   -- * Helpers
+  --
+  -- Exported for testing
+  , countPages
   , findNextZeroIndex
   ) where
 
@@ -86,6 +90,16 @@ data Pool n =
     -- `Block`.
     }
 
+-- | Useful function for testing. Check how many pages have been allocated thus far.
+countPages :: Pool n -> IO Int
+countPages pool = go 1 (poolFirstPage pool)
+  where
+    go n Page {pageNextPage} = do
+      readIORef pageNextPage >>= \case
+        Nothing -> pure n
+        Just nextPage -> go (n + 1) nextPage
+
+
 ixBitSize :: Int
 ixBitSize = finiteBitSize (0 :: Word)
 
@@ -116,6 +130,7 @@ initPool groupsPerPage memAlloc blockFinalizer = do
         pageMemory <-
           memAlloc $ groupsPerPage * ixBitSize * blockByteCount (Block :: Block n)
         pageBitArray <- newPrimArray groupsPerPage
+        setPrimArray pageBitArray 0 groupsPerPage 0
         pageFull <- newPVar 0
         pageNextPage <- newIORef Nothing
         pure Page {..}

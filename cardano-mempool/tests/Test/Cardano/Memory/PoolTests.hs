@@ -40,14 +40,14 @@ poolProps block =
     [ testProperty "propPoolGarbageCollected (32byte)" $ propPoolGarbageCollected block
     ]
 
-propFindNextZeroIndex :: Word -> Property
+propFindNextZeroIndex :: Int -> Property
 propFindNextZeroIndex w = propIO $
   case findNextZeroIndex w of
-    Nothing -> w @?= maxBound
+    Nothing -> w @?= complement 0
     Just ix -> do
       testBit w ix @?= False
       case findNextZeroIndex (setBit w ix) of
-        Nothing -> setBit w ix @?= maxBound
+        Nothing -> setBit w ix @?= complement 0
         Just ix' -> do
           assertBool
             ("Expected found index to be different, but got same: " ++ show ix)
@@ -55,6 +55,23 @@ propFindNextZeroIndex w = propIO $
           assertBool
             ("Expected the bit under index: " ++ show ix' ++ " to not be set") $
             not (testBit w ix')
+
+
+checkBlockBytes ::
+     (KnownNat n, Storable a, Eq a, Show a) => Block n -> a -> Ptr b -> Assertion
+checkBlockBytes block byte ptr =
+  let checkFillByte i =
+        when (i >= 0) $ do
+          byte' <- peekByteOff ptr i
+          byte' @?= byte
+          checkFillByte (i - 1)
+   in checkFillByte (blockByteCount block - 1)
+
+mallocPreFilled :: Word8 -> Int -> IO (ForeignPtr b)
+mallocPreFilled preFillByte bc = do
+  mfp <- mallocForeignPtrBytes bc
+  withForeignPtr mfp $ \ptr -> setPtr (castPtr ptr) bc preFillByte
+  pure mfp
 
 propPoolGarbageCollected ::
   forall n.
@@ -65,39 +82,39 @@ propPoolGarbageCollected ::
   Word8 ->
   Word8 ->
   Property
-propPoolGarbageCollected block (Positive n) numBlocks16 preFillByte fillByte = propIO $ do
-  let -- A fairly large positive number
-      numBlocks = 1 + (fromIntegral numBlocks16 `div` 20)
-      mallocPreFilled bc = do
-        mfp <- mallocForeignPtrBytes bc
-        withForeignPtr mfp $ \ptr -> setPtr (castPtr ptr) bc preFillByte
-        pure mfp
-      checkBlockBytes byte ptr =
-        let checkFillByte i =
-              when (i >= 0) $ do
-                byte' <- peekByteOff ptr i
-                byte' @?= byte
-                checkFillByte (i - 1)
-         in checkFillByte (blockByteCount block - 1)
-  countRef <- newPVar (0 :: Int)
-  pool <-
-    initPool n mallocPreFilled $ \ptr -> do
-      setPtr (castPtr ptr) (blockByteCount block) fillByte
-      () <$ atomicAddIntPVar countRef 1
-  fmps :: [ForeignPtr (Block n)] <-
-    replicateConcurrently numBlocks (grabNextBlock pool)
-  touch fmps
-  -- Here we return just the pointers and let the GC collect the ForeignPtrs
-  ptrsFPtrs <- forM fmps $ \fma ->
-    withForeignPtr fma $ \ptr -> do
-      let bytePtr = castPtr ptr
-      checkBlockBytes preFillByte bytePtr
-      setPtr bytePtr (blockByteCount block) fillByte
-      pure bytePtr
-  performGC
-  threadDelay 50000
-  numBlocks' <- atomicReadIntPVar countRef
-  numBlocks' @?= numBlocks
-  forM_ ptrsFPtrs (checkBlockBytes fillByte)
-  -- Ensure that memory to that pointers are referncing is still alive
-  touch pool
+propPoolGarbageCollected block (Positive n) numBlocks16 preFillByte fillByte =
+  propIO $ do
+    let numBlocks = 1 + (fromIntegral numBlocks16 `div` 20) -- make it not too big
+    countRef <- newPVar (0 :: Int)
+    pool <-
+      initPool n (mallocPreFilled preFillByte) $ \ptr -> do
+        setPtr (castPtr ptr) (blockByteCount block) fillByte
+        () <$ atomicAddIntPVar countRef 1
+    fmps :: [ForeignPtr (Block n)] <-
+      replicateConcurrently numBlocks (grabNextBlock pool)
+    touch fmps
+    -- Here we return just the pointers and let the GC collect the ForeignPtrs
+    ptrs <-
+      forM fmps $ \fma ->
+        withForeignPtr fma $ \ptr -> do
+          let bytePtr = castPtr ptr
+          checkBlockBytes block preFillByte bytePtr
+          setPtr bytePtr (blockByteCount block) fillByte
+          pure bytePtr
+    performGC
+    threadDelay 50000
+    numBlocks' <- atomicReadIntPVar countRef
+    numBlocks' @?= numBlocks
+    forM_ ptrs (checkBlockBytes block fillByte)
+    let estimatedUpperBoundOfPages = 1 + max 1 (numBlocks `div` n `div` 64)
+    numPages <- countPages pool
+    assertBool
+      (concat
+         [ "Number of pages should not exceed the expected amount: "
+         , show estimatedUpperBoundOfPages
+         , " but allocated: "
+         , show numPages
+         ])
+      (numPages <= estimatedUpperBoundOfPages)
+    -- Ensure that memory to that pointers are referncing is still alive
+    touch pool
