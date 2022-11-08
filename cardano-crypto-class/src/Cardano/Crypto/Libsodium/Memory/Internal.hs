@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
 module Cardano.Crypto.Libsodium.Memory.Internal (
   -- * High-level memory management
@@ -33,16 +34,18 @@ import Data.Proxy (Proxy (..))
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.Types (CSize (..))
 import Foreign.Ptr (Ptr, nullPtr, WordPtr, ptrToWordPtr)
-import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, finalizeForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, finalizeForeignPtr, castForeignPtr)
 import Foreign.Concurrent (newForeignPtr)
 import Foreign.Storable (Storable (alignment, sizeOf, peek))
 import GHC.TypeLits (KnownNat, natVal)
 import GHC.IO.Exception (ioException)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
+import System.IO (hPutStrLn, stderr)
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C
+import Cardano.Memory.Pool (initPool, grabNextBlock, Pool)
 
 data AllocEvent
   = AllocEv !WordPtr
@@ -80,49 +83,103 @@ traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
 
 {-# DEPRECATED traceMLockedForeignPtr "Don't leave traceMLockedForeignPtr in production" #-}
 
+makeMLockedPool :: forall n. KnownNat n => IO (Pool n)
+makeMLockedPool = do
+  hPutStrLn stderr "makeMLockedPool"
+  initPool
+    (fromIntegral $ 4096 `div` (natVal (Proxy @n)) `div` 64)
+    (\size -> do
+      ptr <- sodiumMalloc (fromIntegral size)
+      newForeignPtr ptr (sodiumFree ptr)
+    )
+    (\ptr -> pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr))
+
+mlpool32 :: Pool 32
+mlpool32 = unsafePerformIO makeMLockedPool
+{-#NOINLINE mlpool32 #-}
+
+mlpool64 :: Pool 64
+mlpool64 = unsafePerformIO makeMLockedPool
+{-#NOINLINE mlpool64 #-}
+
+
 -- | Allocate secure memory using 'c_sodium_malloc'.
 --
 -- <https://libsodium.gitbook.io/doc/memory_management>
 --
-allocMLockedForeignPtr :: Storable a => IO (MLockedForeignPtr a)
-allocMLockedForeignPtr = impl undefined where
-    impl :: forall b. Storable b => b -> IO (MLockedForeignPtr b)
-    impl b = do
-        ptr <- malloc size
-        let finalizer = free ptr
-        fmap SFP (newForeignPtr ptr finalizer)
+-- allocMLockedForeignPtr :: Storable a => IO (MLockedForeignPtr a)
+-- allocMLockedForeignPtr = impl undefined where
+--     impl :: forall b. Storable b => b -> IO (MLockedForeignPtr b)
+--     impl b = do
+--         ptr <- sodiumMalloc size
+--         let finalizer = sodiumFree ptr
+--         fmap SFP (newForeignPtr ptr finalizer)
+-- 
+--       where
+--         size :: CSize
+--         size = fromIntegral size''
+-- 
+--         size' :: Int
+--         size' = sizeOf b
+-- 
+--         align :: Int
+--         align = alignment b
+-- 
+--         size'' :: Int
+--         size''
+--             | m == 0    = size'
+--             | otherwise = (q + 1) * align
+--           where
+--             (q,m) = size' `divMod` align
 
+allocMLockedForeignPtr :: forall a. Storable a => IO (MLockedForeignPtr a)
+allocMLockedForeignPtr = do
+  fptr <- mlockedMalloc size
+  withForeignPtr fptr $ \ptr -> pushAllocLogEvent $ AllocEv (ptrToWordPtr ptr)
+
+  return $ SFP . castForeignPtr $ fptr
+  where
+    b :: a
+    b = undefined
+
+    size :: CSize
+    size = fromIntegral size''
+
+    size' :: Int
+    size' = sizeOf b
+
+    align :: Int
+    align = alignment b
+
+    size'' :: Int
+    size''
+        | m == 0    = size'
+        | otherwise = (q + 1) * align
       where
-        (malloc, free) = getAllocator size
+        (q,m) = size' `divMod` align
 
-        size :: CSize
-        size = fromIntegral size''
-
-        size' :: Int
-        size' = sizeOf b
-
-        align :: Int
-        align = alignment b
-
-        size'' :: Int
-        size''
-            | m == 0    = size'
-            | otherwise = (q + 1) * align
-          where
-            (q,m) = size' `divMod` align
-
-getAllocator :: CSize -> (CSize -> IO (Ptr a), Ptr a -> IO ())
-getAllocator size
-  | size <= 32
-  = (sodiumMallocSmall, sodiumFreeSmall)
-  | otherwise
-  = (sodiumMalloc, sodiumFree)
+mlockedMalloc :: CSize -> IO (ForeignPtr a)
+mlockedMalloc size = do
+  pushAllocLogEvent $ MarkerEv $ "Allocating " ++ show size ++ " bytes"
+  if
+    | size <= 32 -> do
+        pushAllocLogEvent $ MarkerEv $ "Using 32-bit pool"
+        coerce $ grabNextBlock mlpool32
+    | size <= 64 -> do
+        pushAllocLogEvent $ MarkerEv $ "Using 64-bit pool"
+        coerce $ grabNextBlock mlpool64
+    | otherwise -> do
+        pushAllocLogEvent $ MarkerEv $ "Using direct allocation"
+        ptr <- sodiumMalloc (fromIntegral size)
+        newForeignPtr ptr (sodiumFree ptr)
 
 mlockedAlloca :: forall a b. CSize -> (Ptr a -> IO b) -> IO b
 mlockedAlloca size =
-  bracket (malloc size) free
+  bracket alloc free . flip withForeignPtr
   where
-    (malloc, free) = getAllocator size
+    alloc = mlockedMalloc size
+    free = finalizeForeignPtr
+    
 
 mlockedAllocaSized :: forall n b. KnownNat n => (SizedPtr n -> IO b) -> IO b
 mlockedAllocaSized k = mlockedAlloca size (k . SizedPtr) where
@@ -135,24 +192,8 @@ sodiumMalloc size = do
     when (ptr == nullPtr) $ do
         errno <- getErrno
         ioException $ errnoToIOError "c_sodium_malloc" errno Nothing Nothing
-    pushAllocLogEvent $ AllocEv (ptrToWordPtr ptr)
     return ptr
 
 sodiumFree :: Ptr a -> IO ()
 sodiumFree ptr = do
-  pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr)
   c_sodium_free ptr
-
-sodiumMallocSmall :: CSize -> IO (Ptr a)
-sodiumMallocSmall size = do
-    ptr <- c_mlocked_pool_malloc size
-    when (ptr == nullPtr) $ do
-        errno <- getErrno
-        ioException $ errnoToIOError "c_mlocked_pool_malloc" errno Nothing Nothing
-    pushAllocLogEvent $ AllocEv (ptrToWordPtr ptr)
-    return ptr
-
-sodiumFreeSmall :: Ptr a -> IO ()
-sodiumFreeSmall ptr = do
-  pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr)
-  c_mlocked_pool_free ptr
