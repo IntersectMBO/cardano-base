@@ -48,7 +48,10 @@ data MockKES (t :: Nat)
 -- keys. Mock KES is more suitable for a basic testnet, since it doesn't suffer
 -- from the performance implications of shuffling a giant list of keys around
 instance KnownNat t => KESAlgorithm (MockKES t) where
-    type SeedSizeKES (MockKES t) = 8
+    -- We only need 8 bytes for the seed, but in order to satisfy
+    -- @instance MLockedPoolSize (SeedSizeKES (MockKES t))@, we pick 32, one
+    -- of the block sizes for which pools exist.
+    type SeedSizeKES (MockKES t) = 32
 
     --
     -- Key and signature types
