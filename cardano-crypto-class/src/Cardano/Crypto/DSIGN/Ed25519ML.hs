@@ -38,13 +38,11 @@ import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.C
 -- import Cardano.Crypto.Libsodium.Memory.Internal
 import Cardano.Crypto.Libsodium (MLockedSizedBytes)
--- import Cardano.Crypto.Libsodium.MLockedBytes
 import Cardano.Crypto.MonadSodium (MonadSodium (..), mlsbToByteString, mlsbFromByteStringCheck)
 
 import Cardano.Crypto.DSIGNM.Class
 -- import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (SignableRepresentation(..))
-
 
 data Ed25519DSIGNM
 

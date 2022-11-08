@@ -512,7 +512,9 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
         action
 
 prop_dsignm_seed_roundtrip
-  :: forall v. (DSIGNMAlgorithm IO v)
+  :: forall v.
+     ( DSIGNMAlgorithm IO v
+     )
   => Lock
   -> Proxy v
   -> PinnedSizedBytes (SeedSizeDSIGNM v)
@@ -530,7 +532,10 @@ prop_dsignm_seed_roundtrip lock p seedPSB = ioProperty . withLock lock . withMLS
 -- corresponding verification key.
 prop_dsign_verify
   :: forall (v :: Type) (a :: Type) .
-  (DSIGNAlgorithm v, ContextDSIGN v ~ (), Signable v a)
+     ( DSIGNAlgorithm v
+     , ContextDSIGN v ~ ()
+     , Signable v a
+     )
   => (a, SignKeyDSIGN v)
   -> Property
 prop_dsign_verify (msg, sk) =
@@ -542,7 +547,10 @@ prop_dsign_verify (msg, sk) =
 -- verification fails.
 prop_dsign_verify_wrong_key
   :: forall (v :: Type) (a :: Type) .
-  (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
+     ( DSIGNAlgorithm v
+     , ContextDSIGN v ~ ()
+     , Signable v a
+     )
   => (a, SignKeyDSIGN v, SignKeyDSIGN v)
   -> Property
 prop_dsign_verify_wrong_key (msg, sk, sk') =
