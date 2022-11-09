@@ -16,6 +16,8 @@ import Data.Bits
 import Data.Function
 import Data.Primitive.PVar
 import Data.Primitive.Ptr (setPtr)
+import Data.Proxy
+import Data.Reflection
 import Data.Word
 import Foreign.ForeignPtr
 import Foreign.Ptr
@@ -29,9 +31,10 @@ poolTests :: TestTree
 poolTests = do
   testGroup
     "Pool"
-    [ testProperty "findNextZeroIndex" $ propFindNextZeroIndex,
-      poolProps (Block :: Block 32),
-      poolProps (Block :: Block 64)
+    [ testProperty "findNextZeroIndex" $ propFindNextZeroIndex
+    , poolProps (Block :: Block 32)
+    , poolProps (Block :: Block 64)
+    , poolPropsArbSizeBlock
     ]
 
 poolProps :: KnownNat n => Block n -> TestTree
@@ -41,6 +44,19 @@ poolProps block =
     [ testProperty "PoolGarbageCollected" $ propPoolGarbageCollected block
     , testProperty "PoolAllocateAndFinalize" $ propPoolAllocateAndFinalize block
     ]
+
+poolPropsArbSizeBlock :: TestTree
+poolPropsArbSizeBlock =
+  testGroup
+    "Arbitrary sized block"
+    [ testProperty "PoolGarbageCollected" $ \(Positive n) ->
+        reifyNat n (propPoolGarbageCollected . proxyToBlock)
+    , testProperty "PoolAllocateAndFinalize" $ \(Positive n) ->
+        reifyNat n (propPoolAllocateAndFinalize . proxyToBlock)
+    ]
+  where
+    proxyToBlock :: Proxy n -> Block n
+    proxyToBlock Proxy = Block
 
 propFindNextZeroIndex :: Int -> Property
 propFindNextZeroIndex w = monadicIO . run $

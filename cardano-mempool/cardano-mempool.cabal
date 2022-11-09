@@ -42,6 +42,7 @@ test-suite tests
                     , primitive
                     , pvar
                     , random
+                    , reflection
                     , tasty
                     , tasty-quickcheck
                     , tasty-hunit
