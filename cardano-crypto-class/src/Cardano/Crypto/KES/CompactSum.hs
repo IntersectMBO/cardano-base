@@ -311,6 +311,7 @@ instance ( OptimizedKESAlgorithm d
       vk_1 <- deriveVerKeyKES @m @d sk_1
       forgetSignKeyKES sk_1
       NaCl.releaseSafePinned r0
+      NaCl.mlsbFinalize rr0
       return $ SignKeyCompactSumKES sk_0 r1 vk_0 vk_1
 
     --
