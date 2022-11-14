@@ -51,7 +51,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     -- We only need 8 bytes for the seed, but in order to satisfy
     -- @instance MLockedPoolSize (SeedSizeKES (MockKES t))@, we pick 32, one
     -- of the block sizes for which pools exist.
-    type SeedSizeKES (MockKES t) = 32
+    type SeedSizeKES (MockKES t) = 8
 
     --
     -- Key and signature types
