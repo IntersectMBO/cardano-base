@@ -23,7 +23,6 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   -- * Debugging / testing instrumentation
   AllocEvent (..),
   pushAllocLogEvent,
-  popAllocLogEvent,
   withAllocLog,
 ) where
 
@@ -51,6 +50,11 @@ import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C
 import Cardano.Memory.Pool (initPool, grabNextBlock, Pool)
 
+-- | Allocation log event. These are emitted automatically whenever mlocked
+-- memory is allocated through the 'allocMLockedForeignPtr' primitive, or
+-- released through an associated finalizer (either explicitly or due to GC).
+-- Additional events that are not actual allocations/deallocations, but may
+-- provide useful debugging context, can be inserted as 'MarkerEv'.
 data AllocEvent
   = AllocEv !WordPtr
   | FreeEv !WordPtr
@@ -82,6 +86,9 @@ drainAllocLog =
         Just x ->
           go (x:xs)
 
+-- | Run an IO action with allocation logging. The allocation log for the
+-- action will be returned as a list of events, in ascending chronological
+-- order.
 withAllocLog :: IO () -> IO [AllocEvent]
 withAllocLog a =
   bracket_
@@ -206,7 +213,9 @@ mlockedMalloc size = do
     | otherwise -> do
         pushAllocLogEvent $ MarkerEv $ "Using direct allocation"
         ptr <- sodiumMalloc (fromIntegral size)
-        newForeignPtr ptr (sodiumFree ptr)
+        newForeignPtr ptr $ do
+          pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr)
+          sodiumFree ptr
 
 mlockedAlloca :: forall a b. CSize -> (Ptr a -> IO b) -> IO b
 mlockedAlloca size =
