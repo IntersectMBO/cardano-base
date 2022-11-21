@@ -8,7 +8,6 @@ module Cardano.Crypto.Libsodium.Memory (
   -- * Debugging / testing instrumentation
   AllocEvent (..),
   pushAllocLogEvent,
-  popAllocLogEvent,
   withAllocLog,
 ) where
 
