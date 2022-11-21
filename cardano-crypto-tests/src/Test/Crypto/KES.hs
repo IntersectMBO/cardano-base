@@ -197,17 +197,6 @@ testForgetUpdateKeyKES lock _p = withLock lock $ do
   -- assertBool "third entry is DEL" ("DEL" `isPrefixOf` (result !! 2))
 
 
-drainAllocLog :: IO [NaCl.AllocEvent]
-drainAllocLog =
-  reverse <$> go []
-  where
-    go xs = do
-      NaCl.popAllocLogEvent >>= \case
-        Nothing ->
-          return xs
-        Just x ->
-          go (x:xs)
-
 matchAllocLog :: [NaCl.AllocEvent] -> Set WordPtr
 matchAllocLog evs = foldl' (flip go) Set.empty evs
   where
@@ -223,18 +212,16 @@ testMLockGenKeyKES
   -> Proxy v
   -> Assertion
 testMLockGenKeyKES lock _p = withLock lock $ do
-  _ <- drainAllocLog
-
-  NaCl.pushAllocLogEvent $ NaCl.MarkerEv "gen seed"
-  (seed :: NaCl.MLockedSizedBytes (SeedSizeKES v)) <- NaCl.mlsbFromByteString (BS.replicate 1024 23)
-  NaCl.pushAllocLogEvent $ NaCl.MarkerEv "gen key"
-  sk <- genKeyKES @IO @v seed
-  NaCl.pushAllocLogEvent $ NaCl.MarkerEv "forget key"
-  forgetSignKeyKES sk
-  NaCl.pushAllocLogEvent $ NaCl.MarkerEv "forget seed"
-  NaCl.mlsbFinalize seed
-  NaCl.pushAllocLogEvent $ NaCl.MarkerEv "done"
-  after <- drainAllocLog
+  after <- NaCl.withAllocLog $ do
+    NaCl.pushAllocLogEvent $ NaCl.MarkerEv "gen seed"
+    (seed :: NaCl.MLockedSizedBytes (SeedSizeKES v)) <- NaCl.mlsbFromByteString (BS.replicate 1024 23)
+    NaCl.pushAllocLogEvent $ NaCl.MarkerEv "gen key"
+    sk <- genKeyKES @IO @v seed
+    NaCl.pushAllocLogEvent $ NaCl.MarkerEv "forget key"
+    forgetSignKeyKES sk
+    NaCl.pushAllocLogEvent $ NaCl.MarkerEv "forget seed"
+    NaCl.mlsbFinalize seed
+    NaCl.pushAllocLogEvent $ NaCl.MarkerEv "done"
   let evset = matchAllocLog after
   putStrLn ""
   mapM_ print after

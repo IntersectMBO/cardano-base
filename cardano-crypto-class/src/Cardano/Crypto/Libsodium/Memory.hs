@@ -9,6 +9,7 @@ module Cardano.Crypto.Libsodium.Memory (
   AllocEvent (..),
   pushAllocLogEvent,
   popAllocLogEvent,
+  withAllocLog,
 ) where
 
 import Cardano.Crypto.Libsodium.Memory.Internal
