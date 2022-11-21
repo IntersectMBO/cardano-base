@@ -15,6 +15,7 @@ import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
 import Cardano.Crypto.VRF.PraosBatchCompat
 import Cardano.Crypto.Util
+import Cardano.Crypto.Seed
 
 import qualified Data.ByteString as BS
 import Data.Word (Word8, Word64)
@@ -25,7 +26,7 @@ import Test.QuickCheck
          ((==>), (===), Arbitrary(..), Gen, Property,  NonNegative(..),
           counterexample)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck (testProperty)
+import Test.Tasty.QuickCheck (testProperty, vectorOf)
 
 {- HLINT IGNORE "Use <$>" -}
 
@@ -43,6 +44,15 @@ tests =
     , testGroup "OutputVRF"
       [ testProperty "bytesToNatural" prop_bytesToNatural
       , testProperty "naturalToBytes" prop_naturalToBytes
+      ]
+    , testGroup "ConvertingTypes"
+      [ testProperty "pubKeyToBatchCompat" prop_pubKeyToBatchComopat
+      , testProperty "signKeyToBatchCompat" prop_signKeyToBatchCompat
+      , testProperty "outputToBatchCompat" prop_outputToBatchComat
+      , testProperty "compatibleVerKeyConversion" prop_verKeyValidConversion
+      , testProperty "compatibleOutputConversion" prop_outputValidConversion
+      , testProperty "compatibleSignKeyConversion" prop_signKeyValidConversion
+      , testProperty "compatibleFullConversion" prop_fullValidConversion
       ]
     ]
 
@@ -207,6 +217,84 @@ prop_naturalToBytes (NonNegative sz) n =
     sz >= 8 ==>
       bytesToNatural (naturalToBytes sz (fromIntegral n)) == fromIntegral n
 
+--
+-- Praos <-> BatchCompatPraos VerKey conversion
+--
+prop_pubKeyToBatchComopat :: VerKeyVRF PraosVRF -> Bool
+prop_pubKeyToBatchComopat vk =
+  rawSerialiseVerKeyVRF (vkToBatchCompat vk) == rawSerialiseVerKeyVRF vk
+
+--
+-- Praos <-> BatchCompatPraos SignKey conversion
+--
+prop_signKeyToBatchCompat :: SignKeyVRF PraosVRF -> Bool
+prop_signKeyToBatchCompat sk =
+  rawSerialiseSignKeyVRF (skToBatchCompat sk) == rawSerialiseSignKeyVRF sk
+
+--
+-- Praos <-> BatchCompatPraos Output conversion
+--
+prop_outputToBatchComat :: OutputVRF PraosVRF -> Bool
+prop_outputToBatchComat output =
+  getOutputVRFBytes (outputToBatchCompat output) == getOutputVRFBytes output
+
+--
+-- Praos <-> BatchCompatPraos VerKey compatibility. We check that a proof is validated with a
+-- transformed key
+--
+prop_verKeyValidConversion :: BS.ByteString -> Message -> Bool
+prop_verKeyValidConversion sharedBytes msg =
+  let
+    vkPraos = deriveVerKeyVRF . genKeyVRF . mkSeedFromBytes $ sharedBytes
+    skBatchCompat = genKeyVRF . mkSeedFromBytes $ sharedBytes
+    vkBatchCompat = vkToBatchCompat vkPraos
+    (y, c) = evalVRF () msg skBatchCompat
+  in
+    verifyVRF () vkBatchCompat msg (y, c)
+
+--
+-- Praos <-> BatchCompatPraos SignKey compatibility. We check that a proof is validated with a
+-- transformed key
+--
+prop_signKeyValidConversion :: BS.ByteString -> Bool
+prop_signKeyValidConversion sharedBytes =
+  let
+    skPraos = genKeyVRF . mkSeedFromBytes $ sharedBytes
+    skBatchCompat = genKeyVRF . mkSeedFromBytes $ sharedBytes
+  in
+    skBatchCompat == skToBatchCompat skPraos
+
+--
+-- Praos <-> BatchCompatPraos Output compatibility. We check that a proof is validated with a
+-- transformed output
+--
+prop_outputValidConversion :: BS.ByteString -> Message -> Bool
+prop_outputValidConversion sharedBytes msg =
+  let
+    skPraos = genKeyVRF . mkSeedFromBytes $ sharedBytes
+    (outPraos, _c) = evalVRF () msg skPraos
+    skBatchCompat = genKeyVRF . mkSeedFromBytes $ sharedBytes
+    vkBatchCompat = deriveVerKeyVRF skBatchCompat
+    (_out, c) = evalVRF () msg skBatchCompat
+    outBatchCompat = outputToBatchCompat outPraos
+  in
+    verifyVRF () vkBatchCompat msg (outBatchCompat, c)
+
+--
+-- Praos <-> BatchCompatPraos compatibility. We check that a proof is validated with a
+-- transformed key and output
+--
+prop_fullValidConversion :: BS.ByteString -> Message -> Bool
+prop_fullValidConversion sharedBytes msg =
+  let
+    skPraos = genKeyVRF . mkSeedFromBytes $ sharedBytes
+    vkPraos = deriveVerKeyVRF skPraos
+    (outPraos, _c) = evalVRF () msg skPraos
+    skBatchCompat = skToBatchCompat skPraos
+    vkBatchCompat = vkToBatchCompat vkPraos
+    (_out, c) = evalVRF () msg skBatchCompat
+    outBatchCompat = outputToBatchCompat outPraos
+  in verifyVRF () vkBatchCompat msg (outBatchCompat, c)
 
 --
 -- Arbitrary instances
@@ -229,4 +317,14 @@ instance (VRFAlgorithm v,
     a <- arbitrary :: Gen Message
     sk <- arbitrary
     return $ snd $ evalVRF () a sk
+  shrink = const []
+
+instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
+  arbitrary = do
+    bytes <- BS.pack <$> vectorOf (fromIntegral (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
+    return $ OutputVRF( bytes )
+  shrink = const []
+
+instance Arbitrary (BS.ByteString) where
+  arbitrary = BS.pack <$> vectorOf 32 arbitrary
   shrink = const []
