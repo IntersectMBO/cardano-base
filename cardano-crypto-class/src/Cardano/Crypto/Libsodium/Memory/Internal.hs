@@ -5,7 +5,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fprof-auto #-}
 module Cardano.Crypto.Libsodium.Memory.Internal (
   -- * High-level memory management
   MLockedForeignPtr (..),
@@ -22,12 +24,14 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   AllocEvent (..),
   pushAllocLogEvent,
   popAllocLogEvent,
+  withAllocLog,
 ) where
 
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TChan (newTChanIO, TChan, tryReadTChan, writeTChan)
+import Control.Concurrent.STM.TVar (newTVarIO, TVar, readTVar, modifyTVar)
 import Control.DeepSeq (NFData (..), rwhnf)
-import Control.Exception (bracket)
+import Control.Exception (bracket, bracket_)
 import Control.Monad (when)
 import Data.Coerce (coerce)
 import Data.Proxy (Proxy (..))
@@ -57,11 +61,42 @@ data AllocEvent
 allocLog :: TChan AllocEvent
 allocLog = unsafePerformIO newTChanIO
 
+{-#NOINLINE allocLogEnableCounter #-}
+allocLogEnableCounter :: TVar Int
+allocLogEnableCounter = unsafePerformIO $ newTVarIO 0
+
+enableAllocLog :: IO ()
+enableAllocLog = atomically $ modifyTVar allocLogEnableCounter succ
+
+disableAllocLog :: IO ()
+disableAllocLog = atomically $ modifyTVar allocLogEnableCounter pred
+
+drainAllocLog :: IO [AllocEvent]
+drainAllocLog =
+  reverse <$> go []
+  where
+    go xs = do
+      popAllocLogEvent >>= \case
+        Nothing ->
+          return xs
+        Just x ->
+          go (x:xs)
+
+withAllocLog :: IO () -> IO [AllocEvent]
+withAllocLog a =
+  bracket_
+    enableAllocLog
+    disableAllocLog
+    (a >> drainAllocLog)
+
 popAllocLogEvent :: IO (Maybe AllocEvent)
 popAllocLogEvent = atomically $ tryReadTChan allocLog
 
 pushAllocLogEvent :: AllocEvent -> IO ()
-pushAllocLogEvent = atomically . writeTChan allocLog
+pushAllocLogEvent ev = atomically $ do
+  count <- readTVar allocLogEnableCounter
+  when (count > 0) $
+    writeTChan allocLog ev
 
 -- | Foreign pointer to securely allocated memory.
 newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: ForeignPtr a }
