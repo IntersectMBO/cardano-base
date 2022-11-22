@@ -33,7 +33,7 @@ import Test.Tasty.QuickCheck (testProperty, vectorOf)
 --
 -- New type to generate random ByteStrings of size 32
 --
-newtype BS32 = BS32 { unBS32 :: BS.ByteString }
+newtype BS32 = BS32 { unBS32 :: BS.ByteString } deriving (Show)
 
 --
 -- The list of all tests
@@ -332,6 +332,3 @@ instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
 
 instance Arbitrary BS32 where
     arbitrary = BS32 . BS.pack <$> vectorOf 32 arbitrary
-
-instance Show BS32 where
- show = show . unBS32
