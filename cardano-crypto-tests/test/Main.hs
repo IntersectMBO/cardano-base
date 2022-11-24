@@ -27,9 +27,6 @@ tests =
       , Test.Crypto.KES.tests
       , Test.Crypto.VRF.tests
       , Test.Crypto.Regressions.tests
-<<<<<<< HEAD
       , Test.Crypto.Vector.Secp256k1DSIGN.tests
-=======
       , Test.Crypto.EllipticCurve.tests
->>>>>>> 8c57190 (BLS12-381 bindings)
       ]

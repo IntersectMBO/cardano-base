@@ -19,7 +19,7 @@ category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
 extra-source-files:  cbits/blst.h
-                  ,  cbits/blst_util.c
+                  ,  cbits/blst_aux.h
 
 flag development
   description: Disable `-Werror`

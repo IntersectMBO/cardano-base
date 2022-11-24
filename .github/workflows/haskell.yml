@@ -166,6 +166,28 @@ jobs:
         git-ref: ${{ env.SECP256K1_REF }}
         cache-version: ${{ env.SECP_CACHE_VERSION }}
 
+    - name: Install blst (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mkdir blst-sources
+        cd blst-sources
+        git clone https://github.com/supranational/blst
+        cd blst
+        ./build.sh
+        sudo install libblst.a /usr/local/lib/libblst.a
+        cd ../..
+
+    - name: Install blst (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir blst-sources
+        cd blst-sources
+        git clone https://github.com/supranational/blst
+        cd blst
+        ./build.sh
+        sudo install libblst.a /usr/local/lib/libblst.a
+        cd ../..
+
     - name: Cabal update
       run: cabal update
 

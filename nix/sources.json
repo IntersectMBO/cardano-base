@@ -38,15 +38,15 @@
         "version": "962ecfed3a4fb656b5a91d89159291e00ed766bc"
     },
     "iohk-nix": {
-        "branch": "master",
+        "branch": "iquerejeta/include-blst",
         "description": "nix scripts shared across projects",
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "iohk-nix",
-        "rev": "9a604d01bd4420ab7f396f14d1947fbe2ce7db8b",
-        "sha256": "0w562wdmdhp83dw9rabiijj5hk1f4l8p8f3bwlr7virakgbg8lf8",
+        "rev": "7737550ee747584471c047df9172ad459fa56247",
+        "sha256": "102fj629jscqcg5mw5b3isj5gyg4a6nfnh62nzhzz7hwdw0lz1xk",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/iohk-nix/archive/9a604d01bd4420ab7f396f14d1947fbe2ce7db8b.tar.gz",
+        "url": "https://github.com/input-output-hk/iohk-nix/archive/7737550ee747584471c047df9172ad459fa56247.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
