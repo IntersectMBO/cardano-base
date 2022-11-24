@@ -859,7 +859,6 @@ pairing p1 p2 =
             c_blst_miller_loop ppt ap2 ap1
   else
     Left BLST_POINT_NOT_IN_GROUP
-    
 
 ---- Utility
 
