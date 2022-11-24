@@ -96,8 +96,35 @@ jobs:
       if: runner.os == 'macOS'
       run: brew install autoconf automake libtool
 
+<<<<<<< HEAD
     - name: Install secp256k1
       uses: input-output-hk/setup-secp256k1@v1
+=======
+    - name: Install blst (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mkdir blst-sources
+        cd blst-sources
+        git clone https://github.com/supranational/blst
+        cd blst
+        ./build.sh
+        sudo install libblst.a /usr/local/lib/libblst.a
+        cd ../..
+
+    - name: Install blst (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir blst-sources
+        cd blst-sources
+        git clone https://github.com/supranational/blst
+        cd blst
+        ./build.sh
+        sudo install libblst.a /usr/local/lib/libblst.a
+        cd ../..
+
+    - uses: actions/cache@v3
+      name: "Cache secp256k1"
+>>>>>>> 6d2474f (Check exact size of serialised points)
       with:
         git-ref: ${{ env.SECP256K1_REF }}
         cache-version: ${{ env.SECP_CACHE_VERSION }}

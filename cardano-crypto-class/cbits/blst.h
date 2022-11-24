@@ -72,11 +72,11 @@ void blst_lendian_from_scalar(byte out[32], const blst_scalar *a);
 bool blst_scalar_fr_check(const blst_scalar *a);
 bool blst_sk_check(const blst_scalar *a);
 bool blst_sk_add_n_check(blst_scalar *out, const blst_scalar *a,
-                                           const blst_scalar *b);
+                         const blst_scalar *b);
 bool blst_sk_sub_n_check(blst_scalar *out, const blst_scalar *a,
-                                           const blst_scalar *b);
+                         const blst_scalar *b);
 bool blst_sk_mul_n_check(blst_scalar *out, const blst_scalar *a,
-                                           const blst_scalar *b);
+                         const blst_scalar *b);
 void blst_sk_inverse(blst_scalar *out, const blst_scalar *a);
 bool blst_scalar_from_le_bytes(blst_scalar *out, const byte *in, size_t len);
 bool blst_scalar_from_be_bytes(blst_scalar *out, const byte *in, size_t len);
@@ -147,7 +147,7 @@ void blst_fp12_sqr(blst_fp12 *ret, const blst_fp12 *a);
 void blst_fp12_cyclotomic_sqr(blst_fp12 *ret, const blst_fp12 *a);
 void blst_fp12_mul(blst_fp12 *ret, const blst_fp12 *a, const blst_fp12 *b);
 void blst_fp12_mul_by_xy00z0(blst_fp12 *ret, const blst_fp12 *a,
-                                             const blst_fp6 *xy00z0);
+                             const blst_fp6 *xy00z0);
 void blst_fp12_conjugate(blst_fp12 *a);
 void blst_fp12_inverse(blst_fp12 *ret, const blst_fp12 *a);
 /* caveat lector! |n| has to be non-zero and not more than 3! */
@@ -167,12 +167,12 @@ typedef struct { blst_fp x, y; } blst_p1_affine;
 void blst_p1_add(blst_p1 *out, const blst_p1 *a, const blst_p1 *b);
 void blst_p1_add_or_double(blst_p1 *out, const blst_p1 *a, const blst_p1 *b);
 void blst_p1_add_affine(blst_p1 *out, const blst_p1 *a,
-                                      const blst_p1_affine *b);
+                        const blst_p1_affine *b);
 void blst_p1_add_or_double_affine(blst_p1 *out, const blst_p1 *a,
-                                                const blst_p1_affine *b);
+                                  const blst_p1_affine *b);
 void blst_p1_double(blst_p1 *out, const blst_p1 *a);
 void blst_p1_mult(blst_p1 *out, const blst_p1 *p, const byte *scalar,
-                                                  size_t nbits);
+                  size_t nbits);
 void blst_p1_cneg(blst_p1 *p, bool cbit);
 void blst_p1_to_affine(blst_p1_affine *out, const blst_p1 *in);
 void blst_p1_from_affine(blst_p1 *out, const blst_p1_affine *in);
@@ -194,12 +194,12 @@ typedef struct { blst_fp2 x, y; } blst_p2_affine;
 void blst_p2_add(blst_p2 *out, const blst_p2 *a, const blst_p2 *b);
 void blst_p2_add_or_double(blst_p2 *out, const blst_p2 *a, const blst_p2 *b);
 void blst_p2_add_affine(blst_p2 *out, const blst_p2 *a,
-                                      const blst_p2_affine *b);
+                        const blst_p2_affine *b);
 void blst_p2_add_or_double_affine(blst_p2 *out, const blst_p2 *a,
-                                                const blst_p2_affine *b);
+                                  const blst_p2_affine *b);
 void blst_p2_double(blst_p2 *out, const blst_p2 *a);
 void blst_p2_mult(blst_p2 *out, const blst_p2 *p, const byte *scalar,
-                                                  size_t nbits);
+                  size_t nbits);
 void blst_p2_cneg(blst_p2 *p, bool cbit);
 void blst_p2_to_affine(blst_p2_affine *out, const blst_p2 *in);
 void blst_p2_from_affine(blst_p2 *out, const blst_p2_affine *in);
@@ -222,7 +222,7 @@ const blst_p2_affine *blst_p2_affine_generator();
 void blst_p1s_to_affine(blst_p1_affine dst[], const blst_p1 *const points[],
                         size_t npoints);
 void blst_p1s_add(blst_p1 *ret, const blst_p1_affine *const points[],
-                                size_t npoints);
+                  size_t npoints);
 
 size_t blst_p1s_mult_wbits_precompute_sizeof(size_t wbits, size_t npoints);
 void blst_p1s_mult_wbits_precompute(blst_p1_affine table[], size_t wbits,
@@ -246,7 +246,7 @@ void blst_p1s_tile_pippenger(blst_p1 *ret, const blst_p1_affine *const points[],
 void blst_p2s_to_affine(blst_p2_affine dst[], const blst_p2 *const points[],
                         size_t npoints);
 void blst_p2s_add(blst_p2 *ret, const blst_p2_affine *const points[],
-                                size_t npoints);
+                  size_t npoints);
 
 size_t blst_p2s_mult_wbits_precompute_sizeof(size_t wbits, size_t npoints);
 void blst_p2s_mult_wbits_precompute(blst_p2_affine table[], size_t wbits,
@@ -326,21 +326,21 @@ void blst_keygen(blst_scalar *out_SK, const byte *IKM, size_t IKM_len,
                  const byte *info DEFNULL, size_t info_len DEFNULL);
 void blst_sk_to_pk_in_g1(blst_p1 *out_pk, const blst_scalar *SK);
 void blst_sign_pk_in_g1(blst_p2 *out_sig, const blst_p2 *hash,
-                                          const blst_scalar *SK);
+                        const blst_scalar *SK);
 void blst_sk_to_pk_in_g2(blst_p2 *out_pk, const blst_scalar *SK);
 void blst_sign_pk_in_g2(blst_p1 *out_sig, const blst_p1 *hash,
-                                          const blst_scalar *SK);
+                        const blst_scalar *SK);
 
 /*
  * Pairing interface.
  */
 #ifndef SWIG
 void blst_miller_loop(blst_fp12 *ret, const blst_p2_affine *Q,
-                                      const blst_p1_affine *P);
+                      const blst_p1_affine *P);
 void blst_final_exp(blst_fp12 *ret, const blst_fp12 *f);
 void blst_precompute_lines(blst_fp6 Qlines[68], const blst_p2_affine *Q);
 void blst_miller_loop_lines(blst_fp12 *ret, const blst_fp6 Qlines[68],
-                                            const blst_p1_affine *P);
+                            const blst_p1_affine *P);
 bool blst_fp12_finalverify(const blst_fp12 *gt1, const blst_fp12 *gt2);
 #endif
 
@@ -439,9 +439,9 @@ bool blst_pairing_finalverify(const blst_pairing *ctx,
  * not.
  */
 BLST_ERROR blst_aggregate_in_g1(blst_p1 *out, const blst_p1 *in,
-                                              const byte *zwire);
+                                const byte *zwire);
 BLST_ERROR blst_aggregate_in_g2(blst_p2 *out, const blst_p2 *in,
-                                              const byte *zwire);
+                                const byte *zwire);
 
 void blst_aggregated_in_g1(blst_fp12 *out, const blst_p1_affine *signature);
 void blst_aggregated_in_g2(blst_fp12 *out, const blst_p2_affine *signature);

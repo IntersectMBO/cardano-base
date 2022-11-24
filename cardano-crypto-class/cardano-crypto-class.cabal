@@ -20,7 +20,7 @@ build-type:          Simple
 extra-source-files:  README.md
                     CHANGELOG.md
 extra-source-files:  cbits/blst.h
-                  ,  cbits/blst_util.c
+                  ,  cbits/blst_aux.h
 
 flag secp256k1-support
     description: Enable support for functions from libsecp256k1. Requires

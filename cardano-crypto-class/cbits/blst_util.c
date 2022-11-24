@@ -1,4 +1,4 @@
-#include <blst.h>
+#include "blst.h"
 #include <memory.h>
 
 const size_t size_blst_p1 () { return sizeof(blst_p1); }

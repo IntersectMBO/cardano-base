@@ -38,7 +38,7 @@
         "version": "962ecfed3a4fb656b5a91d89159291e00ed766bc"
     },
     "iohk-nix": {
-        "branch": "master",
+        "branch": "iquerejeta/include-blst",
         "description": "nix scripts shared across projects",
         "homepage": null,
         "owner": "input-output-hk",
