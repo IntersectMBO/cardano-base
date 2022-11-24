@@ -45,6 +45,8 @@ jobs:
 
       # current ref from: 27.02.2022
       SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
+      # current ref from: 25.11.2022
+      BLST_REF: 03b5124029979755c752eec45f3c29674b558446
 
       # Modify this value to "invalidate" the secp cache.
       SECP_CACHE_VERSION: "2022-12-30"
@@ -169,23 +171,11 @@ jobs:
     - name: Install blst (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        mkdir blst-sources
-        cd blst-sources
+        mkdir blst-sources && cd blst-sources
         git clone https://github.com/supranational/blst
         cd blst
+        git reset --hard $BLST_REF
         ./build.sh
-        sudo install libblst.a /usr/local/lib/libblst.a
-        cd ../..
-
-    - name: Install blst (MacOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        mkdir blst-sources
-        cd blst-sources
-        git clone https://github.com/supranational/blst
-        cd blst
-        ./build.sh
-        sudo install libblst.a /usr/local/lib/libblst.a
         cd ../..
 
     - name: Cabal update
@@ -223,7 +213,7 @@ jobs:
       run: cabal build all --enable-tests --only-dependencies
 
     - name: Build
-      run: cabal build all --enable-tests
+      run: cabal build all --enable-tests --extra-lib-dirs ${GITHUB_WORKSPACE}/blst-sources/blst
 
     - name: Git clone
       run: git clone https://github.com/input-output-hk/cardano-mainnet-mirror
@@ -233,7 +223,7 @@ jobs:
         # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
         # we are very deliberate about only adding msys64 to the path where absolutely necessary.
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        cabal test all --enable-tests --test-show-details=direct -j1 -v3
+        cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${GITHUB_WORKSPACE}/blst-sources/blst
 
     - uses: actions/upload-artifact@v3
       with:
