@@ -40,7 +40,6 @@ import Foreign.ForeignPtr
 import GHC.ForeignPtr
 import Control.Applicative
 import Data.Bits
-import Data.Maybe
 import GHC.TypeLits
 import Data.Primitive.PrimArray
 import Data.Primitive.PVar
@@ -159,10 +158,10 @@ grabNextPoolBlockWith ::
   -> IO (ForeignPtr (Block n))
 grabNextPoolBlockWith grabNext pool = go (poolFirstPage pool)
   where
-    go page@Page {..} = do
-      isPageFull <- atomicReadIntPVar pageFull
+    go page = do
+      isPageFull <- atomicReadIntPVar (pageFull page)
       if intToBool isPageFull
-        then readIORef pageNextPage >>= \case
+        then readIORef (pageNextPage page) >>= \case
                Nothing -> do
                  newPage <- poolPageInitializer pool
                  -- There is a slight chance of a race condition in that the next page could
@@ -171,11 +170,16 @@ grabNextPoolBlockWith grabNext pool = go (poolFirstPage pool)
                  -- discard the page created in this thread and switch to the one that was
                  -- assigned to 'pageNextPage'.
                  mNextPage <-
-                   atomicModifyIORef' pageNextPage $ \mNextPage ->
+                   atomicModifyIORef' (pageNextPage page) $ \mNextPage ->
                      (mNextPage <|> Just newPage, mNextPage)
-                 -- Here we potentially discard the newly allocated page in favor of the one
-                 -- created by another thread.
-                 go (fromMaybe newPage mNextPage)
+                 case mNextPage of
+                   Nothing -> go newPage
+                   Just existingPage -> do
+                     -- Here we cleanup the newly allocated page in favor of the one that
+                     -- was potentially created by another thread. It is important to
+                     -- eagerly free up scarce resources
+                     finalizeForeignPtr (pageMemory newPage)
+                     go existingPage
                Just nextPage -> go nextPage
         else grabNext page (poolBlockFinalizer pool) >>= \case
                Nothing -> go page
