@@ -497,6 +497,10 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
       [ testProperty "extracted seed equals original seed" $ prop_dsignm_seed_roundtrip lock (Proxy @v)
       ]
 
+    , testGroup "forgetting"
+      [ testProperty "key overwritten after forget" $ prop_key_overwritten_after_forget lock (Proxy @v)
+      ]
+
     -- , testGroup "NoThunks"
     --   [ testProperty "VerKey"  $ prop_no_thunks_IO_from @(VerKeyDSIGNM v) lock genVerKeyDSIGNM
     --   , testProperty "SignKey" $ prop_no_thunks_IO_from @(SignKeyDSIGNM v) lock genKeyDSIGNM
@@ -510,6 +514,31 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
         (genKeyDSIGNM seed)
         forgetSignKeyDSIGNM
         action
+
+prop_key_overwritten_after_forget
+  :: forall v.
+     (DSIGNMAlgorithm IO v
+     )
+  => Lock
+  -> Proxy v
+  -> PinnedSizedBytes (SeedSizeDSIGNM v)
+  -> Property
+prop_key_overwritten_after_forget lock p seedPSB =
+  ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+    sk <- genKeyDSIGNM seed
+    NaCl.mlsbFinalize seed
+
+    seedBefore <- getSeedDSIGNM p sk
+    bsBefore <- evaluate $! BS.copy (NaCl.mlsbToByteString seedBefore)
+    NaCl.mlsbFinalize seedBefore
+
+    forgetSignKeyDSIGNM sk
+
+    seedAfter <- getSeedDSIGNM p sk
+    bsAfter <- evaluate $! BS.copy (NaCl.mlsbToByteString seedAfter)
+    NaCl.mlsbFinalize seedAfter
+
+    return (bsBefore =/= bsAfter)
 
 prop_dsignm_seed_roundtrip
   :: forall v.
