@@ -40,6 +40,7 @@ import Foreign.Ptr (Ptr, nullPtr, WordPtr, ptrToWordPtr)
 import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, finalizeForeignPtr, castForeignPtr)
 import Foreign.Concurrent (newForeignPtr)
 import Foreign.Storable (Storable (alignment, sizeOf, peek))
+import Foreign.Marshal.Utils (fillBytes)
 import GHC.TypeLits (KnownNat, natVal)
 import GHC.IO.Exception (ioException)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -134,7 +135,13 @@ makeMLockedPool = do
       ptr <- sodiumMalloc (fromIntegral size)
       newForeignPtr ptr (sodiumFree ptr)
     )
-    (\ptr -> pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr))
+    (\ptr -> do
+      eraseMem (Proxy @n) ptr
+      pushAllocLogEvent $ FreeEv (ptrToWordPtr ptr)
+    )
+
+eraseMem :: forall n a. KnownNat n => Proxy n -> Ptr a -> IO ()
+eraseMem proxy ptr = fillBytes ptr 0xff (fromIntegral $ natVal proxy)
 
 mlpool32 :: Pool 32
 mlpool32 = unsafePerformIO makeMLockedPool

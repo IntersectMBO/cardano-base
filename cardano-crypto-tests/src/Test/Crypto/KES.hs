@@ -358,6 +358,13 @@ testKESAlgorithm lock _pm _pv n =
       , testProperty "Sig"     $ prop_serialise_SigKES     @IO @v lock Proxy Proxy
       ]
 
+    -- TODO: this doesn't pass right now, see
+    -- 'prop_key_overwritten_after_forget' for details.
+    --
+    -- , testGroup "forgetting"
+    --   [ testProperty "key overwritten after forget" $ prop_key_overwritten_after_forget lock (Proxy @v)
+    --   ]
+
     -- , testGroup "NoThunks"
     --   [ testProperty "VerKey"  $ prop_no_thunks @(VerKeyKES v)
     --   , testProperty "SignKey" $ prop_no_thunks @(SignKeyKES v)
@@ -382,6 +389,33 @@ testKESAlgorithm lock _pm _pv n =
         (withTestSeedMLSB genKeyKES)
         forgetSignKeyKES
         action
+
+-- TODO: This doesn't actually pass right now, for various reasons:
+-- - MockKES and SimpleKES don't actually implement secure forgetting;
+--   forgetSignKeyKES is a no-op for these algorithms, and obviously that means
+--   forgetting won't actually erase the key
+-- - SumKES and CompactSumKES use a SafePinned guard around the @r@ member,
+--   which triggers a 'SafePinnedFinalizedError' if we try to serialize the
+--   compound key after forgetting it.
+-- prop_key_overwritten_after_forget
+--   :: forall v.
+--      (KESSignAlgorithm IO v
+--      )
+--   => Lock
+--   -> Proxy v
+--   -> PinnedSizedBytes (SeedSizeKES v)
+--   -> Property
+-- prop_key_overwritten_after_forget lock _ seedPSB =
+--   ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+--     sk <- genKeyKES @IO @v seed
+--
+--     before <- rawSerialiseSignKeyKES sk
+--     forgetSignKeyKES sk
+--     after <- rawSerialiseSignKeyKES sk
+--
+--     NaCl.mlsbFinalize seed
+--
+--     return (before =/= after)
 
 
 prop_onlyGenSignKeyKES
