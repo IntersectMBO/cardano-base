@@ -326,10 +326,10 @@ instance ( OptimizedKESAlgorithm d
 
     rawSerialiseSignKeyKES (SignKeyCompactSumKES sk r_1 vk_0 vk_1) = do
       ssk <- rawSerialiseSignKeyKES sk
-      rr1 <- NaCl.interactSafePinned r_1 return
+      sr1 <- NaCl.interactSafePinned r_1 NaCl.mlsbToByteString
       return $ mconcat
                   [ ssk
-                  , NaCl.mlsbToByteString rr1
+                  , sr1
                   , rawSerialiseVerKeyKES vk_0
                   , rawSerialiseVerKeyKES vk_1
                   ]

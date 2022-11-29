@@ -102,8 +102,8 @@ instance Eq a => Eq (SafePinned a) where
 
 instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
   show (SignKeySingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = BS.unpack $ NaCl.mlsbToByteString mlsb
-        hexstr = concatMap (printf "%02x") bytes
+    let bytes = NaCl.mlsbAsByteString mlsb
+        hexstr = hexBS bytes
     in "SignKeySingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
 
 instance Show (SignKeyKES (SumKES h d)) where
@@ -111,12 +111,15 @@ instance Show (SignKeyKES (SumKES h d)) where
 
 instance Show (SignKeyKES (CompactSingleKES Ed25519DSIGNM)) where
   show (SignKeyCompactSingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = BS.unpack $ NaCl.mlsbToByteString mlsb
-        hexstr = concatMap (printf "%02x") bytes
+    let bytes = NaCl.mlsbAsByteString mlsb
+        hexstr = hexBS bytes
     in "SignKeyCompactSingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
 
 instance Show (SignKeyKES (CompactSumKES h d)) where
   show _ = "<SignKeyCompactSumKES>"
+
+hexBS :: ByteString -> String
+hexBS = concatMap (printf "%02x") . BS.unpack
 
 deriving instance Eq (SignKeyDSIGN d) => Eq (SignKeyKES (SimpleKES d t))
 
@@ -253,6 +256,7 @@ testKESAlgorithm lock _pm _pv n =
     , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES lock (Proxy @IO) (Proxy @v)
     , testProperty "total periods" $ prop_totalPeriodsKES lock (Proxy @IO) (Proxy @v)
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES lock (Proxy @IO) (Proxy @v)
+    , testProperty "no forgotten chunks in signkey" $ prop_noErasedBlocksInKey lock (Proxy @v)
     , testGroup "serialisation"
 
       [ testGroup "raw ser only"
@@ -418,14 +422,45 @@ testKESAlgorithm lock _pm _pv n =
 --     return (before =/= after)
 
 
+-- | This test detects whether a sign key contains references to pool-allocated
+-- blocks of memory that have been forgotten by the time the key is complete.
+-- We do this based on the fact that the pooled allocator erases memory blocks
+-- by overwriting them with series of 0xff bytes; thus we cut the serialized
+-- key up into chunks of 16 bytes, and if any of those chunks is entirely
+-- filled with 0xff bytes, we assume that we're looking at erased memory.
+prop_noErasedBlocksInKey
+  :: forall v.
+     KESSignAlgorithm IO v
+  -- => Lock -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  -- prop_noErasedBlocksInKey lock _ seedPSB =
+  => Lock -> Proxy v -> Property
+prop_noErasedBlocksInKey lock _ =
+  ioProperty . withLock lock $ do
+    seed <- NaCl.mlsbFromByteString $ BS.replicate 1024 0
+    sk <- genKeyKES @IO @v seed
+    NaCl.mlsbFinalize seed
+    serialized <- rawSerialiseSignKeyKES sk
+    forgetSignKeyKES sk
+    return $ counterexample (hexBS serialized) $ not (hasLongRunOfFF serialized)
+
+hasLongRunOfFF :: ByteString -> Bool
+hasLongRunOfFF bs
+  | BS.length bs < 16
+  = False
+  | otherwise
+  = let first16 = BS.take 16 bs
+        remainder = BS.drop 16 bs
+    in (BS.all (== 0xFF) first16) || hasLongRunOfFF remainder
+
 prop_onlyGenSignKeyKES
   :: forall v.
       KESSignAlgorithm IO v
   => Lock -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
-prop_onlyGenSignKeyKES lock _ seedPSB = ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
-  sk <- genKeyKES @IO @v seed
-  forgetSignKeyKES sk
-  return True
+prop_onlyGenSignKeyKES lock _ seedPSB =
+  ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
+    sk <- genKeyKES @IO @v seed
+    forgetSignKeyKES sk
+    return True
 
 prop_onlyGenVerKeyKES
   :: forall v.
