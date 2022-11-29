@@ -182,12 +182,13 @@ instance DSIGNMAlgorithm IO Ed25519DSIGNM where
       mlsbFinalize sk
 
     --
-    -- Ser/deser (dangerous)
+    -- Ser/deser (dangerous - do not use in production code)
     --
     rawSerialiseSignKeyDSIGNM sk = do
       seed <- getSeedDSIGNM (Proxy @Ed25519DSIGNM) sk
-      -- need to copy the seed into unsafe memory and finalize the MLSB, in
-      -- order to avoid leaking mlocked memory
+      -- We need to copy the seed into unsafe memory and finalize the MLSB, in
+      -- order to avoid leaking mlocked memory. This will, however, expose the
+      -- secret seed to the unprotected Haskell heap (see 'mlsbToByteString').
       raw <- mlsbToByteString seed
       mlsbFinalize seed
       return raw
