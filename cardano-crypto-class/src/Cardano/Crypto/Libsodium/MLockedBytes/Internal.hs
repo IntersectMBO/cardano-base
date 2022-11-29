@@ -20,7 +20,7 @@ module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
 import Control.DeepSeq (NFData (..))
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types (CSize (..))
-import Foreign.ForeignPtr (castForeignPtr, withForeignPtr)
+import Foreign.ForeignPtr (castForeignPtr)
 import Foreign.Ptr (Ptr, castPtr)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
