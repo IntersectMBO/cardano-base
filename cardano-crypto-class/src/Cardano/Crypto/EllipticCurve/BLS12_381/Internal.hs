@@ -337,7 +337,7 @@ class BLS_Curve curve where
   c_blst_on_curve :: PPtr curve -> IO Bool
 
   c_blst_add_or_double :: PPtr curve -> PPtr curve -> PPtr curve -> IO ()
-  c_blst_mult :: PPtr curve -> PPtr curve -> ScalarPtr -> CInt -> IO ()
+  c_blst_mult :: PPtr curve -> PPtr curve -> ScalarPtr -> CSize -> IO ()
   c_blst_cneg :: PPtr curve -> Bool -> IO ()
 
   c_blst_hash :: PPtr curve -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
@@ -534,7 +534,7 @@ foreign import ccall "size_blst_p1" c_size_blst_p1 :: CSize
 foreign import ccall "blst_p1_on_curve" c_blst_p1_on_curve :: P1Ptr -> IO Bool
 
 foreign import ccall "blst_p1_add_or_double" c_blst_p1_add_or_double :: P1Ptr -> P1Ptr -> P1Ptr -> IO ()
-foreign import ccall "blst_p1_mult" c_blst_p1_mult :: P1Ptr -> P1Ptr -> ScalarPtr -> CInt -> IO ()
+foreign import ccall "blst_p1_mult" c_blst_p1_mult :: P1Ptr -> P1Ptr -> ScalarPtr -> CSize -> IO ()
 foreign import ccall "blst_p1_cneg" c_blst_p1_cneg :: P1Ptr -> Bool -> IO ()
 
 foreign import ccall "blst_hash_to_g1" c_blst_hash_to_g1 :: P1Ptr -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
@@ -556,7 +556,7 @@ foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
 foreign import ccall "blst_p2_on_curve" c_blst_p2_on_curve :: P2Ptr -> IO Bool
 
 foreign import ccall "blst_p2_add_or_double" c_blst_p2_add_or_double :: P2Ptr -> P2Ptr -> P2Ptr -> IO ()
-foreign import ccall "blst_p2_mult" c_blst_p2_mult :: P2Ptr -> P2Ptr -> ScalarPtr -> CInt -> IO ()
+foreign import ccall "blst_p2_mult" c_blst_p2_mult :: P2Ptr -> P2Ptr -> ScalarPtr -> CSize -> IO ()
 foreign import ccall "blst_p2_cneg" c_blst_p2_cneg :: P2Ptr -> Bool -> IO ()
 
 foreign import ccall "blst_hash_to_g2" c_blst_hash_to_g2 :: P2Ptr -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
