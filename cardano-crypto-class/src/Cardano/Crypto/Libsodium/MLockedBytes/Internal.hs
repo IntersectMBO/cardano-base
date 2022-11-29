@@ -115,8 +115,11 @@ mlsbFromByteStringCheck bs
     size = fromInteger (natVal (Proxy @n))
 
 -- | /Note:/ the resulting 'BS.ByteString' will still refer to secure memory,
--- but the types don't prevent it from be exposed.
---
+-- but the types don't prevent it from be exposed. Note further that any
+-- subsequent operations (splicing & dicing, copying, conversion,
+-- packing/unpacking, etc.) on the resulting 'BS.ByteString' may create copies
+-- of the mlocked memory on the unprotected GHC heap, and thus leak secrets,
+-- so use this function with extreme care.
 mlsbAsByteString :: forall n. KnownNat n => MLockedSizedBytes n -> BS.ByteString
 mlsbAsByteString (MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size
   where
@@ -124,6 +127,8 @@ mlsbAsByteString (MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size
     size = fromInteger (natVal (Proxy @n))
 
 
+-- | /Note:/ this function will leak mlocked memory to the Haskell heap
+-- and should not be used in production code.
 mlsbToByteString :: forall n. (KnownNat n) => MLockedSizedBytes n -> IO BS.ByteString
 mlsbToByteString mlsb =
   withMLSB mlsb $ \ptr ->
