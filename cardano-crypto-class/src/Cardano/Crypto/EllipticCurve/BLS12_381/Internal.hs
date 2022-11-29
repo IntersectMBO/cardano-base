@@ -809,7 +809,10 @@ scalarFromBS bs =
     (success, scalar) = unsafePerformIO $
       withNewScalar $ \scalarPtr ->
         BS.useAsCStringLen bs $ \(cstr, l) ->
-          c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral l)
+          if l == 32 then
+            c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral l)
+          else
+            return False
 
 scalarToBS :: Scalar -> ByteString
 scalarToBS scalar = unsafePerformIO $ do

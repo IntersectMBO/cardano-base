@@ -66,7 +66,7 @@ testScalar name =
     , testProperty "to/from Integer round-trip" $
         \s -> s === ((unsafePerformIO . BLS.scalarFromInteger) . (unsafePerformIO . BLS.scalarToInteger) $ s)
     , testCase "integer from scalar" $ do
-        s <- case BLS.scalarFromBS (BS.pack [0x12, 0x34]) of
+        s <- case BLS.scalarFromBS (BLS.padBS 32 (BS.pack [0x12, 0x34])) of
               Left err -> error (show err)
               Right x -> return x
         let expected = 0x1234
