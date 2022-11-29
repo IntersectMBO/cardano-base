@@ -45,7 +45,6 @@ import GHC.TypeLits (KnownNat, natVal)
 import GHC.IO.Exception (ioException)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
-import System.IO (hPutStrLn, stderr)
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C
