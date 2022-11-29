@@ -39,7 +39,7 @@ import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
 import           Data.Unit.Strict (forceElemsToWHNF)
-import           Cardano.Crypto.MonadSodium (mlsbToByteString)
+import           Cardano.Crypto.MonadSodium (mlsbAsByteString)
 
 
 data SimpleKES d (t :: Nat)
@@ -179,7 +179,7 @@ instance ( KESAlgorithm (SimpleKES d t)
     --
 
     genKeyKES mlsb =
-        let seed     = mkSeedFromBytes $ mlsbToByteString mlsb
+        let seed     = mkSeedFromBytes $ mlsbAsByteString mlsb
             seedSize = seedSizeDSIGN (Proxy :: Proxy d)
             duration = fromIntegral (natVal (Proxy @t))
             seeds    = take duration

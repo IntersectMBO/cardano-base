@@ -29,7 +29,7 @@ import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
 -- import qualified Data.ByteString.Unsafe as BS
 import Data.Proxy
-import Control.Exception (evaluate)
+import Control.Exception (bracket)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -188,7 +188,7 @@ instance DSIGNMAlgorithm IO Ed25519DSIGNM where
       seed <- getSeedDSIGNM (Proxy @Ed25519DSIGNM) sk
       -- need to copy the seed into unsafe memory and finalize the MLSB, in
       -- order to avoid leaking mlocked memory
-      raw <- evaluate . (BS.copy $!) . mlsbToByteString $ seed
+      raw <- mlsbToByteString seed
       mlsbFinalize seed
       return raw
 

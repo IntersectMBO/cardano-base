@@ -1,4 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- We need this so that we can forward the deprecated traceMLockedForeignPtr
 {-# OPTIONS_GHC -Wno-deprecations #-}
@@ -20,7 +22,7 @@ module Cardano.Crypto.MonadSodium
   NaCl.sodiumInit,
   NaCl.MLockedForeignPtr,
   NaCl.MLockedSizedBytes,
-  NaCl.mlsbToByteString,
+  NaCl.mlsbAsByteString,
   NaCl.SodiumHashAlgorithm (..),
   NaCl.digestMLockedStorable,
   NaCl.digestMLockedBS,
@@ -36,7 +38,8 @@ import Cardano.Crypto.Libsodium
   )
 import qualified Cardano.Crypto.Libsodium as NaCl
 import qualified Cardano.Crypto.SafePinned as SP
-import Cardano.Crypto.Libsodium.MLockedBytes as NaCl
+import Cardano.Crypto.Libsodium.MLockedBytes (MLockedSizedBytes)
+import qualified Cardano.Crypto.Libsodium.MLockedBytes as NaCl
 import Cardano.Crypto.Libsodium.Hash as NaCl
 import Cardano.Crypto.Hash (HashAlgorithm(SizeHash))
 import Cardano.Foreign (SizedPtr)
@@ -64,6 +67,7 @@ class Monad m => MonadSodium m where
   mlsbUseAsCPtr :: forall n r. KnownNat n => MLockedSizedBytes n -> (Ptr Word8 -> m r) -> m r
   mlsbFromByteString :: forall n. KnownNat n => BS.ByteString -> m (MLockedSizedBytes n)
   mlsbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> m (Maybe (MLockedSizedBytes n))
+  mlsbToByteString :: forall n. KnownNat n => MLockedSizedBytes n -> m BS.ByteString
 
   -- * SafePinned
   makeSafePinned :: a -> m (SP.SafePinned a)
@@ -92,6 +96,7 @@ instance MonadSodium IO where
   interactSafePinned = SP.interactSafePinned
   mlsbFromByteString = NaCl.mlsbFromByteString
   mlsbFromByteStringCheck = NaCl.mlsbFromByteStringCheck
+  mlsbToByteString = NaCl.mlsbToByteString
   expandHash = NaCl.expandHash
 
 mapSafePinned :: MonadSodium m => (a -> m b) -> SP.SafePinned a -> m (SP.SafePinned b)

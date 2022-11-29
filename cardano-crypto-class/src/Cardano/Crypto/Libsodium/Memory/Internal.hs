@@ -128,7 +128,6 @@ traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
 
 makeMLockedPool :: forall n. KnownNat n => IO (Pool n)
 makeMLockedPool = do
-  hPutStrLn stderr "makeMLockedPool"
   initPool
     (fromIntegral $ 4096 `div` (natVal (Proxy @n)) `div` 64)
     (\size -> do

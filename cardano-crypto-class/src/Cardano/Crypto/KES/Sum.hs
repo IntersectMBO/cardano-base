@@ -279,8 +279,8 @@ instance ( KESSignAlgorithm m d
     -- forgetting
     --
     forgetSignKeyKES (SignKeySumKES sk_0 r1 _ _) = do
-        forgetSignKeyKES sk_0
-        NaCl.releaseSafePinned r1
+      forgetSignKeyKES sk_0
+      NaCl.releaseSafePinned r1
 
     --
     -- raw serialise/deserialise
@@ -288,10 +288,10 @@ instance ( KESSignAlgorithm m d
 
     rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) = do
       ssk <- rawSerialiseSignKeyKES sk
-      rr1 <- NaCl.interactSafePinned r_1 return
+      sr1 <- NaCl.interactSafePinned r_1 NaCl.mlsbToByteString
       return $ mconcat
                   [ ssk
-                  , NaCl.mlsbToByteString rr1
+                  , sr1
                   , rawSerialiseVerKeyKES vk_0
                   , rawSerialiseVerKeyKES vk_1
                   ]
