@@ -32,7 +32,8 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Crypto.MonadSodium (mlsbToByteString)
+import Cardano.Crypto.DirectSerialise
+import Cardano.Crypto.MonadSodium (mlsbAsByteString)
 
 data MockKES (t :: Nat)
 
@@ -150,7 +151,7 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
     --
 
     genKeyKES seed = do
-        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbToByteString seed) getRandomWord64)
+        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes $ mlsbAsByteString seed) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
     rawSerialiseSignKeyKES sk =

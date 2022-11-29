@@ -529,13 +529,13 @@ prop_key_overwritten_after_forget lock p seedPSB =
     NaCl.mlsbFinalize seed
 
     seedBefore <- getSeedDSIGNM p sk
-    bsBefore <- evaluate $! BS.copy (NaCl.mlsbToByteString seedBefore)
+    bsBefore <- NaCl.mlsbToByteString seedBefore
     NaCl.mlsbFinalize seedBefore
 
     forgetSignKeyDSIGNM sk
 
     seedAfter <- getSeedDSIGNM p sk
-    bsAfter <- evaluate $! BS.copy (NaCl.mlsbToByteString seedAfter)
+    bsAfter <- NaCl.mlsbToByteString seedAfter
     NaCl.mlsbFinalize seedAfter
 
     return (bsBefore =/= bsAfter)
@@ -551,8 +551,8 @@ prop_dsignm_seed_roundtrip
 prop_dsignm_seed_roundtrip lock p seedPSB = ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
   sk <- genKeyDSIGNM seed
   seed' <- getSeedDSIGNM p sk
-  bs <- evaluate $! BS.copy (NaCl.mlsbToByteString seed)
-  bs' <- evaluate $! BS.copy (NaCl.mlsbToByteString seed')
+  bs <- NaCl.mlsbToByteString seed
+  bs' <- NaCl.mlsbToByteString seed'
   forgetSignKeyDSIGNM sk
   NaCl.mlsbFinalize seed'
   return (bs === bs')

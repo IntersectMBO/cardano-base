@@ -9,6 +9,7 @@ module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     mlsbNew,
     mlsbFromByteString,
     mlsbFromByteStringCheck,
+    mlsbAsByteString,
     mlsbToByteString,
     mlsbUseAsCPtr,
     mlsbUseAsSizedPtr,
@@ -19,7 +20,7 @@ module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
 import Control.DeepSeq (NFData (..))
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types (CSize (..))
-import Foreign.ForeignPtr (castForeignPtr)
+import Foreign.ForeignPtr (castForeignPtr, withForeignPtr)
 import Foreign.Ptr (Ptr, castPtr)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -57,9 +58,12 @@ instance KnownNat n => Show (MLockedSizedBytes n) where
     --     $ showString "_ :: MLockedSizedBytes "
     --     . showsPrec 11 (natVal (Proxy @n))
     show mlsb =
-      let bytes = BS.unpack $ mlsbToByteString mlsb
+      let bytes = BS.unpack $ mlsbAsByteString mlsb
           hexstr = concatMap (printf "%02x") bytes
       in "MLSB " ++ hexstr
+
+withMLSB :: forall a b n. MLockedSizedBytes n -> (Ptr a -> IO b) -> IO b
+withMLSB (MLSB fptr) action = withMLockedForeignPtr fptr (action . castPtr)
 
 -- | Note: this doesn't need to allocate mlocked memory,
 -- but we do that for consistency
@@ -113,8 +117,18 @@ mlsbFromByteStringCheck bs
 -- | /Note:/ the resulting 'BS.ByteString' will still refer to secure memory,
 -- but the types don't prevent it from be exposed.
 --
-mlsbToByteString :: forall n. KnownNat n => MLockedSizedBytes n -> BS.ByteString
-mlsbToByteString (MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size where
+mlsbAsByteString :: forall n. KnownNat n => MLockedSizedBytes n -> BS.ByteString
+mlsbAsByteString (MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size
+  where
+    size  :: Int
+    size = fromInteger (natVal (Proxy @n))
+
+
+mlsbToByteString :: forall n. (KnownNat n) => MLockedSizedBytes n -> IO BS.ByteString
+mlsbToByteString mlsb =
+  withMLSB mlsb $ \ptr ->
+    BS.packCStringLen (castPtr ptr, size)
+  where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))
 

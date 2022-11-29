@@ -3,6 +3,7 @@ module Cardano.Crypto.Libsodium.MLockedBytes (
     mlsbNew,
     mlsbFromByteString,
     mlsbFromByteStringCheck,
+    mlsbAsByteString,
     mlsbToByteString,
     mlsbUseAsCPtr,
     mlsbUseAsSizedPtr,

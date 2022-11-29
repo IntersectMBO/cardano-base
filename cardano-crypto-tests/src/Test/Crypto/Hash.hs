@@ -156,7 +156,7 @@ prop_libsodium_model
   => Proxy h -> BS.ByteString -> Property
 prop_libsodium_model p bs = ioProperty $ do
   mlsb <- NaCl.digestMLockedBS p bs
-  let actual = NaCl.mlsbToByteString mlsb
+  let actual = NaCl.mlsbAsByteString mlsb
   return (expected === actual)
   where
     expected = digest p bs
