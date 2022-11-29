@@ -30,9 +30,7 @@ import Test.Tasty.QuickCheck (testProperty, vectorOf)
 
 {- HLINT IGNORE "Use <$>" -}
 
---
--- New type to generate random ByteStrings of size 32
---
+-- | Newtype to generate random ByteStrings of size 32
 newtype BS32 = BS32 { unBS32 :: BS.ByteString } deriving (Show)
 
 --
@@ -225,23 +223,23 @@ prop_naturalToBytes (NonNegative sz) n =
 --
 -- Praos <-> BatchCompatPraos VerKey conversion
 --
-prop_pubKeyToBatchComopat :: VerKeyVRF PraosVRF -> Bool
+prop_pubKeyToBatchComopat :: VerKeyVRF PraosVRF -> Property
 prop_pubKeyToBatchComopat vk =
-  rawSerialiseVerKeyVRF (vkToBatchCompat vk) == rawSerialiseVerKeyVRF vk
+  rawSerialiseVerKeyVRF (vkToBatchCompat vk) === rawSerialiseVerKeyVRF vk
 
 --
 -- Praos <-> BatchCompatPraos SignKey conversion
 --
-prop_signKeyToBatchCompat :: SignKeyVRF PraosVRF -> Bool
+prop_signKeyToBatchCompat :: SignKeyVRF PraosVRF -> Property
 prop_signKeyToBatchCompat sk =
-  rawSerialiseSignKeyVRF (skToBatchCompat sk) == rawSerialiseSignKeyVRF sk
+  rawSerialiseSignKeyVRF (skToBatchCompat sk) === rawSerialiseSignKeyVRF sk
 
 --
 -- Praos <-> BatchCompatPraos Output conversion
 --
-prop_outputToBatchComat :: OutputVRF PraosVRF -> Bool
+prop_outputToBatchComat :: OutputVRF PraosVRF -> Property
 prop_outputToBatchComat output =
-  getOutputVRFBytes (outputToBatchCompat output) == getOutputVRFBytes output
+  getOutputVRFBytes (outputToBatchCompat output) === getOutputVRFBytes output
 
 --
 -- Praos <-> BatchCompatPraos VerKey compatibility. We check that a proof is validated with a
