@@ -67,6 +67,9 @@ class Monad m => MonadSodium m where
   mlsbUseAsCPtr :: forall n r. KnownNat n => MLockedSizedBytes n -> (Ptr Word8 -> m r) -> m r
   mlsbFromByteString :: forall n. KnownNat n => BS.ByteString -> m (MLockedSizedBytes n)
   mlsbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> m (Maybe (MLockedSizedBytes n))
+
+  -- | Note that this function will leak mlocked memory to the Haskell heap
+  -- and should not be used in production code.
   mlsbToByteString :: forall n. KnownNat n => MLockedSizedBytes n -> m BS.ByteString
 
   -- * SafePinned

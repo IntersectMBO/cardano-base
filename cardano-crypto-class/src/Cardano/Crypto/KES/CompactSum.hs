@@ -321,7 +321,7 @@ instance ( OptimizedKESAlgorithm d
         NaCl.releaseSafePinned r1
 
     --
-    -- raw serialise/deserialise
+    -- Raw serialise/deserialise - dangerous, do not use in production code.
     --
 
     rawSerialiseSignKeyKES (SignKeyCompactSumKES sk r_1 vk_0 vk_1) = do
