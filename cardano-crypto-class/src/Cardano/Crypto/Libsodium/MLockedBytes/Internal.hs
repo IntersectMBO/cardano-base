@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE CPP #-}
 module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     MLockedSizedBytes (..),
     mlsbNew,
@@ -83,15 +84,25 @@ instance KnownNat n => Ord (MLockedSizedBytes n) where
       where
         size = natVal (Proxy @n)
 
+#ifdef ALLOW_MLOCK_VIOLATIONS
 instance KnownNat n => Show (MLockedSizedBytes n) where
     show mlsb =
       let bytes = BS.unpack $ mlsbAsByteString mlsb
           hexstr = concatMap (printf "%02x") bytes
       in "MLSB " ++ hexstr
+#else
+instance KnownNat n => Show (MLockedSizedBytes n) where
+    show _ =
+      let size = natVal (Proxy @n)
+      in printf "MLSB <%i bytes>" size
+#endif
 
 traceMLSB :: KnownNat n => MLockedSizedBytes n -> IO ()
 traceMLSB = print
+
+#ifndef ALLOW_MLOCK_VIOLATIONS
 {-# DEPRECATED traceMLSB "Don't leave traceMLockedForeignPtr in production" #-}
+#endif
 
 withMLSB :: forall b n. MLockedSizedBytes n -> (Ptr (SizedVoid n) -> IO b) -> IO b
 withMLSB (MLSB fptr) action = withMLockedForeignPtr fptr action
@@ -160,6 +171,7 @@ mlsbAsByteString (MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size
     size = fromInteger (natVal (Proxy @n))
 
 
+#ifdef ALLOW_MLOCK_VIOLATIONS
 -- | /Note:/ this function will leak mlocked memory to the Haskell heap
 -- and should not be used in production code.
 mlsbToByteString :: forall n. (KnownNat n) => MLockedSizedBytes n -> IO BS.ByteString
@@ -169,6 +181,13 @@ mlsbToByteString mlsb =
   where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))
+#else
+{-#WARNING mlsbToByteString "This function is disabled in production builds" #-}
+mlsbToByteString :: forall n. (KnownNat n) => MLockedSizedBytes n -> IO BS.ByteString
+mlsbToByteString _ = do
+  let _ = natVal (Proxy @n) -- convince GHC of the 'KnownNat' constraint
+  error "mlsbToByteString is disabled in production code"
+#endif
 
 mlsbUseAsCPtr :: MLockedSizedBytes n -> (Ptr Word8 -> IO r) -> IO r
 mlsbUseAsCPtr (MLSB x) k =

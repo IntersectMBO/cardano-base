@@ -39,7 +39,11 @@ import Foreign.C.Types (CSize (..))
 import Foreign.Ptr (Ptr, nullPtr, WordPtr, ptrToWordPtr)
 import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, finalizeForeignPtr, castForeignPtr)
 import Foreign.Concurrent (newForeignPtr)
+#ifdef ALLOW_MLOCK_VIOLATIONS
 import Foreign.Storable (Storable (alignment, sizeOf, peek))
+#else
+import Foreign.Storable (Storable (alignment, sizeOf))
+#endif
 import Foreign.Marshal.Utils (fillBytes)
 import GHC.TypeLits (KnownNat, natVal)
 import GHC.IO.Exception (ioException)
@@ -118,12 +122,19 @@ withMLockedForeignPtr = coerce (withForeignPtr @a @b)
 finalizeMLockedForeignPtr :: forall a. MLockedForeignPtr a -> IO ()
 finalizeMLockedForeignPtr = coerce (finalizeForeignPtr @a)
 
+{-# DEPRECATED traceMLockedForeignPtr "Don't leave traceMLockedForeignPtr in production" #-}
+#ifdef ALLOW_MLOCK_VIOLATIONS
 traceMLockedForeignPtr :: (Storable a, Show a) => MLockedForeignPtr a -> IO ()
 traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
     a <- peek ptr
     print a
-
-{-# DEPRECATED traceMLockedForeignPtr "Don't leave traceMLockedForeignPtr in production" #-}
+#else
+traceMLockedForeignPtr :: forall a. (Storable a, Show a) => MLockedForeignPtr a -> IO ()
+traceMLockedForeignPtr _ = do
+    let size = sizeOf (undefined :: a)
+        _ = show (undefined :: a) -- to convince GHC of the 'Show' constraint
+    putStrLn $ "MLockedForeignPtr <" ++ show size ++ " bytes>"
+#endif
 
 makeMLockedPool :: forall n. KnownNat n => IO (Pool n)
 makeMLockedPool = do
