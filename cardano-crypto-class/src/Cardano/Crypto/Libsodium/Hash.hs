@@ -28,7 +28,6 @@ import qualified Data.ByteString as BS
 
 import Cardano.Foreign
 import Cardano.Crypto.Hash (HashAlgorithm(SizeHash), SHA256, Blake2b_256)
-import Cardano.Crypto.PinnedSizedBytes (ptrPsbToSizedPtr)
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium.Memory.Internal
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
@@ -98,14 +97,13 @@ expandHash h (MLSB sfptr) = do
 instance SodiumHashAlgorithm SHA256 where
     naclDigestPtr :: forall proxy a. proxy SHA256 -> Ptr a -> Int -> IO (MLockedSizedBytes (SizeHash SHA256))
     naclDigestPtr _ input inputlen = do
-        output <- allocMLockedForeignPtr
-        withMLockedForeignPtr output $ \output' -> do
-            res <- c_crypto_hash_sha256 (ptrPsbToSizedPtr output') (castPtr input) (fromIntegral inputlen)
+        output <- mlsbNew
+        mlsbUseAsSizedPtr output $ \output' -> do
+            res <- c_crypto_hash_sha256 output' (castPtr input) (fromIntegral inputlen)
             unless (res == 0) $ do
                 errno <- getErrno
                 ioException $ errnoToIOError "digestMLocked @SHA256: c_crypto_hash_sha256" errno Nothing Nothing
-
-        return (MLSB output)
+        return output
 
 -- Test that manually written numbers are the same as in libsodium
 _testSHA256 :: SizeHash SHA256 :~: CRYPTO_SHA256_BYTES
@@ -114,8 +112,8 @@ _testSHA256 = Refl
 instance SodiumHashAlgorithm Blake2b_256 where
     naclDigestPtr :: forall proxy a. proxy Blake2b_256 -> Ptr a -> Int -> IO (MLockedSizedBytes (SizeHash Blake2b_256))
     naclDigestPtr _ input inputlen = do
-        output <- allocMLockedForeignPtr
-        withMLockedForeignPtr output $ \output' -> do
+        output <- mlsbNew
+        mlsbUseAsCPtr output $ \output' -> do
             res <- c_crypto_generichash_blake2b
                 output' (fromInteger $ natVal (Proxy @CRYPTO_BLAKE2B_256_BYTES))  -- output
                 (castPtr input) (fromIntegral inputlen)  -- input
@@ -123,8 +121,7 @@ instance SodiumHashAlgorithm Blake2b_256 where
             unless (res == 0) $ do
                 errno <- getErrno
                 ioException $ errnoToIOError "digestMLocked @Blake2b_256: c_crypto_hash_sha256" errno Nothing Nothing
-
-        return (MLSB output)
+        return output
 
 _testBlake2b256 :: SizeHash Blake2b_256 :~: CRYPTO_BLAKE2B_256_BYTES
 _testBlake2b256 = Refl

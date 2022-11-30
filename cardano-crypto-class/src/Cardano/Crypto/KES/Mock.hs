@@ -32,7 +32,6 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Crypto.DirectSerialise
 import Cardano.Crypto.MonadSodium (mlsbAsByteString)
 
 data MockKES (t :: Nat)
