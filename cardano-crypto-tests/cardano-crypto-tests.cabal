@@ -72,7 +72,6 @@ library
                       , cryptonite
                       , deepseq
                       , formatting
-                      , ghc-prim
                       , nothunks
                       , pretty-show
                       , QuickCheck
