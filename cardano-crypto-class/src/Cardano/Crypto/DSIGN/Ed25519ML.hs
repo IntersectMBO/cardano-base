@@ -29,7 +29,6 @@ import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
 -- import qualified Data.ByteString.Unsafe as BS
 import Data.Proxy
-import Control.Exception (bracket)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
