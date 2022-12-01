@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Ed25519 digital signatures. This flavor of Ed25519 stores secrets in
 -- mlocked memory to make sure they cannot leak to disk via swapping.
@@ -29,6 +30,7 @@ import qualified Data.ByteString as BS
 import Data.Proxy
 import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO)
 import Control.Monad.Class.MonadST (MonadST (..))
+import Control.Monad.ST (ST)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -56,15 +58,16 @@ instance NoThunks (SigDSIGNM Ed25519DSIGNM)
 -- Runs an IO action (which should be some FFI call into C) that returns a
 -- result code; if the result code returned is nonzero, fetch the errno, and
 -- return it.
-cOrError :: MonadST m => IO Int -> m (Maybe Errno)
+cOrError :: MonadST m => (forall s. ST s Int) -> m (Maybe Errno)
 cOrError action = do
-  withLiftST $ \fromST -> fromST . unsafeIOToST $ do
+  withLiftST $ \fromST -> fromST $ do
     res <- action
     if (res == 0) then
       return Nothing
     else
-      Just <$> getErrno
+      Just <$> unsafeIOToST getErrno
 
+-- | Throws an appropriate 'IOException' when 'Just' an 'Errno' is given.
 throwOnErrno :: (MonadThrow m) => String -> String -> Maybe Errno -> m ()
 throwOnErrno contextDesc cFunName maybeErrno = do
   case maybeErrno of
@@ -165,20 +168,18 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 --   and that are morally referentially transparent (that is, while they do
 --   perform destructive updates, the update is idempotent in the imperative
 --   sense, making it safe to execute repeatedly with the same input).
--- - 'allocaSized', but only to allocate temporary variables that we do not
---   leak outside the same 'unsafeIOToST' block.
--- - The 'cOrError' wrapper, which uses 'getErrno', but in such a way that it
---   runs its argument and 'getErrno' within the same wrapped 'IO' context.
--- - 'psbCreateSizedResult' and 'psbCreateSized', which only demand
---   @PrimMonad@, not 'IO'; all the underlying memory management is done in
---   terms of @PrimMonad@. Since 'IO' and 'ST' are the same thing, modulo
+-- - 'getErrno'; however, 'ST' guarantees sequentiality in the context where
+--   we use 'getErrno', so this is actually fine.
+-- - 'BS.useAsCStringLen', which is actually fine and shouldn't require 'IO'
+--   to begin with, but unfortunately it does.
 instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$> do
         mlsbUseAsSizedPtr sk $ \skPtr -> do
           (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
               psbCreateSizedResult $ \pkPtr ->
-                cOrError $ c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
+                cOrError $ unsafeIOToST $
+                  c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
           throwOnErrno "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
           return psb
 
@@ -188,10 +189,10 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       in SigEd25519DSIGNM <$> do
           mlsbUseAsSizedPtr sk $ \skPtr -> do
             (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
-                psbCreateSizedResult $ \sigPtr -> unsafeIOToST $ do
-                  BS.useAsCStringLen bs $ \(ptr, len) ->
-                    cOrError
-                      $ c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
+                psbCreateSizedResult $ \sigPtr -> do
+                  cOrError $ unsafeIOToST $ do
+                    BS.useAsCStringLen bs $ \(ptr, len) ->
+                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
             throwOnErrno "signDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_detached" maybeErrno
             return psb
 
@@ -203,9 +204,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
           mlsbUseAsSizedPtr sk $ \skPtr ->
             mlsbUseAsCPtr seed $ \seedPtr -> do
               maybeErrno <- withLiftST $ \fromST ->
-                (fromST . unsafeIOToST) $ allocaSized $ \pkPtr -> do
-                    cOrError
-                      $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
+                fromST $ allocaSizedST $ \pkPtr -> do
+                  cOrError $ unsafeIOToST $
+                    c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
               throwOnErrno "genKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair" maybeErrno
           return sk
 
@@ -214,9 +215,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
         mlsbUseAsSizedPtr sk $ \skPtr ->
           mlsbUseAsSizedPtr seed $ \seedPtr -> do
             maybeErrno <- withLiftST $ \fromST ->
-              (fromST . unsafeIOToST)
-                $ cOrError
-                  $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
+              fromST $
+                cOrError $ unsafeIOToST $
+                  c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
             throwOnErrno "genKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_seed_keypair" maybeErrno
         return seed
 
