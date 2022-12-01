@@ -110,6 +110,7 @@ library
     , cryptonite
     , deepseq
     , heapwords
+    , io-classes
     , memory
     , mtl
     , nothunks
