@@ -2,12 +2,14 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Utilities for FFI
 module Cardano.Foreign (
     -- * Sized pointer
     SizedPtr (..),
     allocaSized,
+    allocaSizedST,
     memcpySized,
     memsetSized,
     -- * Low-level C functions
@@ -23,6 +25,8 @@ import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CSize (..))
 import Foreign.Marshal.Alloc (allocaBytes)
 import GHC.TypeLits
+import Control.Monad.ST (ST, stToIO)
+import Control.Monad.ST.Unsafe (unsafeIOToST)
 
 -------------------------------------------------------------------------------
 -- Sized pointer
@@ -37,6 +41,10 @@ allocaSized k = allocaBytes size (k . SizedPtr)
   where
     size :: Int
     size = fromInteger (natVal (Proxy @n))
+
+-- | Like 'allocaSized', but in 'ST'.
+allocaSizedST :: forall n b s. KnownNat n => (forall s1. SizedPtr n -> ST s1 b) -> ST s b
+allocaSizedST k = unsafeIOToST $ allocaSized $ \ptr -> (stToIO $ k ptr)
 
 memcpySized :: forall n. KnownNat n => SizedPtr n -> SizedPtr n -> IO ()
 memcpySized (SizedPtr dest) (SizedPtr src) = void (c_memcpy dest src size)
