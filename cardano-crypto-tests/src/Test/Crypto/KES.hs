@@ -25,7 +25,6 @@ import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
-import System.IO.Unsafe (unsafePerformIO)
 import Data.IORef
 import Text.Printf
 
@@ -41,7 +40,6 @@ import Cardano.Crypto.Util (SignableRepresentation(..))
 import qualified Cardano.Crypto.Libsodium as NaCl
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
 import Cardano.Prelude (ReaderT, runReaderT, evaluate, bracket)
-import Cardano.Crypto.SafePinned
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 
 import Test.QuickCheck
@@ -93,12 +91,6 @@ tests lock =
 -- We normally ensure that we avoid naively comparing signing keys by not
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instances here.
-
-instance Eq a => Eq (SafePinned IO a) where
-  ap == bp = unsafePerformIO $ do
-    interactSafePinned ap $ \a ->
-      interactSafePinned bp $ \b ->
-        return (a == b)
 
 instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
   show (SignKeySingleKES (SignKeyEd25519DSIGNM mlsb)) =
@@ -399,9 +391,6 @@ testKESAlgorithm lock _pm _pv n =
 -- - MockKES and SimpleKES don't actually implement secure forgetting;
 --   forgetSignKeyKES is a no-op for these algorithms, and obviously that means
 --   forgetting won't actually erase the key
--- - SumKES and CompactSumKES use a SafePinned guard around the @r@ member,
---   which triggers a 'SafePinnedFinalizedError' if we try to serialize the
---   compound key after forgetting it.
 -- prop_key_overwritten_after_forget
 --   :: forall v.
 --      (KESSignAlgorithm IO v

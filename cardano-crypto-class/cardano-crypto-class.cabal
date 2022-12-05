@@ -85,7 +85,6 @@ library
     Cardano.Crypto.Libsodium.UnsafeC
     Cardano.Crypto.MonadSodium
     Cardano.Crypto.PinnedSizedBytes
-    Cardano.Crypto.SafePinned
     Cardano.Crypto.Seed
     Cardano.Crypto.Util
     Cardano.Crypto.VRF
@@ -109,7 +108,6 @@ library
     , cardano-strict-containers
     , cryptonite
     , deepseq
-    , ghc-prim
     , heapwords
     , io-classes
     , memory
