@@ -91,7 +91,6 @@ class ( Typeable v
   --
   data VerKeyKES  v :: Type
   data SigKES     v :: Type
-  data SignKeyKES v :: Type
 
   type SeedSizeKES    v :: Nat
   type SizeVerKeyKES  v :: Nat
@@ -171,6 +170,8 @@ class ( KESAlgorithm v
       , Monad m
       )
       => KESSignAlgorithm m v where
+
+  data SignKeyKES v :: Type
 
   deriveVerKeyKES :: SignKeyKES v -> m (VerKeyKES v)
 

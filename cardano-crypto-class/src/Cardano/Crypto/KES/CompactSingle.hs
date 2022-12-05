@@ -88,9 +88,6 @@ instance ( DSIGNMAlgorithmBase d
     newtype VerKeyKES (CompactSingleKES d) = VerKeyCompactSingleKES (VerKeyDSIGNM d)
         deriving Generic
 
-    newtype SignKeyKES (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM d)
-        deriving Generic
-
     data SigKES (CompactSingleKES d) = SigCompactSingleKES !(SigDSIGNM d) !(VerKeyDSIGNM d)
         deriving Generic
 
@@ -157,6 +154,9 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
          , KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)
          )
          => KESSignAlgorithm m (CompactSingleKES d) where
+    newtype SignKeyKES (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM d)
+        deriving Generic
+
     deriveVerKeyKES (SignKeyCompactSingleKES v) =
         VerKeyCompactSingleKES <$> deriveVerKeyDSIGNM v
 

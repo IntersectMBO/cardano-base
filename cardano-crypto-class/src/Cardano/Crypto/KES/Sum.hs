@@ -28,6 +28,11 @@
 --
 -- This relies on "Cardano.Crypto.KES.Single" for the base case.
 --
+-- NOTE - some functions in this module have been deliberately marked NOINLINE;
+-- this is necessary to avoid an edge case in GHC that causes the simplifier to
+-- go haywire, leading to a @Simplifier ticks exhausted@ error and very long
+-- compilation times. Worse yet, this error will only appear when compiling
+-- code that depends on this module, not when compiling the module itself.
 module Cardano.Crypto.KES.Sum (
     SumKES
   , VerKeyKES (..)
@@ -57,12 +62,10 @@ import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.Single (SingleKES)
 import           Cardano.Crypto.Util
-
 import qualified Cardano.Crypto.MonadSodium as NaCl
-import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
-import Control.DeepSeq (NFData)
-
-import GHC.TypeLits (KnownNat, type (+), type (*))
+import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
+import           Control.DeepSeq (NFData)
+import           GHC.TypeLits (KnownNat, type (+), type (*))
 
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
@@ -128,15 +131,6 @@ instance ( KESAlgorithm d
               VerKeySumKES (Hash h (VerKeyKES d, VerKeyKES d))
         deriving Generic
         deriving newtype NFData
-
-    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
-    --
-    data SignKeyKES (SumKES h d) =
-           SignKeySumKES !(SignKeyKES d)
-                         !(NaCl.SafePinned (NaCl.MLockedSizedBytes (SeedSizeKES d)))
-                         !(VerKeyKES d)
-                         !(VerKeyKES d)
-        deriving Generic
 
     -- | From Figure 3: @(sigma, vk_0, vk_1)@
     --
@@ -227,6 +221,15 @@ instance ( KESSignAlgorithm m d
          , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
          )
       => KESSignAlgorithm m (SumKES h d) where
+    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
+    --
+    data SignKeyKES (SumKES h d) =
+           SignKeySumKES !(SignKeyKES d)
+                         !(NaCl.MLockedSizedBytes (SeedSizeKES d))
+                         !(VerKeyKES d)
+                         !(VerKeyKES d)
+        deriving Generic
+
 
     deriveVerKeyKES (SignKeySumKES _ _ vk_0 vk_1) =
         return $ VerKeySumKES (hashPairOfVKeys (vk_0, vk_1))
@@ -241,20 +244,21 @@ instance ( KESSignAlgorithm m d
 
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
+    {-#NOINLINE updateKES #-}
     updateKES ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
       | t+1 <  _T = runMaybeT $
                       do
                         sk' <- MaybeT $ updateKES ctx sk t
-                        r_1' <- MaybeT $ Just <$> NaCl.mapSafePinned NaCl.mlsbCopy r_1
+                        r_1' <- MaybeT $ Just <$> NaCl.mlsbCopy r_1
                         return $ SignKeySumKES sk' r_1' vk_0 vk_1
       | t+1 == _T = do
-                        sk' <- NaCl.interactSafePinned r_1 genKeyKES
-                        r_1' <- NaCl.makeSafePinned =<< NaCl.mlsbNew
+                        sk' <- genKeyKES r_1
+                        r_1' <- NaCl.mlsbNew
                         return . Just $ SignKeySumKES sk' r_1' vk_0 vk_1
       | otherwise = runMaybeT $
                       do
                         sk' <- MaybeT $ updateKES ctx sk (t - _T)
-                        r_1' <- MaybeT $ Just <$> NaCl.mapSafePinned NaCl.mlsbCopy r_1
+                        r_1' <- MaybeT $ Just <$> NaCl.mlsbCopy r_1
                         return $ SignKeySumKES sk' r_1' vk_0 vk_1
       where
         _T = totalPeriodsKES (Proxy :: Proxy d)
@@ -263,16 +267,15 @@ instance ( KESSignAlgorithm m d
     -- Key generation
     --
 
+    {-# NOINLINE genKeyKES #-}
     genKeyKES r = do
-      (rr0, rr1) <- NaCl.expandHash (Proxy :: Proxy h) r
-      r0 <- NaCl.makeSafePinned rr0
-      r1 <- NaCl.makeSafePinned rr1
-      sk_0 <- NaCl.interactSafePinned r0 genKeyKES
+      (r0, r1) <- NaCl.expandHash (Proxy :: Proxy h) r
+      sk_0 <- genKeyKES r0
       vk_0 <- deriveVerKeyKES sk_0
-      sk_1 <- NaCl.interactSafePinned r1 genKeyKES
-      vk_1 <- deriveVerKeyKES @m @d sk_1
+      sk_1 <- genKeyKES r1
+      vk_1 <- deriveVerKeyKES sk_1
       forgetSignKeyKES sk_1
-      NaCl.releaseSafePinned r0
+      NaCl.mlsbFinalize r0
       return $ SignKeySumKES sk_0 r1 vk_0 vk_1
 
     --
@@ -280,15 +283,16 @@ instance ( KESSignAlgorithm m d
     --
     forgetSignKeyKES (SignKeySumKES sk_0 r1 _ _) = do
       forgetSignKeyKES sk_0
-      NaCl.releaseSafePinned r1
+      NaCl.mlsbFinalize r1
 
     --
     -- Raw serialise/deserialise - dangerous, do not use in production code.
     --
 
+    {-# NOINLINE rawSerialiseSignKeyKES #-}
     rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) = do
       ssk <- rawSerialiseSignKeyKES sk
-      sr1 <- NaCl.interactSafePinned r_1 NaCl.mlsbToByteString
+      sr1 <- NaCl.mlsbToByteString r_1
       return $ mconcat
                   [ ssk
                   , sr1
@@ -296,11 +300,11 @@ instance ( KESSignAlgorithm m d
                   , rawSerialiseVerKeyKES vk_1
                   ]
 
+    {-# NOINLINE rawDeserialiseSignKeyKES #-}
     rawDeserialiseSignKeyKES b = runMaybeT $ do
         guard (BS.length b == fromIntegral size_total)
         sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
-        rr <- MaybeT $ NaCl.mlsbFromByteStringCheck b_r
-        r <- MaybeT . fmap Just $ NaCl.makeSafePinned rr
+        r <- MaybeT $ NaCl.mlsbFromByteStringCheck b_r
         vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk0
         vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk1
         return (SignKeySumKES sk r vk_0 vk_1)

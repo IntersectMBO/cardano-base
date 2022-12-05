@@ -51,8 +51,6 @@ instance
 
     newtype VerKeyKES (ForgetMockKES k) = VerKeyForgetMockKES (VerKeyKES k)
       deriving (Generic)
-    data SignKeyKES (ForgetMockKES k) = SignKeyForgetMockKES !Word !(SignKeyKES k)
-      deriving (Generic)
     newtype SigKES (ForgetMockKES k) = SigForgetMockKES (SigKES k)
       deriving (Generic)
 
@@ -81,6 +79,8 @@ instance
   , MonadIO m
   )
   => KESSignAlgorithm (ReaderT Logger m) (ForgetMockKES k) where
+    data SignKeyKES (ForgetMockKES k) = SignKeyForgetMockKES !Word !(SignKeyKES k)
+      deriving (Generic)
     genKeyKES seed = do
       sk <- lift (genKeyKES seed)
       nonce <- liftIO $ randomRIO (10000000, 99999999)

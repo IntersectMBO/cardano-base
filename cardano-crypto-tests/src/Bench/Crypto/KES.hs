@@ -48,6 +48,7 @@ benchmarks = bgroup "KES"
 
 
 
+{-# NOINLINE benchKES #-}
 benchKES :: forall (proxy :: forall k. k -> Type) m v
            . ( KESSignAlgorithm m v
              , ContextKES v ~ ()

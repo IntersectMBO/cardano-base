@@ -61,11 +61,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
         deriving stock   (Show, Eq, Generic)
         deriving newtype (NoThunks)
 
-    data SignKeyKES (MockKES t) =
-           SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
-        deriving stock    (Show, Eq, Generic)
-        deriving anyclass (NoThunks)
-
     data SigKES (MockKES t) =
            SigMockKES !(Hash ShortHash ()) !(SignKeyKES (MockKES t))
         deriving stock    (Show, Eq, Ord, Generic)
@@ -129,6 +124,11 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       = Nothing
 
 instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
+    data SignKeyKES (MockKES t) =
+           SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
+        deriving stock    (Show, Eq, Generic)
+        deriving anyclass (NoThunks)
+
     deriveVerKeyKES (SignKeyMockKES vk _) = return vk
 
     updateKES () (SignKeyMockKES vk t') t =

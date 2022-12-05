@@ -26,10 +26,6 @@ module Cardano.Crypto.MonadSodium
   NaCl.SodiumHashAlgorithm (..),
   NaCl.digestMLockedStorable,
   NaCl.digestMLockedBS,
-
-  -- * SafePinned
-  SP.SafePinned,
-  mapSafePinned
 )
 where
 
@@ -37,7 +33,6 @@ import Cardano.Crypto.Libsodium
   ( MLockedForeignPtr
   )
 import qualified Cardano.Crypto.Libsodium as NaCl
-import qualified Cardano.Crypto.SafePinned as SP
 import Cardano.Crypto.Libsodium.MLockedBytes (MLockedSizedBytes)
 import qualified Cardano.Crypto.Libsodium.MLockedBytes as NaCl
 import Cardano.Crypto.Libsodium.Hash as NaCl
@@ -72,17 +67,13 @@ class Monad m => MonadSodium m where
   -- and should not be used in production code.
   mlsbToByteString :: forall n. KnownNat n => MLockedSizedBytes n -> m BS.ByteString
 
-  -- * SafePinned
-  makeSafePinned :: a -> m (SP.SafePinned a)
-  releaseSafePinned :: forall a. SP.Release a => SP.SafePinned a -> m ()
-  interactSafePinned :: SP.SafePinned a -> (a -> m b) -> m b
-
   -- * Hashing
   expandHash
       :: forall h proxy. NaCl.SodiumHashAlgorithm h
       => proxy h
       -> (MLockedSizedBytes (SizeHash h))
       -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
+
 
 instance MonadSodium IO where
   withMLockedForeignPtr = NaCl.withMLockedForeignPtr
@@ -94,14 +85,7 @@ instance MonadSodium IO where
   mlsbCopy = NaCl.mlsbCopy
   mlsbUseAsSizedPtr = NaCl.mlsbUseAsSizedPtr
   mlsbUseAsCPtr = NaCl.mlsbUseAsCPtr
-  makeSafePinned = SP.makeSafePinned
-  releaseSafePinned = SP.releaseSafePinned
-  interactSafePinned = SP.interactSafePinned
   mlsbFromByteString = NaCl.mlsbFromByteString
   mlsbFromByteStringCheck = NaCl.mlsbFromByteStringCheck
   mlsbToByteString = NaCl.mlsbToByteString
   expandHash = NaCl.expandHash
-
-mapSafePinned :: MonadSodium m => (a -> m b) -> SP.SafePinned a -> m (SP.SafePinned b)
-mapSafePinned f p =
-  interactSafePinned p f >>= makeSafePinned

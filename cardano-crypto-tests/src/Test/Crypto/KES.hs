@@ -94,7 +94,7 @@ tests lock =
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instances here.
 
-instance Eq a => Eq (SafePinned a) where
+instance Eq a => Eq (SafePinned IO a) where
   ap == bp = unsafePerformIO $ do
     interactSafePinned ap $ \a ->
       interactSafePinned bp $ \b ->
@@ -230,6 +230,7 @@ testMLockGenKeyKES lock _p = withLock lock $ do
   mapM_ print after
   assertEqual "all allocations deallocated" Set.empty evset
 
+{-# NOINLINE testKESAlgorithm#-}
 testKESAlgorithm
   :: forall m v.
      ( ToCBOR (VerKeyKES v)

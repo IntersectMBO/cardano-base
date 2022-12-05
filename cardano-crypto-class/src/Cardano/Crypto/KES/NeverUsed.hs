@@ -30,9 +30,6 @@ instance KESAlgorithm NeverKES where
   data VerKeyKES  NeverKES = NeverUsedVerKeyKES
       deriving (Show, Eq, Generic, NoThunks)
 
-  data SignKeyKES NeverKES = NeverUsedSignKeyKES
-      deriving (Show, Eq, Generic, NoThunks)
-
   data SigKES     NeverKES = NeverUsedSigKES
       deriving (Show, Eq, Generic, NoThunks)
 
@@ -53,6 +50,9 @@ instance KESAlgorithm NeverKES where
   rawDeserialiseSigKES     _ = Just NeverUsedSigKES
 
 instance Monad m => KESSignAlgorithm m NeverKES where
+  data SignKeyKES NeverKES = NeverUsedSignKeyKES
+      deriving (Show, Eq, Generic, NoThunks)
+
   deriveVerKeyKES _ = return NeverUsedVerKeyKES
 
   signKES   = error "KES not available"

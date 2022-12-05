@@ -109,6 +109,7 @@ library
     , cardano-strict-containers
     , cryptonite
     , deepseq
+    , ghc-prim
     , heapwords
     , io-classes
     , memory
