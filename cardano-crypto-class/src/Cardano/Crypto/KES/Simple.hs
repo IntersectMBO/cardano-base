@@ -83,10 +83,6 @@ instance ( DSIGNAlgorithm d
               ThunkyVerKeySimpleKES (Vector (VerKeyDSIGN d))
         deriving Generic
 
-    newtype SignKeyKES (SimpleKES d t) =
-              ThunkySignKeySimpleKES (Vector (SignKeyDSIGN d))
-        deriving Generic
-
     newtype SigKES (SimpleKES d t) =
               SigSimpleKES (SigDSIGN d)
         deriving Generic
@@ -159,6 +155,10 @@ instance ( KESAlgorithm (SimpleKES d t)
          , Monad m
          ) =>
          KESSignAlgorithm m (SimpleKES d t) where
+    newtype SignKeyKES (SimpleKES d t) =
+              ThunkySignKeySimpleKES (Vector (SignKeyDSIGN d))
+        deriving Generic
+
 
     deriveVerKeyKES (SignKeySimpleKES sks) =
         return $! VerKeySimpleKES (Vec.map deriveVerKeyDSIGN sks)

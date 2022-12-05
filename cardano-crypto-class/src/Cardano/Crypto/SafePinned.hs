@@ -1,5 +1,7 @@
 {-#LANGUAGE DerivingVia #-}
+{-#LANGUAGE MultiParamTypeClasses #-}
 {-#LANGUAGE GeneralizedNewtypeDeriving #-}
+{-#LANGUAGE FlexibleInstances #-}
 module Cardano.Crypto.SafePinned
 ( SafePinned
 , makeSafePinned
@@ -10,52 +12,51 @@ module Cardano.Crypto.SafePinned
 )
 where
 
-import Control.Concurrent.MVar
+import Control.Monad.Class.MonadMVar
 import Control.Exception (Exception, throw)
 import Control.DeepSeq (NFData (..))
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..))
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Cardano.Crypto.Libsodium.MLockedBytes
+import Cardano.Crypto.MonadSodium
 
 data SafePinnedFinalizedError = SafePinnedFinalizedError
   deriving (Show)
 
 instance Exception SafePinnedFinalizedError
 
-class Release a where
-  release :: a -> IO ()
+class Release m a where
+  release :: a -> m ()
 
-instance Release (MLockedSizedBytes a) where
+instance MonadSodium m => Release m (MLockedSizedBytes a) where
   release = mlsbFinalize
 
-newtype SafePinned a =
-  SafePinned { safePinnedMVar :: MVar a }
-  deriving NoThunks via OnlyCheckWhnf (MVar a)
+newtype SafePinned m a =
+  SafePinned { safePinnedMVar :: MVar m a }
+  deriving NoThunks via OnlyCheckWhnf (MVar m a)
 
-makeSafePinned :: MonadIO m => a -> m (SafePinned a)
-makeSafePinned val = SafePinned <$> liftIO (newMVar val)
+makeSafePinned :: MonadMVar m => a -> m (SafePinned m a)
+makeSafePinned val = SafePinned <$> newMVar val
 
-mapSafePinned :: MonadIO m => (a -> m b) -> SafePinned a -> m (SafePinned b)
+mapSafePinned :: MonadMVar m => (a -> m b) -> SafePinned m a -> m (SafePinned m b)
 mapSafePinned f p =
   interactSafePinned p f >>= makeSafePinned
 
-releaseSafePinned :: (MonadIO m, Release a) => SafePinned a -> m ()
+releaseSafePinned :: (MonadMVar m, Release m a) => SafePinned m a -> m ()
 releaseSafePinned sp = do
-  mval <- liftIO $ tryTakeMVar (safePinnedMVar sp)
-  maybe (return ()) (liftIO . release) mval
+  mval <- tryTakeMVar (safePinnedMVar sp)
+  maybe (return ()) release mval
 
-interactSafePinned :: MonadIO m => SafePinned a -> (a -> m b) -> m b
+interactSafePinned :: MonadMVar m => SafePinned m a -> (a -> m b) -> m b
 interactSafePinned (SafePinned var) action = do
-  mval <- liftIO (tryTakeMVar var)
+  mval <- tryTakeMVar var
   case mval of
     Just val -> do
       result <- action val
-      result `seq` liftIO (putMVar var val)
+      result `seq` putMVar var val
       return result
     Nothing -> do
       throw SafePinnedFinalizedError
 
 -- If it's fine by Kmett & Marlow, ...
 -- https://github.com/haskell/deepseq/issues/6
-instance NFData (SafePinned a) where
+instance NFData (SafePinned m a) where
   rnf x = x `seq` ()

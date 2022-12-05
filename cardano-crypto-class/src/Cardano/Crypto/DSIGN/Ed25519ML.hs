@@ -199,6 +199,7 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
     --
     -- Key generation
     --
+    {-# NOINLINE genKeyDSIGNM #-}
     genKeyDSIGNM seed = SignKeyEd25519DSIGNM <$> do
           sk <- mlsbNew
           mlsbUseAsSizedPtr sk $ \skPtr ->

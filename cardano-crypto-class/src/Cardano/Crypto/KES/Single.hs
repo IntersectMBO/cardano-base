@@ -71,9 +71,6 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
     newtype VerKeyKES (SingleKES d) = VerKeySingleKES (VerKeyDSIGNM d)
         deriving Generic
 
-    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
-        deriving Generic
-
     newtype SigKES (SingleKES d) = SigSingleKES (SigDSIGNM d)
         deriving Generic
 
@@ -114,6 +111,9 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
 instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
          , Monad m
          ) => KESSignAlgorithm m (SingleKES d) where
+    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
+        deriving Generic
+
     deriveVerKeyKES (SignKeySingleKES v) =
       VerKeySingleKES <$> deriveVerKeyDSIGNM v
 
