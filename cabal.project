@@ -26,6 +26,7 @@ packages:
   heapwords
   measures
   orphans-deriving-via
+  sha3-bindings
   slotting
 
 -- Ensures colourized output from test runners

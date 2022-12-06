@@ -9,15 +9,20 @@ module Cardano.Crypto.Hash.SHA3_256
 where
 
 import Cardano.Crypto.Hash.Class
-import qualified "cryptonite" Crypto.Hash as H
-import qualified Data.ByteArray as BA
+import Foreign.Ptr (castPtr)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Internal as BI
+import Sha3Bindings
 
 data SHA3_256
 
 instance HashAlgorithm SHA3_256 where
   type SizeHash SHA3_256 = 32
   hashAlgorithmName _ = "sha3-256"
-  digest _ = convert . H.hash
+  digest _ = sha3_256_rustcrypto
 
-convert :: H.Digest H.SHA3_256 -> ByteString
-convert = BA.convert
+sha3_256_rustcrypto :: B.ByteString -> B.ByteString
+sha3_256_rustcrypto input =
+  BI.unsafeCreate 32 $ \outptr ->
+    B.useAsCStringLen input $ \(inptr, inputlen) -> do
+      sha3_256 (castPtr inptr) (fromIntegral inputlen) (castPtr outptr)

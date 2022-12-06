@@ -118,6 +118,7 @@ library
     , serialise
     , template-haskell
     , th-compat
+    , sha3-bindings
     , stm
     , text
     , transformers
@@ -154,3 +155,6 @@ test-suite test-memory-example
 
   if (os(linux) || os(osx))
     build-depends: unix
+
+package cardano-crypto-praos
+  flags: -external-libsodium-vrf
