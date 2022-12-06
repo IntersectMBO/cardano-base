@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DeriveAnyClass       #-}
 {-# LANGUAGE KindSignatures       #-}
@@ -39,7 +40,11 @@ import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import qualified Cardano.Crypto.Libsodium as NaCl
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
+#ifdef ALLOW_MLOCK_VIOLATIONS
 import Cardano.Prelude (ReaderT, runReaderT, evaluate, bracket)
+#else
+import Cardano.Prelude (ReaderT, runReaderT, bracket)
+#endif
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 
 import Test.QuickCheck
@@ -227,7 +232,9 @@ testKESAlgorithm
   :: forall m v.
      ( ToCBOR (VerKeyKES v)
      , FromCBOR (VerKeyKES v)
+#ifdef ALLOW_MLOCK_VIOLATIONS
      , Eq (SignKeyKES v)   -- no Eq for signing keys normally
+#endif
      , Show (SignKeyKES v) -- fake instance defined locally
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
@@ -249,7 +256,11 @@ testKESAlgorithm lock _pm _pv n =
     , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES lock (Proxy @IO) (Proxy @v)
     , testProperty "total periods" $ prop_totalPeriodsKES lock (Proxy @IO) (Proxy @v)
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES lock (Proxy @IO) (Proxy @v)
+#ifdef ALLOW_MLOCK_VIOLATIONS
+      -- TODO: rewrite the property, and re-enable it, when direct
+      -- serialisation becomes available.
     , testProperty "no forgotten chunks in signkey" $ prop_noErasedBlocksInKey lock (Proxy @v)
+#endif
     , testGroup "serialisation"
 
       [ testGroup "raw ser only"
@@ -257,6 +268,7 @@ testKESAlgorithm lock _pm _pv n =
             ioProperty . withLock lock $ do
               vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
               return $ (rawDeserialiseVerKeyKES . rawSerialiseVerKeyKES $ vk) === Just vk
+#ifdef ALLOW_MLOCK_VIOLATIONS
         , testProperty "SignKey" $
             ioProperty . withLock lock . withNewTestSK $ \sk -> do
               serialized <- rawSerialiseSignKeyKES sk
@@ -264,6 +276,7 @@ testKESAlgorithm lock _pm _pv n =
               equals <- evaluate (Just sk == msk')
               maybe (return ()) forgetSignKeyKES msk'
               return equals
+#endif
         , testProperty "Sig" $ property $ do
             msg <- mkMsg
             return . ioProperty . withLock lock $ do
@@ -275,11 +288,13 @@ testKESAlgorithm lock _pm _pv n =
             ioProperty . withLock lock $ do
               vk :: VerKeyKES v <- withNewTestSK deriveVerKeyKES
               return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === (sizeVerKeyKES (Proxy @v))
+#ifdef ALLOW_MLOCK_VIOLATIONS
         , testProperty "SignKey" $
             ioProperty . withLock lock . withNewTestSK $ \sk -> do
               serialized <- rawSerialiseSignKeyKES sk
               equals <- evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyKES (Proxy @v)))
               return equals
+#endif
         , testProperty "Sig" $ property $ do
             msg <- mkMsg
             return . ioProperty . withLock lock $ do
@@ -412,12 +427,16 @@ testKESAlgorithm lock _pm _pv n =
 --     return (before =/= after)
 
 
+#ifdef ALLOW_MLOCK_VIOLATIONS
 -- | This test detects whether a sign key contains references to pool-allocated
 -- blocks of memory that have been forgotten by the time the key is complete.
 -- We do this based on the fact that the pooled allocator erases memory blocks
 -- by overwriting them with series of 0xff bytes; thus we cut the serialized
 -- key up into chunks of 16 bytes, and if any of those chunks is entirely
 -- filled with 0xff bytes, we assume that we're looking at erased memory.
+--
+-- TODO: when direct serialisation becomes available, rewrite this test to use
+-- that, and remove CPP guard.
 prop_noErasedBlocksInKey
   :: forall v.
      KESSignAlgorithm IO v
@@ -441,6 +460,7 @@ hasLongRunOfFF bs
   = let first16 = BS.take 16 bs
         remainder = BS.drop 16 bs
     in (BS.all (== 0xFF) first16) || hasLongRunOfFF remainder
+#endif
 
 prop_onlyGenSignKeyKES
   :: forall v.

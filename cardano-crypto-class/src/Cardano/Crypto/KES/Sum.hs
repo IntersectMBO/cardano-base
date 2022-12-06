@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -290,17 +291,25 @@ instance ( KESSignAlgorithm m d
     --
 
     {-# NOINLINE rawSerialiseSignKeyKES #-}
-    rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) = do
-      ssk <- rawSerialiseSignKeyKES sk
-      sr1 <- NaCl.mlsbToByteString r_1
-      return $ mconcat
-                  [ ssk
-                  , sr1
-                  , rawSerialiseVerKeyKES vk_0
-                  , rawSerialiseVerKeyKES vk_1
-                  ]
+
+#ifdef ALLOW_MLOCK_VIOLATIONS
+    rawSerialiseSignKeyKES (SignKeySumKES sk r_1 vk_0 vk_1) =
+        do
+          ssk <- rawSerialiseSignKeyKES sk
+          sr1 <- NaCl.mlsbToByteString r_1
+          return $ mconcat
+                      [ ssk
+                      , sr1
+                      , rawSerialiseVerKeyKES vk_0
+                      , rawSerialiseVerKeyKES vk_1
+                      ]
+#else
+    rawSerialiseSignKeyKES _ =
+        error "Sign key raw serialisation is disabled in production code"
+#endif
 
     {-# NOINLINE rawDeserialiseSignKeyKES #-}
+#ifdef ALLOW_MLOCK_VIOLATIONS
     rawDeserialiseSignKeyKES b = runMaybeT $ do
         guard (BS.length b == fromIntegral size_total)
         sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
@@ -323,6 +332,10 @@ instance ( KESSignAlgorithm m d
         off_r      = size_sk
         off_vk0    = off_r + size_r
         off_vk1    = off_vk0 + size_vk
+#else
+    rawDeserialiseSignKeyKES _ =
+      error "Sign key raw serialisation is disabled in production code"
+#endif
 
 
 --

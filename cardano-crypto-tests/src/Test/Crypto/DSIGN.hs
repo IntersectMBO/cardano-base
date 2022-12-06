@@ -27,6 +27,7 @@ import Test.QuickCheck (
   generate,
   property,
   ioProperty,
+  counterexample
   )
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
@@ -98,15 +99,15 @@ import Cardano.Crypto.DSIGN (
                       rawSerialiseSigDSIGNM,
                       rawDeserialiseSigDSIGNM),
   DSIGNMAlgorithm (
+#ifdef ALLOW_MLOCK_VIOLATIONS
                   rawSerialiseSignKeyDSIGNM,
-                  rawDeserialiseSignKeyDSIGNM),
+                  rawDeserialiseSignKeyDSIGNMi
+#endif
+                  ),
   sizeVerKeyDSIGNM,
-  sizeSignKeyDSIGNM,
   sizeSigDSIGNM,
   encodeVerKeyDSIGNM,
   decodeVerKeyDSIGNM,
-  -- encodeSignKeyDSIGNM,
-  -- decodeSignKeyDSIGNM,
   encodeSigDSIGNM,
   decodeSigDSIGNM,
   signDSIGNM,
@@ -114,6 +115,10 @@ import Cardano.Crypto.DSIGN (
   verifyDSIGNM,
   genKeyDSIGNM,
   seedSizeDSIGNM,
+
+#ifdef ALLOW_MLOCK_VIOLATIONS
+  sizeSignKeyDSIGNM,
+#endif
 
   getSeedDSIGNM,
   forgetSignKeyDSIGNM
@@ -380,7 +385,9 @@ testDSIGNMAlgorithm
                  -- encoding/decoding for 'SignKeyDSIGNM'.
                  -- , ToCBOR (SignKeyDSIGNM v)
                  -- , FromCBOR (SignKeyDSIGNM v)
+#ifdef ALLOW_MLOCK_VIOLATIONS
                  , Eq (SignKeyDSIGNM v)   -- no Eq for signing keys normally
+#endif
                  , ToCBOR (SigDSIGNM v)
                  , FromCBOR (SigDSIGNM v)
                  , SignableM v a
@@ -401,6 +408,7 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
             ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
               vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
               return $ (rawDeserialiseVerKeyDSIGNM . rawSerialiseVerKeyDSIGNM $ vk) === Just vk
+#ifdef ALLOW_MLOCK_VIOLATIONS
         , testProperty "SignKey" $ \seedPSB ->
             ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
               withSK seed $ \sk -> do
@@ -409,6 +417,7 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
                 equals <- evaluate (Just sk == msk')
                 maybe (return ()) forgetSignKeyDSIGNM msk'
                 return equals
+#endif
         , testProperty "Sig" $ \seedPSB -> property $ do
             msg <- mkMsg
             return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
@@ -420,11 +429,13 @@ testDSIGNMAlgorithm lock _ _ mkMsg n =
             ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
               vk :: VerKeyDSIGNM v <- withSK seed deriveVerKeyDSIGNM
               return $ (fromIntegral . BS.length . rawSerialiseVerKeyDSIGNM $ vk) === (sizeVerKeyDSIGNM (Proxy @v))
+#ifdef ALLOW_MLOCK_VIOLATIONS
         , testProperty "SignKey" $ \seedPSB -> do
             ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
               serialized <- withSK seed rawSerialiseSignKeyDSIGNM
               equals <- evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyDSIGNM (Proxy @v)))
               return equals
+#endif
         , testProperty "Sig" $ \seedPSB -> property $ do
             msg <- mkMsg
             return . ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
@@ -529,16 +540,17 @@ prop_key_overwritten_after_forget lock p seedPSB =
     NaCl.mlsbFinalize seed
 
     seedBefore <- getSeedDSIGNM p sk
-    bsBefore <- NaCl.mlsbToByteString seedBefore
-    NaCl.mlsbFinalize seedBefore
-
     forgetSignKeyDSIGNM sk
-
     seedAfter <- getSeedDSIGNM p sk
-    bsAfter <- NaCl.mlsbToByteString seedAfter
+
+    equal <- evaluate $! seedBefore == seedAfter
+    strBefore <- evaluate $! show seedBefore
+    strAfter <- evaluate $! show seedAfter
+
+    NaCl.mlsbFinalize seedBefore
     NaCl.mlsbFinalize seedAfter
 
-    return (bsBefore =/= bsAfter)
+    return $ counterexample (strBefore ++ " == " ++ strAfter) (not equal)
 
 prop_dsignm_seed_roundtrip
   :: forall v.
@@ -551,11 +563,15 @@ prop_dsignm_seed_roundtrip
 prop_dsignm_seed_roundtrip lock p seedPSB = ioProperty . withLock lock . withMLSBFromPSB seedPSB $ \seed -> do
   sk <- genKeyDSIGNM seed
   seed' <- getSeedDSIGNM p sk
-  bs <- NaCl.mlsbToByteString seed
-  bs' <- NaCl.mlsbToByteString seed'
+
+  equal <- evaluate $! seed == seed'
+  str <- evaluate $! show seed
+  str' <- evaluate $! show seed'
+
   forgetSignKeyDSIGNM sk
   NaCl.mlsbFinalize seed'
-  return (bs === bs')
+
+  return $ counterexample (str ++ " /= " ++ str') equal
 
 -- If we sign a message with the key, we can verify the signature with the
 -- corresponding verification key.

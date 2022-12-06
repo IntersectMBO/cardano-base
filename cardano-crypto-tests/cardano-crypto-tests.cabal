@@ -26,6 +26,19 @@ flag secp256k1-support
     default: True
     manual: True
 
+-- We currently use some operations on mlocked primitives that allow secrets
+-- stored in mlocked memory to escape to the Haskell heap, which defeats the
+-- purpose of mlocking. Currently, the test suite depends on such primitives,
+-- and cardano-node uses sign key serialization which also depends on them, so
+-- we need those unsafe primitives around. Dependants that do not need them,
+-- though, can turn them off by clearing this flag.
+flag allow-mlock-violations
+    description: Enable unsafe but useful operations on mlocked primitives
+    -- enable this flag for now
+    default:     False
+    manual:      True
+
+
 common base                         { build-depends: base >= 4.14 && < 4.17 }
 
 common project-config
@@ -89,6 +102,9 @@ library
 
   if flag(secp256k1-support)
     cpp-options: -DSECP256K1_ENABLED
+
+  if flag(allow-mlock-violations)
+    cpp-options: -DALLOW_MLOCK_VIOLATIONS
 
 test-suite test-crypto
   import:               base, project-config

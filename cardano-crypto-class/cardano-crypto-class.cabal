@@ -33,7 +33,7 @@ flag development
 flag allow-mlock-violations
     description: Enable unsafe but useful operations on mlocked primitives
     -- enable this flag for now
-    default:     True
+    default:     False
     manual:      True
 
 flag secp256k1-support

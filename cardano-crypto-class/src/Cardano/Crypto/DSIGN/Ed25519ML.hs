@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
@@ -26,8 +27,11 @@ import System.IO.Unsafe (unsafeDupablePerformIO)
 import Foreign.C.Error (errnoToIOError, getErrno, Errno)
 import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
--- import qualified Data.ByteString.Unsafe as BS
+
+#ifdef ALLOW_MLOCK_VIOLATIONS
 import Data.Proxy
+#endif
+
 import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO)
 import Control.Monad.Class.MonadST (MonadST (..))
 import Control.Monad.ST (ST)
@@ -40,7 +44,12 @@ import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.C
 -- import Cardano.Crypto.Libsodium.Memory.Internal
 import Cardano.Crypto.Libsodium (MLockedSizedBytes)
+
+#ifdef ALLOW_MLOCK_VIOLATIONS
 import Cardano.Crypto.MonadSodium (MonadSodium (..), mlsbToByteString, mlsbFromByteStringCheck)
+#else
+import Cardano.Crypto.MonadSodium (MonadSodium (..))
+#endif
 
 import Cardano.Crypto.DSIGNM.Class
 -- import Cardano.Crypto.Seed
@@ -231,6 +240,8 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
     --
     -- Ser/deser (dangerous - do not use in production code)
     --
+
+#ifdef ALLOW_MLOCK_VIOLATIONS
     rawSerialiseSignKeyDSIGNM sk = do
       seed <- getSeedDSIGNM (Proxy @Ed25519DSIGNM) sk
       -- We need to copy the seed into unsafe memory and finalize the MLSB, in
@@ -239,7 +250,12 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       raw <- mlsbToByteString seed
       mlsbFinalize seed
       return raw
+#else
+    rawSerialiseSignKeyDSIGNM _ = do
+      error "Sign key raw serialisation is disabled in production code"
+#endif
 
+#ifdef ALLOW_MLOCK_VIOLATIONS
     rawDeserialiseSignKeyDSIGNM raw = do
       mseed <- mlsbFromByteStringCheck raw
       case mseed of
@@ -248,6 +264,10 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
           sk <- Just <$> genKeyDSIGNM seed
           mlsbFinalize seed
           return sk
+#else
+    rawDeserialiseSignKeyDSIGNM _ = do
+      error "Sign key raw serialisation is disabled in production code"
+#endif
 
 
 instance ToCBOR (VerKeyDSIGNM Ed25519DSIGNM) where

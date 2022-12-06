@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -46,6 +47,10 @@ import Data.Word (Word8)
 import qualified Data.ByteString as BS
 
 {-#DEPRECATED traceMLockedForeignPtr "Do not use traceMLockedForeignPtr in production" #-}
+
+#ifndef ALLOW_MLOCK_VIOLATIONS
+{-#WARNING mlsbToByteString "This function is disabled in production builds" #-}
+#endif
 
 class Monad m => MonadSodium m where
   -- * MLocked memory management
