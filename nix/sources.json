@@ -38,15 +38,15 @@
         "version": "962ecfed3a4fb656b5a91d89159291e00ed766bc"
     },
     "iohk-nix": {
-        "branch": "iquerejeta/update-vrf",
+        "branch": "master",
         "description": "nix scripts shared across projects",
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "iohk-nix",
-        "rev": "ab57af81e7b34eb173868fd991c54bc4cfe9aff5",
+        "rev": "61510bb482eaca8cb7d61f40f5d375d95ea1fbf7",
         "sha256": "1dbhdmfq7g9j6fn25cb6sx5sqm46knqza4wlg6xxyjj9ln71dv15",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/iohk-nix/archive/ab57af81e7b34eb173868fd991c54bc4cfe9aff5.tar.gz",
+        "url": "https://github.com/input-output-hk/iohk-nix/archive/61510bb482eaca8cb7d61f40f5d375d95ea1fbf7.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
