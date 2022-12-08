@@ -33,8 +33,6 @@ main = do
     putStrLn $ "                /proc/" ++ show pid ++ "/smaps"
 #endif
 
-    sodiumInit
-
     args <- getArgs
 
     sodiumInit
@@ -75,6 +73,7 @@ example args alloc = do
     hash <- withMLockedForeignPtr fptr $ \ptr ->
         digestMLockedStorable (Proxy @SHA256) ptr
     traceMLSB hash
+    mlsbFinalize hash
 
     -- force finalizers
     finalizeMLockedForeignPtr fptr
