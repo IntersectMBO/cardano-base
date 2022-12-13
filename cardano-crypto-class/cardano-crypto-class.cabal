@@ -127,16 +127,3 @@ library
       Cardano.Crypto.SECP256K1.C
     pkgconfig-depends: libsecp256k1 -any
     cpp-options: -DSECP256K1_ENABLED
-
-test-suite test-memory-example
-  import:         base, project-config
-  type:           exitcode-stdio-1.0
-  hs-source-dirs: memory-example
-  main-is:        Main.hs
-  build-depends:
-    , base
-    , bytestring
-    , cardano-crypto-class
-
-  if (os(linux) || os(osx))
-    build-depends: unix
