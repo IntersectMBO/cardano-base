@@ -801,11 +801,14 @@ frFromCanonicalScalar scalar
 
 scalarFromBS :: ByteString -> Either BLSTError Scalar
 scalarFromBS bs = unsafePerformIO $ do
-  BS.useAsCStringLen bs $ \(cstr, l) -> do
-    (success, scalar) <- withNewScalar $ \scalarPtr -> do
-      c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral l)
-    if (success && l == sizeScalar) then
-      return $ Right scalar
+  BS.useAsCStringLen bs $ \(cstr, l) ->
+    if l == sizeScalar then do
+      (success, scalar) <- withNewScalar $ \scalarPtr ->
+        c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral l)
+      if success then
+        return $ Right scalar
+      else
+        return $ Left BLST_BAD_SCALAR
     else
       return $ Left BLST_BAD_SCALAR
 
