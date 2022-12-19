@@ -228,6 +228,9 @@ newtype Affine curve = Affine (ForeignPtr Void)
 type Affine1 = Affine Curve1
 type Affine2 = Affine Curve2
 
+-- | Target element without the final exponantiation. By defining target elements
+-- | as such, we save up the final exponantiation when computing a pairing, and only
+-- | compute it when necessary (e.g. comparison with another point or serialisation)
 newtype PT = PT (ForeignPtr Void)
 
 -- | Sizes of various representations of elliptic curve points.
@@ -706,27 +709,27 @@ neg p = cneg p True
 
 uncompress :: forall curve. (BLS_P curve, BLS_Curve curve) => ByteString -> Either BLSTError (P curve)
 uncompress bs = unsafePerformIO $ do
-  BS.useAsCStringLen bs $ \(bytes, numBytes) -> do
-    if numBytes < compressedSizeP (Proxy @curve) then
-      return $ Left BLST_BAD_ENCODING
-    else do
+  BS.useAsCStringLen bs $ \(bytes, numBytes) ->
+    if numBytes == compressedSizeP (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_uncompress ap bytes
       if err /= 0 then
         return $ Left $ mkBLSTError err
       else
         return $ Right (fromAffine affine)
+    else do
+      return $ Left BLST_BAD_ENCODING
 
 deserialize :: forall curve. (BLS_P curve, BLS_Curve curve) => ByteString -> Either BLSTError (P curve)
 deserialize bs = unsafePerformIO $ do
-  BS.useAsCStringLen bs $ \(bytes, numBytes) -> do
-    if numBytes < serializedSizeP (Proxy @curve) then
-      return $ Left BLST_BAD_ENCODING
-    else do
+  BS.useAsCStringLen bs $ \(bytes, numBytes) ->
+    if numBytes == serializedSizeP (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_deserialize ap bytes
       if err /= 0 then
         return $ Left $ mkBLSTError err
       else
         return $ Right (fromAffine affine)
+    else do
+      return $ Left BLST_BAD_ENCODING
 
 compress :: forall curve. (BLS_P curve, BLS_Curve curve) => P curve -> ByteString
 compress p = unsafePerformIO $ do
