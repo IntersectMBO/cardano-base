@@ -187,10 +187,6 @@ jobs:
         cabal build all --dry-run
         cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
 
-    - name: "OUTPUT Record weeknum"
-      shell: bash
-      run: echo "weeknum=$(/usr/bin/date -u "+%W")" >> $GITHUB_OUTPUT
-
     - name: Cache Cabal store
       uses: actions/cache@v2
       with:
@@ -199,15 +195,6 @@ jobs:
         restore-keys: |
           cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
           cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}
-
-    - uses: actions/cache@v2
-      name: "Cache `dist-newstyle`"
-      with:
-        path: |
-          dist-newstyle
-          !dist-newstyle/**/.git
-        key: cache-dist-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ steps.record-deps.outputs.weeknum }}
-        restore-keys: cache-dist-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}
 
     - name: Install dependencies
       run: cabal build all --only-dependencies
