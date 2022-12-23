@@ -43,6 +43,8 @@ jobs:
       # current ref from: 27.02.2022
       SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
 
+      SECP_CACHE_VERSION: 2022-12-23
+
       # we need the LD_LIBRARY_PATH env var here because we ended up installing libsecp256k1 into /usr/local,
       # pkg-config, *does* return the proper location, but the library does not appear to be properly referenced.
       # FIXME: this is arguably a bug, and pkg-config should return the right values!
@@ -99,16 +101,28 @@ jobs:
                           -a ("extra-lib-dirs: {0}, C:/msys64/mingw64/lib" -f $ghcMingwDir) `
                           -f init
 
-    - name: "OUTPUT Record cabal-store (Linux)"
-      id: lin-setup-haskell
-      if: runner.os != 'Windows'
-      run: echo "cabal-store=/home/runner/.cabal/store" >> $GITHUB_OUTPUT
-
-    - name: "OUTPUT Record cabal-store (Windows)"
-      id: win-setup-haskell
-      if: runner.os == 'Windows'
+    # Unify the computation of the cabal store directory to a single step. This makes referencing the cabal
+    # store in later steps easier.
+    #
+    # We know on cabal store is located in the following locations by OS:
+    #
+    #   Linux: /home/runner/.cabal/store
+    #   MacOS: /Users/runner/.cabal/store
+    #   Windows: C:\cabal\store
+    #
+    # However, we compute these as best be can from information cabal provides in case this changes in the future.
+    - name: "Setup cabal-store"
+      id: cabal-store
       shell: bash
-      run: echo "cabal-store=C:\\cabal\\store" >> $GITHUB_OUTPUT
+      run: |
+        cabal help user-config
+        cabal_config_file="$(cabal help user-config | grep -A 1 'You can edit the cabal configuration file to set defaults' | tail -n 1 | xargs)"
+
+        if [[ '${{ runner.os }}' != 'Windows' ]]; then
+          echo "cabal-store=$(dirname "$cabal_config_file")/store" | tee -a "$GITHUB_OUTPUT"
+        else
+          echo "cabal-store=C:\\cabal\\store" | tee -a "$GITHUB_OUTPUT"
+        fi
 
     - name: Set cache version
       run: echo "CACHE_VERSION=grFfw7r" >> $GITHUB_ENV
@@ -144,6 +158,13 @@ jobs:
     - name: "MAC: Install build environment (for secp256k1)"
       if: runner.os == 'macOS'
       run: brew install autoconf automake libtool
+
+    - uses: actions/cache@v3
+      name: "Cache secp256k1"
+      with:
+        path: secp256k1
+        key: cache-secp256k1-${{ runner.os }}-${{ env.SECP_CACHE_VERSION }}
+        restore-keys: cache-secp256k1-${{ runner.os }}-${{ env.SECP_CACHE_VERSION }}
 
     - name: "LINUX: Install secp256k1"
       if: runner.os != 'Windows'
@@ -191,7 +212,7 @@ jobs:
     - name: Cache Cabal store
       uses: actions/cache@v2
       with:
-        path: ${{ runner.os == 'Windows' && steps.win-setup-haskell.outputs.cabal-store || steps.lin-setup-haskell.outputs.cabal-store }}
+        path: ${{ steps.cabal-store.outputs.cabal-store }}
         key: cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}-${{ hashFiles('date.txt') }}
         restore-keys: |
           cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
