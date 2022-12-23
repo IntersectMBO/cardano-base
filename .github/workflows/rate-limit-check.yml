@@ -1,0 +1,14 @@
+name: Haskell CI
+
+on:
+  push:
+  create:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: "WIN: Install System Dependencies via pacman (msys2)"
+      run: |
+         curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/rate_limit

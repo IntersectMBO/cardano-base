@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - name: Traing whitespace check
+    - name: Trailing whitespace check
       if: matrix.os != 'windows-latest'
       run: |
         offenders="$(git grep "\s$" -- *.hs *.c *.h *.nix *.yml *.md || true)";
@@ -29,12 +29,9 @@ jobs:
           echo -n "${offenders}"
           exit 1
         fi
+
   build:
     runs-on: ${{ matrix.os }}
-
-    defaults:
-      run:
-        shell: bash
 
     strategy:
       fail-fast: false
@@ -46,150 +43,218 @@ jobs:
       # current ref from: 27.02.2022
       SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
 
+      SECP_CACHE_VERSION: 2022-12-23
+
+      # we need the LD_LIBRARY_PATH env var here because we ended up installing libsecp256k1 into /usr/local,
+      # pkg-config, *does* return the proper location, but the library does not appear to be properly referenced.
+      # FIXME: this is arguably a bug, and pkg-config should return the right values!
+      LD_LIBRARY_PATH: ${{ (matrix.os != 'windows-latest' && '/usr/local/lib') || '' }}
+
     steps:
-    - uses: actions/checkout@v1
 
-    - name: Install pkgconfiglite (Windows)
-      if: matrix.os == 'windows-latest'
-      run: choco install -y pkgconfiglite --allow-empty-checksums
-
-    - name: Install libsodium (MacOS)
-      if: matrix.os == 'macos-latest'
-      run: brew install libsodium
-
-    - name: Install secp256k1 (MacOS)
-      if: matrix.os == 'macos-latest'
+    - name: "WIN: Install System Dependencies via pacman (msys2)"
+      if: runner.os == 'Windows'
       run: |
-        brew install autoconf automake libtool
-        mkdir secp256k1-sources
-        cd secp256k1-sources
-        git clone https://github.com/bitcoin-core/secp256k1.git
-        cd secp256k1
-        git reset --hard $SECP256K1_REF
-        ./autogen.sh
-        ./configure --enable-module-schnorrsig --enable-experimental
-        make
-        make check
-        sudo make install
-        cd ../..
+         # ghcup should be installed on current GHA Windows runners. Let's use ghcup to run
+         # pacman, to install the necessary dependencies, ...
+         ghcup run -- pacman --noconfirm -S `
+            mingw-w64-x86_64-pkg-config `
+            mingw-w64-x86_64-libsodium `
+            base-devel `
+            autoconf-wrapper `
+            autoconf `
+            automake `
+            libtool `
+            make
 
-    - name: Install libsodium (Linux)
-      if: matrix.os == 'ubuntu-latest'
+     # this seems to break something. It _must_ come after the pacman setup
+     # above. It appears as if PATHEXT is set _after_ ghcup install ghc/cabal, and
+     # as such we'd need pacman.exe instead.
+    - name: Setup Haskell
+      run: |
+        # Use GHCUP to manage ghc/cabal
+        ghcup install ghc --set ${{ matrix.ghc }}
+        ghcup install cabal --set 3.6.2.0
+
+        ghc --version
+        cabal --version
+
+    - name: "WIN: fixup cabal config"
+      if: runner.os == 'Windows'
+      run: |
+        # make sure cabal knows about msys64, and mingw64 tools. Not clear why C:/cabal/config is empty
+        # and C:/cabal doesn't even exist.  The ghcup bootstrap file should have create it in the image:
+        # See https://github.com/haskell/ghcup-hs/blob/787edc17af4907dbc51c85e25c490edd8d68b80b/scripts/bootstrap/bootstrap-haskell#L591
+        # So we'll do it by hand here for now.
+        #
+        # We'll _not_ add extra-include-dirs, or extra-lib-dirs, and rely on what's shipped with GHC.
+        # https://github.com/msys2/MINGW-packages/issues/10837#issuecomment-1047105402
+        # https://gitlab.haskell.org/ghc/ghc/-/issues/21111
+        # if we _do_ want them, this would be the lines to add below
+
+        $ghcMingwDir = Join-Path -Path $(ghc --print-libdir) `
+                                 -ChildPath ../mingw/x86_64-*-mingw32/lib/ `
+                                 -Resolve
+
+        cabal user-config -a "extra-prog-path: C:/msys64/mingw64/bin, C:/msys64/usr/bin" `
+                          -a "extra-include-dirs: C:/msys64/mingw64/include" `
+                          -a ("extra-lib-dirs: {0}, C:/msys64/mingw64/lib" -f $ghcMingwDir) `
+                          -f init
+
+    # Unify the computation of the cabal store directory to a single step. This makes referencing the cabal
+    # store in later steps easier.
+    #
+    # We know on cabal store is located in the following locations by OS:
+    #
+    #   Linux: /home/runner/.cabal/store
+    #   MacOS: /Users/runner/.cabal/store
+    #   Windows: C:\cabal\store
+    #
+    # However, we compute these as best be can from information cabal provides in case this changes in the future.
+    - name: "Setup cabal-store"
+      id: cabal-store
+      shell: bash
+      run: |
+        cabal help user-config
+        cabal_config_file="$(cabal help user-config | grep -A 1 'You can edit the cabal configuration file to set defaults' | tail -n 1 | xargs)"
+
+        if [[ '${{ runner.os }}' != 'Windows' ]]; then
+          echo "cabal-store=$(dirname "$cabal_config_file")/store" | tee -a "$GITHUB_OUTPUT"
+        else
+          echo "cabal-store=C:\\cabal\\store" | tee -a "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set cache version
+      run: echo "CACHE_VERSION=grFfw7r" >> $GITHUB_ENV
+
+    - uses: actions/checkout@v2
+
+    - name: "[PowerShell] Add build script path"
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: Add-Content $env:GITHUB_PATH "$(pwd)/.github/bin"
+
+    - name: "[Bash] Add build script path"
+      if: runner.os != 'Windows'
+      run: echo "$(pwd)/.github/bin" >> $GITHUB_PATH
+
+    - name: "LINUX: Install build environment (apt-get)"
+      if: runner.os == 'Linux'
       run: |
         sudo apt-get update
         sudo apt-get -y install libsodium23 libsodium-dev
         sudo apt-get -y remove --purge software-properties-common
         sudo apt-get -y autoremove
 
-    - name: Install secp256k1 (Linux)
-      if: matrix.os == 'ubuntu-latest'
+    - name: "LINUX: Install build environment (for secp256k1)"
+      if: runner.os == 'Linux'
+      run: sudo apt-get -y install autoconf automake libtool
+
+    - name: "MAC: Install build environment (brew)"
+      if: runner.os == 'macOS'
       run: |
-        sudo apt-get -y install autoconf automake libtool
-        mkdir secp256k1-sources
-        cd secp256k1-sources
-        git clone https://github.com/bitcoin-core/secp256k1.git
-        cd secp256k1
-        git reset --hard $SECP256K1_REF
-        ./autogen.sh
-        ./configure --prefix=/usr --enable-module-schnorrsig --enable-experimental
-        make
-        make check
-        sudo make install
-        cd ../..
+        brew install libsodium
 
-    - name: Install libsodium (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        curl -Ls \
-          --connect-timeout 5 \
-          --max-time 10 \
-          --retry 5 \
-          --retry-delay 0 \
-          --retry-max-time 40 \
-          https://download.libsodium.org/libsodium/releases/libsodium-1.0.18-mingw.tar.gz -o libsodium-1.0.18-mingw.tar.gz
-        tar zxvf libsodium-1.0.18-mingw.tar.gz
+    - name: "MAC: Install build environment (for secp256k1)"
+      if: runner.os == 'macOS'
+      run: brew install autoconf automake libtool
 
-        sed -i "s|/d/a/1/s/|D:/a/cardano-base/cardano-base/|g" libsodium-win64/lib/pkgconfig/libsodium.pc
-
-        export PKG_CONFIG_PATH="$(readlink -f libsodium-win64/lib/pkgconfig | sed 's|^/d|D:|g' | tr / '\\')"
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-        export LIBSODIUM_PATH="$(readlink -f libsodium-win64/bin | sed 's|^/d|D:|g' | tr / '\\')"
-        echo "LIBSODIUM_PATH=$LIBSODIUM_PATH"
-        echo "$LIBSODIUM_PATH" >> $GITHUB_PATH
-
-    - name: Install secp256k1 (Windows)
-      if: matrix.os == 'windows-latest'
-      env:
-        RUNNER_TEMP: ${{ runner.temp }}
-      run: |
-        echo "RUNNER_TEMP=$RUNNER_TEMP"
-        cd "$RUNNER_TEMP"
-        RUNNER_TEMP_FWD="$(echo "$RUNNER_TEMP" | sed 's|\\|/|g')"
-        curl -Ls \
-          --connect-timeout 5 \
-          --max-time 10 \
-          --retry 5 \
-          --retry-delay 0 \
-          --retry-max-time 40 \
-          https://hydra.iohk.io/job/Cardano/haskell-nix/windows-secp256k1/latest/download/1 -o secp256k1.zip
-        mkdir secp256k1
-        cd secp256k1
-        unzip ../secp256k1.zip
-        cd ..
-        export PKG_CONFIG_PATH="$PKG_CONFIG_PATH;$(readlink -f secp256k1/lib/pkgconfig | sed 's|^/d|D:|g' | tr / '\\')"
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-        export SECP256K1_PATH="$(readlink -f secp256k1/bin | sed 's|^/d|D:|g' | tr / '\\')"
-        echo "SECP256K1_PATH=$SECP256K1_PATH"
-        echo "$SECP256K1_PATH" >> $GITHUB_PATH
-
-    - uses: haskell/actions/setup@v1
-      id: setup-haskell
+    - uses: actions/cache@v3
+      name: "Cache secp256k1"
       with:
-        ghc-version: ${{ matrix.ghc }}
-        cabal-version: 3.6.2.0
+        path: secp256k1
+        key: cache-secp256k1-${{ runner.os }}-${{ env.SECP_CACHE_VERSION }}
+        restore-keys: cache-secp256k1-${{ runner.os }}-${{ env.SECP_CACHE_VERSION }}
 
-    - name: Configure to use libsodium
-      run: |
-        cat >> cabal.project <<EOF
-        package cardano-crypto-praos
-          flags: -external-libsodium-vrf
-        EOF
+    - name: "LINUX: Install secp256k1"
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        CI_SECP_FLAGS: "--prefix=/usr/local"
+        CI_SECP_INSTALL_CMD: sudo
+      run: bash .github/workflows/build-secp256k1.bash
+
+    # TODO: this really should come from a pre-built location
+    - name: "WIN: Install secp256k1"
+      if: runner.os == 'Windows'
+      # Same env as tmate action
+      env:
+        MSYS2_PATH_TYPE: inherit
+        MSYSTEM: MINGW64
+        CHERE_INVOKING: 1
+        # install secp into /mingw64 prefix, which is where pkg-config will look
+        # by default.
+        CI_SECP_FLAGS: "--prefix=/mingw64"
+      run: C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-secp256k1.bash
 
     - name: Cabal update
       run: cabal update
 
-    - name: Cabal Configure
-      run: cabal configure --enable-tests --enable-benchmarks --write-ghc-environment-files=always
+    - name: Configure build
+      shell: bash
+      run: |
+        if [ "${{github.event.inputs.tests}}" == "all" ]; then
+          echo "Reconfigure cabal projects to run tests for all dependencies"
+          sed -i 's|tests: False|tests: True|g' cabal.project
+        fi
+
+        cp ".github/workflows/cabal.project.local.ci.$(uname -s)" cabal.project.local
+
+        echo "# cabal.project.local"
+        cat cabal.project.local
 
     - name: Record dependencies
+      id: record-deps
       run: |
+        cabal build all --dry-run
         cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
 
-    - name: Set cache version
-      run: echo "CACHE_VERSION=9w76Z3Q" >> $GITHUB_ENV
-
-    - uses: actions/cache@v2
-      name: Cache cabal store
+    - name: Cache Cabal store
+      uses: actions/cache@v2
       with:
-        path: ${{ steps.setup-haskell.outputs.cabal-store }}
-        key: cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
+        path: ${{ steps.cabal-store.outputs.cabal-store }}
+        key: cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}-${{ hashFiles('date.txt') }}
         restore-keys: |
           cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
-          cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-
+          cache-${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}
 
     - name: Install dependencies
-      run: cabal build all --only-dependencies
+      run: cabal build all --enable-tests --only-dependencies
 
     - name: Build
-      run: cabal build all
+      run: cabal build all --enable-tests
 
     - name: Git clone
       run: git clone https://github.com/input-output-hk/cardano-mainnet-mirror
 
     - name: Run tests
-      run: cabal test all
+      run: |
+        # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
+        # we are very deliberate about only adding msys64 to the path where absolutely necessary.
+        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
+        cabal test all --enable-tests --test-show-details=direct -j1 -v3
 
-    - name: Run benchmarks
-      run: cabal bench all
+    - uses: actions/upload-artifact@v3
+      with:
+        name: Build & test logs
+        path: |
+          dist-newstyle/**/*.log
+
+    # - name: Run benchmarks
+    #   run: cabal bench all --enable-tests
+
+    # Uncomment the following back in for debugging. Remember to launch a `pwsh` from
+    # the tmux session to debug `pwsh` issues. And be reminded that the `/msys2` and
+    # `/msys2/mingw64` paths are not in PATH by default for the workflow, but tmate
+    # will put them in.
+    # You may also want to run
+    #
+    #   $env:PATH=("C:\Program Files\PowerShell\7;{0}" -f $env:ORIGINAL_PATH)
+    #
+    # to restore the original path.  Do note that some test might need msys2
+    # and will silently fail if msys2 is not in path. See the "Run tests" step.
+    #
+    # - name: Setup tmate session
+    #   uses: mxschmitt/action-tmate@v3
+    #   with:
+    #     limit-access-to-actor: true
