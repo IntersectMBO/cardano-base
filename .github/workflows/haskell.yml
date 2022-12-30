@@ -168,8 +168,24 @@ jobs:
         git-ref: ${{ env.SECP256K1_REF }}
         cache-version: ${{ env.SECP_CACHE_VERSION }}
 
-    - name: Install blst (Linux)
-      if: matrix.os == 'ubuntu-latest'
+    - name: "WINDOWS: Install blst"
+      if: runner.os == 'Windows'
+      env:
+        MSYS2_PATH_TYPE: inherit
+        MSYSTEM: MINGW64
+        # install secp into /mingw64 prefix, which is where pkg-config will look
+        # by default.
+        CI_BLST_FLAGS: "--prefix=/mingw64"
+      run: |
+        mkdir blst-sources && cd blst-sources
+        git clone https://github.com/supranational/blst
+        cd blst
+        git reset --hard $BLST_REF
+        ./build.sh
+        cd ../..
+
+    - name: "NON-WINDOWS: Install blst"
+      if: runner.os != 'Windows'
       run: |
         mkdir blst-sources && cd blst-sources
         git clone https://github.com/supranational/blst
