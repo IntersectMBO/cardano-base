@@ -153,22 +153,18 @@ jobs:
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
         cabal build all --enable-tests --only-dependencies
 
-    - name: Build
-      run: |
-        # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
-        # we are very deliberate about only adding msys64 to the path where absolutely necessary.
-        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        cabal build all --enable-tests
-        ${{ (runner.os != 'Windows' && ' --extra-lib-dirs ${GITHUB_PATH}/blst-sources/blst') || ' --extra-lib-dirs ${env:GITHUB_PATH}/blst-sources/blst' }}
+    - name: Build [WIN - testing]
+      run: cabal build all --enable-tests --extra-lib-dirs ${env:GITHUB_PATH}/blst-sources/blst
+
+    - name: Build [non-WIN - testing]
+      run cabal build all --enable-tests --extra-lib-dirs ${GITHUB_PATH}/blst-sources/blst')
 
     - name: Run tests
       run: |
         # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
         # we are very deliberate about only adding msys64 to the path where absolutely necessary.
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        cabal test all --enable-tests --test-show-details=direct -j1 -v3
-        ${{ (runner.os != 'Windows' && '--extra-lib-dirs ${GITHUB_PATH}/blst-sources/blst') || '--extra-lib-dirs ${env:GITHUB_PATH}/blst-sources/blst' }}
-
+        cabal test all --enable-tests --test-show-details=direct -j1 -v3 '--extra-lib-dirs ${GITHUB_PATH}/blst-sources/blst
 
     - uses: actions/upload-artifact@v3
       with:
