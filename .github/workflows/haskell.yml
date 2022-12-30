@@ -157,7 +157,7 @@ jobs:
       run: cabal build all --enable-tests --extra-lib-dirs ${env:GITHUB_PATH}/blst-sources/blst
 
     - name: Build [non-WIN - testing]
-      run cabal build all --enable-tests --extra-lib-dirs ${GITHUB_PATH}/blst-sources/blst
+      run: cabal build all --enable-tests --extra-lib-dirs ${GITHUB_PATH}/blst-sources/blst
 
     - name: Run tests
       run: |
