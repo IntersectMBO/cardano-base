@@ -181,7 +181,7 @@ jobs:
         git clone https://github.com/supranational/blst
         cd blst
         git reset --hard $BLST_REF
-        ./build.sh
+        bash -x ./build.sh
         cd ../..
 
     - name: "NON-WINDOWS: Install blst"
@@ -191,7 +191,7 @@ jobs:
         git clone https://github.com/supranational/blst
         cd blst
         git reset --hard $BLST_REF
-        ./build.sh
+        bash -x ./build.sh
         cd ../..
 
     - name: Cabal update
