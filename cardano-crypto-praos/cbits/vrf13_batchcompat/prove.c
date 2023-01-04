@@ -6,7 +6,7 @@
 #include "sodium/crypto_core_ed25519.h"
 #include "../private/ed25519_ref10.h"
 #include "sodium/utils.h"
-#include "vrf_ietfdraft13.h"
+#include "../crypto_vrf.h"
 
 
 int

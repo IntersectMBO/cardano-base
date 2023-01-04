@@ -34,3 +34,5 @@ packages:
 -- Ensures colourized output from test runners
 test-show-details: direct
 
+package cardano-crypto-praos
+  flags: -external-libsodium-vrf
