@@ -2900,7 +2900,6 @@ ristretto255_is_canonical(const unsigned char *s)
 {
     unsigned char c;
     unsigned char d;
-    unsigned char e;
     unsigned int  i;
 
     c = (s[31] & 0x7f) ^ 0x7f;
@@ -2909,7 +2908,6 @@ ristretto255_is_canonical(const unsigned char *s)
     }
     c = (((unsigned int) c) - 1U) >> 8;
     d = (0xed - 1U - (unsigned int) s[0]) >> 8;
-    e = s[31] >> 7;
 
     return 1 - (((c & d) | e | s[0]) & 1);
 }
@@ -3000,7 +2998,7 @@ ristretto255_p3_tobytes(unsigned char *s, const ge25519_p3 *h)
 
     fe25519_mul(ix, h->X, sqrtm1);     /* ix = X*sqrt(-1) */
     fe25519_mul(iy, h->Y, sqrtm1);     /* iy = Y*sqrt(-1) */
-    fe25519_mul(eden, den1, invsqrtamd); /* eden = den1/sqrt(a-d) */
+    fe25519_mul(eden, den1, invsqrtamd); /* eden = den1*sqrt(a-d) */
 
     fe25519_mul(t_z_inv, h->T, z_inv); /* t_z_inv = T*z_inv */
     rotate = fe25519_isnegative(t_z_inv);
@@ -3043,7 +3041,7 @@ ristretto255_elligator(ge25519_p3 *p, const fe25519 t)
     fe25519_mul(u, u, onemsqd);        /* u = (r+1)*(1-d^2) */
     fe25519_1(c);
     fe25519_neg(c, c);                 /* c = -1 */
-    fe25519_add(rpd, r, d);            /* rpd = r+d */
+    fe25519_add(rpd, r, d);            /* rpd = r*d */
     fe25519_mul(v, r, d);              /* v = r*d */
     fe25519_sub(v, c, v);              /* v = c-r*d */
     fe25519_mul(v, v, rpd);            /* v = (c-r*d)*(r+d) */
