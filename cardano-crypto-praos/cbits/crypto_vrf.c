@@ -40,33 +40,33 @@ crypto_vrf_primitive(void)
 }
 
 int
-crypto_vrf_seed_keypair(unsigned char *pk, unsigned char *sk,
+crypto_vrf_seed_keypair(unsigned char *pk, unsigned char *skpk,
                         const unsigned char *seed)
 {
     ge25519_p3 A;
 
-    crypto_hash_sha512(sk, seed, 32);
-    sk[0] &= 248;
-    sk[31] &= 127;
-    sk[31] |= 64;
+    crypto_hash_sha512(skpk, seed, 32);
+    skpk[0] &= 248;
+    skpk[31] &= 127;
+    skpk[31] |= 64;
 
-    ge25519_scalarmult_base(&A, sk);
+    ge25519_scalarmult_base(&A, skpk);
     ge25519_p3_tobytes(pk, &A);
 
-    memmove(sk, seed, 32);
-    memmove(sk + 32, pk, 32);
+    memmove(skpk, seed, 32);
+    memmove(skpk + 32, pk, 32);
 
     return 0;
 }
 
 int
-crypto_vrf_keypair(unsigned char *pk, unsigned char *sk)
+crypto_vrf_keypair(unsigned char *pk, unsigned char *skpk)
 {
     unsigned char seed[32];
     int           ret;
 
     randombytes_buf(seed, sizeof seed);
-    ret = crypto_vrf_seed_keypair(pk, sk, seed);
+    ret = crypto_vrf_seed_keypair(pk, skpk, seed);
     sodium_memzero(seed, sizeof seed);
 
     return ret;

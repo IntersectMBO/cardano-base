@@ -10,7 +10,7 @@
 
 
 int
-crypto_vrf_ietfdraft13_prove(unsigned char *proof, const unsigned char *sk,
+crypto_vrf_ietfdraft13_prove(unsigned char *proof, const unsigned char *skpk,
                              const unsigned char *m, unsigned long long mlen)
 {
 
@@ -22,7 +22,7 @@ crypto_vrf_ietfdraft13_prove(unsigned char *proof, const unsigned char *sk,
     unsigned char hram[64], nonce[64];
     ge25519_p3    H, Gamma, kB, kH;
 
-    crypto_hash_sha512(az, sk, 32);
+    crypto_hash_sha512(az, skpk, 32);
     az[0] &= 248;
     az[31] &= 127;
     az[31] |= 64;
@@ -31,7 +31,7 @@ crypto_vrf_ietfdraft13_prove(unsigned char *proof, const unsigned char *sk,
         return -1;
     }
 
-    memmove(string_to_hash, sk + 32, 32);
+    memmove(string_to_hash, skpk + 32, 32);
     memmove(string_to_hash + 32, m, mlen);
     crypto_core_ed25519_from_string(H_string, "ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_\4", string_to_hash, 32 + mlen, 2); /* elligator2 */
 
@@ -54,7 +54,7 @@ crypto_vrf_ietfdraft13_prove(unsigned char *proof, const unsigned char *sk,
     crypto_hash_sha512_init(&hs);
     crypto_hash_sha512_update(&hs, &SUITE, 1);
     crypto_hash_sha512_update(&hs, &TWO, 1);
-    crypto_hash_sha512_update(&hs, sk + 32, 32);
+    crypto_hash_sha512_update(&hs, skpk + 32, 32);
     crypto_hash_sha512_update(&hs, H_string, 32);
     crypto_hash_sha512_update(&hs, proof, 32);
     crypto_hash_sha512_update(&hs, kB_string, 32);
@@ -73,7 +73,7 @@ crypto_vrf_ietfdraft13_prove(unsigned char *proof, const unsigned char *sk,
 }
 
 int
-crypto_vrf_ietfdraft13_prove_batchcompat(unsigned char *proof, const unsigned char *sk,
+crypto_vrf_ietfdraft13_prove_batchcompat(unsigned char *proof, const unsigned char *skpk,
                                          const unsigned char *m, unsigned long long mlen)
 {
 
@@ -85,7 +85,7 @@ crypto_vrf_ietfdraft13_prove_batchcompat(unsigned char *proof, const unsigned ch
     unsigned char hram[64], nonce[64];
     ge25519_p3    H, Gamma, kB, kH;
 
-    crypto_hash_sha512(az, sk, 32);
+    crypto_hash_sha512(az, skpk, 32);
     az[0] &= 248;
     az[31] &= 127;
     az[31] |= 64;
@@ -94,7 +94,7 @@ crypto_vrf_ietfdraft13_prove_batchcompat(unsigned char *proof, const unsigned ch
         return -1;
     }
 
-    memmove(string_to_hash, sk + 32, 32);
+    memmove(string_to_hash, skpk + 32, 32);
     memmove(string_to_hash + 32, m, mlen);
     crypto_core_ed25519_from_string(H_string, "ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_\4", string_to_hash, 32 + mlen, 2); /* elligator2 */
 
@@ -117,7 +117,7 @@ crypto_vrf_ietfdraft13_prove_batchcompat(unsigned char *proof, const unsigned ch
     crypto_hash_sha512_init(&hs);
     crypto_hash_sha512_update(&hs, &SUITE, 1);
     crypto_hash_sha512_update(&hs, &TWO, 1);
-    crypto_hash_sha512_update(&hs, sk + 32, 32);
+    crypto_hash_sha512_update(&hs, skpk + 32, 32);
     crypto_hash_sha512_update(&hs, H_string, 32);
     crypto_hash_sha512_update(&hs, proof, 32);
     crypto_hash_sha512_update(&hs, kB_string, 32);

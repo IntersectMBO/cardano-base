@@ -36,10 +36,10 @@ crypto_vrf_ietfdraft03_secretkeybytes(void)
  * versions of the cardano node, but these are identical as those
  * without the versioning in crypto_vrf.h
  */
-int crypto_vrf_ietfdraft03_keypair_from_seed(unsigned char *pk, unsigned char *sk,
+int crypto_vrf_ietfdraft03_keypair_from_seed(unsigned char *pk, unsigned char *skpk,
                                              const unsigned char *seed)
 {
-    return crypto_vrf_seed_keypair(pk, sk, seed);
+    return crypto_vrf_seed_keypair(pk, skpk, seed);
 }
 
 void crypto_vrf_ietfdraft03_sk_to_pk(unsigned char *pk,

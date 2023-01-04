@@ -34,7 +34,7 @@ SODIUM_EXPORT
 size_t crypto_vrf_ietfdraft03_outputbytes(void);
 
 SODIUM_EXPORT
-int crypto_vrf_ietfdraft03_prove(unsigned char *proof, const unsigned char *sk,
+int crypto_vrf_ietfdraft03_prove(unsigned char *proof, const unsigned char *skpk,
 				 const unsigned char *m,
 				 unsigned long long mlen);
 

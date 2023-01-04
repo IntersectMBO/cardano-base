@@ -38,13 +38,13 @@ SODIUM_EXPORT
 
 SODIUM_EXPORT
 int crypto_vrf_ietfdraft13_prove(unsigned char *proof,
-                                 const unsigned char *sk,
+                                 const unsigned char *skpk,
                                  const unsigned char *m,
                                  unsigned long long mlen);
 
 SODIUM_EXPORT
 int crypto_vrf_ietfdraft13_prove_batchcompat(unsigned char *proof,
-                                             const unsigned char *sk,
+                                             const unsigned char *skpk,
                                              const unsigned char *m,
                                              unsigned long long mlen);
 
