@@ -170,13 +170,19 @@ foreign import ccall "crypto_vrf_ietfdraft13_outputbytes" crypto_vrf_ietfdraft13
 foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes" io_crypto_vrf_ietfdraft13_publickeybytes :: IO CSize
 foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes" io_crypto_vrf_ietfdraft13_secretkeybytes :: IO CSize
 
-foreign import ccall "crypto_vrf_seed_keypair" crypto_vrf_ietfdraft13_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
-foreign import ccall "crypto_vrf_sk_to_pk" crypto_vrf_ietfdraft13_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
-foreign import ccall "crypto_vrf_sk_to_seed" crypto_vrf_ietfdraft13_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft13_prove_batchcompat" crypto_vrf_ietfdraft13_prove_batchcompat :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
-foreign import ccall "crypto_vrf_ietfdraft13_verify_batchcompat" crypto_vrf_ietfdraft13_verify_batchcompat :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_seed_keypair"
+  crypto_vrf_ietfdraft13_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
+foreign import ccall "crypto_vrf_sk_to_pk"
+  crypto_vrf_ietfdraft13_sk_to_pk :: VerKeyPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_sk_to_seed"
+  crypto_vrf_ietfdraft13_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft13_prove_batchcompat"
+  crypto_vrf_ietfdraft13_prove_batchcompat :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft13_verify_batchcompat"
+  crypto_vrf_ietfdraft13_verify_batchcompat :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
 
-foreign import ccall "crypto_vrf_ietfdraft13_proof_to_hash_batchcompat" crypto_vrf_ietfdraft13_proof_to_hash_batchcompat :: OutputPtr -> ProofPtr -> IO CInt
+foreign import ccall "crypto_vrf_ietfdraft13_proof_to_hash_batchcompat"
+  crypto_vrf_ietfdraft13_proof_to_hash_batchcompat :: OutputPtr -> ProofPtr -> IO CInt
 
 -- Key size constants
 
