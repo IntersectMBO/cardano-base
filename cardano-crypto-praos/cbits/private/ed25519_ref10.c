@@ -2759,12 +2759,12 @@ ge25519_elligator2(fe25519 x, fe25519 y, const fe25519 r, int *notsquare_p)
     fe25519_sq2(rr2, r);
     rr2[0]++;
     fe25519_invert(rr2, rr2);
-    fe25519_scalar_product(x, rr2, ed25519_A_32);
+    fe25519_mul(x, curve25519_A, rr2);
     fe25519_neg(x, x); /* x=x1 */
 
     fe25519_sq(x2, x);
     fe25519_mul(x3, x, x2);
-    fe25519_scalar_product(x2, x2, ed25519_A_32); /* x2 = A*x1^2 */
+    fe25519_mul(x2, x2, curve25519_A); /* x2 = A*x1^2 */
     fe25519_add(gx1, x3, x);
     fe25519_add(gx1, gx1, x2); /* gx1 = x1^3 + A*x1^2 + x1 */
 
@@ -2909,7 +2909,7 @@ ristretto255_is_canonical(const unsigned char *s)
     c = (((unsigned int) c) - 1U) >> 8;
     d = (0xed - 1U - (unsigned int) s[0]) >> 8;
 
-    return 1 - (((c & d) | e | s[0]) & 1);
+    return 1 - (((c & d) | s[0]) & 1);
 }
 
 int
