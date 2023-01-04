@@ -16,9 +16,9 @@ extern "C" {
 SODIUM_EXPORT
         size_t crypto_vrf_ietfdraft13_bytes(void);
 
-#define crypto_vrf_batchcompat_ietfdraft13_BYTES 128U
+#define crypto_vrf_ietfdraft13_BYTES_BATCHCOMPAT 128U
 SODIUM_EXPORT
-        size_t crypto_vrf_batchcompat_ietfdraft13_bytes(void);
+        size_t crypto_vrf_ietfdraft13_bytes_batchcompat(void);
 
 #define crypto_vrf_ietfdraft13_OUTPUTBYTES 64U
 SODIUM_EXPORT

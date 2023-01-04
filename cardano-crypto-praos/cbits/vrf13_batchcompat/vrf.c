@@ -7,9 +7,9 @@ crypto_vrf_ietfdraft13_bytes(void)
 }
 
 size_t
-crypto_vrf_batchcompat_ietfdraft13_bytes(void)
+crypto_vrf_ietfdraft13_bytes_batchcompat(void)
 {
-    return crypto_vrf_batchcompat_ietfdraft13_BYTES;
+    return crypto_vrf_ietfdraft13_BYTES_BATCHCOMPAT;
 }
 
 size_t

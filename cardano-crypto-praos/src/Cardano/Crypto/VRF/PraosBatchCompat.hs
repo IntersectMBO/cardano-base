@@ -161,7 +161,7 @@ newtype Output = Output { unOutput :: ForeignPtr OutputValue }
 
 -- Raw low-level FFI bindings.
 --
-foreign import ccall "crypto_vrf_batchcompat_ietfdraft13_bytes" crypto_vrf_ietfdraft13_proofbytes_batchcompat :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_bytes_batchcompat" crypto_vrf_ietfdraft13_proofbytes_batchcompat :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes" crypto_vrf_ietfdraft13_publickeybytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes" crypto_vrf_ietfdraft13_secretkeybytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_seedbytes" crypto_vrf_ietfdraft13_seedbytes :: CSize
