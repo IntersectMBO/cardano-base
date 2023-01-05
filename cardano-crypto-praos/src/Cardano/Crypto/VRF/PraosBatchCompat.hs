@@ -22,7 +22,7 @@ module Cardano.Crypto.VRF.PraosBatchCompat
   -- Sizes of various value types involved in the VRF calculations. Users of
   -- this module will not need these, we are only exporting them for unit
   -- testing purposes.
-  , crypto_vrf_ietfdraft13_proofbytes_batchcompat
+  , crypto_vrf_ietfdraft13_bytes_batchcompat
   , crypto_vrf_ietfdraft13_publickeybytes
   , crypto_vrf_ietfdraft13_secretkeybytes
   , crypto_vrf_ietfdraft13_seedbytes
@@ -161,7 +161,7 @@ newtype Output = Output { unOutput :: ForeignPtr OutputValue }
 
 -- Raw low-level FFI bindings.
 --
-foreign import ccall "crypto_vrf_ietfdraft13_bytes_batchcompat" crypto_vrf_ietfdraft13_proofbytes_batchcompat :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_bytes_batchcompat" crypto_vrf_ietfdraft13_bytes_batchcompat :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes" crypto_vrf_ietfdraft13_publickeybytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes" crypto_vrf_ietfdraft13_secretkeybytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_seedbytes" crypto_vrf_ietfdraft13_seedbytes :: CSize
@@ -187,7 +187,7 @@ foreign import ccall "crypto_vrf_ietfdraft13_proof_to_hash_batchcompat"
 -- Key size constants
 
 certSizeVRF :: Int
-certSizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_proofbytes_batchcompat
+certSizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_bytes_batchcompat
 
 signKeySizeVRF :: Int
 signKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_secretkeybytes
