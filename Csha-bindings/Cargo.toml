@@ -1,0 +1,11 @@
+[package]
+name = "Csha-bindings"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+sha3 = "0.10.6"
+hs-bindgen = { version = "0.7.1", features = ["full"] }

@@ -12,7 +12,7 @@ import Cardano.Crypto.Hash.Class
 import Foreign.Ptr (castPtr)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
-import Sha3Bindings
+import CshaBindings
 
 data SHA3_256
 
