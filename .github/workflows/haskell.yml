@@ -103,13 +103,7 @@ jobs:
       env:
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
-      run: |
-        mkdir blst-sources && cd blst-sources
-        git clone https://github.com/supranational/blst
-        cd blst
-        git reset --hard $BLST_REF
-        C:\\msys64\\usr\\bin\\bash.exe ./build.sh
-        cd ../..
+      run: C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
