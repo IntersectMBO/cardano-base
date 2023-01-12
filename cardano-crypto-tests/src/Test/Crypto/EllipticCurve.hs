@@ -141,6 +141,16 @@ testPairing name =
                 let tt = BLS.ptMult t1 t2
                 return $ BLS.ptFinalVerify tt t3
         )
+    , testProperty "four pairings"
+            (\a1 a2 a3 b ->
+                either (const False) id $ do
+                    t1 <- BLS.pairing a1 b
+                    t2 <- BLS.pairing a2 b
+                    t3 <- BLS.pairing a3 b
+                    t4 <- BLS.pairing (BLS.addOrDouble (BLS.addOrDouble a1 a2) a3) b
+                    let tt = BLS.ptMult (BLS.ptMult t1 t2) t3
+                    return $ BLS.ptFinalVerify tt t4
+            )
     ]
     where
       pairingCheck (a, b) (c, d) =
