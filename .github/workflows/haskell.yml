@@ -149,9 +149,6 @@ jobs:
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
         cabal build all --enable-tests
 
-    - name: Git clone
-      run: git clone https://github.com/input-output-hk/cardano-mainnet-mirror
-
     - name: Run tests
       run: |
         # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
