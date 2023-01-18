@@ -198,7 +198,6 @@ instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SimpleKES d t))
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (VerKeyKES (SimpleKES d t)) where
   toCBOR = encodeVerKeyKES
-  encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (VerKeyKES (SimpleKES d t)) where
@@ -208,7 +207,6 @@ instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (SignKeyKES (SimpleKES d t)) where
   toCBOR = encodeSignKeyKES
-  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (SignKeyKES (SimpleKES d t)) where
@@ -217,7 +215,6 @@ instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => ToCBOR (SigKES (SimpleKES d t)) where
   toCBOR = encodeSigKES
-  encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
       => FromCBOR (SigKES (SimpleKES d t)) where

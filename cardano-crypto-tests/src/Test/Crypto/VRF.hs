@@ -115,12 +115,6 @@ testVRFAlgorithm _ n =
         , testProperty "Cert"    $ prop_cbor @(CertVRF v)
         ]
 
-      , testGroup "ToCBOR size"
-        [ testProperty "VerKey"  $ prop_cbor_size @(VerKeyVRF v)
-        , testProperty "SignKey" $ prop_cbor_size @(SignKeyVRF v)
-        , testProperty "Sig"     $ prop_cbor_size @(CertVRF v)
-        ]
-
       , testGroup "direct matches class"
         [ testProperty "VerKey"  $ prop_cbor_direct_vs_class @(VerKeyVRF v)
                                                              encodeVerKeyVRF

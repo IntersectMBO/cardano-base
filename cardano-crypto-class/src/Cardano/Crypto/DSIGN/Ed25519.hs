@@ -189,21 +189,18 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
 instance ToCBOR (VerKeyDSIGN Ed25519DSIGN) where
   toCBOR = encodeVerKeyDSIGN
-  encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN Ed25519DSIGN) where
   fromCBOR = decodeVerKeyDSIGN
 
 instance ToCBOR (SignKeyDSIGN Ed25519DSIGN) where
   toCBOR = encodeSignKeyDSIGN
-  encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN Ed25519DSIGN) where
   fromCBOR = decodeSignKeyDSIGN
 
 instance ToCBOR (SigDSIGN Ed25519DSIGN) where
   toCBOR = encodeSigDSIGN
-  encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN Ed25519DSIGN) where
   fromCBOR = decodeSigDSIGN

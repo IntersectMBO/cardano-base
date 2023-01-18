@@ -78,7 +78,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
 import Data.Maybe (fromMaybe, isJust)
-import Data.Proxy (Proxy (..))
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc
@@ -274,8 +273,6 @@ instance Eq Proof where
 
 instance ToCBOR Proof where
   toCBOR = toCBOR . proofBytes
-  encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral certSizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR Proof where
   fromCBOR = fromCBOR >>= proofFromBytes
@@ -288,8 +285,6 @@ instance Eq SignKey where
 
 instance ToCBOR SignKey where
   toCBOR = toCBOR . skBytes
-  encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral signKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR SignKey where
   fromCBOR = fromCBOR >>= skFromBytes
@@ -302,8 +297,6 @@ instance Eq VerKey where
 
 instance ToCBOR VerKey where
   toCBOR = toCBOR . vkBytes
-  encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral verKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR VerKey where
   fromCBOR = fromCBOR >>= vkFromBytes

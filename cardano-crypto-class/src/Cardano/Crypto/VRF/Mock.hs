@@ -111,21 +111,18 @@ instance VRFAlgorithm MockVRF where
 
 instance ToCBOR (VerKeyVRF MockVRF) where
   toCBOR = encodeVerKeyVRF
-  encodedSizeExpr _size = encodedVerKeyVRFSizeExpr
 
 instance FromCBOR (VerKeyVRF MockVRF) where
   fromCBOR = decodeVerKeyVRF
 
 instance ToCBOR (SignKeyVRF MockVRF) where
   toCBOR = encodeSignKeyVRF
-  encodedSizeExpr _size = encodedSignKeyVRFSizeExpr
 
 instance FromCBOR (SignKeyVRF MockVRF) where
   fromCBOR = decodeSignKeyVRF
 
 instance ToCBOR (CertVRF MockVRF) where
   toCBOR = encodeCertVRF
-  encodedSizeExpr _size = encodedCertVRFSizeExpr
 
 instance FromCBOR (CertVRF MockVRF) where
   fromCBOR = decodeCertVRF

@@ -13,7 +13,7 @@ import Data.Set (Set)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Numeric.Natural (Natural)
 
-import Cardano.Binary hiding (Range)
+import Cardano.Binary
 
 import Hedgehog
 import qualified Hedgehog.Gen as Gen

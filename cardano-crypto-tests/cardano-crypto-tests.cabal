@@ -70,7 +70,6 @@ library
                       , cborg
                       , cryptonite
                       , deepseq
-                      , formatting
                       , nothunks
                       , pretty-show
                       , QuickCheck

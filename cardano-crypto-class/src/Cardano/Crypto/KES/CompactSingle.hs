@@ -177,7 +177,6 @@ instance DSIGNAlgorithm d => NoThunks (SignKeyKES (CompactSingleKES d))
 
 instance DSIGNAlgorithm d => ToCBOR (VerKeyKES (CompactSingleKES d)) where
   toCBOR = encodeVerKeyKES
-  encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance DSIGNAlgorithm d => FromCBOR (VerKeyKES (CompactSingleKES d)) where
   fromCBOR = decodeVerKeyKES
@@ -193,7 +192,6 @@ instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (CompactSingleKES d))
 
 instance DSIGNAlgorithm d => ToCBOR (SignKeyKES (CompactSingleKES d)) where
   toCBOR = encodeSignKeyKES
-  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
 instance DSIGNAlgorithm d => FromCBOR (SignKeyKES (CompactSingleKES d)) where
   fromCBOR = decodeSignKeyKES
@@ -210,7 +208,6 @@ instance DSIGNAlgorithm d => NoThunks (SigKES (CompactSingleKES d))
 
 instance DSIGNAlgorithm d => ToCBOR (SigKES (CompactSingleKES d)) where
   toCBOR = encodeSigKES
-  encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance DSIGNAlgorithm d => FromCBOR (SigKES (CompactSingleKES d)) where
   fromCBOR = decodeSigKES

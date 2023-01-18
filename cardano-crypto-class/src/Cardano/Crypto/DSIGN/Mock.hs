@@ -131,21 +131,18 @@ instance DSIGNAlgorithm MockDSIGN where
 
 instance ToCBOR (VerKeyDSIGN MockDSIGN) where
   toCBOR = encodeVerKeyDSIGN
-  encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN MockDSIGN) where
   fromCBOR = decodeVerKeyDSIGN
 
 instance ToCBOR (SignKeyDSIGN MockDSIGN) where
   toCBOR = encodeSignKeyDSIGN
-  encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN MockDSIGN) where
   fromCBOR = decodeSignKeyDSIGN
 
 instance ToCBOR (SigDSIGN MockDSIGN) where
   toCBOR = encodeSigDSIGN
-  encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN MockDSIGN) where
   fromCBOR = decodeSigDSIGN

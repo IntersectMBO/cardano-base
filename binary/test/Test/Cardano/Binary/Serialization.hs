@@ -6,7 +6,7 @@ module Test.Cardano.Binary.Serialization
   (tests)
   where
 
-import Cardano.Binary hiding (Range)
+import Cardano.Binary
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.Decoding as D
 

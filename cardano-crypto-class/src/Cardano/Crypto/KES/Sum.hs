@@ -290,7 +290,6 @@ instance (KESAlgorithm d) => NoThunks (SignKeyKES (SumKES h d))
 instance (KESAlgorithm d, HashAlgorithm h)
       => ToCBOR (VerKeyKES (SumKES h d)) where
   toCBOR = encodeVerKeyKES
-  encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance (KESAlgorithm d, HashAlgorithm h)
       => FromCBOR (VerKeyKES (SumKES h d)) where
@@ -308,7 +307,6 @@ instance (KESAlgorithm d) => NoThunks (VerKeyKES  (SumKES h d))
 instance (KESAlgorithm d, HashAlgorithm h)
       => ToCBOR (SignKeyKES (SumKES h d)) where
   toCBOR = encodeSignKeyKES
-  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 
 instance (KESAlgorithm d, HashAlgorithm h)
       => FromCBOR (SignKeyKES (SumKES h d)) where
@@ -327,7 +325,6 @@ instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 instance (KESAlgorithm d, HashAlgorithm h)
       => ToCBOR (SigKES (SumKES h d)) where
   toCBOR = encodeSigKES
-  encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance (KESAlgorithm d, HashAlgorithm h)
       => FromCBOR (SigKES (SumKES h d)) where

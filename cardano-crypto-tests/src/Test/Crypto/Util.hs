@@ -15,7 +15,6 @@ module Test.Crypto.Util
     FromCBOR (..)
   , ToCBOR (..)
   , prop_cbor
-  , prop_cbor_size
   , prop_cbor_with
   , prop_cbor_valid
   , prop_cbor_roundtrip
@@ -58,21 +57,12 @@ import Cardano.Binary (
   ToCBOR (toCBOR),
   Encoding,
   Decoder,
-  Range (Range),
   decodeFullDecoder,
   serializeEncoding,
-  szGreedy,
-  szSimplify,
-  lo,
-  hi,
-  encodedSizeExpr
   )
 import Codec.CBOR.FlatTerm  (
   validFlatTerm,
   toFlatTerm
-  )
-import Codec.CBOR.Write (
-  toStrictByteString
   )
 import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
 import Cardano.Crypto.Util (SignableRepresentation(..))
@@ -87,7 +77,6 @@ import qualified Data.ByteString as BS
 import Data.Proxy (Proxy (Proxy))
 import Data.Word (Word64)
 import NoThunks.Class (NoThunks, unsafeNoThunks)
-import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
   , (===)
@@ -103,7 +92,6 @@ import Test.QuickCheck
   , checkCoverage
   , cover
   )
-import Formatting.Buildable (build)
 import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
@@ -164,17 +152,6 @@ instance Arbitrary Message where
 prop_cbor :: (ToCBOR a, FromCBOR a, Eq a, Show a)
           => a -> Property
 prop_cbor = prop_cbor_with toCBOR fromCBOR
-
-prop_cbor_size :: forall a. ToCBOR a => a -> Property
-prop_cbor_size a = counterexample (show lo ++ " ≰ " ++ show len) (lo <= len)
-              .&&. counterexample (show len ++ " ≰ " ++ show hi) (len <= hi)
-  where
-    len, lo, hi :: Natural
-    len = fromIntegral $ BS.length (toStrictByteString (toCBOR a))
-    Range {lo, hi} =
-      case szSimplify $ encodedSizeExpr szGreedy (Proxy :: Proxy a) of
-        Right x -> x
-        Left err -> error . show . build $ err
 
 prop_cbor_with :: (Eq a, Show a)
                => (a -> Encoding)

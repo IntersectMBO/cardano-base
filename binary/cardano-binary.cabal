@@ -40,16 +40,11 @@ library
                         Cardano.Binary.Deserialize
 
   build-depends:        base
-                      , aeson
                       , bytestring
                       , cborg              >= 0.2.2 && < 0.3
                       , containers
-                      , data-fix
-                      , deepseq
                       , formatting
-                      , nothunks
                       , primitive
-                      , recursion-schemes  >= 5.1   && < 5.3
                       , safe-exceptions
                       , tagged
                       , text
@@ -62,8 +57,7 @@ test-suite test
   main-is:              test.hs
   type:                 exitcode-stdio-1.0
 
-  other-modules:        Test.Cardano.Binary.SizeBounds
-                        Test.Cardano.Binary.Helpers
+  other-modules:        Test.Cardano.Binary.Helpers
                         Test.Cardano.Binary.Helpers.GoldenRoundTrip
                         Test.Cardano.Binary.RoundTrip
                         Test.Cardano.Binary.Serialization
@@ -77,11 +71,9 @@ test-suite test
                       , containers
                       , formatting
                       , hedgehog
-                      , hspec
                       , pretty-show
                       , QuickCheck
                       , quickcheck-instances
-                      , tagged
                       , text
                       , time
                       , vector

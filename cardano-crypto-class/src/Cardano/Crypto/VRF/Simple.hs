@@ -231,21 +231,18 @@ instance VRFAlgorithm SimpleVRF where
 
 instance ToCBOR (VerKeyVRF SimpleVRF) where
   toCBOR = encodeVerKeyVRF
-  encodedSizeExpr _size = encodedVerKeyVRFSizeExpr
 
 instance FromCBOR (VerKeyVRF SimpleVRF) where
   fromCBOR = decodeVerKeyVRF
 
 instance ToCBOR (SignKeyVRF SimpleVRF) where
   toCBOR = encodeSignKeyVRF
-  encodedSizeExpr _size = encodedSignKeyVRFSizeExpr
 
 instance FromCBOR (SignKeyVRF SimpleVRF) where
   fromCBOR = decodeSignKeyVRF
 
 instance ToCBOR (CertVRF SimpleVRF) where
   toCBOR = encodeCertVRF
-  encodedSizeExpr _size = encodedCertVRFSizeExpr
 
 instance FromCBOR (CertVRF SimpleVRF) where
   fromCBOR = decodeCertVRF

@@ -52,7 +52,7 @@ import Cardano.Crypto.SECP256K1.C (
 import Cardano.Foreign (allocaSized)
 import Control.Monad (when)
 import System.IO.Unsafe (unsafeDupablePerformIO)
-import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
+import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR))
 import Foreign.Ptr (castPtr, nullPtr)
 import NoThunks.Class (NoThunks)
 import Cardano.Crypto.DSIGN.Class (
@@ -76,13 +76,10 @@ import Cardano.Crypto.DSIGN.Class (
                   rawDeserialiseSignKeyDSIGN,
                   rawDeserialiseSigDSIGN),
   encodeVerKeyDSIGN,
-  encodedVerKeyDSIGNSizeExpr,
   decodeVerKeyDSIGN,
   encodeSignKeyDSIGN,
-  encodedSignKeyDSIGNSizeExpr,
   decodeSignKeyDSIGN,
   encodeSigDSIGN,
-  encodedSigDSIGNSizeExpr,
   decodeSigDSIGN,
   seedSizeDSIGN
   )
@@ -205,21 +202,18 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
 
 instance ToCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
   toCBOR = encodeVerKeyDSIGN
-  encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
   fromCBOR = decodeVerKeyDSIGN
 
 instance ToCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
   toCBOR = encodeSignKeyDSIGN
-  encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
   fromCBOR = decodeSignKeyDSIGN
 
 instance ToCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
   toCBOR = encodeSigDSIGN
-  encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
   fromCBOR = decodeSigDSIGN

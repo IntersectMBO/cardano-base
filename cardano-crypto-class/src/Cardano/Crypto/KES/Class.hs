@@ -34,11 +34,6 @@ module Cardano.Crypto.KES.Class
   , encodeSignedKES
   , decodeSignedKES
 
-    -- * Encoded 'Size' expressions
-  , encodedVerKeyKESSizeExpr
-  , encodedSignKeyKESSizeExpr
-  , encodedSigKESSizeExpr
-
     -- * Utility functions
     -- These are used between multiple KES implementations. User code will
     -- most likely not need these, but they are required for recursive
@@ -63,7 +58,7 @@ import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
+import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes)
 
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
@@ -369,40 +364,6 @@ encodeSignedKES (SignedKES s) = encodeSigKES s
 
 decodeSignedKES :: KESAlgorithm v => Decoder s (SignedKES v a)
 decodeSignedKES = SignedKES <$> decodeSigKES
-
---
--- 'Size' expressions for 'ToCBOR' instances.
---
-
--- | 'Size' expression for 'VerKeyKES' which is using 'sizeVerKeyKES' encoded
--- as 'Size'.
---
-encodedVerKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (VerKeyKES v) -> Size
-encodedVerKeyKESSizeExpr _proxy =
-      -- 'encodeBytes' envelope
-      fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyKES (Proxy :: Proxy v)))
-      -- payload
-    + fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
-
--- | 'Size' expression for 'SignKeyKES' which is using 'sizeSignKeyKES' encoded
--- as 'Size'.
---
-encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
-encodedSignKeyKESSizeExpr _proxy =
-      -- 'encodeBytes' envelope
-      fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy :: Proxy v)))
-      -- payload
-    + fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
-
--- | 'Size' expression for 'SigKES' which is using 'sizeSigKES' encoded as
--- 'Size'.
---
-encodedSigKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SigKES v) -> Size
-encodedSigKESSizeExpr _proxy =
-      -- 'encodeBytes' envelope
-      fromIntegral ((withWordSize :: Word -> Integer) (sizeSigKES (Proxy :: Proxy v)))
-      -- payload
-    + fromIntegral (sizeSigKES (Proxy :: Proxy v))
 
 hashPairOfVKeys :: (KESAlgorithm d, HashAlgorithm h)
                 => (VerKeyKES d, VerKeyKES d)

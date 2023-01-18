@@ -67,7 +67,6 @@ import Test.Crypto.Util (
   prop_size_serialise,
   prop_cbor_with,
   prop_cbor,
-  prop_cbor_size,
   prop_cbor_direct_vs_class,
   prop_no_thunks,
   arbitrarySeedOfSize,
@@ -240,11 +239,6 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
       testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor,
       testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor,
       testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor
-      ],
-    testGroup "ToCBOR size" [
-      testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor_size,
-      testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor_size,
-      testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor_size
       ],
     testGroup "direct matches class" [
       testProperty "VerKey" .

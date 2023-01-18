@@ -17,8 +17,6 @@ module Cardano.Binary.Serialize
   -- * CBOR in CBOR
   , encodeNestedCbor
   , encodeNestedCborBytes
-  , nestedCborSizeExpr
-  , nestedCborBytesSizeExpr
   )
 where
 
@@ -31,8 +29,7 @@ import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder.Extra as Builder
 import qualified Data.ByteString.Lazy as BSL
 
-import Cardano.Binary.EncCBOR
-  (Encoding, Size, ToCBOR(..), apMono, encodeTag, withWordSize)
+import Cardano.Binary.EncCBOR (Encoding, ToCBOR(..), encodeTag)
 
 
 -- | Serialize a Haskell value with a 'ToCBOR' instance to an external binary
@@ -90,10 +87,4 @@ encodeNestedCbor = encodeNestedCborBytes . serialize
 --   indeed to valid, previously-serialised CBOR data.
 encodeNestedCborBytes :: BSL.ByteString -> Encoding
 encodeNestedCborBytes x = encodeTag 24 <> toCBOR x
-
-nestedCborSizeExpr :: Size -> Size
-nestedCborSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
-
-nestedCborBytesSizeExpr :: Size -> Size
-nestedCborBytesSizeExpr x = 2 + apMono "withWordSize" withWordSize x + x
 

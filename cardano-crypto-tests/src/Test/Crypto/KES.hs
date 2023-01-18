@@ -34,7 +34,6 @@ import Test.Crypto.Util (
   prop_size_serialise,
   prop_cbor_with,
   prop_cbor,
-  prop_cbor_size,
   prop_cbor_direct_vs_class,
   prop_no_thunks,
   arbitrarySeedOfSize,
@@ -134,11 +133,6 @@ testKESAlgorithm _p n =
         [ testProperty "VerKey"  $ prop_cbor @(VerKeyKES v)
         , testProperty "SignKey" $ prop_cbor @(SignKeyKES v)
         , testProperty "Sig"     $ prop_cbor @(SigKES v)
-        ]
-      , testGroup "ToCBOR size"
-        [ testProperty "VerKey"  $ prop_cbor_size @(VerKeyKES v)
-        , testProperty "SignKey" $ prop_cbor_size @(SignKeyKES v)
-        , testProperty "Sig"     $ prop_cbor_size @(SigKES v)
         ]
 
       , testGroup "direct matches class"
