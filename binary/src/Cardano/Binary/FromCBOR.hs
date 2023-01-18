@@ -59,9 +59,6 @@ import Numeric.Natural (Natural)
 {- HLINT ignore "Reduce duplication" -}
 {- HLINT ignore "Redundant <$>" -}
 
---------------------------------------------------------------------------------
--- FromCBOR
---------------------------------------------------------------------------------
 
 class Typeable a => FromCBOR a where
   fromCBOR :: D.Decoder s a
