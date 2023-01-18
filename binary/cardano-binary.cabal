@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name:                cardano-binary
-version:             1.5.0.1
+version:             1.6.0.0
 synopsis:            Binary serialization for Cardano
 description:         This package includes the binary serialization format for Cardano
 license:             Apache-2.0
@@ -14,6 +14,7 @@ copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
+                     CHANGELOG.md
 
 flag development
     description: Disable `-Werror`
