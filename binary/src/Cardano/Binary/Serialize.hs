@@ -31,7 +31,7 @@ import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder.Extra as Builder
 import qualified Data.ByteString.Lazy as BSL
 
-import Cardano.Binary.ToCBOR
+import Cardano.Binary.EncCBOR
   (Encoding, Size, ToCBOR(..), apMono, encodeTag, withWordSize)
 
 

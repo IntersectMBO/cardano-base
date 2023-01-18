@@ -33,12 +33,8 @@ library
   import:               base, project-config
   hs-source-dirs:       src
   exposed-modules:      Cardano.Binary
-  other-modules:        Cardano.Binary.Annotated
-                        Cardano.Binary.Drop
-                        Cardano.Binary.Raw
-
-                        Cardano.Binary.ToCBOR
-                        Cardano.Binary.FromCBOR
+  other-modules:        Cardano.Binary.EncCBOR
+                        Cardano.Binary.DecCBOR
 
                         Cardano.Binary.Serialize
                         Cardano.Binary.Deserialize
@@ -71,7 +67,6 @@ test-suite test
                         Test.Cardano.Binary.Helpers.GoldenRoundTrip
                         Test.Cardano.Binary.RoundTrip
                         Test.Cardano.Binary.Serialization
-                        Test.Cardano.Binary.Drop
                         Test.Cardano.Binary.Failure
 
   build-depends:        base

@@ -11,7 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE TypeApplications          #-}
 
-module Cardano.Binary.ToCBOR
+module Cardano.Binary.EncCBOR
   ( ToCBOR(..)
   , withWordSize
   , module E

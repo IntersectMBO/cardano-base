@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RankNTypes                #-}
 
-module Cardano.Binary.FromCBOR
+module Cardano.Binary.DecCBOR
   ( FromCBOR(..)
   , DecoderError(..)
   , enforceSize
@@ -59,9 +59,6 @@ import Numeric.Natural (Natural)
 {- HLINT ignore "Reduce duplication" -}
 {- HLINT ignore "Redundant <$>" -}
 
---------------------------------------------------------------------------------
--- FromCBOR
---------------------------------------------------------------------------------
 
 class Typeable a => FromCBOR a where
   fromCBOR :: D.Decoder s a

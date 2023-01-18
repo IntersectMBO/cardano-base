@@ -39,7 +39,7 @@ import qualified Data.ByteString.Lazy.Internal as BSL
 import Data.Proxy (Proxy(Proxy))
 import Data.Text (Text)
 
-import Cardano.Binary.FromCBOR (DecoderError(..), FromCBOR(..), cborError, toCborError)
+import Cardano.Binary.DecCBOR (DecoderError(..), FromCBOR(..), cborError, toCborError)
 
 
 -- | Deserialize a Haskell value from the external binary representation
