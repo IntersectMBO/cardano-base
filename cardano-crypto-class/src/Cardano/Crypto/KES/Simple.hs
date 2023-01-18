@@ -28,7 +28,7 @@ import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 import           NoThunks.Class (NoThunks)
 
-import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import           Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import           Cardano.Crypto.DSIGN
 import qualified Cardano.Crypto.DSIGN as DSIGN
@@ -196,27 +196,27 @@ instance DSIGNAlgorithm d => NoThunks (SignKeyKES (SimpleKES d t))
 instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SimpleKES d t))
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
-      => ToCBOR (VerKeyKES (SimpleKES d t)) where
-  toCBOR = encodeVerKeyKES
+      => EncCBOR (VerKeyKES (SimpleKES d t)) where
+  encCBOR = encodeVerKeyKES
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
-      => FromCBOR (VerKeyKES (SimpleKES d t)) where
-  fromCBOR = decodeVerKeyKES
+      => DecCBOR (VerKeyKES (SimpleKES d t)) where
+  decCBOR = decodeVerKeyKES
 
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
-      => ToCBOR (SignKeyKES (SimpleKES d t)) where
-  toCBOR = encodeSignKeyKES
+      => EncCBOR (SignKeyKES (SimpleKES d t)) where
+  encCBOR = encodeSignKeyKES
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
-      => FromCBOR (SignKeyKES (SimpleKES d t)) where
-  fromCBOR = decodeSignKeyKES
+      => DecCBOR (SignKeyKES (SimpleKES d t)) where
+  decCBOR = decodeSignKeyKES
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
-      => ToCBOR (SigKES (SimpleKES d t)) where
-  toCBOR = encodeSigKES
+      => EncCBOR (SigKES (SimpleKES d t)) where
+  encCBOR = encodeSigKES
 
 instance (DSIGNAlgorithm d, KnownNat t, KnownNat (SeedSizeDSIGN d * t))
-      => FromCBOR (SigKES (SimpleKES d t)) where
-  fromCBOR = decodeSigKES
+      => DecCBOR (SigKES (SimpleKES d t)) where
+  decCBOR = decodeSigKES
 

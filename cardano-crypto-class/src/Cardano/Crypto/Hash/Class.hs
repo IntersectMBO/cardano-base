@@ -84,7 +84,7 @@ import Control.DeepSeq (NFData)
 
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (Encoding, FromCBOR(..), ToCBOR(..), decodeBytes,
+import Cardano.Binary (Encoding, DecCBOR(..), EncCBOR(..), decodeBytes,
                        serializeEncoding')
 import Cardano.Crypto.PackedBytes
 import Cardano.Crypto.Util (decodeHexString)
@@ -93,8 +93,8 @@ import Cardano.HeapWords (HeapWords (..))
 import qualified Data.ByteString.Short.Internal as SBSI
 
 class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
-  --TODO: eliminate this Typeable constraint needed only for the ToCBOR
-  -- the ToCBOR should not need it either
+  --TODO: eliminate this Typeable constraint needed only for the EncCBOR
+  -- the EncCBOR should not need it either
 
   -- | Size of hash digest
   type SizeHash h :: Nat
@@ -336,11 +336,11 @@ parseHash t =
 -- CBOR serialisation
 --
 
-instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
-  toCBOR (UnsafeHash h) = toCBOR h
+instance (HashAlgorithm h, Typeable a) => EncCBOR (Hash h a) where
+  encCBOR (UnsafeHash h) = encCBOR h
 
-instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
-  fromCBOR = do
+instance (HashAlgorithm h, Typeable a) => DecCBOR (Hash h a) where
+  decCBOR = do
     bs <- decodeBytes
     case hashFromBytes bs of
       Just x  -> return x
@@ -355,8 +355,8 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
 --
 
 {-# DEPRECATED hash "Use hashWith or hashWithSerialiser" #-}
-hash :: forall h a. (HashAlgorithm h, ToCBOR a) => a -> Hash h a
-hash = hashWithSerialiser toCBOR
+hash :: forall h a. (HashAlgorithm h, EncCBOR a) => a -> Hash h a
+hash = hashWithSerialiser encCBOR
 
 {-# DEPRECATED fromHash "Use bytesToNatural . hashToBytes" #-}
 fromHash :: Hash h a -> Natural

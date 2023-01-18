@@ -50,7 +50,7 @@ import           Control.Monad (guard)
 
 import Control.Exception (assert)
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGN.Class
@@ -175,11 +175,11 @@ deriving instance DSIGNAlgorithm d => Eq   (VerKeyKES (CompactSingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (SignKeyKES (CompactSingleKES d))
 
-instance DSIGNAlgorithm d => ToCBOR (VerKeyKES (CompactSingleKES d)) where
-  toCBOR = encodeVerKeyKES
+instance DSIGNAlgorithm d => EncCBOR (VerKeyKES (CompactSingleKES d)) where
+  encCBOR = encodeVerKeyKES
 
-instance DSIGNAlgorithm d => FromCBOR (VerKeyKES (CompactSingleKES d)) where
-  fromCBOR = decodeVerKeyKES
+instance DSIGNAlgorithm d => DecCBOR (VerKeyKES (CompactSingleKES d)) where
+  decCBOR = decodeVerKeyKES
 
 
 --
@@ -190,11 +190,11 @@ deriving instance DSIGNAlgorithm d => Show (SignKeyKES (CompactSingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (CompactSingleKES d))
 
-instance DSIGNAlgorithm d => ToCBOR (SignKeyKES (CompactSingleKES d)) where
-  toCBOR = encodeSignKeyKES
+instance DSIGNAlgorithm d => EncCBOR (SignKeyKES (CompactSingleKES d)) where
+  encCBOR = encodeSignKeyKES
 
-instance DSIGNAlgorithm d => FromCBOR (SignKeyKES (CompactSingleKES d)) where
-  fromCBOR = decodeSignKeyKES
+instance DSIGNAlgorithm d => DecCBOR (SignKeyKES (CompactSingleKES d)) where
+  decCBOR = decodeSignKeyKES
 
 
 --
@@ -206,11 +206,11 @@ deriving instance DSIGNAlgorithm d => Eq   (SigKES (CompactSingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (SigKES (CompactSingleKES d))
 
-instance DSIGNAlgorithm d => ToCBOR (SigKES (CompactSingleKES d)) where
-  toCBOR = encodeSigKES
+instance DSIGNAlgorithm d => EncCBOR (SigKES (CompactSingleKES d)) where
+  encCBOR = encodeSigKES
 
-instance DSIGNAlgorithm d => FromCBOR (SigKES (CompactSingleKES d)) where
-  fromCBOR = decodeSigKES
+instance DSIGNAlgorithm d => DecCBOR (SigKES (CompactSingleKES d)) where
+  decCBOR = decodeSigKES
 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size = BS.take (fromIntegral size)

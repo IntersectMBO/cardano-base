@@ -12,9 +12,9 @@
 {-# LANGUAGE TypeApplications          #-}
 
 module Cardano.Binary.EncCBOR
-  ( ToCBOR(..)
+  ( EncCBOR(..)
   , module E
-  , toCBORMaybe
+  , encCBORMaybe
   )
 where
 
@@ -46,154 +46,154 @@ import Data.Void (Void, absurd)
 import Data.Word ( Word8, Word16, Word32, Word64 )
 import Numeric.Natural (Natural)
 
-class Typeable a => ToCBOR a where
-  toCBOR :: a -> Encoding
+class Typeable a => EncCBOR a where
+  encCBOR :: a -> Encoding
 
 --------------------------------------------------------------------------------
 -- Primitive types
 --------------------------------------------------------------------------------
 
-instance ToCBOR () where
-  toCBOR = const E.encodeNull
+instance EncCBOR () where
+  encCBOR = const E.encodeNull
 
-instance ToCBOR Bool where
-  toCBOR = E.encodeBool
+instance EncCBOR Bool where
+  encCBOR = E.encodeBool
 
 
 --------------------------------------------------------------------------------
 -- Numeric data
 --------------------------------------------------------------------------------
 
-instance ToCBOR Integer where
-  toCBOR = E.encodeInteger
+instance EncCBOR Integer where
+  encCBOR = E.encodeInteger
 
-instance ToCBOR Word where
-  toCBOR = E.encodeWord
+instance EncCBOR Word where
+  encCBOR = E.encodeWord
 
-instance ToCBOR Word8 where
-  toCBOR = E.encodeWord8
+instance EncCBOR Word8 where
+  encCBOR = E.encodeWord8
 
-instance ToCBOR Word16 where
-  toCBOR = E.encodeWord16
+instance EncCBOR Word16 where
+  encCBOR = E.encodeWord16
 
-instance ToCBOR Word32 where
-  toCBOR = E.encodeWord32
+instance EncCBOR Word32 where
+  encCBOR = E.encodeWord32
 
-instance ToCBOR Word64 where
-  toCBOR = E.encodeWord64
+instance EncCBOR Word64 where
+  encCBOR = E.encodeWord64
 
-instance ToCBOR Int where
-  toCBOR = E.encodeInt
+instance EncCBOR Int where
+  encCBOR = E.encodeInt
 
-instance ToCBOR Float where
-  toCBOR = E.encodeFloat
+instance EncCBOR Float where
+  encCBOR = E.encodeFloat
 
-instance ToCBOR Int32 where
-  toCBOR = E.encodeInt32
+instance EncCBOR Int32 where
+  encCBOR = E.encodeInt32
 
-instance ToCBOR Int64 where
-  toCBOR = E.encodeInt64
+instance EncCBOR Int64 where
+  encCBOR = E.encodeInt64
 
-instance ToCBOR a => ToCBOR (Ratio a) where
-  toCBOR r = E.encodeListLen 2 <> toCBOR (numerator r) <> toCBOR (denominator r)
+instance EncCBOR a => EncCBOR (Ratio a) where
+  encCBOR r = E.encodeListLen 2 <> encCBOR (numerator r) <> encCBOR (denominator r)
 
-instance ToCBOR Nano where
-  toCBOR (MkFixed nanoseconds) = toCBOR nanoseconds
+instance EncCBOR Nano where
+  encCBOR (MkFixed nanoseconds) = encCBOR nanoseconds
 
-instance ToCBOR Pico where
-  toCBOR (MkFixed picoseconds) = toCBOR picoseconds
+instance EncCBOR Pico where
+  encCBOR (MkFixed picoseconds) = encCBOR picoseconds
 
 -- | For backwards compatibility we round pico precision to micro
-instance ToCBOR NominalDiffTime where
-  toCBOR = toCBOR . (`div` 1e6) . toPicoseconds
+instance EncCBOR NominalDiffTime where
+  encCBOR = encCBOR . (`div` 1e6) . toPicoseconds
    where
     toPicoseconds :: NominalDiffTime -> Integer
     toPicoseconds t =
       numerator (toRational t * toRational (resolution $ Proxy @E12))
 
-instance ToCBOR Natural where
-  toCBOR = toCBOR . toInteger
+instance EncCBOR Natural where
+  encCBOR = encCBOR . toInteger
 
-instance ToCBOR Void where
-  toCBOR = absurd
+instance EncCBOR Void where
+  encCBOR = absurd
 
 
 --------------------------------------------------------------------------------
 -- Tagged
 --------------------------------------------------------------------------------
 
-instance (Typeable s, ToCBOR a) => ToCBOR (Tagged s a) where
-  toCBOR (Tagged a) = toCBOR a
+instance (Typeable s, EncCBOR a) => EncCBOR (Tagged s a) where
+  encCBOR (Tagged a) = encCBOR a
 
 
 --------------------------------------------------------------------------------
 -- Containers
 --------------------------------------------------------------------------------
 
-instance (ToCBOR a, ToCBOR b) => ToCBOR (a,b) where
-  toCBOR (a, b) = E.encodeListLen 2 <> toCBOR a <> toCBOR b
+instance (EncCBOR a, EncCBOR b) => EncCBOR (a,b) where
+  encCBOR (a, b) = E.encodeListLen 2 <> encCBOR a <> encCBOR b
 
-instance (ToCBOR a, ToCBOR b, ToCBOR c) => ToCBOR (a,b,c) where
-  toCBOR (a, b, c) = E.encodeListLen 3 <> toCBOR a <> toCBOR b <> toCBOR c
+instance (EncCBOR a, EncCBOR b, EncCBOR c) => EncCBOR (a,b,c) where
+  encCBOR (a, b, c) = E.encodeListLen 3 <> encCBOR a <> encCBOR b <> encCBOR c
 
-instance (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d) => ToCBOR (a,b,c,d) where
-  toCBOR (a, b, c, d) =
-    E.encodeListLen 4 <> toCBOR a <> toCBOR b <> toCBOR c <> toCBOR d
+instance (EncCBOR a, EncCBOR b, EncCBOR c, EncCBOR d) => EncCBOR (a,b,c,d) where
+  encCBOR (a, b, c, d) =
+    E.encodeListLen 4 <> encCBOR a <> encCBOR b <> encCBOR c <> encCBOR d
 
 instance
-  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e)
-  => ToCBOR (a, b, c, d, e)
+  (EncCBOR a, EncCBOR b, EncCBOR c, EncCBOR d, EncCBOR e)
+  => EncCBOR (a, b, c, d, e)
  where
-  toCBOR (a, b, c, d, e) =
+  encCBOR (a, b, c, d, e) =
     E.encodeListLen 5
-      <> toCBOR a
-      <> toCBOR b
-      <> toCBOR c
-      <> toCBOR d
-      <> toCBOR e
+      <> encCBOR a
+      <> encCBOR b
+      <> encCBOR c
+      <> encCBOR d
+      <> encCBOR e
 
 instance
-  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f, ToCBOR g)
-  => ToCBOR (a, b, c, d, e, f, g)
+  (EncCBOR a, EncCBOR b, EncCBOR c, EncCBOR d, EncCBOR e, EncCBOR f, EncCBOR g)
+  => EncCBOR (a, b, c, d, e, f, g)
   where
-  toCBOR (a, b, c, d, e, f, g) =
+  encCBOR (a, b, c, d, e, f, g) =
     E.encodeListLen 7
-      <> toCBOR a
-      <> toCBOR b
-      <> toCBOR c
-      <> toCBOR d
-      <> toCBOR e
-      <> toCBOR f
-      <> toCBOR g
+      <> encCBOR a
+      <> encCBOR b
+      <> encCBOR c
+      <> encCBOR d
+      <> encCBOR e
+      <> encCBOR f
+      <> encCBOR g
 
-instance ToCBOR BS.ByteString where
-  toCBOR = E.encodeBytes
+instance EncCBOR BS.ByteString where
+  encCBOR = E.encodeBytes
 
-instance ToCBOR Text.Text where
-  toCBOR = E.encodeString
+instance EncCBOR Text.Text where
+  encCBOR = E.encodeString
 
-instance ToCBOR SBS.ShortByteString where
-  toCBOR sbs@(SBS ba) =
+instance EncCBOR SBS.ShortByteString where
+  encCBOR sbs@(SBS ba) =
     E.encodeByteArray $ BAS.SBA (Prim.ByteArray ba) 0 (SBS.length sbs)
 
-instance ToCBOR BS.Lazy.ByteString where
-  toCBOR = toCBOR . BS.Lazy.toStrict
+instance EncCBOR BS.Lazy.ByteString where
+  encCBOR = encCBOR . BS.Lazy.toStrict
 
-instance ToCBOR a => ToCBOR [a] where
-  toCBOR xs = E.encodeListLenIndef <> foldr (\x r -> toCBOR x <> r) E.encodeBreak xs
+instance EncCBOR a => EncCBOR [a] where
+  encCBOR xs = E.encodeListLenIndef <> foldr (\x r -> encCBOR x <> r) E.encodeBreak xs
 
-instance (ToCBOR a, ToCBOR b) => ToCBOR (Either a b) where
-  toCBOR (Left  x) = E.encodeListLen 2 <> E.encodeWord 0 <> toCBOR x
-  toCBOR (Right x) = E.encodeListLen 2 <> E.encodeWord 1 <> toCBOR x
+instance (EncCBOR a, EncCBOR b) => EncCBOR (Either a b) where
+  encCBOR (Left  x) = E.encodeListLen 2 <> E.encodeWord 0 <> encCBOR x
+  encCBOR (Right x) = E.encodeListLen 2 <> E.encodeWord 1 <> encCBOR x
 
-instance ToCBOR a => ToCBOR (NonEmpty a) where
-  toCBOR = toCBOR . toList
+instance EncCBOR a => EncCBOR (NonEmpty a) where
+  encCBOR = encCBOR . toList
 
-instance ToCBOR a => ToCBOR (Maybe a) where
-  toCBOR = toCBORMaybe toCBOR
+instance EncCBOR a => EncCBOR (Maybe a) where
+  encCBOR = encCBORMaybe encCBOR
 
-toCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
-toCBORMaybe encodeA = \case
+encCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+encCBORMaybe encodeA = \case
   Nothing -> E.encodeListLen 0
   Just x  -> E.encodeListLen 1 <> encodeA x
 
@@ -209,7 +209,7 @@ encodeContainerSkel encodeLen size foldFunction f c =
 {-# INLINE encodeContainerSkel #-}
 
 encodeMapSkel
-  :: (ToCBOR k, ToCBOR v)
+  :: (EncCBOR k, EncCBOR v)
   => (m -> Int)
   -> ((k -> v -> E.Encoding -> E.Encoding) -> E.Encoding -> m -> E.Encoding)
   -> m
@@ -218,14 +218,14 @@ encodeMapSkel size foldrWithKey = encodeContainerSkel
   E.encodeMapLen
   size
   foldrWithKey
-  (\k v b -> toCBOR k <> toCBOR v <> b)
+  (\k v b -> encCBOR k <> encCBOR v <> b)
 {-# INLINE encodeMapSkel #-}
 
-instance (ToCBOR k, ToCBOR v) => ToCBOR (M.Map k v) where
-  toCBOR = encodeMapSkel M.size M.foldrWithKey
+instance (EncCBOR k, EncCBOR v) => EncCBOR (M.Map k v) where
+  encCBOR = encodeMapSkel M.size M.foldrWithKey
 
 encodeSetSkel
-  :: ToCBOR a
+  :: EncCBOR a
   => (s -> Int)
   -> ((a -> E.Encoding -> E.Encoding) -> E.Encoding -> s -> E.Encoding)
   -> s
@@ -234,7 +234,7 @@ encodeSetSkel size foldFunction = mappend encodeSetTag . encodeContainerSkel
   E.encodeListLen
   size
   foldFunction
-  (\a b -> toCBOR a <> b)
+  (\a b -> encCBOR a <> b)
 {-# INLINE encodeSetSkel #-}
 
 -- We stitch a `258` in from of a (Hash)Set, so that tools which
@@ -250,31 +250,31 @@ setTag = 258
 encodeSetTag :: E.Encoding
 encodeSetTag = E.encodeTag setTag
 
-instance ToCBOR a => ToCBOR (S.Set a) where
-  toCBOR = encodeSetSkel S.size S.foldr
+instance EncCBOR a => EncCBOR (S.Set a) where
+  encCBOR = encodeSetSkel S.size S.foldr
 
 -- | Generic encoder for vectors. Its intended use is to allow easy
 -- definition of 'Serialise' instances for custom vector
-encodeVector :: (ToCBOR a, Vector.Generic.Vector v a) => v a -> E.Encoding
+encodeVector :: (EncCBOR a, Vector.Generic.Vector v a) => v a -> E.Encoding
 encodeVector = encodeContainerSkel
   E.encodeListLen
   Vector.Generic.length
   Vector.Generic.foldr
-  (\a b -> toCBOR a <> b)
+  (\a b -> encCBOR a <> b)
 {-# INLINE encodeVector #-}
 
 
-instance (ToCBOR a) => ToCBOR (Vector.Vector a) where
-  toCBOR = encodeVector
-  {-# INLINE toCBOR #-}
+instance (EncCBOR a) => EncCBOR (Vector.Vector a) where
+  encCBOR = encodeVector
+  {-# INLINE encCBOR #-}
 
 
 --------------------------------------------------------------------------------
 -- Time
 --------------------------------------------------------------------------------
 
-instance ToCBOR UTCTime where
-  toCBOR (UTCTime day timeOfDay) = mconcat [
+instance EncCBOR UTCTime where
+  encCBOR (UTCTime day timeOfDay) = mconcat [
       encodeListLen 3
     , encodeInteger year
     , encodeInt dayOfYear

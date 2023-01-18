@@ -25,7 +25,7 @@ import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
@@ -164,20 +164,20 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
 
 
-instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
-  toCBOR = encodeVerKeyKES
+instance KnownNat t => EncCBOR (VerKeyKES (MockKES t)) where
+  encCBOR = encodeVerKeyKES
 
-instance KnownNat t => FromCBOR (VerKeyKES (MockKES t)) where
-  fromCBOR = decodeVerKeyKES
+instance KnownNat t => DecCBOR (VerKeyKES (MockKES t)) where
+  decCBOR = decodeVerKeyKES
 
-instance KnownNat t => ToCBOR (SignKeyKES (MockKES t)) where
-  toCBOR = encodeSignKeyKES
+instance KnownNat t => EncCBOR (SignKeyKES (MockKES t)) where
+  encCBOR = encodeSignKeyKES
 
-instance KnownNat t => FromCBOR (SignKeyKES (MockKES t)) where
-  fromCBOR = decodeSignKeyKES
+instance KnownNat t => DecCBOR (SignKeyKES (MockKES t)) where
+  decCBOR = decodeSignKeyKES
 
-instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
-  toCBOR = encodeSigKES
+instance KnownNat t => EncCBOR (SigKES (MockKES t)) where
+  encCBOR = encodeSigKES
 
-instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
-  fromCBOR = decodeSigKES
+instance KnownNat t => DecCBOR (SigKES (MockKES t)) where
+  decCBOR = decodeSigKES

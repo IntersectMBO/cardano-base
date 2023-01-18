@@ -5,7 +5,7 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
--- | Serialization primitives built on top of the @ToCBOR@ typeclass
+-- | Serialization primitives built on top of the @EncCBOR@ typeclass
 
 module Cardano.Binary.Serialize
   ( serialize
@@ -29,27 +29,27 @@ import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder.Extra as Builder
 import qualified Data.ByteString.Lazy as BSL
 
-import Cardano.Binary.EncCBOR (Encoding, ToCBOR(..), encodeTag)
+import Cardano.Binary.EncCBOR (Encoding, EncCBOR(..), encodeTag)
 
 
--- | Serialize a Haskell value with a 'ToCBOR' instance to an external binary
+-- | Serialize a Haskell value with a 'EncCBOR' instance to an external binary
 --   representation.
 --
 --   The output is represented as a lazy 'LByteString' and is constructed
 --   incrementally.
-serialize :: ToCBOR a => a -> BSL.ByteString
-serialize = serializeEncoding . toCBOR
+serialize :: EncCBOR a => a -> BSL.ByteString
+serialize = serializeEncoding . encCBOR
 
 -- | Serialize a Haskell value to an external binary representation.
 --
 --   The output is represented as a strict 'ByteString'.
-serialize' :: ToCBOR a => a -> BS.ByteString
+serialize' :: EncCBOR a => a -> BS.ByteString
 serialize' = BSL.toStrict . serialize
 
 -- | Serialize into a Builder. Useful if you want to throw other ByteStrings
 --   around it.
-serializeBuilder :: ToCBOR a => a -> Builder
-serializeBuilder = CBOR.Write.toBuilder . toCBOR
+serializeBuilder :: EncCBOR a => a -> Builder
+serializeBuilder = CBOR.Write.toBuilder . encCBOR
 
 -- | Serialize a Haskell value to an external binary representation using the
 --   provided CBOR 'Encoding'
@@ -78,7 +78,7 @@ serializeEncoding' = BSL.toStrict . serializeEncoding
 -- | Encode and serialise the given `a` and sorround it with the semantic tag 24
 --   In CBOR diagnostic notation:
 --   >>> 24(h'DEADBEEF')
-encodeNestedCbor :: ToCBOR a => a -> Encoding
+encodeNestedCbor :: EncCBOR a => a -> Encoding
 encodeNestedCbor = encodeNestedCborBytes . serialize
 
 -- | Like `encodeNestedCbor`, but assumes nothing about the shape of
@@ -86,5 +86,5 @@ encodeNestedCbor = encodeNestedCborBytes . serialize
 --   the caller responsibility to ensure the input `ByteString` correspond
 --   indeed to valid, previously-serialised CBOR data.
 encodeNestedCborBytes :: BSL.ByteString -> Encoding
-encodeNestedCborBytes x = encodeTag 24 <> toCBOR x
+encodeNestedCborBytes x = encodeTag 24 <> encCBOR x
 

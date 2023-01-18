@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 
--- | Golden and round-trip testing of 'FromCBOR' and 'ToCBOR' instances
+-- | Golden and round-trip testing of 'DecCBOR' and 'EncCBOR' instances
 
 module Test.Cardano.Binary.Helpers.GoldenRoundTrip
   ( goldenTestCBOR
@@ -36,8 +36,8 @@ import Cardano.Binary
   ( Decoder
   , DecoderError
   , Encoding
-  , FromCBOR(..)
-  , ToCBOR(..)
+  , DecCBOR(..)
+  , EncCBOR(..)
   , decodeFull
   , decodeFullDecoder
   , serialize
@@ -91,12 +91,12 @@ failHexDumpDiff x y = case hexDumpDiff x y of
 --
 goldenTestCBOR
   :: forall a
-  . (FromCBOR a, ToCBOR a, Eq a, Show a, HasCallStack)
+  . (DecCBOR a, EncCBOR a, Eq a, Show a, HasCallStack)
   => a
   -> FilePath
   -> Property
 goldenTestCBOR = withFrozenCallStack
-  $ goldenTestCBORExplicit (label $ Proxy @a) toCBOR fromCBOR
+  $ goldenTestCBORExplicit (label $ Proxy @a) encCBOR decCBOR
 
 
 -- | Variant of 'goldenTestBi' using custom encode and decode functions.
@@ -136,20 +136,20 @@ goldenTestExplicit encode decode x path = withFrozenCallStack $ do
     compareHexDump bs bs'
     fmap decode target === Just (Right x)
 
--- | Round trip test a value (any instance of 'FromCBOR', 'ToCBOR', and 'Show'
+-- | Round trip test a value (any instance of 'DecCBOR', 'EncCBOR', and 'Show'
 --   classes) by serializing it to a ByteString and back again and that also has
 --   a 'Show' instance. If the 'a' type has both 'Show' and 'Buildable'
 --   instances, it's best to use this version.
 roundTripsCBORShow
-  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Show a, HasCallStack)
+  :: (DecCBOR a, EncCBOR a, Eq a, MonadTest m, Show a, HasCallStack)
   => a
   -> m ()
 roundTripsCBORShow x = withFrozenCallStack $ tripping x serialize decodeFull
 
--- | Round trip (via ByteString) any instance of the 'FromCBOR' and 'ToCBOR'
+-- | Round trip (via ByteString) any instance of the 'DecCBOR' and 'EncCBOR'
 --   class that also has a 'Buildable' instance.
 roundTripsCBORBuildable
-  :: (FromCBOR a, ToCBOR a, Eq a, MonadTest m, Buildable a, HasCallStack)
+  :: (DecCBOR a, EncCBOR a, Eq a, MonadTest m, Buildable a, HasCallStack)
   => a
   -> m ()
 roundTripsCBORBuildable a =

@@ -46,7 +46,7 @@ import qualified Data.ByteString as BS
 import           Control.Monad (guard)
 import           NoThunks.Class (NoThunks)
 
-import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import           Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import           Cardano.Crypto.Util
 import           Cardano.Crypto.Seed
@@ -288,12 +288,12 @@ deriving instance Eq   (VerKeyKES (SumKES h d))
 instance (KESAlgorithm d) => NoThunks (SignKeyKES (SumKES h d))
 
 instance (KESAlgorithm d, HashAlgorithm h)
-      => ToCBOR (VerKeyKES (SumKES h d)) where
-  toCBOR = encodeVerKeyKES
+      => EncCBOR (VerKeyKES (SumKES h d)) where
+  encCBOR = encodeVerKeyKES
 
 instance (KESAlgorithm d, HashAlgorithm h)
-      => FromCBOR (VerKeyKES (SumKES h d)) where
-  fromCBOR = decodeVerKeyKES
+      => DecCBOR (VerKeyKES (SumKES h d)) where
+  decCBOR = decodeVerKeyKES
 
 
 --
@@ -305,12 +305,12 @@ deriving instance KESAlgorithm d => Show (SignKeyKES (SumKES h d))
 instance (KESAlgorithm d) => NoThunks (VerKeyKES  (SumKES h d))
 
 instance (KESAlgorithm d, HashAlgorithm h)
-      => ToCBOR (SignKeyKES (SumKES h d)) where
-  toCBOR = encodeSignKeyKES
+      => EncCBOR (SignKeyKES (SumKES h d)) where
+  encCBOR = encodeSignKeyKES
 
 instance (KESAlgorithm d, HashAlgorithm h)
-      => FromCBOR (SignKeyKES (SumKES h d)) where
-  fromCBOR = decodeSignKeyKES
+      => DecCBOR (SignKeyKES (SumKES h d)) where
+  decCBOR = decodeSignKeyKES
 
 
 --
@@ -323,9 +323,9 @@ deriving instance KESAlgorithm d => Eq   (SigKES (SumKES h d))
 instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 
 instance (KESAlgorithm d, HashAlgorithm h)
-      => ToCBOR (SigKES (SumKES h d)) where
-  toCBOR = encodeSigKES
+      => EncCBOR (SigKES (SumKES h d)) where
+  encCBOR = encodeSigKES
 
 instance (KESAlgorithm d, HashAlgorithm h)
-      => FromCBOR (SigKES (SumKES h d)) where
-  fromCBOR = decodeSigKES
+      => DecCBOR (SigKES (SumKES h d)) where
+  decCBOR = decodeSigKES

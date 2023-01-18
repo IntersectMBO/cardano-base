@@ -37,7 +37,7 @@ import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import Cardano.Foreign
 import Cardano.Crypto.PinnedSizedBytes
@@ -187,20 +187,20 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN . psbFromByteStringCheck
 
 
-instance ToCBOR (VerKeyDSIGN Ed25519DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+instance EncCBOR (VerKeyDSIGN Ed25519DSIGN) where
+  encCBOR = encodeVerKeyDSIGN
 
-instance FromCBOR (VerKeyDSIGN Ed25519DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+instance DecCBOR (VerKeyDSIGN Ed25519DSIGN) where
+  decCBOR = decodeVerKeyDSIGN
 
-instance ToCBOR (SignKeyDSIGN Ed25519DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+instance EncCBOR (SignKeyDSIGN Ed25519DSIGN) where
+  encCBOR = encodeSignKeyDSIGN
 
-instance FromCBOR (SignKeyDSIGN Ed25519DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+instance DecCBOR (SignKeyDSIGN Ed25519DSIGN) where
+  decCBOR = decodeSignKeyDSIGN
 
-instance ToCBOR (SigDSIGN Ed25519DSIGN) where
-  toCBOR = encodeSigDSIGN
+instance EncCBOR (SigDSIGN Ed25519DSIGN) where
+  encCBOR = encodeSigDSIGN
 
-instance FromCBOR (SigDSIGN Ed25519DSIGN) where
-  fromCBOR = decodeSigDSIGN
+instance DecCBOR (SigDSIGN Ed25519DSIGN) where
+  decCBOR = decodeSigDSIGN

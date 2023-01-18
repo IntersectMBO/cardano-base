@@ -42,7 +42,7 @@ import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGN.Class
@@ -143,11 +143,11 @@ deriving instance DSIGNAlgorithm d => Eq   (VerKeyKES (SingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (SignKeyKES (SingleKES d))
 
-instance DSIGNAlgorithm d => ToCBOR (VerKeyKES (SingleKES d)) where
-  toCBOR = encodeVerKeyKES
+instance DSIGNAlgorithm d => EncCBOR (VerKeyKES (SingleKES d)) where
+  encCBOR = encodeVerKeyKES
 
-instance DSIGNAlgorithm d => FromCBOR (VerKeyKES (SingleKES d)) where
-  fromCBOR = decodeVerKeyKES
+instance DSIGNAlgorithm d => DecCBOR (VerKeyKES (SingleKES d)) where
+  decCBOR = decodeVerKeyKES
 
 
 --
@@ -158,11 +158,11 @@ deriving instance DSIGNAlgorithm d => Show (SignKeyKES (SingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (VerKeyKES  (SingleKES d))
 
-instance DSIGNAlgorithm d => ToCBOR (SignKeyKES (SingleKES d)) where
-  toCBOR = encodeSignKeyKES
+instance DSIGNAlgorithm d => EncCBOR (SignKeyKES (SingleKES d)) where
+  encCBOR = encodeSignKeyKES
 
-instance DSIGNAlgorithm d => FromCBOR (SignKeyKES (SingleKES d)) where
-  fromCBOR = decodeSignKeyKES
+instance DSIGNAlgorithm d => DecCBOR (SignKeyKES (SingleKES d)) where
+  decCBOR = decodeSignKeyKES
 
 
 --
@@ -174,8 +174,8 @@ deriving instance DSIGNAlgorithm d => Eq   (SigKES (SingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (SigKES (SingleKES d))
 
-instance DSIGNAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
-  toCBOR = encodeSigKES
+instance DSIGNAlgorithm d => EncCBOR (SigKES (SingleKES d)) where
+  encCBOR = encodeSigKES
 
-instance DSIGNAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
-  fromCBOR = decodeSigKES
+instance DSIGNAlgorithm d => DecCBOR (SigKES (SingleKES d)) where
+  decCBOR = decodeSigKES

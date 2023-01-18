@@ -21,7 +21,7 @@ module Test.Crypto.Vector.Vectors
   )
 where
 
-import Cardano.Binary (FromCBOR)
+import Cardano.Binary (DecCBOR)
 import Cardano.Crypto.DSIGN
   ( DSIGNAlgorithm (SigDSIGN, SignKeyDSIGN, VerKeyDSIGN),
     EcdsaSecp256k1DSIGN,
@@ -35,14 +35,14 @@ import Test.Crypto.Vector.SerializationUtils
     vKeyParser,
   )
 
-defaultSKey :: forall d. (FromCBOR (SignKeyDSIGN d)) => SignKeyDSIGN d
+defaultSKey :: forall d. (DecCBOR (SignKeyDSIGN d)) => SignKeyDSIGN d
 defaultSKey = sKeyParser "B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF"
 
 defaultMessage :: ByteString
 defaultMessage = "243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89"
 
 -- These vectors contains secret key which first signs the given message and verifies using generated signature and derived vKey
-signAndVerifyTestVectors :: forall d. (FromCBOR (SignKeyDSIGN d)) => [(SignKeyDSIGN d, ByteString)]
+signAndVerifyTestVectors :: forall d. (DecCBOR (SignKeyDSIGN d)) => [(SignKeyDSIGN d, ByteString)]
 signAndVerifyTestVectors =
   map
     (\(sk, m) -> (sKeyParser sk, m))

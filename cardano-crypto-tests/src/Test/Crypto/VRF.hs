@@ -57,12 +57,12 @@ tests =
 
 testVRFAlgorithm
   :: forall proxy v. ( VRFAlgorithm v
-                     , ToCBOR (VerKeyVRF v)
-                     , FromCBOR (VerKeyVRF v)
-                     , ToCBOR (SignKeyVRF v)
-                     , FromCBOR (SignKeyVRF v)
-                     , ToCBOR (CertVRF v)
-                     , FromCBOR (CertVRF v)
+                     , EncCBOR (VerKeyVRF v)
+                     , DecCBOR (VerKeyVRF v)
+                     , EncCBOR (SignKeyVRF v)
+                     , DecCBOR (SignKeyVRF v)
+                     , EncCBOR (CertVRF v)
+                     , DecCBOR (CertVRF v)
                      , Eq (SignKeyVRF v)     -- no Eq for signing keys normally
                      , ContextVRF v ~ ()
                      , Signable v ~ SignableRepresentation
@@ -109,7 +109,7 @@ testVRFAlgorithm _ n =
                                                   decodeCertVRF
         ]
 
-      , testGroup "To/FromCBOR class"
+      , testGroup "To/DecCBOR class"
         [ testProperty "VerKey"  $ prop_cbor @(VerKeyVRF v)
         , testProperty "SignKey" $ prop_cbor @(SignKeyVRF v)
         , testProperty "Cert"    $ prop_cbor @(CertVRF v)

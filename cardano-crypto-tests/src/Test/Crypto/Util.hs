@@ -12,8 +12,8 @@
 
 module Test.Crypto.Util
   ( -- * CBOR
-    FromCBOR (..)
-  , ToCBOR (..)
+    DecCBOR (..)
+  , EncCBOR (..)
   , prop_cbor
   , prop_cbor_with
   , prop_cbor_valid
@@ -53,8 +53,8 @@ import GHC.Exts (fromListN, fromList, toList)
 import Text.Show.Pretty (ppShow)
 import Data.Kind (Type)
 import Cardano.Binary (
-  FromCBOR (fromCBOR),
-  ToCBOR (toCBOR),
+  DecCBOR (decCBOR),
+  EncCBOR (encCBOR),
   Encoding,
   Decoder,
   decodeFullDecoder,
@@ -103,7 +103,7 @@ newtype TestSeed
   = TestSeed
       { getTestSeed :: (Word64, Word64, Word64, Word64, Word64)
       }
-  deriving (Show, Eq, Ord, FromCBOR, ToCBOR)
+  deriving (Show, Eq, Ord, DecCBOR, EncCBOR)
 
 withTestSeed :: TestSeed -> MonadPseudoRandom ChaChaDRG a -> a
 withTestSeed s = fst . withDRG (drgNewTest $ getTestSeed s)
@@ -149,9 +149,9 @@ instance Arbitrary Message where
 -- Serialisation properties
 --------------------------------------------------------------------------------
 
-prop_cbor :: (ToCBOR a, FromCBOR a, Eq a, Show a)
+prop_cbor :: (EncCBOR a, DecCBOR a, Eq a, Show a)
           => a -> Property
-prop_cbor = prop_cbor_with toCBOR fromCBOR
+prop_cbor = prop_cbor_with encCBOR decCBOR
 
 prop_cbor_with :: (Eq a, Show a)
                => (a -> Encoding)
@@ -205,14 +205,14 @@ prop_raw_deserialise deserialise (BadInputFor (forbiddenLen, bs)) =
     Just x -> counterexample (ppShow x) False
 
 -- | The crypto algorithm classes have direct encoding functions, and the key
--- types are also typically a member of the 'ToCBOR' class. Where a 'ToCBOR'
+-- types are also typically a member of the 'EncCBOR' class. Where a 'EncCBOR'
 -- instance is provided then these should match.
 --
-prop_cbor_direct_vs_class :: ToCBOR a
+prop_cbor_direct_vs_class :: EncCBOR a
                           => (a -> Encoding)
                           -> a -> Property
 prop_cbor_direct_vs_class encoder x =
-  toFlatTerm (encoder x) === toFlatTerm (toCBOR x)
+  toFlatTerm (encoder x) === toFlatTerm (encCBOR x)
 
 prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
 prop_size_serialise serialise size x =

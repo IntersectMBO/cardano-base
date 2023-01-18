@@ -10,7 +10,7 @@ module Test.Crypto.Vector.Secp256k1DSIGN
   )
 where
 
-import Cardano.Binary (DecoderError (DecoderErrorDeserialiseFailure), FromCBOR, decodeFull')
+import Cardano.Binary (DecoderError (DecoderErrorDeserialiseFailure), DecCBOR, decodeFull')
 import Cardano.Crypto.DSIGN
   ( DSIGNAlgorithm
       ( ContextDSIGN,
@@ -118,7 +118,7 @@ type InvalidLengthErrorFunction = Integer -> String
 
 invalidLengthSignatureParserTest ::
   forall v.
-  ( FromCBOR (SigDSIGN v)
+  ( DecCBOR (SigDSIGN v)
   ) =>
   Proxy v ->
   [HexStringInCBOR] ->
@@ -133,7 +133,7 @@ invalidLengthSignatureParserTest _ invalidLengthSigs errorF =
 -- Try to parse the raw string into signature key and return the deserialize error
 invalidSigParserTest ::
   forall v.
-  ( FromCBOR (SigDSIGN v)
+  ( DecCBOR (SigDSIGN v)
   ) =>
   Proxy v ->
   HexStringInCBOR ->
@@ -148,7 +148,7 @@ invalidSigParserTest _ rawSig = do
 -- Signature parser using decodeFull
 fullSigParser ::
   forall v.
-  ( FromCBOR (SigDSIGN v)
+  ( DecCBOR (SigDSIGN v)
   ) =>
   Proxy v ->
   HexStringInCBOR ->
@@ -158,7 +158,7 @@ fullSigParser _ (HexCBOR hs) = decodeFull' hs
 -- Try to parse invalid length raw verification key
 invalidLengthVerKeyParserTest ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
+  ( DecCBOR (VerKeyDSIGN v)
   ) =>
   Proxy v ->
   [HexStringInCBOR] ->
@@ -173,7 +173,7 @@ invalidLengthVerKeyParserTest _ invalidLengthVKeys errorF =
 -- Try to parse raw verification key string and expect decode key error.
 verKeyNotOnCurveParserTest ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
+  ( DecCBOR (VerKeyDSIGN v)
   ) =>
   Proxy v ->
   HexStringInCBOR ->
@@ -185,7 +185,7 @@ verKeyNotOnCurveParserTest _ rawVKey = testCase "Parsing should fail when trying
 -- Try to parse the raw string into verification key and return the deserialize error
 invalidVerKeyParserTest ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
+  ( DecCBOR (VerKeyDSIGN v)
   ) =>
   Proxy v ->
   HexStringInCBOR ->
@@ -200,7 +200,7 @@ invalidVerKeyParserTest _ rawVKey = do
 -- Vkey parser using decodeFull
 fullVerKeyParser ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
+  ( DecCBOR (VerKeyDSIGN v)
   ) =>
   Proxy v ->
   HexStringInCBOR ->
@@ -233,7 +233,7 @@ mismatchSignKeyVerKeyTest ::
     ContextDSIGN v ~ (),
     Signable v a,
     ToSignable v a,
-    FromCBOR (SignKeyDSIGN v)
+    DecCBOR (SignKeyDSIGN v)
   ) =>
   VerKeyDSIGN v ->
   TestTree
@@ -267,7 +267,7 @@ signAndVerifyTest ::
     ContextDSIGN v ~ (),
     Signable v a,
     ToSignable v a,
-    FromCBOR (SignKeyDSIGN v)
+    DecCBOR (SignKeyDSIGN v)
   ) =>
   Proxy v ->
   TestTree

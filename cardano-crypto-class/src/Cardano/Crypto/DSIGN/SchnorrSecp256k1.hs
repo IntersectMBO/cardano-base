@@ -52,7 +52,7 @@ import Cardano.Crypto.SECP256K1.C (
 import Cardano.Foreign (allocaSized)
 import Control.Monad (when)
 import System.IO.Unsafe (unsafeDupablePerformIO)
-import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR))
+import Cardano.Binary (DecCBOR (decCBOR), EncCBOR (encCBOR))
 import Foreign.Ptr (castPtr, nullPtr)
 import NoThunks.Class (NoThunks)
 import Cardano.Crypto.DSIGN.Class (
@@ -200,20 +200,20 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   rawDeserialiseSigDSIGN bs =
     SigSchnorrSecp256k1 <$> psbFromByteStringCheck bs
 
-instance ToCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+instance EncCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
+  encCBOR = encodeVerKeyDSIGN
 
-instance FromCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+instance DecCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
+  decCBOR = decodeVerKeyDSIGN
 
-instance ToCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+instance EncCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
+  encCBOR = encodeSignKeyDSIGN
 
-instance FromCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+instance DecCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
+  decCBOR = decodeSignKeyDSIGN
 
-instance ToCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
-  toCBOR = encodeSigDSIGN
+instance EncCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
+  encCBOR = encodeSigDSIGN
 
-instance FromCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
-  fromCBOR = decodeSigDSIGN
+instance DecCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
+  decCBOR = decodeSigDSIGN

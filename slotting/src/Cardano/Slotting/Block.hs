@@ -7,7 +7,7 @@ module Cardano.Slotting.Block
   )
 where
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 import Codec.Serialise (Serialise (..))
 import Control.DeepSeq (NFData)
 import Data.Word (Word64)
@@ -23,8 +23,8 @@ newtype BlockNo = BlockNo {unBlockNo :: Word64}
   deriving Show via Quiet BlockNo
   deriving newtype (Enum, Bounded, Num, Serialise, NoThunks, NFData)
 
-instance ToCBOR BlockNo where
-  toCBOR = encode
+instance EncCBOR BlockNo where
+  encCBOR = encode
 
-instance FromCBOR BlockNo where
-  fromCBOR = decode
+instance DecCBOR BlockNo where
+  decCBOR = decode

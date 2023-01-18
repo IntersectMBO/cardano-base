@@ -7,12 +7,12 @@
 {-# LANGUAGE RankNTypes                #-}
 
 module Cardano.Binary.DecCBOR
-  ( FromCBOR(..)
+  ( DecCBOR(..)
   , DecoderError(..)
   , enforceSize
   , matchSize
   , module D
-  , fromCBORMaybe
+  , decCBORMaybe
   , decodeListWith
     -- * Helper tools to build instances
   , decodeMapSkel
@@ -60,8 +60,8 @@ import Numeric.Natural (Natural)
 {- HLINT ignore "Redundant <$>" -}
 
 
-class Typeable a => FromCBOR a where
-  fromCBOR :: D.Decoder s a
+class Typeable a => DecCBOR a where
+  decCBOR :: D.Decoder s a
 
   label :: Proxy a -> Text
   label = T.pack . show . typeRep
@@ -156,199 +156,199 @@ decodeListWith d = do
 -- Primitive types
 --------------------------------------------------------------------------------
 
-instance FromCBOR () where
-  fromCBOR = D.decodeNull
+instance DecCBOR () where
+  decCBOR = D.decodeNull
 
-instance FromCBOR Bool where
-  fromCBOR = D.decodeBool
+instance DecCBOR Bool where
+  decCBOR = D.decodeBool
 
 
 --------------------------------------------------------------------------------
 -- Numeric data
 --------------------------------------------------------------------------------
 
-instance FromCBOR Integer where
-  fromCBOR = D.decodeInteger
+instance DecCBOR Integer where
+  decCBOR = D.decodeInteger
 
-instance FromCBOR Word where
-  fromCBOR = D.decodeWord
+instance DecCBOR Word where
+  decCBOR = D.decodeWord
 
-instance FromCBOR Word8 where
-  fromCBOR = D.decodeWord8
+instance DecCBOR Word8 where
+  decCBOR = D.decodeWord8
 
-instance FromCBOR Word16 where
-  fromCBOR = D.decodeWord16
+instance DecCBOR Word16 where
+  decCBOR = D.decodeWord16
 
-instance FromCBOR Word32 where
-  fromCBOR = D.decodeWord32
+instance DecCBOR Word32 where
+  decCBOR = D.decodeWord32
 
-instance FromCBOR Word64 where
-  fromCBOR = D.decodeWord64
+instance DecCBOR Word64 where
+  decCBOR = D.decodeWord64
 
-instance FromCBOR Int where
-  fromCBOR = D.decodeInt
+instance DecCBOR Int where
+  decCBOR = D.decodeInt
 
-instance FromCBOR Float where
-  fromCBOR = D.decodeFloat
+instance DecCBOR Float where
+  decCBOR = D.decodeFloat
 
-instance FromCBOR Int32 where
-  fromCBOR = D.decodeInt32
+instance DecCBOR Int32 where
+  decCBOR = D.decodeInt32
 
-instance FromCBOR Int64 where
-  fromCBOR = D.decodeInt64
+instance DecCBOR Int64 where
+  decCBOR = D.decodeInt64
 
-instance (Integral a, FromCBOR a) => FromCBOR (Ratio a) where
-  fromCBOR = do
+instance (Integral a, DecCBOR a) => DecCBOR (Ratio a) where
+  decCBOR = do
     enforceSize "Ratio" 2
-    n <- fromCBOR
-    d <- fromCBOR
+    n <- decCBOR
+    d <- decCBOR
     if d <= 0
       then cborError $ DecoderErrorCustom "Ratio" "invalid denominator"
       else return $! n % d
 
-instance FromCBOR Nano where
-  fromCBOR = MkFixed <$> fromCBOR
+instance DecCBOR Nano where
+  decCBOR = MkFixed <$> decCBOR
 
-instance FromCBOR Pico where
-  fromCBOR = MkFixed <$> fromCBOR
+instance DecCBOR Pico where
+  decCBOR = MkFixed <$> decCBOR
 
 -- | For backwards compatibility we round pico precision to micro
-instance FromCBOR NominalDiffTime where
-  fromCBOR = fromRational . (% 1e6) <$> fromCBOR
+instance DecCBOR NominalDiffTime where
+  decCBOR = fromRational . (% 1e6) <$> decCBOR
 
-instance FromCBOR Natural where
-  fromCBOR = do
-      !n <- fromCBOR
+instance DecCBOR Natural where
+  decCBOR = do
+      !n <- decCBOR
       if n >= 0
         then return $! fromInteger n
         else cborError $ DecoderErrorCustom "Natural" "got a negative number"
 
-instance FromCBOR Void where
-  fromCBOR = cborError DecoderErrorVoid
+instance DecCBOR Void where
+  decCBOR = cborError DecoderErrorVoid
 
 
 --------------------------------------------------------------------------------
 -- Tagged
 --------------------------------------------------------------------------------
 
-instance (Typeable s, FromCBOR a) => FromCBOR (Tagged s a) where
-  fromCBOR = Tagged <$> fromCBOR
+instance (Typeable s, DecCBOR a) => DecCBOR (Tagged s a) where
+  decCBOR = Tagged <$> decCBOR
 
 
 --------------------------------------------------------------------------------
 -- Containers
 --------------------------------------------------------------------------------
 
-instance (FromCBOR a, FromCBOR b) => FromCBOR (a,b) where
-  fromCBOR = do
+instance (DecCBOR a, DecCBOR b) => DecCBOR (a,b) where
+  decCBOR = do
     D.decodeListLenOf 2
-    !x <- fromCBOR
-    !y <- fromCBOR
+    !x <- decCBOR
+    !y <- decCBOR
     return (x, y)
 
-instance (FromCBOR a, FromCBOR b, FromCBOR c) => FromCBOR (a,b,c) where
+instance (DecCBOR a, DecCBOR b, DecCBOR c) => DecCBOR (a,b,c) where
 
-  fromCBOR = do
+  decCBOR = do
     D.decodeListLenOf 3
-    !x <- fromCBOR
-    !y <- fromCBOR
-    !z <- fromCBOR
+    !x <- decCBOR
+    !y <- decCBOR
+    !z <- decCBOR
     return (x, y, z)
 
-instance (FromCBOR a, FromCBOR b, FromCBOR c, FromCBOR d) => FromCBOR (a,b,c,d) where
-  fromCBOR = do
+instance (DecCBOR a, DecCBOR b, DecCBOR c, DecCBOR d) => DecCBOR (a,b,c,d) where
+  decCBOR = do
     D.decodeListLenOf 4
-    !a <- fromCBOR
-    !b <- fromCBOR
-    !c <- fromCBOR
-    !d <- fromCBOR
+    !a <- decCBOR
+    !b <- decCBOR
+    !c <- decCBOR
+    !d <- decCBOR
     return (a, b, c, d)
 
 instance
-  (FromCBOR a, FromCBOR b, FromCBOR c, FromCBOR d, FromCBOR e)
-  => FromCBOR (a, b, c, d, e)
+  (DecCBOR a, DecCBOR b, DecCBOR c, DecCBOR d, DecCBOR e)
+  => DecCBOR (a, b, c, d, e)
  where
-  fromCBOR = do
+  decCBOR = do
     D.decodeListLenOf 5
-    !a <- fromCBOR
-    !b <- fromCBOR
-    !c <- fromCBOR
-    !d <- fromCBOR
-    !e <- fromCBOR
+    !a <- decCBOR
+    !b <- decCBOR
+    !c <- decCBOR
+    !d <- decCBOR
+    !e <- decCBOR
     return (a, b, c, d, e)
 
 instance
-  ( FromCBOR a
-  , FromCBOR b
-  , FromCBOR c
-  , FromCBOR d
-  , FromCBOR e
-  , FromCBOR f
-  , FromCBOR g
+  ( DecCBOR a
+  , DecCBOR b
+  , DecCBOR c
+  , DecCBOR d
+  , DecCBOR e
+  , DecCBOR f
+  , DecCBOR g
   )
-  => FromCBOR (a, b, c, d, e, f, g)
+  => DecCBOR (a, b, c, d, e, f, g)
   where
-  fromCBOR = do
+  decCBOR = do
     D.decodeListLenOf 7
-    !a <- fromCBOR
-    !b <- fromCBOR
-    !c <- fromCBOR
-    !d <- fromCBOR
-    !e <- fromCBOR
-    !f <- fromCBOR
-    !g <- fromCBOR
+    !a <- decCBOR
+    !b <- decCBOR
+    !c <- decCBOR
+    !d <- decCBOR
+    !e <- decCBOR
+    !f <- decCBOR
+    !g <- decCBOR
     return (a, b, c, d, e, f, g)
 
-instance FromCBOR BS.ByteString where
-  fromCBOR = D.decodeBytes
+instance DecCBOR BS.ByteString where
+  decCBOR = D.decodeBytes
 
-instance FromCBOR Text where
-  fromCBOR = D.decodeString
+instance DecCBOR Text where
+  decCBOR = D.decodeString
 
-instance FromCBOR BSL.ByteString where
-  fromCBOR = BSL.fromStrict <$> fromCBOR
+instance DecCBOR BSL.ByteString where
+  decCBOR = BSL.fromStrict <$> decCBOR
 
-instance FromCBOR SBS.ShortByteString where
-  fromCBOR = do
+instance DecCBOR SBS.ShortByteString where
+  decCBOR = do
     BA.BA (Prim.ByteArray ba) <- D.decodeByteArray
     return $ SBS ba
 
-instance FromCBOR a => FromCBOR [a] where
-  fromCBOR = decodeListWith fromCBOR
+instance DecCBOR a => DecCBOR [a] where
+  decCBOR = decodeListWith decCBOR
 
-instance (FromCBOR a, FromCBOR b) => FromCBOR (Either a b) where
-  fromCBOR = do
+instance (DecCBOR a, DecCBOR b) => DecCBOR (Either a b) where
+  decCBOR = do
     D.decodeListLenOf 2
     t <- D.decodeWord
     case t of
       0 -> do
-        !x <- fromCBOR
+        !x <- decCBOR
         return (Left x)
       1 -> do
-        !x <- fromCBOR
+        !x <- decCBOR
         return (Right x)
       _ -> cborError $ DecoderErrorUnknownTag "Either" (fromIntegral t)
 
-instance FromCBOR a => FromCBOR (NonEmpty a) where
-  fromCBOR = nonEmpty <$> fromCBOR >>= toCborError . \case
+instance DecCBOR a => DecCBOR (NonEmpty a) where
+  decCBOR = nonEmpty <$> decCBOR >>= toCborError . \case
     Nothing -> Left $ DecoderErrorEmptyList "NonEmpty"
     Just xs -> Right xs
 
-instance FromCBOR a => FromCBOR (Maybe a) where
-  fromCBOR = fromCBORMaybe fromCBOR
+instance DecCBOR a => DecCBOR (Maybe a) where
+  decCBOR = decCBORMaybe decCBOR
 
-fromCBORMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
-fromCBORMaybe fromCBORA = do
+decCBORMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
+decCBORMaybe decCBORA = do
   n <- D.decodeListLen
   case n of
     0 -> return Nothing
     1 -> do
-      !x <- fromCBORA
+      !x <- decCBORA
       return (Just x)
     _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral n)
 
 decodeContainerSkelWithReplicate
-  :: FromCBOR a
+  :: DecCBOR a
   => D.Decoder s Int
   -- ^ How to get the size of the container
   -> (Int -> D.Decoder s a -> D.Decoder s container)
@@ -366,7 +366,7 @@ decodeContainerSkelWithReplicate decodeLen replicateFun fromList = do
   size  <- decodeLen
   limit <- D.peekAvailable
   if size <= limit
-    then replicateFun size fromCBOR
+    then replicateFun size decCBOR
     else do
         -- Take the max of limit and a fixed chunk size (note: limit can be
         -- 0). This basically means that the attacker can make us allocate a
@@ -374,7 +374,7 @@ decodeContainerSkelWithReplicate decodeLen replicateFun fromList = do
       let
         chunkSize = max limit 128
         (d, m)    = size `divMod` chunkSize
-        buildOne s = replicateFun s fromCBOR
+        buildOne s = replicateFun s decCBOR
       containers <- sequence $ buildOne m : replicate d (buildOne chunkSize)
       return $! fromList containers
 {-# INLINE decodeContainerSkelWithReplicate #-}
@@ -384,7 +384,7 @@ decodeContainerSkelWithReplicate decodeLen replicateFun fromList = do
 --   See: https://tools.ietf.org/html/rfc7049#section-3.9
 --   "[..]The keys in every map must be sorted lowest value to highest.[...]"
 decodeMapSkel
-  :: (Ord k, FromCBOR k, FromCBOR v) => ([(k, v)] -> m) -> D.Decoder s m
+  :: (Ord k, DecCBOR k, DecCBOR v) => ([(k, v)] -> m) -> D.Decoder s m
 decodeMapSkel fromDistinctAscList = do
   n <- D.decodeMapLen
   case n of
@@ -395,16 +395,16 @@ decodeMapSkel fromDistinctAscList = do
         <$> decodeEntries (n - 1) firstKey [(firstKey, firstValue)]
  where
     -- Decode a single (k,v).
-  decodeEntry :: (FromCBOR k, FromCBOR v) => D.Decoder s (k, v)
+  decodeEntry :: (DecCBOR k, DecCBOR v) => D.Decoder s (k, v)
   decodeEntry = do
-    !k <- fromCBOR
-    !v <- fromCBOR
+    !k <- decCBOR
+    !v <- decCBOR
     return (k, v)
 
   -- Decode all the entries, enforcing canonicity by ensuring that the
   -- previous key is smaller than the next one.
   decodeEntries
-    :: (FromCBOR k, FromCBOR v, Ord k)
+    :: (DecCBOR k, DecCBOR v, Ord k)
     => Int
     -> k
     -> [(k, v)]
@@ -421,8 +421,8 @@ decodeMapSkel fromDistinctAscList = do
       else cborError $ DecoderErrorCanonicityViolation "Map"
 {-# INLINE decodeMapSkel #-}
 
-instance (Ord k, FromCBOR k, FromCBOR v) => FromCBOR (M.Map k v) where
-  fromCBOR = decodeMapSkel M.fromDistinctAscList
+instance (Ord k, DecCBOR k, DecCBOR v) => DecCBOR (M.Map k v) where
+  decCBOR = decodeMapSkel M.fromDistinctAscList
 
 -- We stitch a `258` in from of a (Hash)Set, so that tools which
 -- programmatically check for canonicity can recognise it from a normal
@@ -439,20 +439,20 @@ decodeSetTag = do
   t <- D.decodeTag
   when (t /= setTag) $ cborError $ DecoderErrorUnknownTag "Set" (fromIntegral t)
 
-decodeSetSkel :: (Ord a, FromCBOR a) => ([a] -> c) -> D.Decoder s c
+decodeSetSkel :: (Ord a, DecCBOR a) => ([a] -> c) -> D.Decoder s c
 decodeSetSkel fromDistinctAscList = do
   decodeSetTag
   n <- D.decodeListLen
   case n of
     0 -> return (fromDistinctAscList [])
     _ -> do
-      firstValue <- fromCBOR
+      firstValue <- decCBOR
       fromDistinctAscList <$> decodeEntries (n - 1) firstValue [firstValue]
  where
-  decodeEntries :: (FromCBOR v, Ord v) => Int -> v -> [v] -> D.Decoder s [v]
+  decodeEntries :: (DecCBOR v, Ord v) => Int -> v -> [v] -> D.Decoder s [v]
   decodeEntries 0                 _             acc  = pure $ reverse acc
   decodeEntries !remainingEntries previousValue !acc = do
-    newValue <- fromCBOR
+    newValue <- decCBOR
     -- Order of values needs to be strictly increasing, because otherwise
     -- it's possible to supply lists with various amount of duplicates which
     -- will result in the same set.
@@ -461,29 +461,29 @@ decodeSetSkel fromDistinctAscList = do
       else cborError $ DecoderErrorCanonicityViolation "Set"
 {-# INLINE decodeSetSkel #-}
 
-instance (Ord a, FromCBOR a) => FromCBOR (S.Set a) where
-  fromCBOR = decodeSetSkel S.fromDistinctAscList
+instance (Ord a, DecCBOR a) => DecCBOR (S.Set a) where
+  decCBOR = decodeSetSkel S.fromDistinctAscList
 
 -- | Generic decoder for vectors. Its intended use is to allow easy
 -- definition of 'Serialise' instances for custom vector
-decodeVector :: (FromCBOR a, Vector.Generic.Vector v a) => D.Decoder s (v a)
+decodeVector :: (DecCBOR a, Vector.Generic.Vector v a) => D.Decoder s (v a)
 decodeVector = decodeContainerSkelWithReplicate
   D.decodeListLen
   Vector.Generic.replicateM
   Vector.Generic.concat
 {-# INLINE decodeVector #-}
 
-instance (FromCBOR a) => FromCBOR (Vector.Vector a) where
-  fromCBOR = decodeVector
-  {-# INLINE fromCBOR #-}
+instance (DecCBOR a) => DecCBOR (Vector.Vector a) where
+  decCBOR = decodeVector
+  {-# INLINE decCBOR #-}
 
 
 --------------------------------------------------------------------------------
 -- Time
 --------------------------------------------------------------------------------
 
-instance FromCBOR UTCTime where
-  fromCBOR = do
+instance DecCBOR UTCTime where
+  decCBOR = do
     enforceSize "UTCTime" 3
     year <- decodeInteger
     dayOfYear <- decodeInt

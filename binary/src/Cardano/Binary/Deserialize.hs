@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 
--- | Deserialization primitives built on top of the @FromCBOR@ typeclass
+-- | Deserialization primitives built on top of the @DecCBOR@ typeclass
 
 module Cardano.Binary.Deserialize
   (
@@ -39,7 +39,7 @@ import qualified Data.ByteString.Lazy.Internal as BSL
 import Data.Proxy (Proxy(Proxy))
 import Data.Text (Text)
 
-import Cardano.Binary.DecCBOR (DecoderError(..), FromCBOR(..), cborError, toCborError)
+import Cardano.Binary.DecCBOR (DecoderError(..), DecCBOR(..), cborError, toCborError)
 
 
 -- | Deserialize a Haskell value from the external binary representation
@@ -48,22 +48,22 @@ import Cardano.Binary.DecCBOR (DecoderError(..), FromCBOR(..), cborError, toCbor
 --   /Throws/: @'Read.DeserialiseFailure'@ if the given external
 --   representation is invalid or does not correspond to a value of the
 --   expected type.
-unsafeDeserialize :: FromCBOR a => BSL.ByteString -> a
+unsafeDeserialize :: DecCBOR a => BSL.ByteString -> a
 unsafeDeserialize =
-  either impureThrow id . bimap fst fst . deserialiseDecoder fromCBOR
+  either impureThrow id . bimap fst fst . deserialiseDecoder decCBOR
 
 -- | Strict variant of 'deserialize'.
-unsafeDeserialize' :: FromCBOR a => BS.ByteString -> a
+unsafeDeserialize' :: DecCBOR a => BS.ByteString -> a
 unsafeDeserialize' = unsafeDeserialize . BSL.fromStrict
 
 -- | Deserialize a Haskell value from the external binary representation,
 --   failing if there are leftovers. In a nutshell, the `full` here implies
 --   the contract of this function is that what you feed as input needs to
 --   be consumed entirely.
-decodeFull :: forall a . FromCBOR a => BSL.ByteString -> Either DecoderError a
-decodeFull = decodeFullDecoder (label $ Proxy @a) fromCBOR
+decodeFull :: forall a . DecCBOR a => BSL.ByteString -> Either DecoderError a
+decodeFull = decodeFullDecoder (label $ Proxy @a) decCBOR
 
-decodeFull' :: forall a . FromCBOR a => BS.ByteString -> Either DecoderError a
+decodeFull' :: forall a . DecCBOR a => BS.ByteString -> Either DecoderError a
 decodeFull' = decodeFull . BSL.fromStrict
 
 decodeFullDecoder
@@ -118,7 +118,7 @@ decodeNestedCborTag = do
 -- | Remove the the semantic tag 24 from the enclosed CBOR data item,
 -- decoding back the inner `ByteString` as a proper Haskell type.
 -- Consume its input in full.
-decodeNestedCbor :: FromCBOR a => D.Decoder s a
+decodeNestedCbor :: DecCBOR a => D.Decoder s a
 decodeNestedCbor = do
   bs <- decodeNestedCborBytes
   toCborError $ decodeFull' bs

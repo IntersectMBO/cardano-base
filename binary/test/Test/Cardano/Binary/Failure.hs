@@ -29,12 +29,12 @@ tests = checkParallel $$(discover)
 -------------------------   Generators   -----------------------------
 
 genInvalidNonEmptyCBOR :: Gen Encoding -- NonEmpty Bool
-genInvalidNonEmptyCBOR  = pure (toCBOR ([] :: [Bool]))
+genInvalidNonEmptyCBOR  = pure (encCBOR ([] :: [Bool]))
 
 genInvalidEitherCBOR :: Gen Encoding -- Either Bool Bool
 genInvalidEitherCBOR = do
   b <- Gen.bool
-  pure (encodeListLen 2 <> encodeWord 3 <> toCBOR b)
+  pure (encodeListLen 2 <> encodeWord 3 <> encCBOR b)
 
 genNegativeInteger :: Gen Integer
 genNegativeInteger =
@@ -69,13 +69,13 @@ prop_shouldFailSet = property $ do
   ls <- forAll $ Gen.list (Range.constant 0 20) (Gen.int Range.constantBounded)
   let set = encodeTag 258
           <> encodeListLen (fromIntegral (length ls + 2))
-          <> mconcat (toCBOR <$> (4:3:ls))
+          <> mconcat (encCBOR <$> (4:3:ls))
   assertIsLeft (decode set :: Either DecoderError (Set Int))
 
 prop_shouldFailNegativeNatural :: Property
 prop_shouldFailNegativeNatural = property $ do
   n <- forAll genNegativeInteger
-  assertIsLeft (decode (toCBOR n) :: Either DecoderError Natural)
+  assertIsLeft (decode (encCBOR n) :: Either DecoderError Natural)
 
 ---------------------------------------------------------------------
 ------------------------------- helpers -----------------------------
@@ -92,7 +92,7 @@ assertIsLeft (Left !x) = case x of
   DecoderErrorUnknownTag _ i | i > 0 -> success
   _                                  -> success
 
-decode :: FromCBOR a => Encoding -> Either DecoderError a
+decode :: DecCBOR a => Encoding -> Either DecoderError a
 decode enc =
  let encoded = serializeEncoding enc
  in decodeFull encoded

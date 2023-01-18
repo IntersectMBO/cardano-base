@@ -17,7 +17,7 @@ import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (FromCBOR, ToCBOR (..), FromCBOR(..))
+import Cardano.Binary (DecCBOR, EncCBOR (..), DecCBOR(..))
 
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Util
@@ -109,23 +109,23 @@ instance VRFAlgorithm MockVRF where
     = Nothing
 
 
-instance ToCBOR (VerKeyVRF MockVRF) where
-  toCBOR = encodeVerKeyVRF
+instance EncCBOR (VerKeyVRF MockVRF) where
+  encCBOR = encodeVerKeyVRF
 
-instance FromCBOR (VerKeyVRF MockVRF) where
-  fromCBOR = decodeVerKeyVRF
+instance DecCBOR (VerKeyVRF MockVRF) where
+  decCBOR = decodeVerKeyVRF
 
-instance ToCBOR (SignKeyVRF MockVRF) where
-  toCBOR = encodeSignKeyVRF
+instance EncCBOR (SignKeyVRF MockVRF) where
+  encCBOR = encodeSignKeyVRF
 
-instance FromCBOR (SignKeyVRF MockVRF) where
-  fromCBOR = decodeSignKeyVRF
+instance DecCBOR (SignKeyVRF MockVRF) where
+  decCBOR = decodeSignKeyVRF
 
-instance ToCBOR (CertVRF MockVRF) where
-  toCBOR = encodeCertVRF
+instance EncCBOR (CertVRF MockVRF) where
+  encCBOR = encodeCertVRF
 
-instance FromCBOR (CertVRF MockVRF) where
-  fromCBOR = decodeCertVRF
+instance DecCBOR (CertVRF MockVRF) where
+  decCBOR = decodeCertVRF
 
 
 evalVRF' :: SignableRepresentation a
@@ -134,5 +134,5 @@ evalVRF' :: SignableRepresentation a
          -> (OutputVRF MockVRF, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
   let y = hashToBytes $ hashWithSerialiser @ShortHash id $
-            toCBOR (getSignableRepresentation a) <> toCBOR sk
+            encCBOR (getSignableRepresentation a) <> encCBOR sk
   in (OutputVRF y, CertMockVRF n)

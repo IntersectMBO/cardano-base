@@ -63,8 +63,8 @@ module Cardano.Crypto.VRF.Praos
 where
 
 import Cardano.Binary
-  ( FromCBOR (..)
-  , ToCBOR (..)
+  ( DecCBOR (..)
+  , EncCBOR (..)
   )
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
@@ -271,11 +271,11 @@ instance Show Proof where
 instance Eq Proof where
   a == b = proofBytes a == proofBytes b
 
-instance ToCBOR Proof where
-  toCBOR = toCBOR . proofBytes
+instance EncCBOR Proof where
+  encCBOR = encCBOR . proofBytes
 
-instance FromCBOR Proof where
-  fromCBOR = fromCBOR >>= proofFromBytes
+instance DecCBOR Proof where
+  decCBOR = decCBOR >>= proofFromBytes
 
 instance Show SignKey where
   show = show . skBytes
@@ -283,11 +283,11 @@ instance Show SignKey where
 instance Eq SignKey where
   a == b = skBytes a == skBytes b
 
-instance ToCBOR SignKey where
-  toCBOR = toCBOR . skBytes
+instance EncCBOR SignKey where
+  encCBOR = encCBOR . skBytes
 
-instance FromCBOR SignKey where
-  fromCBOR = fromCBOR >>= skFromBytes
+instance DecCBOR SignKey where
+  decCBOR = decCBOR >>= skFromBytes
 
 instance Show VerKey where
   show = show . vkBytes
@@ -295,11 +295,11 @@ instance Show VerKey where
 instance Eq VerKey where
   a == b = vkBytes a == vkBytes b
 
-instance ToCBOR VerKey where
-  toCBOR = toCBOR . vkBytes
+instance EncCBOR VerKey where
+  encCBOR = encCBOR . vkBytes
 
-instance FromCBOR VerKey where
-  fromCBOR = fromCBOR >>= vkFromBytes
+instance DecCBOR VerKey where
+  decCBOR = decCBOR >>= vkFromBytes
 
 -- | Allocate a Verification Key and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -472,19 +472,19 @@ data PraosVRF
 instance VRFAlgorithm PraosVRF where
   newtype VerKeyVRF PraosVRF = VerKeyPraosVRF VerKey
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
+    deriving newtype (EncCBOR, DecCBOR)
     deriving NoThunks via OnlyCheckWhnfNamed "VerKeyVRF PraosVRF" VerKey
     deriving newtype (NFData)
 
   newtype SignKeyVRF PraosVRF = SignKeyPraosVRF SignKey
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
+    deriving newtype (EncCBOR, DecCBOR)
     deriving NoThunks via OnlyCheckWhnfNamed "SignKeyVRF PraosVRF" SignKey
     deriving newtype (NFData)
 
   newtype CertVRF PraosVRF = CertPraosVRF Proof
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
+    deriving newtype (EncCBOR, DecCBOR)
     deriving NoThunks via OnlyCheckWhnfNamed "CertKeyVRF PraosVRF" Proof
     deriving newtype (NFData)
 

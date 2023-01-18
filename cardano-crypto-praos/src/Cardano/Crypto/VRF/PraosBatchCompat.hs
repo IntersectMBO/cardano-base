@@ -62,8 +62,8 @@ module Cardano.Crypto.VRF.PraosBatchCompat
 where
 
 import Cardano.Binary
-  ( FromCBOR (..)
-  , ToCBOR (..)
+  ( DecCBOR (..)
+  , EncCBOR (..)
   )
 
 import Cardano.Crypto.VRF.Class
@@ -281,11 +281,11 @@ instance Show Proof where
 instance Eq Proof where
   a == b = proofBytes a == proofBytes b
 
-instance ToCBOR Proof where
-  toCBOR = toCBOR . proofBytes
+instance EncCBOR Proof where
+  encCBOR = encCBOR . proofBytes
 
-instance FromCBOR Proof where
-  fromCBOR = proofFromBytes <$> fromCBOR
+instance DecCBOR Proof where
+  decCBOR = proofFromBytes <$> decCBOR
 
 
 instance Show SignKey where
@@ -294,11 +294,11 @@ instance Show SignKey where
 instance Eq SignKey where
   a == b = skBytes a == skBytes b
 
-instance ToCBOR SignKey where
-  toCBOR = toCBOR . skBytes
+instance EncCBOR SignKey where
+  encCBOR = encCBOR . skBytes
 
-instance FromCBOR SignKey where
-  fromCBOR = skFromBytes <$> fromCBOR
+instance DecCBOR SignKey where
+  decCBOR = skFromBytes <$> decCBOR
 
 
 instance Show VerKey where
@@ -307,11 +307,11 @@ instance Show VerKey where
 instance Eq VerKey where
   a == b = vkBytes a == vkBytes b
 
-instance ToCBOR VerKey where
-  toCBOR = toCBOR . vkBytes
+instance EncCBOR VerKey where
+  encCBOR = encCBOR . vkBytes
 
-instance FromCBOR VerKey where
-  fromCBOR = vkFromBytes <$> fromCBOR
+instance DecCBOR VerKey where
+  decCBOR = vkFromBytes <$> decCBOR
 
 -- | Allocate a Verification Key and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -448,19 +448,19 @@ data PraosBatchCompatVRF
 instance VRFAlgorithm PraosBatchCompatVRF where
   newtype VerKeyVRF PraosBatchCompatVRF = VerKeyPraosBatchCompatVRF VerKey
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
+    deriving newtype (EncCBOR, DecCBOR)
     deriving NoThunks via OnlyCheckWhnfNamed "VerKeyVRF PraosBatchCompatVRF" VerKey
     deriving newtype (NFData)
 
   newtype SignKeyVRF PraosBatchCompatVRF = SignKeyPraosBatchCompatVRF SignKey
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
+    deriving newtype (EncCBOR, DecCBOR)
     deriving NoThunks via OnlyCheckWhnfNamed "SignKeyVRF PraosBatchCompatVRF" SignKey
     deriving newtype (NFData)
 
   newtype CertVRF PraosBatchCompatVRF = CertPraosBatchCompatVRF Proof
     deriving stock   (Show, Eq, Generic)
-    deriving newtype (ToCBOR, FromCBOR)
+    deriving newtype (EncCBOR, DecCBOR)
     deriving NoThunks via OnlyCheckWhnfNamed "CertKeyVRF PraosBatchCompatVRF" Proof
     deriving newtype (NFData)
 

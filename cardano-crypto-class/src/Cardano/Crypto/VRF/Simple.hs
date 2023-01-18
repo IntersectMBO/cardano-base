@@ -23,7 +23,7 @@ import           GHC.Generics (Generic)
 import           NoThunks.Class (NoThunks, InspectHeap(..))
 import           Numeric.Natural (Natural)
 
-import           Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
+import           Cardano.Binary (Encoding, DecCBOR (..), EncCBOR (..))
 
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
@@ -62,11 +62,11 @@ pattern Point p <- ThunkyPoint p
 instance Show Point where
   show (Point p) = show p
 
-instance ToCBOR Point where
-  toCBOR (Point p) = toCBOR $ pointToMaybe p
+instance EncCBOR Point where
+  encCBOR (Point p) = encCBOR $ pointToMaybe p
 
-instance FromCBOR Point where
-  fromCBOR = Point . pointFromMaybe <$> fromCBOR
+instance DecCBOR Point where
+  decCBOR = Point . pointFromMaybe <$> decCBOR
 
 instance Semigroup Point where
   Point p <> Point r = Point $ C.pointAdd curve p r
@@ -143,12 +143,12 @@ instance VRFAlgorithm SimpleVRF where
 
   evalVRF () a' sk@(SignKeySimpleVRF k) =
     let a = getSignableRepresentation a'
-        u = h' (toCBOR a) k
-        y = h $ toCBOR a <> toCBOR u
+        u = h' (encCBOR a) k
+        y = h $ encCBOR a <> encCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
 
         r = fromIntegral (bytesToNatural y) `mod` q
-        c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
+        c = h $ encCBOR a <> encCBOR v <> encCBOR (pow r) <> encCBOR (h' (encCBOR a) r)
         s = mod (r + k * fromIntegral (bytesToNatural c)) q
     in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
 
@@ -158,12 +158,12 @@ instance VRFAlgorithm SimpleVRF where
         c = certC cert
         c' = -fromIntegral c
         s = certS cert
-        b1 = y == h (toCBOR a <> toCBOR u)
+        b1 = y == h (encCBOR a <> encCBOR u)
         rhs =
-          h $ toCBOR a <>
-            toCBOR v <>
-            toCBOR (pow s <> pow' v c') <>
-            toCBOR (h' (toCBOR a) s <> pow' u c')
+          h $ encCBOR a <>
+            encCBOR v <>
+            encCBOR (pow s <> pow' v c') <>
+            encCBOR (h' (encCBOR a) s <> pow' u c')
     in b1 && c == bytesToNatural rhs
 
   sizeOutputVRF _ = sizeHash (Proxy :: Proxy H)
@@ -229,20 +229,20 @@ instance VRFAlgorithm SimpleVRF where
     | otherwise
     = Nothing
 
-instance ToCBOR (VerKeyVRF SimpleVRF) where
-  toCBOR = encodeVerKeyVRF
+instance EncCBOR (VerKeyVRF SimpleVRF) where
+  encCBOR = encodeVerKeyVRF
 
-instance FromCBOR (VerKeyVRF SimpleVRF) where
-  fromCBOR = decodeVerKeyVRF
+instance DecCBOR (VerKeyVRF SimpleVRF) where
+  decCBOR = decodeVerKeyVRF
 
-instance ToCBOR (SignKeyVRF SimpleVRF) where
-  toCBOR = encodeSignKeyVRF
+instance EncCBOR (SignKeyVRF SimpleVRF) where
+  encCBOR = encodeSignKeyVRF
 
-instance FromCBOR (SignKeyVRF SimpleVRF) where
-  fromCBOR = decodeSignKeyVRF
+instance DecCBOR (SignKeyVRF SimpleVRF) where
+  decCBOR = decodeSignKeyVRF
 
-instance ToCBOR (CertVRF SimpleVRF) where
-  toCBOR = encodeCertVRF
+instance EncCBOR (CertVRF SimpleVRF) where
+  encCBOR = encodeCertVRF
 
-instance FromCBOR (CertVRF SimpleVRF) where
-  fromCBOR = decodeCertVRF
+instance DecCBOR (CertVRF SimpleVRF) where
+  decCBOR = decodeCertVRF

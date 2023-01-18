@@ -18,7 +18,7 @@ module Cardano.Slotting.Slot
   )
 where
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 import Codec.Serialise (Serialise (..))
 import Control.DeepSeq (NFData (rnf))
 import Data.Aeson (FromJSON, ToJSON)
@@ -34,11 +34,11 @@ newtype SlotNo = SlotNo {unSlotNo :: Word64}
   deriving Show via Quiet SlotNo
   deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoThunks, ToJSON, FromJSON)
 
-instance ToCBOR SlotNo where
-  toCBOR = encode
+instance EncCBOR SlotNo where
+  encCBOR = encode
 
-instance FromCBOR SlotNo where
-  fromCBOR = decode
+instance DecCBOR SlotNo where
+  decCBOR = decode
 
 {-------------------------------------------------------------------------------
   WithOrigin
@@ -57,11 +57,11 @@ data WithOrigin t = Origin | At !t
       NoThunks
     )
 
-instance (Serialise t, Typeable t) => ToCBOR (WithOrigin t) where
-  toCBOR = encode
+instance (Serialise t, Typeable t) => EncCBOR (WithOrigin t) where
+  encCBOR = encode
 
-instance (Serialise t, Typeable t) => FromCBOR (WithOrigin t) where
-  fromCBOR = decode
+instance (Serialise t, Typeable t) => DecCBOR (WithOrigin t) where
+  decCBOR = decode
 
 instance Bounded t => Bounded (WithOrigin t) where
   minBound = Origin
@@ -102,9 +102,9 @@ withOriginFromMaybe (Just t) = At t
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochNo
-  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+  deriving newtype (Enum, Num, Serialise, EncCBOR, DecCBOR, NoThunks, ToJSON, FromJSON, NFData)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochSize
-  deriving newtype (Enum, Num, Real, Integral, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+  deriving newtype (Enum, Num, Real, Integral, EncCBOR, DecCBOR, NoThunks, ToJSON, FromJSON, NFData)

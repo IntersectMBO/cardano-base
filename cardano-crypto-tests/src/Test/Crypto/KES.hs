@@ -27,8 +27,8 @@ import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
 import Test.Crypto.Util (
-  ToCBOR,
-  FromCBOR,
+  EncCBOR,
+  DecCBOR,
   Message,
   prop_raw_serialise,
   prop_size_serialise,
@@ -77,13 +77,13 @@ deriving instance (KESAlgorithm d, Eq (SignKeyKES d))
 testKESAlgorithm
   :: forall v proxy.
      ( KESAlgorithm v
-     , ToCBOR (VerKeyKES v)
-     , FromCBOR (VerKeyKES v)
-     , ToCBOR (SignKeyKES v)
-     , FromCBOR (SignKeyKES v)
+     , EncCBOR (VerKeyKES v)
+     , DecCBOR (VerKeyKES v)
+     , EncCBOR (SignKeyKES v)
+     , DecCBOR (SignKeyKES v)
      , Eq (SignKeyKES v)   -- no Eq for signing keys normally
-     , ToCBOR (SigKES v)
-     , FromCBOR (SigKES v)
+     , EncCBOR (SigKES v)
+     , DecCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
      )
@@ -129,7 +129,7 @@ testKESAlgorithm _p n =
                                                   decodeSigKES
         ]
 
-      , testGroup "To/FromCBOR class"
+      , testGroup "To/DecCBOR class"
         [ testProperty "VerKey"  $ prop_cbor @(VerKeyKES v)
         , testProperty "SignKey" $ prop_cbor @(SignKeyKES v)
         , testProperty "Sig"     $ prop_cbor @(SigKES v)

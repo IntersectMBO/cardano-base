@@ -14,7 +14,7 @@ module Test.Crypto.Vector.SerializationUtils
   )
 where
 
-import Cardano.Binary (FromCBOR, serialize', unsafeDeserialize')
+import Cardano.Binary (DecCBOR, serialize', unsafeDeserialize')
 import Cardano.Crypto.DSIGN
   ( DSIGNAlgorithm (SigDSIGN, SignKeyDSIGN, VerKeyDSIGN),
   )
@@ -54,11 +54,11 @@ unsafeUnHex hexBs = case unHex hexBs of
 
 type SignatureResult = (Either String ())
 
-sKeyParser :: forall d. (FromCBOR (SignKeyDSIGN d)) => HexStringInCBOR -> SignKeyDSIGN d
+sKeyParser :: forall d. (DecCBOR (SignKeyDSIGN d)) => HexStringInCBOR -> SignKeyDSIGN d
 sKeyParser (HexCBOR bs) = unsafeDeserialize' bs
 
-vKeyParser :: forall d. (FromCBOR (VerKeyDSIGN d)) => HexStringInCBOR -> VerKeyDSIGN d
+vKeyParser :: forall d. (DecCBOR (VerKeyDSIGN d)) => HexStringInCBOR -> VerKeyDSIGN d
 vKeyParser (HexCBOR bs) = unsafeDeserialize' bs
 
-sigParser :: forall d. (FromCBOR (SigDSIGN d)) => HexStringInCBOR -> SigDSIGN d
+sigParser :: forall d. (DecCBOR (SigDSIGN d)) => HexStringInCBOR -> SigDSIGN d
 sigParser (HexCBOR bs) = unsafeDeserialize' bs

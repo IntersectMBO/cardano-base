@@ -19,8 +19,8 @@ module Data.Maybe.Strict
 where
 
 import Cardano.Binary
-  ( FromCBOR (fromCBOR),
-    ToCBOR (toCBOR),
+  ( DecCBOR (decCBOR),
+    EncCBOR (encCBOR),
     decodeBreakOr,
     decodeListLenOrIndef,
     encodeListLen,
@@ -67,23 +67,23 @@ instance Monad StrictMaybe where
 instance MonadFail StrictMaybe where
   fail _ = SNothing
 
-instance ToCBOR a => ToCBOR (StrictMaybe a) where
-  toCBOR SNothing = encodeListLen 0
-  toCBOR (SJust x) = encodeListLen 1 <> toCBOR x
+instance EncCBOR a => EncCBOR (StrictMaybe a) where
+  encCBOR SNothing = encodeListLen 0
+  encCBOR (SJust x) = encodeListLen 1 <> encCBOR x
 
-instance FromCBOR a => FromCBOR (StrictMaybe a) where
-  fromCBOR = do
+instance DecCBOR a => DecCBOR (StrictMaybe a) where
+  decCBOR = do
     maybeN <- decodeListLenOrIndef
     case maybeN of
       Just 0 -> pure SNothing
-      Just 1 -> SJust <$> fromCBOR
+      Just 1 -> SJust <$> decCBOR
       Just _ -> fail "too many elements in length-style decoding of StrictMaybe."
       Nothing -> do
         isBreak <- decodeBreakOr
         if isBreak
           then pure SNothing
           else do
-            x <- fromCBOR
+            x <- decCBOR
             isBreak2 <- decodeBreakOr
             if isBreak2
               then pure (SJust x)

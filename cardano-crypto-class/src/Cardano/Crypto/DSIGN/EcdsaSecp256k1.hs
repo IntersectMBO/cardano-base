@@ -42,7 +42,7 @@ import Foreign.Ptr (castPtr, nullPtr, Ptr)
 import Control.Monad (when, void, unless)
 import Cardano.Crypto.Hash.Class (HashAlgorithm (SizeHash, digest))
 import Data.Proxy (Proxy)
-import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR))
+import Cardano.Binary (DecCBOR (decCBOR), EncCBOR (encCBOR))
 import Data.ByteString (ByteString)
 import Crypto.Random (getRandomBytes)
 import Cardano.Crypto.Seed (runMonadRandomWithSeed)
@@ -260,20 +260,20 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
     rawDeserialiseSignKeyDSIGN bs =
       SignKeyEcdsaSecp256k1 <$> psbFromByteStringCheck bs
 
-instance ToCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+instance EncCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
+  encCBOR = encodeVerKeyDSIGN
 
-instance FromCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+instance DecCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
+  decCBOR = decodeVerKeyDSIGN
 
-instance ToCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+instance EncCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
+  encCBOR = encodeSignKeyDSIGN
 
-instance FromCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+instance DecCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
+  decCBOR = decodeSignKeyDSIGN
 
-instance ToCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
-  toCBOR = encodeSigDSIGN
+instance EncCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
+  encCBOR = encodeSigDSIGN
 
-instance FromCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
-  fromCBOR = decodeSigDSIGN
+instance DecCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
+  decCBOR = decodeSigDSIGN

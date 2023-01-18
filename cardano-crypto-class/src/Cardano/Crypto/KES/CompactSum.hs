@@ -79,7 +79,7 @@ import qualified Data.ByteString as BS
 import           Control.Monad (guard)
 import           NoThunks.Class (NoThunks)
 
-import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import           Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Util
@@ -329,12 +329,12 @@ deriving instance Eq   (VerKeyKES (CompactSumKES h d))
 instance (KESAlgorithm d) => NoThunks (SignKeyKES (CompactSumKES h d))
 
 instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => ToCBOR (VerKeyKES (CompactSumKES h d)) where
-  toCBOR = encodeVerKeyKES
+      => EncCBOR (VerKeyKES (CompactSumKES h d)) where
+  encCBOR = encodeVerKeyKES
 
 instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => FromCBOR (VerKeyKES (CompactSumKES h d)) where
-  fromCBOR = decodeVerKeyKES
+      => DecCBOR (VerKeyKES (CompactSumKES h d)) where
+  decCBOR = decodeVerKeyKES
 
 
 --
@@ -346,12 +346,12 @@ deriving instance KESAlgorithm d => Show (SignKeyKES (CompactSumKES h d))
 instance (OptimizedKESAlgorithm d) => NoThunks (VerKeyKES  (CompactSumKES h d))
 
 instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => ToCBOR (SignKeyKES (CompactSumKES h d)) where
-  toCBOR = encodeSignKeyKES
+      => EncCBOR (SignKeyKES (CompactSumKES h d)) where
+  encCBOR = encodeSignKeyKES
 
 instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => FromCBOR (SignKeyKES (CompactSumKES h d)) where
-  fromCBOR = decodeSignKeyKES
+      => DecCBOR (SignKeyKES (CompactSumKES h d)) where
+  decCBOR = decodeSignKeyKES
 
 
 --
@@ -364,9 +364,9 @@ deriving instance KESAlgorithm d => Eq   (SigKES (CompactSumKES h d))
 instance KESAlgorithm d => NoThunks (SigKES (CompactSumKES h d))
 
 instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => ToCBOR (SigKES (CompactSumKES h d)) where
-  toCBOR = encodeSigKES
+      => EncCBOR (SigKES (CompactSumKES h d)) where
+  encCBOR = encodeSigKES
 
 instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => FromCBOR (SigKES (CompactSumKES h d)) where
-  fromCBOR = decodeSigKES
+      => DecCBOR (SigKES (CompactSumKES h d)) where
+  decCBOR = decodeSigKES

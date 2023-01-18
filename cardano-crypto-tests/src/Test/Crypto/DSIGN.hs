@@ -59,7 +59,7 @@ import Cardano.Crypto.DSIGN (
   seedSizeDSIGN,
   hashAndPack
   )
-import Cardano.Binary (FromCBOR, ToCBOR)
+import Cardano.Binary (DecCBOR, EncCBOR)
 import Test.Crypto.Util (
   Message (messageBytes),
   prop_raw_serialise,
@@ -166,12 +166,12 @@ testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
    Show a,
    Eq (SignKeyDSIGN v),
    Eq a,
-   ToCBOR (VerKeyDSIGN v),
-   FromCBOR (VerKeyDSIGN v),
-   ToCBOR (SignKeyDSIGN v),
-   FromCBOR (SignKeyDSIGN v),
-   ToCBOR (SigDSIGN v),
-   FromCBOR (SigDSIGN v)) =>
+   EncCBOR (VerKeyDSIGN v),
+   DecCBOR (VerKeyDSIGN v),
+   EncCBOR (SignKeyDSIGN v),
+   DecCBOR (SignKeyDSIGN v),
+   EncCBOR (SigDSIGN v),
+   DecCBOR (SigDSIGN v)) =>
   Gen (SigDSIGN v) ->
   Gen a ->
   String ->
@@ -235,7 +235,7 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
                    ppShow $
                    prop_cbor_with encodeSigDSIGN decodeSigDSIGN
       ],
-    testGroup "To/FromCBOR class" [
+    testGroup "To/DecCBOR class" [
       testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor,
       testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor,
       testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor

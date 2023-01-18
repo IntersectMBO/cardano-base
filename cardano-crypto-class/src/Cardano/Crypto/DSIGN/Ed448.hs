@@ -20,7 +20,7 @@ import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, InspectHeap(..))
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import Crypto.Error (CryptoFailable (..))
 import Crypto.PubKey.Ed448 as Ed448
@@ -106,23 +106,23 @@ instance DSIGNAlgorithm Ed448DSIGN where
                                . cryptoFailableToMaybe . Ed448.signature
 
 
-instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+instance EncCBOR (VerKeyDSIGN Ed448DSIGN) where
+  encCBOR = encodeVerKeyDSIGN
 
-instance FromCBOR (VerKeyDSIGN Ed448DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+instance DecCBOR (VerKeyDSIGN Ed448DSIGN) where
+  decCBOR = decodeVerKeyDSIGN
 
-instance ToCBOR (SignKeyDSIGN Ed448DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+instance EncCBOR (SignKeyDSIGN Ed448DSIGN) where
+  encCBOR = encodeSignKeyDSIGN
 
-instance FromCBOR (SignKeyDSIGN Ed448DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+instance DecCBOR (SignKeyDSIGN Ed448DSIGN) where
+  decCBOR = decodeSignKeyDSIGN
 
-instance ToCBOR (SigDSIGN Ed448DSIGN) where
-  toCBOR = encodeSigDSIGN
+instance EncCBOR (SigDSIGN Ed448DSIGN) where
+  encCBOR = encodeSigDSIGN
 
-instance FromCBOR (SigDSIGN Ed448DSIGN) where
-  fromCBOR = decodeSigDSIGN
+instance DecCBOR (SigDSIGN Ed448DSIGN) where
+  decCBOR = decodeSigDSIGN
 
 
 cryptoFailableToMaybe :: CryptoFailable a -> Maybe a

@@ -35,8 +35,8 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 import Cardano.Binary
-  ( FromCBOR(..)
-  , ToCBOR(..)
+  ( DecCBOR(..)
+  , EncCBOR(..)
   , decodeListLenOf
   , decodeNestedCborBytes
   , encodeListLen
@@ -51,8 +51,8 @@ import Cardano.Binary
 --------------------------------------------------------------------------------
 
 -- | Machinery to test we perform "flat" encoding.
-cborFlatTermValid :: ToCBOR a => a -> Property
-cborFlatTermValid = property . validFlatTerm . toFlatTerm . toCBOR
+cborFlatTermValid :: EncCBOR a => a -> Property
+cborFlatTermValid = property . validFlatTerm . toFlatTerm . encCBOR
 
 --------------------------------------------------------------------------------
 
@@ -62,16 +62,16 @@ cborFlatTermValid = property . validFlatTerm . toFlatTerm . toCBOR
 -- Check the `extensionProperty` for more details.
 data U = U Word8 BS.ByteString deriving (Show, Eq)
 
-instance ToCBOR U where
-  toCBOR (U word8 bs) =
-    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeNestedCborBytes
+instance EncCBOR U where
+  encCBOR (U word8 bs) =
+    encodeListLen 2 <> encCBOR (word8 :: Word8) <> encodeNestedCborBytes
       (LBS.fromStrict bs)
 
 
-instance FromCBOR U where
-  fromCBOR = do
+instance DecCBOR U where
+  decCBOR = do
     decodeListLenOf 2
-    U <$> fromCBOR <*> decodeNestedCborBytes
+    U <$> decCBOR <*> decodeNestedCborBytes
 
 instance Arbitrary U where
   arbitrary = U <$> choose (0, 255) <*> arbitrary
@@ -79,14 +79,14 @@ instance Arbitrary U where
 -- | Like `U`, but we expect to read back the Cbor Data Item when decoding.
 data U24 = U24 Word8 BS.ByteString deriving (Show, Eq)
 
-instance FromCBOR U24 where
-  fromCBOR = do
+instance DecCBOR U24 where
+  decCBOR = do
     decodeListLenOf 2
-    U24 <$> fromCBOR <*> decodeNestedCborBytes
+    U24 <$> decCBOR <*> decodeNestedCborBytes
 
-instance ToCBOR U24 where
-  toCBOR (U24 word8 bs) =
-    encodeListLen 2 <> toCBOR (word8 :: Word8) <> encodeNestedCborBytes
+instance EncCBOR U24 where
+  encCBOR (U24 word8 bs) =
+    encodeListLen 2 <> encCBOR (word8 :: Word8) <> encodeNestedCborBytes
       (LBS.fromStrict bs)
 
 
@@ -95,7 +95,7 @@ instance ToCBOR U24 where
 -- the schema of having at least one constructor of the form:
 -- .... | Unknown Word8 ByteString
 extensionProperty
-  :: forall a . (Arbitrary a, Eq a, Show a, FromCBOR a, ToCBOR a) => Property
+  :: forall a . (Arbitrary a, Eq a, Show a, DecCBOR a, EncCBOR a) => Property
 extensionProperty = forAll @a (arbitrary :: Gen a) $ \input ->
 {- This function works as follows:
 

@@ -27,7 +27,7 @@ import Data.Proxy (Proxy (..))
 import GHC.Stack
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (DecCBOR (..), EncCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Seed
@@ -129,23 +129,23 @@ instance DSIGNAlgorithm MockDSIGN where
       = Nothing
 
 
-instance ToCBOR (VerKeyDSIGN MockDSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+instance EncCBOR (VerKeyDSIGN MockDSIGN) where
+  encCBOR = encodeVerKeyDSIGN
 
-instance FromCBOR (VerKeyDSIGN MockDSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+instance DecCBOR (VerKeyDSIGN MockDSIGN) where
+  decCBOR = decodeVerKeyDSIGN
 
-instance ToCBOR (SignKeyDSIGN MockDSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+instance EncCBOR (SignKeyDSIGN MockDSIGN) where
+  encCBOR = encodeSignKeyDSIGN
 
-instance FromCBOR (SignKeyDSIGN MockDSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+instance DecCBOR (SignKeyDSIGN MockDSIGN) where
+  decCBOR = decodeSignKeyDSIGN
 
-instance ToCBOR (SigDSIGN MockDSIGN) where
-  toCBOR = encodeSigDSIGN
+instance EncCBOR (SigDSIGN MockDSIGN) where
+  encCBOR = encodeSigDSIGN
 
-instance FromCBOR (SigDSIGN MockDSIGN) where
-  fromCBOR = decodeSigDSIGN
+instance DecCBOR (SigDSIGN MockDSIGN) where
+  decCBOR = decodeSigDSIGN
 
 
 -- | Debugging: provide information about the verification failure

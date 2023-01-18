@@ -53,7 +53,7 @@ import Numeric.Natural (Natural)
 import qualified Data.ByteString as BS
 
 import Cardano.Binary
-         (Decoder, Encoding, FromCBOR (..), ToCBOR (..),
+         (Decoder, Encoding, DecCBOR (..), EncCBOR (..),
           encodeListLen, enforceSize, decodeBytes, encodeBytes)
 
 import Cardano.Crypto.Util (Empty, bytesToNatural, naturalToBytes)
@@ -197,7 +197,7 @@ instance ( TypeError ('Text "Ord not supported for verification keys, use the ha
 -- The output size is a fixed number of bytes and is given by 'sizeOutputVRF'.
 --
 newtype OutputVRF v = OutputVRF { getOutputVRFBytes :: ByteString }
-  deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoThunks)
+  deriving (Eq, Ord, Show, EncCBOR, DecCBOR, NoThunks)
   deriving newtype NFData
 
 
@@ -288,17 +288,17 @@ deriving instance VRFAlgorithm v => Eq   (CertifiedVRF v a)
 instance VRFAlgorithm v => NoThunks (CertifiedVRF v a)
   -- use generic instance
 
-instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
-  toCBOR cvrf =
+instance (VRFAlgorithm v, Typeable a) => EncCBOR (CertifiedVRF v a) where
+  encCBOR cvrf =
     encodeListLen 2 <>
-      toCBOR (certifiedOutput cvrf) <>
+      encCBOR (certifiedOutput cvrf) <>
       encodeCertVRF (certifiedProof cvrf)
 
-instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
-  fromCBOR =
+instance (VRFAlgorithm v, Typeable a) => DecCBOR (CertifiedVRF v a) where
+  decCBOR =
     CertifiedVRF <$
       enforceSize "CertifiedVRF" 2 <*>
-      fromCBOR <*>
+      decCBOR <*>
       decodeCertVRF
 
 evalCertified
