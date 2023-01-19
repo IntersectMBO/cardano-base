@@ -38,15 +38,15 @@
         "version": "962ecfed3a4fb656b5a91d89159291e00ed766bc"
     },
     "iohk-nix": {
-        "branch": "iquerejeta/vrf-naming",
+        "branch": "master",
         "description": "nix scripts shared across projects",
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "iohk-nix",
-        "rev": "5984ace888000a1b11da82446e70738b6bade510",
-        "sha256": "1xd610z065pjjgs308kzwiawhnkcl71pak8rb03zl446qy75rl1x",
+        "rev": "ccd5bf7d8168a0452d9ec504ea1b559ada7752df",
+        "sha256": "10p6nmqz3frslh5y92dnvi4zdkhiybl18s3wmsbysfxz6gpzwgy7",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/iohk-nix/archive/5984ace888000a1b11da82446e70738b6bade510.tar.gz",
+        "url": "https://github.com/input-output-hk/iohk-nix/archive/ccd5bf7d8168a0452d9ec504ea1b559ada7752df.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
