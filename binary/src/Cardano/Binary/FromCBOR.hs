@@ -579,10 +579,11 @@ instance FromCBOR UTCTime where
       (fromOrdinalDate year dayOfYear)
       (picosecondsToDiffTime timeOfDayPico)
 
--- | Convert an 'Either'-encoded failure to a 'cborg' decoder failure
-toCborError :: B.Buildable e => Either e a -> D.Decoder s a
+-- | Convert an 'Either'-encoded failure to a 'MonadFail' failure using the `B.Buildable`
+-- insatance
+toCborError :: (MonadFail m, B.Buildable e) => Either e a -> m a
 toCborError = either cborError pure
 
--- | Convert a @Buildable@ error into a 'cborg' decoder error
-cborError :: B.Buildable e => e -> D.Decoder s a
+-- | Convert a `B.Buildable` error message into a 'MonadFail' failure.
+cborError :: (MonadFail m, B.Buildable e) => e -> m a
 cborError = fail . formatToString build
