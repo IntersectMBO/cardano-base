@@ -15,6 +15,7 @@ module Cardano.Binary.EncCBOR
   ( EncCBOR(..)
   , module E
   , encCBORMaybe
+  , encSeq
   )
 where
 
@@ -28,8 +29,9 @@ import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
 import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import qualified Data.Primitive.ByteArray as Prim
+import qualified Data.Sequence as Seq
 import Data.Fixed (E12, Fixed(..), Nano, Pico, resolution)
-import Data.Foldable (toList)
+import Data.Foldable (toList, foldMap')
 import Data.Int (Int32, Int64)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Map as M
@@ -191,6 +193,34 @@ instance EncCBOR a => EncCBOR (NonEmpty a) where
 
 instance EncCBOR a => EncCBOR (Maybe a) where
   encCBOR = encCBORMaybe encCBOR
+
+instance EncCBOR a => EncCBOR (Seq.Seq a) where
+  encCBOR = encSeq encCBOR
+
+encSeq :: (a -> Encoding) -> Seq.Seq a -> Encoding
+encSeq encValue f = variableListLenEncoding (Seq.length f) (foldMap' encValue f)
+{-# INLINE encSeq #-}
+
+exactListLenEncoding :: Int -> Encoding -> Encoding
+exactListLenEncoding len contents =
+  encodeListLen (fromIntegral len :: Word) <> contents
+{-# INLINE exactListLenEncoding #-}
+
+-- | Conditionally use variable length encoding for list like structures with length
+-- larger than 23, otherwise use exact list length encoding.
+variableListLenEncoding ::
+  -- | Number of elements in the encoded data structure.
+  Int ->
+  -- | Encoding for the actual data structure
+  Encoding ->
+  Encoding
+variableListLenEncoding len contents =
+  if len <= lengthThreshold
+    then exactListLenEncoding len contents
+    else encodeListLenIndef <> contents <> encodeBreak
+  where
+    lengthThreshold = 23
+{-# INLINE variableListLenEncoding #-}
 
 encCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
 encCBORMaybe encodeA = \case

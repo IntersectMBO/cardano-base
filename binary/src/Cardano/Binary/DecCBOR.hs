@@ -27,7 +27,7 @@ import Codec.CBOR.Decoding as D
 import Codec.CBOR.ByteArray as BA ( ByteArray(BA) )
 import Control.Category (Category((.)))
 import Control.Exception (Exception)
-import Control.Monad (when)
+import Control.Monad (when, replicateM)
 import qualified Codec.CBOR.Read as CBOR.Read
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -39,6 +39,7 @@ import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.Map as M
 import qualified Data.Primitive.ByteArray as Prim
 import Data.Ratio ( Ratio, (%) )
+import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
 import Data.Text (Text)
@@ -473,10 +474,33 @@ decodeVector = decodeContainerSkelWithReplicate
   Vector.Generic.concat
 {-# INLINE decodeVector #-}
 
-instance (DecCBOR a) => DecCBOR (Vector.Vector a) where
+instance DecCBOR a => DecCBOR (Vector.Vector a) where
   decCBOR = decodeVector
   {-# INLINE decCBOR #-}
 
+instance DecCBOR a => DecCBOR (Seq.Seq a) where
+  decCBOR = decodeSeq decCBOR
+  {-# INLINE decCBOR #-}
+
+decodeSeq :: Decoder s a -> Decoder s (Seq.Seq a)
+decodeSeq decoder = Seq.fromList <$> decodeCollection decodeListLenOrIndef decoder
+
+decodeCollection :: Decoder s (Maybe Int) -> Decoder s a -> Decoder s [a]
+decodeCollection lenOrIndef el = snd <$> decodeCollectionWithLen lenOrIndef el
+
+decodeCollectionWithLen ::
+  Decoder s (Maybe Int) ->
+  Decoder s v ->
+  Decoder s (Int, [v])
+decodeCollectionWithLen lenOrIndef el = do
+  lenOrIndef >>= \case
+    Just len -> (,) len <$> replicateM len el
+    Nothing -> loop (0, []) (not <$> decodeBreakOr) el
+  where
+    loop (!n, !acc) condition action =
+      condition >>= \case
+        False -> pure (n, reverse acc)
+        True -> action >>= \v -> loop (n + 1, v : acc) condition action
 
 --------------------------------------------------------------------------------
 -- Time
