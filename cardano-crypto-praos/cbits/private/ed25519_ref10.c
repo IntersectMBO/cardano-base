@@ -4,7 +4,9 @@
 #include <string.h>
 
 #include "sodium/crypto_verify_32.h"
+#include "sodium/crypto_core_ed25519.h"
 #include "common.h"
+#include "core_h2c.h"
 #include "ed25519_ref10.h"
 #include "sodium/utils.h"
 
@@ -49,17 +51,6 @@ load_4(const unsigned char *in)
 # include "fe_25_5/constants.h"
 # include "fe_25_5/fe.h"
 #endif
-
-static inline void
-fe25519_sqmul(fe25519 s, const int n, const fe25519 a)
-{
-    int i;
-
-    for (i = 0; i < n; i++) {
-        fe25519_sq(s, s);
-    }
-    fe25519_mul(s, s, a);
-}
 
 void
 fe25519_invert(fe25519 out, const fe25519 z)
@@ -205,7 +196,34 @@ fe25519_sqrt(fe25519 x, const fe25519 x2)
     return fe25519_iszero(check) - 1;
 }
 
-static int
+static inline void
+fe25519_cneg(fe25519 h, const fe25519 f, unsigned int b)
+{
+    fe25519 negf;
+
+    fe25519_neg(negf, f);
+    fe25519_copy(h, f);
+    fe25519_cmov(h, negf, b);
+}
+
+static inline void
+fe25519_abs(fe25519 h, const fe25519 f)
+{
+    fe25519_cneg(h, f, fe25519_isnegative(f));
+}
+
+static inline void
+fe25519_sqmul(fe25519 s, const int n, const fe25519 a)
+{
+    int i;
+
+    for (i = 0; i < n; i++) {
+        fe25519_sq(s, s);
+    }
+    fe25519_mul(s, s, a);
+}
+
+static unsigned int
 fe25519_notsquare(const fe25519 x)
 {
     fe25519       _10, _11, _1100, _1111, _11110000, _11111111;
@@ -241,22 +259,6 @@ fe25519_notsquare(const fe25519 x)
     fe25519_tobytes(s, t);
 
     return s[1] & 1;
-}
-
-static inline void
-fe25519_cneg(fe25519 h, const fe25519 f, unsigned int b)
-{
-    fe25519 negf;
-
-    fe25519_neg(negf, f);
-    fe25519_copy(h, f);
-    fe25519_cmov(h, negf, b);
-}
-
-static inline void
-fe25519_abs(fe25519 h, const fe25519 f)
-{
-    fe25519_cneg(h, f, fe25519_isnegative(f));
 }
 
 /*
@@ -493,7 +495,7 @@ ge25519_p2_0(ge25519_p2 *h)
  r = 2 * p
  */
 
-static void
+void
 ge25519_p2_dbl(ge25519_p1p1 *r, const ge25519_p2 *p)
 {
     fe25519 t0;
@@ -587,7 +589,7 @@ ge25519_p3_tobytes(unsigned char *s, const ge25519_p3 *h)
  r = 2 * p
  */
 
-static void
+void
 ge25519_p3_dbl(ge25519_p1p1 *r, const ge25519_p3 *p)
 {
     ge25519_p2 q;
@@ -782,6 +784,44 @@ void point_precomputation(ge25519_cached cached[8], const ge25519_p3 *base) {
     ge25519_p3_to_cached(&cached[7], &u);
 }
 
+/*
+ * This will eventually stability in upstream:stable
+ */
+#define HASH_GE_L 48
+static int
+_string_to_points(unsigned char * const px, const size_t n,
+                  const char *ctx, const unsigned char *msg, size_t msg_len,
+                  int hash_alg)
+{
+    unsigned char h[crypto_core_ed25519_HASHBYTES];
+    unsigned char h_be[2U * HASH_GE_L];
+    size_t        i, j;
+
+    if (n > 2U) {
+        abort(); /* LCOV_EXCL_LINE */
+    }
+    if (core_h2c_string_to_hash(h_be, n * HASH_GE_L, ctx, msg, msg_len,
+                                hash_alg) != 0) {
+        return -1;
+    }
+    COMPILER_ASSERT(sizeof h >= HASH_GE_L);
+    for (i = 0U; i < n; i++) {
+        for (j = 0U; j < HASH_GE_L; j++) {
+            h[j] = h_be[i * HASH_GE_L + HASH_GE_L - 1U - j];
+        }
+        memset(&h[j], 0, (sizeof h) - j);
+        ge25519_from_hash(&px[i * crypto_core_ed25519_BYTES], h);
+    }
+    return 0;
+}
+
+int
+crypto_core_ed25519_from_string(unsigned char p[crypto_core_ed25519_BYTES],
+                                const char *ctx, const unsigned char *msg,
+                                size_t msg_len, int hash_alg)
+{
+    return _string_to_points(p, 1, ctx, msg, msg_len, hash_alg);
+}
 
 /*
  r = a * A + b * B
@@ -933,6 +973,21 @@ ge25519_double_scalarmult_vartime_variable(ge25519_p2 *r, const unsigned char *a
 
         ge25519_p1p1_to_p2(r, &t);
     }
+}
+
+/* multiply by the cofactor */
+void
+ge25519_clear_cofactor(ge25519_p3 *p3)
+{
+    ge25519_p1p1 p1;
+    ge25519_p2   p2;
+
+    ge25519_p3_dbl(&p1, p3);
+    ge25519_p1p1_to_p2(&p2, &p1);
+    ge25519_p2_dbl(&p1, &p2);
+    ge25519_p1p1_to_p2(&p2, &p1);
+    ge25519_p2_dbl(&p1, &p2);
+    ge25519_p1p1_to_p3(p3, &p1);
 }
 
 /*
@@ -2650,62 +2705,6 @@ sc25519_is_canonical(const unsigned char s[32])
     return (c != 0);
 }
 
-static void
-chi25519(fe25519 out, const fe25519 z)
-{
-    fe25519 t0, t1, t2, t3;
-    int     i;
-
-    fe25519_sq(t0, z);
-    fe25519_mul(t1, t0, z);
-    fe25519_sq(t0, t1);
-    fe25519_sq(t2, t0);
-    fe25519_sq(t2, t2);
-    fe25519_mul(t2, t2, t0);
-    fe25519_mul(t1, t2, z);
-    fe25519_sq(t2, t1);
-
-    for (i = 1; i < 5; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t1, t2, t1);
-    fe25519_sq(t2, t1);
-    for (i = 1; i < 10; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t2, t2, t1);
-    fe25519_sq(t3, t2);
-    for (i = 1; i < 20; i++) {
-        fe25519_sq(t3, t3);
-    }
-    fe25519_mul(t2, t3, t2);
-    fe25519_sq(t2, t2);
-    for (i = 1; i < 10; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t1, t2, t1);
-    fe25519_sq(t2, t1);
-    for (i = 1; i < 50; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t2, t2, t1);
-    fe25519_sq(t3, t2);
-    for (i = 1; i < 100; i++) {
-        fe25519_sq(t3, t3);
-    }
-    fe25519_mul(t2, t3, t2);
-    fe25519_sq(t2, t2);
-    for (i = 1; i < 50; i++) {
-        fe25519_sq(t2, t2);
-    }
-    fe25519_mul(t1, t2, t1);
-    fe25519_sq(t1, t1);
-    for (i = 1; i < 4; i++) {
-        fe25519_sq(t1, t1);
-    }
-    fe25519_mul(out, t1, t0);
-}
-
 /* montgomery to edwards */
 static void
 ge25519_mont_to_ed(fe25519 xed, fe25519 yed, const fe25519 x, const fe25519 y)
@@ -2741,26 +2740,11 @@ ge25519_xmont_to_ymont(fe25519 y, const fe25519 x)
 
     fe25519_sq(x2, x);
     fe25519_mul(x3, x, x2);
-    fe25519_mul32(x2, x2, ed25519_A_32);
+    fe25519_scalar_product(x2, x2, ed25519_A_32);
     fe25519_add(y, x3, x);
     fe25519_add(y, y, x2);
 
     return fe25519_sqrt(y, y);
-}
-
-/* multiply by the cofactor */
-static void
-ge25519_clear_cofactor(ge25519_p3 *p3)
-{
-    ge25519_p1p1 p1;
-    ge25519_p2   p2;
-
-    ge25519_p3_dbl(&p1, p3);
-    ge25519_p1p1_to_p2(&p2, &p1);
-    ge25519_p2_dbl(&p1, &p2);
-    ge25519_p1p1_to_p2(&p2, &p1);
-    ge25519_p2_dbl(&p1, &p2);
-    ge25519_p1p1_to_p3(p3, &p1);
 }
 
 static void
@@ -2775,12 +2759,12 @@ ge25519_elligator2(fe25519 x, fe25519 y, const fe25519 r, int *notsquare_p)
     fe25519_sq2(rr2, r);
     rr2[0]++;
     fe25519_invert(rr2, rr2);
-    fe25519_mul32(x, rr2, ed25519_A_32);
+    fe25519_mul(x, curve25519_A, rr2);
     fe25519_neg(x, x); /* x=x1 */
 
     fe25519_sq(x2, x);
     fe25519_mul(x3, x, x2);
-    fe25519_mul32(x2, x2, ed25519_A_32); /* x2 = A*x1^2 */
+    fe25519_mul(x2, x2, curve25519_A); /* x2 = A*x1^2 */
     fe25519_add(gx1, x3, x);
     fe25519_add(gx1, gx1, x2); /* gx1 = x1^3 + A*x1^2 + x1 */
 

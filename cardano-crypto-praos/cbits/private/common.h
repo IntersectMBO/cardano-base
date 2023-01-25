@@ -1,7 +1,7 @@
 #ifndef common_H
 #define common_H 1
 
-#if !defined(_MSC_VER) && !defined(DEV_MODE) && 1
+#if !defined(_MSC_VER) && !defined(DEV_MODE) && 0
 # warning *** This is unstable, untested, development code.
 # warning It might not compile. It might not work as expected.
 # warning It might be totally insecure.
@@ -10,17 +10,9 @@
 # warning Alternatively, use the "stable" branch in the git repository.
 #endif
 
-#if !defined(_MSC_VER) && (!defined(CONFIGURED) || CONFIGURED != 1)
-# warning *** The library is being compiled using an undocumented method.
-# warning This is not supported. It has not been tested, it might not
-# warning work as expected, and performance is likely to be suboptimal.
-#endif
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "quirks.h"
 
 #define COMPILER_ASSERT(X) (void) sizeof(char[(X) ? 1 : -1])
 
