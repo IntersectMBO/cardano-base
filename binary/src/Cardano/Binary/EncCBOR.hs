@@ -14,7 +14,8 @@
 module Cardano.Binary.EncCBOR
   ( EncCBOR(..)
   , module E
-  , encCBORMaybe
+  , encMaybe
+  , encNullMaybe
   , encSeq
   )
 where
@@ -192,7 +193,7 @@ instance EncCBOR a => EncCBOR (NonEmpty a) where
   encCBOR = encCBOR . toList
 
 instance EncCBOR a => EncCBOR (Maybe a) where
-  encCBOR = encCBORMaybe encCBOR
+  encCBOR = encMaybe encCBOR
 
 instance EncCBOR a => EncCBOR (Seq.Seq a) where
   encCBOR = encSeq encCBOR
@@ -222,10 +223,18 @@ variableListLenEncoding len contents =
     lengthThreshold = 23
 {-# INLINE variableListLenEncoding #-}
 
-encCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
-encCBORMaybe encodeA = \case
+encMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+encMaybe encodeA = \case
   Nothing -> E.encodeListLen 0
   Just x  -> E.encodeListLen 1 <> encodeA x
+
+-- | Alternative way to encode a Maybe type.
+--
+-- /Note/ - this is not the default method for encoding `Maybe`, use `encodeMaybe` instead
+encNullMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+encNullMaybe encodeValue = \case
+  Nothing -> encodeNull
+  Just x -> encodeValue x
 
 encodeContainerSkel
   :: (Word -> E.Encoding)
