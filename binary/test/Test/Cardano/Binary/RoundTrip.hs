@@ -63,6 +63,10 @@ roundTripFloatBi :: Property
 roundTripFloatBi =
   eachOf 1000 (Gen.float (Range.constant (-1e12) 1e12)) roundTripsCBORBuildable
 
+roundTripDoubleBi :: Property
+roundTripDoubleBi =
+  eachOf 1000 (Gen.double (Range.constant (-1e308) 1e308)) roundTripsCBORBuildable
+
 roundTripInt32Bi :: Property
 roundTripInt32Bi =
   eachOf 1000 (Gen.int32 Range.constantBounded) roundTripsCBORBuildable
@@ -75,9 +79,9 @@ roundTripRatioBi :: Property
 roundTripRatioBi =
   eachOf
     1000
-    ((%)
-      <$> Gen.int Range.constantBounded
-      <*> Gen.int Range.constantBounded
+    (((%) :: Integer -> Integer -> Rational)
+      <$> Gen.integral (Range.constant (-2 ^ (128 :: Int)) (2 ^ (128 :: Int)))
+      <*> Gen.integral (Range.constant (-2 ^ (128 :: Int)) (2 ^ (128 :: Int)))
     )
     roundTripsCBORBuildable
 

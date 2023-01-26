@@ -43,7 +43,7 @@ import Data.Int (Int32, Int64)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.Map as M
 import qualified Data.Primitive.ByteArray as Prim
-import Data.Ratio ( Ratio, (%) )
+import Data.Ratio ((%))
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
@@ -194,22 +194,25 @@ instance FromCBOR Word64 where
 instance FromCBOR Int where
   fromCBOR = D.decodeInt
 
-instance FromCBOR Float where
-  fromCBOR = D.decodeFloat
-
 instance FromCBOR Int32 where
   fromCBOR = D.decodeInt32
 
 instance FromCBOR Int64 where
   fromCBOR = D.decodeInt64
 
-instance (Integral a, FromCBOR a) => FromCBOR (Ratio a) where
+instance FromCBOR Float where
+  fromCBOR = D.decodeFloat
+
+instance FromCBOR Double where
+  fromCBOR = D.decodeDouble
+
+instance FromCBOR Rational where
   fromCBOR = do
-    enforceSize "Ratio" 2
+    enforceSize "Rational" 2
     n <- fromCBOR
     d <- fromCBOR
     if d <= 0
-      then cborError $ DecoderErrorCustom "Ratio" "invalid denominator"
+      then cborError $ DecoderErrorCustom "Rational" "invalid denominator"
       else return $! n % d
 
 instance FromCBOR Nano where

@@ -461,10 +461,6 @@ instance ToCBOR Int where
   toCBOR = E.encodeInt
   encodedSizeExpr _ = encodedSizeRange
 
-instance ToCBOR Float where
-  toCBOR = E.encodeFloat
-  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Float))
-
 instance ToCBOR Int32 where
   toCBOR = E.encodeInt32
   encodedSizeExpr _ = encodedSizeRange
@@ -472,6 +468,14 @@ instance ToCBOR Int32 where
 instance ToCBOR Int64 where
   toCBOR = E.encodeInt64
   encodedSizeExpr _ = encodedSizeRange
+
+instance ToCBOR Float where
+  toCBOR = E.encodeFloat
+  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Float))
+
+instance ToCBOR Double where
+  toCBOR = E.encodeDouble
+  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Double))
 
 instance ToCBOR a => ToCBOR (Ratio a) where
   toCBOR r = E.encodeListLen 2 <> toCBOR (numerator r) <> toCBOR (denominator r)
