@@ -554,6 +554,28 @@ instance
       + size (Proxy @e)
 
 instance
+  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f)
+  => ToCBOR (a, b, c, d, e, f)
+ where
+  toCBOR (a, b, c, d, e, f) =
+    E.encodeListLen 6
+      <> toCBOR a
+      <> toCBOR b
+      <> toCBOR c
+      <> toCBOR d
+      <> toCBOR e
+      <> toCBOR f
+
+  encodedSizeExpr size _ =
+    1
+    + size (Proxy @a)
+    + size (Proxy @b)
+    + size (Proxy @c)
+    + size (Proxy @d)
+    + size (Proxy @e)
+    + size (Proxy @f)
+
+instance
   (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f, ToCBOR g)
   => ToCBOR (a, b, c, d, e, f, g)
   where
@@ -576,6 +598,32 @@ instance
     + size (Proxy @e)
     + size (Proxy @f)
     + size (Proxy @g)
+
+instance
+  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f, ToCBOR g, ToCBOR h)
+  => ToCBOR (a, b, c, d, e, f, g, h)
+  where
+  toCBOR (a, b, c, d, e, f, g, h) =
+    E.encodeListLen 8
+      <> toCBOR a
+      <> toCBOR b
+      <> toCBOR c
+      <> toCBOR d
+      <> toCBOR e
+      <> toCBOR f
+      <> toCBOR g
+      <> toCBOR h
+
+  encodedSizeExpr size _ =
+    1
+    + size (Proxy @a)
+    + size (Proxy @b)
+    + size (Proxy @c)
+    + size (Proxy @d)
+    + size (Proxy @e)
+    + size (Proxy @f)
+    + size (Proxy @g)
+    + size (Proxy @h)
 
 instance ToCBOR BS.ByteString where
   toCBOR = E.encodeBytes
