@@ -88,14 +88,17 @@ instance EncCBOR Word64 where
 instance EncCBOR Int where
   encCBOR = E.encodeInt
 
-instance EncCBOR Float where
-  encCBOR = E.encodeFloat
-
 instance EncCBOR Int32 where
   encCBOR = E.encodeInt32
 
 instance EncCBOR Int64 where
   encCBOR = E.encodeInt64
+
+instance EncCBOR Float where
+  encCBOR = E.encodeFloat
+
+instance EncCBOR Double where
+  encCBOR = E.encodeDouble
 
 instance EncCBOR a => EncCBOR (Ratio a) where
   encCBOR r = E.encodeListLen 2 <> encCBOR (numerator r) <> encCBOR (denominator r)
