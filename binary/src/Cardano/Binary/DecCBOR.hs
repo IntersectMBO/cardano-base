@@ -282,6 +282,20 @@ instance
     return (a, b, c, d, e)
 
 instance
+  (DecCBOR a, DecCBOR b, DecCBOR c, DecCBOR d, DecCBOR e, DecCBOR f)
+  => DecCBOR (a, b, c, d, e, f)
+ where
+  decCBOR = do
+    D.decodeListLenOf 6
+    !a <- decCBOR
+    !b <- decCBOR
+    !c <- decCBOR
+    !d <- decCBOR
+    !e <- decCBOR
+    !f <- decCBOR
+    return (a, b, c, d, e, f)
+
+instance
   ( DecCBOR a
   , DecCBOR b
   , DecCBOR c
@@ -302,6 +316,30 @@ instance
     !f <- decCBOR
     !g <- decCBOR
     return (a, b, c, d, e, f, g)
+
+instance
+  ( DecCBOR a
+  , DecCBOR b
+  , DecCBOR c
+  , DecCBOR d
+  , DecCBOR e
+  , DecCBOR f
+  , DecCBOR g
+  , DecCBOR h
+  )
+  => DecCBOR (a, b, c, d, e, f, g, h)
+  where
+  decCBOR = do
+    D.decodeListLenOf 8
+    !a <- decCBOR
+    !b <- decCBOR
+    !c <- decCBOR
+    !d <- decCBOR
+    !e <- decCBOR
+    !f <- decCBOR
+    !g <- decCBOR
+    !h <- decCBOR
+    return (a, b, c, d, e, f, g, h)
 
 instance DecCBOR BS.ByteString where
   decCBOR = D.decodeBytes

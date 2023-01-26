@@ -159,6 +159,19 @@ instance
       <> encCBOR e
 
 instance
+  (EncCBOR a, EncCBOR b, EncCBOR c, EncCBOR d, EncCBOR e, EncCBOR f)
+  => EncCBOR (a, b, c, d, e, f)
+ where
+  encCBOR (a, b, c, d, e, f) =
+    E.encodeListLen 6
+      <> encCBOR a
+      <> encCBOR b
+      <> encCBOR c
+      <> encCBOR d
+      <> encCBOR e
+      <> encCBOR f
+
+instance
   (EncCBOR a, EncCBOR b, EncCBOR c, EncCBOR d, EncCBOR e, EncCBOR f, EncCBOR g)
   => EncCBOR (a, b, c, d, e, f, g)
   where
@@ -171,6 +184,21 @@ instance
       <> encCBOR e
       <> encCBOR f
       <> encCBOR g
+
+instance
+  (EncCBOR a, EncCBOR b, EncCBOR c, EncCBOR d, EncCBOR e, EncCBOR f, EncCBOR g, EncCBOR h)
+  => EncCBOR (a, b, c, d, e, f, g, h)
+  where
+  encCBOR (a, b, c, d, e, f, g, h) =
+    E.encodeListLen 8
+      <> encCBOR a
+      <> encCBOR b
+      <> encCBOR c
+      <> encCBOR d
+      <> encCBOR e
+      <> encCBOR f
+      <> encCBOR g
+      <> encCBOR h
 
 instance EncCBOR BS.ByteString where
   encCBOR = E.encodeBytes
