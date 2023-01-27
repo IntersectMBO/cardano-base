@@ -25,6 +25,7 @@ import Prelude hiding ((.))
 
 import Codec.CBOR.Decoding as D
 import Codec.CBOR.ByteArray as BA ( ByteArray(BA) )
+import Codec.CBOR.Term
 import Control.Category (Category((.)))
 import Control.Exception (Exception)
 import Control.Monad (when, replicateM)
@@ -67,6 +68,8 @@ class Typeable a => DecCBOR a where
   label :: Proxy a -> Text
   label = T.pack . show . typeRep
 
+instance DecCBOR Term where
+  decCBOR = decodeTerm
 
 --------------------------------------------------------------------------------
 -- DecoderError

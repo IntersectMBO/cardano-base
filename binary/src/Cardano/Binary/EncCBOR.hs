@@ -24,6 +24,7 @@ import Prelude hiding ((.))
 
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.ByteArray.Sliced as BAS
+import Codec.CBOR.Term
 import Control.Category (Category((.)))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BS.Lazy
@@ -51,6 +52,12 @@ import Numeric.Natural (Natural)
 
 class Typeable a => EncCBOR a where
   encCBOR :: a -> Encoding
+
+instance EncCBOR Encoding where
+  encCBOR = id
+
+instance EncCBOR Term where
+  encCBOR = encodeTerm
 
 --------------------------------------------------------------------------------
 -- Primitive types
