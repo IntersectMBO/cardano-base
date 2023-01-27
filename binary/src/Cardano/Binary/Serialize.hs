@@ -38,7 +38,13 @@ import Cardano.Binary.EncCBOR (Encoding, EncCBOR(..), encodeTag)
 --   The output is represented as a lazy 'LByteString' and is constructed
 --   incrementally.
 serialize :: EncCBOR a => a -> BSL.ByteString
-serialize = serializeEncoding . encCBOR
+serialize =
+  Builder.toLazyByteStringWith strategy mempty . CBOR.Write.toBuilder . encCBOR
+  where
+    -- 1024 is the size of the first buffer, 4096 is the size of subsequent
+    -- buffers. Chosen because they seem to give good performance. They are not
+    -- sacred.
+        strategy = Builder.safeStrategy 1024 4096
 
 -- | Serialize a Haskell value to an external binary representation.
 --
@@ -57,17 +63,13 @@ serializeBuilder = CBOR.Write.toBuilder . encCBOR
 --   The output is represented as an 'LByteString' and is constructed
 --   incrementally.
 serializeEncoding :: Encoding -> BSL.ByteString
-serializeEncoding =
-  Builder.toLazyByteStringWith strategy mempty . CBOR.Write.toBuilder
-  where
-    -- 1024 is the size of the first buffer, 4096 is the size of subsequent
-    -- buffers. Chosen because they seem to give good performance. They are not
-    -- sacred.
-        strategy = Builder.safeStrategy 1024 4096
+serializeEncoding = serialize
+{-# DEPRECATED serializeEncoding "Use `serialize` instead, since `Encoding` has `EncCBOR` instance" #-}
 
 -- | A strict version of 'serializeEncoding'
 serializeEncoding' :: Encoding -> BS.ByteString
-serializeEncoding' = BSL.toStrict . serializeEncoding
+serializeEncoding' = serialize'
+{-# DEPRECATED serializeEncoding' "Use `serialize'` instead, since `Encoding` has `EncCBOR` instance" #-}
 
 
 --------------------------------------------------------------------------------

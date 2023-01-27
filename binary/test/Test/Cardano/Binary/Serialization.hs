@@ -182,7 +182,7 @@ prop_roundTripSerialize' = property $ do
 prop_roundTripEncodeNestedCbor :: Property
 prop_roundTripEncodeNestedCbor = property $ do
   ts <- forAll genTestStruct
-  let encoded = serializeEncoding . encodeNestedCbor $ ts
+  let encoded = serialize . encodeNestedCbor $ ts
   decodeFullDecoder "" decodeNestedCbor encoded === Right ts
 
 prop_decodeContainerSkelWithReplicate :: Property
@@ -192,6 +192,6 @@ prop_decodeContainerSkelWithReplicate = property $
     _       -> False
   where
     decode :: Encoding -> Either DecoderError (V.Vector ())
-    decode enc = decodeFull (serializeEncoding enc)
+    decode enc = decodeFull (serialize enc)
 
     vec = encodeListLen 4097 <> mconcat (replicate 4097 encodeNull)

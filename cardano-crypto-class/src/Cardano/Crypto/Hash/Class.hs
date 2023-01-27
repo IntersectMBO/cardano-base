@@ -85,7 +85,7 @@ import Control.DeepSeq (NFData)
 import NoThunks.Class (NoThunks)
 
 import Cardano.Binary (Encoding, DecCBOR(..), EncCBOR(..), decodeBytes,
-                       serializeEncoding')
+                       serialize')
 import Cardano.Crypto.PackedBytes
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.HeapWords (HeapWords (..))
@@ -172,7 +172,7 @@ hashWith serialise =
 -- | A variation on 'hashWith', but specially for CBOR encodings.
 --
 hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
-hashWithSerialiser toEnc = hashWith (serializeEncoding' . toEnc)
+hashWithSerialiser toEnc = hashWith (serialize' . toEnc)
 
 
 --
