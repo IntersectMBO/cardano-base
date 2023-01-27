@@ -56,6 +56,9 @@ class Typeable a => EncCBOR a where
 instance EncCBOR Encoding where
   encCBOR = id
 
+instance EncCBOR (Tokens -> Tokens) where
+  encCBOR = Encoding
+
 instance EncCBOR Term where
   encCBOR = encodeTerm
 
