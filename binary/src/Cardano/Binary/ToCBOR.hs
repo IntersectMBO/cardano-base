@@ -44,6 +44,7 @@ import Prelude hiding ((.))
 
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.ByteArray.Sliced as BAS
+import Codec.CBOR.Term
 import Control.Category (Category((.)))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BS.Lazy
@@ -407,6 +408,12 @@ withWordSize x =
       | s <= 0xffffffff && s >= (-0x100000000) -> 5
       | otherwise                              -> 9
 
+
+instance ToCBOR Encoding where
+  toCBOR = id
+
+instance ToCBOR Term where
+  toCBOR = encodeTerm
 
 --------------------------------------------------------------------------------
 -- Primitive types
