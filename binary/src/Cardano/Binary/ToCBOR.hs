@@ -412,6 +412,9 @@ withWordSize x =
 instance ToCBOR Encoding where
   toCBOR = id
 
+instance ToCBOR (Tokens -> Tokens) where
+  toCBOR = Encoding
+
 instance ToCBOR Term where
   toCBOR = encodeTerm
 
