@@ -60,7 +60,7 @@ import Cardano.Binary (
   Decoder,
   Range (Range),
   decodeFullDecoder,
-  serializeEncoding,
+  serialize,
   szGreedy,
   szSimplify,
   lo,
@@ -200,7 +200,7 @@ prop_cbor_roundtrip :: (Eq a, Show a)
                     -> (forall s. Decoder s a)
                     -> a -> Property
 prop_cbor_roundtrip encoder decoder x =
-    case decodeFullDecoder "" decoder (serializeEncoding (encoder x)) of
+    case decodeFullDecoder "" decoder (serialize (encoder x)) of
       Right y  -> y === x
       Left err -> counterexample (show err) (property False)
 
