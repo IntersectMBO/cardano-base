@@ -15,10 +15,11 @@ module Cardano.Binary.Deserialize
   , unsafeDeserialize'
   , CBOR.Write.toStrictByteString
 
-  -- * Backward-compatible functions
+  -- * Decoding
   , decodeFull
   , decodeFull'
   , decodeFullDecoder
+  , decodeFullDecoder'
 
   -- * CBOR in CBOR
   , decodeNestedCbor
@@ -80,6 +81,17 @@ decodeFullDecoder lbl decoder bs0 = case deserialiseDecoder decoder bs0 of
     then pure x
     else Left $ DecoderErrorLeftover lbl leftover
   Left (e, _) -> Left $ DecoderErrorDeserialiseFailure lbl e
+
+decodeFullDecoder'
+  :: Text
+  -- ^ Label for error reporting
+  -> (forall s . D.Decoder s a)
+  -- ^ The parser for the @ByteString@ to decode. It should decode the given
+  -- @ByteString@ into a value of type @a@
+  -> BS.ByteString
+  -- ^ The @ByteString@ to decode
+  -> Either DecoderError a
+decodeFullDecoder' lbl decoder = decodeFullDecoder lbl decoder . BSL.fromStrict
 
 -- | Deserialise a 'LByteString' incrementally using the provided 'Decoder'
 deserialiseDecoder
