@@ -524,7 +524,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
     int64_t h8 = f0g8 + f1g7_2 + f2g6 + f3g5_2 + f4g4 + f5g3_2 + f6g2 + f7g1_2 +
                  f8g0 + f9g9_38;
     int64_t h9 =
-            f0g9 + f1g8 + f2g7 + f3g6 + f4g5 + f5g4 + f6g3 + f7g2 + f8g1 + f9g0;
+        f0g9 + f1g8 + f2g7 + f3g6 + f4g5 + f5g4 + f6g3 + f7g2 + f8g1 + f9g0;
 
     int64_t carry0;
     int64_t carry1;
