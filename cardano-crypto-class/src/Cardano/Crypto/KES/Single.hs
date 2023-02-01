@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -8,7 +7,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -112,7 +110,6 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
 
 
 instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
-         , Monad m
          ) => KESSignAlgorithm m (SingleKES d) where
     newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
 
@@ -127,7 +124,7 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
         assert (t == 0) $!
         SigSingleKES <$!> signDSIGNM ctxt a sk
 
-    updateKES _ctx (SignKeySingleKES _sk) _to = return $! Nothing
+    updateKES _ctx (SignKeySingleKES _sk) _to = return Nothing
 
     --
     -- Key generation

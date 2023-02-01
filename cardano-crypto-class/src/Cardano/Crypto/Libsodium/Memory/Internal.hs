@@ -1,11 +1,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fprof-auto #-}
 module Cardano.Crypto.Libsodium.Memory.Internal (
@@ -63,7 +60,7 @@ traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
 makeMLockedPool :: forall n. KnownNat n => IO (Pool n)
 makeMLockedPool = do
   initPool
-    (max 1 . fromIntegral $ 4096 `div` (natVal (Proxy @n)) `div` 64)
+    (max 1 . fromIntegral $ 4096 `div` natVal (Proxy @n) `div` 64)
     (\size -> mask_ $ do
       ptr <- sodiumMalloc (fromIntegral size)
       newForeignPtr ptr (sodiumFree ptr (fromIntegral size))

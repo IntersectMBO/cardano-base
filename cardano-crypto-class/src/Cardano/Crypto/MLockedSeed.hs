@@ -11,6 +11,7 @@ import Cardano.Crypto.MonadSodium
   , MonadSodium (..)
   , mlsbCopy
   , mlsbNew
+  , mlsbNewZero
   , mlsbFinalize
   , mlsbUseAsCPtr
   , mlsbUseAsSizedPtr
@@ -48,6 +49,10 @@ mlockedSeedCopy =
 mlockedSeedNew :: (KnownNat n, MonadSodium m) => m (MLockedSeed n)
 mlockedSeedNew =
   MLockedSeed <$> mlsbNew
+
+mlockedSeedNewZero :: (KnownNat n, MonadSodium m) => m (MLockedSeed n)
+mlockedSeedNewZero =
+  MLockedSeed <$> mlsbNewZero
 
 mlockedSeedFinalize :: (MonadSodium m) => MLockedSeed n -> m ()
 mlockedSeedFinalize = mlsbFinalize . mlockedSeedMLSB

@@ -1,11 +1,9 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
 module Cardano.Crypto.Libsodium.Hash (
     SodiumHashAlgorithm (..),
     digestMLockedStorable,
@@ -22,7 +20,6 @@ import GHC.TypeLits
 
 import Cardano.Crypto.Hash (HashAlgorithm(SizeHash))
 import Cardano.Crypto.Libsodium.Hash.Class
-import Cardano.Crypto.Libsodium.Memory.Internal ()
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
 import Cardano.Crypto.MonadSodium.Class
 import Cardano.Crypto.MonadSodium.Alloc
@@ -38,7 +35,7 @@ expandHash
     :: forall h m proxy.
        (SodiumHashAlgorithm h, MonadSodium m, MonadST m, MonadThrow m)
     => proxy h
-    -> (MLockedSizedBytes (SizeHash h))
+    -> MLockedSizedBytes (SizeHash h)
     -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
 expandHash h (MLSB sfptr) = do
     withMLockedForeignPtr sfptr $ \ptr -> do

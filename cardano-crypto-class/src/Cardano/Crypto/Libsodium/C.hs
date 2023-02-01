@@ -91,7 +91,7 @@ foreign import capi unsafe "sodium.h sodium_mlock" c_sodium_mlock :: Ptr a -> CS
 -- | @void *sodium_munlock(void * const addr, size_t size);@
 --
 -- <https://libsodium.gitbook.io/doc/memory_management>
-foreign import capi unsafe "sodium.h sodium_munlock" c_sodium_munlock :: Ptr a  -> CSize-> IO CInt
+foreign import capi unsafe "sodium.h sodium_munlock" c_sodium_munlock :: Ptr a -> CSize -> IO CInt
 
 -------------------------------------------------------------------------------
 -- Hashing: SHA256

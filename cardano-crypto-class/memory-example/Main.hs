@@ -38,7 +38,7 @@ main = do
     args <- getArgs
 
     sodiumInit
-    example args allocMLockedForeignPtr
+    example args mlockedAllocForeignPtr
 
     -- example SHA256 hash
     do

@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE UnboxedTuples              #-}
 {-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TemplateHaskellQuotes      #-}
 module Cardano.Crypto.PinnedSizedBytes
   (
     PinnedSizedBytes,
@@ -234,6 +234,7 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
 --
 -- The 'Ptr' given to the function argument /must not/ be used as the result of
 -- type @r@.
+{-# INLINE psbUseAsCPtr #-}
 psbUseAsCPtr ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (PrimMonad m) =>
@@ -256,6 +257,7 @@ psbUseAsCPtr (PSB ba) = runAndTouch ba
 --
 -- The same caveats apply to the use of this function as to the use of
 -- 'psbUseAsCPtr'.
+{-# INLINE psbUseAsCPtrLen #-}
 psbUseAsCPtrLen ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
@@ -270,17 +272,20 @@ psbUseAsCPtrLen (PSB ba) f = do
 --
 -- The same caveats apply to this use of this function as to the use of
 -- 'psbUseAsCPtr'.
+{-# INLINE psbUseAsSizedPtr  #-}
 psbUseAsSizedPtr ::
-  forall (n :: Nat) (r :: Type) .
+  forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
+  (PrimMonad m) =>
   PinnedSizedBytes n ->
-  (SizedPtr n -> IO r) ->
-  IO r
+  (SizedPtr n -> m r) ->
+  m r
 psbUseAsSizedPtr (PSB ba) k = do
     r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
     r <$ touch ba
 
 -- | As 'psbCreateResult', but presumes that no useful value is produced: that
 -- is, the function argument is run only for its side effects.
+{-# INLINE psbCreate  #-}
 psbCreate ::
   forall (n :: Nat) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
@@ -290,6 +295,7 @@ psbCreate f = fst <$> psbCreateResult f
 
 -- | As 'psbCreateResultLen', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
+{-# INLINE psbCreateLen  #-}
 psbCreateLen ::
   forall (n :: Nat) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
@@ -312,6 +318,7 @@ psbCreateLen f = fst <$> psbCreateResultLen f
 -- which can lead to segfaults or out-of-bounds reads.
 --
 -- This poses both correctness /and/ security risks, so please don't do it.
+{-# INLINE psbCreateResult  #-}
 psbCreateResult ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
@@ -331,6 +338,7 @@ psbCreateResult f = psbCreateResultLen (\p _ -> f p)
 --
 -- The same caveats apply to this function as to 'psbCreateResult': the 'Ptr'
 -- given to the function argument /must not/ be returned as @r@.
+{-# INLINE psbCreateResultLen  #-}
 psbCreateResultLen ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type).
   (KnownNat n, PrimMonad m) =>
@@ -345,6 +353,7 @@ psbCreateResultLen f = do
 
 -- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
+{-# INLINE psbCreateSized  #-}
 psbCreateSized ::
   forall (n :: Nat) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
@@ -355,6 +364,7 @@ psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
 -- | As 'psbCreateResult', but gives a 'SizedPtr' to the function argument. The
 -- same caveats apply to this function as to 'psbCreateResult': the 'SizedPtr'
 -- given to the function argument /must not/ be resulted as @r@.
+{-# INLINE psbCreateSizedResult  #-}
 psbCreateSizedResult ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
@@ -392,6 +402,7 @@ die :: String -> String -> a
 die fun problem = error $ "PinnedSizedBytes." ++ fun ++ ": " ++ problem
 
 -- Wrapper that combines applying a function, then touching
+{-# INLINE runAndTouch  #-}
 runAndTouch ::
   forall (a :: Type) (m :: Type -> Type) .
   (PrimMonad m) =>

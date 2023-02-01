@@ -1,11 +1,8 @@
 {-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DeriveAnyClass       #-}
 {-# LANGUAGE DerivingVia          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TypeApplications     #-}
@@ -17,6 +14,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
+
+{- HLINT ignore "Use head" -}
 
 module Test.Crypto.KES
   ( tests
@@ -30,9 +29,9 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
 import Data.IORef
+import Data.Foldable (traverse_)
 import GHC.TypeNats (KnownNat)
 
-import Control.Concurrent (threadDelay)
 import Control.Tracer
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -178,10 +177,12 @@ testForgetGenKeyKES _p = do
     sk <- genKeyKES @(LogT (GenericEvent ForgetMockEvent) IO) @(ForgetMockKES v) seed
     mlockedSeedFinalize seed
     forgetSignKeyKES sk
-  result <- readIORef logVar
-  assertEqual "number of log entries" 2 (length result)
-  assertBool "first entry is GEN" (isGEN . concreteEvent $ (result !! 0))
-  assertBool "second entry is DEL" (isDEL . concreteEvent $ (result !! 1))
+  result <- map concreteEvent <$> readIORef logVar
+  assertBool ("Unexpected log: " ++ show result) $ case result of
+    [GEN a, DEL b] ->
+      -- End of last period, so no update happened
+      a == b
+    _ -> False
   return ()
 
 testForgetUpdateKeyKES
@@ -200,19 +201,22 @@ testForgetUpdateKeyKES _p = do
     sk <- genKeyKES @(LogT (GenericEvent ForgetMockEvent) IO) @(ForgetMockKES v) seed
     mlockedSeedFinalize seed
     msk' <- updateKES () sk 0
-    case msk' of
-      Just sk' -> forgetSignKeyKES sk'
-      Nothing -> return ()
-  threadDelay 1000000
-  result <- readIORef logVar
-  -- assertEqual "number of log entries" 3 (length result)
-  assertBool "first entry is GEN" (isGEN . concreteEvent $ (result !! 0))
-  -- assertBool "second entry is UPD" ("UPD" `isPrefixOf` (result !! 1))
-  -- assertBool "third entry is DEL" ("DEL" `isPrefixOf` (result !! 2))
+    forgetSignKeyKES sk
+    traverse_ forgetSignKeyKES msk'
+  result <- map concreteEvent <$> readIORef logVar
+
+  assertBool ("Unexpected log: " ++ show result) $ case result of
+    [GEN a, UPD b c, DEL d, DEL e] ->
+      -- Regular update
+      a == b && d == a && e == c
+    [GEN a, NOUPD, DEL b] ->
+      -- End of last period, so no update happened
+      a == b
+    _ -> False
 
 
 matchAllocLog :: [AllocEvent] -> Set WordPtr
-matchAllocLog evs = foldl' (flip go) Set.empty evs
+matchAllocLog = foldl' (flip go) Set.empty
   where
     go (AllocEv ptr) = Set.insert ptr
     go (FreeEv ptr) = Set.delete ptr
@@ -239,8 +243,6 @@ testMLockGenKeyKES _p = do
     pushAllocLogEvent $ MarkerEv "done"
   after <- readIORef accumVar
   let evset = matchAllocLog after
-  -- putStrLn ""
-  -- mapM_ print after
   assertEqual "all allocations deallocated" Set.empty evset
 
 {-# NOINLINE testKESAlgorithm#-}
@@ -304,8 +306,7 @@ testKESAlgorithm lock _pm _pv n =
                           (maybe (return ()) forgetSignKeyKES)
                           (\msk' -> Just sk ==! msk')
               return $
-                counterexample (show serialized) $
-                equals
+                counterexample (show serialized) equals
         , testProperty "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigKES v <- signKES () 0 msg sk
@@ -315,15 +316,15 @@ testKESAlgorithm lock _pm _pv n =
         [ testProperty "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyKES v <- deriveVerKeyKES sk
-              return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === (sizeVerKeyKES (Proxy @v))
+              return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === sizeVerKeyKES (Proxy @v)
         , testProperty "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               serialized <- rawSerialiseSignKeyKES sk
-              evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyKES (Proxy @v)))
+              evaluate ((fromIntegral . BS.length $ serialized) == sizeSignKeyKES (Proxy @v))
         , testProperty "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigKES v <- signKES () 0 msg sk
-              return $ (fromIntegral . BS.length . rawSerialiseSigKES $ sig) === (sizeSigKES (Proxy @v))
+              return $ (fromIntegral . BS.length . rawSerialiseSigKES $ sig) === sizeSigKES (Proxy @v)
         ]
 
       , testGroup "direct CBOR"
@@ -411,7 +412,7 @@ withSK :: ( MonadSodium m
           ) => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> m b) -> m b
 withSK seedPSB =
   bracket
-    (withMLockedSeedFromPSB seedPSB $ genKeyKES)
+    (withMLockedSeedFromPSB seedPSB genKeyKES)
     forgetSignKeyKES
 
 -- | Wrap an IO action that requires a 'SignKeyKES' into a 'Property' that
@@ -457,7 +458,7 @@ prop_onlyGenSignKeyKES
       KESSignAlgorithm IO v
   => Lock -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_onlyGenSignKeyKES lock _ =
-  ioPropertyWithSK @v lock $ \_ -> noExceptionsThrown
+  ioPropertyWithSK @v lock $ const noExceptionsThrown
 
 prop_onlyGenVerKeyKES
   :: forall v.
@@ -576,13 +577,13 @@ prop_verifyKES_positive _ _ seedPSB = do
     xs :: [Message] <- vectorOf totalPeriods arbitrary
     return $ checkCoverage $
       cover 1 (length xs >= totalPeriods) "Message count covers total periods" $
-      (length xs > 0) ==>
+      not (null xs) ==>
       ioProperty $ fmap conjoin $ io $ do
         sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @m @v
         vk <- deriveVerKeyKES @m sk_0
         forgetSignKeyKES sk_0
         withAllUpdatesKES seedPSB $ \t sk -> do
-          let x = (cycle xs) !! (fromIntegral t)
+          let x = cycle xs !! fromIntegral t
           sig <- signKES () t x sk
           let verResult = verifyKES () vk t x sig
           return $

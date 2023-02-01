@@ -106,7 +106,7 @@ withMLSBChunk :: forall b n n' m.
 withMLSBChunk mlsb offset action
   | offset < 0
   = error "Negative offset not allowed"
-  | offset + chunkSize > parentSize
+  | offset > parentSize - chunkSize 
   = error $ "Overrun (" ++ show offset ++ " + " ++ show chunkSize ++ " > " ++ show parentSize ++ ")"
   | otherwise
   = withMLSB mlsb $ \ptr -> do
@@ -125,7 +125,7 @@ mlsbSize mlsb = fromInteger (natVal mlsb)
 -- memory block is undefined.
 mlsbNew :: forall n m. (KnownNat n, MonadSodium m) => m (MLockedSizedBytes n)
 mlsbNew =
-  MLSB <$> allocMLockedForeignPtrBytes size align
+  MLSB <$> mlockedAllocForeignPtrBytes size align
   where
     size = fromInteger (natVal (Proxy @n))
     align = nextPowerOf2 size
@@ -181,7 +181,7 @@ mlsbFromByteString bs = do
 mlsbFromByteStringCheck :: forall n m. (KnownNat n, MonadSodium m, MonadST m) => BS.ByteString -> m (Maybe (MLockedSizedBytes n))
 mlsbFromByteStringCheck bs
     | BS.length bs /= size = return Nothing
-    | otherwise = fmap Just $ mlsbFromByteString bs
+    | otherwise = Just <$> mlsbFromByteString bs
   where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))
@@ -236,7 +236,7 @@ mlsbCompare (MLSB x) (MLSB y) =
   withMLockedForeignPtr x $ \x' ->
     withMLockedForeignPtr y $ \y' -> do
       res <- withLiftST $ \fromST -> fromST . unsafeIOToST $ c_sodium_compare x' y' size
-      return $ (compare res 0)
+      return $ compare res 0
   where
     size = fromInteger $ natVal (Proxy @n)
 

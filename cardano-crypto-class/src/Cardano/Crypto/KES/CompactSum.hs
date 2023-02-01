@@ -294,7 +294,7 @@ instance ( OptimizedKESAlgorithm d
 
       | t+1 == _T = do
                         sk' <- genKeyKES r_1
-                        zero <- mlockedSeedNew
+                        zero <- mlockedSeedNewZero
                         return $! Just $! SignKeyCompactSumKES sk' zero vk_0 vk_1
       | otherwise = runMaybeT $!
                       do

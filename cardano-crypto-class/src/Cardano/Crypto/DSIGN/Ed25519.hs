@@ -85,7 +85,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     -- (the libsodium \"seed\"). And because of this, we need to define the
     -- sign key size to be SEEDBYTES (which is 32), not PRIVATEKEYBYTES (which
     -- would be 64).
-    -- (the libsodium \"seed\").
     type SizeSignKeyDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_SEEDBYTES
     -- | Ed25519 signature size is 64 octets
     type SizeSigDSIGN     Ed25519DSIGN = CRYPTO_SIGN_ED25519_BYTES

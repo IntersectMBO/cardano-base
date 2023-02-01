@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -33,7 +32,7 @@ import NoThunks.Class (NoThunks (..), allNoThunks)
 import System.Random (randomRIO)
 import Control.Tracer
 import Test.Crypto.AllocLog
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (ask)
 import Control.Monad ((<$!>))
 
@@ -108,15 +107,15 @@ instance
 
     genKeyKES seed = do
       sk <- genKeyKES seed
-      nonce <- liftIO $ randomRIO (10000000, 99999999)
+      nonce <- randomRIO (10000000, 99999999)
       tracer <- ask
       traceWith tracer (GenericEvent $ GEN nonce)
       return $! SignKeyForgetMockKES nonce sk
 
-    forgetSignKeyKES (SignKeyForgetMockKES nonce _) = do
+    forgetSignKeyKES (SignKeyForgetMockKES nonce sk) = do
       tracer <- ask
       traceWith tracer (GenericEvent $ DEL nonce)
-      return ()
+      forgetSignKeyKES sk
 
     deriveVerKeyKES (SignKeyForgetMockKES _ k) =
       VerKeyForgetMockKES <$!> deriveVerKeyKES k
@@ -126,14 +125,14 @@ instance
 
     updateKES ctx (SignKeyForgetMockKES nonce sk) p = do
       tracer <- ask
-      nonce' <- liftIO $ randomRIO (10000000, 99999999)
+      nonce' <- randomRIO (10000000, 99999999)
       updateKES ctx sk p >>= \case
         Just sk' -> do
           traceWith tracer (GenericEvent $ UPD nonce nonce')
           return $! Just $! SignKeyForgetMockKES nonce' sk'
         Nothing -> do
-          traceWith tracer (GenericEvent $ NOUPD)
-          return $! Nothing
+          traceWith tracer (GenericEvent NOUPD)
+          return Nothing
 
 instance
   ( UnsoundKESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) m) k
@@ -145,7 +144,7 @@ instance
 
     rawDeserialiseSignKeyKES bs = do
       msk <- rawDeserialiseSignKeyKES bs
-      nonce :: Word <- liftIO $ randomRIO (10000000, 99999999)
+      nonce :: Word <- randomRIO (10000000, 99999999)
       return $ fmap (SignKeyForgetMockKES nonce) msk
 
 

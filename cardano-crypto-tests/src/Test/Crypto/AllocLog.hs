@@ -20,7 +20,7 @@ import Foreign.Concurrent (addForeignPtrFinalizer)
 import Test.Crypto.RunIO
 
 -- | Allocation log event. These are emitted automatically whenever mlocked
--- memory is allocated through the 'allocMLockedForeignPtr' primitive, or
+-- memory is allocated through the 'mlockedAllocForeignPtr' primitive, or
 -- released through an associated finalizer (either explicitly or due to GC).
 -- Additional events that are not actual allocations/deallocations, but may
 -- provide useful debugging context, can be inserted as 'MarkerEv'.
@@ -60,7 +60,7 @@ pushAllocLogEvent = pushLogEvent
 -- 'mlockedAlloca', 'mlockedMalloc', and associated finalizers.
 instance (MonadIO m, MonadThrow m, MonadSodium m, MonadST m, RunIO m)
          => MonadSodium (LogT AllocEvent m) where
-  withMLockedForeignPtr fptr (action) = LogT $ do
+  withMLockedForeignPtr fptr action = LogT $ do
     tracer <- ask
     lift $ withMLockedForeignPtr fptr (\ptr -> (runReaderT . unLogT) (action ptr) tracer)
 

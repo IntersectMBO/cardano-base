@@ -337,7 +337,7 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
       testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_no_thunks,
       testProperty "Sig" . forAllShow genSig ppShow $ prop_no_thunks,
       testProperty "VerKey rawSerialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
-        prop_no_thunks (rawSerialiseVerKeyDSIGN $ vk),
+        prop_no_thunks (rawSerialiseVerKeyDSIGN vk),
       testProperty "VerKey rawDeserialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
         prop_no_thunks (fromJust $! rawDeserialiseVerKeyDSIGN @v . rawSerialiseVerKeyDSIGN $ vk)
     ]
@@ -365,10 +365,10 @@ testDSIGNMAlgorithm
                  UnsoundDSIGNMAlgorithm IO v
                , ToCBOR (VerKeyDSIGNM v)
                , FromCBOR (VerKeyDSIGNM v)
-               -- DSIGNM cannot satisfy To/FromCBOR, because those
-               -- typeclasses assume that a non-monadic
-               -- encoding/decoding exists.  Hence, we only test direct
-               -- encoding/decoding for 'SignKeyDSIGNM'.
+               -- DSIGNM cannot satisfy To/FromCBOR (not even with
+               -- UnsoundDSIGNMAlgorithm), because those typeclasses assume
+               -- that a non-monadic encoding/decoding exists. Hence, we only
+               -- test direct encoding/decoding for 'SignKeyDSIGNM'.
                -- , ToCBOR (SignKeyDSIGNM v)
                -- , FromCBOR (SignKeyDSIGNM v)
                , MEq IO (SignKeyDSIGNM v)   -- only monadic MEq for signing keys
@@ -620,7 +620,7 @@ prop_dsignm_verify_neg_key
 prop_dsignm_verify_neg_key lock _ msg seedPSB seedPSB' =
   ioProperty . withLock lock $ do
     sig <- withSK @v seedPSB $ signDSIGNM () msg
-    vk' <- withSK @v seedPSB' $ deriveVerKeyDSIGNM
+    vk' <- withSK @v seedPSB' deriveVerKeyDSIGNM
     return $
       seedPSB /= seedPSB' ==> verifyDSIGNM () vk' msg sig =/= Right ()
 
@@ -693,124 +693,5 @@ prop_dsignm_verify_neg_msg lock _ a a' =
     vk <- deriveVerKeyDSIGNM sk
     return $
       a /= a' ==> verifyDSIGNM () vk a' sig =/= Right ()
---
--- Libsodium
---
 
--- TODO: use these
-
--- prop_sodium_genKey
---     :: forall v w.
---        ( DSIGNMAlgorithm IO v
---        , DSIGNAlgorithm w
---        )
---     => Proxy v
---     -> Proxy w
---     -> MLockedSeed (SeedSizeDSIGNM v)
---     -> Property
--- prop_sodium_genKey _p _q seed = ioProperty $ do
---     sk <- genKeyDSIGNM seed :: IO (SignKeyDSIGNM v)
---     let sk' = genKeyDSIGN (mkSeedFromBytes $ NaCl.mlsbToByteString seed) :: SignKeyDSIGN w
---     actual <- rawSerialiseSignKeyDSIGNM sk
---     let expected = rawSerialiseSignKeyDSIGN sk'
---     return (actual === expected)
---
--- fromJustCS :: HasCallStack => Maybe a -> a
--- fromJustCS (Just x) = x
--- fromJustCS Nothing  = error "fromJustCS"
---
--- -- | Given the monadic and pure flavors of the same DSIGN algorithm, show that
--- -- they derive the same verkey
--- prop_sodium_deriveVerKey
---     :: forall v w
---      . (DSIGNMAlgorithm IO v, DSIGNAlgorithm w)
---     => Proxy v
---     -> Proxy w
---     -> SignKeyDSIGNM v
---     -> Property
--- prop_sodium_deriveVerKey p q sk = ioProperty $ do
---   Just sk' <- (rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk) :: IO (Maybe (SignKeyDSIGN w))
---   actual <- rawSerialiseVerKeyDSIGNM <$> deriveVerKeyDSIGNM sk
---   let expected = rawSerialiseVerKeyDSIGN $ deriveVerKeyDSIGN sk'
---   return (actual === expected)
---
--- prop_sodium_sign
---     :: forall v w.
---        ( DSIGNMAlgorithm IO v
---        , DSIGNAlgorithm w
---        , SignableM v ~ SignableRepresentation
---        , Signable w ~ SignableRepresentation
---        , ContextDSIGNM v ~ ()
---        , ContextDSIGN w ~ ()
---        )
---     => Proxy v
---     -> Proxy w
---     -> SignKeyDSIGNM v
---     -> [Word8]
---     -> Property
--- prop_sodium_sign p q sk bytes = ioProperty $ do
---   Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
---   actual <- rawSerialiseSigDSIGNM <$> (signDSIGNM () msg sk :: IO (SigDSIGNM v))
---   let expected = rawSerialiseSigDSIGN $ (signDSIGN () msg sk' :: SigDSIGN w)
---   return (actual === expected)
---   where
---     msg = BS.pack bytes
---
--- prop_sodium_verify
---     :: forall v w.
---        ( DSIGNMAlgorithm IO v
---        , DSIGNAlgorithm w
---        , SignableM v ~ SignableRepresentation
---        , Signable w ~ SignableRepresentation
---        , ContextDSIGNM v ~ ()
---        , ContextDSIGN w ~ ()
---        )
---     => Proxy v
---     -> Proxy w
---     -> SignKeyDSIGNM v
---     -> [Word8]
---     -> Property
--- prop_sodium_verify p q sk bytes = ioProperty $ do
---     Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
---     vk <- deriveVerKeyDSIGNM sk
---     let vk' = deriveVerKeyDSIGN sk'
---     sig <- signDSIGNM () msg sk
---     let sig' = signDSIGN () msg sk' :: SigDSIGN w
---
---     let actual = verifyDSIGNM () vk msg sig
---     let expected = verifyDSIGN () vk' msg sig'
---     return $ label (con expected) $ actual === expected
---   where
---     msg = BS.pack bytes
---     con :: Either a b -> String
---     con (Left _) = "Left"
---     con (Right _) = "Right"
---
--- prop_sodium_verify_neg
---     :: forall v w.
---        ( DSIGNMAlgorithm IO v
---        , DSIGNAlgorithm w
---        , SignableM v ~ SignableRepresentation
---        , Signable w ~ SignableRepresentation
---        , ContextDSIGNM v ~ ()
---        , ContextDSIGN w ~ ()
---        )
---     => Proxy v
---     -> Proxy w
---     -> SignKeyDSIGNM v
---     -> [Word8]
---     -> SigDSIGNM v
---     -> Property
--- prop_sodium_verify_neg p q sk bytes sig = ioProperty $ do
---     Just sk' <- rawDeserialiseSignKeyDSIGN <$> rawSerialiseSignKeyDSIGNM sk
---     vk <- deriveVerKeyDSIGNM sk
---     let vk' = deriveVerKeyDSIGN sk'
---     let Just sig' = rawDeserialiseSigDSIGN $ rawSerialiseSigDSIGNM sig :: Maybe (SigDSIGN w)
---     let actual = verifyDSIGNM () vk msg sig
---     let expected = verifyDSIGN () vk' msg sig'
---     return $ label (con expected) $ actual === expected
---   where
---     msg = BS.pack bytes
---     con :: Either a b -> String
---     con (Left _) = "Left"
---     con (Right _) = "Right"
+-- TODO: verify that DSIGN and DSIGNM implementations match (see #363)

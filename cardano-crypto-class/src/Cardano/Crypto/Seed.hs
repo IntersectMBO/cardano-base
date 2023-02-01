@@ -15,6 +15,8 @@ module Cardano.Crypto.Seed
     -- * Using seeds
   , getBytesFromSeed
   , getBytesFromSeedT
+  , getBytesFromSeedEither
+  , getSeedSize
   , runMonadRandomWithSeed
   , SeedBytesExhausted(..)
   ) where
@@ -27,7 +29,8 @@ import           Control.DeepSeq (NFData)
 import           Control.Exception (Exception(..), throw)
 
 import           Data.Functor.Identity
-import           Control.Monad.Trans.Maybe
+import           Data.Bifunctor (first)
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           NoThunks.Class (NoThunks)
 
@@ -41,68 +44,57 @@ import           Cardano.Crypto.Hash.Class (HashAlgorithm(digest))
 --
 -- This is not itself a PRNG, but can be used to seed a PRNG.
 --
-newtype SeedOf a = Seed a
+newtype Seed = Seed ByteString
   deriving (Show, Eq, Semigroup, Monoid, NoThunks, NFData)
-
-type Seed = SeedOf ByteString
-
-class SplittableRawSeed a where
-  rawSeedLength :: a -> Word
-  rawSeedSplitAt :: Word -> a -> (a, a)
-
-instance SplittableRawSeed ByteString where
-  rawSeedLength = fromIntegral . BS.length
-  rawSeedSplitAt = BS.splitAt . fromIntegral
-
 
 -- | Construct a 'Seed' deterministically from a number of bytes.
 --
-mkSeedFromBytes :: a -> SeedOf a
+mkSeedFromBytes :: ByteString -> Seed
 mkSeedFromBytes = Seed
 
 
 -- | Extract the full bytes from a seed. Note that this function does not
 -- guarantee that the result is sufficiently long for the desired seed size!
-getSeedBytes :: SeedOf a -> a
+getSeedBytes :: Seed -> ByteString
 getSeedBytes (Seed s) = s
+
+getSeedSize :: Seed -> Word
+getSeedSize (Seed bs) =
+  fromIntegral . max 0 $ BS.length bs
 
 -- | Get a number of bytes from the seed. This will fail if not enough bytes
 -- are available. This can be chained multiple times provided the seed is big
 -- enough to cover each use.
 --
-getBytesFromSeed :: SplittableRawSeed a => Word -> SeedOf a -> Maybe (a, SeedOf a)
-getBytesFromSeed n (Seed s)
-  | rawSeedLength b == n
-  = Just (b, Seed s')
+getBytesFromSeed :: Word -> Seed -> Maybe (ByteString, Seed)
+getBytesFromSeed n s =
+  case getBytesFromSeedEither n s of
+    Right x -> Just x
+    Left _ -> Nothing
+
+getBytesFromSeedEither :: Word -> Seed -> Either SeedBytesExhausted (ByteString, Seed)
+getBytesFromSeedEither n (Seed s)
+  | n == fromIntegral (BS.length b)
+  = Right (b, Seed s')
   | otherwise
-  = Nothing
+  = Left $ SeedBytesExhausted (fromIntegral $ BS.length b) (fromIntegral n)
   where
-    (b, s') = rawSeedSplitAt n s
+    (b, s') = BS.splitAt (fromIntegral n) s
 
 -- | A flavor of 'getBytesFromSeed' that throws 'SeedBytesExhausted' instead of
 -- returning 'Nothing'.
-getBytesFromSeedT :: SplittableRawSeed a => Word -> SeedOf a -> (a, SeedOf a)
-getBytesFromSeedT n (Seed s)
-  | rawSeedLength b == n
-  = (b, Seed s')
-  | otherwise
-  = throw (SeedBytesExhausted . fromIntegral $ rawSeedLength b)
-  where
-    (b, s') = rawSeedSplitAt n s
+getBytesFromSeedT :: Word -> Seed -> (ByteString, Seed)
+getBytesFromSeedT n s =
+  either throw id $ getBytesFromSeedEither n s
 
 -- | Split a seed into two smaller seeds, the first of which is the given
 -- number of bytes large, and the second is the remaining. This will fail if
 -- not enough bytes are available. This can be chained multiple times provided
 -- the seed is big enough to cover each use.
 --
-splitSeed :: SplittableRawSeed a => Word -> SeedOf a -> Maybe (SeedOf a, SeedOf a)
-splitSeed n (Seed s)
-  | rawSeedLength b == n
-  = Just (Seed b, Seed s')
-  | otherwise
-  = Nothing
-  where
-    (b, s') = rawSeedSplitAt n s
+splitSeed :: Word -> Seed -> Maybe (Seed, Seed)
+splitSeed n s =
+  first Seed <$> getBytesFromSeed n s
 
 -- | Expand a seed into a pair of seeds using a cryptographic hash function (in
 -- the role of a crypto PRNG). The whole input seed is consumed. The output
@@ -133,19 +125,23 @@ readSeedFromSystemEntropy n = mkSeedFromBytes <$> getEntropy (fromIntegral n)
 -- upper bound on the amount of entropy that will be requested.
 --
 runMonadRandomWithSeed :: Seed -> (forall m. MonadRandom m => m a) -> a
-runMonadRandomWithSeed s@(Seed bs) a =
-    case runIdentity (runMaybeT (evalStateT (unMonadRandomFromSeed a) s)) of
-      Just x  -> x
-      Nothing -> throw (SeedBytesExhausted (BS.length bs))
+runMonadRandomWithSeed s a =
+    case runIdentity (runExceptT (evalStateT (unMonadRandomFromSeed a) s)) of
+      Right x  -> x
+      Left e -> throw e
 
-newtype SeedBytesExhausted = SeedBytesExhausted { seedBytesSupplied :: Int }
+data SeedBytesExhausted =
+  SeedBytesExhausted
+    { seedBytesSupplied :: Int
+    , seedBytesDemanded :: Int
+    }
   deriving Show
 
 instance Exception SeedBytesExhausted
 
 newtype MonadRandomFromSeed a =
         MonadRandomFromSeed {
-          unMonadRandomFromSeed :: StateT Seed (MaybeT Identity) a
+          unMonadRandomFromSeed :: StateT Seed (ExceptT SeedBytesExhausted Identity) a
         }
   deriving newtype (Functor, Applicative, Monad)
 
@@ -153,9 +149,9 @@ getRandomBytesFromSeed :: Int -> MonadRandomFromSeed ByteString
 getRandomBytesFromSeed n =
     MonadRandomFromSeed $
       StateT $ \s ->
-        MaybeT $
+        ExceptT $
           Identity $
-            getBytesFromSeed (fromIntegral n) s
+            getBytesFromSeedEither (fromIntegral n) s
 
 instance MonadRandom MonadRandomFromSeed where
   getRandomBytes n = BA.convert <$> getRandomBytesFromSeed n

@@ -19,8 +19,8 @@ module Cardano.Crypto.MonadSodium.Alloc
   MonadSodium (..),
   mlockedAlloca,
   mlockedAllocaSized,
-  allocMLockedForeignPtr,
-  allocMLockedForeignPtrBytes,
+  mlockedAllocForeignPtr,
+  mlockedAllocForeignPtrBytes,
 
   -- * Re-exports from plain Libsodium module
   NaCl.MLockedForeignPtr,
@@ -45,8 +45,8 @@ mlockedAllocaSized k = mlockedAlloca size (k . SizedPtr) where
     size :: CSize
     size = fromInteger (natVal (Proxy @n))
 
-allocMLockedForeignPtrBytes :: (MonadSodium m) => CSize -> CSize -> m (MLockedForeignPtr a)
-allocMLockedForeignPtrBytes size align = do
+mlockedAllocForeignPtrBytes :: (MonadSodium m) => CSize -> CSize -> m (MLockedForeignPtr a)
+mlockedAllocForeignPtrBytes size align = do
   mlockedMalloc size'
   where
     size' :: CSize
@@ -56,18 +56,18 @@ allocMLockedForeignPtrBytes size align = do
       where
         (q,m) = size `quotRem` align
 
-allocMLockedForeignPtr :: forall a m . (MonadSodium m, Storable a) => m (MLockedForeignPtr a)
-allocMLockedForeignPtr =
-  allocMLockedForeignPtrBytes size align
+mlockedAllocForeignPtr :: forall a m . (MonadSodium m, Storable a) => m (MLockedForeignPtr a)
+mlockedAllocForeignPtr =
+  mlockedAllocForeignPtrBytes size align
   where
-    b :: a
-    b = undefined
+    dummy :: a
+    dummy = undefined
 
     size :: CSize
-    size = fromIntegral $ sizeOf b
+    size = fromIntegral $ sizeOf dummy
 
     align :: CSize
-    align = fromIntegral $ alignment b
+    align = fromIntegral $ alignment dummy
 
 mlockedAlloca :: forall a b m. (MonadSodium m, MonadThrow m) => CSize -> (Ptr a -> m b) -> m b
 mlockedAlloca size =

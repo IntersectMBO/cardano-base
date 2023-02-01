@@ -4,7 +4,7 @@ module Cardano.Crypto.Libsodium (
   -- * MLocked memory management
   MLockedForeignPtr,
   withMLockedForeignPtr,
-  allocMLockedForeignPtr,
+  mlockedAllocForeignPtr,
   finalizeMLockedForeignPtr,
   traceMLockedForeignPtr,
   -- * MLocked bytes

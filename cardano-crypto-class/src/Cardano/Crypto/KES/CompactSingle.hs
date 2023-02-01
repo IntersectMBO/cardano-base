@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -9,7 +8,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -144,7 +142,6 @@ instance ( DSIGNMAlgorithmBase d
         off_vk     = size_sig
 
 instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
-         , Monad m
          , KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)
          )
          => KESSignAlgorithm m (CompactSingleKES d) where
@@ -160,7 +157,7 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
         assert (t == 0) $
         SigCompactSingleKES <$!> signDSIGNM ctxt a sk <*> deriveVerKeyDSIGNM sk
 
-    updateKES _ctx (SignKeyCompactSingleKES _sk) _to = return $! Nothing
+    updateKES _ctx (SignKeyCompactSingleKES _sk) _to = return Nothing
 
     --
     -- Key generation

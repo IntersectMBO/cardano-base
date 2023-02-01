@@ -136,6 +136,7 @@ class ( Typeable v
   rawDeserialiseSigDSIGNM     :: ByteString -> Maybe (SigDSIGNM v)
 
 class ( DSIGNMAlgorithmBase v
+      , Monad m
       )
       => DSIGNMAlgorithm m v where
 
@@ -220,7 +221,7 @@ sizeSigDSIGNM     _ = fromInteger (natVal (Proxy @(SizeSigDSIGNM v)))
 encodeVerKeyDSIGNM :: DSIGNMAlgorithmBase v => VerKeyDSIGNM v -> Encoding
 encodeVerKeyDSIGNM = encodeBytes . rawSerialiseVerKeyDSIGNM
 
-encodeSignKeyDSIGNM :: (UnsoundDSIGNMAlgorithm m v, Functor m) => SignKeyDSIGNM v -> m Encoding
+encodeSignKeyDSIGNM :: (UnsoundDSIGNMAlgorithm m v) => SignKeyDSIGNM v -> m Encoding
 encodeSignKeyDSIGNM = fmap encodeBytes . rawSerialiseSignKeyDSIGNM
 
 encodeSigDSIGNM :: DSIGNMAlgorithmBase v => SigDSIGNM v -> Encoding
@@ -241,7 +242,7 @@ decodeVerKeyDSIGNM = do
           actual   = BS.length bs
 
 decodeSignKeyDSIGNM :: forall m v s
-                     . (UnsoundDSIGNMAlgorithm m v, Monad m)
+                     . (UnsoundDSIGNMAlgorithm m v)
                     => Decoder s (m (SignKeyDSIGNM v))
 decodeSignKeyDSIGNM = do
     bs <- decodeBytes
@@ -281,7 +282,7 @@ instance DSIGNMAlgorithmBase v => NoThunks (SignedDSIGNM v a)
   -- use generic instance
 
 signedDSIGNM
-  :: (DSIGNMAlgorithm m v, SignableM v a, Functor m)
+  :: (DSIGNMAlgorithm m v, SignableM v a)
   => ContextDSIGNM v
   -> a
   -> SignKeyDSIGNM v

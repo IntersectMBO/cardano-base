@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Ed25519 digital signatures. This flavor of Ed25519 stores secrets in
 -- mlocked memory to make sure they cannot leak to disk via swapping.
@@ -22,6 +23,7 @@ where
 
 import Control.DeepSeq (NFData (..), rwhnf)
 import GHC.Generics (Generic)
+import GHC.TypeLits (TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 import Foreign.C.Error (errnoToIOError, getErrno, Errno)
@@ -76,7 +78,7 @@ cOrError :: MonadST m => (forall s. ST s Int) -> m (Maybe Errno)
 cOrError action = do
   withLiftST $ \fromST -> fromST $ do
     res <- action
-    if (res == 0) then
+    if res == 0 then
       return Nothing
     else
       Just <$> unsafeIOToST getErrno
@@ -144,9 +146,10 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
           psbUseAsSizedPtr sig $ \sigPtr -> do
               res <- c_crypto_sign_ed25519_verify_detached sigPtr (castPtr ptr) (fromIntegral len) vkPtr
               if res == 0
-              then return (Right ())
-              else do
-                  return (Left  "Verification failed")
+              then
+                return (Right ())
+              else
+                return (Left  "Verification failed")
 
     --
     -- raw serialise/deserialise
@@ -176,15 +179,15 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 -- Specifically, we only use the following potentially dangerous operations
 -- inside 'unsafeIOToST':
 --
--- - Libsodium functions marshalled from C, which do not allocate and only
---   perform operations on previously allocated memory through stable pointers,
---   and that are morally referentially transparent (that is, while they do
---   perform destructive updates, the update is idempotent in the imperative
---   sense, making it safe to execute repeatedly with the same input).
+-- - Libsodium functions (via C FFI) that are morally referentially
+--   transparent: that is, while they do perform destructive updates, the
+--   update is idempotent in the imperative sense, and the functions themselves
+--   never allocate / deallocate, they only operate on previously allocated
+--   memory passed to them via C pointers.
 -- - 'getErrno'; however, 'ST' guarantees sequentiality in the context where
---   we use 'getErrno', so this is actually fine.
--- - 'BS.useAsCStringLen', which is actually fine and shouldn't require 'IO'
---   to begin with, but unfortunately it does.
+--   we use 'getErrno', so this is fine.
+-- - 'BS.useAsCStringLen', which is fine and shouldn't require 'IO' to begin
+--   with, but unfortunately, for historical reasons, does.
 instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$!> do
@@ -225,7 +228,7 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       return sk
       where
         allocaSizedST k =
-          unsafeIOToST $ allocaSized $ \ptr -> (stToIO $ k ptr)
+          unsafeIOToST $ allocaSized $ \ptr -> stToIO $ k ptr
 
     cloneKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       SignKeyEd25519DSIGNM <$!> mlsbCopy sk
@@ -279,12 +282,14 @@ instance ToCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
 instance FromCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
   fromCBOR = decodeVerKeyDSIGNM
 
--- instance ToCBOR (SignKeyDSIGNM Ed25519DSIGNM) where
---   toCBOR = encodeSignKeyDSIGNM
---   encodedSizeExpr _ = encodedSignKeyDESIGNSizeExpr
---
--- instance FromCBOR (SignKeyDSIGNM Ed25519DSIGNM) where
---   fromCBOR = decodeSignKeyDSIGNM
+instance TypeError ('Text "CBOR encoding would violate mlocking guarantees")
+  => ToCBOR (SignKeyDSIGNM Ed25519DSIGNM) where
+  toCBOR = error "unsupported"
+  encodedSizeExpr _ = error "unsupported"
+
+instance TypeError ('Text "CBOR decoding would violate mlocking guarantees")
+  => FromCBOR (SignKeyDSIGNM Ed25519DSIGNM) where
+  fromCBOR = error "unsupported"
 
 instance ToCBOR (SigDSIGNM Ed25519DSIGNM) where
   toCBOR = encodeSigDSIGNM

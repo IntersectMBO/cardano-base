@@ -260,7 +260,7 @@ instance ( KESSignAlgorithm m d
                         return $! SignKeySumKES sk' r_1' vk_0 vk_1
       | t+1 == _T = do
                         sk' <- genKeyKES r_1
-                        r_1' <- mlockedSeedNew
+                        r_1' <- mlockedSeedNewZero
                         return $! Just $! SignKeySumKES sk' r_1' vk_0 vk_1
       | otherwise = runMaybeT $
                       do

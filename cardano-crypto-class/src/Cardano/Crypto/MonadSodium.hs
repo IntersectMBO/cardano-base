@@ -31,8 +31,8 @@ module Cardano.Crypto.MonadSodium
 
   -- * Memory management
   mlockedAllocaSized,
-  allocMLockedForeignPtr,
-  allocMLockedForeignPtrBytes,
+  mlockedAllocForeignPtr,
+  mlockedAllocForeignPtrBytes,
 
   -- * MLockedSizedBytes operations
   mlsbNew,

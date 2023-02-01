@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -31,7 +30,7 @@ import           NoThunks.Class (NoThunks)
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Class.MonadThrow (MonadEvaluate)
 import           Control.Monad.Class.MonadST (MonadST)
-import           Control.Monad ((<$!>), forM)
+import           Control.Monad ( (<$!>) )
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -164,9 +163,9 @@ instance ( KESAlgorithm (SimpleKES d t)
 
     updateKES _ (ThunkySignKeySimpleKES sk) t
       | t+1 < fromIntegral (natVal (Proxy @t)) = do
-          sk' <- Vec.mapM cloneKeyDSIGNM $! sk
+          sk' <- Vec.mapM cloneKeyDSIGNM sk
           return $! Just $! SignKeySimpleKES sk'
-      | otherwise                               = return $! Nothing
+      | otherwise                               = return Nothing
 
 
     --
@@ -176,10 +175,10 @@ instance ( KESAlgorithm (SimpleKES d t)
     genKeyKES (MLockedSeed mlsb) = do
       let seedSize = seedSizeDSIGNM (Proxy :: Proxy d)
           duration = fromIntegral (natVal (Proxy @t))
-      sks <- forM [0 .. (duration - 1)] $ \t -> do
-        withMLSBChunk mlsb (fromIntegral $ t * seedSize) $ \mlsb' -> do
+      sks <- Vec.generateM duration $ \t -> do
+        withMLSBChunk mlsb (fromIntegral t * fromIntegral seedSize) $ \mlsb' -> do
           genKeyDSIGNM (MLockedSeed mlsb')
-      return $! SignKeySimpleKES $! Vec.fromList $! sks
+      return $! SignKeySimpleKES sks
 
     --
     -- Forgetting
@@ -220,7 +219,8 @@ deriving instance DSIGNMAlgorithmBase d => Eq   (SigKES (SimpleKES d t))
 
 instance (Monad m, MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SimpleKES d t)) where
   equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =
-    Vec.all id <$> Vec.zipWithM equalsM a b
+    -- No need to check that lengths agree, the types already guarantee this.
+    Vec.and <$> Vec.zipWithM equalsM a b
 
 
 instance DSIGNMAlgorithmBase d => NoThunks (SigKES     (SimpleKES d t))
