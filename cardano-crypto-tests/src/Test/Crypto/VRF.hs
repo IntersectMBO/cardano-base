@@ -325,8 +325,7 @@ instance (VRFAlgorithm v,
 instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
   arbitrary = do
     bytes <- BS.pack <$> vectorOf (fromIntegral (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
-    return $ OutputVRF( bytes )
-  shrink = const []
+    return $ OutputVRF bytes
 
 instance Arbitrary BS32 where
     arbitrary = BS32 . BS.pack <$> vectorOf 32 arbitrary

@@ -428,18 +428,21 @@ vkToBatchCompat :: VerKeyVRF PraosVRF -> VerKeyVRF BC.PraosBatchCompatVRF
 vkToBatchCompat praosVk =
   case rawDeserialiseVerKeyVRF (rawSerialiseVerKeyVRF praosVk) of
     Just vk -> vk
-    Nothing -> error "Unable to convert PraosVK to BatchCompatVK."
+    Nothing -> error "VerKeyVRF: Unable to convert PraosVK to BatchCompatVK."
 
 -- | Construct a BatchCompat skey from praos, non-batchcompat
 skToBatchCompat :: SignKeyVRF PraosVRF -> SignKeyVRF BC.PraosBatchCompatVRF
 skToBatchCompat praosSk =
   case rawDeserialiseSignKeyVRF (rawSerialiseSignKeyVRF praosSk) of
     Just sk -> sk
-    Nothing -> error "Unable to convert PraosSK to BatchCompatSK."
+    Nothing -> error "SignKeyVRF: Unable to convert PraosSK to BatchCompatSK."
 
 -- | Construct a BatchCompat output from praos, non-batchcompat
 outputToBatchCompat :: OutputVRF PraosVRF -> OutputVRF BC.PraosBatchCompatVRF
 outputToBatchCompat praosOutput =
+  if vrfKeySizeVRF /= BC.vrfKeySizeVRF
+  then error "OutputVRF: Unable to convert PraosSK to BatchCompatSK."
+  else
   OutputVRF (getOutputVRFBytes praosOutput)
 
 
