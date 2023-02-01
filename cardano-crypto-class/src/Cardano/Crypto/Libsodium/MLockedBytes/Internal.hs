@@ -106,7 +106,7 @@ withMLSBChunk :: forall b n n' m.
 withMLSBChunk mlsb offset action
   | offset < 0
   = error "Negative offset not allowed"
-  | offset > parentSize - chunkSize 
+  | offset > parentSize - chunkSize
   = error $ "Overrun (" ++ show offset ++ " + " ++ show chunkSize ++ " > " ++ show parentSize ++ ")"
   | otherwise
   = withMLSB mlsb $ \ptr -> do
