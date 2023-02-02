@@ -23,7 +23,6 @@ extra-source-files:    cbits/crypto_vrf.h
                        cbits/vrf13_batchcompat/crypto_vrf_ietfdraft13.h
 
                        cbits/private/common.h
-                       cbits/private/quirks.h
                        cbits/private/ed25519_ref10.h
                        cbits/private/core_h2c.h
                        cbits/private/ed25519_ref10_fe_25_5.h
