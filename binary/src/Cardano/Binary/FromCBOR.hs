@@ -12,7 +12,9 @@ module Cardano.Binary.FromCBOR
   , enforceSize
   , matchSize
   , module D
+  , decodeMaybe
   , fromCBORMaybe
+  , decodeNullMaybe
   , decodeSeq
   , decodeListWith
     -- * Helper tools to build instances
@@ -338,18 +340,32 @@ instance FromCBOR a => FromCBOR (NonEmpty a) where
     Nothing -> Left $ DecoderErrorEmptyList "NonEmpty"
     Just xs -> Right xs
 
+
 instance FromCBOR a => FromCBOR (Maybe a) where
-  fromCBOR = fromCBORMaybe fromCBOR
+  fromCBOR = decodeMaybe fromCBOR
 
 fromCBORMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
-fromCBORMaybe fromCBORA = do
+fromCBORMaybe = decodeMaybe
+{-# DEPRECATED fromCBORMaybe "In favor of `decodeMaybe`" #-}
+
+decodeMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
+decodeMaybe decodeValue = do
   n <- D.decodeListLen
   case n of
     0 -> return Nothing
     1 -> do
-      !x <- fromCBORA
+      !x <- decodeValue
       return (Just x)
     _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral n)
+
+decodeNullMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
+decodeNullMaybe decoder = do
+  D.peekTokenType >>= \case
+    D.TypeNull -> do
+      D.decodeNull
+      pure Nothing
+    _ -> Just <$> decoder
+
 
 decodeContainerSkelWithReplicate
   :: FromCBOR a
