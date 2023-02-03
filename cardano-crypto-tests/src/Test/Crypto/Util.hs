@@ -8,6 +8,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DataKinds #-}
 
 module Test.Crypto.Util
   ( -- * CBOR
@@ -33,6 +34,8 @@ module Test.Crypto.Util
   , nullTestSeed
 
     -- * Seeds
+  , SizedSeed
+  , unSizedSeed
   , arbitrarySeedOfSize
 
    -- * test messages for signings
@@ -103,6 +106,7 @@ import Test.QuickCheck
 import Formatting.Buildable (build)
 import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
+import GHC.TypeLits (Nat, KnownNat, natVal)
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -133,6 +137,11 @@ instance Arbitrary TestSeed where
 --------------------------------------------------------------------------------
 -- Seeds
 --------------------------------------------------------------------------------
+
+newtype SizedSeed (n :: Nat) = SizedSeed { unSizedSeed :: Seed } deriving Show
+
+instance (KnownNat n) => Arbitrary (SizedSeed n) where
+    arbitrary = SizedSeed <$> arbitrarySeedOfSize (fromIntegral $ natVal (Proxy :: Proxy n))
 
 arbitrarySeedOfSize :: Word -> Gen Seed
 arbitrarySeedOfSize sz = mkSeedFromBytes . BS.pack <$> vector (fromIntegral sz)

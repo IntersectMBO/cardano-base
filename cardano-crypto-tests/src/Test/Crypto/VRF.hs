@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -15,7 +16,6 @@ import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
 import Cardano.Crypto.VRF.PraosBatchCompat
 import Cardano.Crypto.Util
-import Cardano.Crypto.Seed
 
 import qualified Data.ByteString as BS
 import Data.Word (Word8, Word64)
@@ -29,10 +29,6 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck (testProperty, vectorOf)
 
 {- HLINT IGNORE "Use <$>" -}
-
--- | Newtype to generate random ByteStrings of size 32
-newtype BS32 = BS32 { unBS32 :: BS.ByteString } deriving (Show)
-
 --
 -- The list of all tests
 --
@@ -245,11 +241,11 @@ prop_outputToBatchComat output =
 -- Praos <-> BatchCompatPraos VerKey compatibility. We check that a proof is validated with a
 -- transformed key
 --
-prop_verKeyValidConversion :: BS32 -> Message -> Bool
+prop_verKeyValidConversion :: SizedSeed (32) -> Message -> Bool
 prop_verKeyValidConversion sharedBytes msg =
   let
-    vkPraos = deriveVerKeyVRF . genKeyVRF . mkSeedFromBytes . unBS32 $ sharedBytes
-    skBatchCompat = genKeyVRF . mkSeedFromBytes . unBS32 $ sharedBytes
+    vkPraos = deriveVerKeyVRF . genKeyVRF . unSizedSeed $ sharedBytes
+    skBatchCompat = genKeyVRF . unSizedSeed $ sharedBytes
     vkBatchCompat = vkToBatchCompat vkPraos
     (y, c) = evalVRF () msg skBatchCompat
   in
@@ -259,11 +255,11 @@ prop_verKeyValidConversion sharedBytes msg =
 -- Praos <-> BatchCompatPraos SignKey compatibility. We check that a proof is validated with a
 -- transformed key
 --
-prop_signKeyValidConversion :: BS32 -> Bool
+prop_signKeyValidConversion :: SizedSeed (32) -> Bool
 prop_signKeyValidConversion sharedBytes =
   let
-    skPraos = genKeyVRF . mkSeedFromBytes . unBS32 $ sharedBytes
-    skBatchCompat = genKeyVRF . mkSeedFromBytes . unBS32 $ sharedBytes
+    skPraos = genKeyVRF . unSizedSeed $ sharedBytes
+    skBatchCompat = genKeyVRF . unSizedSeed $ sharedBytes
   in
     skBatchCompat == skToBatchCompat skPraos
 
@@ -271,12 +267,12 @@ prop_signKeyValidConversion sharedBytes =
 -- Praos <-> BatchCompatPraos Output compatibility. We check that a proof is validated with a
 -- transformed output
 --
-prop_outputValidConversion :: BS32 -> Message -> Bool
+prop_outputValidConversion :: SizedSeed (32) -> Message -> Bool
 prop_outputValidConversion sharedBytes msg =
   let
-    skPraos = genKeyVRF . mkSeedFromBytes . unBS32 $ sharedBytes
+    skPraos = genKeyVRF . unSizedSeed $ sharedBytes
     (outPraos, _c) = evalVRF () msg skPraos
-    skBatchCompat = genKeyVRF . mkSeedFromBytes . unBS32 $ sharedBytes
+    skBatchCompat = genKeyVRF . unSizedSeed $ sharedBytes
     vkBatchCompat = deriveVerKeyVRF skBatchCompat
     (_out, c) = evalVRF () msg skBatchCompat
     outBatchCompat = outputToBatchCompat outPraos
@@ -287,10 +283,10 @@ prop_outputValidConversion sharedBytes msg =
 -- Praos <-> BatchCompatPraos compatibility. We check that a proof is validated with a
 -- transformed key and output
 --
-prop_fullValidConversion :: BS32 -> Message -> Bool
+prop_fullValidConversion :: SizedSeed (32) -> Message -> Bool
 prop_fullValidConversion sharedBytes msg =
   let
-    skPraos = genKeyVRF . mkSeedFromBytes . unBS32 $ sharedBytes
+    skPraos = genKeyVRF . unSizedSeed $ sharedBytes
     vkPraos = deriveVerKeyVRF skPraos
     (outPraos, _c) = evalVRF () msg skPraos
     skBatchCompat = skToBatchCompat skPraos
@@ -326,6 +322,3 @@ instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
   arbitrary = do
     bytes <- BS.pack <$> vectorOf (fromIntegral (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
     return $ OutputVRF bytes
-
-instance Arbitrary BS32 where
-    arbitrary = BS32 . BS.pack <$> vectorOf 32 arbitrary
