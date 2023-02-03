@@ -1,7 +1,6 @@
 #include <string.h>
 
 #include "common.h"
-#include "quirks.h"
 #include "sodium/utils.h"
 
 /*
@@ -492,35 +491,6 @@ fe25519_sq2(fe25519 h, const fe25519 f)
 
 static void
 fe25519_scalar_product(fe25519 h, const fe25519 f, uint32_t n)
-{
-    const uint64_t mask = 0x7ffffffffffffULL;
-    uint128_t a;
-    uint128_t sn = (uint128_t) n;
-    uint64_t  h0, h1, h2, h3, h4;
-
-    a  = f[0] * sn;
-    h0 = ((uint64_t) a) & mask;
-    a  = f[1] * sn + ((uint64_t) (a >> 51));
-    h1 = ((uint64_t) a) & mask;
-    a  = f[2] * sn + ((uint64_t) (a >> 51));
-    h2 = ((uint64_t) a) & mask;
-    a  = f[3] * sn + ((uint64_t) (a >> 51));
-    h3 = ((uint64_t) a) & mask;
-    a  = f[4] * sn + ((uint64_t) (a >> 51));
-    h4 = ((uint64_t) a) & mask;
-
-    h0 += (a >> 51) * 19ULL;
-
-    h[0] = h0;
-    h[1] = h1;
-    h[2] = h2;
-    h[3] = h3;
-    h[4] = h4;
-}
-
-
-static inline void
-fe25519_mul32(fe25519 h, const fe25519 f, uint32_t n)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint128_t a;
