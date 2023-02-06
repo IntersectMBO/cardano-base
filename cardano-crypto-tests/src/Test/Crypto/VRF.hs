@@ -241,7 +241,7 @@ prop_outputToBatchComat output =
 -- Praos <-> BatchCompatPraos VerKey compatibility. We check that a proof is validated with a
 -- transformed key
 --
-prop_verKeyValidConversion :: SizedSeed (32) -> Message -> Bool
+prop_verKeyValidConversion :: SizedSeed 32 -> Message -> Bool
 prop_verKeyValidConversion sharedBytes msg =
   let
     vkPraos = deriveVerKeyVRF . genKeyVRF . unSizedSeed $ sharedBytes
@@ -255,7 +255,7 @@ prop_verKeyValidConversion sharedBytes msg =
 -- Praos <-> BatchCompatPraos SignKey compatibility. We check that a proof is validated with a
 -- transformed key
 --
-prop_signKeyValidConversion :: SizedSeed (32) -> Bool
+prop_signKeyValidConversion :: SizedSeed 32 -> Bool
 prop_signKeyValidConversion sharedBytes =
   let
     skPraos = genKeyVRF . unSizedSeed $ sharedBytes
@@ -267,7 +267,7 @@ prop_signKeyValidConversion sharedBytes =
 -- Praos <-> BatchCompatPraos Output compatibility. We check that a proof is validated with a
 -- transformed output
 --
-prop_outputValidConversion :: SizedSeed (32) -> Message -> Bool
+prop_outputValidConversion :: SizedSeed 32 -> Message -> Bool
 prop_outputValidConversion sharedBytes msg =
   let
     skPraos = genKeyVRF . unSizedSeed $ sharedBytes
@@ -283,7 +283,7 @@ prop_outputValidConversion sharedBytes msg =
 -- Praos <-> BatchCompatPraos compatibility. We check that a proof is validated with a
 -- transformed key and output
 --
-prop_fullValidConversion :: SizedSeed (32) -> Message -> Bool
+prop_fullValidConversion :: SizedSeed 32 -> Message -> Bool
 prop_fullValidConversion sharedBytes msg =
   let
     skPraos = genKeyVRF . unSizedSeed $ sharedBytes
