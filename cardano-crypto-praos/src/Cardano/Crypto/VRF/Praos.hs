@@ -41,6 +41,10 @@ module Cardano.Crypto.VRF.Praos
   , skFromBytes
   , vkFromBytes
 
+  , vkToBatchCompat
+  , skToBatchCompat
+  , outputToBatchCompat
+
 
   -- * Core VRF operations
   , prove
@@ -66,6 +70,7 @@ import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
 import Cardano.Crypto.VRF.Class
+import qualified Cardano.Crypto.VRF.PraosBatchCompat as BC
 import Control.DeepSeq (NFData (..))
 import Control.Monad (void)
 import Data.ByteString (ByteString)
@@ -417,6 +422,29 @@ prove sk msg =
           crypto_vrf_prove proofPtr skPtr m (fromIntegral mlen) >>= \case
             0 -> return $ Just $! proof
             _ -> return Nothing
+
+-- | Construct a BatchCompat vkey from praos, non-batchcompat
+vkToBatchCompat :: VerKeyVRF PraosVRF -> VerKeyVRF BC.PraosBatchCompatVRF
+vkToBatchCompat praosVk =
+  case rawDeserialiseVerKeyVRF (rawSerialiseVerKeyVRF praosVk) of
+    Just vk -> vk
+    Nothing -> error "VerKeyVRF: Unable to convert PraosVK to BatchCompatVK."
+
+-- | Construct a BatchCompat skey from praos, non-batchcompat
+skToBatchCompat :: SignKeyVRF PraosVRF -> SignKeyVRF BC.PraosBatchCompatVRF
+skToBatchCompat praosSk =
+  case rawDeserialiseSignKeyVRF (rawSerialiseSignKeyVRF praosSk) of
+    Just sk -> sk
+    Nothing -> error "SignKeyVRF: Unable to convert PraosSK to BatchCompatSK."
+
+-- | Construct a BatchCompat output from praos, non-batchcompat
+outputToBatchCompat :: OutputVRF PraosVRF -> OutputVRF BC.PraosBatchCompatVRF
+outputToBatchCompat praosOutput =
+  if vrfKeySizeVRF /= BC.vrfKeySizeVRF
+  then error "OutputVRF: Unable to convert PraosSK to BatchCompatSK."
+  else
+  OutputVRF (getOutputVRFBytes praosOutput)
+
 
 -- | Verify a VRF proof and validate the Verification Key. Returns 'Just' a hash of
 -- the verification result on success, 'Nothing' if the verification did not
