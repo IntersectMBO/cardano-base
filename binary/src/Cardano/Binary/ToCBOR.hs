@@ -15,7 +15,9 @@ module Cardano.Binary.ToCBOR
   ( ToCBOR(..)
   , withWordSize
   , module E
+  , encodeMaybe
   , toCBORMaybe
+  , encodeNullMaybe
   , encodeSeq
 
     -- * Size of expressions
@@ -615,7 +617,7 @@ instance ToCBOR a => ToCBOR (NonEmpty a) where
   encodedSizeExpr size _ = size (Proxy @[a]) -- MN TODO make 0 count impossible
 
 instance ToCBOR a => ToCBOR (Maybe a) where
-  toCBOR = toCBORMaybe toCBOR
+  toCBOR = encodeMaybe toCBOR
 
   encodedSizeExpr size _ =
     szCases [Case "Nothing" 1, Case "Just" (1 + size (Proxy @a))]
@@ -648,11 +650,22 @@ variableListLenEncoding len contents =
     lengthThreshold = 23
 {-# INLINE variableListLenEncoding #-}
 
-toCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
-toCBORMaybe encodeA = \case
+encodeMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+encodeMaybe encodeA = \case
   Nothing -> E.encodeListLen 0
   Just x  -> E.encodeListLen 1 <> encodeA x
 
+toCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+toCBORMaybe = encodeMaybe
+{-# DEPRECATED toCBORMaybe "In favor of `encodeMaybe`" #-}
+
+-- | Alternative way to encode a Maybe type.
+--
+-- /Note/ - this is not the default method for encoding `Maybe`, use `encodeMaybe` instead
+encodeNullMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+encodeNullMaybe encodeValue = \case
+  Nothing -> encodeNull
+  Just x -> encodeValue x
 
 encodeContainerSkel
   :: (Word -> E.Encoding)
