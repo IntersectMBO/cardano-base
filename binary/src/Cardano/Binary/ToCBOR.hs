@@ -16,6 +16,7 @@ module Cardano.Binary.ToCBOR
   , withWordSize
   , module E
   , toCBORMaybe
+  , encodeSeq
 
     -- * Size of expressions
   , Range(..)
@@ -47,14 +48,15 @@ import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
 import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import qualified Data.Primitive.ByteArray as Prim
+import qualified Data.Sequence as Seq
 import Data.Fixed (E12, Fixed(..), Nano, Pico, resolution)
 #if MIN_VERSION_recursion_schemes(5,2,0)
 import Data.Fix ( Fix(..) )
 #else
 import Data.Functor.Foldable (Fix(..))
 #endif
-import Data.Foldable (toList)
 import Data.Functor.Foldable (cata, project)
+import Data.Foldable (toList, foldMap')
 import Data.Int (Int32, Int64)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Map as M
@@ -618,10 +620,39 @@ instance ToCBOR a => ToCBOR (Maybe a) where
   encodedSizeExpr size _ =
     szCases [Case "Nothing" 1, Case "Just" (1 + size (Proxy @a))]
 
+instance ToCBOR a => ToCBOR (Seq.Seq a) where
+  toCBOR = encodeSeq toCBOR
+
+encodeSeq :: (a -> Encoding) -> Seq.Seq a -> Encoding
+encodeSeq encValue f = variableListLenEncoding (Seq.length f) (foldMap' encValue f)
+{-# INLINE encodeSeq #-}
+
+exactListLenEncoding :: Int -> Encoding -> Encoding
+exactListLenEncoding len contents =
+  encodeListLen (fromIntegral len :: Word) <> contents
+{-# INLINE exactListLenEncoding #-}
+
+-- | Conditionally use variable length encoding for list like structures with length
+-- larger than 23, otherwise use exact list length encoding.
+variableListLenEncoding ::
+  -- | Number of elements in the encoded data structure.
+  Int ->
+  -- | Encoding for the actual data structure
+  Encoding ->
+  Encoding
+variableListLenEncoding len contents =
+  if len <= lengthThreshold
+    then exactListLenEncoding len contents
+    else encodeListLenIndef <> contents <> encodeBreak
+  where
+    lengthThreshold = 23
+{-# INLINE variableListLenEncoding #-}
+
 toCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
 toCBORMaybe encodeA = \case
   Nothing -> E.encodeListLen 0
   Just x  -> E.encodeListLen 1 <> encodeA x
+
 
 encodeContainerSkel
   :: (Word -> E.Encoding)
