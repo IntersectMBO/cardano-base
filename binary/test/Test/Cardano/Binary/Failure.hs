@@ -94,5 +94,5 @@ assertIsLeft (Left !x) = case x of
 
 decode :: FromCBOR a => Encoding -> Either DecoderError a
 decode enc =
- let encoded = serializeEncoding enc
+ let encoded = serialize enc
  in decodeFull encoded

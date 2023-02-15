@@ -62,6 +62,7 @@ module Data.Sequence.Strict
   )
 where
 
+import Cardano.Binary (FromCBOR(..), ToCBOR(..))
 import Codec.Serialise (Serialise)
 import Control.Arrow ((***))
 import Control.DeepSeq (NFData)
@@ -108,6 +109,12 @@ infixl 5 :|>
 newtype StrictSeq a = StrictSeq {fromStrict :: Seq a}
   deriving stock (Eq, Ord, Show)
   deriving newtype (Foldable, Monoid, Semigroup, Serialise, NFData)
+
+instance ToCBOR a => ToCBOR (StrictSeq a) where
+  toCBOR = toCBOR . fromStrict
+
+instance FromCBOR a => FromCBOR (StrictSeq a) where
+  fromCBOR = forceToStrict <$> fromCBOR
 
 instance Functor StrictSeq where
   fmap f (StrictSeq s) = StrictSeq . forceElemsToWHNF $ fmap f s

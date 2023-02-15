@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name:                cardano-binary
-version:             1.5.0.1
+version:             1.6.0.0
 synopsis:            Binary serialization for Cardano
 description:         This package includes the binary serialization format for Cardano
 license:             Apache-2.0
@@ -14,6 +14,7 @@ copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
+                     CHANGELOG.md
 
 flag development
     description: Disable `-Werror`
@@ -40,25 +41,18 @@ library
   import:               base, project-config
   hs-source-dirs:       src
   exposed-modules:      Cardano.Binary
-  other-modules:        Cardano.Binary.Annotated
-                        Cardano.Binary.Drop
-                        Cardano.Binary.Raw
-
-                        Cardano.Binary.ToCBOR
+  other-modules:        Cardano.Binary.ToCBOR
                         Cardano.Binary.FromCBOR
 
                         Cardano.Binary.Serialize
                         Cardano.Binary.Deserialize
 
   build-depends:        base
-                      , aeson
                       , bytestring
                       , cborg              >= 0.2.2 && < 0.3
                       , containers
                       , data-fix
-                      , deepseq
                       , formatting
-                      , nothunks
                       , primitive
                       , recursion-schemes  >= 5.1   && < 5.3
                       , safe-exceptions
@@ -78,7 +72,6 @@ test-suite test
                         Test.Cardano.Binary.Helpers.GoldenRoundTrip
                         Test.Cardano.Binary.RoundTrip
                         Test.Cardano.Binary.Serialization
-                        Test.Cardano.Binary.Drop
                         Test.Cardano.Binary.Failure
 
   build-depends:        base

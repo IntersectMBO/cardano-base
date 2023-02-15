@@ -56,7 +56,6 @@ data TestStruct = TestStruct
   , tsMaybeBool             :: !(Maybe Bool)
   , tsMapBoolBool           :: !(Map Bool Bool)
   , tsSetBool               :: !(Set Bool)
-  , tsRaw                   :: !Raw
   , tsVectorBool            :: !(V.Vector Bool)
   , tsLByteString           :: BS.Lazy.ByteString
   , tsSByteString           :: BS.Short.ShortByteString
@@ -89,7 +88,6 @@ genTestStruct = TestStruct
     <*> Gen.maybe Gen.bool
     <*> Gen.map (Range.constant 0 2) ((,) <$> Gen.bool <*> Gen.bool)
     <*> Gen.set (Range.constant 0 2) Gen.bool
-    <*> (Raw <$> Gen.bytes (Range.linear 0 20))
     <*> (V.fromList <$> Gen.list (Range.constant 0 10) Gen.bool)
     <*> (BS.Lazy.fromStrict <$> Gen.bytes (Range.linear 0 20))
     <*> (BS.Short.toShort <$> Gen.bytes (Range.linear 0 20))
@@ -120,7 +118,6 @@ instance ToCBOR TestStruct where
     <> toCBOR (tsMaybeBool             ts)
     <> toCBOR (tsMapBoolBool           ts)
     <> toCBOR (tsSetBool               ts)
-    <> toCBOR (tsRaw                   ts)
     <> toCBOR (tsVectorBool            ts)
     <> toCBOR (tsLByteString           ts)
     <> toCBOR (tsSByteString           ts)
@@ -131,7 +128,6 @@ instance FromCBOR TestStruct where
     D.decodeListLenOf 1
     TestStruct
       <$> fromCBOR
-      <*> fromCBOR
       <*> fromCBOR
       <*> fromCBOR
       <*> fromCBOR
@@ -186,7 +182,7 @@ prop_roundTripSerialize' = property $ do
 prop_roundTripEncodeNestedCbor :: Property
 prop_roundTripEncodeNestedCbor = property $ do
   ts <- forAll genTestStruct
-  let encoded = serializeEncoding . encodeNestedCbor $ ts
+  let encoded = serialize . encodeNestedCbor $ ts
   decodeFullDecoder "" decodeNestedCbor encoded === Right ts
 
 prop_decodeContainerSkelWithReplicate :: Property
@@ -196,6 +192,6 @@ prop_decodeContainerSkelWithReplicate = property $
     _       -> False
   where
     decode :: Encoding -> Either DecoderError (V.Vector ())
-    decode enc = decodeFull (serializeEncoding enc)
+    decode enc = decodeFull (serialize enc)
 
     vec = encodeListLen 4097 <> mconcat (replicate 4097 encodeNull)

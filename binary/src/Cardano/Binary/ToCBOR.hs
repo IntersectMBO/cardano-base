@@ -15,7 +15,10 @@ module Cardano.Binary.ToCBOR
   ( ToCBOR(..)
   , withWordSize
   , module E
+  , encodeMaybe
   , toCBORMaybe
+  , encodeNullMaybe
+  , encodeSeq
 
     -- * Size of expressions
   , Range(..)
@@ -41,20 +44,22 @@ import Prelude hiding ((.))
 
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.ByteArray.Sliced as BAS
+import Codec.CBOR.Term
 import Control.Category (Category((.)))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
 import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import qualified Data.Primitive.ByteArray as Prim
+import qualified Data.Sequence as Seq
 import Data.Fixed (E12, Fixed(..), Nano, Pico, resolution)
 #if MIN_VERSION_recursion_schemes(5,2,0)
 import Data.Fix ( Fix(..) )
 #else
 import Data.Functor.Foldable (Fix(..))
 #endif
-import Data.Foldable (toList)
 import Data.Functor.Foldable (cata, project)
+import Data.Foldable (toList, foldMap')
 import Data.Int (Int32, Int64)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Map as M
@@ -404,6 +409,15 @@ withWordSize x =
       | otherwise                              -> 9
 
 
+instance ToCBOR Encoding where
+  toCBOR = id
+
+instance ToCBOR (Tokens -> Tokens) where
+  toCBOR = Encoding
+
+instance ToCBOR Term where
+  toCBOR = encodeTerm
+
 --------------------------------------------------------------------------------
 -- Primitive types
 --------------------------------------------------------------------------------
@@ -457,10 +471,6 @@ instance ToCBOR Int where
   toCBOR = E.encodeInt
   encodedSizeExpr _ = encodedSizeRange
 
-instance ToCBOR Float where
-  toCBOR = E.encodeFloat
-  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Float))
-
 instance ToCBOR Int32 where
   toCBOR = E.encodeInt32
   encodedSizeExpr _ = encodedSizeRange
@@ -468,6 +478,14 @@ instance ToCBOR Int32 where
 instance ToCBOR Int64 where
   toCBOR = E.encodeInt64
   encodedSizeExpr _ = encodedSizeRange
+
+instance ToCBOR Float where
+  toCBOR = E.encodeFloat
+  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Float))
+
+instance ToCBOR Double where
+  toCBOR = E.encodeDouble
+  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Double))
 
 instance ToCBOR a => ToCBOR (Ratio a) where
   toCBOR r = E.encodeListLen 2 <> toCBOR (numerator r) <> toCBOR (denominator r)
@@ -546,6 +564,28 @@ instance
       + size (Proxy @e)
 
 instance
+  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f)
+  => ToCBOR (a, b, c, d, e, f)
+ where
+  toCBOR (a, b, c, d, e, f) =
+    E.encodeListLen 6
+      <> toCBOR a
+      <> toCBOR b
+      <> toCBOR c
+      <> toCBOR d
+      <> toCBOR e
+      <> toCBOR f
+
+  encodedSizeExpr size _ =
+    1
+    + size (Proxy @a)
+    + size (Proxy @b)
+    + size (Proxy @c)
+    + size (Proxy @d)
+    + size (Proxy @e)
+    + size (Proxy @f)
+
+instance
   (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f, ToCBOR g)
   => ToCBOR (a, b, c, d, e, f, g)
   where
@@ -568,6 +608,32 @@ instance
     + size (Proxy @e)
     + size (Proxy @f)
     + size (Proxy @g)
+
+instance
+  (ToCBOR a, ToCBOR b, ToCBOR c, ToCBOR d, ToCBOR e, ToCBOR f, ToCBOR g, ToCBOR h)
+  => ToCBOR (a, b, c, d, e, f, g, h)
+  where
+  toCBOR (a, b, c, d, e, f, g, h) =
+    E.encodeListLen 8
+      <> toCBOR a
+      <> toCBOR b
+      <> toCBOR c
+      <> toCBOR d
+      <> toCBOR e
+      <> toCBOR f
+      <> toCBOR g
+      <> toCBOR h
+
+  encodedSizeExpr size _ =
+    1
+    + size (Proxy @a)
+    + size (Proxy @b)
+    + size (Proxy @c)
+    + size (Proxy @d)
+    + size (Proxy @e)
+    + size (Proxy @f)
+    + size (Proxy @g)
+    + size (Proxy @h)
 
 instance ToCBOR BS.ByteString where
   toCBOR = E.encodeBytes
@@ -613,15 +679,55 @@ instance ToCBOR a => ToCBOR (NonEmpty a) where
   encodedSizeExpr size _ = size (Proxy @[a]) -- MN TODO make 0 count impossible
 
 instance ToCBOR a => ToCBOR (Maybe a) where
-  toCBOR = toCBORMaybe toCBOR
+  toCBOR = encodeMaybe toCBOR
 
   encodedSizeExpr size _ =
     szCases [Case "Nothing" 1, Case "Just" (1 + size (Proxy @a))]
 
-toCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
-toCBORMaybe encodeA = \case
+instance ToCBOR a => ToCBOR (Seq.Seq a) where
+  toCBOR = encodeSeq toCBOR
+
+encodeSeq :: (a -> Encoding) -> Seq.Seq a -> Encoding
+encodeSeq encValue f = variableListLenEncoding (Seq.length f) (foldMap' encValue f)
+{-# INLINE encodeSeq #-}
+
+exactListLenEncoding :: Int -> Encoding -> Encoding
+exactListLenEncoding len contents =
+  encodeListLen (fromIntegral len :: Word) <> contents
+{-# INLINE exactListLenEncoding #-}
+
+-- | Conditionally use variable length encoding for list like structures with length
+-- larger than 23, otherwise use exact list length encoding.
+variableListLenEncoding ::
+  -- | Number of elements in the encoded data structure.
+  Int ->
+  -- | Encoding for the actual data structure
+  Encoding ->
+  Encoding
+variableListLenEncoding len contents =
+  if len <= lengthThreshold
+    then exactListLenEncoding len contents
+    else encodeListLenIndef <> contents <> encodeBreak
+  where
+    lengthThreshold = 23
+{-# INLINE variableListLenEncoding #-}
+
+encodeMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+encodeMaybe encodeA = \case
   Nothing -> E.encodeListLen 0
   Just x  -> E.encodeListLen 1 <> encodeA x
+
+toCBORMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+toCBORMaybe = encodeMaybe
+{-# DEPRECATED toCBORMaybe "In favor of `encodeMaybe`" #-}
+
+-- | Alternative way to encode a Maybe type.
+--
+-- /Note/ - this is not the default method for encoding `Maybe`, use `encodeMaybe` instead
+encodeNullMaybe :: (a -> Encoding) -> Maybe a -> Encoding
+encodeNullMaybe encodeValue = \case
+  Nothing -> encodeNull
+  Just x -> encodeValue x
 
 encodeContainerSkel
   :: (Word -> E.Encoding)

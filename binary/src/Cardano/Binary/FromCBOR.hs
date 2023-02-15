@@ -12,10 +12,15 @@ module Cardano.Binary.FromCBOR
   , enforceSize
   , matchSize
   , module D
+  , decodeMaybe
   , fromCBORMaybe
+  , decodeNullMaybe
+  , decodeSeq
   , decodeListWith
     -- * Helper tools to build instances
   , decodeMapSkel
+  , decodeCollection
+  , decodeCollectionWithLen
   , cborError
   , toCborError
   )
@@ -25,9 +30,10 @@ import Prelude hiding ((.))
 
 import Codec.CBOR.Decoding as D
 import Codec.CBOR.ByteArray as BA ( ByteArray(BA) )
+import Codec.CBOR.Term
 import Control.Category (Category((.)))
 import Control.Exception (Exception)
-import Control.Monad (when)
+import Control.Monad (when, replicateM)
 import qualified Codec.CBOR.Read as CBOR.Read
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -38,7 +44,8 @@ import Data.Int (Int32, Int64)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.Map as M
 import qualified Data.Primitive.ByteArray as Prim
-import Data.Ratio ( Ratio, (%) )
+import Data.Ratio ((%))
+import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import Data.Tagged (Tagged(..))
 import Data.Text (Text)
@@ -59,9 +66,6 @@ import Numeric.Natural (Natural)
 {- HLINT ignore "Reduce duplication" -}
 {- HLINT ignore "Redundant <$>" -}
 
---------------------------------------------------------------------------------
--- FromCBOR
---------------------------------------------------------------------------------
 
 class Typeable a => FromCBOR a where
   fromCBOR :: D.Decoder s a
@@ -69,6 +73,8 @@ class Typeable a => FromCBOR a where
   label :: Proxy a -> Text
   label = T.pack . show . typeRep
 
+instance FromCBOR Term where
+  fromCBOR = decodeTerm
 
 --------------------------------------------------------------------------------
 -- DecoderError
@@ -191,22 +197,25 @@ instance FromCBOR Word64 where
 instance FromCBOR Int where
   fromCBOR = D.decodeInt
 
-instance FromCBOR Float where
-  fromCBOR = D.decodeFloat
-
 instance FromCBOR Int32 where
   fromCBOR = D.decodeInt32
 
 instance FromCBOR Int64 where
   fromCBOR = D.decodeInt64
 
-instance (Integral a, FromCBOR a) => FromCBOR (Ratio a) where
+instance FromCBOR Float where
+  fromCBOR = D.decodeFloat
+
+instance FromCBOR Double where
+  fromCBOR = D.decodeDouble
+
+instance FromCBOR Rational where
   fromCBOR = do
-    enforceSize "Ratio" 2
+    enforceSize "Rational" 2
     n <- fromCBOR
     d <- fromCBOR
     if d <= 0
-      then cborError $ DecoderErrorCustom "Ratio" "invalid denominator"
+      then cborError $ DecoderErrorCustom "Rational" "invalid denominator"
       else return $! n % d
 
 instance FromCBOR Nano where
@@ -281,6 +290,20 @@ instance
     return (a, b, c, d, e)
 
 instance
+  (FromCBOR a, FromCBOR b, FromCBOR c, FromCBOR d, FromCBOR e, FromCBOR f)
+  => FromCBOR (a, b, c, d, e, f)
+ where
+  fromCBOR = do
+    D.decodeListLenOf 6
+    !a <- fromCBOR
+    !b <- fromCBOR
+    !c <- fromCBOR
+    !d <- fromCBOR
+    !e <- fromCBOR
+    !f <- fromCBOR
+    return (a, b, c, d, e, f)
+
+instance
   ( FromCBOR a
   , FromCBOR b
   , FromCBOR c
@@ -301,6 +324,30 @@ instance
     !f <- fromCBOR
     !g <- fromCBOR
     return (a, b, c, d, e, f, g)
+
+instance
+  ( FromCBOR a
+  , FromCBOR b
+  , FromCBOR c
+  , FromCBOR d
+  , FromCBOR e
+  , FromCBOR f
+  , FromCBOR g
+  , FromCBOR h
+  )
+  => FromCBOR (a, b, c, d, e, f, g, h)
+  where
+  fromCBOR = do
+    D.decodeListLenOf 8
+    !a <- fromCBOR
+    !b <- fromCBOR
+    !c <- fromCBOR
+    !d <- fromCBOR
+    !e <- fromCBOR
+    !f <- fromCBOR
+    !g <- fromCBOR
+    !h <- fromCBOR
+    return (a, b, c, d, e, f, g, h)
 
 instance FromCBOR BS.ByteString where
   fromCBOR = D.decodeBytes
@@ -337,18 +384,32 @@ instance FromCBOR a => FromCBOR (NonEmpty a) where
     Nothing -> Left $ DecoderErrorEmptyList "NonEmpty"
     Just xs -> Right xs
 
+
 instance FromCBOR a => FromCBOR (Maybe a) where
-  fromCBOR = fromCBORMaybe fromCBOR
+  fromCBOR = decodeMaybe fromCBOR
 
 fromCBORMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
-fromCBORMaybe fromCBORA = do
+fromCBORMaybe = decodeMaybe
+{-# DEPRECATED fromCBORMaybe "In favor of `decodeMaybe`" #-}
+
+decodeMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
+decodeMaybe decodeValue = do
   n <- D.decodeListLen
   case n of
     0 -> return Nothing
     1 -> do
-      !x <- fromCBORA
+      !x <- decodeValue
       return (Just x)
     _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral n)
+
+decodeNullMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
+decodeNullMaybe decoder = do
+  D.peekTokenType >>= \case
+    D.TypeNull -> do
+      D.decodeNull
+      pure Nothing
+    _ -> Just <$> decoder
+
 
 decodeContainerSkelWithReplicate
   :: FromCBOR a
@@ -476,10 +537,33 @@ decodeVector = decodeContainerSkelWithReplicate
   Vector.Generic.concat
 {-# INLINE decodeVector #-}
 
-instance (FromCBOR a) => FromCBOR (Vector.Vector a) where
+instance FromCBOR a => FromCBOR (Vector.Vector a) where
   fromCBOR = decodeVector
   {-# INLINE fromCBOR #-}
 
+instance FromCBOR a => FromCBOR (Seq.Seq a) where
+  fromCBOR = decodeSeq fromCBOR
+  {-# INLINE fromCBOR #-}
+
+decodeSeq :: Decoder s a -> Decoder s (Seq.Seq a)
+decodeSeq decoder = Seq.fromList <$> decodeCollection decodeListLenOrIndef decoder
+
+decodeCollection :: Decoder s (Maybe Int) -> Decoder s a -> Decoder s [a]
+decodeCollection lenOrIndef el = snd <$> decodeCollectionWithLen lenOrIndef el
+
+decodeCollectionWithLen ::
+  Decoder s (Maybe Int) ->
+  Decoder s v ->
+  Decoder s (Int, [v])
+decodeCollectionWithLen lenOrIndef el = do
+  lenOrIndef >>= \case
+    Just len -> (,) len <$> replicateM len el
+    Nothing -> loop (0, []) (not <$> decodeBreakOr) el
+  where
+    loop (!n, !acc) condition action =
+      condition >>= \case
+        False -> pure (n, reverse acc)
+        True -> action >>= \v -> loop (n + 1, v : acc) condition action
 
 --------------------------------------------------------------------------------
 -- Time
@@ -495,10 +579,11 @@ instance FromCBOR UTCTime where
       (fromOrdinalDate year dayOfYear)
       (picosecondsToDiffTime timeOfDayPico)
 
--- | Convert an 'Either'-encoded failure to a 'cborg' decoder failure
-toCborError :: B.Buildable e => Either e a -> D.Decoder s a
+-- | Convert an 'Either'-encoded failure to a 'MonadFail' failure using the `B.Buildable`
+-- insatance
+toCborError :: (MonadFail m, B.Buildable e) => Either e a -> m a
 toCborError = either cborError pure
 
--- | Convert a @Buildable@ error into a 'cborg' decoder error
-cborError :: B.Buildable e => e -> D.Decoder s a
+-- | Convert a `B.Buildable` error message into a 'MonadFail' failure.
+cborError :: (MonadFail m, B.Buildable e) => e -> m a
 cborError = fail . formatToString build

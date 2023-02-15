@@ -41,7 +41,6 @@ import Cardano.Binary
   , decodeFull
   , decodeFullDecoder
   , serialize
-  , serializeEncoding
   )
 import Text.Show.Pretty (Value(..))
 
@@ -115,7 +114,7 @@ goldenTestCBORExplicit
   -> FilePath
   -> Property
 goldenTestCBORExplicit eLabel enc dec =
-  goldenTestExplicit (serializeEncoding . enc) fullDecoder
+  goldenTestExplicit (serialize . enc) fullDecoder
   where
   fullDecoder :: BSL.ByteString -> Either DecoderError a
   fullDecoder = decodeFullDecoder eLabel dec
