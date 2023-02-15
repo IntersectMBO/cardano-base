@@ -36,7 +36,7 @@ library
                         Data.Unit.Strict
   build-depends:        aeson
                       , base
-                      , cardano-binary
+                      , cardano-binary >= 1.6
                       , cborg
                       , containers
                       , data-default-class
