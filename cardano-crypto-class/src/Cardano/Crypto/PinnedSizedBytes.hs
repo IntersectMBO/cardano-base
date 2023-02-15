@@ -58,7 +58,7 @@ import Foreign.Storable (Storable (..))
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import Language.Haskell.TH.Syntax (Q, TExp(..))
-import Language.Haskell.TH.Syntax.Compat (examineSplice)
+import Language.Haskell.TH.Syntax.Compat (Code(..), examineSplice)
 import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -150,6 +150,8 @@ instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
         Left err -> fail $ "<PinnedSizedBytes>: " ++ err
         Right _  -> examineSplice [|| either error psbFromByteString (decodeHexString hexStr n) ||]
 
+instance KnownNat n => IsString (Code Q (PinnedSizedBytes n)) where
+  fromString = Code . fromString
 
 -- | See 'psbFromBytes'.
 psbToBytes :: PinnedSizedBytes n -> [Word8]
