@@ -1,10 +1,8 @@
 name: Haskell CI
 
 on:
-  push:
-    branches: [ '*' ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "**" ]
 
 jobs:
   whitespace:
@@ -18,7 +16,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
     - name: Trailing whitespace check
       if: matrix.os != 'windows-latest'
@@ -66,7 +64,7 @@ jobs:
           libtool
           make
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: "[PowerShell] Add build script path"
       if: runner.os == 'Windows'
@@ -130,13 +128,12 @@ jobs:
         cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
 
     - name: Cache Cabal store
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
-        path: ${{ steps.setup-haskell.outputs.cabal-store }}
-        key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}-${{ hashFiles('date.txt') }}
-        restore-keys: |
-          cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
-          cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}
+        path: |
+          ${{ steps.setup-haskell.outputs.cabal-store }}
+          dist-newstyle
+        key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
 
     - name: Install dependencies
       run: |
@@ -151,9 +148,6 @@ jobs:
         # we are very deliberate about only adding msys64 to the path where absolutely necessary.
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
         cabal build all --enable-tests
-
-    - name: Git clone
-      run: git clone https://github.com/input-output-hk/cardano-mainnet-mirror
 
     - name: Run tests
       run: |
