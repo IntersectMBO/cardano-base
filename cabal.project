@@ -24,12 +24,12 @@ packages:
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
+  cardano-slotting
   cardano-strict-containers
   cardano-mempool
   heapwords
   measures
   orphans-deriving-via
-  slotting
 
 -- Ensures colourized output from test runners
 test-show-details: direct
