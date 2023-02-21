@@ -19,8 +19,8 @@ index-state:
 
 packages:
   base-deriving-via
-  binary
-  binary/test
+  cardano-binary
+  cardano-binary/test
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
