@@ -1,3 +1,8 @@
+# 2.1.1.0
+
+* Addition of `Cardano.Crypto.VRF.PraosBatchCompat`.
+* Addition of conversion functions: `vkToBatchCompat`, `skToBatchCompat`, `outputToBatchCompat`.
+
 # 2.1.0.0
 
 * Remove redundant and unused `unsafeRawSeed`, `io_crypto_vrf_publickeybytes` and
