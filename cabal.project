@@ -19,17 +19,17 @@ index-state:
 
 packages:
   base-deriving-via
-  binary
-  binary/test
+  cardano-binary
+  cardano-binary/test
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
+  cardano-slotting
   cardano-strict-containers
   cardano-mempool
   heapwords
   measures
   orphans-deriving-via
-  slotting
 
 -- Ensures colourized output from test runners
 test-show-details: direct

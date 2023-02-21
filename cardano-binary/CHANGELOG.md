@@ -16,7 +16,7 @@
 * Rename `toCBORMaybe` -> `encodeMaybe` with deprecation.
 * Rename `decCBORMaybe` -> `decodeMaybe` with deprecation.
 * Add `encodeNullMaybe` and `decodeNullMaybe`.
-* Add `ToFromCBOR` instances for `Seq` and `StrictSeq`
+* Add `To/FromCBOR` instances for `Seq`
 * Deprecate `serializeEncoding` and `serializeEncoding'` in favor of `serialize` and
   `serialize'` respectively, since `Encoding` now has the `ToCBOR` instance.
 * Add `decodeFullDecoder'` that accepts strict `ByteString`.
