@@ -11,6 +11,7 @@ author:              IOHK
 maintainer:          operations@iohk.io
 copyright:           IOHK
 build-type:          Simple
+extra-source-files:  CHANGELOG.md
 
 flag development
     description: Disable `-Werror`
