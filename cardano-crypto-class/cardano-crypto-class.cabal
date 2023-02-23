@@ -12,12 +12,12 @@ license-files:
   LICENSE
   NOTICE
 
-author:              IOHK
-maintainer:          operations@iohk.io
-copyright:           2019-2021 IOHK
-category:            Currency
-build-type:          Simple
-extra-source-files:  README.md
+author:             IOHK
+maintainer:         operations@iohk.io
+copyright:          2019-2021 IOHK
+category:           Currency
+build-type:         Simple
+extra-source-files: README.md
                     CHANGELOG.md
 extra-source-files:  cbits/blst.h
                   ,  cbits/blst_aux.h

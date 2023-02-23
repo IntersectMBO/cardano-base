@@ -116,10 +116,10 @@ jobs:
         cd ../..
 
     - name: Install secp256k1
-        uses: input-output-hk/setup-secp256k1@v1
-        with:
-          git-ref: ${{ env.SECP256K1_REF }}
-          cache-version: ${{ env.SECP_CACHE_VERSION }}
+      uses: input-output-hk/setup-secp256k1@v1
+      with:
+        git-ref: ${{ env.SECP256K1_REF }}
+        cache-version: ${{ env.SECP_CACHE_VERSION }}
 
     - name: Cabal update
       run: cabal update
