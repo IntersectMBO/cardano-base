@@ -30,6 +30,7 @@ module Cardano.Slotting.Time (
 import           Cardano.Binary (FromCBOR(..), ToCBOR(..))
 import           Codec.Serialise
 import           Control.Exception (assert)
+import           Data.Aeson (FromJSON, ToJSON)
 import           Data.Fixed
 import           Data.Time
                   ( NominalDiffTime,
@@ -55,17 +56,30 @@ newtype SystemStart = SystemStart { getSystemStart :: UTCTime }
   deriving NoThunks via InspectHeap SystemStart
   deriving Show via Quiet SystemStart
   deriving newtype Serialise
-  deriving newtype (ToCBOR, FromCBOR)
+  deriving newtype (ToCBOR, FromCBOR, ToJSON, FromJSON)
 
 {-------------------------------------------------------------------------------
   Relative time
 -------------------------------------------------------------------------------}
 
 -- | 'RelativeTime' is time relative to the 'SystemStart'
+--
+-- Precision is in picoseconds
 newtype RelativeTime = RelativeTime { getRelativeTime :: NominalDiffTime }
   deriving stock   (Eq, Ord, Generic)
   deriving newtype (NoThunks)
   deriving Show via Quiet RelativeTime
+  deriving newtype (ToJSON, FromJSON)
+
+instance ToCBOR RelativeTime where
+  toCBOR = toCBOR . nominalDiffTimeToSeconds . getRelativeTime
+
+instance FromCBOR RelativeTime where
+  fromCBOR = RelativeTime . secondsToNominalDiffTime <$> fromCBOR
+
+instance Serialise RelativeTime where
+  encode = toCBOR
+  decode = fromCBOR
 
 addRelativeTime :: NominalDiffTime -> RelativeTime -> RelativeTime
 addRelativeTime delta (RelativeTime t) = RelativeTime (t + delta)
@@ -95,9 +109,21 @@ multNominalDiffTime t f =
 -------------------------------------------------------------------------------}
 
 -- | Slot length
+--
+-- Precision is in milliseconds
 newtype SlotLength = SlotLength { getSlotLength :: NominalDiffTime }
   deriving (Eq, Generic, NoThunks)
   deriving Show via Quiet SlotLength
+
+instance ToCBOR SlotLength where
+  toCBOR = toCBOR . slotLengthToMillisec
+
+instance FromCBOR SlotLength where
+  fromCBOR = slotLengthFromMillisec <$> fromCBOR
+
+instance Serialise SlotLength where
+  encode = toCBOR
+  decode = fromCBOR
 
 -- | Constructor for 'SlotLength'
 mkSlotLength :: NominalDiffTime -> SlotLength
@@ -129,21 +155,3 @@ slotLengthToMillisec = conv . getSlotLength
          . (* 1000)
          . (realToFrac :: NominalDiffTime -> Pico)
 
-{-------------------------------------------------------------------------------
-  Serialisation
--------------------------------------------------------------------------------}
-
-instance Serialise RelativeTime where
-  encode = encode . toPico . getRelativeTime
-    where
-      toPico :: NominalDiffTime -> Pico
-      toPico = realToFrac
-
-  decode = (RelativeTime . fromPico) <$> decode
-    where
-      fromPico :: Pico -> NominalDiffTime
-      fromPico = realToFrac
-
-instance Serialise SlotLength where
-  encode = encode . slotLengthToMillisec
-  decode = slotLengthFromMillisec <$> decode
