@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name:                cardano-binary
-version:             1.6.0.0
+version:             1.7.0.0
 synopsis:            Binary serialization for Cardano
 description:         This package includes the binary serialization format for Cardano
 license:             Apache-2.0

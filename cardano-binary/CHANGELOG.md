@@ -1,5 +1,15 @@
 # Changelog for `cardano-binary`
 
+## 1.7.0.0
+
+* Remove `To/FromCBOR` instances for `NominalDiffTime`, since they did rounding.  Newly
+  added functions `encodeNominalDiffTimeMicro`/`decodedNominalDiffTimeMicro` can be used
+  to recover previous behavior. Correct instances that do not perform any rounding will
+  be added in some future version, for now `decodeNominalDiffTime` and
+  `encodeNominalDiffTime` can be used.
+* Add `decodeNominalDiffTime` and `encodeNominalDiffTime`
+* Add `To/FromCBOR` for all `Fixed a`, not just `Nano` and `Pico`
+
 ## 1.6.0.0
 
 * Removed `Cardano.Binary.Annotated` and `Cardano.Binary.Drop` modules. They have been

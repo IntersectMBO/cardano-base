@@ -17,6 +17,8 @@ module Cardano.Binary.FromCBOR
   , decodeNullMaybe
   , decodeSeq
   , decodeListWith
+  , decodeNominalDiffTime
+  , decodeNominalDiffTimeMicro
     -- * Helper tools to build instances
   , decodeMapSkel
   , decodeCollection
@@ -39,7 +41,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Short as SBS
 import Data.ByteString.Short.Internal (ShortByteString (SBS))
-import Data.Fixed (Fixed(..), Nano, Pico)
+import Data.Fixed (Fixed(..))
 import Data.Int (Int32, Int64)
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import qualified Data.Map as M
@@ -51,7 +53,7 @@ import Data.Tagged (Tagged(..))
 import Data.Text (Text)
 import qualified Data.Text  as T
 import Data.Time.Calendar.OrdinalDate ( fromOrdinalDate )
-import Data.Time.Clock (NominalDiffTime, UTCTime(..), picosecondsToDiffTime)
+import Data.Time.Clock (NominalDiffTime, UTCTime(..), secondsToNominalDiffTime, picosecondsToDiffTime)
 import Data.Typeable ( Typeable, typeRep, Proxy )
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
@@ -218,15 +220,15 @@ instance FromCBOR Rational where
       then cborError $ DecoderErrorCustom "Rational" "invalid denominator"
       else return $! n % d
 
-instance FromCBOR Nano where
+instance Typeable a => FromCBOR (Fixed a) where
   fromCBOR = MkFixed <$> fromCBOR
 
-instance FromCBOR Pico where
-  fromCBOR = MkFixed <$> fromCBOR
+decodeNominalDiffTime :: Decoder s NominalDiffTime
+decodeNominalDiffTime = secondsToNominalDiffTime <$> fromCBOR
 
 -- | For backwards compatibility we round pico precision to micro
-instance FromCBOR NominalDiffTime where
-  fromCBOR = fromRational . (% 1e6) <$> fromCBOR
+decodeNominalDiffTimeMicro :: Decoder s NominalDiffTime
+decodeNominalDiffTimeMicro = fromRational . (% 1e6) <$> fromCBOR
 
 instance FromCBOR Natural where
   fromCBOR = do
