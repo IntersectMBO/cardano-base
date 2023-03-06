@@ -7,7 +7,7 @@ function) implemented in libsodium.
 
 This package depends on a custom fork of the `libsodium` C library, found at
 
-https://github.com/input-output-hk/libsodium/tree/tdammers/rebased-vrf
+https://github.com/input-output-hk/libsodium/tree/iquerejeta/vrf_batchverify
 
 ### Usage with `cabal`:
 
