@@ -64,7 +64,7 @@ testScalar name =
     , testProperty "non-negative" $
         \s -> (unsafePerformIO . BLS.scalarToInteger $ s) >= 0
     , testProperty "to/from Integer round-trip" $
-        \s -> s === ((unsafePerformIO . BLS.scalarFromInteger) . (unsafePerformIO . BLS.scalarToInteger) $ s)
+        \s -> s === unsafePerformIO (BLS.scalarToInteger s >>= BLS.scalarFromInteger)
     , testCase "integer from scalar" $ do
         s <- case BLS.scalarFromBS (BLS.padBS 32 (BS.pack [0x12, 0x34])) of
               Left err -> error (show err)

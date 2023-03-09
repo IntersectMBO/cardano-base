@@ -487,14 +487,12 @@ cstrToInteger p l = do
       return $ res .|. shiftL (fromIntegral val) (8 * pred n)
 
 integerToBS :: Integer -> ByteString
-integerToBS 0 = BS.empty
-integerToBS n
-  | n < 0
-  = error "Cannot convert negative Integer to ByteString"
-  | otherwise
-  = BS.snoc
-      (integerToBS (n `shiftR` 8))
-      (fromIntegral n)
+integerToBS k
+  | k < 0 = error "Cannot convert negative Integer to ByteString"
+  | otherwise = go 0 [] k
+  where
+    go !i !acc 0 = BS.unsafePackLenBytes i acc
+    go !i !acc n = go (i + 1) (fromIntegral n : acc) (n `shiftR` 8)
 
 padBS :: Int -> ByteString -> ByteString
 padBS i b
@@ -709,7 +707,7 @@ neg p = cneg p True
 
 uncompress :: forall curve. (BLS_P curve, BLS_Curve curve) => ByteString -> Either BLSTError (P curve)
 uncompress bs = unsafePerformIO $ do
-  BS.useAsCStringLen bs $ \(bytes, numBytes) ->
+  BS.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == compressedSizeP (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_uncompress ap bytes
       if err /= 0 then
@@ -721,7 +719,7 @@ uncompress bs = unsafePerformIO $ do
 
 deserialize :: forall curve. (BLS_P curve, BLS_Curve curve) => ByteString -> Either BLSTError (P curve)
 deserialize bs = unsafePerformIO $ do
-  BS.useAsCStringLen bs $ \(bytes, numBytes) ->
+  BS.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == serializedSizeP (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_deserialize ap bytes
       if err /= 0 then
@@ -737,7 +735,7 @@ compress p = unsafePerformIO $ do
     cstr <- mallocForeignPtrBytes (compressedSizeP (Proxy @curve))
     withForeignPtr cstr $ \cstrp -> do
       c_blst_compress cstrp pp
-      BS.packCStringLen (cstrp, compressedSizeP (Proxy @curve))
+    BS.fromForeignPtr0 cstr (compressedSizeP (Proxy @curve))
 
 serialize :: forall curve. (BLS_P curve, BLS_Curve curve) => P curve -> ByteString
 serialize p = unsafePerformIO $ do
@@ -745,14 +743,14 @@ serialize p = unsafePerformIO $ do
     cstr <- mallocForeignPtrBytes (serializedSizeP (Proxy @curve))
     withForeignPtr cstr $ \cstrp -> do
       c_blst_serialize cstrp pp
-      BS.packCStringLen (cstrp, serializedSizeP (Proxy @curve))
+          BS.fromForeignPtr0 cstr (serializedSizeP (Proxy @curve))
 
 -- | @hash msg mDST mAug@ generates the elliptic curve hash for the given
 -- message @msg@; @mDST@ and @mAug@ are the optional @aug@ and @dst@
 -- arguments.
 hash :: (BLS_P curve, BLS_Curve curve) => ByteString -> Maybe ByteString -> Maybe ByteString -> P curve
 hash msg mDST mAug = unsafePerformIO $
-  BS.useAsCStringLen msg $ \(msgPtr, msgLen) ->
+  BS.unsafeUseAsCStringLen msg $ \(msgPtr, msgLen) ->
     withMaybeCStringLen mDST $ \(dstPtr, dstLen) ->
       withMaybeCStringLen mAug $ \(augPtr, augLen) ->
         withNewP' $ \pPtr ->
@@ -804,7 +802,7 @@ frFromCanonicalScalar scalar
 
 scalarFromBS :: ByteString -> Either BLSTError Scalar
 scalarFromBS bs = unsafePerformIO $ do
-  BS.useAsCStringLen bs $ \(cstr, l) ->
+  BS.unsafeUseAsCStringLen bs $ \(cstr, l) ->
     if l == sizeScalar then do
       (success, scalar) <- withNewScalar $ \scalarPtr ->
         c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral l)
@@ -821,7 +819,7 @@ scalarToBS scalar = unsafePerformIO $ do
   withForeignPtr cstr $ \cstrp -> do
     withScalar scalar $ \scalarPtr -> do
       c_blst_bendian_from_scalar cstrp scalarPtr
-      BS.packCStringLen (castPtr cstrp, sizeScalar)
+  BS.fromForeignPtr0 (castForeignPtr cstr) sizeScalar
 
 scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar = unsafePerformIO $
@@ -868,7 +866,7 @@ pairing p1 p2 =
 
 withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)
-withMaybeCStringLen (Just bs) go = BS.useAsCStringLen bs go
+withMaybeCStringLen (Just bs) go = BS.unsafeUseAsCStringLen bs go
 
 -- | The period of scalar modulo operations.
 scalarPeriod :: Integer
