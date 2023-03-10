@@ -686,7 +686,8 @@ addOrDouble in1 in2 = unsafePerformIO $ do
 
 -- | Scalar multiplication of a curve point. The scalar will be brought into
 -- the range of modular arithmetic by means of a modulo operation over the
--- 'scalarPeriod'.
+-- 'scalarPeriod'. Negative number will also be brought to the range
+-- [0, 'scalarPeriod' - 1] via modular reduction.
 mult :: (BLS curve) => P curve -> Integer -> P curve
 mult in1 inS = unsafePerformIO $ do
   withNewP' $ \outp -> do
