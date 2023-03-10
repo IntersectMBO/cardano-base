@@ -107,13 +107,7 @@ jobs:
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
-      run: |
-        mkdir blst-sources && cd blst-sources
-        git clone https://github.com/supranational/blst
-        cd blst
-        git reset --hard $BLST_REF
-        ./build.sh
-        cd ../..
+      run: .github/workflows/build-blst.bash
 
     - name: Install secp256k1
       uses: input-output-hk/setup-secp256k1@v1
