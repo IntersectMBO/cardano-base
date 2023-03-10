@@ -168,7 +168,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , scalarCanonical
 
   -- * Pairings
-  , pairing
+  , miller_loop
 )
 where
 
@@ -220,7 +220,8 @@ instance BLS_P curve => Eq (AffinePtr curve) where
 
 ---- Safe P types / marshalling
 
--- | A point on an elliptic curve.
+-- | A point on an elliptic curve. This type guarantees that the point is part of the
+-- | prime order subgroup.
 newtype P curve = P (ForeignPtr Void)
 
 type P1 = P Curve1
@@ -713,10 +714,14 @@ uncompress bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == compressedSizeP (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_uncompress ap bytes
+      let p = fromAffine affine
       if err /= 0 then
         return $ Left $ mkBLSTError err
       else
-        return $ Right (fromAffine affine)
+        if inGroup p then
+         return $ Right p
+        else
+          return $ Left BLST_POINT_NOT_IN_GROUP
     else do
       return $ Left BLST_BAD_ENCODING
 
@@ -725,10 +730,14 @@ deserialize bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == serializedSizeP (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_deserialize ap bytes
+      let p = fromAffine affine
       if err /= 0 then
         return $ Left $ mkBLSTError err
       else
-        return $ Right (fromAffine affine)
+        if inGroup p then
+         return $ Right p
+        else
+          return $ Left BLST_POINT_NOT_IN_GROUP
     else do
       return $ Left BLST_BAD_ENCODING
 
@@ -860,16 +869,13 @@ instance Eq PT where
 
 ---- Pairings
 
-pairing :: P1 -> P2 -> Either BLSTError PT
-pairing p1 p2 =
-  if inGroup p1 && inGroup p2 then
-    Right . unsafePerformIO $
-      withAffine (toAffine p1) $ \ap1 ->
-        withAffine (toAffine p2) $ \ap2 ->
-          withNewPT' $ \ppt ->
-            c_blst_miller_loop ppt ap2 ap1
-  else
-    Left BLST_POINT_NOT_IN_GROUP
+miller_loop :: P1 -> P2 -> Either BLSTError PT
+miller_loop p1 p2 =
+  Right . unsafePerformIO $
+    withAffine (toAffine p1) $ \ap1 ->
+      withAffine (toAffine p2) $ \ap2 ->
+        withNewPT' $ \ppt ->
+          c_blst_miller_loop ppt ap2 ap1
 
 ---- Utility
 

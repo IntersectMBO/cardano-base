@@ -135,19 +135,19 @@ testPairing name =
     , testProperty "three pairings"
         (\a b p q ->
             either (const False) id $ do
-                t1 <- BLS.pairing (BLS.mult p a) q
-                t2 <- BLS.pairing p (BLS.mult q b)
-                t3 <- BLS.pairing (BLS.mult p (a + b)) q
+                t1 <- BLS.miller_loop (BLS.mult p a) q
+                t2 <- BLS.miller_loop p (BLS.mult q b)
+                t3 <- BLS.miller_loop (BLS.mult p (a + b)) q
                 let tt = BLS.ptMult t1 t2
                 return $ BLS.ptFinalVerify tt t3
         )
     , testProperty "four pairings"
             (\a1 a2 a3 b ->
                 either (const False) id $ do
-                    t1 <- BLS.pairing a1 b
-                    t2 <- BLS.pairing a2 b
-                    t3 <- BLS.pairing a3 b
-                    t4 <- BLS.pairing (BLS.addOrDouble (BLS.addOrDouble a1 a2) a3) b
+                    t1 <- BLS.miller_loop a1 b
+                    t2 <- BLS.miller_loop a2 b
+                    t3 <- BLS.miller_loop a3 b
+                    t4 <- BLS.miller_loop (BLS.addOrDouble (BLS.addOrDouble a1 a2) a3) b
                     let tt = BLS.ptMult (BLS.ptMult t1 t2) t3
                     return $ BLS.ptFinalVerify tt t4
             )
@@ -155,8 +155,8 @@ testPairing name =
     where
       pairingCheck (a, b) (c, d) =
         either (error . show) id $ do
-          p <- BLS.pairing a b
-          q <- BLS.pairing c d
+          p <- BLS.miller_loop a b
+          q <- BLS.miller_loop c d
           return $ BLS.ptFinalVerify p q
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
@@ -190,7 +190,7 @@ instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
 
 instance Arbitrary BLS.PT where
-  arbitrary = either (error . show) return =<< BLS.pairing <$> arbitrary <*> arbitrary
+  arbitrary = either (error . show) return =<< BLS.miller_loop <$> arbitrary <*> arbitrary
 
 instance Show BLS.PT where
   show = const "<<<PT>>>"

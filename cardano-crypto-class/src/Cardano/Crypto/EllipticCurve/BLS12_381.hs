@@ -38,7 +38,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   , ptFinalVerify
 
   -- * Pairings
-  , pairing
+  , miller_loop
 
   -- * The period (modulo) of scalars
   , scalarPeriod
