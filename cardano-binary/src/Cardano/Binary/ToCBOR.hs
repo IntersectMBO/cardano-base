@@ -19,7 +19,8 @@ module Cardano.Binary.ToCBOR
   , toCBORMaybe
   , encodeNullMaybe
   , encodeSeq
-
+  , encodeNominalDiffTime
+  , encodeNominalDiffTimeMicro
     -- * Size of expressions
   , Range(..)
   , szEval
@@ -52,7 +53,7 @@ import qualified Data.ByteString.Short as SBS
 import Data.ByteString.Short.Internal (ShortByteString (SBS))
 import qualified Data.Primitive.ByteArray as Prim
 import qualified Data.Sequence as Seq
-import Data.Fixed (E12, Fixed(..), Nano, Pico, resolution)
+import Data.Fixed (Fixed(..), Micro)
 #if MIN_VERSION_recursion_schemes(5,2,0)
 import Data.Fix ( Fix(..) )
 #else
@@ -70,7 +71,7 @@ import qualified Data.Text as Text
 import Data.Text (Text)
 import Data.Text.Lazy.Builder (Builder)
 import Data.Time.Calendar.OrdinalDate ( toOrdinalDate )
-import Data.Time.Clock (NominalDiffTime, UTCTime(..), diffTimeToPicoseconds)
+import Data.Time.Clock (NominalDiffTime, nominalDiffTimeToSeconds, diffTimeToPicoseconds, UTCTime(..))
 import Data.Typeable ( Typeable, typeRep, TypeRep, Proxy(..) )
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Generic as Vector.Generic
@@ -491,19 +492,16 @@ instance ToCBOR a => ToCBOR (Ratio a) where
   toCBOR r = E.encodeListLen 2 <> toCBOR (numerator r) <> toCBOR (denominator r)
   encodedSizeExpr size _ = 1 + size (Proxy @a) + size (Proxy @a)
 
-instance ToCBOR Nano where
-  toCBOR (MkFixed nanoseconds) = toCBOR nanoseconds
+instance Typeable a => ToCBOR (Fixed a) where
+  toCBOR (MkFixed i) = toCBOR i
 
-instance ToCBOR Pico where
-  toCBOR (MkFixed picoseconds) = toCBOR picoseconds
+encodeNominalDiffTime :: NominalDiffTime -> Encoding
+encodeNominalDiffTime = toCBOR . nominalDiffTimeToSeconds
 
--- | For backwards compatibility we round pico precision to micro
-instance ToCBOR NominalDiffTime where
-  toCBOR = toCBOR . (`div` 1e6) . toPicoseconds
-   where
-    toPicoseconds :: NominalDiffTime -> Integer
-    toPicoseconds t =
-      numerator (toRational t * toRational (resolution $ Proxy @E12))
+-- | Same as `encodeNominalDiffTime`, except with loss of precision, because it encoded as
+-- `Data.Fixed.Micro`
+encodeNominalDiffTimeMicro :: NominalDiffTime -> Encoding
+encodeNominalDiffTimeMicro = toCBOR . realToFrac @_ @Micro
 
 instance ToCBOR Natural where
   toCBOR = toCBOR . toInteger
