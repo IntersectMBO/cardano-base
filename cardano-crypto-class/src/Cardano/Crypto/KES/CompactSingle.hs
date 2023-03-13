@@ -69,7 +69,7 @@ import Cardano.Crypto.DirectSerialise
 data CompactSingleKES d
 
 deriving newtype instance NFData (VerKeyDSIGNM d) => NFData (VerKeyKES (CompactSingleKES d))
-deriving newtype instance NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (CompactSingleKES d))
+deriving newtype instance NFData (SignKeyDSIGNM m d) => NFData (SignKeyKES m (CompactSingleKES d))
 
 deriving instance (NFData (SigDSIGNM d), NFData (VerKeyDSIGNM d)) => NFData (SigKES (CompactSingleKES d))
 
@@ -146,7 +146,7 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
          , KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)
          )
          => KESSignAlgorithm m (CompactSingleKES d) where
-    newtype SignKeyKES (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM d)
+    newtype SignKeyKES m (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM m d)
 
     deriveVerKeyKES (SignKeyCompactSingleKES v) =
         VerKeyCompactSingleKES <$!> deriveVerKeyDSIGNM v
@@ -210,7 +210,7 @@ instance DSIGNMAlgorithmBase d => NoThunks (VerKeyKES  (CompactSingleKES d))
 -- SignKey instances
 --
 
-deriving via (SignKeyDSIGNM d) instance DSIGNMAlgorithmBase d => NoThunks (SignKeyKES (CompactSingleKES d))
+deriving via (SignKeyDSIGNM m d) instance DSIGNMAlgorithm m d => NoThunks (SignKeyKES m (CompactSingleKES d))
 
 --
 -- Sig instances
@@ -236,10 +236,10 @@ slice offset size = BS.take (fromIntegral size)
 -- Direct ser/deser
 --
 
-instance (DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (CompactSingleKES d)) where
+instance (DirectSerialise m (SignKeyDSIGNM m d)) => DirectSerialise m (SignKeyKES m (CompactSingleKES d)) where
   directSerialise push (SignKeyCompactSingleKES sk) = directSerialise push sk
 
-instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d)) => DirectDeserialise m (SignKeyKES (CompactSingleKES d)) where
+instance (Monad m, DirectDeserialise m (SignKeyDSIGNM m d)) => DirectDeserialise m (SignKeyKES m (CompactSingleKES d)) where
   directDeserialise pull = SignKeyCompactSingleKES <$!> directDeserialise pull
 
 instance (DirectSerialise m (VerKeyDSIGNM d)) => DirectSerialise m (VerKeyKES (CompactSingleKES d)) where

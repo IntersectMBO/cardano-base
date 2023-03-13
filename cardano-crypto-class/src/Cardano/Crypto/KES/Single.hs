@@ -61,7 +61,7 @@ data SingleKES d
 deriving instance NFData (VerKeyDSIGNM d) => NFData (VerKeyKES (SingleKES d))
 deriving instance NFData (SigDSIGNM d) => NFData (SigKES (SingleKES d))
 
-deriving via (SignKeyDSIGNM d) instance NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (SingleKES d))
+deriving newtype instance NFData (SignKeyDSIGNM m d) => NFData (SignKeyKES m (SingleKES d))
 
 instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
     type SeedSizeKES (SingleKES d) = SeedSizeDSIGNM d
@@ -111,7 +111,7 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
 
 instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
          ) => KESSignAlgorithm m (SingleKES d) where
-    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
+    newtype SignKeyKES m (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM m d)
 
     deriveVerKeyKES (SignKeySingleKES v) =
       VerKeySingleKES <$!> deriveVerKeyDSIGNM v
@@ -167,7 +167,7 @@ instance DSIGNMAlgorithmBase d => NoThunks (VerKeyKES  (SingleKES d))
 -- SignKey instances
 --
 
-deriving via (SignKeyDSIGNM d) instance DSIGNMAlgorithmBase d => NoThunks (SignKeyKES (SingleKES d))
+deriving via (SignKeyDSIGNM m d) instance DSIGNMAlgorithm m d => NoThunks (SignKeyKES m (SingleKES d))
 
 --
 -- Sig instances
@@ -189,10 +189,10 @@ instance DSIGNMAlgorithmBase d => FromCBOR (SigKES (SingleKES d)) where
 -- Direct ser/deser
 --
 
-instance (DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (SingleKES d)) where
+instance (DirectSerialise m (SignKeyDSIGNM m d)) => DirectSerialise m (SignKeyKES m (SingleKES d)) where
   directSerialise push (SignKeySingleKES sk) = directSerialise push sk
 
-instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d)) => DirectDeserialise m (SignKeyKES (SingleKES d)) where
+instance (Monad m, DirectDeserialise m (SignKeyDSIGNM m d)) => DirectDeserialise m (SignKeyKES m (SingleKES d)) where
   directDeserialise pull = SignKeySingleKES <$!> directDeserialise pull
 
 instance (DirectSerialise m (VerKeyDSIGNM d)) => DirectSerialise m (VerKeyKES (SingleKES d)) where

@@ -69,11 +69,9 @@ import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 class ( Typeable v
       , Show (VerKeyDSIGNM v)
       , Eq (VerKeyDSIGNM v)
-      , Show (SignKeyDSIGNM v)
       , Show (SigDSIGNM v)
       , Eq (SigDSIGNM v)
       , NoThunks (SigDSIGNM v)
-      , NoThunks (SignKeyDSIGNM v)
       , NoThunks (VerKeyDSIGNM v)
       , KnownNat (SeedSizeDSIGNM v)
       , KnownNat (SizeVerKeyDSIGNM v)
@@ -92,7 +90,6 @@ class ( Typeable v
   --
 
   data VerKeyDSIGNM  v :: Type
-  data SignKeyDSIGNM v :: Type
   data SigDSIGNM     v :: Type
 
   --
@@ -136,15 +133,18 @@ class ( Typeable v
   rawDeserialiseSigDSIGNM     :: ByteString -> Maybe (SigDSIGNM v)
 
 class ( DSIGNMAlgorithmBase v
+      , NoThunks (SignKeyDSIGNM m v)
       , Monad m
       )
       => DSIGNMAlgorithm m v where
+
+  data SignKeyDSIGNM m v :: Type
 
   --
   -- Metadata and basic key operations
   --
 
-  deriveVerKeyDSIGNM :: SignKeyDSIGNM v -> m (VerKeyDSIGNM v)
+  deriveVerKeyDSIGNM :: SignKeyDSIGNM m v -> m (VerKeyDSIGNM v)
 
   --
   -- Core algorithm operations
@@ -154,24 +154,24 @@ class ( DSIGNMAlgorithmBase v
     :: (SignableM v a, HasCallStack)
     => ContextDSIGNM v
     -> a
-    -> SignKeyDSIGNM v
+    -> SignKeyDSIGNM m v
     -> m (SigDSIGNM v)
 
   --
   -- Key generation
   --
 
-  genKeyDSIGNM :: MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
+  genKeyDSIGNM :: MLockedSeed m (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM m v)
 
-  cloneKeyDSIGNM :: SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
+  cloneKeyDSIGNM :: SignKeyDSIGNM m v -> m (SignKeyDSIGNM m v)
 
-  getSeedDSIGNM :: Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
+  getSeedDSIGNM :: Proxy v -> SignKeyDSIGNM m v -> m (MLockedSeed m (SeedSizeDSIGNM v))
 
   --
   -- Secure forgetting
   --
 
-  forgetSignKeyDSIGNM :: SignKeyDSIGNM v -> m ()
+  forgetSignKeyDSIGNM :: SignKeyDSIGNM m v -> m ()
 
 -- | Unsound operations on DSIGNM sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider
@@ -181,18 +181,18 @@ class DSIGNMAlgorithm m v => UnsoundDSIGNMAlgorithm m v where
   -- Serialisation/(de)serialisation in fixed-size raw format
   --
 
-  rawSerialiseSignKeyDSIGNM   :: SignKeyDSIGNM v -> m ByteString
+  rawSerialiseSignKeyDSIGNM   :: SignKeyDSIGNM m v -> m ByteString
 
-  rawDeserialiseSignKeyDSIGNM :: ByteString -> m (Maybe (SignKeyDSIGNM v))
+  rawDeserialiseSignKeyDSIGNM :: ByteString -> m (Maybe (SignKeyDSIGNM m v))
 
 --
 -- Do not provide Ord instances for keys, see #38
 --
 
 instance ( TypeError ('Text "Ord not supported for signing keys, use the hash instead")
-         , Eq (SignKeyDSIGNM v)
+         , Eq (SignKeyDSIGNM m v)
          )
-      => Ord (SignKeyDSIGNM v) where
+      => Ord (SignKeyDSIGNM m v) where
     compare = error "unsupported"
 
 instance ( TypeError ('Text "Ord not supported for verification keys, use the hash instead")
@@ -221,7 +221,7 @@ sizeSigDSIGNM     _ = fromInteger (natVal (Proxy @(SizeSigDSIGNM v)))
 encodeVerKeyDSIGNM :: DSIGNMAlgorithmBase v => VerKeyDSIGNM v -> Encoding
 encodeVerKeyDSIGNM = encodeBytes . rawSerialiseVerKeyDSIGNM
 
-encodeSignKeyDSIGNM :: (UnsoundDSIGNMAlgorithm m v) => SignKeyDSIGNM v -> m Encoding
+encodeSignKeyDSIGNM :: (UnsoundDSIGNMAlgorithm m v) => SignKeyDSIGNM m v -> m Encoding
 encodeSignKeyDSIGNM = fmap encodeBytes . rawSerialiseSignKeyDSIGNM
 
 encodeSigDSIGNM :: DSIGNMAlgorithmBase v => SigDSIGNM v -> Encoding
@@ -243,7 +243,7 @@ decodeVerKeyDSIGNM = do
 
 decodeSignKeyDSIGNM :: forall m v s
                      . (UnsoundDSIGNMAlgorithm m v)
-                    => Decoder s (m (SignKeyDSIGNM v))
+                    => Decoder s (m (SignKeyDSIGNM m v))
 decodeSignKeyDSIGNM = do
     bs <- decodeBytes
     return $ rawDeserialiseSignKeyDSIGNM bs >>= \case
@@ -285,7 +285,7 @@ signedDSIGNM
   :: (DSIGNMAlgorithm m v, SignableM v a)
   => ContextDSIGNM v
   -> a
-  -> SignKeyDSIGNM v
+  -> SignKeyDSIGNM m v
   -> m (SignedDSIGNM v a)
 signedDSIGNM ctxt a key = SignedDSIGNM <$> signDSIGNM ctxt a key
 
@@ -321,7 +321,7 @@ encodedVerKeyDSIGNMSizeExpr _proxy =
 -- | 'Size' expression for 'SignKeyDSIGNM' which is using 'sizeSignKeyDSIGNM'
 -- encoded as 'Size'.
 --
-encodedSignKeyDSIGNMSizeExpr :: forall v. DSIGNMAlgorithmBase v => Proxy (SignKeyDSIGNM v) -> Size
+encodedSignKeyDSIGNMSizeExpr :: forall m v. DSIGNMAlgorithm m v => Proxy (SignKeyDSIGNM m v) -> Size
 encodedSignKeyDSIGNMSizeExpr _proxy =
       -- 'encodeBytes' envelope
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyDSIGNM (Proxy :: Proxy v)))

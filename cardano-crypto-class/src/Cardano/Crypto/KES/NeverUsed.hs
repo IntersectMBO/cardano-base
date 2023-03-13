@@ -50,15 +50,15 @@ instance KESAlgorithm NeverKES where
   rawDeserialiseSigKES     _ = Just NeverUsedSigKES
 
 instance Monad m => KESSignAlgorithm m NeverKES where
-  data SignKeyKES NeverKES = NeverUsedSignKeyKES
+  data SignKeyKES m NeverKES = NeverUsedSignKeyKES
       deriving (Show, Eq, Generic, NoThunks)
 
-  deriveVerKeyKES _ = return $! NeverUsedVerKeyKES
+  deriveVerKeyKES _ = return NeverUsedVerKeyKES
 
   signKES   = error "KES not available"
   updateKES = error "KES not available"
 
-  genKeyKES       _ = return $! NeverUsedSignKeyKES
+  genKeyKES       _ = return NeverUsedSignKeyKES
 
   forgetSignKeyKES = const $ return ()
 

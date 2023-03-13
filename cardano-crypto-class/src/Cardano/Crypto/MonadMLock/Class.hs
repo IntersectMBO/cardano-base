@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- We need this so that we can forward the deprecated traceMLockedForeignPtr
 {-# OPTIONS_GHC -Wno-deprecations #-}
@@ -33,13 +34,8 @@ module Cardano.Crypto.MonadMLock.Class
   psbCreateSizedResult,
 
   packByteStringCStringLen,
-
-  -- * Re-exports from plain Libsodium module
-  NaCl.MLockedForeignPtr,
 )
 where
-
-import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
 import Control.Monad (void)
@@ -48,6 +44,7 @@ import Control.Monad.ST.Unsafe
 
 import Cardano.Foreign (c_memset, c_memcpy, SizedPtr (..))
 
+import Data.Kind (type Type)
 import Foreign.Ptr (Ptr, castPtr)
 import Foreign.Storable (Storable)
 import Foreign.C.Types (CSize)
@@ -74,10 +71,11 @@ import GHC.TypeLits (KnownNat)
 -- - Running mlocked-memory operations directly on some monad stack with 'IO'
 --   at the bottom.
 class MonadUnmanagedMemory m => MonadMLock m where
-  withMLockedForeignPtr :: forall a b. MLockedForeignPtr a -> (Ptr a -> m b) -> m b
-  finalizeMLockedForeignPtr :: forall a. MLockedForeignPtr a -> m ()
-  traceMLockedForeignPtr :: (Storable a, Show a) => MLockedForeignPtr a -> m ()
-  mlockedMalloc :: CSize -> m (MLockedForeignPtr a)
+  type MLockedForeignPtr m :: Type -> Type
+  withMLockedForeignPtr :: forall a b. MLockedForeignPtr m a -> (Ptr a -> m b) -> m b
+  finalizeMLockedForeignPtr :: forall a. MLockedForeignPtr m a -> m ()
+  traceMLockedForeignPtr :: (Storable a, Show a) => MLockedForeignPtr m a -> m ()
+  mlockedMalloc :: CSize -> m (MLockedForeignPtr m a)
 
 class Monad m => MonadUnmanagedMemory m where
   zeroMem :: Ptr a -> CSize -> m ()
@@ -99,6 +97,7 @@ class Monad m => MonadPSB m where
                      -> m (PSB.PinnedSizedBytes n, r)
 
 instance MonadMLock IO where
+  type MLockedForeignPtr IO = NaCl.MLockedForeignPtr
   withMLockedForeignPtr = NaCl.withMLockedForeignPtr
   finalizeMLockedForeignPtr = NaCl.finalizeMLockedForeignPtr
   traceMLockedForeignPtr = NaCl.traceMLockedForeignPtr

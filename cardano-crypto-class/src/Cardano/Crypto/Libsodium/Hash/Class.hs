@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -14,6 +15,8 @@ module Cardano.Crypto.Libsodium.Hash.Class (
 ) where
 
 import Control.Monad (unless)
+import Control.Monad.ST.Unsafe (unsafeIOToST)
+import Control.Monad.Class.MonadST
 import Data.Proxy (Proxy (..))
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
@@ -27,45 +30,49 @@ import qualified Data.ByteString as BS
 import Cardano.Crypto.Hash (HashAlgorithm(SizeHash), SHA256, Blake2b_256)
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
+import Cardano.Crypto.MonadMLock.Class
 
 -------------------------------------------------------------------------------
 -- Type-Class
 -------------------------------------------------------------------------------
 
-class HashAlgorithm h => SodiumHashAlgorithm h where
+class HashAlgorithm h => SodiumHashAlgorithm m h where
     -- This function is in IO, it is "morally pure"
     -- and can be 'unsafePerformDupableIO'd.
     naclDigestPtr
         :: proxy h
         -> Ptr a  -- ^ input
         -> Int    -- ^ input length
-        -> IO (MLockedSizedBytes (SizeHash h))
+        -> m (MLockedSizedBytes m (SizeHash h))
 
     -- TODO: provide interface for multi-part?
     -- That will be useful to hashing ('1' <> oldseed).
 
 digestMLockedStorable
-    :: forall h a proxy. (SodiumHashAlgorithm h, Storable a)
-    => proxy h -> Ptr a -> IO (MLockedSizedBytes (SizeHash h))
+    :: forall h m a proxy. (SodiumHashAlgorithm m h, Storable a)
+    => proxy h -> Ptr a -> m (MLockedSizedBytes m (SizeHash h))
 digestMLockedStorable p ptr =
     naclDigestPtr p ptr ((sizeOf (undefined :: a)))
 
 digestMLockedBS
-    :: forall h proxy. (SodiumHashAlgorithm h)
-    => proxy h -> BS.ByteString -> IO (MLockedSizedBytes (SizeHash h))
+    :: forall h m proxy. (SodiumHashAlgorithm m h, MonadByteStringMemory m)
+    => proxy h -> BS.ByteString -> m (MLockedSizedBytes m (SizeHash h))
 digestMLockedBS p bs =
-    BS.useAsCStringLen bs $ \(ptr, len) ->
+    useByteStringAsCStringLen
+    bs $ \(ptr, len) ->
     naclDigestPtr p (castPtr ptr) len
 
 -------------------------------------------------------------------------------
 -- Instances
 -------------------------------------------------------------------------------
 
-instance SodiumHashAlgorithm SHA256 where
-    naclDigestPtr :: forall proxy a. proxy SHA256 -> Ptr a -> Int -> IO (MLockedSizedBytes (SizeHash SHA256))
+unsafeIOToM :: MonadST m => IO a -> m a
+unsafeIOToM action = withLiftST $ \liftST -> liftST . unsafeIOToST $ action
+
+instance (MonadMLock m, MonadST m) => SodiumHashAlgorithm m SHA256 where
     naclDigestPtr _ input inputlen = do
         output <- mlsbNew
-        mlsbUseAsSizedPtr output $ \output' -> do
+        mlsbUseAsSizedPtr output $ \output' -> unsafeIOToM $ do
             res <- c_crypto_hash_sha256 output' (castPtr input) (fromIntegral inputlen)
             unless (res == 0) $ do
                 errno <- getErrno
@@ -76,11 +83,10 @@ instance SodiumHashAlgorithm SHA256 where
 _testSHA256 :: SizeHash SHA256 :~: CRYPTO_SHA256_BYTES
 _testSHA256 = Refl
 
-instance SodiumHashAlgorithm Blake2b_256 where
-    naclDigestPtr :: forall proxy a. proxy Blake2b_256 -> Ptr a -> Int -> IO (MLockedSizedBytes (SizeHash Blake2b_256))
+instance (MonadMLock m, MonadST m) => SodiumHashAlgorithm m Blake2b_256 where
     naclDigestPtr _ input inputlen = do
         output <- mlsbNew
-        mlsbUseAsCPtr output $ \output' -> do
+        mlsbUseAsCPtr output $ \output' -> unsafeIOToM $ do
             res <- c_crypto_generichash_blake2b
                 output' (fromInteger $ natVal (Proxy @CRYPTO_BLAKE2B_256_BYTES))  -- output
                 (castPtr input) (fromIntegral inputlen)  -- input

@@ -1,22 +1,20 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+
 {-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Test.Crypto.AllocLog where
 
 import Cardano.Crypto.MonadMLock
-import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 import Control.Tracer
 import Control.Monad.Reader
 import Foreign.Ptr
 import Control.Monad.Class.MonadThrow
 import Control.Monad.Class.MonadST
-import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Data.Typeable
-import Data.Coerce (coerce)
-import Foreign.Concurrent (addForeignPtrFinalizer)
 import Test.Crypto.RunIO
 
 -- | Allocation log event. These are emitted automatically whenever mlocked
@@ -56,26 +54,26 @@ pushLogEvent event = do
 pushAllocLogEvent :: Monad m => AllocEvent -> LogT AllocEvent m ()
 pushAllocLogEvent = pushLogEvent
 
-instance (MonadIO m, MonadThrow m, MonadMLock m, MonadST m, RunIO m)
+instance ( MonadIO m
+         , MonadThrow m
+         , MonadMLock m
+         , MonadST m
+         , RunIO m
+         )
          => MonadMLock (LogT AllocEvent m) where
+  type MLockedForeignPtr (LogT AllocEvent m) = MLockedForeignPtr m
   withMLockedForeignPtr fptr action = LogT $ do
     tracer <- ask
     lift $ withMLockedForeignPtr fptr (\ptr -> (runReaderT . unLogT) (action ptr) tracer)
 
-  finalizeMLockedForeignPtr = lift . finalizeMLockedForeignPtr
+  finalizeMLockedForeignPtr fptr = do
+    addr <- withMLockedForeignPtr fptr (return . ptrToWordPtr)
+    pushAllocLogEvent $ FreeEv addr
+    lift . finalizeMLockedForeignPtr $ fptr
 
   traceMLockedForeignPtr = lift . traceMLockedForeignPtr
 
-  mlockedMalloc size = do
-    fptr <- lift (mlockedMalloc size)
-    addr <- withMLockedForeignPtr fptr (return . ptrToWordPtr)
-    pushAllocLogEvent (AllocEv addr)
-    tracer :: Tracer (LogT event m) event <- ask
-    withLiftST $ \liftST -> liftST . unsafeIOToST $
-      addForeignPtrFinalizer
-        (coerce fptr)
-        (io . runLogT tracer . pushAllocLogEvent $ FreeEv addr)
-    return fptr
+  mlockedMalloc = lift . mlockedMalloc
 
 instance (MonadIO m, MonadMLock m)
          => MonadUnmanagedMemory (LogT AllocEvent m) where
@@ -110,6 +108,7 @@ newtype GenericEvent e = GenericEvent { concreteEvent :: e }
 -- | Generic instance, log nothing automatically. Log entries can be triggered
 -- manually using 'pushLogEvent'.
 instance MonadMLock m => MonadMLock (LogT (GenericEvent e) m) where
+  type MLockedForeignPtr (LogT (GenericEvent e) m) = MLockedForeignPtr m
   withMLockedForeignPtr fptr action = LogT $ do
     tracer <- ask
     lift $ withMLockedForeignPtr fptr (\ptr -> (runReaderT . unLogT) (action ptr) tracer)

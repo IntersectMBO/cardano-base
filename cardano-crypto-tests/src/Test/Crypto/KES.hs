@@ -22,38 +22,41 @@ module Test.Crypto.KES
   )
 where
 
-import Data.Proxy (Proxy(..))
-import Data.List (foldl')
 import qualified Data.ByteString as BS
+import Data.Foldable (traverse_)
+import Data.IORef
+import Data.List (foldl')
+import Data.Proxy (Proxy(..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr, plusPtr)
-import Data.IORef
-import Data.Foldable (traverse_)
 import GHC.TypeNats (KnownNat, natVal)
 
-import Control.Tracer
-import Control.Concurrent.MVar (newMVar, takeMVar, putMVar)
+import Control.Monad (void, when)
+import Control.Monad.Class.MonadMVar
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad (void, when)
+import Control.Tracer
 
 import Cardano.Crypto.DSIGN hiding (Signable)
+import Cardano.Crypto.DirectSerialise (DirectSerialise, directSerialise, DirectDeserialise)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
 import Cardano.Crypto.KES.ForgetMock
-import Cardano.Crypto.DirectSerialise (DirectSerialise, directSerialise, DirectDeserialise)
-import Cardano.Crypto.Util (SignableRepresentation(..))
-import Cardano.Crypto.MLockedSeed
 import qualified Cardano.Crypto.Libsodium as NaCl
+import Cardano.Crypto.MLockedSeed
 import Cardano.Crypto.MonadMLock
+import Cardano.Crypto.Util (SignableRepresentation(..))
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
-import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 import Test.Tasty.HUnit (testCase, Assertion, assertEqual, assertBool)
+import Test.Tasty.QuickCheck (testProperty, QuickCheckMaxSize(..))
 
+import Test.Crypto.AllocLog
+import Test.Crypto.Instances (withMLockedSeedFromPSB)
+import Test.Crypto.RunIO (RunIO (..))
 import Test.Crypto.Util (
   ToCBOR,
   FromCBOR,
@@ -70,12 +73,10 @@ import Test.Crypto.Util (
   noExceptionsThrown,
   Lock,
   withLock,
-  directSerialiseToBS,
+  directSerialiseToHex,
+  directSerialiseToBSSized,
   directDeserialiseFromBS,
   )
-import Test.Crypto.RunIO (RunIO (..))
-import Test.Crypto.Instances (withMLockedSeedFromPSB)
-import Test.Crypto.AllocLog
 
 {- HLINT ignore "Reduce duplication" -}
 {- HLINT ignore "Use head" -}
@@ -104,45 +105,40 @@ tests lock =
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instances here.
 
-instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
-  show (SignKeySingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = NaCl.mlsbAsByteString mlsb
-        hexstr = hexBS bytes
-    in "SignKeySingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
+instance Show (SignKeyKES m (SingleKES Ed25519DSIGNM)) where
+  show _ = "<SignKeySingleKES>"
 
-instance Show (SignKeyKES (SumKES h d)) where
+instance Show (SignKeyKES m (SumKES h d)) where
   show _ = "<SignKeySumKES>"
 
-instance Show (SignKeyKES (CompactSingleKES Ed25519DSIGNM)) where
-  show (SignKeyCompactSingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = NaCl.mlsbAsByteString mlsb
-        hexstr = hexBS bytes
-    in "SignKeyCompactSingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
+instance Show (SignKeyKES m (CompactSingleKES Ed25519DSIGNM)) where
+  show _ = "<SignKeyCompactSingleKES>"
 
-instance Show (SignKeyKES (CompactSumKES h d)) where
+instance Show (SignKeyKES m (CompactSumKES h d)) where
   show _ = "<SignKeyCompactSumKES>"
 
-deriving via (PureMEq (SignKeyKES (MockKES t))) instance Applicative m => MEq m (SignKeyKES (MockKES t))
+deriving via (PureMEq (SignKeyKES m (MockKES t)))
+  instance Applicative m => MEq m (SignKeyKES m (MockKES t))
 
-deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SingleKES d))
+deriving newtype instance (MEq m (SignKeyDSIGNM m d)) => MEq m (SignKeyKES m (SingleKES d))
 
 instance ( MonadMLock m
          , MonadST m
-         , MEq m (SignKeyKES d)
+         , MEq m (SignKeyKES m d)
          , Eq (VerKeyKES d)
          , KnownNat (SeedSizeKES d)
-         ) => MEq m (SignKeyKES (SumKES h d)) where
+         ) => MEq m (SignKeyKES m (SumKES h d)) where
   equalsM (SignKeySumKES s r v1 v2) (SignKeySumKES s' r' v1' v2') =
     (s, r, PureMEq v1, PureMEq v2) ==! (s', r', PureMEq v1', PureMEq v2')
 
-deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (CompactSingleKES d))
+deriving newtype instance (MEq m (SignKeyDSIGNM m d)) => MEq m (SignKeyKES m (CompactSingleKES d))
 
 instance ( MonadMLock m
          , MonadST m
-         , MEq m (SignKeyKES d)
+         , MEq m (SignKeyKES m d)
          , Eq (VerKeyKES d)
          , KnownNat (SeedSizeKES d)
-         ) => MEq m (SignKeyKES (CompactSumKES h d)) where
+         ) => MEq m (SignKeyKES m (CompactSumKES h d)) where
   equalsM (SignKeyCompactSumKES s r v1 v2) (SignKeyCompactSumKES s' r' v1' v2') =
     (s, r, PureMEq v1, PureMEq v2) ==! (s', r', PureMEq v1', PureMEq v2')
 
@@ -237,7 +233,7 @@ testMLockGenKeyKES _p = do
   let tracer = Tracer (\ev -> liftIO $ modifyIORef accumVar (++ [ev]))
   runAllocLogT tracer $ do
     pushAllocLogEvent $ MarkerEv "gen seed"
-    (seed :: MLockedSeed (SeedSizeKES v)) <- MLockedSeed <$> NaCl.mlsbFromByteString (BS.replicate 1024 23)
+    (seed :: MLockedSeed (LogT AllocEvent IO) (SeedSizeKES v)) <- MLockedSeed <$> NaCl.mlsbFromByteString (BS.replicate 1024 23)
     pushAllocLogEvent $ MarkerEv "gen key"
     sk <- genKeyKES @_ @v seed
     pushAllocLogEvent $ MarkerEv "forget key"
@@ -254,8 +250,8 @@ testKESAlgorithm
   :: forall m v.
      ( ToCBOR (VerKeyKES v)
      , FromCBOR (VerKeyKES v)
-     , MEq IO (SignKeyKES v)   -- only monadic MEq for signing keys
-     , Show (SignKeyKES v) -- fake instance defined locally
+     , MEq IO (SignKeyKES IO v)   -- only monadic MEq for signing keys
+     -- , Show (SignKeyKES m v) -- fake instance defined locally
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
@@ -263,9 +259,9 @@ testKESAlgorithm
      , KESSignAlgorithm m v
      -- , KESSignAlgorithm IO v -- redundant for now
      , UnsoundKESSignAlgorithm IO v
-     , DirectSerialise IO (SignKeyKES v)
+     , DirectSerialise IO (SignKeyKES IO v)
      , DirectSerialise IO (VerKeyKES v)
-     , DirectDeserialise IO (SignKeyKES v)
+     , DirectDeserialise IO (SignKeyKES IO v)
      , DirectDeserialise IO (VerKeyKES v)
      )
   => Lock
@@ -300,22 +296,22 @@ testKESAlgorithm lock _pm _pv n =
       , testProperty "VerKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
             prop_no_thunks_IO (return $! direct)
       , testProperty "SignKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
-            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
             prop_no_thunks_IO (return $! direct)
       , testProperty "VerKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
             prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
       , testProperty "SignKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
-            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
             bracket
-              (directDeserialiseFromBS @IO @(SignKeyKES v) $! direct)
+              (directDeserialiseFromBS @IO @(SignKeyKES IO v) $! direct)
               forgetSignKeyKES
               (prop_no_thunks_IO . return)
       ]
@@ -337,9 +333,9 @@ testKESAlgorithm lock _pm _pv n =
               (equals, skSer, msk'Ser) <- bracket
                           (rawDeserialiseSignKeyKES serialized)
                           (maybe (return ()) forgetSignKeyKES)
-                          (\(msk' :: Maybe (SignKeyKES v)) -> do
-                            skSer <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
-                            msk'Ser <- mapM (directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v))) msk'
+                          (\(msk' :: Maybe (SignKeyKES IO v)) -> do
+                            skSer <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+                            msk'Ser <- mapM (directSerialiseToBSSized (fromIntegral $ sizeSignKeyKES (Proxy @v))) msk'
                             equals <- Just sk ==! msk'
                             return
                                   ( equals
@@ -425,12 +421,12 @@ testKESAlgorithm lock _pm _pv n =
         [ testProperty "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyKES v <- deriveVerKeyKES sk
-              serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              serialized <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
               vk' <- directDeserialiseFromBS serialized
               return $ vk === vk'
         , testProperty "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
-              serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              serialized <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
               equals <- bracket
                           (directDeserialiseFromBS serialized)
                           forgetSignKeyKES
@@ -443,12 +439,12 @@ testKESAlgorithm lock _pm _pv n =
         [ testProperty "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyKES v <- deriveVerKeyKES sk
-              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              direct <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
               let raw = rawSerialiseVerKeyKES vk
               return $ direct === raw
         , testProperty "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
-              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              direct <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
               raw <- rawSerialiseSignKeyKES sk
               return $ direct === raw
         ]
@@ -485,7 +481,7 @@ withSK :: ( MonadMLock m
           , MonadST m
           , MonadThrow m
           , KESSignAlgorithm m v
-          ) => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> m b) -> m b
+          ) => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES m v -> m b) -> m b
 withSK seedPSB =
   bracket
     (withMLockedSeedFromPSB seedPSB genKeyKES)
@@ -500,7 +496,7 @@ withSK seedPSB =
 -- here).
 ioPropertyWithSK :: forall v a. (Testable a, KESSignAlgorithm IO v)
                  => Lock
-                 -> (SignKeyKES v -> IO a)
+                 -> (SignKeyKES IO v -> IO a)
                  -> PinnedSizedBytes (SeedSizeKES v)
                  -> Property
 ioPropertyWithSK lock action seedPSB =
@@ -529,13 +525,13 @@ ioPropertyWithSK lock action seedPSB =
 --
 --     return (before =/= after)
 
-withNullSeed :: forall m n a. (MonadThrow m, MonadMLock m, MonadST m, KnownNat n) => (MLockedSeed n -> m a) -> m a
+withNullSeed :: forall m n a. (MonadThrow m, MonadMLock m, MonadST m, KnownNat n) => (MLockedSeed m n -> m a) -> m a
 withNullSeed = bracket
   (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral $ natVal (Proxy @n)) 0))
   mlockedSeedFinalize
 
 withNullSK :: forall m v a. (KESSignAlgorithm m v, MonadThrow m, MonadMLock m, MonadST m)
-           => (SignKeyKES v -> m a) -> m a
+           => (SignKeyKES m v -> m a) -> m a
 withNullSK = bracket
   (withNullSeed genKeyKES)
   forgetSignKeyKES
@@ -550,7 +546,7 @@ withNullSK = bracket
 prop_noErasedBlocksInKey
   :: forall v.
      UnsoundKESSignAlgorithm IO v
-  => DirectSerialise IO (SignKeyKES v)
+  => DirectSerialise IO (SignKeyKES IO v)
   => Proxy v
   -> Property
 prop_noErasedBlocksInKey kesAlgorithm =
@@ -861,12 +857,13 @@ prop_serialise_SigKES
   :: forall m v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , Show (SignKeyKES v)
+     , DirectSerialise m (SignKeyKES m v)
      , RunIO m
      , MonadIO m
      , MonadMLock m
      , MonadST m
      , MonadThrow m
+     , MonadMVar m
      , KESSignAlgorithm m v
      )
   => Proxy m -> Proxy v
@@ -877,9 +874,10 @@ prop_serialise_SigKES _ _ seedPSB x =
     ioProperty $ fmap conjoin $ io $ do
         withAllUpdatesKES @m @v seedPSB $ \t sk -> do
             sig <- signKES () t x sk
+            skStr <- directSerialiseToHex sk
             return $
               counterexample ("period " ++ show t) $
-              counterexample ("vkey "   ++ show sk) $
+              counterexample ("vkey "   ++ skStr) $
               counterexample ("sig "    ++ show sig) $
                   prop_raw_serialise rawSerialiseSigKES
                                      rawDeserialiseSigKES sig
@@ -900,7 +898,7 @@ withAllUpdatesKES_ :: forall m v a.
                   , MonadThrow m
                   )
               => PinnedSizedBytes (SeedSizeKES v)
-              -> (SignKeyKES v -> m a)
+              -> (SignKeyKES m v -> m a)
               -> m [a]
 withAllUpdatesKES_ seedPSB f = do
   withAllUpdatesKES seedPSB (const f)
@@ -913,13 +911,13 @@ withAllUpdatesKES :: forall m v a.
                   , MonadThrow m
                   )
               => PinnedSizedBytes (SeedSizeKES v)
-              -> (Word -> SignKeyKES v -> m a)
+              -> (Word -> SignKeyKES m v -> m a)
               -> m [a]
 withAllUpdatesKES seedPSB f = withMLockedSeedFromPSB seedPSB $ \seed -> do
   sk_0 <- genKeyKES seed
   go sk_0 0
   where
-    go :: SignKeyKES v -> Word -> m [a]
+    go :: SignKeyKES m v -> Word -> m [a]
     go sk t = do
       x <- f t sk
       msk' <- updateKES () sk t

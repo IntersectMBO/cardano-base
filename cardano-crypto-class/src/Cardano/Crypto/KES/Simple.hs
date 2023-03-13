@@ -28,8 +28,7 @@ import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 import           NoThunks.Class (NoThunks)
 import           Control.Monad.Trans.Maybe
-import           Control.Monad.Class.MonadThrow (MonadEvaluate)
-import           Control.Monad.Class.MonadST (MonadST)
+import           Control.Monad.Class.MonadThrow (MonadEvaluate, bracket)
 import           Control.Monad ( (<$!>) )
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -37,11 +36,11 @@ import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import           Cardano.Crypto.DSIGN
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.MLockedSeed
-import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
 import           Cardano.Crypto.DirectSerialise (DirectSerialise (..), DirectDeserialise (..))
 import           Data.Unit.Strict (forceElemsToWHNF)
 import           Cardano.Crypto.MonadMLock (MonadMLock (..), MEq (..))
+import           Cardano.Crypto.Libsodium.MLockedBytes (takeMLSBChunk, mlsbFinalize)
 
 
 data SimpleKES d (t :: Nat)
@@ -60,7 +59,7 @@ pattern VerKeySimpleKES v <- ThunkyVerKeySimpleKES v
 {-# COMPLETE VerKeySimpleKES #-}
 
 -- | See 'VerKeySimpleKES'.
-pattern SignKeySimpleKES :: Vector (SignKeyDSIGNM d) -> SignKeyKES (SimpleKES d t)
+pattern SignKeySimpleKES :: Vector (SignKeyDSIGNM m d) -> SignKeyKES m (SimpleKES d t)
 pattern SignKeySimpleKES v <- ThunkySignKeySimpleKES v
   where
     SignKeySimpleKES v = ThunkySignKeySimpleKES (forceElemsToWHNF v)
@@ -145,11 +144,10 @@ instance ( KESAlgorithm (SimpleKES d t)
          , KnownNat (SeedSizeDSIGNM d * t)
          , MonadEvaluate m
          , MonadMLock m
-         , MonadST m
          ) =>
          KESSignAlgorithm m (SimpleKES d t) where
-    newtype SignKeyKES (SimpleKES d t) =
-              ThunkySignKeySimpleKES (Vector (SignKeyDSIGNM d))
+    newtype SignKeyKES m (SimpleKES d t) =
+              ThunkySignKeySimpleKES (Vector (SignKeyDSIGNM m d))
         deriving Generic
 
 
@@ -177,8 +175,10 @@ instance ( KESAlgorithm (SimpleKES d t)
       let seedSize = seedSizeDSIGNM (Proxy :: Proxy d)
           duration = fromIntegral (natVal (Proxy @t))
       sks <- Vec.generateM duration $ \t -> do
-        withMLSBChunk mlsb (fromIntegral t * fromIntegral seedSize) $ \mlsb' -> do
-          genKeyDSIGNM (MLockedSeed mlsb')
+        bracket
+          (takeMLSBChunk mlsb (fromIntegral t * fromIntegral seedSize))
+          mlsbFinalize
+          (genKeyDSIGNM . MLockedSeed)
       return $! SignKeySimpleKES sks
 
     --
@@ -220,32 +220,34 @@ instance (Monad m, DirectDeserialise m (VerKeyDSIGNM d), KnownNat t) => DirectDe
     vks <- Vec.replicateM duration (directDeserialise pull)
     return $! VerKeySimpleKES $! vks
 
-instance (Monad m, DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (SimpleKES d t)) where
+instance (Monad m, DirectSerialise m (SignKeyDSIGNM m d)) => DirectSerialise m (SignKeyKES m (SimpleKES d t)) where
   directSerialise push (SignKeySimpleKES sks) =
     mapM_ (directSerialise push) sks
 
-instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d), KnownNat t) => DirectDeserialise m (SignKeyKES (SimpleKES d t)) where
+instance (Monad m, DirectDeserialise m (SignKeyDSIGNM m d), KnownNat t) => DirectDeserialise m (SignKeyKES m (SimpleKES d t)) where
   directDeserialise pull = do
     let duration = fromIntegral (natVal (Proxy :: Proxy t))
     sks <- Vec.replicateM duration (directDeserialise pull)
     return $! SignKeySimpleKES $! sks
 
 deriving instance DSIGNMAlgorithmBase d => Show (VerKeyKES (SimpleKES d t))
-deriving instance DSIGNMAlgorithmBase d => Show (SignKeyKES (SimpleKES d t))
 deriving instance DSIGNMAlgorithmBase d => Show (SigKES (SimpleKES d t))
+
+-- deriving instance DSIGNMAlgorithm m d => Show (SignKeyKES m (SimpleKES d t))
 
 deriving instance DSIGNMAlgorithmBase d => Eq   (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNMAlgorithmBase d => Eq   (SigKES (SimpleKES d t))
 
-instance (Monad m, MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SimpleKES d t)) where
+instance (Monad m, MEq m (SignKeyDSIGNM m d)) => MEq m (SignKeyKES m (SimpleKES d t)) where
   equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =
     -- No need to check that lengths agree, the types already guarantee this.
     Vec.and <$> Vec.zipWithM equalsM a b
 
 
 instance DSIGNMAlgorithmBase d => NoThunks (SigKES     (SimpleKES d t))
-instance DSIGNMAlgorithmBase d => NoThunks (SignKeyKES (SimpleKES d t))
 instance DSIGNMAlgorithmBase d => NoThunks (VerKeyKES  (SimpleKES d t))
+
+instance DSIGNMAlgorithm m d => NoThunks (SignKeyKES m (SimpleKES d t))
 
 instance ( DSIGNMAlgorithmBase d
          , KnownNat t

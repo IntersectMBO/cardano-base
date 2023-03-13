@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -67,7 +68,7 @@ testHashAlgorithm p =
     where n = hashAlgorithmName p
 
 testSodiumHashAlgorithm
-  :: forall proxy h. NaCl.SodiumHashAlgorithm h
+  :: forall proxy h. NaCl.SodiumHashAlgorithm IO h
   => Lock
   -> proxy h
   -> TestTree
@@ -154,7 +155,7 @@ prop_hash_hashFromStringAsHex_hashToStringFromHash
 prop_hash_hashFromStringAsHex_hashToStringFromHash h = fromJust (hashFromStringAsHex @h @a (hashToStringAsHex h)) === h
 
 prop_libsodium_model
-  :: forall h. NaCl.SodiumHashAlgorithm h
+  :: forall h. NaCl.SodiumHashAlgorithm IO h
   => Lock -> Proxy h -> BS.ByteString -> Property
 prop_libsodium_model lock p bs = ioProperty . withLock lock $ do
   actual <- bracket

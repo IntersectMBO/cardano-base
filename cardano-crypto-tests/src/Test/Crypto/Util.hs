@@ -65,15 +65,13 @@ module Test.Crypto.Util
   , mkLock
 
   -- * Direct ser/deser helpers
+  , directSerialiseToHex
   , directSerialiseToBS
+  , directSerialiseToBSSized
   , directDeserialiseFromBS
   )
 where
 
-import Numeric (showHex)
-import GHC.Exts (fromListN, fromList, toList)
-import Text.Show.Pretty (ppShow)
-import Data.Kind (Type)
 import Cardano.Binary (
   FromCBOR (fromCBOR),
   ToCBOR (toCBOR),
@@ -88,6 +86,9 @@ import Cardano.Binary (
   hi,
   encodedSizeExpr
   )
+import Cardano.Crypto.MonadMLock
+import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
+import Cardano.Crypto.Util (SignableRepresentation(..))
 import Codec.CBOR.FlatTerm  (
   validFlatTerm,
   toFlatTerm
@@ -95,8 +96,9 @@ import Codec.CBOR.FlatTerm  (
 import Codec.CBOR.Write (
   toStrictByteString
   )
-import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
-import Cardano.Crypto.Util (SignableRepresentation(..))
+import Control.Monad (guard, when)
+import Control.Monad.Class.MonadMVar
+import Control.Monad.Class.MonadST
 import Crypto.Random
   ( ChaChaDRG
   , MonadPseudoRandom
@@ -105,9 +107,18 @@ import Crypto.Random
   )
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Builder as BSB
+import qualified Data.ByteString.Lazy as LBS
+import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import Data.Word (Word64)
+import Foreign.C.Types (CChar, CSize)
+import Foreign.Ptr (Ptr, plusPtr)
+import Formatting.Buildable (Buildable (..), build)
+import GHC.Exts (fromListN, fromList, toList)
+import GHC.TypeLits (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks, unsafeNoThunks, noThunks)
+import Numeric (showHex)
 import Numeric.Natural (Natural)
 import Test.QuickCheck
   ( (.&&.)
@@ -127,14 +138,7 @@ import Test.QuickCheck
   , forAllBlind
   )
 import qualified Test.QuickCheck.Gen as Gen
-import Control.Monad (guard, when)
-import GHC.TypeLits (Nat, KnownNat, natVal)
-import Formatting.Buildable (Buildable (..), build)
-import Foreign.Ptr (Ptr, plusPtr)
-import Foreign.C.Types (CChar, CSize)
-import Control.Monad.Class.MonadMVar
-import Control.Monad.Class.MonadST
-import Cardano.Crypto.MonadMLock
+import Text.Show.Pretty (ppShow)
 
 import Cardano.Crypto.DirectSerialise
 
@@ -381,13 +385,40 @@ mkLock = Lock <$> newMVar ()
 -- Helpers for direct ser/deser
 --------------------------------------------------------------------------------
 
+directSerialiseToHex :: forall m a.
+                       DirectSerialise m a
+                    => MonadMLock m
+                    => MonadMVar m
+                    => MonadST m
+                    => a -> m String
+directSerialiseToHex =
+  fmap hexBS . directSerialiseToBS
+
 directSerialiseToBS :: forall m a.
                        DirectSerialise m a
                     => MonadMLock m
                     => MonadMVar m
                     => MonadST m
-                    => Int -> a -> m ByteString
-directSerialiseToBS dstsize val = do
+                    => a -> m ByteString
+directSerialiseToBS val = do
+    builderVar <- newMVar mempty
+    let pusher :: Ptr CChar -> CSize -> m ()
+        pusher src size = do
+          allocaBytes (fromIntegral size) $ \dst -> do
+            builder <- takeMVar builderVar
+            copyMem dst src (fromIntegral size)
+            chunk <- packByteStringCStringLen (dst, fromIntegral size)
+            putMVar builderVar $ builder <> BSB.byteString chunk
+    directSerialise pusher val
+    LBS.toStrict . BSB.toLazyByteString <$> takeMVar builderVar
+
+directSerialiseToBSSized :: forall m a.
+                            DirectSerialise m a
+                         => MonadMLock m
+                         => MonadMVar m
+                         => MonadST m
+                         => Int -> a -> m ByteString
+directSerialiseToBSSized dstsize val = do
   allocaBytes dstsize $ \dst -> do
     posVar <- newMVar 0
     let pusher :: Ptr CChar -> CSize -> m ()

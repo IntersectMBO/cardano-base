@@ -83,17 +83,20 @@ import Cardano.Crypto.DSIGN (
   genKeyDSIGN,
   seedSizeDSIGN,
 
-  DSIGNMAlgorithmBase (VerKeyDSIGNM,
-                      SignKeyDSIGNM,
-                      SigDSIGNM,
-                      ContextDSIGNM,
-                      SignableM,
-                      SeedSizeDSIGNM,
-                      rawSerialiseVerKeyDSIGNM,
-                      rawDeserialiseVerKeyDSIGNM,
-                      rawSerialiseSigDSIGNM,
-                      rawDeserialiseSigDSIGNM),
-  DSIGNMAlgorithm (),
+  DSIGNMAlgorithmBase (
+    VerKeyDSIGNM,
+    SigDSIGNM,
+    ContextDSIGNM,
+    SignableM,
+    SeedSizeDSIGNM,
+    rawSerialiseVerKeyDSIGNM,
+    rawDeserialiseVerKeyDSIGNM,
+    rawSerialiseSigDSIGNM,
+    rawDeserialiseSigDSIGNM
+    ),
+  DSIGNMAlgorithm (
+    SignKeyDSIGNM
+    ),
   UnsoundDSIGNMAlgorithm (
                   rawSerialiseSignKeyDSIGNM,
                   rawDeserialiseSignKeyDSIGNM),
@@ -134,7 +137,7 @@ import Test.Crypto.Util (
   Lock,
   withLock,
   hexBS,
-  directSerialiseToBS,
+  directSerialiseToBSSized,
   directDeserialiseFromBS,
   )
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
@@ -376,13 +379,13 @@ testDSIGNMAlgorithm
                -- test direct encoding/decoding for 'SignKeyDSIGNM'.
                -- , ToCBOR (SignKeyDSIGNM v)
                -- , FromCBOR (SignKeyDSIGNM v)
-               , MEq IO (SignKeyDSIGNM v)   -- only monadic MEq for signing keys
+               , MEq IO (SignKeyDSIGNM IO v)   -- only monadic MEq for signing keys
                , ToCBOR (SigDSIGNM v)
                , FromCBOR (SigDSIGNM v)
                , ContextDSIGNM v ~ ()
                , SignableM v Message
-               , DirectSerialise IO (SignKeyDSIGNM v)
-               , DirectDeserialise IO (SignKeyDSIGNM v)
+               , DirectSerialise IO (SignKeyDSIGNM IO v)
+               , DirectDeserialise IO (SignKeyDSIGNM IO v)
                , DirectSerialise IO (VerKeyDSIGNM v)
                , DirectDeserialise IO (VerKeyDSIGNM v)
                )
@@ -414,12 +417,12 @@ testDSIGNMAlgorithm lock _ n =
         [ testProperty "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
-              serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
+              serialized <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
               vk' <- directDeserialiseFromBS serialized
               return $ vk === vk'
         , testProperty "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
-              serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
+              serialized <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
               sk' <- directDeserialiseFromBS serialized
               equals <- sk ==! sk'
               forgetSignKeyDSIGNM sk'
@@ -431,12 +434,12 @@ testDSIGNMAlgorithm lock _ n =
         [ testProperty "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
-              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
+              direct <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
               let raw = rawSerialiseVerKeyDSIGNM vk
               return $ direct === raw
         , testProperty "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
-              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
+              direct <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
               raw <- rawSerialiseSignKeyDSIGNM sk
               return $ direct === raw
         ]
@@ -532,21 +535,21 @@ testDSIGNMAlgorithm lock _ n =
           ioPropertyWithSK @v lock $ prop_no_thunks_IO . signDSIGNM () msg
       , testProperty "SignKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
-            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
             prop_no_thunks_IO (return $! direct)
       , testProperty "SignKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
-            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
-            prop_no_thunks_IO (directDeserialiseFromBS @IO @(SignKeyDSIGNM v) $! direct)
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeSignKeyDSIGNM (Proxy @v)) sk
+            prop_no_thunks_IO (directDeserialiseFromBS @IO @(SignKeyDSIGNM IO v) $! direct)
       , testProperty "VerKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk <- deriveVerKeyDSIGNM sk
-            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
             prop_no_thunks_IO (return $! direct)
       , testProperty "VerKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk <- deriveVerKeyDSIGNM sk
-            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
+            direct <- directSerialiseToBSSized (fromIntegral $ sizeVerKeyDSIGNM (Proxy @v)) vk
             prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyDSIGNM v) $! direct)
       ]
     ]
@@ -556,7 +559,7 @@ testDSIGNMAlgorithm lock _ n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: (DSIGNMAlgorithm IO v) => PinnedSizedBytes (SeedSizeDSIGNM v) -> (SignKeyDSIGNM v -> IO b) -> IO b
+withSK :: (DSIGNMAlgorithm IO v) => PinnedSizedBytes (SeedSizeDSIGNM v) -> (SignKeyDSIGNM IO v -> IO b) -> IO b
 withSK seedPSB action =
   withMLockedSeedFromPSB seedPSB $ \seed ->
     bracket
@@ -573,7 +576,7 @@ withSK seedPSB action =
 -- here).
 ioPropertyWithSK :: forall v a. (Testable a, DSIGNMAlgorithm IO v)
                  => Lock
-                 -> (SignKeyDSIGNM v -> IO a)
+                 -> (SignKeyDSIGNM IO v -> IO a)
                  -> PinnedSizedBytes (SeedSizeDSIGNM v)
                  -> Property
 ioPropertyWithSK lock action seedPSB =

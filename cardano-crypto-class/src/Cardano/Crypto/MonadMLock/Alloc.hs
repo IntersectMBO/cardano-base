@@ -21,16 +21,11 @@ module Cardano.Crypto.MonadMLock.Alloc
   mlockedAllocaSized,
   mlockedAllocForeignPtr,
   mlockedAllocForeignPtrBytes,
-
-  -- * Re-exports from plain Libsodium module
-  NaCl.MLockedForeignPtr,
 )
 where
 
 import Cardano.Crypto.MonadMLock.Class
 import Control.Monad.Class.MonadThrow (MonadThrow, bracket)
-
-import qualified Cardano.Crypto.Libsodium.Memory as NaCl
 
 import Cardano.Foreign (SizedPtr (..))
 
@@ -45,7 +40,7 @@ mlockedAllocaSized k = mlockedAlloca size (k . SizedPtr) where
     size :: CSize
     size = fromInteger (natVal (Proxy @n))
 
-mlockedAllocForeignPtrBytes :: (MonadMLock m) => CSize -> CSize -> m (MLockedForeignPtr a)
+mlockedAllocForeignPtrBytes :: (MonadMLock m) => CSize -> CSize -> m (MLockedForeignPtr m a)
 mlockedAllocForeignPtrBytes size align = do
   mlockedMalloc size'
   where
@@ -56,7 +51,7 @@ mlockedAllocForeignPtrBytes size align = do
       where
         (q,m) = size `quotRem` align
 
-mlockedAllocForeignPtr :: forall a m . (MonadMLock m, Storable a) => m (MLockedForeignPtr a)
+mlockedAllocForeignPtr :: forall a m . (MonadMLock m, Storable a) => m (MLockedForeignPtr m a)
 mlockedAllocForeignPtr =
   mlockedAllocForeignPtrBytes size align
   where

@@ -19,13 +19,12 @@ import Cardano.Crypto.Hash.Blake2b
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.KES.Sum
 import Cardano.Crypto.KES.CompactSum
-
+import Cardano.Crypto.Libsodium as NaCl
+import Cardano.Crypto.MLockedSeed
 
 import Criterion
 import qualified Data.ByteString as BS (ByteString)
 import Data.Either (fromRight)
-import Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.MLockedSeed
 import System.IO.Unsafe (unsafePerformIO)
 import GHC.TypeLits (KnownNat)
 import Data.Kind (Type)
@@ -35,8 +34,8 @@ import Bench.Crypto.BenchData
 {- HLINT ignore "Use camelCase" -}
 
 {-# NOINLINE testSeedML #-}
-testSeedML :: forall n. KnownNat n => MLockedSeed n
-testSeedML = MLockedSeed . unsafePerformIO $ NaCl.mlsbFromByteString testBytes
+testSeedML :: forall n. (KnownNat n) => MLockedSeed IO n
+testSeedML = MLockedSeed . unsafePerformIO $ mlsbFromByteString testBytes
 
 benchmarks :: Benchmark
 benchmarks = bgroup "KES"
@@ -53,7 +52,7 @@ benchKES :: forall (proxy :: forall k. k -> Type) v
            . ( KESSignAlgorithm IO v
              , ContextKES v ~ ()
              , Signable v BS.ByteString
-             , NFData (SignKeyKES v)
+             , NFData (SignKeyKES IO v)
              , NFData (SigKES v)
              )
           => proxy v

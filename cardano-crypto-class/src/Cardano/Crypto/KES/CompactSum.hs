@@ -146,13 +146,13 @@ data CompactSumKES h d
 instance (NFData (SigKES d), NFData (VerKeyKES d)) =>
   NFData (SigKES (CompactSumKES h d)) where
 
-instance (NFData (SignKeyKES d), NFData (VerKeyKES d)) =>
-  NFData (SignKeyKES (CompactSumKES h d)) where
+instance (NFData (SignKeyKES m d), NFData (VerKeyKES d)) =>
+  NFData (SignKeyKES m (CompactSumKES h d)) where
     rnf (SignKeyCompactSumKES sk r vk1 vk2) =
       rnf (sk, r, vk1, vk2)
 
 instance ( OptimizedKESAlgorithm d
-         , SodiumHashAlgorithm h -- needed for secure forgetting
+         , HashAlgorithm h -- needed for secure forgetting
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
          , NoThunks (VerKeyKES (CompactSumKES h d))
          , KnownNat (SizeVerKeyKES (CompactSumKES h d))
@@ -252,7 +252,7 @@ instance ( OptimizedKESAlgorithm d
 
 instance ( OptimizedKESAlgorithm d
          , KESSignAlgorithm m d
-         , SodiumHashAlgorithm h -- needed for secure forgetting
+         , SodiumHashAlgorithm m h -- needed for secure forgetting
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
          , MonadMLock m
          , MonadST m -- only needed for unsafe raw ser/deser
@@ -265,9 +265,9 @@ instance ( OptimizedKESAlgorithm d
       => KESSignAlgorithm m (CompactSumKES h d) where
     -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
     --
-    data SignKeyKES (CompactSumKES h d) =
-           SignKeyCompactSumKES !(SignKeyKES d)
-                         !(MLockedSeed (SeedSizeKES d))
+    data SignKeyKES m (CompactSumKES h d) =
+           SignKeyCompactSumKES !(SignKeyKES m d)
+                         !(MLockedSeed m (SeedSizeKES d))
                          !(VerKeyKES d)
                          !(VerKeyKES d)
 
@@ -402,14 +402,14 @@ instance (KESAlgorithm (CompactSumKES h d), OptimizedKESAlgorithm d, HashAlgorit
 deriving instance HashAlgorithm h => Show (VerKeyKES (CompactSumKES h d))
 deriving instance Eq   (VerKeyKES (CompactSumKES h d))
 
-deriving via OnlyCheckWhnfNamed "SignKeyKES (CompactSumKES h d)" (SignKeyKES (CompactSumKES h d))
-  instance NoThunks (SignKeyKES (CompactSumKES h d))
+deriving via OnlyCheckWhnfNamed "SignKeyKES (CompactSumKES h d)" (SignKeyKES m (CompactSumKES h d))
+  instance NoThunks (SignKeyKES m (CompactSumKES h d))
 
 instance (KESAlgorithm d) => NoThunks (VerKeyKES (CompactSumKES h d))
 
 instance ( OptimizedKESAlgorithm d
-         , SodiumHashAlgorithm h
          , SizeHash h ~ SeedSizeKES d
+         , HashAlgorithm h
          , NoThunks (VerKeyKES (CompactSumKES h d))
          , KnownNat (SizeVerKeyKES (CompactSumKES h d))
          , KnownNat (SizeSignKeyKES (CompactSumKES h d))
@@ -420,7 +420,7 @@ instance ( OptimizedKESAlgorithm d
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance ( OptimizedKESAlgorithm d
-         , SodiumHashAlgorithm h
+         , HashAlgorithm h
          , SizeHash h ~ SeedSizeKES d
          , NoThunks (VerKeyKES (CompactSumKES h d))
          , KnownNat (SizeVerKeyKES (CompactSumKES h d))
@@ -460,7 +460,7 @@ deriving instance KESAlgorithm d => Eq   (SigKES (CompactSumKES h d))
 instance KESAlgorithm d => NoThunks (SigKES (CompactSumKES h d))
 
 instance ( OptimizedKESAlgorithm d
-         , SodiumHashAlgorithm h
+         , HashAlgorithm h
          , SizeHash h ~ SeedSizeKES d
          , NoThunks (VerKeyKES (CompactSumKES h d))
          , KnownNat (SizeVerKeyKES (CompactSumKES h d))
@@ -472,7 +472,7 @@ instance ( OptimizedKESAlgorithm d
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance ( OptimizedKESAlgorithm d
-         , SodiumHashAlgorithm h
+         , HashAlgorithm h
          , SizeHash h ~ SeedSizeKES d
          , NoThunks (VerKeyKES (CompactSumKES h d))
          , KnownNat (SizeVerKeyKES (CompactSumKES h d))
@@ -486,11 +486,11 @@ instance ( OptimizedKESAlgorithm d
 -- Direct ser/deser
 --
 
-instance ( DirectSerialise m (SignKeyKES d)
+instance ( DirectSerialise m (SignKeyKES m d)
          , DirectSerialise m (VerKeyKES d)
          , MonadMLock m
          , KESAlgorithm d
-         ) => DirectSerialise m (SignKeyKES (CompactSumKES h d)) where
+         ) => DirectSerialise m (SignKeyKES m (CompactSumKES h d)) where
   directSerialise push (SignKeyCompactSumKES sk r vk0 vk1) = do
     directSerialise push sk
     mlockedSeedUseAsCPtr r $ \ptr ->
@@ -498,11 +498,11 @@ instance ( DirectSerialise m (SignKeyKES d)
     directSerialise push vk0
     directSerialise push vk1
 
-instance ( DirectDeserialise m (SignKeyKES d)
+instance ( DirectDeserialise m (SignKeyKES m d)
          , DirectDeserialise m (VerKeyKES d)
          , MonadMLock m
          , KESAlgorithm d
-         ) => DirectDeserialise m (SignKeyKES (CompactSumKES h d)) where
+         ) => DirectDeserialise m (SignKeyKES m (CompactSumKES h d)) where
   directDeserialise pull = do
     sk <- directDeserialise pull
 

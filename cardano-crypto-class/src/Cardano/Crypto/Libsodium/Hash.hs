@@ -33,23 +33,23 @@ import Control.Monad.ST.Unsafe (unsafeIOToST)
 
 expandHash
     :: forall h m proxy.
-       (SodiumHashAlgorithm h, MonadMLock m, MonadST m, MonadThrow m)
+       (SodiumHashAlgorithm m h, MonadMLock m, MonadST m, MonadThrow m)
     => proxy h
-    -> MLockedSizedBytes (SizeHash h)
-    -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
+    -> MLockedSizedBytes m (SizeHash h)
+    -> m (MLockedSizedBytes m (SizeHash h), MLockedSizedBytes m (SizeHash h))
 expandHash h (MLSB sfptr) = do
     withMLockedForeignPtr sfptr $ \ptr -> do
         l <- mlockedAlloca size1 $ \ptr' -> do
               withLiftST $ \liftST -> liftST . unsafeIOToST $ do
                 poke ptr' (1 :: Word8)
                 copyMem (castPtr (plusPtr ptr' 1)) ptr size
-                naclDigestPtr h ptr' (fromIntegral size1)
+              naclDigestPtr h ptr' (fromIntegral size1)
 
         r <- mlockedAlloca size1 $ \ptr' -> do
               withLiftST $ \liftST -> liftST . unsafeIOToST $ do
                 poke ptr' (2 :: Word8)
                 copyMem (castPtr (plusPtr ptr' 1)) ptr size
-                naclDigestPtr h ptr' (fromIntegral size1)
+              naclDigestPtr h ptr' (fromIntegral size1)
 
         return (l, r)
   where

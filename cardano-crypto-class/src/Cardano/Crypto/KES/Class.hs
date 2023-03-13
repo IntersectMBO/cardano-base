@@ -89,12 +89,11 @@ class ( Typeable v
       , Show (SigKES v)
       , Eq (SigKES v)
       , NoThunks (SigKES v)
-      , NoThunks (SignKeyKES v)
       , NoThunks (VerKeyKES v)
       , KnownNat (SeedSizeKES v)
       , KnownNat (SizeVerKeyKES v)
-      , KnownNat (SizeSignKeyKES v)
       , KnownNat (SizeSigKES v)
+      , KnownNat (SizeSignKeyKES v)
       )
       => KESAlgorithm v where
   --
@@ -105,8 +104,12 @@ class ( Typeable v
 
   type SeedSizeKES    v :: Nat
   type SizeVerKeyKES  v :: Nat
-  type SizeSignKeyKES v :: Nat
   type SizeSigKES     v :: Nat
+  -- Sign key size actually belongs in 'KESSignAlgorithm'; we keep it here for
+  -- reasons of type bureaucracy. That is, because it does not depend on the
+  -- @m@ type parameter, putting it in 'KESSignAlgorithm' would lead to type
+  -- ambiguities or require passing around proxies to disambiguate @m@.
+  type SizeSignKeyKES v :: Nat
 
   --
   -- Metadata and basic key operations
@@ -178,12 +181,13 @@ seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
 
 class ( KESAlgorithm v
       , Monad m
+      , NoThunks (SignKeyKES m v)
       )
       => KESSignAlgorithm m v where
 
-  data SignKeyKES v :: Type
+  data SignKeyKES m v :: Type
 
-  deriveVerKeyKES :: SignKeyKES v -> m (VerKeyKES v)
+  deriveVerKeyKES :: SignKeyKES m v -> m (VerKeyKES v)
 
   --
   -- Core algorithm operations
@@ -194,7 +198,7 @@ class ( KESAlgorithm v
     => ContextKES v
     -> Period  -- ^ The /current/ period for the key
     -> a
-    -> SignKeyKES v
+    -> SignKeyKES m v
     -> m (SigKES v)
 
   -- | Update the KES signature key to the /next/ period, given the /current/
@@ -216,17 +220,17 @@ class ( KESAlgorithm v
   updateKES
     :: HasCallStack
     => ContextKES v
-    -> SignKeyKES v
+    -> SignKeyKES m v
     -> Period  -- ^ The /current/ period for the key, not the target period.
-    -> m (Maybe (SignKeyKES v))
+    -> m (Maybe (SignKeyKES m v))
 
   --
   -- Key generation
   --
 
   genKeyKES
-    :: MLockedSeed (SeedSizeKES v)
-    -> m (SignKeyKES v)
+    :: MLockedSeed m (SeedSizeKES v)
+    -> m (SignKeyKES m v)
 
   --
   -- Secure forgetting
@@ -239,15 +243,15 @@ class ( KESAlgorithm v
   -- The precondition is that this key value will not be used again.
   --
   forgetSignKeyKES
-    :: SignKeyKES v
+    :: SignKeyKES m v
     -> m ()
 
 -- | Unsound operations on KES sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider
 -- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
 class (KESSignAlgorithm m v) => UnsoundKESSignAlgorithm m v where
-  rawDeserialiseSignKeyKES  :: ByteString -> m (Maybe (SignKeyKES v))
-  rawSerialiseSignKeyKES   :: SignKeyKES v -> m ByteString
+  rawDeserialiseSignKeyKES  :: ByteString -> m (Maybe (SignKeyKES m v))
+  rawSerialiseSignKeyKES   :: SignKeyKES m v -> m ByteString
 
 -- | Subclass for KES algorithms that embed a copy of the VerKey into the
 -- signature itself, rather than relying on the externally supplied VerKey
@@ -296,9 +300,9 @@ verifyOptimizedKES ctx vk t a sig = do
 --
 
 instance ( TypeError ('Text "Ord not supported for signing keys, use the hash instead")
-         , Eq (SignKeyKES v)
+         , Eq (SignKeyKES m v)
          )
-      => Ord (SignKeyKES v) where
+      => Ord (SignKeyKES m v) where
     compare = error "unsupported"
 
 instance ( TypeError ('Text "Ord not supported for verification keys, use the hash instead")
@@ -319,7 +323,7 @@ encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
-encodeSignKeyKES :: forall v m. (UnsoundKESSignAlgorithm m v) => SignKeyKES v -> m Encoding
+encodeSignKeyKES :: forall v m. (UnsoundKESSignAlgorithm m v) => SignKeyKES m v -> m Encoding
 encodeSignKeyKES = fmap encodeBytes . rawSerialiseSignKeyKES
 
 decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
@@ -350,7 +354,7 @@ decodeSigKES = do
           expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
           actual   = BS.length bs
 
-decodeSignKeyKES :: forall v s m. (UnsoundKESSignAlgorithm m v) => Decoder s (m (Maybe (SignKeyKES v)))
+decodeSignKeyKES :: forall v s m. (UnsoundKESSignAlgorithm m v) => Decoder s (m (Maybe (SignKeyKES m v)))
 decodeSignKeyKES = do
     bs <- decodeBytes
     let expected = fromIntegral (sizeSignKeyKES (Proxy @v))
@@ -382,9 +386,9 @@ signedKES
   => ContextKES v
   -> Period
   -> a
-  -> SignKeyKES v
+  -> SignKeyKES m v
   -> m (SignedKES v a)
-signedKES ctxt time a key = SignedKES <$> (signKES ctxt time a key)
+signedKES ctxt time a key = SignedKES <$> signKES ctxt time a key
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)
@@ -403,25 +407,25 @@ decodeSignedKES :: KESAlgorithm v => Decoder s (SignedKES v a)
 decodeSignedKES = SignedKES <$> decodeSigKES
 
 -- | A sign key bundled with its associated period.
-data SignKeyWithPeriodKES v =
+data SignKeyWithPeriodKES m v =
   SignKeyWithPeriodKES
-    { skWithoutPeriodKES :: !(SignKeyKES v)
+    { skWithoutPeriodKES :: !(SignKeyKES m v)
     , periodKES :: !Period
     }
     deriving (Generic)
 
-deriving instance (KESAlgorithm v, Eq (SignKeyKES v)) => Eq (SignKeyWithPeriodKES v)
+deriving instance (KESAlgorithm v, Eq (SignKeyKES m v)) => Eq (SignKeyWithPeriodKES m v)
 
-deriving instance (KESAlgorithm v, Show (SignKeyKES v)) => Show (SignKeyWithPeriodKES v)
+deriving instance (KESAlgorithm v, Show (SignKeyKES m v)) => Show (SignKeyWithPeriodKES m v)
 
-instance KESAlgorithm v => NoThunks (SignKeyWithPeriodKES v)
+instance KESSignAlgorithm m v => NoThunks (SignKeyWithPeriodKES m v)
   -- use generic instance
 
 updateKESWithPeriod
     :: (HasCallStack, KESSignAlgorithm m v)
     => ContextKES v
-    -> (SignKeyWithPeriodKES v)
-    -> m (Maybe (SignKeyWithPeriodKES v))
+    -> SignKeyWithPeriodKES m v
+    -> m (Maybe (SignKeyWithPeriodKES m v))
 updateKESWithPeriod c (SignKeyWithPeriodKES sk t) = runMaybeT $ do
   sk' <- MaybeT $ updateKES c sk t
   return $ SignKeyWithPeriodKES sk' (succ t)
@@ -443,7 +447,7 @@ encodedVerKeyKESSizeExpr _proxy =
 -- | 'Size' expression for 'SignKeyKES' which is using 'sizeSignKeyKES' encoded
 -- as 'Size'.
 --
-encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
+encodedSignKeyKESSizeExpr :: forall v m. KESAlgorithm v => Proxy (SignKeyKES m v) -> Size
 encodedSignKeyKESSizeExpr _proxy =
       -- 'encodeBytes' envelope
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy @v)))

@@ -22,7 +22,6 @@ module Cardano.Crypto.MonadMLock
   MonadPSB (..),
 
   -- * Re-exported types
-  MLockedForeignPtr,
   MLockedSizedBytes,
 
   -- * Monadic Eq and Ord
@@ -59,7 +58,6 @@ module Cardano.Crypto.MonadMLock
   mlsbCopy,
   mlsbFinalize,
   mlsbToByteString,
-  mlsbAsByteString,
   mlsbFromByteString,
   mlsbFromByteStringCheck,
   mlsbUseAsSizedPtr,

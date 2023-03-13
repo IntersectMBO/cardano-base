@@ -32,19 +32,19 @@ import Control.Monad.Class.MonadST
 --         size :: Int
 --         size = fromInteger (natVal (Proxy :: Proxy n))
 
-mlsbFromPSB :: (MonadMLock m, MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSizedBytes n)
+mlsbFromPSB :: (MonadMLock m, MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSizedBytes m n)
 mlsbFromPSB = mlsbFromByteString . psbToByteString
 
-withMLSBFromPSB :: (MonadMLock m, MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSizedBytes n -> m a) -> m a
+withMLSBFromPSB :: (MonadMLock m, MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSizedBytes m n -> m a) -> m a
 withMLSBFromPSB psb =
   bracket
     (mlsbFromPSB psb)
     mlsbFinalize
 
-mlockedSeedFromPSB :: (MonadMLock m, MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSeed n)
+mlockedSeedFromPSB :: (MonadMLock m, MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSeed m n)
 mlockedSeedFromPSB = fmap MLockedSeed . mlsbFromPSB
 
-withMLockedSeedFromPSB :: (MonadMLock m, MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSeed n -> m a) -> m a
+withMLockedSeedFromPSB :: (MonadMLock m, MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSeed m n -> m a) -> m a
 withMLockedSeedFromPSB psb =
   bracket
     (mlockedSeedFromPSB psb)

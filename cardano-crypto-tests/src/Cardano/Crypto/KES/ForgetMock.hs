@@ -103,7 +103,8 @@ instance
   , MonadIO m
   )
   => KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) m) (ForgetMockKES k) where
-    data SignKeyKES (ForgetMockKES k) = SignKeyForgetMockKES !Word !(SignKeyKES k)
+    data SignKeyKES (LogT (GenericEvent ForgetMockEvent) m) (ForgetMockKES k) =
+          SignKeyForgetMockKES !Word !(SignKeyKES (LogT (GenericEvent ForgetMockEvent) m) k)
 
     genKeyKES seed = do
       sk <- genKeyKES seed
@@ -153,9 +154,10 @@ deriving instance Eq (VerKeyKES k) => Eq (VerKeyKES (ForgetMockKES k))
 deriving instance Ord (VerKeyKES k) => Ord (VerKeyKES (ForgetMockKES k))
 deriving instance NoThunks (VerKeyKES k) => NoThunks (VerKeyKES (ForgetMockKES k))
 
-deriving instance Eq (SignKeyKES k) => Eq (SignKeyKES (ForgetMockKES k))
+-- deriving instance Eq (SignKeyKES m k) => Eq (SignKeyKES m (ForgetMockKES k))
 
-instance NoThunks (SignKeyKES k) => NoThunks (SignKeyKES (ForgetMockKES k)) where
+instance NoThunks (SignKeyKES (LogT (GenericEvent ForgetMockEvent) m) k) =>
+  NoThunks (SignKeyKES (LogT (GenericEvent ForgetMockEvent) m) (ForgetMockKES k)) where
   showTypeOf _ = "SignKeyKES (ForgetMockKES k)"
   wNoThunks ctx (SignKeyForgetMockKES t k) =
     allNoThunks

@@ -35,6 +35,7 @@ import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO, bracket)
 import Control.Monad.Class.MonadST (MonadST (..))
 import Control.Monad.ST (ST, stToIO)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
+import Data.Typeable (Typeable)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -69,10 +70,10 @@ data Ed25519DSIGNM
 instance NoThunks (VerKeyDSIGNM Ed25519DSIGNM)
 instance NoThunks (SigDSIGNM Ed25519DSIGNM)
 
-deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance NoThunks (SignKeyDSIGNM Ed25519DSIGNM)
+deriving via (MLockedSizedBytes m CRYPTO_SIGN_ED25519_SECRETKEYBYTES)
+  instance NoThunks (SignKeyDSIGNM m Ed25519DSIGNM)
 
-instance NFData (SignKeyDSIGNM Ed25519DSIGNM) where
+instance NFData (SignKeyDSIGNM m Ed25519DSIGNM) where
   rnf = rwhnf
 
 -- | Convert C-style return code / errno error reporting into Haskell
@@ -120,14 +121,6 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
     newtype VerKeyDSIGNM Ed25519DSIGNM = VerKeyEd25519DSIGNM (PinnedSizedBytes (SizeVerKeyDSIGNM Ed25519DSIGNM))
         deriving (Show, Eq, Generic)
         deriving newtype NFData
-
-    -- Note that the size of the internal key data structure is the SECRET KEY
-    -- bytes as per libsodium, while the declared key size (for serialization)
-    -- is libsodium's SEED bytes. We expand 32-octet keys to 64-octet ones
-    -- during deserialization, and we delete the 32 octets that contain the
-    -- public key from the secret key before serializing.
-    newtype SignKeyDSIGNM Ed25519DSIGNM = SignKeyEd25519DSIGNM (MLockedSizedBytes CRYPTO_SIGN_ED25519_SECRETKEYBYTES)
-        deriving (Show)
 
     newtype SigDSIGNM Ed25519DSIGNM = SigEd25519DSIGNM (PinnedSizedBytes (SizeSigDSIGNM Ed25519DSIGNM))
         deriving (Show, Eq, Generic)
@@ -196,6 +189,15 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 -- - 'BS.useAsCStringLen', which is fine and shouldn't require 'IO' to begin
 --   with, but unfortunately, for historical reasons, does.
 instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
+    -- Note that the size of the internal key data structure is the SECRET KEY
+    -- bytes as per libsodium, while the declared key size (for serialization)
+    -- is libsodium's SEED bytes. We expand 32-octet keys to 64-octet ones
+    -- during deserialization, and we delete the 32 octets that contain the
+    -- public key from the secret key before serializing.
+    newtype SignKeyDSIGNM m Ed25519DSIGNM =
+        SignKeyEd25519DSIGNM (MLockedSizedBytes m CRYPTO_SIGN_ED25519_SECRETKEYBYTES)
+        deriving (Show)
+
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$!> do
         mlsbUseAsSizedPtr sk $ \skPtr -> do
@@ -259,8 +261,8 @@ instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => DSIGNMAlgorithm 
     forgetSignKeyDSIGNM (SignKeyEd25519DSIGNM sk) = do
       mlsbFinalize sk
 
-deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance (MonadST m, MonadMLock m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
+deriving via (MLockedSizedBytes m CRYPTO_SIGN_ED25519_SECRETKEYBYTES)
+  instance (MonadST m, MonadMLock m) => MEq m (SignKeyDSIGNM m Ed25519DSIGNM)
 
 instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
     --
@@ -288,7 +290,7 @@ instance ( MonadThrow m
          , MonadST m
          , MonadMLock m
          , MonadPSB m
-         ) => DirectSerialise m (SignKeyDSIGNM Ed25519DSIGNM) where
+         ) => DirectSerialise m (SignKeyDSIGNM m Ed25519DSIGNM) where
   -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. The
   -- latter contains both the seed and the 32-byte verification key, which is
   -- convenient, but redundant, since we can always reconstruct it from the
@@ -307,7 +309,7 @@ instance ( MonadThrow m
          , MonadST m
          , MonadPSB m
          , MonadMLock m
-         ) => DirectDeserialise m (SignKeyDSIGNM Ed25519DSIGNM) where
+         ) => DirectDeserialise m (SignKeyDSIGNM m Ed25519DSIGNM) where
   -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. See
   -- the DirectSerialise m instance above.
   directDeserialise pull = do
@@ -347,13 +349,17 @@ instance ToCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
 instance FromCBOR (VerKeyDSIGNM Ed25519DSIGNM) where
   fromCBOR = decodeVerKeyDSIGNM
 
-instance TypeError ('Text "CBOR encoding would violate mlocking guarantees")
-  => ToCBOR (SignKeyDSIGNM Ed25519DSIGNM) where
+instance ( TypeError ('Text "CBOR encoding would violate mlocking guarantees")
+         , Typeable m
+         )
+  => ToCBOR (SignKeyDSIGNM m Ed25519DSIGNM) where
   toCBOR = error "unsupported"
   encodedSizeExpr _ = error "unsupported"
 
-instance TypeError ('Text "CBOR decoding would violate mlocking guarantees")
-  => FromCBOR (SignKeyDSIGNM Ed25519DSIGNM) where
+instance ( TypeError ('Text "CBOR decoding would violate mlocking guarantees")
+         , Typeable m
+         )
+  => FromCBOR (SignKeyDSIGNM m Ed25519DSIGNM) where
   fromCBOR = error "unsupported"
 
 instance ToCBOR (SigDSIGNM Ed25519DSIGNM) where
