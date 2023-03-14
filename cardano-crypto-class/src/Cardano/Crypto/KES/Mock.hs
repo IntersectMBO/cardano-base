@@ -137,7 +137,7 @@ data MockSignKeyKES t =
     deriving stock    (Show, Eq, Generic, Ord)
     deriving anyclass (NoThunks)
 
-deriving newtype instance NoThunks (MockSignKeyKES t) => NoThunks (SignKeyKES m (MockKES t))
+deriving newtype instance NoThunks (SignKeyKES m (MockKES t))
 
 deriving newtype instance Eq (SignKeyKES m (MockKES t))
 
