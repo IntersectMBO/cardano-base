@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name:                cardano-binary-test
-version:             1.4.0.0
+version:             1.4.0.1
 synopsis:            Test helpers from cardano-binary exposed to other packages
 description:         Test helpers from cardano-binary exposed to other packages
 license:             MIT
@@ -12,11 +12,6 @@ copyright:           2019-2021 IOHK
 category:            Currency
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
-
-flag development
-    description: Disable `-Werror`
-    default: False
-    manual: True
 
 common base                         { build-depends: base >= 4.14 && < 4.17 }
 
@@ -30,9 +25,6 @@ common project-config
                         -Wpartial-fields
                         -Wredundant-constraints
                         -Wunused-packages
-
-  if (!flag(development))
-    ghc-options:         -Werror
 
 library
   import:               base, project-config

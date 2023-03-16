@@ -3,6 +3,8 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Cardano.Slotting.Slot
   ( SlotNo (..),
@@ -21,7 +23,7 @@ where
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Codec.Serialise (Serialise (..))
 import Control.DeepSeq (NFData (rnf))
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON, ToJSON (..), Value (String))
 import Data.Typeable (Typeable)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
@@ -72,6 +74,10 @@ instance NFData a => NFData (WithOrigin a) where
   rnf Origin = ()
   rnf (At t) = rnf t
 
+instance ToJSON a => ToJSON (WithOrigin a) where
+  toJSON = \case
+    Origin -> String "origin"
+    At n -> toJSON n
 
 at :: t -> WithOrigin t
 at = At

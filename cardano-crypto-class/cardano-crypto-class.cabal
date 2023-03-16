@@ -1,6 +1,6 @@
 cabal-version:      2.2
 name:               cardano-crypto-class
-version:            2.1.0.0
+version:            2.1.0.1
 synopsis:
   Type classes abstracting over cryptography primitives for Cardano
 
@@ -20,11 +20,6 @@ build-type:         Simple
 extra-source-files: README.md
                     CHANGELOG.md
 
-flag development
-  description: Disable `-Werror`
-  default:     False
-  manual:      True
-
 flag secp256k1-support
     description: Enable support for functions from libsecp256k1. Requires
                  a recent libsecp256k1 with support for Schnorr signatures.
@@ -39,9 +34,6 @@ common project-config
     -Wall -Wcompat -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
     -Wunused-packages
-
-  if !flag(development)
-    ghc-options: -Werror
 
 library
   import:            base, project-config

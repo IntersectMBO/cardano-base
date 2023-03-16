@@ -2,8 +2,12 @@
 
 ## 0.1.1.0
 
-* Addition of `ToJSON`/`FromJSON` instances for `SystemStart`
-* Addition of `ToCBOR`/`FromCBOR` instances for `RelativeTime` and `SlotLength`
+* Remove `development` flag: #372
+* Addition of `ToJSON` instances for `WithOrigin`.
+* Addition of `ToJSON`/`FromJSON` instances for:
+  * `BlockNo`
+  * `SystemStart`
+  * `RelativeTime` and `SlotLength`
 
 ## 0.1.0.1
 

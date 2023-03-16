@@ -34,3 +34,5 @@ packages:
 -- Ensures colourized output from test runners
 test-show-details: direct
 
+program-options
+  ghc-options: -Werror

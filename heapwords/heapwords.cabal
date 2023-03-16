@@ -1,7 +1,7 @@
 cabal-version:       >=1.10
 
 name:                heapwords
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Heapwords
 license:             Apache-2.0
 license-files:
@@ -12,11 +12,6 @@ maintainer:          operations@iohk.io
 copyright:           IOHK
 build-type:          Simple
 extra-source-files:  CHANGELOG.md
-
-flag development
-    description: Disable `-Werror`
-    default: False
-    manual: True
 
 library
   default-language:     Haskell2010
@@ -29,9 +24,6 @@ library
     -Wredundant-constraints
     -Wunused-packages
 
-  if (!flag(development))
-    ghc-options:
-      -Werror
   exposed-modules:      Cardano.HeapWords
   build-depends:        array
                       , base

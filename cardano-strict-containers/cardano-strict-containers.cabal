@@ -1,7 +1,7 @@
 cabal-version:       >=1.10
 
 name:                cardano-strict-containers
-version:             0.1.2.0
+version:             0.1.2.1
 synopsis:            Various strict container types
 license:             Apache-2.0
 license-files:
@@ -13,11 +13,6 @@ maintainer:          operations@iohk.io
 copyright:           IOHK
 build-type:          Simple
 
-flag development
-    description: Disable `-Werror`
-    default: False
-    manual: True
-
 library
   default-language:     Haskell2010
   hs-source-dirs:       src
@@ -27,9 +22,6 @@ library
     -Wincomplete-record-updates
     -Wincomplete-uni-patterns
     -Wredundant-constraints
-  if (!flag(development))
-    ghc-options:
-      -Werror
   exposed-modules:      Data.FingerTree.Strict
                         Data.Maybe.Strict
                         Data.Sequence.Strict
