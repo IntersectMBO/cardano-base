@@ -2,6 +2,7 @@
 
 ## 0.1.1.0
 
+* Addition of `ToJSON`/`FromJSON` instances for `BlockNo`
 * Addition of `ToJSON`/`FromJSON` instances for `SystemStart`
 * Addition of `ToCBOR`/`FromCBOR` instances for `RelativeTime` and `SlotLength`
 
