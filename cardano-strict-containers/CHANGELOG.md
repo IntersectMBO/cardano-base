@@ -1,3 +1,9 @@
+# Changelog for `cardano-strict-containers`
+
+# 0.1.2.1
+
+* Remove `development` flag: #372
+
 # 0.1.2.0
 
 * Added `ToCBOR` and `FromCBOR` instances for `StrictSeq`: [#361](https://github.com/input-output-hk/cardano-base/pull/361)

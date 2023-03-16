@@ -1,3 +1,7 @@
+## 2.1.0.1
+
+* Remove `development` flag: #372
+
 ## 2.1.0.0
 
 * Fixed the name `encodedSignKeyDESIGNSizeExpr` -> `encodedSignKeyDSIGNSizeExpr`

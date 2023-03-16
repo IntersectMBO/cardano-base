@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name:                cardano-crypto-praos
-version:             2.1.1.0
+version:             2.1.1.1
 synopsis:            Crypto primitives from libsodium
 description:         VRF (and KES, tba) primitives from libsodium.
 license:             Apache-2.0
@@ -37,11 +37,6 @@ extra-source-files:    cbits/crypto_vrf.h
                        cbits/private/fe_51/base2.h
                        cbits/private/fe_51/fe.h
 
-flag development
-    description: Disable `-Werror`
-    default: False
-    manual: True
-
 flag external-libsodium-vrf
     description: Rely on a special libsodium fork containing the VRF code.
                  Otherwise expect a normal unaltered system libsodium, and
@@ -61,9 +56,6 @@ common project-config
                         -Wpartial-fields
                         -Wredundant-constraints
                         -Wunused-packages
-
-  if (!flag(development))
-    ghc-options:        -Werror
 
 library
   import:               base, project-config

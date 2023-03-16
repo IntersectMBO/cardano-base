@@ -16,11 +16,6 @@ build-type:          Simple
 extra-source-files:  README.md
                      CHANGELOG.md
 
-flag development
-    description: Disable `-Werror`
-    default: False
-    manual: True
-
 common base                         { build-depends: base                             >= 4.14       && < 4.17     }
 
 common project-config
@@ -33,9 +28,6 @@ common project-config
                         -Wpartial-fields
                         -Wredundant-constraints
                         -Wunused-packages
-
-  if (!flag(development))
-    ghc-options:        -Werror
 
 library
   import:               base, project-config

@@ -2,6 +2,7 @@
 
 ## 1.7.0.0
 
+* Remove `development` flag: #372
 * Remove `To/FromCBOR` instances for `NominalDiffTime`, since they did rounding.  Newly
   added functions `encodeNominalDiffTimeMicro`/`decodedNominalDiffTimeMicro` can be used
   to recover previous behavior. Correct instances that do not perform any rounding will
