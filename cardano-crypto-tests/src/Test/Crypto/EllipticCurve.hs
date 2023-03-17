@@ -87,18 +87,18 @@ testBLSCurve name _ =
     , testProperty "in group" (BLS.inGroup @curve)
     , testProperty "neg in group" (BLS.inGroup @curve . BLS.neg)
 
-    , testProperty "self-equality" (\(a :: BLS.P curve) -> a === a)
-    , testProperty "double negation" (\(a :: BLS.P curve) -> a === BLS.neg (BLS.neg a))
-    , testProperty "addition associative" (testAssoc (BLS.addOrDouble :: BLS.P curve -> BLS.P curve -> BLS.P curve))
-    , testProperty "addition commutative" (testCommut (BLS.addOrDouble :: BLS.P curve -> BLS.P curve -> BLS.P curve))
+    , testProperty "self-equality" (\(a :: BLS.Point curve) -> a === a)
+    , testProperty "double negation" (\(a :: BLS.Point curve) -> a === BLS.neg (BLS.neg a))
+    , testProperty "addition associative" (testAssoc (BLS.addOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
+    , testProperty "addition commutative" (testCommut (BLS.addOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
     , testProperty "adding negation yields infinity" (testAddNegYieldsInf @curve)
     , testProperty "round-trip serialization" $
-        testRoundTripEither @(BLS.P curve) BLS.serialize BLS.deserialize
+        testRoundTripEither @(BLS.Point curve) BLS.serialize BLS.deserialize
     , testProperty "round-trip compression" $
-        testRoundTripEither @(BLS.P curve) BLS.compress BLS.uncompress
-    , testProperty "mult by p is inf" $ \(a :: BLS.P curve) ->
+        testRoundTripEither @(BLS.Point curve) BLS.compress BLS.uncompress
+    , testProperty "mult by p is inf" $ \(a :: BLS.Point curve) ->
         BLS.isInf (BLS.mult a BLS.scalarPeriod)
-    , testProperty "mult by p+1 is identity" $ \(a :: BLS.P curve) ->
+    , testProperty "mult by p+1 is identity" $ \(a :: BLS.Point curve) ->
         BLS.mult a (BLS.scalarPeriod + 1) === a
     ]
 
@@ -135,19 +135,19 @@ testPairing name =
     , testProperty "three pairings"
         (\a b p q ->
             either (const False) id $ do
-                t1 <- BLS.miller_loop (BLS.mult p a) q
-                t2 <- BLS.miller_loop p (BLS.mult q b)
-                t3 <- BLS.miller_loop (BLS.mult p (a + b)) q
+                t1 <- BLS.millerLoop (BLS.mult p a) q
+                t2 <- BLS.millerLoop p (BLS.mult q b)
+                t3 <- BLS.millerLoop (BLS.mult p (a + b)) q
                 let tt = BLS.ptMult t1 t2
                 return $ BLS.ptFinalVerify tt t3
         )
     , testProperty "four pairings"
             (\a1 a2 a3 b ->
                 either (const False) id $ do
-                    t1 <- BLS.miller_loop a1 b
-                    t2 <- BLS.miller_loop a2 b
-                    t3 <- BLS.miller_loop a3 b
-                    t4 <- BLS.miller_loop (BLS.addOrDouble (BLS.addOrDouble a1 a2) a3) b
+                    t1 <- BLS.millerLoop a1 b
+                    t2 <- BLS.millerLoop a2 b
+                    t3 <- BLS.millerLoop a3 b
+                    t4 <- BLS.millerLoop (BLS.addOrDouble (BLS.addOrDouble a1 a2) a3) b
                     let tt = BLS.ptMult (BLS.ptMult t1 t2) t3
                     return $ BLS.ptFinalVerify tt t4
             )
@@ -155,8 +155,8 @@ testPairing name =
     where
       pairingCheck (a, b) (c, d) =
         either (error . show) id $ do
-          p <- BLS.miller_loop a b
-          q <- BLS.miller_loop c d
+          p <- BLS.millerLoop a b
+          q <- BLS.millerLoop c d
           return $ BLS.ptFinalVerify p q
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
@@ -168,7 +168,7 @@ testCommut f a b =
   f a b === f b a
 
 testAddNegYieldsInf :: forall curve. BLS.BLS curve
-        => BLS.P curve -> Bool
+        => BLS.Point curve -> Bool
 testAddNegYieldsInf p =
   BLS.isInf (BLS.addOrDouble p (BLS.neg p))
 
@@ -180,7 +180,7 @@ testRoundTripEither :: forall p a err. (Show p, Show err, Eq p, Eq err)
 testRoundTripEither encode decode p =
   Right p === (decode . encode) p
 
-instance BLS.BLS curve => Arbitrary (BLS.P curve) where
+instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
   arbitrary = do
     str <- arbitrary
     let bs = BS.pack str
@@ -190,7 +190,7 @@ instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
 
 instance Arbitrary BLS.PT where
-  arbitrary = either (error . show) return =<< BLS.miller_loop <$> arbitrary <*> arbitrary
+  arbitrary = either (error . show) return =<< BLS.millerLoop <$> arbitrary <*> arbitrary
 
 instance Show BLS.PT where
   show = const "<<<PT>>>"
@@ -207,7 +207,7 @@ instance Arbitrary BLS.Scalar where
 instance Show BLS.Scalar where
   show = show . BLS.scalarToBS
 
-instance BLS.BLS curve => Show (BLS.P curve) where
+instance BLS.BLS curve => Show (BLS.Point curve) where
   show = show . BLS.serialize
 
 instance BLS.BLS curve => Show (BLS.Affine curve) where

@@ -4,9 +4,9 @@
 module Cardano.Crypto.EllipticCurve.BLS12_381
 (
   -- * Types
-    P
-  , P1
-  , P2
+    Point
+  , Point1
+  , Point2
   , PT
   , Curve1
   , Curve2
@@ -14,8 +14,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
 
   -- * BLS Class
   , BLS
-  , BLS_P
-  , BLS_Curve
+  , BLSPoint
+  , BLSCurve
 
   -- * Point / Group operations
   -- | These work on both curves, and take phantom parameters of type 'Curve1'
@@ -38,7 +38,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
   , ptFinalVerify
 
   -- * Pairings
-  , miller_loop
+  , millerLoop
 
   -- * The period (modulo) of scalars
   , scalarPeriod
