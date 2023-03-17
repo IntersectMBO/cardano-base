@@ -136,18 +136,18 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , padBS
 
   -- * Point1/G1 operations
-  , inGroup
-  , addOrDouble
-  , mult
-  , cneg
-  , neg
-  , compress
-  , serialize
-  , uncompress
-  , deserialize
-  , hash
-  , generator
-  , isInf
+  , blsInGroup
+  , blsAddOrDouble
+  , blsMult
+  , blsCneg
+  , blsNeg
+  , blsCompress
+  , blsSerialize
+  , blsUncompress
+  , blsDeserialize
+  , blsHash
+  , blsGenerator
+  , blsIsInf
 
   , toAffine
   , fromAffine
@@ -339,7 +339,7 @@ sizePT = fromIntegral c_size_blst_fp12
 ---- Curve operations
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
--- use higher-level wrappers such as 'addOrDouble', 'mult', 'cneg', 'neg', etc.
+-- use higher-level wrappers such as 'blsAddOrDouble', 'blsMult', 'blsCneg', 'blsNeg', etc.
 class BLSCurve curve where
   c_blst_on_curve :: PointPtr curve -> IO Bool
 
@@ -674,12 +674,12 @@ instance Eq Fr where
     (==) <$> scalarFromFr a <*> scalarFromFr b
 
 -- | Check whether a point is in the group corresponding to its elliptic curve
-inGroup :: BLSCurve curve => Point curve -> Bool
-inGroup p = unsafePerformIO $ withPoint p c_blst_in_g
+blsInGroup :: BLSCurve curve => Point curve -> Bool
+blsInGroup p = unsafePerformIO $ withPoint p c_blst_in_g
 
 -- | Curve point addition.
-addOrDouble :: (BLS curve) => Point curve -> Point curve -> Point curve
-addOrDouble in1 in2 = unsafePerformIO $ do
+blsAddOrDouble :: (BLS curve) => Point curve -> Point curve -> Point curve
+blsAddOrDouble in1 in2 = unsafePerformIO $ do
   withNewPoint' $ \outp -> do
     withPoint in1 $ \in1p -> do
       withPoint in2 $ \in2p -> do
@@ -689,8 +689,8 @@ addOrDouble in1 in2 = unsafePerformIO $ do
 -- the range of modular arithmetic by means of a modulo operation over the
 -- 'scalarPeriod'. Negative number will also be brought to the range
 -- [0, 'scalarPeriod' - 1] via modular reduction.
-mult :: (BLS curve) => Point curve -> Integer -> Point curve
-mult in1 inS = unsafePerformIO $ do
+blsMult :: (BLS curve) => Point curve -> Integer -> Point curve
+blsMult in1 inS = unsafePerformIO $ do
   withNewPoint' $ \outp -> do
     withPoint in1 $ \in1p -> do
       withIntScalar inS $ \inSp -> do
@@ -699,20 +699,20 @@ mult in1 inS = unsafePerformIO $ do
         c_blst_mult outp in1p inSp (fromIntegral sizeScalar * 8)
 
 -- | Conditional curve point negation.
--- @cneg x cond = if cond then neg x else x@
-cneg :: (BLS curve) => Point curve -> Bool -> Point curve
-cneg in1 cond = unsafePerformIO $ do
+-- @blsCneg x cond = if cond then neg x else x@
+blsCneg :: (BLS curve) => Point curve -> Bool -> Point curve
+blsCneg in1 cond = unsafePerformIO $ do
   out1 <- clonePoint in1
   withPoint out1 $ \out1p ->
     c_blst_cneg out1p cond
   return out1
 
 -- | Unconditional curve point negation
-neg :: (BLS curve) => Point curve -> Point curve
-neg p = cneg p True
+blsNeg :: (BLS curve) => Point curve -> Point curve
+blsNeg p = blsCneg p True
 
-uncompress :: forall curve. (BLSPoint curve, BLSCurve curve) => ByteString -> Either BLSTError (Point curve)
-uncompress bs = unsafePerformIO $ do
+blsUncompress :: forall curve. (BLSPoint curve, BLSCurve curve) => ByteString -> Either BLSTError (Point curve)
+blsUncompress bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == compressedSizePoint (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_uncompress ap bytes
@@ -720,15 +720,15 @@ uncompress bs = unsafePerformIO $ do
       if err /= 0 then
         return $ Left $ mkBLSTError err
       else
-        if inGroup p then
+        if blsInGroup p then
          return $ Right p
         else
           return $ Left BLST_POINT_NOT_IN_GROUP
     else do
       return $ Left BLST_BAD_ENCODING
 
-deserialize :: forall curve. (BLSPoint curve, BLSCurve curve) => ByteString -> Either BLSTError (Point curve)
-deserialize bs = unsafePerformIO $ do
+blsDeserialize :: forall curve. (BLSPoint curve, BLSCurve curve) => ByteString -> Either BLSTError (Point curve)
+blsDeserialize bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == serializedSizePoint (Proxy @curve) then do
       (err, affine) <- withNewAffine $ \ap -> c_blst_deserialize ap bytes
@@ -736,15 +736,15 @@ deserialize bs = unsafePerformIO $ do
       if err /= 0 then
         return $ Left $ mkBLSTError err
       else
-        if inGroup p then
+        if blsInGroup p then
          return $ Right p
         else
           return $ Left BLST_POINT_NOT_IN_GROUP
     else do
       return $ Left BLST_BAD_ENCODING
 
-compress :: forall curve. (BLSPoint curve, BLSCurve curve) => Point curve -> ByteString
-compress p = BSI.fromForeignPtr0 (castForeignPtr ptr) (compressedSizePoint (Proxy @curve))
+blsCompress :: forall curve. (BLSPoint curve, BLSCurve curve) => Point curve -> ByteString
+blsCompress p = BSI.fromForeignPtr0 (castForeignPtr ptr) (compressedSizePoint (Proxy @curve))
     where
         ptr = unsafePerformIO $ do
           cstr <- mallocForeignPtrBytes (compressedSizePoint (Proxy @curve))
@@ -753,8 +753,8 @@ compress p = BSI.fromForeignPtr0 (castForeignPtr ptr) (compressedSizePoint (Prox
               c_blst_compress cstrp pp
           return cstr
 
-serialize :: forall curve. (BLSPoint curve, BLSCurve curve) => Point curve -> ByteString
-serialize p = BSI.fromForeignPtr0 (castForeignPtr ptr) (serializedSizePoint (Proxy @curve))
+blsSerialize :: forall curve. (BLSPoint curve, BLSCurve curve) => Point curve -> ByteString
+blsSerialize p = BSI.fromForeignPtr0 (castForeignPtr ptr) (serializedSizePoint (Proxy @curve))
     where
         ptr = unsafePerformIO $ do
           cstr <- mallocForeignPtrBytes (serializedSizePoint (Proxy @curve))
@@ -763,11 +763,11 @@ serialize p = BSI.fromForeignPtr0 (castForeignPtr ptr) (serializedSizePoint (Pro
               c_blst_serialize cstrp pp
           return cstr
 
--- | @hash msg mDST mAug@ generates the elliptic curve hash for the given
+-- | @blsHash msg mDST mAug@ generates the elliptic curve blsHash for the given
 -- message @msg@; @mDST@ and @mAug@ are the optional @aug@ and @dst@
 -- arguments.
-hash :: (BLSPoint curve, BLSCurve curve) => ByteString -> Maybe ByteString -> Maybe ByteString -> Point curve
-hash msg mDST mAug = unsafePerformIO $
+blsHash :: (BLSPoint curve, BLSCurve curve) => ByteString -> Maybe ByteString -> Maybe ByteString -> Point curve
+blsHash msg mDST mAug = unsafePerformIO $
   BSU.unsafeUseAsCStringLen msg $ \(msgPtr, msgLen) ->
     withMaybeCStringLen mDST $ \(dstPtr, dstLen) ->
       withMaybeCStringLen mAug $ \(augPtr, augLen) ->
@@ -787,15 +787,15 @@ fromAffine affine = unsafePerformIO $
       c_blst_from_affine pp affinePtr
 
 -- | Infinity check on curve points.
-isInf :: (BLSCurve curve) => Point curve -> Bool
-isInf p = unsafePerformIO $ withPoint p c_blst_p_is_inf
+blsIsInf :: (BLSCurve curve) => Point curve -> Bool
+blsIsInf p = unsafePerformIO $ withPoint p c_blst_p_is_inf
 
 affineInG :: (BLSCurve curve) => Affine curve -> Bool
 affineInG affine = unsafePerformIO $
   withAffine affine c_blst_affine_in_g
 
-generator :: (BLSCurve curve) => Point curve
-generator = unsafePointFromPointPtr c_blst_generator
+blsGenerator :: (BLSCurve curve) => Point curve
+blsGenerator = unsafePointFromPointPtr c_blst_generator
 
 ---- Scalar / Fr operations
 
