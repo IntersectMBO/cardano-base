@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 (
@@ -220,6 +221,10 @@ instance BLS curve => Eq (AffinePtr curve) where
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
 newtype Point curve = Point (ForeignPtr Void)
+
+-- Making sure different 'Point's are not 'Coercible', which would ruin the
+-- intended type safety:
+type role Point nominal
 
 type Point1 = Point Curve1
 type Point2 = Point Curve2
