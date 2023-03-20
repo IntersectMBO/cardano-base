@@ -53,8 +53,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   -- * Curve abstraction
 
   , BLS
-
-  , BLSCurve
       ( c_blst_on_curve
       , c_blst_add_or_double
       , c_blst_mult
@@ -93,7 +91,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , c_blst_bendian_from_scalar
 
   -- * Marshalling functions
-  , BLSPoint
   , sizePoint
   , withPoint
   , withNewPoint
@@ -211,11 +208,11 @@ unsafePointFromPointPtr :: PointPtr curve -> Point curve
 unsafePointFromPointPtr (PointPtr ptr) =
   Point . unsafePerformIO $ newForeignPtr_ ptr
 
-eqAffinePtr :: forall curve. BLSPoint curve => AffinePtr curve -> AffinePtr curve -> IO Bool
+eqAffinePtr :: forall curve. BLS curve => AffinePtr curve -> AffinePtr curve -> IO Bool
 eqAffinePtr (AffinePtr a) (AffinePtr b) =
   (== 0) <$> c_memcmp (castPtr a) (castPtr b) (sizeAffine_ (Proxy @curve))
 
-instance BLSPoint curve => Eq (AffinePtr curve) where
+instance BLS curve => Eq (AffinePtr curve) where
   a == b = unsafePerformIO $ eqAffinePtr a b
 
 ---- Safe Point types / marshalling
@@ -238,50 +235,38 @@ type Affine2 = Affine Curve2
 newtype PT = PT (ForeignPtr Void)
 
 -- | Sizes of various representations of elliptic curve points.
-class BLSPoint curve where
-  sizePoint_ :: Proxy curve -> CSize
-  serializedSizePoint_ :: Proxy curve -> CSize
-  compressedSizePoint_ :: Proxy curve -> CSize
-  sizeAffine_ :: Proxy curve -> CSize
-
-instance BLSPoint curve => Eq (Affine curve) where
-  a == b = unsafePerformIO $
-    withAffine a $ \aptr ->
-      withAffine b $ \bptr ->
-        eqAffinePtr aptr bptr
-
 -- | Size of a curve point in memory
-sizePoint :: forall curve. (BLSPoint curve) => Proxy curve -> Int
+sizePoint :: forall curve. (BLS curve) => Proxy curve -> Int
 sizePoint = fromIntegral . sizePoint_
 
 -- | Size of a curved point when serialized in compressed form
-compressedSizePoint :: forall curve. (BLSPoint curve) => Proxy curve -> Int
+compressedSizePoint :: forall curve. (BLS curve) => Proxy curve -> Int
 compressedSizePoint = fromIntegral . compressedSizePoint_
 
 -- | Size of a curved point when serialized in uncompressed form
-serializedSizePoint :: forall curve. (BLSPoint curve) => Proxy curve -> Int
+serializedSizePoint :: forall curve. (BLS curve) => Proxy curve -> Int
 serializedSizePoint = fromIntegral . serializedSizePoint_
 
 -- | In-memory size of the affine representation of a curve point
-sizeAffine :: forall curve. (BLSPoint curve) => Proxy curve -> Int
+sizeAffine :: forall curve. (BLS curve) => Proxy curve -> Int
 sizeAffine = fromIntegral . sizeAffine_
 
 withPoint :: forall a curve. Point curve -> (PointPtr curve -> IO a) -> IO a
 withPoint (Point p) go = withForeignPtr p (go . PointPtr)
 
-withNewPoint :: forall curve a. (BLSPoint curve) => (PointPtr curve -> IO a) -> IO (a, Point curve)
+withNewPoint :: forall curve a. (BLS curve) => (PointPtr curve -> IO a) -> IO (a, Point curve)
 withNewPoint go = do
   p <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
   x <- withForeignPtr p (go . PointPtr)
   return (x, Point p)
 
-withNewPoint_ :: (BLSPoint curve) => (PointPtr curve -> IO a) -> IO a
+withNewPoint_ :: (BLS curve) => (PointPtr curve -> IO a) -> IO a
 withNewPoint_ = fmap fst . withNewPoint
 
-withNewPoint' :: (BLSPoint curve) => (PointPtr curve -> IO a) -> IO (Point curve)
+withNewPoint' :: (BLS curve) => (PointPtr curve -> IO a) -> IO (Point curve)
 withNewPoint' = fmap snd . withNewPoint
 
-clonePoint :: forall curve. (BLSPoint curve) => Point curve -> IO (Point curve)
+clonePoint :: forall curve. (BLS curve) => Point curve -> IO (Point curve)
 clonePoint (Point a) = do
   b <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
   withForeignPtr a $ \ap ->
@@ -292,16 +277,16 @@ clonePoint (Point a) = do
 withAffine :: forall a curve. Affine curve -> (AffinePtr curve -> IO a) -> IO a
 withAffine (Affine p) go = withForeignPtr p (go . AffinePtr)
 
-withNewAffine :: forall curve a. (BLSPoint curve) => (AffinePtr curve -> IO a) -> IO (a, Affine curve)
+withNewAffine :: forall curve a. (BLS curve) => (AffinePtr curve -> IO a) -> IO (a, Affine curve)
 withNewAffine go = do
   p <- mallocForeignPtrBytes (sizeAffine (Proxy @curve))
   x <- withForeignPtr p (go . AffinePtr)
   return (x, Affine p)
 
-withNewAffine_ :: (BLSPoint curve) => (AffinePtr curve -> IO a) -> IO a
+withNewAffine_ :: (BLS curve) => (AffinePtr curve -> IO a) -> IO a
 withNewAffine_ = fmap fst . withNewAffine
 
-withNewAffine' :: (BLSPoint curve) => (AffinePtr curve -> IO a) -> IO (Affine curve)
+withNewAffine' :: (BLS curve) => (AffinePtr curve -> IO a) -> IO (Affine curve)
 withNewAffine' = fmap snd . withNewAffine
 
 
@@ -320,18 +305,6 @@ withNewPT_ = fmap fst . withNewPT
 withNewPT' :: (PTPtr -> IO a) -> IO PT
 withNewPT' = fmap snd . withNewPT
 
-instance BLSPoint Curve1 where
-  sizePoint_ _ = c_size_blst_p1
-  compressedSizePoint_ _ = 48
-  serializedSizePoint_ _ = 96
-  sizeAffine_ _ = c_size_blst_affine1
-
-instance BLSPoint Curve2 where
-  sizePoint_ _ = c_size_blst_p2
-  compressedSizePoint_ _ = 96
-  serializedSizePoint_ _ = 192
-  sizeAffine_ _ = c_size_blst_affine2
-
 sizePT :: Int
 sizePT = fromIntegral c_size_blst_fp12
 
@@ -340,7 +313,7 @@ sizePT = fromIntegral c_size_blst_fp12
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
 -- use higher-level wrappers such as 'blsAddOrDouble', 'blsMult', 'blsCneg', 'blsNeg', etc.
-class BLSCurve curve where
+class BLS curve where
   c_blst_on_curve :: PointPtr curve -> IO Bool
 
   c_blst_add_or_double :: PointPtr curve -> PointPtr curve -> PointPtr curve -> IO ()
@@ -362,7 +335,12 @@ class BLSCurve curve where
   c_blst_p_is_equal :: PointPtr curve -> PointPtr curve -> IO Bool
   c_blst_p_is_inf :: PointPtr curve -> IO Bool
 
-instance BLSCurve Curve1 where
+  sizePoint_ :: Proxy curve -> CSize
+  serializedSizePoint_ :: Proxy curve -> CSize
+  compressedSizePoint_ :: Proxy curve -> CSize
+  sizeAffine_ :: Proxy curve -> CSize
+
+instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
 
   c_blst_add_or_double = c_blst_p1_add_or_double
@@ -385,7 +363,12 @@ instance BLSCurve Curve1 where
   c_blst_p_is_equal = c_blst_p1_is_equal
   c_blst_p_is_inf = c_blst_p1_is_inf
 
-instance BLSCurve Curve2 where
+  sizePoint_ _ = c_size_blst_p1
+  compressedSizePoint_ _ = 48
+  serializedSizePoint_ _ = 96
+  sizeAffine_ _ = c_size_blst_affine1
+
+instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
 
   c_blst_add_or_double = c_blst_p2_add_or_double
@@ -407,6 +390,17 @@ instance BLSCurve Curve2 where
 
   c_blst_p_is_equal = c_blst_p2_is_equal
   c_blst_p_is_inf = c_blst_p2_is_inf
+
+  sizePoint_ _ = c_size_blst_p2
+  compressedSizePoint_ _ = 96
+  serializedSizePoint_ _ = 192
+  sizeAffine_ _ = c_size_blst_affine2
+
+instance BLS curve => Eq (Affine curve) where
+  a == b = unsafePerformIO $
+    withAffine a $ \aptr ->
+      withAffine b $ \bptr ->
+        eqAffinePtr aptr bptr
 
 ---- Safe Scalar types / marshalling
 
@@ -651,13 +645,6 @@ mkBLSTError e
   | otherwise
   = BLST_UNKNOWN_ERROR
 
--- | This class represents phantom types that can be used as BLS curves.
-class (BLSCurve a, BLSPoint a) => BLS a where
-
-instance BLS Curve1
-
-instance BLS Curve2
-
 ---- Curve point operations
 
 instance BLS curve => Eq (Point curve) where
@@ -674,11 +661,11 @@ instance Eq Fr where
     (==) <$> scalarFromFr a <*> scalarFromFr b
 
 -- | Check whether a point is in the group corresponding to its elliptic curve
-blsInGroup :: BLSCurve curve => Point curve -> Bool
+blsInGroup :: BLS curve => Point curve -> Bool
 blsInGroup p = unsafePerformIO $ withPoint p c_blst_in_g
 
 -- | Curve point addition.
-blsAddOrDouble :: (BLS curve) => Point curve -> Point curve -> Point curve
+blsAddOrDouble :: BLS curve => Point curve -> Point curve -> Point curve
 blsAddOrDouble in1 in2 = unsafePerformIO $ do
   withNewPoint' $ \outp -> do
     withPoint in1 $ \in1p -> do
@@ -689,7 +676,7 @@ blsAddOrDouble in1 in2 = unsafePerformIO $ do
 -- the range of modular arithmetic by means of a modulo operation over the
 -- 'scalarPeriod'. Negative number will also be brought to the range
 -- [0, 'scalarPeriod' - 1] via modular reduction.
-blsMult :: (BLS curve) => Point curve -> Integer -> Point curve
+blsMult :: BLS curve => Point curve -> Integer -> Point curve
 blsMult in1 inS = unsafePerformIO $ do
   withNewPoint' $ \outp -> do
     withPoint in1 $ \in1p -> do
@@ -700,7 +687,7 @@ blsMult in1 inS = unsafePerformIO $ do
 
 -- | Conditional curve point negation.
 -- @blsCneg x cond = if cond then neg x else x@
-blsCneg :: (BLS curve) => Point curve -> Bool -> Point curve
+blsCneg :: BLS curve => Point curve -> Bool -> Point curve
 blsCneg in1 cond = unsafePerformIO $ do
   out1 <- clonePoint in1
   withPoint out1 $ \out1p ->
@@ -708,10 +695,10 @@ blsCneg in1 cond = unsafePerformIO $ do
   return out1
 
 -- | Unconditional curve point negation
-blsNeg :: (BLS curve) => Point curve -> Point curve
+blsNeg :: BLS curve => Point curve -> Point curve
 blsNeg p = blsCneg p True
 
-blsUncompress :: forall curve. (BLSPoint curve, BLSCurve curve) => ByteString -> Either BLSTError (Point curve)
+blsUncompress :: forall curve. BLS curve => ByteString -> Either BLSTError (Point curve)
 blsUncompress bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == compressedSizePoint (Proxy @curve) then do
@@ -727,7 +714,7 @@ blsUncompress bs = unsafePerformIO $ do
     else do
       return $ Left BLST_BAD_ENCODING
 
-blsDeserialize :: forall curve. (BLSPoint curve, BLSCurve curve) => ByteString -> Either BLSTError (Point curve)
+blsDeserialize :: forall curve. BLS curve => ByteString -> Either BLSTError (Point curve)
 blsDeserialize bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == serializedSizePoint (Proxy @curve) then do
@@ -743,7 +730,7 @@ blsDeserialize bs = unsafePerformIO $ do
     else do
       return $ Left BLST_BAD_ENCODING
 
-blsCompress :: forall curve. (BLSPoint curve, BLSCurve curve) => Point curve -> ByteString
+blsCompress :: forall curve. BLS curve => Point curve -> ByteString
 blsCompress p = BSI.fromForeignPtr0 (castForeignPtr ptr) (compressedSizePoint (Proxy @curve))
     where
         ptr = unsafePerformIO $ do
@@ -753,7 +740,7 @@ blsCompress p = BSI.fromForeignPtr0 (castForeignPtr ptr) (compressedSizePoint (P
               c_blst_compress cstrp pp
           return cstr
 
-blsSerialize :: forall curve. (BLSPoint curve, BLSCurve curve) => Point curve -> ByteString
+blsSerialize :: forall curve. BLS curve => Point curve -> ByteString
 blsSerialize p = BSI.fromForeignPtr0 (castForeignPtr ptr) (serializedSizePoint (Proxy @curve))
     where
         ptr = unsafePerformIO $ do
@@ -766,7 +753,7 @@ blsSerialize p = BSI.fromForeignPtr0 (castForeignPtr ptr) (serializedSizePoint (
 -- | @blsHash msg mDST mAug@ generates the elliptic curve blsHash for the given
 -- message @msg@; @mDST@ and @mAug@ are the optional @aug@ and @dst@
 -- arguments.
-blsHash :: (BLSPoint curve, BLSCurve curve) => ByteString -> Maybe ByteString -> Maybe ByteString -> Point curve
+blsHash :: BLS curve => ByteString -> Maybe ByteString -> Maybe ByteString -> Point curve
 blsHash msg mDST mAug = unsafePerformIO $
   BSU.unsafeUseAsCStringLen msg $ \(msgPtr, msgLen) ->
     withMaybeCStringLen mDST $ \(dstPtr, dstLen) ->
@@ -774,27 +761,27 @@ blsHash msg mDST mAug = unsafePerformIO $
         withNewPoint' $ \pPtr ->
           c_blst_hash pPtr msgPtr (fromIntegral msgLen) dstPtr (fromIntegral dstLen) augPtr (fromIntegral augLen)
 
-toAffine :: (BLSPoint curve, BLSCurve curve) => Point curve -> Affine curve
+toAffine :: BLS curve => Point curve -> Affine curve
 toAffine p = unsafePerformIO $
   withPoint p $ \pp ->
     withNewAffine' $ \affinePtr ->
       c_blst_to_affine affinePtr pp
 
-fromAffine :: (BLSPoint curve, BLSCurve curve) => Affine curve -> Point curve
+fromAffine :: BLS curve => Affine curve -> Point curve
 fromAffine affine = unsafePerformIO $
   withAffine affine $ \affinePtr ->
     withNewPoint' $ \pp ->
       c_blst_from_affine pp affinePtr
 
 -- | Infinity check on curve points.
-blsIsInf :: (BLSCurve curve) => Point curve -> Bool
+blsIsInf :: BLS curve => Point curve -> Bool
 blsIsInf p = unsafePerformIO $ withPoint p c_blst_p_is_inf
 
-affineInG :: (BLSCurve curve) => Affine curve -> Bool
+affineInG :: BLS curve => Affine curve -> Bool
 affineInG affine = unsafePerformIO $
   withAffine affine c_blst_affine_in_g
 
-blsGenerator :: (BLSCurve curve) => Point curve
+blsGenerator :: BLS curve => Point curve
 blsGenerator = unsafePointFromPointPtr c_blst_generator
 
 ---- Scalar / Fr operations

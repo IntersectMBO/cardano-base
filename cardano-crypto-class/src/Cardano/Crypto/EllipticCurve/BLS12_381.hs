@@ -1,5 +1,4 @@
 {-#LANGUAGE ScopedTypeVariables #-}
-{-#LANGUAGE TypeApplications #-}
 {-#LANGUAGE FlexibleContexts #-}
 module Cardano.Crypto.EllipticCurve.BLS12_381
 (
@@ -14,8 +13,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381
 
   -- * BLS Class
   , BLS
-  , BLSPoint
-  , BLSCurve
 
   -- * Point / Group operations
   -- | These work on both curves, and take phantom parameters of type 'Curve1'
