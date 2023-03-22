@@ -17,8 +17,6 @@ let
 
     # These programs will be available inside the nix-shell.
     nativeBuildInputs = with buildPackages; with haskellPackages; [
-      cabal-install
-      ghcid
       gitAndTools.git
       hlint
       weeder
@@ -29,6 +27,8 @@ let
     ];
 
     tools = {
+      cabal = "3.10.1.0";
+      ghcid = "0.8.8";
       haskell-language-server = "latest";
     };
 
