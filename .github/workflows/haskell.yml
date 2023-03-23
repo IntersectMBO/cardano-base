@@ -34,8 +34,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.7"]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # ghc: ["9.2.4", "9.2.5", "9.2.6", "9.2.7"]
+        ghc: ["9.4.4"]
+        os: [windows-latest]
 
     env:
       # Modify this value to "invalidate" the cabal cache.
@@ -162,8 +163,8 @@ jobs:
         path: |
           dist-newstyle/**/*.log
 
-    # - name: Run benchmarks
-    #   run: cabal bench all --enable-tests
+    - name: Run benchmarks
+      run: cabal bench all --enable-tests
 
     # Uncomment the following back in for debugging. Remember to launch a `pwsh` from
     # the tmux session to debug `pwsh` issues. And be reminded that the `/msys2` and
@@ -177,6 +178,7 @@ jobs:
     # and will silently fail if msys2 is not in path. See the "Run tests" step.
     #
     # - name: Setup tmate session
+    #   if: always()
     #   uses: mxschmitt/action-tmate@v3
     #   with:
     #     limit-access-to-actor: true
