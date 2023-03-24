@@ -95,7 +95,7 @@ library
     , base
     , base16-bytestring  >=1
     , bytestring >= 0.11
-    , cardano-binary
+    , cardano-binary >= 1.6
     , cardano-strict-containers
     , cryptonite
     , deepseq
