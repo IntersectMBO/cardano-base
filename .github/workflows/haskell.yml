@@ -170,7 +170,7 @@ jobs:
         MSYSTEM: MINGW64
       run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${env:GITHUB_WORKSPACE}/blst-sources/blst
 
-  - name: Run tests [non-WIN]
+    - name: Run tests [non-WIN]
       run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${GITHUB_WORKSPACE}/blst-sources/blst
 
     - uses: actions/upload-artifact@v3
