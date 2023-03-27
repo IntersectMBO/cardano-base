@@ -4,7 +4,10 @@
     std.url = github:divnix/std;
     tullia = {
       url = github:input-output-hk/tullia;
-      inputs.std.follows = "std";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        std.follows = "std";
+      };
     };
   };
 
