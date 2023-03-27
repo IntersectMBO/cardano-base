@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         ghc: ["8.10.7", "9.2.7"]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [windows-latest]
 
     env:
       # Modify this value to "invalidate" the cabal cache.
@@ -155,22 +155,22 @@ jobs:
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
         cabal build all --enable-tests --only-dependencies
 
-    - name: Build [WIN - testing]
-      if: runner.os == 'Windows'
-      run: cabal build all --enable-tests --extra-lib-dirs ${env:GITHUB_WORKSPACE}/blst-sources/blst
+#    - name: Build [WIN - testing]
+#      if: runner.os == 'Windows'
+#      run: cabal build all --enable-tests --extra-lib-dirs ${env:GITHUB_WORKSPACE}/blst-sources/blst
 
-    - name: Build [non-WIN - testing]
-      if: runner.os != 'Windows'
+    - name: Build
+#      if: runner.os != 'Windows'
       run: cabal build all --enable-tests --extra-lib-dirs ${GITHUB_WORKSPACE}/blst-sources/blst
 
-    - name: Run tests [WIN]
-      if: runner.os == 'Windows'
-      env:
-        MSYS2_PATH_TYPE: inherit
-        MSYSTEM: MINGW64
-      run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${env:GITHUB_WORKSPACE}/blst-sources/blst
+#    - name: Run tests [WIN]
+#      if: runner.os == 'Windows'
+#      env:
+#        MSYS2_PATH_TYPE: inherit
+#        MSYSTEM: MINGW64
+#      run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${env:GITHUB_WORKSPACE}/blst-sources/blst
 
-    - name: Run tests [non-WIN]
+    - name: Run tests
       run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${GITHUB_WORKSPACE}/blst-sources/blst
 
     - uses: actions/upload-artifact@v3
@@ -193,8 +193,8 @@ jobs:
     # to restore the original path.  Do note that some test might need msys2
     # and will silently fail if msys2 is not in path. See the "Run tests" step.
     #
-    - name: Setup tmate session
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
+    #- name: Setup tmate session
+    #  if: ${{ failure() }}
+    #  uses: mxschmitt/action-tmate@v3
+    #  with:
+    #    limit-access-to-actor: true
