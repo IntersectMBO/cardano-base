@@ -161,7 +161,7 @@ jobs:
 
     - name: Build
 #      if: runner.os != 'Windows'
-      run: cabal build all --enable-tests --extra-lib-dirs ${GITHUB_WORKSPACE}/blst-sources/blst
+      run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs "$(cygpath -u "${env:GITHUB_WORKSPACE}")/blst-sources/blst"
 
 #    - name: Run tests [WIN]
 #      if: runner.os == 'Windows'
