@@ -161,7 +161,11 @@ jobs:
 
     - name: Build
 #      if: runner.os != 'Windows'
-      run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs "$(cygpath -u "${env:GITHUB_WORKSPACE}")/blst-sources/blst"
+      run: |
+        echo ${env:GITHUB_WORKSPACE}
+        echo ${GITHUB_WORKSPACE}
+        echo $(cygpath -u "${env:GITHUB_WORKSPACE}")
+        cabal build all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs "${env:GITHUB_WORKSPACE}/blst-sources/blst"
 
 #    - name: Run tests [WIN]
 #      if: runner.os == 'Windows'
@@ -171,7 +175,7 @@ jobs:
 #      run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${env:GITHUB_WORKSPACE}/blst-sources/blst
 
     - name: Run tests
-      run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${GITHUB_WORKSPACE}/blst-sources/blst
+      run: cabal test all --enable-tests --test-show-details=direct -j1 -v3 --extra-lib-dirs ${env:GITHUB_WORKSPACE}/blst-sources/blst
 
     - uses: actions/upload-artifact@v3
       with:
@@ -193,8 +197,8 @@ jobs:
     # to restore the original path.  Do note that some test might need msys2
     # and will silently fail if msys2 is not in path. See the "Run tests" step.
     #
-    #- name: Setup tmate session
-    #  if: ${{ failure() }}
-    #  uses: mxschmitt/action-tmate@v3
-    #  with:
-    #    limit-access-to-actor: true
+    - name: Setup tmate session
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: true
