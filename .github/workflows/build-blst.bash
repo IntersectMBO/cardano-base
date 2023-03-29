@@ -7,5 +7,4 @@ git clone https://github.com/supranational/blst
 cd blst
 git reset --hard $BLST_REF
 ./build.sh
-echo $PWD
 cd ../..
