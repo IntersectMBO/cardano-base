@@ -42,7 +42,7 @@ let
         # otherwise choose. Unfortunately, this means that we also override any other
         # pkgconfig libraries that haskell.nix would pick for us. So we also need to
         # manually include those here.
-        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ pkgs.libsodium-vrf pkgs.secp256k1 ]];
+        packages.cardano-crypto-class.components.library.pkgconfig = lib.mkForce [[ pkgs.libsodium-vrf pkgs.secp256k1 pkgs.blst ]];
         packages.cardano-crypto-praos.components.library.pkgconfig = lib.mkForce [[ pkgs.libsodium-vrf ]];
         packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
         enableLibraryProfiling = profiling;
