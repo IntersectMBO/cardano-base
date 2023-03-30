@@ -40,6 +40,7 @@ library
   hs-source-dirs:       src
 
   exposed-modules:      Test.Crypto.DSIGN
+                        Test.Crypto.EllipticCurve
                         Test.Crypto.Hash
                         Test.Crypto.KES
                         Test.Crypto.Util
@@ -71,8 +72,11 @@ library
                       , tasty
                       , tasty-hunit
                       , tasty-quickcheck
+                      , tasty-hunit
                       , criterion
                       , base16-bytestring
+
+  extra-libraries: blst
 
   if flag(secp256k1-support)
     cpp-options: -DSECP256K1_ENABLED
@@ -89,6 +93,7 @@ test-suite test-crypto
                       , tasty-quickcheck
 
   ghc-options:          -threaded -rtsopts -with-rtsopts=-N
+  extra-libraries: blst
 
 benchmark bench-crypto
   import:               base, project-config
@@ -101,3 +106,4 @@ benchmark bench-crypto
                       , criterion
 
   ghc-options:          -threaded
+  extra-libraries: blst

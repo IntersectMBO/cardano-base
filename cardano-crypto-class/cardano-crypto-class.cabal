@@ -19,6 +19,8 @@ category:           Currency
 build-type:         Simple
 extra-source-files: README.md
                     CHANGELOG.md
+extra-source-files:  cbits/blst.h
+                  ,  cbits/blst_aux.h
 
 flag secp256k1-support
     description: Enable support for functions from libsecp256k1. Requires
@@ -45,6 +47,8 @@ library
     Cardano.Crypto.DSIGN.Ed448
     Cardano.Crypto.DSIGN.Mock
     Cardano.Crypto.DSIGN.NeverUsed
+    Cardano.Crypto.EllipticCurve.BLS12_381
+    Cardano.Crypto.EllipticCurve.BLS12_381.Internal
     Cardano.Crypto.Hash
     Cardano.Crypto.Hash.Blake2b
     Cardano.Crypto.Hash.Class
@@ -90,7 +94,7 @@ library
     , aeson
     , base
     , base16-bytestring  >=1
-    , bytestring
+    , bytestring >= 0.11
     , cardano-binary >= 1.6
     , cardano-strict-containers
     , cryptonite
@@ -120,6 +124,9 @@ library
       Cardano.Crypto.SECP256K1.C
     pkgconfig-depends: libsecp256k1 -any
     cpp-options: -DSECP256K1_ENABLED
+
+  extra-libraries: blst
+  c-sources: cbits/blst_util.c
 
 test-suite test-memory-example
   import:         base, project-config
