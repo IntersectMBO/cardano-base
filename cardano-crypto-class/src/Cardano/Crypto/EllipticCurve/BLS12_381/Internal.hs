@@ -863,9 +863,9 @@ instance Eq PT where
 
 ---- Pairings
 
-millerLoop :: Point1 -> Point2 -> Either BLSTError PT
+millerLoop :: Point1 -> Point2 -> PT
 millerLoop p1 p2 =
-  Right . unsafePerformIO $
+  unsafePerformIO $
     withAffine (toAffine p1) $ \ap1 ->
       withAffine (toAffine p2) $ \ap2 ->
         withNewPT' $ \ppt ->

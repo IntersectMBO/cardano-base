@@ -132,32 +132,11 @@ testPairing name =
         pairingCheck
           (BLS.blsMult p (a * b), q)
           (BLS.blsMult p a, BLS.blsMult q b)
-    , testProperty "three pairings"
-        (\a b p q ->
-            either (const False) id $ do
-                t1 <- BLS.millerLoop (BLS.blsMult p a) q
-                t2 <- BLS.millerLoop p (BLS.blsMult q b)
-                t3 <- BLS.millerLoop (BLS.blsMult p (a + b)) q
-                let tt = BLS.ptMult t1 t2
-                return $ BLS.ptFinalVerify tt t3
-        )
-    , testProperty "four pairings"
-            (\a1 a2 a3 b ->
-                either (const False) id $ do
-                    t1 <- BLS.millerLoop a1 b
-                    t2 <- BLS.millerLoop a2 b
-                    t3 <- BLS.millerLoop a3 b
-                    t4 <- BLS.millerLoop (BLS.blsAddOrDouble (BLS.blsAddOrDouble a1 a2) a3) b
-                    let tt = BLS.ptMult (BLS.ptMult t1 t2) t3
-                    return $ BLS.ptFinalVerify tt t4
-            )
+    , testProperty "three pairings" prop_threePairings
+    , testProperty "four pairings" prop_fourPairings
     ]
     where
-      pairingCheck (a, b) (c, d) =
-        either (error . show) id $ do
-          p <- BLS.millerLoop a b
-          q <- BLS.millerLoop c d
-          return $ BLS.ptFinalVerify p q
+      pairingCheck (a, b) (c, d) = BLS.ptFinalVerify (BLS.millerLoop a b) (BLS.millerLoop c d)
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =
@@ -180,6 +159,23 @@ testRoundTripEither :: forall p a err. (Show p, Show err, Eq p, Eq err)
 testRoundTripEither encode decode p =
   Right p === (decode . encode) p
 
+prop_threePairings :: Integer -> Integer -> BLS.Point1 -> BLS.Point2 -> Bool
+prop_threePairings a b p q = BLS.ptFinalVerify tt t3
+  where
+    t1 = BLS.millerLoop (BLS.blsMult p a) q
+    t2 = BLS.millerLoop p (BLS.blsMult q b)
+    t3 = BLS.millerLoop (BLS.blsMult p (a + b)) q
+    tt = BLS.ptMult t1 t2
+
+prop_fourPairings :: BLS.Point1 -> BLS.Point1 -> BLS.Point1 -> BLS.Point2 -> Bool
+prop_fourPairings a1 a2 a3 b = BLS.ptFinalVerify tt t4
+  where
+    t1 = BLS.millerLoop a1 b
+    t2 = BLS.millerLoop a2 b
+    t3 = BLS.millerLoop a3 b
+    t4 = BLS.millerLoop (BLS.blsAddOrDouble (BLS.blsAddOrDouble a1 a2) a3) b
+    tt = BLS.ptMult (BLS.ptMult t1 t2) t3
+
 instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
   arbitrary = do
     str <- arbitrary
@@ -190,7 +186,7 @@ instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
 
 instance Arbitrary BLS.PT where
-  arbitrary = either (error . show) return =<< BLS.millerLoop <$> arbitrary <*> arbitrary
+  arbitrary = BLS.millerLoop <$> arbitrary <*> arbitrary
 
 instance Show BLS.PT where
   show = const "<<<PT>>>"
