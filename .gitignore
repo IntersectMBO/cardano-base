@@ -37,6 +37,8 @@ stack-local.yaml
 
 # Test artefacts
 /result-*
+cardano-crypto-class/output
+cardano-crypto-praos/output
 
 # ghcid
 **/.ghcid
