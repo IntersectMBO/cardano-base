@@ -23,7 +23,7 @@ where
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Codec.Serialise (Serialise (..))
 import Control.DeepSeq (NFData (rnf))
-import Data.Aeson (FromJSON, ToJSON (..), Value (String))
+import Data.Aeson (FromJSON (..), ToJSON (..), Value (String))
 import Data.Typeable (Typeable)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
@@ -78,6 +78,11 @@ instance ToJSON a => ToJSON (WithOrigin a) where
   toJSON = \case
     Origin -> String "origin"
     At n -> toJSON n
+
+instance FromJSON a => FromJSON (WithOrigin a) where
+  parseJSON = \case
+    String "origin" -> pure Origin
+    value -> At <$> parseJSON value
 
 at :: t -> WithOrigin t
 at = At
