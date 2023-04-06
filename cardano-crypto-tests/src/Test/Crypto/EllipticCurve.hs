@@ -23,6 +23,7 @@ import Data.Proxy (Proxy (..))
 import qualified Data.ByteString as BS
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Bits (shiftL)
+import Data.List (foldl', genericReplicate)
 
 tests :: TestTree
 tests =
@@ -89,6 +90,7 @@ testBLSCurve name _ =
 
     , testProperty "self-equality" (\(a :: BLS.Point curve) -> a === a)
     , testProperty "double negation" (\(a :: BLS.Point curve) -> a === BLS.blsNeg (BLS.blsNeg a))
+    , testProperty "adding infinity yields equality" (\(a :: BLS.Point curve) -> BLS.blsAddOrDouble a (BLS.blsZero @curve) === a)
     , testProperty "addition associative" (testAssoc (BLS.blsAddOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
     , testProperty "addition commutative" (testCommut (BLS.blsAddOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
     , testProperty "adding negation yields infinity" (testAddNegYieldsInf @curve)
@@ -100,6 +102,19 @@ testBLSCurve name _ =
         BLS.blsIsInf (BLS.blsMult a BLS.scalarPeriod)
     , testProperty "mult by p+1 is identity" $ \(a :: BLS.Point curve) ->
         BLS.blsMult a (BLS.scalarPeriod + 1) === a
+    , testProperty "scalar mult associative" $ \(a :: BLS.Point curve) (b :: Integer) (c :: Integer) ->
+        BLS.blsMult (BLS.blsMult a b) c === BLS.blsMult (BLS.blsMult a c) b
+    , testProperty "scalar mult distributive left" $ \(a :: BLS.Point curve) (b :: Integer) (c :: Integer) ->
+        BLS.blsMult a (b + c) === BLS.blsAddOrDouble (BLS.blsMult a b) (BLS.blsMult a c)
+    , testProperty "scalar mult distributive right" $ \ (a :: BLS.Point curve) (b :: BLS.Point curve) (c :: Integer) ->
+        BLS.blsMult (BLS.blsAddOrDouble a b) c === BLS.blsAddOrDouble (BLS.blsMult a c) (BLS.blsMult b c)
+    , testProperty "mult by zero is inf" $ \(a :: BLS.Point curve) ->
+        BLS.blsIsInf (BLS.blsMult a 0)
+    , testProperty "mult by -1 is equal to neg" $ \(a :: BLS.Point curve) ->
+        BLS.blsMult a (-1)  === BLS.blsNeg a
+    , testProperty "modular multiplication" $ \(a :: Integer) (b :: Integer) (p :: BLS.Point curve) ->
+        BLS.blsMult p a === BLS.blsMult p (a + b * BLS.scalarPeriod)
+    , testProperty "repeated addition" (prop_repeatedAddition @curve)
     ]
 
 testPT :: String -> TestTree
@@ -145,6 +160,16 @@ testAssoc f a b c =
 testCommut :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> Property
 testCommut f a b =
   f a b === f b a
+
+prop_repeatedAddition :: forall curve. BLS.BLS curve => Integer -> BLS.Point curve -> Property
+prop_repeatedAddition a p = BLS.blsMult p red_a === repeatedAdd red_a p
+    where
+    red_a = mod a 1000
+    repeatedAdd :: Integer -> BLS.Point curve -> BLS.Point curve
+    repeatedAdd scalar point =
+         if scalar >= 0
+         then foldl' BLS.blsAddOrDouble BLS.blsZero $ genericReplicate scalar point
+         else repeatedAdd (-scalar) (BLS.blsNeg point)
 
 testAddNegYieldsInf :: forall curve. BLS.BLS curve
         => BLS.Point curve -> Bool
