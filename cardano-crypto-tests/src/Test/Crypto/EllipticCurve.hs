@@ -149,6 +149,7 @@ testPairing name =
           (BLS.blsMult p a, BLS.blsMult q b)
     , testProperty "three pairings" prop_threePairings
     , testProperty "four pairings" prop_fourPairings
+    , testProperty "finalVerify fails on random inputs" prop_randomFailsFinalVerify
     ]
     where
       pairingCheck (a, b) (c, d) = BLS.ptFinalVerify (BLS.millerLoop a b) (BLS.millerLoop c d)
@@ -200,6 +201,11 @@ prop_fourPairings a1 a2 a3 b = BLS.ptFinalVerify tt t4
     t3 = BLS.millerLoop a3 b
     t4 = BLS.millerLoop (BLS.blsAddOrDouble (BLS.blsAddOrDouble a1 a2) a3) b
     tt = BLS.ptMult (BLS.ptMult t1 t2) t3
+
+prop_randomFailsFinalVerify :: BLS.Point1 -> BLS.Point1 -> BLS.Point2 -> BLS.Point2 -> Property
+prop_randomFailsFinalVerify a b c d =
+    a /= b && c /= d ==>
+    BLS.ptFinalVerify (BLS.millerLoop a c) (BLS.millerLoop b d) === False
 
 instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
   arbitrary = do
