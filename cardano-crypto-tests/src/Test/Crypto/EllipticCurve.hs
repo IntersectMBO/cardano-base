@@ -23,7 +23,7 @@ import Data.Proxy (Proxy (..))
 import qualified Data.ByteString as BS
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Bits (shiftL)
-import Data.List (foldl', genericReplicate)
+import Data.List (foldl')
 
 tests :: TestTree
 tests =
@@ -115,6 +115,7 @@ testBLSCurve name _ =
     , testProperty "modular multiplication" $ \(a :: Integer) (b :: Integer) (p :: BLS.Point curve) ->
         BLS.blsMult p a === BLS.blsMult p (a + b * BLS.scalarPeriod)
     , testProperty "repeated addition" (prop_repeatedAddition @curve)
+    , testCase "zero is inf" $ assertBool "Zero is at infinity" (BLS.blsIsInf (BLS.blsZero @curve))
     ]
 
 testPT :: String -> TestTree
@@ -162,15 +163,12 @@ testCommut :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> Property
 testCommut f a b =
   f a b === f b a
 
-prop_repeatedAddition :: forall curve. BLS.BLS curve => Integer -> BLS.Point curve -> Property
-prop_repeatedAddition a p = BLS.blsMult p red_a === repeatedAdd red_a p
+prop_repeatedAddition :: forall curve. BLS.BLS curve => Int -> BLS.Point curve -> Property
+prop_repeatedAddition a p = BLS.blsMult p (fromIntegral a) === repeatedAdd a p
     where
-    red_a = mod a 1000
-    repeatedAdd :: Integer -> BLS.Point curve -> BLS.Point curve
+    repeatedAdd :: Int -> BLS.Point curve -> BLS.Point curve
     repeatedAdd scalar point =
-         if scalar >= 0
-         then foldl' BLS.blsAddOrDouble BLS.blsZero $ genericReplicate scalar point
-         else repeatedAdd (-scalar) (BLS.blsNeg point)
+         foldl' BLS.blsAddOrDouble BLS.blsZero $ replicate (abs scalar) (BLS.blsCneg point (scalar < 0))
 
 testAddNegYieldsInf :: forall curve. BLS.BLS curve
         => BLS.Point curve -> Bool

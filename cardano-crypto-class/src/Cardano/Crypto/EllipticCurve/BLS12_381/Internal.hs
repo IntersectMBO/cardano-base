@@ -790,13 +790,15 @@ affineInG affine = unsafePerformIO $
 blsGenerator :: BLS curve => Point curve
 blsGenerator = unsafePointFromPointPtr c_blst_generator
 
-blsZero :: forall curve. (BLS curve) => Point curve
+blsZero :: forall curve. BLS curve => Point curve
 blsZero =
-    let b = BS.pack (0xc0 : replicate ((compressedSizePoint (Proxy @curve)) - 1) 0x00) -- Compressed serialised G1 points are bytestrings of length 48: see CIP-0381.
-    in case blsUncompress b of
-        Left err       -> error $ "Unexpected failure deserialising point at infinity on BLS12_381.G1:  " ++ show err
-        Right infinity -> infinity  -- The zero point on this curve is chosen to be the point at infinity.
-
+  -- Compressed serialised G1 points are bytestrings of length 48: see CIP-0381.
+  let b = BS.pack (0xc0 : replicate (compressedSizePoint (Proxy @curve) - 1) 0x00)
+   in case blsUncompress b of
+        Left err       ->
+          error $ "Unexpected failure deserialising point at infinity on BLS12_381.G1: " ++ show err
+        Right infinity ->
+          infinity  -- The zero point on this curve is chosen to be the point at infinity.
 ---- Scalar / Fr operations
 
 scalarFromFr :: Fr -> IO Scalar
