@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
@@ -13,7 +14,11 @@ import Test.QuickCheck (
     (===),
     (==>),
     Arbitrary(..),
+    Gen,
     Property,
+    choose,
+    chooseAny,
+    oneof,
     suchThatMap,
   )
 import Test.Tasty (TestTree, testGroup)
@@ -102,17 +107,17 @@ testBLSCurve name _ =
         BLS.blsIsInf (BLS.blsMult a BLS.scalarPeriod)
     , testProperty "mult by p+1 is identity" $ \(a :: BLS.Point curve) ->
         BLS.blsMult a (BLS.scalarPeriod + 1) === a
-    , testProperty "scalar mult associative" $ \(a :: BLS.Point curve) (b :: Integer) (c :: Integer) ->
+    , testProperty "scalar mult associative" $ \(a :: BLS.Point curve) (b :: genBetterInteger) (c :: genBetterInteger) ->
         BLS.blsMult (BLS.blsMult a b) c === BLS.blsMult (BLS.blsMult a c) b
-    , testProperty "scalar mult distributive left" $ \(a :: BLS.Point curve) (b :: Integer) (c :: Integer) ->
+    , testProperty "scalar mult distributive left" $ \(a :: BLS.Point curve) (b :: genBetterInteger) (c :: genBetterInteger) ->
         BLS.blsMult a (b + c) === BLS.blsAddOrDouble (BLS.blsMult a b) (BLS.blsMult a c)
-    , testProperty "scalar mult distributive right" $ \ (a :: BLS.Point curve) (b :: BLS.Point curve) (c :: Integer) ->
+    , testProperty "scalar mult distributive right" $ \ (a :: BLS.Point curve) (b :: BLS.Point curve) (c :: genBetterInteger) ->
         BLS.blsMult (BLS.blsAddOrDouble a b) c === BLS.blsAddOrDouble (BLS.blsMult a c) (BLS.blsMult b c)
     , testProperty "mult by zero is inf" $ \(a :: BLS.Point curve) ->
         BLS.blsIsInf (BLS.blsMult a 0)
     , testProperty "mult by -1 is equal to neg" $ \(a :: BLS.Point curve) ->
         BLS.blsMult a (-1)  === BLS.blsNeg a
-    , testProperty "modular multiplication" $ \(a :: Integer) (b :: Integer) (p :: BLS.Point curve) ->
+    , testProperty "modular multiplication" $ \(a :: genBetterInteger) (b :: genBetterInteger) (p :: BLS.Point curve) ->
         BLS.blsMult p a === BLS.blsMult p (a + b * BLS.scalarPeriod)
     , testProperty "repeated addition" (prop_repeatedAddition @curve)
     , testCase "zero is inf" $ assertBool "Zero is at infinity" (BLS.blsIsInf (BLS.blsZero @curve))
@@ -204,6 +209,9 @@ prop_randomFailsFinalVerify :: BLS.Point1 -> BLS.Point1 -> BLS.Point2 -> BLS.Poi
 prop_randomFailsFinalVerify a b c d =
     a /= b && c /= d ==>
     BLS.ptFinalVerify (BLS.millerLoop a c) (BLS.millerLoop b d) === False
+
+genBetterInteger :: Gen Integer
+genBetterInteger = oneof [arbitrary, chooseAny, choose (-2^128, 2^128)]
 
 instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
   arbitrary = do
