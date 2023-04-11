@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
@@ -211,7 +210,7 @@ prop_randomFailsFinalVerify a b c d =
     BLS.ptFinalVerify (BLS.millerLoop a c) (BLS.millerLoop b d) === False
 
 genBetterInteger :: Gen Integer
-genBetterInteger = oneof [arbitrary, chooseAny, choose (-2^128, 2^128)]
+genBetterInteger = oneof [arbitrary, chooseAny, choose (-2^(128 :: Integer), 2^(128 :: Integer))]
 
 instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
   arbitrary = do
