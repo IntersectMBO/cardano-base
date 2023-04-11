@@ -13,7 +13,6 @@ import Test.QuickCheck (
     (===),
     (==>),
     Arbitrary(..),
-    Gen,
     Property,
     choose,
     chooseAny,
