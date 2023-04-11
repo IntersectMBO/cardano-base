@@ -209,8 +209,10 @@ prop_randomFailsFinalVerify a b c d =
     a /= b && c /= d ==>
     BLS.ptFinalVerify (BLS.millerLoop a c) (BLS.millerLoop b d) === False
 
-genBetterInteger :: Gen Integer
-genBetterInteger = oneof [arbitrary, chooseAny, choose (-2^(128 :: Integer), 2^(128 :: Integer))]
+newtype BigInteger = BigInteger Integer
+  deriving (Eq, Show)
+instance Arbitrary BigInteger where
+  arbitrary = BigInteger <$> oneof [arbitrary, chooseAny, choose (- 2 ^ (128 :: Int), 2 ^ (128 ::Int))]
 
 instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
   arbitrary = do
