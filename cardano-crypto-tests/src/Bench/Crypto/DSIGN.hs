@@ -1,9 +1,10 @@
-{-#LANGUAGE TypeApplications #-}
-{-#LANGUAGE ScopedTypeVariables #-}
-{-#LANGUAGE TypeFamilies #-}
-{-#LANGUAGE FlexibleContexts #-}
-{-#LANGUAGE MultiParamTypeClasses #-}
-{-#LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Bench.Crypto.DSIGN
   ( benchmarks
   ) where
@@ -15,9 +16,11 @@ import Control.DeepSeq
 
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.DSIGN.Ed25519
+#ifdef SECP256K1_ENABLED
 import Cardano.Crypto.DSIGN.EcdsaSecp256k1
 import Cardano.Crypto.DSIGN.SchnorrSecp256k1
 import Cardano.Crypto.Hash.Blake2b
+#endif
 
 import Criterion
 
@@ -27,8 +30,10 @@ import Bench.Crypto.BenchData
 benchmarks :: Benchmark
 benchmarks = bgroup "DSIGN"
   [ benchDSIGN (Proxy :: Proxy Ed25519DSIGN) "Ed25519"
+#ifdef SECP256K1_ENABLED
   , benchDSIGN (Proxy :: Proxy EcdsaSecp256k1DSIGN) "EcdsaSecp256k1"
   , benchDSIGN (Proxy :: Proxy SchnorrSecp256k1DSIGN) "SchnorrSecp256k1"
+#endif
   ]
 
 benchDSIGN :: forall v a
@@ -70,9 +75,10 @@ class ExampleSignable v a | v -> a where
 instance ExampleSignable Ed25519DSIGN ByteString where
   exampleSignable _ = typicalMsg
 
+#ifdef SECP256K1_ENABLED
 instance ExampleSignable EcdsaSecp256k1DSIGN MessageHash where
   exampleSignable _ = hashAndPack (Proxy @Blake2b_256) typicalMsg
 
 instance ExampleSignable SchnorrSecp256k1DSIGN ByteString where
   exampleSignable _ = typicalMsg
-
+#endif

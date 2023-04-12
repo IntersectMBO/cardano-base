@@ -1,12 +1,18 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoStarIsType #-}
 
 -- | A key evolving signatures implementation.
 --
@@ -56,6 +62,12 @@
 -- so we split up the verification into two parts: verifying a signature
 -- against its embedded VerKey, and comparing that VerKey against the
 -- externally supplied target key.
+--
+-- NOTE - some functions in this module have been deliberately marked NOINLINE;
+-- this is necessary to avoid an edge case in GHC that causes the simplifier to
+-- go haywire, leading to a @Simplifier ticks exhausted@ error and very long
+-- compilation times. Worse yet, this error will only appear when compiling
+-- code that depends on this module, not when compiling the module itself.
 module Cardano.Crypto.KES.CompactSum (
     CompactSumKES
   , VerKeyKES (..)
@@ -77,17 +89,22 @@ import           Data.Proxy (Proxy(..))
 import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
 import           Control.Monad (guard)
-import           NoThunks.Class (NoThunks)
+import           NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
-import           Cardano.Crypto.Seed
-import           Cardano.Crypto.Util
 import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.CompactSingle (CompactSingleKES)
-import           Control.DeepSeq (NFData)
-
+import           Cardano.Crypto.Util
+import           Cardano.Crypto.MLockedSeed
+import qualified Cardano.Crypto.MonadSodium as NaCl
+import           Control.Monad.Class.MonadST (MonadST)
+import           Control.Monad.Class.MonadThrow (MonadThrow)
+import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
+import           Control.Monad.Trans (lift)
+import           Control.DeepSeq (NFData (..))
+import           GHC.TypeLits (KnownNat, type (+), type (*))
 
 -- | A 2^0 period KES
 type CompactSum0KES d   = CompactSingleKES d
@@ -129,8 +146,17 @@ instance (NFData (SigKES d), NFData (VerKeyKES d)) =>
 
 instance (NFData (SignKeyKES d), NFData (VerKeyKES d)) =>
   NFData (SignKeyKES (CompactSumKES h d)) where
+    rnf (SignKeyCompactSumKES sk r vk1 vk2) =
+      rnf (sk, r, vk1, vk2)
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h)
+instance ( OptimizedKESAlgorithm d
+         , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
+         , SizeHash h ~ SeedSizeKES d -- can be relaxed
+         , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         )
       => KESAlgorithm (CompactSumKES h d) where
 
     type SeedSizeKES (CompactSumKES h d) = SeedSizeKES d
@@ -149,15 +175,6 @@ instance (OptimizedKESAlgorithm d, HashAlgorithm h)
         deriving Generic
         deriving newtype NFData
 
-    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
-    --
-    data SignKeyKES (CompactSumKES h d) =
-           SignKeyCompactSumKES !(SignKeyKES d)
-                         !Seed
-                         !(VerKeyKES d)
-                         !(VerKeyKES d)
-        deriving Generic
-
     -- | Figure 3 gives: @(sigma, vk_0, vk_1)@ - however, we store only the
     -- \"off-side\" VK in the branch, and calculate the \"on-side\" one from
     -- the leaf VK (stored in the leaf node, see 'CompactSingleKES') and the
@@ -165,7 +182,7 @@ instance (OptimizedKESAlgorithm d, HashAlgorithm h)
     --
     data SigKES (CompactSumKES h d) =
            SigCompactSumKES !(SigKES d) -- includes VerKeys for the Merkle subpath
-                     !(VerKeyKES d)
+                            !(VerKeyKES d)
         deriving Generic
 
 
@@ -174,9 +191,6 @@ instance (OptimizedKESAlgorithm d, HashAlgorithm h)
     --
 
     algorithmNameKES _ = mungeName (algorithmNameKES (Proxy :: Proxy d))
-
-    deriveVerKeyKES (SignKeyCompactSumKES _ _ vk_0 vk_1) =
-        VerKeyCompactSumKES (hashPairOfVKeys (vk_0, vk_1))
 
     -- The verification key in this scheme is actually a hash already
     -- however the type of hashVerKeyKES says the caller gets to choose
@@ -193,67 +207,22 @@ instance (OptimizedKESAlgorithm d, HashAlgorithm h)
     type Signable   (CompactSumKES h d) = Signable   d
     type ContextKES (CompactSumKES h d) = ContextKES d
 
-    signKES ctxt t a (SignKeyCompactSumKES sk _r_1 vk_0 vk_1) =
-        SigCompactSumKES sigma vk_other
-      where
-        (sigma, vk_other)
-          | t < _T    = (signKES ctxt  t       a sk, vk_1)
-          | otherwise = (signKES ctxt (t - _T) a sk, vk_0)
-
-        _T = totalPeriodsKES (Proxy :: Proxy d)
-
     verifyKES = verifyOptimizedKES
 
-    updateKES ctx (SignKeyCompactSumKES sk r_1 vk_0 vk_1) t
-      | t+1 <  _T = do sk' <- updateKES ctx sk t
-                       return $ SignKeyCompactSumKES sk' r_1 vk_0 vk_1
-      | t+1 == _T = do let sk' = genKeyKES r_1
-                       return $ SignKeyCompactSumKES sk' zero vk_0 vk_1
-      | otherwise = do sk' <- updateKES ctx sk (t - _T)
-                       return $ SignKeyCompactSumKES sk' r_1 vk_0 vk_1
-      where
-        _T = totalPeriodsKES (Proxy :: Proxy d)
-        zero = zeroSeed (Proxy :: Proxy d)
-
     totalPeriodsKES  _ = 2 * totalPeriodsKES (Proxy :: Proxy d)
-
-
-    --
-    -- Key generation
-    --
-
-    seedSizeKES _ = seedSizeKES (Proxy :: Proxy d)
-    genKeyKES r = SignKeyCompactSumKES sk_0 r1 vk_0 vk_1
-      where
-        (r0, r1) = expandSeed (Proxy :: Proxy h) r
-
-        sk_0 = genKeyKES r0
-        vk_0 = deriveVerKeyKES sk_0
-
-        sk_1 = genKeyKES r1
-        vk_1 = deriveVerKeyKES sk_1
-
 
     --
     -- raw serialise/deserialise
     --
 
-    sizeVerKeyKES  _ = sizeHash       (Proxy :: Proxy h)
-    sizeSignKeyKES _ = sizeSignKeyKES (Proxy :: Proxy d)
-                     + seedSizeKES    (Proxy :: Proxy d)
-                     + sizeVerKeyKES  (Proxy :: Proxy d) * 2
-    sizeSigKES     _ = sizeSigKES     (Proxy :: Proxy d)
-                     + sizeVerKeyKES  (Proxy :: Proxy d)
+    type SizeVerKeyKES  (CompactSumKES h d) = SizeHash       h
+    type SizeSignKeyKES (CompactSumKES h d) = SizeSignKeyKES d
+                                            + SeedSizeKES    d
+                                            + SizeVerKeyKES  d * 2
+    type SizeSigKES     (CompactSumKES h d) = SizeSigKES     d
+                                            + SizeVerKeyKES  d
 
     rawSerialiseVerKeyKES  (VerKeyCompactSumKES  vk) = hashToBytes vk
-
-    rawSerialiseSignKeyKES (SignKeyCompactSumKES sk r_1 vk_0 vk_1) =
-      mconcat
-        [ rawSerialiseSignKeyKES sk
-        , getSeedBytes r_1
-        , rawSerialiseVerKeyKES vk_0
-        , rawSerialiseVerKeyKES vk_1
-        ]
 
     rawSerialiseSigKES (SigCompactSumKES sigma vk_other) =
       mconcat
@@ -262,29 +231,6 @@ instance (OptimizedKESAlgorithm d, HashAlgorithm h)
         ]
 
     rawDeserialiseVerKeyKES = fmap VerKeyCompactSumKES  . hashFromBytes
-
-    rawDeserialiseSignKeyKES b = do
-        guard (BS.length b == fromIntegral size_total)
-        sk   <- rawDeserialiseSignKeyKES b_sk
-        let r = mkSeedFromBytes          b_r
-        vk_0 <- rawDeserialiseVerKeyKES  b_vk0
-        vk_1 <- rawDeserialiseVerKeyKES  b_vk1
-        return (SignKeyCompactSumKES sk r vk_0 vk_1)
-      where
-        b_sk  = slice off_sk  size_sk b
-        b_r   = slice off_r   size_r  b
-        b_vk0 = slice off_vk0 size_vk b
-        b_vk1 = slice off_vk1 size_vk b
-
-        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
-        size_r     = seedSizeKES    (Proxy :: Proxy d)
-        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
-        size_total = sizeSignKeyKES (Proxy :: Proxy (CompactSumKES h d))
-
-        off_sk     = 0 :: Word
-        off_r      = size_sk
-        off_vk0    = off_r + size_r
-        off_vk1    = off_vk0 + size_vk
 
     rawDeserialiseSigKES b = do
         guard (BS.length b == fromIntegral size_total)
@@ -302,7 +248,135 @@ instance (OptimizedKESAlgorithm d, HashAlgorithm h)
         off_sig    = 0 :: Word
         off_vk     = size_sig
 
-instance (KESAlgorithm (CompactSumKES h d), OptimizedKESAlgorithm d, HashAlgorithm h) => OptimizedKESAlgorithm (CompactSumKES h d) where
+instance ( OptimizedKESAlgorithm d
+         , KESSignAlgorithm m d
+         , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
+         , SizeHash h ~ SeedSizeKES d -- can be relaxed
+         , NaCl.MonadSodium m
+         , MonadST m -- only needed for unsafe raw ser/deser
+         , MonadThrow m
+         , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         )
+      => KESSignAlgorithm m (CompactSumKES h d) where
+    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
+    --
+    data SignKeyKES (CompactSumKES h d) =
+           SignKeyCompactSumKES !(SignKeyKES d)
+                         !(MLockedSeed (SeedSizeKES d))
+                         !(VerKeyKES d)
+                         !(VerKeyKES d)
+
+
+    deriveVerKeyKES (SignKeyCompactSumKES _ _ vk_0 vk_1) =
+        return $! VerKeyCompactSumKES (hashPairOfVKeys (vk_0, vk_1))
+
+    {-# NOINLINE signKES #-}
+    signKES ctxt t a (SignKeyCompactSumKES sk _r_1 vk_0 vk_1) = do
+        sigma <- getSigma
+        return $! SigCompactSumKES sigma vk_other
+      where
+        (getSigma, vk_other)
+          | t < _T    = (signKES ctxt  t       a sk, vk_1)
+          | otherwise = (signKES ctxt (t - _T) a sk, vk_0)
+
+        _T = totalPeriodsKES (Proxy :: Proxy d)
+
+    {-# NOINLINE updateKES #-}
+    updateKES ctx (SignKeyCompactSumKES sk r_1 vk_0 vk_1) t
+      | t+1 <  _T = runMaybeT $!
+                      do
+                        sk' <- MaybeT $! updateKES ctx sk t
+                        r_1' <- lift $! mlockedSeedCopy r_1
+                        return $! SignKeyCompactSumKES sk' r_1' vk_0 vk_1
+
+      | t+1 == _T = do
+                        sk' <- genKeyKES r_1
+                        zero <- mlockedSeedNewZero
+                        return $! Just $! SignKeyCompactSumKES sk' zero vk_0 vk_1
+      | otherwise = runMaybeT $!
+                      do
+                        sk' <- MaybeT $! updateKES ctx sk (t - _T)
+                        r_1' <- lift $! mlockedSeedCopy r_1
+                        return $! SignKeyCompactSumKES sk' r_1' vk_0 vk_1
+      where
+        _T = totalPeriodsKES (Proxy :: Proxy d)
+
+    --
+    -- Key generation
+    --
+
+    {-# NOINLINE genKeyKES #-}
+    genKeyKES r = do
+      (r0raw, r1raw) <- NaCl.expandHash (Proxy :: Proxy h) (mlockedSeedMLSB r)
+      let r0 = MLockedSeed r0raw
+          r1 = MLockedSeed r1raw
+      sk_0 <- genKeyKES r0
+      vk_0 <- deriveVerKeyKES sk_0
+      sk_1 <- genKeyKES r1
+      vk_1 <- deriveVerKeyKES sk_1
+      forgetSignKeyKES sk_1
+      mlockedSeedFinalize r0
+      return $! SignKeyCompactSumKES sk_0 r1 vk_0 vk_1
+
+    --
+    -- forgetting
+    --
+    forgetSignKeyKES (SignKeyCompactSumKES sk_0 r1 _ _) = do
+      forgetSignKeyKES sk_0
+      mlockedSeedFinalize r1
+
+instance ( KESSignAlgorithm m (CompactSumKES h d)
+         , UnsoundKESSignAlgorithm m d
+         , NaCl.MonadSodium m
+         , MonadST m
+         ) => UnsoundKESSignAlgorithm m (CompactSumKES h d) where
+    --
+    -- Raw serialise/deserialise - dangerous, do not use in production code.
+    --
+
+    {-# NOINLINE rawSerialiseSignKeyKES #-}
+    rawSerialiseSignKeyKES (SignKeyCompactSumKES sk r_1 vk_0 vk_1) = do
+      ssk <- rawSerialiseSignKeyKES sk
+      sr1 <- NaCl.mlsbToByteString . mlockedSeedMLSB $ r_1
+      return $ mconcat
+                  [ ssk
+                  , sr1
+                  , rawSerialiseVerKeyKES vk_0
+                  , rawSerialiseVerKeyKES vk_1
+                  ]
+
+    {-# NOINLINE rawDeserialiseSignKeyKES #-}
+    rawDeserialiseSignKeyKES b = runMaybeT $ do
+        guard (BS.length b == fromIntegral size_total)
+        sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
+        r <- MaybeT $ NaCl.mlsbFromByteStringCheck b_r
+        vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk0
+        vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk1
+        return (SignKeyCompactSumKES sk (MLockedSeed r) vk_0 vk_1)
+      where
+        b_sk  = slice off_sk  size_sk b
+        b_r   = slice off_r   size_r  b
+        b_vk0 = slice off_vk0 size_vk b
+        b_vk1 = slice off_vk1 size_vk b
+
+        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
+        size_r     = seedSizeKES    (Proxy :: Proxy d)
+        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
+        size_total = sizeSignKeyKES (Proxy :: Proxy (CompactSumKES h d))
+
+        off_sk     = 0 :: Word
+        off_r      = size_sk
+        off_vk0    = off_r + size_r
+        off_vk1    = off_vk0 + size_vk
+
+
+
+instance (KESAlgorithm (CompactSumKES h d), OptimizedKESAlgorithm d, HashAlgorithm h) =>
+         OptimizedKESAlgorithm (CompactSumKES h d) where
+
     verifySigKES ctxt t a (SigCompactSumKES sigma _) =
       verifySigKES ctxt t' a sigma
       where
@@ -326,35 +400,53 @@ instance (KESAlgorithm (CompactSumKES h d), OptimizedKESAlgorithm d, HashAlgorit
 deriving instance HashAlgorithm h => Show (VerKeyKES (CompactSumKES h d))
 deriving instance Eq   (VerKeyKES (CompactSumKES h d))
 
-instance (KESAlgorithm d) => NoThunks (SignKeyKES (CompactSumKES h d))
+deriving via OnlyCheckWhnfNamed "SignKeyKES (CompactSumKES h d)" (SignKeyKES (CompactSumKES h d))
+  instance NoThunks (SignKeyKES (CompactSumKES h d))
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h)
+instance (KESAlgorithm d) => NoThunks (VerKeyKES (CompactSumKES h d))
+
+instance ( OptimizedKESAlgorithm d
+         , NaCl.SodiumHashAlgorithm h
+         , SizeHash h ~ SeedSizeKES d
+         , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         )
       => ToCBOR (VerKeyKES (CompactSumKES h d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h)
+instance ( OptimizedKESAlgorithm d
+         , NaCl.SodiumHashAlgorithm h
+         , SizeHash h ~ SeedSizeKES d
+         , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         )
       => FromCBOR (VerKeyKES (CompactSumKES h d)) where
   fromCBOR = decodeVerKeyKES
-
 
 --
 -- SignKey instances
 --
 
-deriving instance KESAlgorithm d => Show (SignKeyKES (CompactSumKES h d))
-
-instance (OptimizedKESAlgorithm d) => NoThunks (VerKeyKES  (CompactSumKES h d))
-
-instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => ToCBOR (SignKeyKES (CompactSumKES h d)) where
-  toCBOR = encodeSignKeyKES
-  encodedSizeExpr _size = encodedSignKeyKESSizeExpr
-
-instance (OptimizedKESAlgorithm d, HashAlgorithm h)
-      => FromCBOR (SignKeyKES (CompactSumKES h d)) where
-  fromCBOR = decodeSignKeyKES
-
+-- These instances would violate mlocking protections, bleeding secret keys
+-- onto the GHC heap.
+--
+-- deriving instance KESAlgorithm d => Show (SignKeyKES (CompactSumKES h d))
+--
+-- instance (OptimizedKESAlgorithm d) => NoThunks (VerKeyKES  (CompactSumKES h d))
+--
+-- instance (OptimizedKESAlgorithm d, HashAlgorithm h, SizeHash h ~ SeedSizeKES d)
+--       => ToCBOR (SignKeyKES (CompactSumKES h d)) where
+--   toCBOR = encodeSignKeyKES
+--   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
+--
+-- instance (OptimizedKESAlgorithm d, HashAlgorithm h, SizeHash h ~ SeedSizeKES d)
+--       => FromCBOR (SignKeyKES (CompactSumKES h d)) where
+--   fromCBOR = decodeSignKeyKES
 
 --
 -- Sig instances
@@ -365,11 +457,25 @@ deriving instance KESAlgorithm d => Eq   (SigKES (CompactSumKES h d))
 
 instance KESAlgorithm d => NoThunks (SigKES (CompactSumKES h d))
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h)
+instance ( OptimizedKESAlgorithm d
+         , NaCl.SodiumHashAlgorithm h
+         , SizeHash h ~ SeedSizeKES d
+         , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         )
       => ToCBOR (SigKES (CompactSumKES h d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (OptimizedKESAlgorithm d, HashAlgorithm h)
+instance ( OptimizedKESAlgorithm d
+         , NaCl.SodiumHashAlgorithm h
+         , SizeHash h ~ SeedSizeKES d
+         , NoThunks (VerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         )
       => FromCBOR (SigKES (CompactSumKES h d)) where
   fromCBOR = decodeSigKES

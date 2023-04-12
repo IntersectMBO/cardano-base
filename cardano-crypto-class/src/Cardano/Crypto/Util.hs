@@ -188,4 +188,3 @@ decodeHexStringQ hexStr n = do
   case decodeHexString hexStr n of
     Left err -> fail $ "<decodeHexByteString>: " ++ err
     Right _  -> [| either error id (decodeHexString hexStr n) |]
-
