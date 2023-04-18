@@ -39,22 +39,29 @@ import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Foreign
-import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.C
-import Cardano.Crypto.Libsodium (MLockedSizedBytes)
-import Cardano.Crypto.MonadSodium
-  ( MonadSodium (..)
+import Cardano.Crypto.Libsodium
+  ( MLockedSizedBytes
   , mlsbToByteString
-  , mlsbFromByteStringCheck
+  , mlsbFromByteStringCheckWith
   , mlsbUseAsSizedPtr
-  , mlsbNew
+  , mlsbNewWith
   , mlsbFinalize
-  , mlsbCopy
-  , MEq (..)
+  , mlsbCopyWith
+  )
+import Cardano.Crypto.PinnedSizedBytes
+  ( PinnedSizedBytes
+  , psbUseAsSizedPtr
+  , psbToByteString
+  , psbFromByteStringCheck
+  , psbCreateSizedResult
+  )
+import Cardano.Crypto.EqST
+  ( EqST (..)
   )
 
 import Cardano.Crypto.DSIGNM.Class
-import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Util (SignableRepresentation(..))
 
 data Ed25519DSIGNM
@@ -83,8 +90,8 @@ cOrError action = do
     else
       Just <$> unsafeIOToST getErrno
 
--- | Throws an appropriate 'IOException' when 'Just' an 'Errno' is given.
-throwOnErrno :: (MonadThrow m) => String -> String -> Maybe Errno -> m ()
+-- | Throws an error when 'Just' an 'Errno' is given.
+throwOnErrno :: MonadThrow m => String -> String -> Maybe Errno -> m ()
 throwOnErrno contextDesc cFunName maybeErrno = do
   case maybeErrno of
     Just errno -> throwIO $ errnoToIOError (contextDesc ++ ": " ++ cFunName) errno Nothing Nothing
@@ -171,7 +178,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 -- reflects this.
 --
 -- Various libsodium primitives, particularly 'MLockedSizedBytes' primitives,
--- are used via the 'MonadSodium' typeclass, which is responsible for
+-- are used via the 'MonadST' typeclass, which is responsible for
 -- guaranteeing orderly execution of these actions. We avoid using these
 -- primitives inside 'unsafeIOToST', as well as any 'IO' actions that would be
 -- unsafe to use inside 'unsafePerformIO'.
@@ -186,14 +193,13 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 --   memory passed to them via C pointers.
 -- - 'getErrno'; however, 'ST' guarantees sequentiality in the context where
 --   we use 'getErrno', so this is fine.
--- - 'BS.useAsCStringLen', which is fine and shouldn't require 'IO' to begin
---   with, but unfortunately, for historical reasons, does.
-instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
+instance DSIGNMAlgorithm Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$!> do
         mlsbUseAsSizedPtr sk $ \skPtr -> do
-          (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
-              psbCreateSizedResult $ \pkPtr ->
+          (psb, maybeErrno) <-
+            psbCreateSizedResult $ \pkPtr ->
+              withLiftST $ \fromST -> fromST $ do
                 cOrError $ unsafeIOToST $
                   c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
           throwOnErrno "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
@@ -204,8 +210,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       let bs = getSignableRepresentation a
       in SigEd25519DSIGNM <$!> do
           mlsbUseAsSizedPtr sk $ \skPtr -> do
-            (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
-                psbCreateSizedResult $ \sigPtr -> do
+            (psb, maybeErrno) <-
+              psbCreateSizedResult $ \sigPtr -> do
+                withLiftST $ \fromST -> fromST $ do
                   cOrError $ unsafeIOToST $ do
                     BS.useAsCStringLen bs $ \(ptr, len) ->
                       c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
@@ -215,9 +222,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
     --
     -- Key generation
     --
-    {-# NOINLINE genKeyDSIGNM #-}
-    genKeyDSIGNM seed = SignKeyEd25519DSIGNM <$!> do
-      sk <- mlsbNew
+    {-# NOINLINE genKeyDSIGNMWith #-}
+    genKeyDSIGNMWith allocator seed = SignKeyEd25519DSIGNM <$!> do
+      sk <- mlsbNewWith allocator
       mlsbUseAsSizedPtr sk $ \skPtr ->
         mlockedSeedUseAsCPtr seed $ \seedPtr -> do
           maybeErrno <- withLiftST $ \fromST ->
@@ -230,11 +237,11 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
         allocaSizedST k =
           unsafeIOToST $ allocaSized $ \ptr -> stToIO $ k ptr
 
-    cloneKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
-      SignKeyEd25519DSIGNM <$!> mlsbCopy sk
+    cloneKeyDSIGNMWith allocator (SignKeyEd25519DSIGNM sk) =
+      SignKeyEd25519DSIGNM <$!> mlsbCopyWith allocator sk
 
-    getSeedDSIGNM _ (SignKeyEd25519DSIGNM sk) = do
-      seed <- mlockedSeedNew
+    getSeedDSIGNMWith allocator _ (SignKeyEd25519DSIGNM sk) = do
+      seed <- mlockedSeedNewWith allocator
       mlsbUseAsSizedPtr sk $ \skPtr ->
         mlockedSeedUseAsSizedPtr seed $ \seedPtr -> do
           maybeErrno <- withLiftST $ \fromST ->
@@ -247,13 +254,12 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
     --
     -- Secure forgetting
     --
-    forgetSignKeyDSIGNM (SignKeyEd25519DSIGNM sk) = do
-      mlsbFinalize sk
+    forgetSignKeyDSIGNMWith _ (SignKeyEd25519DSIGNM sk) = mlsbFinalize sk
 
 deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance (MonadST m, MonadSodium m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
+  instance EqST (SignKeyDSIGNM Ed25519DSIGNM)
 
-instance (MonadST m, MonadSodium m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
+instance UnsoundDSIGNMAlgorithm Ed25519DSIGNM where
     --
     -- Ser/deser (dangerous - do not use in production code)
     --
@@ -266,12 +272,12 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed
       mlockedSeedFinalize seed
       return raw
 
-    rawDeserialiseSignKeyDSIGNM raw = do
-      mseed <- fmap MLockedSeed <$> mlsbFromByteStringCheck raw
+    rawDeserialiseSignKeyDSIGNMWith allocator raw = do
+      mseed <- fmap MLockedSeed <$> mlsbFromByteStringCheckWith allocator raw
       case mseed of
         Nothing -> return Nothing
         Just seed -> do
-          sk <- Just <$> genKeyDSIGNM seed
+          sk <- Just <$> genKeyDSIGNMWith allocator seed
           mlockedSeedFinalize seed
           return sk
 

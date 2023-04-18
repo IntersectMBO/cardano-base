@@ -141,10 +141,10 @@ instance ( DSIGNMAlgorithmBase d
         off_sig    = 0 :: Word
         off_vk     = size_sig
 
-instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
+instance ( DSIGNMAlgorithm d -- needed for secure forgetting
          , KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)
          )
-         => KESSignAlgorithm m (CompactSingleKES d) where
+         => KESSignAlgorithm (CompactSingleKES d) where
     newtype SignKeyKES (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM d)
 
     deriveVerKeyKES (SignKeyCompactSingleKES v) =
@@ -157,19 +157,19 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
         assert (t == 0) $
         SigCompactSingleKES <$!> signDSIGNM ctxt a sk <*> deriveVerKeyDSIGNM sk
 
-    updateKES _ctx (SignKeyCompactSingleKES _sk) _to = return Nothing
+    updateKESWith _allocator _ctx (SignKeyCompactSingleKES _sk) _to = return Nothing
 
     --
     -- Key generation
     --
 
-    genKeyKES seed = SignKeyCompactSingleKES <$!> genKeyDSIGNM seed
+    genKeyKESWith allocator seed = SignKeyCompactSingleKES <$!> genKeyDSIGNMWith allocator seed
 
     --
     -- forgetting
     --
-    forgetSignKeyKES (SignKeyCompactSingleKES v) =
-      forgetSignKeyDSIGNM v
+    forgetSignKeyKESWith allocator (SignKeyCompactSingleKES v) =
+      forgetSignKeyDSIGNMWith allocator v
 
 instance ( KESAlgorithm (CompactSingleKES d)
          , DSIGNMAlgorithmBase d
@@ -182,10 +182,10 @@ instance ( KESAlgorithm (CompactSingleKES d)
       assert (t == 0) $
       VerKeyCompactSingleKES vk
 
-instance (KESSignAlgorithm m (CompactSingleKES d), UnsoundDSIGNMAlgorithm m d)
-         => UnsoundKESSignAlgorithm m (CompactSingleKES d) where
+instance (KESSignAlgorithm (CompactSingleKES d), UnsoundDSIGNMAlgorithm d)
+         => UnsoundKESSignAlgorithm (CompactSingleKES d) where
     rawSerialiseSignKeyKES (SignKeyCompactSingleKES sk) = rawSerialiseSignKeyDSIGNM sk
-    rawDeserialiseSignKeyKES bs = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNM bs
+    rawDeserialiseSignKeyKESWith allocator bs = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
 
 --

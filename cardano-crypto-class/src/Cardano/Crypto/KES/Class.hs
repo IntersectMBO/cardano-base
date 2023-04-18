@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Abstract key evolving signatures.
 module Cardano.Crypto.KES.Class
@@ -16,6 +17,9 @@ module Cardano.Crypto.KES.Class
     -- * KES algorithm class
     KESAlgorithm (..)
   , KESSignAlgorithm (..)
+  , genKeyKES
+  , updateKES
+  , forgetSignKeyKES
   , Period
 
   , OptimizedKESAlgorithm (..)
@@ -49,6 +53,7 @@ module Cardano.Crypto.KES.Class
   , UnsoundKESSignAlgorithm (..)
   , encodeSignKeyKES
   , decodeSignKeyKES
+  , rawDeserialiseSignKeyKES
 
     -- * Utility functions
     -- These are used between multiple KES implementations. User code will
@@ -71,11 +76,14 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
+import Control.Monad.Class.MonadST (MonadST)
+import Control.Monad.Class.MonadThrow (MonadThrow)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
-import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.Libsodium (MLockedAllocator, mlockedMalloc)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 import Cardano.Crypto.DSIGN.Class (failSizeCheck)
 
@@ -172,57 +180,38 @@ seedSizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
 seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
 
 
-class ( KESAlgorithm v
-      , Monad m
-      )
-      => KESSignAlgorithm m v where
+class KESAlgorithm v => KESSignAlgorithm v where
 
   data SignKeyKES v :: Type
 
-  deriveVerKeyKES :: SignKeyKES v -> m (VerKeyKES v)
+  deriveVerKeyKES :: (MonadST m, MonadThrow m) => SignKeyKES v -> m (VerKeyKES v)
 
   --
   -- Core algorithm operations
   --
 
   signKES
-    :: forall a. (Signable v a, HasCallStack)
+    :: forall a m. (Signable v a, MonadST m, MonadThrow m)
     => ContextKES v
     -> Period  -- ^ The /current/ period for the key
     -> a
     -> SignKeyKES v
     -> m (SigKES v)
 
-  -- | Update the KES signature key to the /next/ period, given the /current/
-  -- period.
-  --
-  -- It returns 'Nothing' if the cannot be evolved any further.
-  --
-  -- The precondition (to get a 'Just' result) is that the current KES period
-  -- of the input key is not the last period. The given period must be the
-  -- current KES period of the input key (not the next or target).
-  --
-  -- The postcondition is that in case a key is returned, its current KES
-  -- period is incremented by one compared to before.
-  --
-  -- Note that you must track the current period separately, and to skip to a
-  -- later period requires repeated use of this function, since it only
-  -- increments one period at once.
-  --
-  updateKES
-    :: HasCallStack
-    => ContextKES v
+  updateKESWith
+    :: (MonadST m, MonadThrow m)
+    => MLockedAllocator m
+    -> ContextKES v
     -> SignKeyKES v
     -> Period  -- ^ The /current/ period for the key, not the target period.
     -> m (Maybe (SignKeyKES v))
 
-  --
-  -- Key generation
-  --
-
-  genKeyKES
-    :: MLockedSeed (SeedSizeKES v)
+  genKeyKESWith
+    :: (MonadST m, MonadThrow m)
+    => MLockedAllocator m
+    -> MLockedSeed (SeedSizeKES v)
     -> m (SignKeyKES v)
+
 
   --
   -- Secure forgetting
@@ -234,16 +223,75 @@ class ( KESAlgorithm v
   --
   -- The precondition is that this key value will not be used again.
   --
-  forgetSignKeyKES
-    :: SignKeyKES v
+  forgetSignKeyKESWith
+    :: (MonadST m, MonadThrow m)
+    => MLockedAllocator m
+    -> SignKeyKES v
     -> m ()
+
+-- | Forget a signing key synchronously, rather than waiting for GC. In some
+-- non-mock instances this provides a guarantee that the signing key is no
+-- longer in memory.
+--
+-- The precondition is that this key value will not be used again.
+--
+forgetSignKeyKES
+  :: (KESSignAlgorithm v, MonadST m, MonadThrow m)
+  => SignKeyKES v
+  -> m ()
+forgetSignKeyKES = forgetSignKeyKESWith mlockedMalloc
+
+-- | Key generation
+--
+genKeyKES
+  :: forall v m. (KESSignAlgorithm v, MonadST m, MonadThrow m)
+  => MLockedSeed (SeedSizeKES v)
+  -> m (SignKeyKES v)
+genKeyKES = genKeyKESWith mlockedMalloc
+
+
+-- | Update the KES signature key to the /next/ period, given the /current/
+-- period.
+--
+-- It returns 'Nothing' if the cannot be evolved any further.
+--
+-- The precondition (to get a 'Just' result) is that the current KES period
+-- of the input key is not the last period. The given period must be the
+-- current KES period of the input key (not the next or target).
+--
+-- The postcondition is that in case a key is returned, its current KES
+-- period is incremented by one compared to before.
+--
+-- Note that you must track the current period separately, and to skip to a
+-- later period requires repeated use of this function, since it only
+-- increments one period at once.
+--
+updateKES
+  :: forall v m. (KESSignAlgorithm v, MonadST m, MonadThrow m)
+  => ContextKES v
+  -> SignKeyKES v
+  -> Period  -- ^ The /current/ period for the key, not the target period.
+  -> m (Maybe (SignKeyKES v))
+updateKES = updateKESWith mlockedMalloc
+
 
 -- | Unsound operations on KES sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider
 -- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
-class (KESSignAlgorithm m v) => UnsoundKESSignAlgorithm m v where
-  rawDeserialiseSignKeyKES  :: ByteString -> m (Maybe (SignKeyKES v))
-  rawSerialiseSignKeyKES   :: SignKeyKES v -> m ByteString
+class KESSignAlgorithm v => UnsoundKESSignAlgorithm v where
+  rawDeserialiseSignKeyKESWith :: (MonadST m, MonadThrow m)
+                               => MLockedAllocator m
+                               -> ByteString
+                               -> m (Maybe (SignKeyKES v))
+
+  rawSerialiseSignKeyKES :: (MonadST m, MonadThrow m) => SignKeyKES v -> m ByteString
+
+rawDeserialiseSignKeyKES ::
+     (UnsoundKESSignAlgorithm v, MonadST m, MonadThrow m)
+  => ByteString
+  -> m (Maybe (SignKeyKES v))
+rawDeserialiseSignKeyKES = rawDeserialiseSignKeyKESWith mlockedMalloc
+
 
 -- | Subclass for KES algorithms that embed a copy of the VerKey into the
 -- signature itself, rather than relying on the externally supplied VerKey
@@ -315,7 +363,10 @@ encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
-encodeSignKeyKES :: forall v m. (UnsoundKESSignAlgorithm m v) => SignKeyKES v -> m Encoding
+encodeSignKeyKES ::
+     forall v m. (UnsoundKESSignAlgorithm v, MonadST m, MonadThrow m)
+  => SignKeyKES v
+  -> m Encoding
 encodeSignKeyKES = fmap encodeBytes . rawSerialiseSignKeyKES
 
 decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
@@ -334,7 +385,9 @@ decodeSigKES = do
     Nothing -> failSizeCheck "decodeSigKES" "signature" bs (sizeSigKES (Proxy :: Proxy v))
 {-# INLINE decodeSigKES #-}
 
-decodeSignKeyKES :: forall v s m. (UnsoundKESSignAlgorithm m v) => Decoder s (m (Maybe (SignKeyKES v)))
+decodeSignKeyKES ::
+     forall v s m. (UnsoundKESSignAlgorithm v, MonadST m, MonadThrow m)
+  => Decoder s (m (Maybe (SignKeyKES v)))
 decodeSignKeyKES = do
     bs <- decodeBytes
     let expected = fromIntegral (sizeSignKeyKES (Proxy @v))
@@ -362,13 +415,13 @@ instance KESAlgorithm v => NoThunks (SignedKES v a)
   -- use generic instance
 
 signedKES
-  :: (KESSignAlgorithm m v, Signable v a)
+  :: (KESSignAlgorithm v, Signable v a, MonadST m, MonadThrow m)
   => ContextKES v
   -> Period
   -> a
   -> SignKeyKES v
   -> m (SignedKES v a)
-signedKES ctxt time a key = SignedKES <$> (signKES ctxt time a key)
+signedKES ctxt time a key = SignedKES <$> signKES ctxt time a key
 
 verifySignedKES
   :: (KESAlgorithm v, Signable v a)

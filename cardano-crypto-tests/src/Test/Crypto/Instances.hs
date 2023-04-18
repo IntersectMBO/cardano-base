@@ -12,13 +12,9 @@ import Data.Proxy (Proxy (Proxy))
 import GHC.TypeLits (KnownNat, natVal)
 import Test.QuickCheck (Arbitrary (..))
 import qualified Test.QuickCheck.Gen as Gen
-import Cardano.Crypto.MonadSodium
-import Cardano.Crypto.MLockedSeed
-import Cardano.Crypto.PinnedSizedBytes (
-  PinnedSizedBytes,
-  psbFromByteStringCheck,
-  psbToByteString,
-  )
+import Cardano.Crypto.Libsodium
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.PinnedSizedBytes
 import Control.Monad.Class.MonadThrow
 import Control.Monad.Class.MonadST
 
@@ -37,19 +33,19 @@ import Control.Monad.Class.MonadST
 --         size :: Int
 --         size = fromInteger (natVal (Proxy :: Proxy n))
 
-mlsbFromPSB :: (MonadSodium m, MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSizedBytes n)
+mlsbFromPSB :: (MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSizedBytes n)
 mlsbFromPSB = mlsbFromByteString . psbToByteString
 
-withMLSBFromPSB :: (MonadSodium m, MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSizedBytes n -> m a) -> m a
+withMLSBFromPSB :: (MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSizedBytes n -> m a) -> m a
 withMLSBFromPSB psb =
   bracket
     (mlsbFromPSB psb)
     mlsbFinalize
 
-mlockedSeedFromPSB :: (MonadSodium m, MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSeed n)
+mlockedSeedFromPSB :: (MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSeed n)
 mlockedSeedFromPSB = fmap MLockedSeed . mlsbFromPSB
 
-withMLockedSeedFromPSB :: (MonadSodium m, MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSeed n -> m a) -> m a
+withMLockedSeedFromPSB :: (MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSeed n -> m a) -> m a
 withMLockedSeedFromPSB psb =
   bracket
     (mlockedSeedFromPSB psb)
