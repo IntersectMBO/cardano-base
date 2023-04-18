@@ -48,6 +48,10 @@ jobs:
           - platform: aarch64-linux
             target-platform: "-windows"
 
+    env:
+      # Modify this value to "invalidate" the cabal cache.
+      CABAL_CACHE_VERSION: "2023-04-18"
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -72,6 +76,13 @@ jobs:
           sudo cp devx/devx /usr/bin
       - name: cabal update
         run: cabal update
+      - name: Cache Cabal store
+        uses: actions/cache@v3
+        with:
+          path: |
+            path: $HOME/.cabal/store
+            dist-newstyle
+          key: cache-devx-${{ env.CABAL_CACHE_VERSION }}-${{ matrix.platform }}.${{ matrix.compiler-nix-name }}${{ matrix.target-platform }}${{ matrix.variant }}-${{ hashFiles('dependencies.txt') }}
       - name: cabal build
         run: cabal build all
       - name: cabal test
