@@ -64,5 +64,6 @@ jobs:
       - name: Check output
         run: |
           echo HOME=$HOME
+          ls -l
           ls -l $HOME/.cabal${{ matrix.target-platform }}/store
           ls -l dist-newstyle
