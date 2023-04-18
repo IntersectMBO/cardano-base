@@ -32,7 +32,7 @@ import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
 
 import qualified Data.ByteString as BS
 import qualified Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.MonadSodium (MEq (..), (==!))
+import Cardano.Crypto.MonadMLock (MEq (..), (==!))
 
 import Text.Show.Pretty (ppShow)
 
@@ -431,37 +431,37 @@ testDSIGNMAlgorithm lock _ n =
 
       , testGroup "To/FromCBOR class"
         [ testProperty "VerKey"  $
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
         , testProperty "Sig" $ \(msg :: Message) ->
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGNM v <- signDSIGNM () msg sk
               return $ prop_cbor sig
         ]
 
       , testGroup "ToCBOR size"
         [ testProperty "VerKey"  $
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor_size vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
         , testProperty "Sig" $ \(msg :: Message) ->
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGNM v <- signDSIGNM () msg sk
               return $ prop_cbor_size sig
         ]
 
       , testGroup "direct matches class"
         [ testProperty "VerKey" $
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor_direct_vs_class encodeVerKeyDSIGNM vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
         , testProperty "Sig" $ \(msg :: Message) ->
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGNM v <- signDSIGNM () msg sk
               return $ prop_cbor_direct_vs_class encodeSigDSIGNM sig
         ]

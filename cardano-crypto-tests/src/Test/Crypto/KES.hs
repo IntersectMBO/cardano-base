@@ -33,10 +33,10 @@ import Data.Foldable (traverse_)
 import GHC.TypeNats (KnownNat)
 
 import Control.Tracer
-import Control.Monad (void)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Class.MonadThrow
 import Control.Monad.Class.MonadST
+import Control.Monad.Class.MonadThrow
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad (void)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
@@ -45,8 +45,7 @@ import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import Cardano.Crypto.MLockedSeed
 import qualified Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
-import Cardano.Crypto.MonadSodium
+import Cardano.Crypto.MonadMLock
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
@@ -75,6 +74,7 @@ import Test.Crypto.Instances (withMLockedSeedFromPSB)
 import Test.Crypto.AllocLog
 
 {- HLINT ignore "Reduce duplication" -}
+{- HLINT ignore "Use head" -}
 
 --
 -- The list of all tests
@@ -122,7 +122,7 @@ deriving via (PureMEq (SignKeyKES (MockKES t))) instance Applicative m => MEq m 
 
 deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SingleKES d))
 
-instance ( MonadSodium m
+instance ( MonadMLock m
          , MonadST m
          , MEq m (SignKeyKES d)
          , Eq (VerKeyKES d)
@@ -133,7 +133,7 @@ instance ( MonadSodium m
 
 deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (CompactSingleKES d))
 
-instance ( MonadSodium m
+instance ( MonadMLock m
          , MonadST m
          , MEq m (SignKeyKES d)
          , Eq (VerKeyKES d)
@@ -144,7 +144,7 @@ instance ( MonadSodium m
 
 testKESAlloc
   :: forall v.
-     ( (forall m. (MonadSodium m, MonadThrow m, MonadST m) => KESSignAlgorithm m v)
+     ( (forall m. (MonadMLock m, MonadThrow m, MonadST m, MonadPSB m) => KESSignAlgorithm m v)
      , ContextKES v ~ ()
      )
   => Proxy v
@@ -405,7 +405,7 @@ testKESAlgorithm lock _pm _pv n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: ( MonadSodium m
+withSK :: ( MonadMLock m
           , MonadST m
           , MonadThrow m
           , KESSignAlgorithm m v
@@ -472,7 +472,7 @@ prop_oneUpdateSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadFail m
-        , MonadSodium m
+        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -491,7 +491,7 @@ prop_allUpdatesSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadSodium m
+        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -510,7 +510,7 @@ prop_totalPeriodsKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadSodium m
+        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -537,7 +537,7 @@ prop_deriveVerKeyKES
       ( ContextKES v ~ ()
       , RunIO m
       , MonadIO m
-      , MonadSodium m
+      , MonadMLock m
       , MonadST m
       , MonadThrow m
       , KESSignAlgorithm m v
@@ -567,7 +567,7 @@ prop_verifyKES_positive
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -604,7 +604,7 @@ prop_verifyKES_negative_key
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -636,7 +636,7 @@ prop_verifyKES_negative_message
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -668,7 +668,7 @@ prop_verifyKES_negative_period
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -703,7 +703,7 @@ prop_serialise_VerKeyKES
      ( ContextKES v ~ ()
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -735,7 +735,7 @@ prop_serialise_SigKES
      , Show (SignKeyKES v)
      , RunIO m
      , MonadIO m
-     , MonadSodium m
+     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -766,7 +766,7 @@ prop_serialise_SigKES _ _ seedPSB x =
 withAllUpdatesKES_ :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadSodium m
+                  , MonadMLock m
                   , MonadST m
                   , MonadThrow m
                   )
@@ -779,7 +779,7 @@ withAllUpdatesKES_ seedPSB f = do
 withAllUpdatesKES :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadSodium m
+                  , MonadMLock m
                   , MonadST m
                   , MonadThrow m
                   )

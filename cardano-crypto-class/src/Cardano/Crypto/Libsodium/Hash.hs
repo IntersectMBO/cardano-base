@@ -21,8 +21,8 @@ import GHC.TypeLits
 import Cardano.Crypto.Hash (HashAlgorithm(SizeHash))
 import Cardano.Crypto.Libsodium.Hash.Class
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
-import Cardano.Crypto.MonadSodium.Class
-import Cardano.Crypto.MonadSodium.Alloc
+import Cardano.Crypto.MonadMLock.Class
+import Cardano.Crypto.MonadMLock.Alloc
 import Control.Monad.Class.MonadST (MonadST (..))
 import Control.Monad.Class.MonadThrow (MonadThrow)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
@@ -33,7 +33,7 @@ import Control.Monad.ST.Unsafe (unsafeIOToST)
 
 expandHash
     :: forall h m proxy.
-       (SodiumHashAlgorithm h, MonadSodium m, MonadST m, MonadThrow m)
+       (SodiumHashAlgorithm h, MonadMLock m, MonadST m, MonadThrow m)
     => proxy h
     -> MLockedSizedBytes (SizeHash h)
     -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))

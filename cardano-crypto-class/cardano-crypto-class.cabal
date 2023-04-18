@@ -80,11 +80,11 @@ library
     Cardano.Crypto.Libsodium.MLockedBytes
     Cardano.Crypto.Libsodium.MLockedBytes.Internal
     Cardano.Crypto.Libsodium.UnsafeC
+    Cardano.Crypto.MonadMLock
+    Cardano.Crypto.MonadMLock.Class
+    Cardano.Crypto.MonadMLock.Alloc
     Cardano.Crypto.MEqOrd
     Cardano.Crypto.MLockedSeed
-    Cardano.Crypto.MonadSodium
-    Cardano.Crypto.MonadSodium.Class
-    Cardano.Crypto.MonadSodium.Alloc
     Cardano.Crypto.PinnedSizedBytes
     Cardano.Crypto.Seed
     Cardano.Crypto.Util

@@ -1,6 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 -- We need this so that we can forward the deprecated traceMLockedForeignPtr
 {-# OPTIONS_GHC -Wno-deprecations #-}
@@ -14,10 +13,13 @@
 -- It may also be used to provide Libsodium functionality in monad stacks that
 -- have IO at the bottom, but decorate certain Libsodium operations with
 -- additional effects, e.g. logging mlocked memory access.
-module Cardano.Crypto.MonadSodium
+module Cardano.Crypto.MonadMLock
 (
-  -- * MonadSodium class
-  MonadSodium (..),
+  -- * MonadMLock class
+  MonadMLock (..),
+  MonadUnmanagedMemory (..),
+  MonadByteStringMemory (..),
+  MonadPSB (..),
 
   -- * Re-exported types
   MLockedForeignPtr,
@@ -33,6 +35,22 @@ module Cardano.Crypto.MonadSodium
   mlockedAllocaSized,
   mlockedAllocForeignPtr,
   mlockedAllocForeignPtrBytes,
+
+  -- * Generalized foreign memory access
+  packByteStringCStringLen,
+
+  -- * PinnedSizedBytes operations
+  PinnedSizedBytes,
+
+  psbUseAsCPtr,
+  psbUseAsSizedPtr,
+
+  psbCreate,
+  psbCreateLen,
+  psbCreateSizedResult,
+
+  psbToByteString,
+  psbFromByteStringCheck,
 
   -- * MLockedSizedBytes operations
   mlsbNew,
@@ -57,8 +75,8 @@ module Cardano.Crypto.MonadSodium
 )
 where
 
-import Cardano.Crypto.MonadSodium.Class
-import Cardano.Crypto.MonadSodium.Alloc
+import Cardano.Crypto.MonadMLock.Class
+import Cardano.Crypto.MonadMLock.Alloc
 import Cardano.Crypto.Libsodium.Hash
 import Cardano.Crypto.Libsodium.MLockedBytes
 import Cardano.Crypto.MEqOrd
