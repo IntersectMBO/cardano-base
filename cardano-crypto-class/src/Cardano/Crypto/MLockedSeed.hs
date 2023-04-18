@@ -6,9 +6,9 @@
 module Cardano.Crypto.MLockedSeed
 where
 
-import Cardano.Crypto.MonadSodium
+import Cardano.Crypto.MonadMLock
   ( MLockedSizedBytes
-  , MonadSodium (..)
+  , MonadMLock (..)
   , mlsbCopy
   , mlsbNew
   , mlsbNewZero
@@ -33,7 +33,7 @@ newtype MLockedSeed n =
   deriving (NFData, NoThunks)
 
 deriving via (MLockedSizedBytes n)
-  instance (MonadSodium m, MonadST m, KnownNat n) => MEq m (MLockedSeed n)
+  instance (MonadMLock m, MonadST m, KnownNat n) => MEq m (MLockedSeed n)
 
 withMLockedSeedAsMLSB :: Functor m
                   => (MLockedSizedBytes n -> m (MLockedSizedBytes n))
@@ -42,23 +42,23 @@ withMLockedSeedAsMLSB :: Functor m
 withMLockedSeedAsMLSB action =
   fmap MLockedSeed . action . mlockedSeedMLSB
 
-mlockedSeedCopy :: (KnownNat n, MonadSodium m) => MLockedSeed n -> m (MLockedSeed n)
+mlockedSeedCopy :: (KnownNat n, MonadMLock m) => MLockedSeed n -> m (MLockedSeed n)
 mlockedSeedCopy =
   withMLockedSeedAsMLSB mlsbCopy
 
-mlockedSeedNew :: (KnownNat n, MonadSodium m) => m (MLockedSeed n)
+mlockedSeedNew :: (KnownNat n, MonadMLock m) => m (MLockedSeed n)
 mlockedSeedNew =
   MLockedSeed <$> mlsbNew
 
-mlockedSeedNewZero :: (KnownNat n, MonadSodium m) => m (MLockedSeed n)
+mlockedSeedNewZero :: (KnownNat n, MonadMLock m) => m (MLockedSeed n)
 mlockedSeedNewZero =
   MLockedSeed <$> mlsbNewZero
 
-mlockedSeedFinalize :: (MonadSodium m) => MLockedSeed n -> m ()
+mlockedSeedFinalize :: (MonadMLock m) => MLockedSeed n -> m ()
 mlockedSeedFinalize = mlsbFinalize . mlockedSeedMLSB
 
-mlockedSeedUseAsCPtr :: (MonadSodium m) => MLockedSeed n -> (Ptr Word8 -> m b) -> m b
+mlockedSeedUseAsCPtr :: (MonadMLock m) => MLockedSeed n -> (Ptr Word8 -> m b) -> m b
 mlockedSeedUseAsCPtr seed = mlsbUseAsCPtr (mlockedSeedMLSB seed)
 
-mlockedSeedUseAsSizedPtr :: (MonadSodium m) => MLockedSeed n -> (SizedPtr n -> m b) -> m b
+mlockedSeedUseAsSizedPtr :: (MonadMLock m) => MLockedSeed n -> (SizedPtr n -> m b) -> m b
 mlockedSeedUseAsSizedPtr seed = mlsbUseAsSizedPtr (mlockedSeedMLSB seed)

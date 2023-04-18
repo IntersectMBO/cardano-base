@@ -34,7 +34,9 @@ import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
 import Cardano.Crypto.MLockedSeed
-import Cardano.Crypto.MonadSodium (mlsbAsByteString)
+import Cardano.Crypto.MonadMLock
+  ( mlsbAsByteString
+  )
 
 data MockKES (t :: Nat)
 

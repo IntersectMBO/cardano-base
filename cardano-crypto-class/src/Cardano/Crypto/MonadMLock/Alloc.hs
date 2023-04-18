@@ -14,9 +14,9 @@
 -- It may also be used to provide Libsodium functionality in monad stacks that
 -- have IO at the bottom, but decorate certain Libsodium operations with
 -- additional effects, e.g. logging mlocked memory access.
-module Cardano.Crypto.MonadSodium.Alloc
+module Cardano.Crypto.MonadMLock.Alloc
 (
-  MonadSodium (..),
+  MonadMLock (..),
   mlockedAlloca,
   mlockedAllocaSized,
   mlockedAllocForeignPtr,
@@ -27,7 +27,7 @@ module Cardano.Crypto.MonadSodium.Alloc
 )
 where
 
-import Cardano.Crypto.MonadSodium.Class
+import Cardano.Crypto.MonadMLock.Class
 import Control.Monad.Class.MonadThrow (MonadThrow, bracket)
 
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
@@ -40,12 +40,12 @@ import Foreign.C.Types (CSize)
 import Foreign.Ptr (Ptr)
 import Data.Proxy (Proxy (..))
 
-mlockedAllocaSized :: forall m n b. (MonadSodium m, MonadThrow m, KnownNat n) => (SizedPtr n -> m b) -> m b
+mlockedAllocaSized :: forall m n b. (MonadMLock m, MonadThrow m, KnownNat n) => (SizedPtr n -> m b) -> m b
 mlockedAllocaSized k = mlockedAlloca size (k . SizedPtr) where
     size :: CSize
     size = fromInteger (natVal (Proxy @n))
 
-mlockedAllocForeignPtrBytes :: (MonadSodium m) => CSize -> CSize -> m (MLockedForeignPtr a)
+mlockedAllocForeignPtrBytes :: (MonadMLock m) => CSize -> CSize -> m (MLockedForeignPtr a)
 mlockedAllocForeignPtrBytes size align = do
   mlockedMalloc size'
   where
@@ -56,7 +56,7 @@ mlockedAllocForeignPtrBytes size align = do
       where
         (q,m) = size `quotRem` align
 
-mlockedAllocForeignPtr :: forall a m . (MonadSodium m, Storable a) => m (MLockedForeignPtr a)
+mlockedAllocForeignPtr :: forall a m . (MonadMLock m, Storable a) => m (MLockedForeignPtr a)
 mlockedAllocForeignPtr =
   mlockedAllocForeignPtrBytes size align
   where
@@ -69,7 +69,7 @@ mlockedAllocForeignPtr =
     align :: CSize
     align = fromIntegral $ alignment dummy
 
-mlockedAlloca :: forall a b m. (MonadSodium m, MonadThrow m) => CSize -> (Ptr a -> m b) -> m b
+mlockedAlloca :: forall a b m. (MonadMLock m, MonadThrow m) => CSize -> (Ptr a -> m b) -> m b
 mlockedAlloca size =
   bracket alloc free . flip withMLockedForeignPtr
   where

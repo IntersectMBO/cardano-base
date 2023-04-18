@@ -39,11 +39,11 @@ import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Foreign
-import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium (MLockedSizedBytes)
-import Cardano.Crypto.MonadSodium
-  ( MonadSodium (..)
+import Cardano.Crypto.MonadMLock
+  ( MonadMLock (..)
+  , MonadPSB (..)
   , mlsbToByteString
   , mlsbFromByteStringCheck
   , mlsbUseAsSizedPtr
@@ -51,6 +51,11 @@ import Cardano.Crypto.MonadSodium
   , mlsbFinalize
   , mlsbCopy
   , MEq (..)
+  , PinnedSizedBytes
+  , psbUseAsSizedPtr
+  , psbToByteString
+  , psbFromByteStringCheck
+  , psbCreateSizedResult
   )
 
 import Cardano.Crypto.DSIGNM.Class
@@ -171,7 +176,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 -- reflects this.
 --
 -- Various libsodium primitives, particularly 'MLockedSizedBytes' primitives,
--- are used via the 'MonadSodium' typeclass, which is responsible for
+-- are used via the 'MonadMLock' typeclass, which is responsible for
 -- guaranteeing orderly execution of these actions. We avoid using these
 -- primitives inside 'unsafeIOToST', as well as any 'IO' actions that would be
 -- unsafe to use inside 'unsafePerformIO'.
@@ -188,12 +193,13 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 --   we use 'getErrno', so this is fine.
 -- - 'BS.useAsCStringLen', which is fine and shouldn't require 'IO' to begin
 --   with, but unfortunately, for historical reasons, does.
-instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
+instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$!> do
         mlsbUseAsSizedPtr sk $ \skPtr -> do
-          (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
-              psbCreateSizedResult $ \pkPtr ->
+          (psb, maybeErrno) <-
+            psbCreateSizedResult $ \pkPtr ->
+              withLiftST $ \fromST -> fromST $ do
                 cOrError $ unsafeIOToST $
                   c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
           throwOnErrno "deriveVerKeyDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
@@ -204,8 +210,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       let bs = getSignableRepresentation a
       in SigEd25519DSIGNM <$!> do
           mlsbUseAsSizedPtr sk $ \skPtr -> do
-            (psb, maybeErrno) <- withLiftST $ \fromST -> fromST $ do
-                psbCreateSizedResult $ \sigPtr -> do
+            (psb, maybeErrno) <-
+              psbCreateSizedResult $ \sigPtr -> do
+                withLiftST $ \fromST -> fromST $ do
                   cOrError $ unsafeIOToST $ do
                     BS.useAsCStringLen bs $ \(ptr, len) ->
                       c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
@@ -251,9 +258,9 @@ instance (MonadST m, MonadSodium m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DS
       mlsbFinalize sk
 
 deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance (MonadST m, MonadSodium m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
+  instance (MonadST m, MonadMLock m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
 
-instance (MonadST m, MonadSodium m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
+instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
     --
     -- Ser/deser (dangerous - do not use in production code)
     --

@@ -43,7 +43,7 @@ import Control.Monad ((<$!>))
 -- The wrapped KES behaves exactly like its unwrapped payload, except that
 -- invocations of 'genKeyKES', 'updateKES' and 'forgetSignKeyKES' are logged
 -- as 'GenericEvent' 'ForgetMockEvent' values. (We use 'GenericEvent' in order
--- to use the generic 'MonadSodium' instance of 'LogT'; otherwise we would
+-- to use the generic 'MonadMLock' instance of 'LogT'; otherwise we would
 -- have to provide a boilerplate instance here).
 data ForgetMockKES k
 
