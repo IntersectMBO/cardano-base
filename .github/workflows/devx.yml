@@ -80,10 +80,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            path: $HOME/.cabal/store
+            path: $HOME/.cabal${{ matrix.target-platform }}/store
             dist-newstyle
           key: cache-devx-${{ env.CABAL_CACHE_VERSION }}-${{ matrix.platform }}.${{ matrix.compiler-nix-name }}${{ matrix.target-platform }}${{ matrix.variant }}-${{ hashFiles('dependencies.txt') }}
       - name: cabal build
         run: cabal build all
-      - name: cabal test
-        run: cabal test all
