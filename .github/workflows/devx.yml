@@ -73,6 +73,6 @@ jobs:
       - name: cabal update
         run: cabal update
       - name: cabal build
-        run: cabal build
+        run: cabal build all
       - name: cabal test
-        run: cabal test
+        run: cabal test all
