@@ -75,10 +75,10 @@ propFindNextZeroIndex w = monadicIO . run $
 
 -- We allow one extra page be allocated due to concurrency false positives in block
 -- reservations
-checkNumPages :: Pool n -> Int -> Int -> Assertion
+checkNumPages :: Pool n RealWorld -> Int -> Int -> Assertion
 checkNumPages pool n numBlocks = do
   let estimatedUpperBoundOfPages = 1 + max 1 (numBlocks `div` n `div` 64)
-  numPages <- countPages pool
+  numPages <- stToPrim $ countPages pool
   assertBool
     (concat
        [ "Number of pages should not exceed the expected amount: "
@@ -102,8 +102,8 @@ checkBlockBytes block byte ptr =
           checkFillByte (i - 1)
    in checkFillByte (blockByteCount block - 1)
 
-mallocPreFilled :: Word8 -> Int -> IO (ForeignPtr b)
-mallocPreFilled preFillByte bc = do
+mallocPreFilled :: Word8 -> Int -> ST s (ForeignPtr b)
+mallocPreFilled preFillByte bc = unsafeIOToPrim $ do
   mfp <- mallocForeignPtrBytes bc
   withForeignPtr mfp $ \ptr -> setPtr (castPtr ptr) bc preFillByte
   pure mfp
@@ -166,11 +166,11 @@ propPoolGarbageCollected block (Positive n) numBlocks16 preFillByte fillByte =
     (pool, ptrs) <-
       ensureAllGCed numBlocks $ \countOneBlockGCed -> do
         pool <-
-          initPool n (mallocPreFilled preFillByte) $ \ptr -> do
+          stToPrim $ initPool n (mallocPreFilled preFillByte) $ \ptr -> do
             setPtr (castPtr ptr) (blockByteCount block) fillByte
             countOneBlockGCed
         fmps :: [ForeignPtr (Block n)] <-
-          replicateConcurrently numBlocks (grabNextBlock pool)
+          replicateConcurrently numBlocks (stToPrim $ grabNextBlock pool)
         touch fmps
         -- Here we return just the pointers and let the GC collect the ForeignPtrs
         ptrs <-
@@ -201,14 +201,14 @@ propPoolAllocateAndFinalize block (Positive n) numBlocks16 emptyByte fullByte =
       ensureAllGCed numBlocks $ \countOneBlockGCed -> do
         chan <- newChan
         pool <-
-          initPool n (mallocPreFilled emptyByte) $ \(ptr :: Ptr (Block n)) -> do
+          stToPrim $ initPool n (mallocPreFilled emptyByte) $ \(ptr :: Ptr (Block n)) -> do
             setPtr (castPtr ptr) (blockByteCount block) emptyByte
             countOneBlockGCed
         -- allocate and finalize blocks concurrently
         pool <$
           concurrently_
             (do replicateConcurrently_ numBlocks $ do
-                  fp <- grabNextBlock pool
+                  fp <- stToPrim $ grabNextBlock pool
                   withForeignPtr fp (checkBlockBytes block emptyByte)
                   writeChan chan (Just fp)
                 -- place Nothing to indicate that we are done allocating blocks

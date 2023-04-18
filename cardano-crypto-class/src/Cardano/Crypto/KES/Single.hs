@@ -111,8 +111,7 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
     {-# INLINE rawDeserialiseSigKES #-}
 
 
-instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
-         ) => KESSignAlgorithm m (SingleKES d) where
+instance DSIGNMAlgorithm d => KESSignAlgorithm (SingleKES d) where
     newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
 
     deriveVerKeyKES (SignKeySingleKES v) =
@@ -126,27 +125,28 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
         assert (t == 0) $!
         SigSingleKES <$!> signDSIGNM ctxt a sk
 
-    updateKES _ctx (SignKeySingleKES _sk) _to = return Nothing
+    updateKESWith _allocator _ctx (SignKeySingleKES _sk) _to = return Nothing
 
     --
     -- Key generation
     --
 
-    genKeyKES seed = SignKeySingleKES <$!> genKeyDSIGNM seed
+    genKeyKESWith allocator seed =
+      SignKeySingleKES <$!> genKeyDSIGNMWith allocator seed
 
     --
     -- forgetting
     --
-    forgetSignKeyKES (SignKeySingleKES v) =
-      forgetSignKeyDSIGNM v
+    forgetSignKeyKESWith allocator (SignKeySingleKES v) =
+      forgetSignKeyDSIGNMWith allocator v
 
-instance (KESSignAlgorithm m (SingleKES d), UnsoundDSIGNMAlgorithm m d)
-         => UnsoundKESSignAlgorithm m (SingleKES d) where
+instance (KESSignAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
+         => UnsoundKESSignAlgorithm (SingleKES d) where
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =
       rawSerialiseSignKeyDSIGNM sk
 
-    rawDeserialiseSignKeyKES bs =
-      fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNM bs
+    rawDeserialiseSignKeyKESWith allocator bs =
+      fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
 --
 -- VerKey instances

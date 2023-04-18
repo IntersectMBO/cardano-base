@@ -38,7 +38,8 @@ import Data.Kind (Type)
 import Control.DeepSeq (NFData)
 import Control.Monad.ST (runST)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
-import Control.Monad.Primitive  (PrimMonad, primitive_, touch)
+import Control.Monad.Class.MonadST
+import Control.Monad.Primitive  (primitive_, touch)
 import Data.Primitive.ByteArray
           ( ByteArray (..)
           , MutableByteArray (..)
@@ -237,7 +238,7 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
 {-# INLINE psbUseAsCPtr #-}
 psbUseAsCPtr ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
-  (PrimMonad m) =>
+  (MonadST m) =>
   PinnedSizedBytes n ->
   (Ptr Word8 -> m r) ->
   m r
@@ -260,7 +261,7 @@ psbUseAsCPtr (PSB ba) = runAndTouch ba
 {-# INLINE psbUseAsCPtrLen #-}
 psbUseAsCPtrLen ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
-  (KnownNat n, PrimMonad m) =>
+  (KnownNat n, MonadST m) =>
   PinnedSizedBytes n ->
   (Ptr Word8 -> CSize -> m r) ->
   m r
@@ -275,20 +276,20 @@ psbUseAsCPtrLen (PSB ba) f = do
 {-# INLINE psbUseAsSizedPtr  #-}
 psbUseAsSizedPtr ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
-  (PrimMonad m) =>
+  (MonadST m) =>
   PinnedSizedBytes n ->
   (SizedPtr n -> m r) ->
   m r
-psbUseAsSizedPtr (PSB ba) k = do
+psbUseAsSizedPtr (PSB ba) k = withLiftST $ \lift -> do
     r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
-    r <$ touch ba
+    r <$ lift (touch ba)
 
 -- | As 'psbCreateResult', but presumes that no useful value is produced: that
 -- is, the function argument is run only for its side effects.
 {-# INLINE psbCreate  #-}
 psbCreate ::
   forall (n :: Nat) (m :: Type -> Type) .
-  (KnownNat n, PrimMonad m) =>
+  (KnownNat n, MonadST m) =>
   (Ptr Word8 -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreate f = fst <$> psbCreateResult f
@@ -298,7 +299,7 @@ psbCreate f = fst <$> psbCreateResult f
 {-# INLINE psbCreateLen  #-}
 psbCreateLen ::
   forall (n :: Nat) (m :: Type -> Type) .
-  (KnownNat n, PrimMonad m) =>
+  (KnownNat n, MonadST m) =>
   (Ptr Word8 -> CSize -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreateLen f = fst <$> psbCreateResultLen f
@@ -321,7 +322,7 @@ psbCreateLen f = fst <$> psbCreateResultLen f
 {-# INLINE psbCreateResult  #-}
 psbCreateResult ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
-  (KnownNat n, PrimMonad m) =>
+  (KnownNat n, MonadST m) =>
   (Ptr Word8 -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateResult f = psbCreateResultLen (\p _ -> f p)
@@ -341,14 +342,14 @@ psbCreateResult f = psbCreateResultLen (\p _ -> f p)
 {-# INLINE psbCreateResultLen  #-}
 psbCreateResultLen ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type).
-  (KnownNat n, PrimMonad m) =>
+  (KnownNat n, MonadST m) =>
   (Ptr Word8 -> CSize -> m r) ->
   m (PinnedSizedBytes n, r)
-psbCreateResultLen f = do
+psbCreateResultLen f = withLiftST $ \lift -> do
   let len :: Int = fromIntegral . natVal $ Proxy @n
-  mba <- newPinnedByteArray len
+  mba <- lift (newPinnedByteArray len)
   res <- f (mutableByteArrayContents mba) (fromIntegral len)
-  arr <- unsafeFreezeByteArray mba
+  arr <- lift (unsafeFreezeByteArray mba)
   pure (PSB arr, res)
 
 -- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
@@ -356,7 +357,7 @@ psbCreateResultLen f = do
 {-# INLINE psbCreateSized  #-}
 psbCreateSized ::
   forall (n :: Nat) (m :: Type -> Type) .
-  (KnownNat n, PrimMonad m) =>
+  (KnownNat n, MonadST m) =>
   (SizedPtr n -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
@@ -367,7 +368,7 @@ psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
 {-# INLINE psbCreateSizedResult  #-}
 psbCreateSizedResult ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
-  (KnownNat n, PrimMonad m) =>
+  (KnownNat n, MonadST m) =>
   (SizedPtr n -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)
@@ -405,10 +406,10 @@ die fun problem = error $ "PinnedSizedBytes." ++ fun ++ ": " ++ problem
 {-# INLINE runAndTouch  #-}
 runAndTouch ::
   forall (a :: Type) (m :: Type -> Type) .
-  (PrimMonad m) =>
+  (MonadST m) =>
   ByteArray ->
   (Ptr Word8 -> m a) ->
   m a
-runAndTouch ba f = do
+runAndTouch ba f = withLiftST $ \lift -> do
   r <- f (byteArrayContents ba)
-  r <$ touch ba
+  r <$ lift (touch ba)

@@ -130,7 +130,7 @@ import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import Formatting.Buildable (Buildable (..), build)
-import Control.Concurrent.MVar (MVar, withMVar, newMVar)
+import Control.Concurrent.Class.MonadMVar (MVar, withMVar, newMVar)
 import GHC.Stack (HasCallStack)
 
 --------------------------------------------------------------------------------
@@ -364,7 +364,7 @@ noExceptionsThrown = pure (property True)
 doesNotThrow :: Applicative m => m a -> m Property
 doesNotThrow = (*> noExceptionsThrown)
 
-newtype Lock = Lock (MVar ())
+newtype Lock = Lock (MVar IO ())
 
 withLock :: Lock -> IO a -> IO a
 withLock (Lock v) = withMVar v . const
