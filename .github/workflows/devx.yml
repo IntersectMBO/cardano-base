@@ -56,14 +56,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            $HOME/.cabal${{ matrix.target-platform }}/store
+            /home/runner/.cabal/.cabal${{ matrix.target-platform }}/store
             dist-newstyle
           key: cache-devx-${{ env.CABAL_CACHE_VERSION }}-${{ matrix.platform }}.${{ matrix.compiler-nix-name }}${{ matrix.target-platform }}-${{ hashFiles('dependencies.txt') }}
       - name: cabal build
         run: cabal build all
-      - name: Check output
-        run: |
-          echo HOME=$HOME
-          ls -l
-          ls -l $HOME/.cabal${{ matrix.target-platform }}/store
-          ls -l dist-newstyle
