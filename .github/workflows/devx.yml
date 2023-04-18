@@ -1,0 +1,78 @@
+name: Build using https://github.com/input-output-hk/devx
+on:
+  push:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: devx {0}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          #- x86_64-darwin
+          - x86_64-linux
+          #- aarch64-darwin
+          #- aarch64-linux
+        compiler-nix-name:
+          - ghc8107
+          - ghc927
+          - ghc961
+        target-platform:
+          - ""
+          - "-static"
+          - "-js"
+          - "-windows"
+        variant:
+          # - ""
+          - "-minimal"
+        os:
+          - ubuntu-latest
+          #- macOS-latest
+        exclude:
+          - compiler-nix-name: ghc8107
+            target-platform: "-js"
+          - compiler-nix-name: ghc927
+            target-platform: "-js"
+          - platform: x86_64-darwin
+            target-platform: "-static"
+          - target-platform: "-static"
+            variant: ""
+          - target-platform: ghc961
+            variant: ""
+          - platform: aarch64-darwin
+            target-platform: "-windows"
+          - platform: aarch64-linux
+            target-platform: "-windows"
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Nix with good defaults
+        uses: cachix/install-nix-action@v17
+        with:
+          extra_nix_config: |
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= loony-tools:pr9m4BkM/5/eSTZlkQyRt57Jz7OMBxNSUiMC4FkcNfk= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+            substituters = https://cache.iog.io/ https://cache.zw3rk.com/ https://cache.nixos.org/
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Install jq
+        shell: bash
+        run: |
+          curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o jq
+          chmod +x jq
+      - name: Download and import closure
+        shell: bash
+        run: |
+          ./devx/fetch-docker.sh input-output-hk/devx ${{ matrix.platform }}.${{ matrix.compiler-nix-name }}${{ matrix.target-platform }}${{ matrix.variant }}${{ matrix.iog }}-env | zstd -d | nix-store --import | tee store-paths.txt
+          sudo ln -s $(tail -n 1 store-paths.txt) /usr/bin/devx-env.sh
+          sudo cp devx/devx /usr/bin
+      - name: cabal update
+        run: cabal update
+      - name: cabal build
+        run: cabal build
+      - name: cabal test
+        run: cabal test

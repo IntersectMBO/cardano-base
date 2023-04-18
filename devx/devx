@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+source /usr/bin/devx-env.sh
+source "$1"
