@@ -59,5 +59,11 @@ jobs:
             /home/runner/.cabal${{ matrix.target-platform }}/store
             dist-newstyle
           key: cache-devx-${{ env.CABAL_CACHE_VERSION }}-${{ matrix.platform }}.${{ matrix.compiler-nix-name }}${{ matrix.target-platform }}-${{ hashFiles('dependencies.txt') }}
+  
+  
+      - name: cabal build dependencies
+        run: cabal build all -j --enable-tests --only-dependencies
       - name: cabal build
-        run: cabal build all
+        run: cabal build all -j --enable-tests
+      - name: cabal test
+        run: cabal test all -j --enable-tests --test-show-details=direct
