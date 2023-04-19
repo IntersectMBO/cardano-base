@@ -737,7 +737,7 @@ blsDeserialize bs = unsafePerformIO $ do
       return $ Left BLST_BAD_ENCODING
 
 blsCompress :: forall curve. BLS curve => Point curve -> ByteString
-blsCompress p = BSI.fromForeignPtr0 (castForeignPtr ptr) (compressedSizePoint (Proxy @curve))
+blsCompress p = BSI.fromForeignPtr (castForeignPtr ptr) 0 (compressedSizePoint (Proxy @curve))
     where
         ptr = unsafePerformIO $ do
           cstr <- mallocForeignPtrBytes (compressedSizePoint (Proxy @curve))
@@ -747,7 +747,7 @@ blsCompress p = BSI.fromForeignPtr0 (castForeignPtr ptr) (compressedSizePoint (P
           return cstr
 
 blsSerialize :: forall curve. BLS curve => Point curve -> ByteString
-blsSerialize p = BSI.fromForeignPtr0 (castForeignPtr ptr) (serializedSizePoint (Proxy @curve))
+blsSerialize p = BSI.fromForeignPtr (castForeignPtr ptr) 0 (serializedSizePoint (Proxy @curve))
     where
         ptr = unsafePerformIO $ do
           cstr <- mallocForeignPtrBytes (serializedSizePoint (Proxy @curve))
@@ -834,7 +834,7 @@ scalarFromBS bs = unsafePerformIO $ do
       return $ Left BLST_BAD_SCALAR
 
 scalarToBS :: Scalar -> ByteString
-scalarToBS scalar = BSI.fromForeignPtr0 (castForeignPtr ptr) sizeScalar
+scalarToBS scalar = BSI.fromForeignPtr (castForeignPtr ptr) 0 sizeScalar
    where
        ptr = unsafePerformIO $ do
           cstr <- mallocForeignPtrBytes sizeScalar
