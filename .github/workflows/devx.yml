@@ -20,8 +20,7 @@ jobs:
       # Modify this value to "invalidate" the cabal cache.
       CABAL_CACHE_VERSION: "2023-04-18"
     
-    if: ${{ matrix.platform == "x86_64-linux" }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform == 'x86_64-linux' && 'ubuntu-latest' || 'macos-latest' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
