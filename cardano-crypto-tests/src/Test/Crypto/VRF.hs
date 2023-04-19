@@ -162,7 +162,7 @@ prop_vrf_verify_pos
 prop_vrf_verify_pos a sk =
   let (y, c) = evalVRF () a sk
       vk = deriveVerKeyVRF sk
-  in verifyVRF () vk a (y, c)
+  in verifyVRF () vk a c == Just y
 
 prop_vrf_verify_neg
   :: forall v. (VRFAlgorithm v, Eq (SignKeyVRF v),
@@ -174,9 +174,9 @@ prop_vrf_verify_neg
 prop_vrf_verify_neg a sk sk' =
   sk /=
     sk' ==>
-    let (y, c) = evalVRF () a sk'
+    let (_y, c) = evalVRF () a sk'
         vk = deriveVerKeyVRF sk
-    in not $ verifyVRF () vk a (y, c)
+    in verifyVRF () vk a c == Nothing
 
 
 prop_vrf_output_size
@@ -250,7 +250,7 @@ prop_verKeyValidConversion sharedBytes msg =
     vkBatchCompat = vkToBatchCompat vkPraos
     (y, c) = evalVRF () msg skBatchCompat
   in
-    verifyVRF () vkBatchCompat msg (y, c)
+    verifyVRF () vkBatchCompat msg c == Just y
 
 --
 -- Praos <-> BatchCompatPraos SignKey compatibility. We check that a proof is validated with a
@@ -278,7 +278,7 @@ prop_outputValidConversion sharedBytes msg =
     (_out, c) = evalVRF () msg skBatchCompat
     outBatchCompat = outputToBatchCompat outPraos
   in
-    verifyVRF () vkBatchCompat msg (outBatchCompat, c)
+    verifyVRF () vkBatchCompat msg c == Just outBatchCompat
 
 --
 -- Praos <-> BatchCompatPraos compatibility. We check that a proof is validated with a
@@ -294,7 +294,7 @@ prop_fullValidConversion sharedBytes msg =
     vkBatchCompat = vkToBatchCompat vkPraos
     (_out, c) = evalVRF () msg skBatchCompat
     outBatchCompat = outputToBatchCompat outPraos
-  in verifyVRF () vkBatchCompat msg (outBatchCompat, c)
+  in verifyVRF () vkBatchCompat msg c == Just outBatchCompat
 
 --
 -- Arbitrary instances

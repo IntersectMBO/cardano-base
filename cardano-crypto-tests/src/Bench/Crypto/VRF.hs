@@ -49,9 +49,9 @@ benchVRF _ lbl =
         nf (evalVRF @v () typicalMsg) signKey
 
     , env (let (sk, vk) = genKeyPairVRF @v testSeed
-               (output, cert) = evalVRF @v () typicalMsg sk
-            in return (vk, output, cert)
-          ) $ \ ~(vk, output, cert) ->
+               (_output, cert) = evalVRF @v () typicalMsg sk
+            in return (vk, cert)
+          ) $ \ ~(vk, cert) ->
       bench "verify" $
-        nf (verifyVRF () vk typicalMsg) (output, cert)
+        nf (verifyVRF () vk typicalMsg) cert
     ]
