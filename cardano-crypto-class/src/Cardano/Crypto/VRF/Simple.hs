@@ -152,19 +152,21 @@ instance VRFAlgorithm SimpleVRF where
         s = mod (r + k * fromIntegral (bytesToNatural c)) q
     in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
 
-  verifyVRF () (VerKeySimpleVRF v) a' (OutputVRF y, cert) =
+  verifyVRF () (VerKeySimpleVRF v) a' cert =
     let a = getSignableRepresentation a'
         u = certU cert
         c = certC cert
         c' = -fromIntegral c
         s = certS cert
-        b1 = y == h (toCBOR a <> toCBOR u)
+        o = h (toCBOR a <> toCBOR u)
         rhs =
           h $ toCBOR a <>
             toCBOR v <>
             toCBOR (pow s <> pow' v c') <>
             toCBOR (h' (toCBOR a) s <> pow' u c')
-    in b1 && c == bytesToNatural rhs
+    in if c == bytesToNatural rhs
+         then Just (OutputVRF o)
+         else Nothing
 
   sizeOutputVRF _ = sizeHash (Proxy :: Proxy H)
 

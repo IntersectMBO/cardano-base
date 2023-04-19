@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -125,8 +126,8 @@ class ( Typeable v
     => ContextVRF v
     -> VerKeyVRF v
     -> a
-    -> (OutputVRF v, CertVRF v)
-    -> Bool
+    -> CertVRF v
+    -> Maybe (OutputVRF v)
 
   --
   -- Key generation
@@ -334,7 +335,10 @@ verifyCertified
   -> a
   -> CertifiedVRF v a
   -> Bool
-verifyCertified ctxt vk a CertifiedVRF {..} = verifyVRF ctxt vk a (certifiedOutput, certifiedProof)
+verifyCertified ctxt vk a CertifiedVRF {certifiedOutput, certifiedProof} =
+    case verifyVRF ctxt vk a certifiedProof of
+      Nothing     -> False
+      Just output -> output == certifiedOutput
 
 --
 -- 'Size' expressions for 'ToCBOR' instances

@@ -58,7 +58,11 @@ instance VRFAlgorithm MockVRF where
 
   evalVRF () a sk = evalVRF' a sk
 
-  verifyVRF () (VerKeyMockVRF n) a c = evalVRF' a (SignKeyMockVRF n) == c
+  verifyVRF () (VerKeyMockVRF n) a c
+      | c == c'   = Just o
+      | otherwise = Nothing
+    where
+      (o, c') = evalVRF' a (SignKeyMockVRF n)
 
   sizeOutputVRF _ = sizeHash (Proxy :: Proxy ShortHash)
 

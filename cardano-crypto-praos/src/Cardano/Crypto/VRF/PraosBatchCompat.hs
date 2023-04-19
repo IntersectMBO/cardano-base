@@ -76,7 +76,7 @@ import Control.Monad (void)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Coerce (coerce)
-import Data.Maybe (isJust, fromMaybe)
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types
 import Foreign.ForeignPtr
@@ -484,8 +484,8 @@ instance VRFAlgorithm PraosBatchCompatVRF where
     in output `seq` proof `seq`
            (OutputVRF (outputBytes output), CertPraosBatchCompatVRF proof)
 
-  verifyVRF = \_ (VerKeyPraosBatchCompatVRF pk) msg (_, CertPraosBatchCompatVRF proof) ->
-    isJust $! verify pk proof (getSignableRepresentation msg)
+  verifyVRF = \_ (VerKeyPraosBatchCompatVRF pk) msg (CertPraosBatchCompatVRF proof) ->
+    (OutputVRF . outputBytes) <$> verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_ietfdraft13_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_ietfdraft13_seedbytes
