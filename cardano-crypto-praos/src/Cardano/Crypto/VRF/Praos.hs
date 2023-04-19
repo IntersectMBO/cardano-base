@@ -77,7 +77,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (..))
 import Foreign.C.Types
 import Foreign.ForeignPtr
@@ -507,8 +507,8 @@ instance VRFAlgorithm PraosVRF where
         !output = maybe (error "Invalid Proof") outputBytes $ outputFromProof proof
      in (OutputVRF output, CertPraosVRF proof)
 
-  verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
-    isJust $! verify pk proof (getSignableRepresentation msg)
+  verifyVRF = \_ (VerKeyPraosVRF pk) msg (CertPraosVRF proof) ->
+    (OutputVRF . outputBytes) <$> verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_seedbytes
