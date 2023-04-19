@@ -12,23 +12,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - x86_64-linux
-        compiler-nix-name:
-          - ghc8107
-          - ghc927
-        target-platform:
-          - ""
-          - "-windows"
-        os:
-          - ubuntu-latest
-          #- macOS-latest
-
+        platform: [ x86_64-linux ]
+        compiler-nix-name: [ ghc8107, ghc927, 961 ]
+        target-platform: [ "", "-windows" ]
+  
     env:
       # Modify this value to "invalidate" the cabal cache.
       CABAL_CACHE_VERSION: "2023-04-18"
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform == "x86_64-linux" && "ubuntu-latest" }
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
