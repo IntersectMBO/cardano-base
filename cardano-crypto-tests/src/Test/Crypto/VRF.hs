@@ -50,9 +50,7 @@ tests =
       , testProperty "signKeyToBatchCompat" prop_signKeyToBatchCompat
       , testProperty "outputToBatchCompat" prop_outputToBatchComat
       , testProperty "compatibleVerKeyConversion" prop_verKeyValidConversion
-      , testProperty "compatibleOutputConversion" prop_outputValidConversion
       , testProperty "compatibleSignKeyConversion" prop_signKeyValidConversion
-      , testProperty "compatibleFullConversion" prop_fullValidConversion
       ]
     ]
 
@@ -162,7 +160,7 @@ prop_vrf_verify_pos
 prop_vrf_verify_pos a sk =
   let (y, c) = evalVRF () a sk
       vk = deriveVerKeyVRF sk
-  in verifyVRF () vk a (y, c)
+  in verifyVRF () vk a c == Just y
 
 prop_vrf_verify_neg
   :: forall v. (VRFAlgorithm v, Eq (SignKeyVRF v),
@@ -174,9 +172,9 @@ prop_vrf_verify_neg
 prop_vrf_verify_neg a sk sk' =
   sk /=
     sk' ==>
-    let (y, c) = evalVRF () a sk'
+    let (_y, c) = evalVRF () a sk'
         vk = deriveVerKeyVRF sk
-    in not $ verifyVRF () vk a (y, c)
+    in verifyVRF () vk a c == Nothing
 
 
 prop_vrf_output_size
@@ -250,7 +248,7 @@ prop_verKeyValidConversion sharedBytes msg =
     vkBatchCompat = vkToBatchCompat vkPraos
     (y, c) = evalVRF () msg skBatchCompat
   in
-    verifyVRF () vkBatchCompat msg (y, c)
+    verifyVRF () vkBatchCompat msg c == Just y
 
 --
 -- Praos <-> BatchCompatPraos SignKey compatibility. We check that a proof is validated with a
@@ -263,38 +261,6 @@ prop_signKeyValidConversion sharedBytes =
     skBatchCompat = genKeyVRF . unSizedSeed $ sharedBytes
   in
     skBatchCompat == skToBatchCompat skPraos
-
---
--- Praos <-> BatchCompatPraos Output compatibility. We check that a proof is validated with a
--- transformed output
---
-prop_outputValidConversion :: SizedSeed 32 -> Message -> Bool
-prop_outputValidConversion sharedBytes msg =
-  let
-    skPraos = genKeyVRF . unSizedSeed $ sharedBytes
-    (outPraos, _c) = evalVRF () msg skPraos
-    skBatchCompat = genKeyVRF . unSizedSeed $ sharedBytes
-    vkBatchCompat = deriveVerKeyVRF skBatchCompat
-    (_out, c) = evalVRF () msg skBatchCompat
-    outBatchCompat = outputToBatchCompat outPraos
-  in
-    verifyVRF () vkBatchCompat msg (outBatchCompat, c)
-
---
--- Praos <-> BatchCompatPraos compatibility. We check that a proof is validated with a
--- transformed key and output
---
-prop_fullValidConversion :: SizedSeed 32 -> Message -> Bool
-prop_fullValidConversion sharedBytes msg =
-  let
-    skPraos = genKeyVRF . unSizedSeed $ sharedBytes
-    vkPraos = deriveVerKeyVRF skPraos
-    (outPraos, _c) = evalVRF () msg skPraos
-    skBatchCompat = skToBatchCompat skPraos
-    vkBatchCompat = vkToBatchCompat vkPraos
-    (_out, c) = evalVRF () msg skBatchCompat
-    outBatchCompat = outputToBatchCompat outPraos
-  in verifyVRF () vkBatchCompat msg (outBatchCompat, c)
 
 --
 -- Arbitrary instances
