@@ -102,7 +102,7 @@ library
     , aeson
     , base
     , base16-bytestring  >=1
-    , bytestring >= 0.11
+    , bytestring
     , cardano-binary >= 1.6
     , cardano-mempool
     , cardano-strict-containers
