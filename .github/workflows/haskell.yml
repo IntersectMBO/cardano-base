@@ -110,16 +110,14 @@ jobs:
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
       run: |
-        $env:PREFIX="${env:GITHUB_WORKSPACE}/blst-sources/blst"
+        $env:PREFIX="/mingw64"
         C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
-        "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH};${env:PREFIX}/pkgconfig" >> $env:GITHUB_ENV
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
       run: |
-        export PREFIX="${GITHUB_WORKSPACE}/blst-sources/blst"
+        export PREFIX="/usr/local"
         .github/workflows/build-blst.bash
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:${PREFIX}/pkgconfig" >> $GITHUB_ENV
 
     - name: Install secp256k1
       uses: input-output-hk/setup-secp256k1@v1
