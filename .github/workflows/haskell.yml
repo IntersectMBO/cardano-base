@@ -111,7 +111,7 @@ jobs:
         MSYSTEM: MINGW64
       run: |
         C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
-        echo "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH}:${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV        
+        echo "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH}:${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
