@@ -113,8 +113,9 @@ jobs:
         C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
         # install the pkgconfig file globally. No idea how to get the msys64 pkg_config to
         # adhere to PKG_CONFIG_PATH.
-        "PKG_CONFIG_PATH={$env:PKG_CONFIG_PATH};${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV
+        "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH};${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
+        $env:PKG_CONFIG_PATH="${env:PKG_CONFIG_PATH};${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig"
         pkg-config --list-all
         # cp ${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig/* C:/msys64/mingw64/lib/pkgconfig
 
