@@ -9,8 +9,12 @@ git reset --hard $BLST_REF
 ./build.sh
 
 mkdir -p pkgconfig
+# the $PREFIX//\\// is to replace windows \ with /
+# as that screws up a lot of cli arguments, and the
+# \ are treated as escape characters when written into
+# prefix (through echo).
 cat <<EOF > pkgconfig/libblst.pc
-prefix=$PREFIX
+prefix=${PREFIX//\\//}
 exec_prefix=\${prefix}
 libdir=\${prefix}
 includedir=\${prefix}/bindings
