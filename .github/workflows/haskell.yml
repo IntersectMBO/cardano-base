@@ -117,7 +117,7 @@ jobs:
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
       env:
-        PREFIX: ${GITHUB_WORKSPACE}/blst-sources/blst         
+        PREFIX: ${GITHUB_WORKSPACE}/blst-sources/blst
       run: |
         .github/workflows/build-blst.bash
         echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:${PREFIX}/pkgconfig" >> $GITHUB_ENV
