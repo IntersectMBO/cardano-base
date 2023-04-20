@@ -111,7 +111,7 @@ jobs:
         MSYSTEM: MINGW64
       run: |
         C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
-        echo "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH}:${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV
+        "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH}:${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
@@ -160,11 +160,11 @@ jobs:
 
     - name: Install dependencies
       run: |
-        ${{ (runner.os == 'Windows' && '$env:PKG_CONFIG_PATH=("{0}:{1}/blst-sources/blst/pkgconfig" -f $env:PKG_CONFIG_PATH -f $env:GITHUB_WORKSPACE)' || '' }
         # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
         # we are very deliberate about only adding msys64 to the path where absolutely necessary.
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
         echo $PKG_CONFIG_PATH
+        echo $env:PKG_CONFIG_PATH
         cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
 
     - name: Build [WIN - testing]
