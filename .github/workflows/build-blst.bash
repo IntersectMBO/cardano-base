@@ -10,9 +10,9 @@ git reset --hard $BLST_REF
 
 mkdir -p pkgconfig
 cat <<EOF > pkgconfig/libblst.pc
-prefix=$PWD
+prefix=$PREFIX
 exec_prefix=\${prefix}
-libdir=$PWD
+libdir=\${prefix}
 includedir=\${prefix}/bindings
 
 Name: libblst
