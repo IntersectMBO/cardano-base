@@ -13,11 +13,13 @@ cat <<EOF > pkgconfig/libblst.pc
 prefix=$PWD
 exec_prefix=\${prefix}
 libdir=$PWD
+includedir=\${prefix}/bindings
 
 Name: libblst
 Version: 0.3.10
 Description: Multilingual BLS12-381 signature library
 
+Cflags: -I\${includedir}
 Libs: -L\${libdir} -lblst
 EOF
 
