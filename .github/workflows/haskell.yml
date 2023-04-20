@@ -109,16 +109,15 @@ jobs:
       env:
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
-        PREFIX: ${{ env.GITHUB_WORKSPACE }}/blst-sources/blst
       run: |
+        $env:PREFIX="${env:GITHUB_WORKSPACE}/blst-sources/blst
         C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
         "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH};${env:PREFIX}/pkgconfig" >> $env:GITHUB_ENV
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
-      env:
-        PREFIX: ${{ env.GITHUB_WORKSPACE }}/blst-sources/blst
       run: |
+        export PREFIX="${GITHUB_WORKSPACE}/blst-sources/blst"
         .github/workflows/build-blst.bash
         echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:${PREFIX}/pkgconfig" >> $GITHUB_ENV
 
