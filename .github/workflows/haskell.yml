@@ -113,7 +113,11 @@ jobs:
         C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
         "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH}:${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV
         $env:PKG_CONFIG_PATH="${env:PKG_CONFIG_PATH}:${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig"
+        echo $PKG_CONFIG_PATH
+        echo $env:PKG_CONFIG_PATH
         pkg-config --list-all
+        ls ${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig
+        ls ${env:GITHUB_WORKSPACE}/blst-sources/blst
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
