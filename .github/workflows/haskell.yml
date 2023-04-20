@@ -109,21 +109,18 @@ jobs:
       env:
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
+        PREFIX: ${env:GITHUB_WORKSPACE}/blst-sources/blst
       run: |
         C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
-        # install the pkgconfig file globally. No idea how to get the msys64 pkg_config to
-        # adhere to PKG_CONFIG_PATH.
-        "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH};${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $env:GITHUB_ENV
-        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        $env:PKG_CONFIG_PATH="${env:PKG_CONFIG_PATH};${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig"
-        pkg-config --list-all
-        # cp ${env:GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig/* C:/msys64/mingw64/lib/pkgconfig
+        "PKG_CONFIG_PATH=${env:PKG_CONFIG_PATH};${env:PREFIX}/pkgconfig" >> $env:GITHUB_ENV
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
+      env:
+        PREFIX: ${GITHUB_WORKSPACE}/blst-sources/blst         
       run: |
         .github/workflows/build-blst.bash
-        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:${GITHUB_WORKSPACE}/blst-sources/blst/pkgconfig" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:${PREFIX}/pkgconfig" >> $GITHUB_ENV
 
     - name: Install secp256k1
       uses: input-output-hk/setup-secp256k1@v1
