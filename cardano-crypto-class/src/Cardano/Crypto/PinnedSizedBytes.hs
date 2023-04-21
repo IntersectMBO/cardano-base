@@ -192,6 +192,7 @@ psbFromByteString bs =
   case psbFromByteStringCheck bs of
     Nothing -> error $ "psbFromByteString: Size mismatch, got: " ++ show (BS.length bs)
     Just psb -> psb
+{-# INLINE psbFromByteString #-}
 
 psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
 psbFromByteStringCheck bs
@@ -205,6 +206,7 @@ psbFromByteStringCheck bs
   where
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
+{-# INLINE psbFromByteStringCheck #-}
 
 {-# DEPRECATED psbZero "This is not referentially transparent" #-}
 psbZero :: KnownNat n =>  PinnedSizedBytes n
@@ -234,7 +236,6 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
 --
 -- The 'Ptr' given to the function argument /must not/ be used as the result of
 -- type @r@.
-{-# INLINE psbUseAsCPtr #-}
 psbUseAsCPtr ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (PrimMonad m) =>
@@ -242,6 +243,7 @@ psbUseAsCPtr ::
   (Ptr Word8 -> m r) ->
   m r
 psbUseAsCPtr (PSB ba) = runAndTouch ba
+{-# INLINE psbUseAsCPtr #-}
 
 -- | As 'psbUseAsCPtr', but also gives the function argument the size we are
 -- allowed to use as a 'CSize'.
@@ -257,7 +259,6 @@ psbUseAsCPtr (PSB ba) = runAndTouch ba
 --
 -- The same caveats apply to the use of this function as to the use of
 -- 'psbUseAsCPtr'.
-{-# INLINE psbUseAsCPtrLen #-}
 psbUseAsCPtrLen ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
@@ -267,12 +268,12 @@ psbUseAsCPtrLen ::
 psbUseAsCPtrLen (PSB ba) f = do
   let len :: CSize = fromIntegral . natVal $ Proxy @n
   runAndTouch ba (`f` len)
+{-# INLINE psbUseAsCPtrLen #-}
 
 -- | As 'psbUseAsCPtr', but does not \'forget\' the size.
 --
 -- The same caveats apply to this use of this function as to the use of
 -- 'psbUseAsCPtr'.
-{-# INLINE psbUseAsSizedPtr  #-}
 psbUseAsSizedPtr ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (PrimMonad m) =>
@@ -282,26 +283,27 @@ psbUseAsSizedPtr ::
 psbUseAsSizedPtr (PSB ba) k = do
     r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
     r <$ touch ba
+{-# INLINE psbUseAsSizedPtr #-}
 
 -- | As 'psbCreateResult', but presumes that no useful value is produced: that
 -- is, the function argument is run only for its side effects.
-{-# INLINE psbCreate  #-}
 psbCreate ::
   forall (n :: Nat) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
   (Ptr Word8 -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreate f = fst <$> psbCreateResult f
+{-# INLINE psbCreate #-}
 
 -- | As 'psbCreateResultLen', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
-{-# INLINE psbCreateLen  #-}
 psbCreateLen ::
   forall (n :: Nat) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
   (Ptr Word8 -> CSize -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreateLen f = fst <$> psbCreateResultLen f
+{-# INLINE psbCreateLen #-}
 
 -- | Given an \'initialization action\', which also produces some result, allocate
 -- new pinned memory of the specified size, perform the action, then return the
@@ -318,13 +320,13 @@ psbCreateLen f = fst <$> psbCreateResultLen f
 -- which can lead to segfaults or out-of-bounds reads.
 --
 -- This poses both correctness /and/ security risks, so please don't do it.
-{-# INLINE psbCreateResult  #-}
 psbCreateResult ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
   (Ptr Word8 -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateResult f = psbCreateResultLen (\p _ -> f p)
+{-# INLINE psbCreateResult #-}
 
 -- | As 'psbCreateResult', but also gives the number of bytes we are allowed to
 -- operate on as a 'CSize'.
@@ -338,7 +340,6 @@ psbCreateResult f = psbCreateResultLen (\p _ -> f p)
 --
 -- The same caveats apply to this function as to 'psbCreateResult': the 'Ptr'
 -- given to the function argument /must not/ be returned as @r@.
-{-# INLINE psbCreateResultLen  #-}
 psbCreateResultLen ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type).
   (KnownNat n, PrimMonad m) =>
@@ -350,27 +351,28 @@ psbCreateResultLen f = do
   res <- f (mutableByteArrayContents mba) (fromIntegral len)
   arr <- unsafeFreezeByteArray mba
   pure (PSB arr, res)
+{-# INLINE psbCreateResultLen #-}
 
 -- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
-{-# INLINE psbCreateSized  #-}
 psbCreateSized ::
   forall (n :: Nat) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
   (SizedPtr n -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
+{-# INLINE psbCreateSized #-}
 
 -- | As 'psbCreateResult', but gives a 'SizedPtr' to the function argument. The
 -- same caveats apply to this function as to 'psbCreateResult': the 'SizedPtr'
 -- given to the function argument /must not/ be resulted as @r@.
-{-# INLINE psbCreateSizedResult  #-}
 psbCreateSizedResult ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
   (KnownNat n, PrimMonad m) =>
   (SizedPtr n -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)
+{-# INLINE psbCreateSizedResult #-}
 
 ptrPsbToSizedPtr :: Ptr (PinnedSizedBytes n) -> SizedPtr n
 ptrPsbToSizedPtr = SizedPtr . castPtr
@@ -402,7 +404,6 @@ die :: String -> String -> a
 die fun problem = error $ "PinnedSizedBytes." ++ fun ++ ": " ++ problem
 
 -- Wrapper that combines applying a function, then touching
-{-# INLINE runAndTouch  #-}
 runAndTouch ::
   forall (a :: Type) (m :: Type -> Type) .
   (PrimMonad m) =>
@@ -412,3 +413,4 @@ runAndTouch ::
 runAndTouch ba f = do
   r <- f (byteArrayContents ba)
   r <$ touch ba
+{-# INLINE runAndTouch #-}
