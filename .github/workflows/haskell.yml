@@ -114,9 +114,9 @@ jobs:
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
-      env:
-        PREFIX: /usr/local
-      run: sudo .github/workflows/build-blst.bash
+      run: |
+        export PREFIX="/usr/local"
+        sudo .github/workflows/build-blst.bash
 
     - name: Install secp256k1
       uses: input-output-hk/setup-secp256k1@v1
