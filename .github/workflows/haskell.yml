@@ -114,9 +114,10 @@ jobs:
 
     - name: "NON-WINDOWS: Install blst"
       if: runner.os != 'Windows'
+      env:
+        PREFIX: /usr/local
       run: |
-        export PREFIX="/usr/local"
-        sudo .github/workflows/build-blst.bash
+        sudo -E .github/workflows/build-blst.bash
         echo "PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" | tee -a "$GITHUB_ENV"
 
     - name: Install secp256k1
