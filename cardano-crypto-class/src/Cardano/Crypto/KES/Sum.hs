@@ -199,6 +199,7 @@ instance ( KESAlgorithm d
         ]
 
     rawDeserialiseVerKeyKES = fmap VerKeySumKES  . hashFromBytes
+    {-# INLINE rawDeserialiseVerKeyKES #-}
 
     rawDeserialiseSigKES b = do
         guard (BS.length b == fromIntegral size_total)
@@ -218,6 +219,7 @@ instance ( KESAlgorithm d
         off_sig    = 0 :: Word
         off_vk0    = size_sig
         off_vk1    = off_vk0 + size_vk
+    {-# INLINEABLE rawDeserialiseSigKES #-}
 
 instance ( KESSignAlgorithm m d
          , NaCl.SodiumHashAlgorithm h -- needed for secure forgetting
@@ -354,6 +356,7 @@ instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, SizeHash h ~ Se
 instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (VerKeyKES (SumKES h d)) where
   fromCBOR = decodeVerKeyKES
+  {-# INLINE fromCBOR #-}
 
 instance (KESAlgorithm d) => NoThunks (VerKeyKES  (SumKES h d))
 
@@ -393,3 +396,4 @@ instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, SizeHash h ~ Se
 instance (KESAlgorithm (SumKES h d), NaCl.SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
+  {-# INLINE fromCBOR #-}

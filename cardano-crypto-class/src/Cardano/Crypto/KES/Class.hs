@@ -330,6 +330,7 @@ decodeVerKeyKES = do
         where
           expected = fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
           actual   = BS.length bs
+{-# INLINEABLE decodeVerKeyKES #-}
 
 decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
 decodeSigKES = do
@@ -344,6 +345,7 @@ decodeSigKES = do
         where
           expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
           actual   = BS.length bs
+{-# INLINEABLE decodeSigKES #-}
 
 decodeSignKeyKES :: forall v s m. (UnsoundKESSignAlgorithm m v) => Decoder s (m (Maybe (SignKeyKES v)))
 decodeSignKeyKES = do
@@ -396,6 +398,7 @@ encodeSignedKES (SignedKES s) = encodeSigKES s
 
 decodeSignedKES :: KESAlgorithm v => Decoder s (SignedKES v a)
 decodeSignedKES = SignedKES <$> decodeSigKES
+{-# INLINE decodeSignedKES #-}
 
 --
 -- 'Size' expressions for 'ToCBOR' instances.
