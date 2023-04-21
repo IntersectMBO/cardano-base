@@ -1,5 +1,7 @@
 ## 2.1.1.0
+
 * Included bindings to `blst` library to enable operations over curve BLS12-381
+* Expose helper function `failSizeCheck`
 
 ## 2.1.0.1
 
