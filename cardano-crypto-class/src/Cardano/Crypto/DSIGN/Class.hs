@@ -40,6 +40,9 @@ module Cardano.Crypto.DSIGN.Class
   , encodedVerKeyDSIGNSizeExpr
   , encodedSignKeyDSIGNSizeExpr
   , encodedSigDSIGNSizeExpr
+
+  -- * Helper
+  , failSizeCheck
   )
 where
 
@@ -198,47 +201,43 @@ encodeSigDSIGN = encodeBytes . rawSerialiseSigDSIGN
 
 decodeVerKeyDSIGN :: forall v s. DSIGNAlgorithm v => Decoder s (VerKeyDSIGN v)
 decodeVerKeyDSIGN = do
-    bs <- decodeBytes
-    case rawDeserialiseVerKeyDSIGN bs of
-      Just vk -> return vk
-      Nothing
-        | actual /= expected
-                    -> fail ("decodeVerKeyDSIGN: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeVerKeyDSIGN: cannot decode key"
-        where
-          expected = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy v))
-          actual   = BS.length bs
-{-# INLINEABLE decodeVerKeyDSIGN #-}
+  bs <- decodeBytes
+  case rawDeserialiseVerKeyDSIGN bs of
+    Just vk -> return vk
+    Nothing -> failSizeCheck "decodeVerKeyDSIGN" bs (sizeVerKeyDSIGN (Proxy :: Proxy v))
+{-# INLINE decodeVerKeyDSIGN #-}
 
 decodeSignKeyDSIGN :: forall v s. DSIGNAlgorithm v => Decoder s (SignKeyDSIGN v)
 decodeSignKeyDSIGN = do
-    bs <- decodeBytes
-    case rawDeserialiseSignKeyDSIGN bs of
-      Just sk -> return sk
-      Nothing
-        | actual /= expected
-                    -> fail ("decodeSignKeyDSIGN: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeSignKeyDSIGN: cannot decode key"
-        where
-          expected = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v))
-          actual   = BS.length bs
+  bs <- decodeBytes
+  case rawDeserialiseSignKeyDSIGN bs of
+    Just sk -> return sk
+    Nothing -> failSizeCheck "decodeSignKeyDSIGN" bs (sizeSignKeyDSIGN (Proxy :: Proxy v))
 
 decodeSigDSIGN :: forall v s. DSIGNAlgorithm v => Decoder s (SigDSIGN v)
 decodeSigDSIGN = do
-    bs <- decodeBytes
-    case rawDeserialiseSigDSIGN bs of
-      Just sig -> return sig
-      Nothing
-        | actual /= expected
-                    -> fail ("decodeSigDSIGN: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeSigDSIGN: cannot decode signature"
-        where
-          expected = fromIntegral (sizeSigDSIGN (Proxy :: Proxy v))
-          actual   = BS.length bs
-{-# INLINEABLE decodeSigDSIGN #-}
+  bs <- decodeBytes
+  case rawDeserialiseSigDSIGN bs of
+    Just sig -> return sig
+    Nothing -> failSizeCheck "decodeSigDSIGN" bs (sizeSigDSIGN (Proxy :: Proxy v))
+{-# INLINE decodeSigDSIGN #-}
+
+-- | Helper function that always fails, but it provides a different message whenever
+-- expected size does not match.
+failSizeCheck :: MonadFail m => String -> ByteString -> Word -> m a
+failSizeCheck name bs expectedSize
+  | actualSize /= expectedSize =
+      fail
+        ( name
+            ++ ": wrong length, expected "
+            ++ show expectedSize
+            ++ " bytes but got "
+            ++ show actualSize
+        )
+  | otherwise = fail $ name ++ ": cannot decode"
+  where
+    actualSize = fromIntegral (BS.length bs)
+{-# NOINLINE failSizeCheck #-}
 
 newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
   deriving Generic
