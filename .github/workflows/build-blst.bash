@@ -7,4 +7,24 @@ git clone https://github.com/supranational/blst
 cd blst
 git reset --hard $BLST_REF
 ./build.sh
+
+mkdir -p ${PREFIX}/lib/pkgconfig
+mkdir -p ${PREFIX}/include/blst
+cp bindings/{blst.h,blst_aux.h} ${PREFIX}/include/blst/ 
+cp -f libblst.{a,dll,so,dylib} ${PREFIX}/lib/
+
+cat <<EOF > ${PREFIX}/lib/pkgconfig/libblst.pc
+prefix=${PREFIX}
+exec_prefix=\${prefix}
+libdir=\${prefix}
+includedir=\${prefix}/include/blst
+
+Name: libblst
+Version: 0.3.10
+Description: Multilingual BLS12-381 signature library
+
+Cflags: -I\${includedir}
+Libs: -L\${libdir} -lblst
+EOF
+
 cd ../..
