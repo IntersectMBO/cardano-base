@@ -9,6 +9,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 -- Needed to ensure that our hash is the right size
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 -- According to the documentation for unsafePerformIO:

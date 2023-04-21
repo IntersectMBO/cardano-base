@@ -1,7 +1,8 @@
-{-#LANGUAGE TypeApplications #-}
-{-#LANGUAGE ScopedTypeVariables #-}
-{-#LANGUAGE TypeFamilies #-}
-{-#LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 module Bench.Crypto.KES
   ( benchmarks
   ) where

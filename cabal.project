@@ -11,11 +11,11 @@ repository cardano-haskell-packages
 
 -- The hackage index-state is repeated twice to work around haskell.nix
 -- limited parsing ability
-index-state: 2022-10-07T01:58:16Z
+index-state: 2023-04-18T07:23:09Z
 index-state:
-  , hackage.haskell.org 2022-10-07T01:58:16Z
+  , hackage.haskell.org 2023-04-18T07:23:09Z
   -- The CHaP index-state
-  , cardano-haskell-packages 2022-10-20T01:58:16Z
+  , cardano-haskell-packages 2023-04-24T15:32:00Z
 
 packages:
   base-deriving-via
@@ -36,3 +36,14 @@ test-show-details: direct
 
 program-options
   ghc-options: -Werror
+
+if impl(ghc >= 9.6)
+  allow-newer:
+    , *:base
+    , *:ghc-prim
+    , *:template-haskell
+    , hedgehog:*
+    , protolude:binary
+    , protolude:bytestring
+    , protolude:text
+    , th-compat:*

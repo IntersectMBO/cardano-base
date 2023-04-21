@@ -11,6 +11,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE NoStarIsType #-}
 
+-- Needed for ghc-9.6.
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+
 -- | Mock key evolving signatures.
 module Cardano.Crypto.KES.Simple
   ( SimpleKES
