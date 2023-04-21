@@ -8,12 +8,12 @@ cd blst
 git reset --hard $BLST_REF
 ./build.sh
 
-mkdir -p ${PREFIX}/lib/pkgconfig
-mkdir -p ${PREFIX}/include/blst
+sudo mkdir -p ${PREFIX}/lib/pkgconfig
+sudo mkdir -p ${PREFIX}/include/blst
 cp bindings/{blst.h,blst_aux.h} ${PREFIX}/include/blst/ 
 cp -f libblst.{a,dll,so,dylib} ${PREFIX}/lib/
 
-cat <<EOF > ${PREFIX}/lib/pkgconfig/libblst.pc
+sudo cat <<EOF > ${PREFIX}/lib/pkgconfig/libblst.pc
 prefix=${PREFIX}
 exec_prefix=\${prefix}
 libdir=\${prefix}
