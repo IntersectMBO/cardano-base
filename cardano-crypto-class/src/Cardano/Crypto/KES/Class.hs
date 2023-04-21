@@ -68,6 +68,7 @@ import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWo
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
+import Cardano.Crypto.DSIGN.Class (failSizeCheck)
 
 
 class ( Typeable v
@@ -288,18 +289,11 @@ encodeSigKES = encodeBytes . rawSerialiseSigKES
 
 decodeVerKeyKES :: forall v s. KESAlgorithm v => Decoder s (VerKeyKES v)
 decodeVerKeyKES = do
-    bs <- decodeBytes
-    case rawDeserialiseVerKeyKES bs of
-      Just vk -> return vk
-      Nothing
-        | actual /= expected
-                    -> fail ("decodeVerKeyKES: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeVerKeyKES: cannot decode key"
-        where
-          expected = fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
-          actual   = BS.length bs
-{-# INLINEABLE decodeVerKeyKES #-}
+  bs <- decodeBytes
+  case rawDeserialiseVerKeyKES bs of
+    Just vk -> return vk
+    Nothing -> failSizeCheck "decodeVerKeyKES" "key" bs (sizeVerKeyKES (Proxy :: Proxy v))
+{-# INLINE decodeVerKeyKES #-}
 
 decodeSignKeyKES :: forall v s. KESAlgorithm v => Decoder s (SignKeyKES v)
 decodeSignKeyKES = do
@@ -317,18 +311,11 @@ decodeSignKeyKES = do
 
 decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
 decodeSigKES = do
-    bs <- decodeBytes
-    case rawDeserialiseSigKES bs of
-      Just sig -> return sig
-      Nothing
-        | actual /= expected
-                    -> fail ("decodeSigKES: wrong length, expected " ++
-                             show expected ++ " bytes but got " ++ show actual)
-        | otherwise -> fail "decodeSigKES: cannot decode key"
-        where
-          expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
-          actual   = BS.length bs
-{-# INLINEABLE decodeSigKES #-}
+  bs <- decodeBytes
+  case rawDeserialiseSigKES bs of
+    Just sig -> return sig
+    Nothing -> failSizeCheck "decodeSigKES" "key" bs (sizeSigKES (Proxy :: Proxy v))
+{-# INLINE decodeSigKES #-}
 
 
 -- | The KES period. Periods are enumerated from zero.
