@@ -191,6 +191,7 @@ psbFromByteString bs =
   case psbFromByteStringCheck bs of
     Nothing -> error $ "psbFromByteString: Size mismatch, got: " ++ show (BS.length bs)
     Just psb -> psb
+{-# INLINE psbFromByteString #-}
 
 psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
 psbFromByteStringCheck bs
@@ -204,6 +205,7 @@ psbFromByteStringCheck bs
   where
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
+{-# INLINE psbFromByteStringCheck #-}
 
 {-# DEPRECATED psbZero "This is not referentially transparent" #-}
 psbZero :: KnownNat n =>  PinnedSizedBytes n
@@ -239,6 +241,7 @@ psbUseAsCPtr ::
   (Ptr Word8 -> IO r) ->
   IO r
 psbUseAsCPtr (PSB ba) = runAndTouch ba
+{-# INLINE psbUseAsCPtr #-}
 
 -- | As 'psbUseAsCPtr', but also gives the function argument the size we are
 -- allowed to use as a 'CSize'.
@@ -263,6 +266,7 @@ psbUseAsCPtrLen ::
 psbUseAsCPtrLen (PSB ba) f = do
   let len :: CSize = fromIntegral . natVal $ Proxy @n
   runAndTouch ba (`f` len)
+{-# INLINE psbUseAsCPtrLen #-}
 
 -- | As 'psbUseAsCPtr', but does not \'forget\' the size.
 --
@@ -276,6 +280,7 @@ psbUseAsSizedPtr ::
 psbUseAsSizedPtr (PSB ba) k = do
     r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
     r <$ touch ba
+{-# INLINE psbUseAsSizedPtr #-}
 
 -- | As 'psbCreateResult', but presumes that no useful value is produced: that
 -- is, the function argument is run only for its side effects.
@@ -285,6 +290,7 @@ psbCreate ::
   (Ptr Word8 -> IO ()) ->
   IO (PinnedSizedBytes n)
 psbCreate f = fst <$> psbCreateResult f
+{-# INLINE psbCreate #-}
 
 -- | As 'psbCreateResultLen', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
@@ -294,6 +300,7 @@ psbCreateLen ::
   (Ptr Word8 -> CSize -> IO ()) ->
   IO (PinnedSizedBytes n)
 psbCreateLen f = fst <$> psbCreateResultLen f
+{-# INLINE psbCreateLen #-}
 
 -- | Given an \'initialization action\', which also produces some result, allocate
 -- new pinned memory of the specified size, perform the action, then return the
@@ -316,6 +323,7 @@ psbCreateResult ::
   (Ptr Word8 -> IO r) ->
   IO (PinnedSizedBytes n, r)
 psbCreateResult f = psbCreateResultLen (\p _ -> f p)
+{-# INLINE psbCreateResult #-}
 
 -- | As 'psbCreateResult', but also gives the number of bytes we are allowed to
 -- operate on as a 'CSize'.
@@ -340,6 +348,7 @@ psbCreateResultLen f = do
   res <- f (mutableByteArrayContents mba) (fromIntegral len)
   arr <- unsafeFreezeByteArray mba
   pure (PSB arr, res)
+{-# INLINE psbCreateResultLen #-}
 
 -- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
@@ -349,6 +358,7 @@ psbCreateSized ::
   (SizedPtr n -> IO ()) ->
   IO (PinnedSizedBytes n)
 psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
+{-# INLINE psbCreateSized #-}
 
 -- | As 'psbCreateResult', but gives a 'SizedPtr' to the function argument. The
 -- same caveats apply to this function as to 'psbCreateResult': the 'SizedPtr'
@@ -359,6 +369,7 @@ psbCreateSizedResult ::
   (SizedPtr n -> IO r) ->
   IO (PinnedSizedBytes n, r)
 psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)
+{-# INLINE psbCreateSizedResult #-}
 
 ptrPsbToSizedPtr :: Ptr (PinnedSizedBytes n) -> SizedPtr n
 ptrPsbToSizedPtr = SizedPtr . castPtr
@@ -398,3 +409,4 @@ runAndTouch ::
 runAndTouch ba f = do
   r <- f (byteArrayContents ba)
   r <$ touch ba
+{-# INLINE runAndTouch #-}

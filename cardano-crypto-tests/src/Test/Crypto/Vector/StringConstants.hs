@@ -36,7 +36,7 @@ invalidSigLengthError expectedLength actualLength =
   "decodeSigDSIGN: wrong length, expected " ++ show expectedLength ++ " bytes but got " ++ show actualLength
 
 cannotDecodeVerificationKeyError :: String
-cannotDecodeVerificationKeyError = "decodeVerKeyDSIGN: cannot decode key"
+cannotDecodeVerificationKeyError = "decodeVerKeyDSIGN: cannot decode"
 
 unexpectedDecodingError :: String
 unexpectedDecodingError = "Test failed. Unexpected decoding error encountered."
