@@ -135,7 +135,6 @@ instance DSIGNAlgorithm d => KESAlgorithm (SingleKES d) where
     rawDeserialiseSigKES     = fmap SigSingleKES     . rawDeserialiseSigDSIGN
     {-# INLINE rawDeserialiseSigKES #-}
 
-
 --
 -- VerKey instances
 --
