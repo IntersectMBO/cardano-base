@@ -117,6 +117,7 @@ jobs:
       run: |
         export PREFIX="/usr/local"
         sudo .github/workflows/build-blst.bash
+        echo "PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" | tee -a "$GITHUB_ENV"
 
     - name: Install secp256k1
       uses: input-output-hk/setup-secp256k1@v1
