@@ -63,9 +63,11 @@ unsafeDeserialize' = unsafeDeserialize . BSL.fromStrict
 --   be consumed entirely.
 decodeFull :: forall a . FromCBOR a => BSL.ByteString -> Either DecoderError a
 decodeFull = decodeFullDecoder (label $ Proxy @a) fromCBOR
+{-# INLINE decodeFull #-}
 
 decodeFull' :: forall a . FromCBOR a => BS.ByteString -> Either DecoderError a
 decodeFull' = decodeFull . BSL.fromStrict
+{-# INLINE decodeFull' #-}
 
 decodeFullDecoder
   :: Text
@@ -81,6 +83,7 @@ decodeFullDecoder lbl decoder bs0 = case deserialiseDecoder decoder bs0 of
     then pure x
     else Left $ DecoderErrorLeftover lbl leftover
   Left (e, _) -> Left $ DecoderErrorDeserialiseFailure lbl e
+{-# INLINE decodeFullDecoder #-}
 
 decodeFullDecoder'
   :: Text
@@ -92,6 +95,7 @@ decodeFullDecoder'
   -- ^ The @ByteString@ to decode
   -> Either DecoderError a
 decodeFullDecoder' lbl decoder = decodeFullDecoder lbl decoder . BSL.fromStrict
+{-# INLINE decodeFullDecoder' #-}
 
 -- | Deserialise a 'LByteString' incrementally using the provided 'Decoder'
 deserialiseDecoder
@@ -100,6 +104,7 @@ deserialiseDecoder
   -> Either (Read.DeserialiseFailure, BS.ByteString) (a, BS.ByteString)
 deserialiseDecoder decoder bs0 =
   runST (supplyAllInput bs0 =<< Read.deserialiseIncremental decoder)
+{-# INLINE deserialiseDecoder #-}
 
 supplyAllInput
   :: BSL.ByteString
@@ -111,6 +116,7 @@ supplyAllInput bs (Read.Partial k) = case bs of
   BSL.Chunk chunk bs' -> k (Just chunk) >>= supplyAllInput bs'
   BSL.Empty           -> k Nothing >>= supplyAllInput BSL.Empty
 supplyAllInput _ (Read.Fail bs _ exn) = return (Left (exn, bs))
+{-# INLINE supplyAllInput #-}
 
 
 --------------------------------------------------------------------------------
@@ -126,6 +132,7 @@ decodeNestedCborTag = do
   when (t /= 24) $ cborError $ DecoderErrorUnknownTag
     "decodeNestedCborTag"
     (fromIntegral t)
+{-# INLINE decodeNestedCborTag #-}
 
 -- | Remove the the semantic tag 24 from the enclosed CBOR data item,
 -- decoding back the inner `ByteString` as a proper Haskell type.
@@ -134,6 +141,7 @@ decodeNestedCbor :: FromCBOR a => D.Decoder s a
 decodeNestedCbor = do
   bs <- decodeNestedCborBytes
   toCborError $ decodeFull' bs
+{-# INLINE decodeNestedCbor #-}
 
 -- | Like `decodeKnownCborDataItem`, but assumes nothing about the Haskell
 -- type we want to deserialise back, therefore it yields the `ByteString`
@@ -148,3 +156,4 @@ decodeNestedCborBytes :: D.Decoder s BS.ByteString
 decodeNestedCborBytes = do
   decodeNestedCborTag
   D.decodeBytes
+{-# INLINE decodeNestedCborBytes #-}
