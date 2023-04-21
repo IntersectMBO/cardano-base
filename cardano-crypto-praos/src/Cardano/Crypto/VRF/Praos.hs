@@ -463,6 +463,7 @@ verify pk proof msg =
             crypto_vrf_verify outputPtr pkPtr proofPtr m (fromIntegral mlen) >>= \case
               0 -> return $ Just $! output
               _ -> return Nothing
+{-# INLINE verify #-}
 
 outputFromProof :: Proof -> Maybe Output
 outputFromProof (Proof p) =
@@ -509,6 +510,7 @@ instance VRFAlgorithm PraosVRF where
 
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (_, CertPraosVRF proof) ->
     isJust $! verify pk proof (getSignableRepresentation msg)
+  {-# INLINE verifyVRF #-}
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_seedbytes
@@ -522,6 +524,7 @@ instance VRFAlgorithm PraosVRF where
   rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
   rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
   rawDeserialiseVerKeyVRF = fmap VerKeyPraosVRF . vkFromBytes
+  {-# INLINE rawDeserialiseVerKeyVRF #-}
   rawDeserialiseSignKeyVRF = fmap SignKeyPraosVRF . skFromBytes
   rawDeserialiseCertVRF = fmap CertPraosVRF . proofFromBytes
 

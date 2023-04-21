@@ -252,6 +252,7 @@ decodeVerKeyVRF = do
         where
           expected = fromIntegral (sizeVerKeyVRF (Proxy :: Proxy v))
           actual   = BS.length bs
+{-# INLINEABLE decodeVerKeyVRF #-}
 
 decodeSignKeyVRF :: forall v s. VRFAlgorithm v => Decoder s (SignKeyVRF v)
 decodeSignKeyVRF = do
@@ -280,6 +281,7 @@ decodeCertVRF = do
         where
           expected = fromIntegral (sizeCertVRF (Proxy :: Proxy v))
           actual   = BS.length bs
+{-# INLINEABLE decodeCertVRF #-}
 
 data CertifiedVRF v a
   = CertifiedVRF
@@ -315,6 +317,7 @@ instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
       enforceSize "CertifiedVRF" 2 <*>
       fromCBOR <*>
       decodeCertVRF
+  {-# INLINE fromCBOR #-}
 
 evalCertified
   :: (VRFAlgorithm v, Signable v a)
@@ -332,6 +335,7 @@ verifyCertified
   -> CertifiedVRF v a
   -> Bool
 verifyCertified ctxt vk a CertifiedVRF {..} = verifyVRF ctxt vk a (certifiedOutput, certifiedProof)
+{-# INLINE verifyCertified #-}
 
 --
 -- 'Size' expressions for 'ToCBOR' instances
