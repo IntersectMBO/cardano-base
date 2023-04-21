@@ -104,6 +104,7 @@ instance DSIGNAlgorithm d => KESAlgorithm (SingleKES d) where
     verifyKES ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
         assert (t == 0) $
         verifyDSIGN ctxt vk a sig
+    {-# INLINE verifyKES #-}
 
     updateKES _ctx (SignKeySingleKES _sk) _to = Nothing
 
@@ -130,8 +131,10 @@ instance DSIGNAlgorithm d => KESAlgorithm (SingleKES d) where
     rawSerialiseSigKES     (SigSingleKES    sig) = rawSerialiseSigDSIGN sig
 
     rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . rawDeserialiseVerKeyDSIGN
+    {-# INLINE rawDeserialiseVerKeyKES #-}
     rawDeserialiseSignKeyKES = fmap SignKeySingleKES . rawDeserialiseSignKeyDSIGN
     rawDeserialiseSigKES     = fmap SigSingleKES     . rawDeserialiseSigDSIGN
+    {-# INLINE rawDeserialiseSigKES #-}
 
 
 --
@@ -149,6 +152,7 @@ instance DSIGNAlgorithm d => ToCBOR (VerKeyKES (SingleKES d)) where
 
 instance DSIGNAlgorithm d => FromCBOR (VerKeyKES (SingleKES d)) where
   fromCBOR = decodeVerKeyKES
+  {-# INLINE fromCBOR #-}
 
 
 --
@@ -182,3 +186,4 @@ instance DSIGNAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
 
 instance DSIGNAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
   fromCBOR = decodeSigKES
+  {-# INLINE fromCBOR #-}

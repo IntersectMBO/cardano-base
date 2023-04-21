@@ -149,6 +149,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
     -- the hash here. We could alternatively provide a "key identifier"
     -- function and let the implementation choose what that is.
     hashVerKeyKES (VerKeySumKES vk) = castHash (hashWith hashToBytes vk)
+    {-# INLINE hashVerKeyKES #-}
 
 
     --
@@ -173,6 +174,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
       | otherwise = verifyKES ctxt vk_1 (t - _T) a sigma
       where
         _T = totalPeriodsKES (Proxy :: Proxy d)
+    {-# INLINEABLE verifyKES #-}
 
     updateKES ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
       | t+1 <  _T = do sk' <- updateKES ctx sk t
@@ -233,6 +235,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
         ]
 
     rawDeserialiseVerKeyKES = fmap VerKeySumKES  . hashFromBytes
+    {-# INLINE rawDeserialiseVerKeyKES #-}
 
     rawDeserialiseSignKeyKES b = do
         guard (BS.length b == fromIntegral size_total)
@@ -275,6 +278,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
         off_sig    = 0 :: Word
         off_vk0    = size_sig
         off_vk1    = off_vk0 + size_vk
+    {-# INLINEABLE rawDeserialiseSigKES #-}
 
 
 
@@ -295,6 +299,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
 instance (KESAlgorithm d, HashAlgorithm h)
       => FromCBOR (VerKeyKES (SumKES h d)) where
   fromCBOR = decodeVerKeyKES
+  {-# INLINE fromCBOR #-}
 
 
 --
@@ -332,3 +337,4 @@ instance (KESAlgorithm d, HashAlgorithm h)
 instance (KESAlgorithm d, HashAlgorithm h)
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
+  {-# INLINE fromCBOR #-}
