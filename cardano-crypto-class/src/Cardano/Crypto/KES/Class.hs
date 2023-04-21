@@ -299,6 +299,7 @@ decodeVerKeyKES = do
         where
           expected = fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
           actual   = BS.length bs
+{-# INLINEABLE decodeVerKeyKES #-}
 
 decodeSignKeyKES :: forall v s. KESAlgorithm v => Decoder s (SignKeyKES v)
 decodeSignKeyKES = do
@@ -327,6 +328,7 @@ decodeSigKES = do
         where
           expected = fromIntegral (sizeSigKES (Proxy :: Proxy v))
           actual   = BS.length bs
+{-# INLINEABLE decodeSigKES #-}
 
 
 -- | The KES period. Periods are enumerated from zero.
@@ -369,6 +371,7 @@ encodeSignedKES (SignedKES s) = encodeSigKES s
 
 decodeSignedKES :: KESAlgorithm v => Decoder s (SignedKES v a)
 decodeSignedKES = SignedKES <$> decodeSigKES
+{-# INLINE decodeSignedKES #-}
 
 --
 -- 'Size' expressions for 'ToCBOR' instances.

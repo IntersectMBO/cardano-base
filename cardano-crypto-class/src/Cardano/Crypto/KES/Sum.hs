@@ -233,6 +233,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
         ]
 
     rawDeserialiseVerKeyKES = fmap VerKeySumKES  . hashFromBytes
+    {-# INLINE rawDeserialiseVerKeyKES #-}
 
     rawDeserialiseSignKeyKES b = do
         guard (BS.length b == fromIntegral size_total)
@@ -275,6 +276,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
         off_sig    = 0 :: Word
         off_vk0    = size_sig
         off_vk1    = off_vk0 + size_vk
+    {-# INLINEABLE rawDeserialiseSigKES #-}
 
 
 
@@ -295,6 +297,7 @@ instance (KESAlgorithm d, HashAlgorithm h)
 instance (KESAlgorithm d, HashAlgorithm h)
       => FromCBOR (VerKeyKES (SumKES h d)) where
   fromCBOR = decodeVerKeyKES
+  {-# INLINE fromCBOR #-}
 
 
 --
@@ -332,3 +335,4 @@ instance (KESAlgorithm d, HashAlgorithm h)
 instance (KESAlgorithm d, HashAlgorithm h)
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
+  {-# INLINE fromCBOR #-}
