@@ -27,11 +27,13 @@ instance HashAlgorithm Blake2b_224 where
   type SizeHash Blake2b_224 = 28
   hashAlgorithmName _ = "blake2b_224"
   digest _ = blake2b_libsodium 28
+  {-# INLINE digest #-}
 
 instance HashAlgorithm Blake2b_256 where
   type SizeHash Blake2b_256 = 32
   hashAlgorithmName _ = "blake2b_256"
   digest _ = blake2b_libsodium 32
+  {-# INLINE digest #-}
 
 blake2b_libsodium :: Int -> B.ByteString -> B.ByteString
 blake2b_libsodium size input =
@@ -41,3 +43,4 @@ blake2b_libsodium size input =
       unless (res == 0) $ do
         errno <- getErrno
         ioException $ errnoToIOError "digest @Blake2b: crypto_generichash_blake2b" errno Nothing Nothing
+{-# INLINE blake2b_libsodium #-}

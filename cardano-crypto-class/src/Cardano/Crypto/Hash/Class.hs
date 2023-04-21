@@ -167,12 +167,14 @@ hashWith serialise =
   . packPinnedBytes
   . digest (Proxy :: Proxy h)
   . serialise
+{-# INLINE hashWith #-}
 
 
 -- | A variation on 'hashWith', but specially for CBOR encodings.
 --
 hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
 hashWithSerialiser toEnc = hashWith (serialize' . toEnc)
+{-# INLINE hashWithSerialiser #-}
 
 
 --
@@ -193,6 +195,7 @@ castHash (UnsafeHashRep h) = UnsafeHashRep h
 --
 hashToBytes :: Hash h a -> ByteString
 hashToBytes (UnsafeHashRep h) = unpackPinnedBytes h
+{-# INLINE hashToBytes #-}
 
 
 -- | Make a hash from it bytes representation.
@@ -205,9 +208,9 @@ hashFromBytes ::
 hashFromBytes bytes
   | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
   = Just $ UnsafeHashRep (packPinnedBytes bytes)
-
   | otherwise
   = Nothing
+{-# INLINE hashFromBytes #-}
 
 -- | Make a hash from it bytes representation, as a 'ShortByteString'.
 --
@@ -217,6 +220,7 @@ hashFromBytesShort ::
   -- ^ It must be a buffer of exact length, as given by 'sizeHash'.
   -> Maybe (Hash h a)
 hashFromBytesShort bytes = UnsafeHashRep <$> packBytesMaybe bytes 0
+{-# INLINE hashFromBytesShort #-}
 
 -- | Just like `hashFromBytesShort`, but allows using a region of a 'ShortByteString'.
 --
@@ -228,22 +232,26 @@ hashFromOffsetBytesShort ::
   -- ^ Offset in number of bytes
   -> Maybe (Hash h a)
 hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packBytesMaybe bytes offset
+{-# INLINE hashFromOffsetBytesShort #-}
 
 
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
 --
 hashToBytesShort :: Hash h a -> ShortByteString
 hashToBytesShort (UnsafeHashRep h) = unpackBytes h
+{-# INLINE hashToBytesShort #-}
 
 -- | /O(1)/ - Get the underlying hash representation
 --
 hashToPackedBytes :: Hash h a -> PackedBytes (SizeHash h)
 hashToPackedBytes (UnsafeHashRep pb) = pb
+{-# INLINE hashToPackedBytes #-}
 
 -- | /O(1)/ - Construct hash from the underlying representation
 --
 hashFromPackedBytes :: PackedBytes (SizeHash h) -> Hash h a
 hashFromPackedBytes = UnsafeHashRep
+{-# INLINE hashFromPackedBytes #-}
 
 --
 -- Rendering and parsing
@@ -361,6 +369,7 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
         where
           expected = sizeHash (Proxy :: Proxy h)
           actual   = BS.length bs
+  {-# INLINE fromCBOR #-}
 
 --
 -- Deprecated
