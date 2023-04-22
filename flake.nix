@@ -11,6 +11,10 @@
 
     # cicero
     tullia.url = "github:input-output-hk/tullia";
+
+    # non-flake nix compatibility
+    flake-compat.url = "github:edolstra/flake-compat";
+    flake-compat.flake = false;
   };
 
   outputs = inputs:
