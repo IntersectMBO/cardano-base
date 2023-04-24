@@ -24,7 +24,7 @@ import Control.Monad (unless, guard)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.Ptr (castPtr, nullPtr)
 import qualified Data.ByteString as BS
-
+import Data.ByteString.Internal as BS (accursedUnutterablePerformIO)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Foreign
@@ -132,7 +132,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
     verifyDSIGN () (VerKeyEd25519DSIGN vk) a (SigEd25519DSIGN sig) =
         let bs = getSignableRepresentation a
-        in unsafeDupablePerformIO $
+        in accursedUnutterablePerformIO $
           BS.useAsCStringLen bs $ \(ptr, len) ->
           psbUseAsSizedPtr vk $ \vkPtr ->
           psbUseAsSizedPtr sig $ \sigPtr -> do

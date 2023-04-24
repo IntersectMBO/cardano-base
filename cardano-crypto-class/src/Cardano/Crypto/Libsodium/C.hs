@@ -149,7 +149,7 @@ foreign import capi unsafe "sodium.h crypto_sign_ed25519_detached" c_crypto_sign
     -> IO Int
 
 -- | @int crypto_sign_ed25519_verify_detached(const unsigned char *sig, const unsigned char *m, unsigned long long mlen, const unsigned char *pk);@
-foreign import capi unsafe "sodium.h crypto_sign_ed25519_verify_detached" c_crypto_sign_ed25519_verify_detached
+foreign import ccall unsafe "sodium.h crypto_sign_ed25519_verify_detached" c_crypto_sign_ed25519_verify_detached
     :: SizedPtr CRYPTO_SIGN_ED25519_BYTES
     -> Ptr CUChar
     -> CULLong
