@@ -10,13 +10,13 @@ git reset --hard $BLST_REF
 
 mkdir -p ${PREFIX}/lib/pkgconfig
 mkdir -p ${PREFIX}/include/blst
-cp bindings/{blst.h,blst_aux.h} ${PREFIX}/include/blst/ 
+cp bindings/{blst.h,blst_aux.h} ${PREFIX}/include/blst/
 cp -f libblst.{a,dll,so,dylib} ${PREFIX}/lib/
 
 cat <<EOF > ${PREFIX}/lib/pkgconfig/libblst.pc
 prefix=${PREFIX}
 exec_prefix=\${prefix}
-libdir=\${prefix}
+libdir=\${prefix}/lib
 includedir=\${prefix}/include/blst
 
 Name: libblst
