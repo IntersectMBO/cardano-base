@@ -15,15 +15,12 @@
 -- additional effects, e.g. logging mlocked memory access.
 module Cardano.Crypto.MonadMLock
 (
-  -- * MonadMLock class
-  MonadMLock (..),
-  MonadUnmanagedMemory (..),
-  MonadByteStringMemory (..),
-  MonadPSB (..),
-
-  -- * Re-exported types
+  -- * MLocked foreign pointers
   MLockedForeignPtr,
   MLockedSizedBytes,
+  withMLockedForeignPtr,
+  finalizeMLockedForeignPtr,
+  traceMLockedForeignPtr,
 
   -- * Monadic Eq and Ord
   MEq (..),

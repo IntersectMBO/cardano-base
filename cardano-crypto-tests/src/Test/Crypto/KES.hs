@@ -123,8 +123,7 @@ deriving via (PureMEq (SignKeyKES (MockKES t))) instance Applicative m => MEq m 
 
 deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SingleKES d))
 
-instance ( MonadMLock m
-         , MonadST m
+instance ( MonadST m
          , MEq m (SignKeyKES d)
          , Eq (VerKeyKES d)
          , KnownNat (SeedSizeKES d)
@@ -134,8 +133,7 @@ instance ( MonadMLock m
 
 deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (CompactSingleKES d))
 
-instance ( MonadMLock m
-         , MonadST m
+instance ( MonadST m
          , MEq m (SignKeyKES d)
          , Eq (VerKeyKES d)
          , KnownNat (SeedSizeKES d)
@@ -145,7 +143,7 @@ instance ( MonadMLock m
 
 testKESAlloc
   :: forall v.
-     ( (forall m. (MonadMLock m, MonadThrow m, MonadST m, MonadPSB m) => KESSignAlgorithm m v)
+     ( (forall m. (MonadThrow m, MonadST m) => KESSignAlgorithm m v)
      , ContextKES v ~ ()
      )
   => Proxy v
@@ -406,8 +404,7 @@ testKESAlgorithm lock _pm _pv n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: ( MonadMLock m
-          , MonadST m
+withSK :: ( MonadST m
           , MonadThrow m
           , KESSignAlgorithm m v
           ) => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> m b) -> m b
@@ -473,7 +470,6 @@ prop_oneUpdateSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadFail m
-        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -492,7 +488,6 @@ prop_allUpdatesSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -511,7 +506,6 @@ prop_totalPeriodsKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadMLock m
         , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
@@ -538,7 +532,6 @@ prop_deriveVerKeyKES
       ( ContextKES v ~ ()
       , RunIO m
       , MonadIO m
-      , MonadMLock m
       , MonadST m
       , MonadThrow m
       , KESSignAlgorithm m v
@@ -568,7 +561,6 @@ prop_verifyKES_positive
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -605,7 +597,6 @@ prop_verifyKES_negative_key
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -637,7 +628,6 @@ prop_verifyKES_negative_message
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -669,7 +659,6 @@ prop_verifyKES_negative_period
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -704,7 +693,6 @@ prop_serialise_VerKeyKES
      ( ContextKES v ~ ()
      , RunIO m
      , MonadIO m
-     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -736,7 +724,6 @@ prop_serialise_SigKES
      , Show (SignKeyKES v)
      , RunIO m
      , MonadIO m
-     , MonadMLock m
      , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
@@ -767,7 +754,6 @@ prop_serialise_SigKES _ _ seedPSB x =
 withAllUpdatesKES_ :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadMLock m
                   , MonadST m
                   , MonadThrow m
                   )
@@ -780,7 +766,6 @@ withAllUpdatesKES_ seedPSB f = do
 withAllUpdatesKES :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadMLock m
                   , MonadST m
                   , MonadThrow m
                   )
