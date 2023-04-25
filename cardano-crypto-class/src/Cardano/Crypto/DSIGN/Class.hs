@@ -209,6 +209,7 @@ decodeVerKeyDSIGN = do
         where
           expected = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy v))
           actual   = BS.length bs
+{-# INLINEABLE decodeVerKeyDSIGN #-}
 
 decodeSignKeyDSIGN :: forall v s. DSIGNAlgorithm v => Decoder s (SignKeyDSIGN v)
 decodeSignKeyDSIGN = do
@@ -237,7 +238,7 @@ decodeSigDSIGN = do
         where
           expected = fromIntegral (sizeSigDSIGN (Proxy :: Proxy v))
           actual   = BS.length bs
-
+{-# INLINEABLE decodeSigDSIGN #-}
 
 newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
   deriving Generic
@@ -272,6 +273,7 @@ encodeSignedDSIGN (SignedDSIGN s) = encodeSigDSIGN s
 
 decodeSignedDSIGN :: DSIGNAlgorithm v => Decoder s (SignedDSIGN v a)
 decodeSignedDSIGN = SignedDSIGN <$> decodeSigDSIGN
+{-# INLINE decodeSignedDSIGN #-}
 
 --
 -- Encoded 'Size' expressions for 'ToCBOR' instances
