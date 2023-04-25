@@ -181,10 +181,12 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     rawSerialiseSigDSIGN      (SigEd25519DSIGN sig) = psbToByteString sig
 
     rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd25519DSIGN . psbFromByteStringCheck
+    {-# INLINE rawDeserialiseVerKeyDSIGN #-}
     rawDeserialiseSignKeyDSIGN bs = do
       guard (fromIntegral (BS.length bs) == seedSizeDSIGN (Proxy @Ed25519DSIGN))
       pure . genKeyDSIGN . mkSeedFromBytes $ bs
     rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN . psbFromByteStringCheck
+    {-# INLINE rawDeserialiseSigDSIGN #-}
 
 
 instance ToCBOR (VerKeyDSIGN Ed25519DSIGN) where
