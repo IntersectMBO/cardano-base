@@ -42,9 +42,8 @@ import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium (MLockedSizedBytes)
 import Cardano.Crypto.MonadMLock
-  ( MonadMLock (..)
-  , MonadPSB (..)
-  , mlsbToByteString
+  ( 
+  mlsbToByteString
   , mlsbFromByteStringCheck
   , mlsbUseAsSizedPtr
   , mlsbNew
@@ -176,7 +175,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 -- reflects this.
 --
 -- Various libsodium primitives, particularly 'MLockedSizedBytes' primitives,
--- are used via the 'MonadMLock' typeclass, which is responsible for
+-- are used via the 'MonadST' typeclass, which is responsible for
 -- guaranteeing orderly execution of these actions. We avoid using these
 -- primitives inside 'unsafeIOToST', as well as any 'IO' actions that would be
 -- unsafe to use inside 'unsafePerformIO'.
@@ -191,9 +190,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 --   memory passed to them via C pointers.
 -- - 'getErrno'; however, 'ST' guarantees sequentiality in the context where
 --   we use 'getErrno', so this is fine.
--- - 'BS.useAsCStringLen', which is fine and shouldn't require 'IO' to begin
---   with, but unfortunately, for historical reasons, does.
-instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
+instance (MonadST m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$!> do
         mlsbUseAsSizedPtr sk $ \skPtr -> do
@@ -258,9 +255,9 @@ instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => DSIGNMAlgorithm 
       mlsbFinalize sk
 
 deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance (MonadST m, MonadMLock m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
+  instance (MonadST m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
 
-instance (MonadST m, MonadMLock m, MonadPSB m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
+instance (MonadST m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
     --
     -- Ser/deser (dangerous - do not use in production code)
     --

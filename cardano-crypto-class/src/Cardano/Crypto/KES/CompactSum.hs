@@ -252,8 +252,7 @@ instance ( OptimizedKESAlgorithm d
          , KESSignAlgorithm m d
          , SodiumHashAlgorithm h -- needed for secure forgetting
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , MonadMLock m
-         , MonadST m -- only needed for unsafe raw ser/deser
+         , MonadST m
          , MonadThrow m
          , NoThunks (VerKeyKES (CompactSumKES h d))
          , KnownNat (SizeVerKeyKES (CompactSumKES h d))
@@ -330,7 +329,6 @@ instance ( OptimizedKESAlgorithm d
 
 instance ( KESSignAlgorithm m (CompactSumKES h d)
          , UnsoundKESSignAlgorithm m d
-         , MonadMLock m
          , MonadST m
          ) => UnsoundKESSignAlgorithm m (CompactSumKES h d) where
     --

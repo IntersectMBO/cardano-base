@@ -17,17 +17,30 @@
 -- additional effects, e.g. logging mlocked memory access.
 module Cardano.Crypto.MonadMLock.Class
 (
-  MonadMLock (..),
-  MonadUnmanagedMemory (..),
-  MonadByteStringMemory (..),
-  MonadPSB (..),
+  -- * mlocked memory
+  mlockedMalloc,
+  withMLockedForeignPtr,
+  finalizeMLockedForeignPtr,
+  traceMLockedForeignPtr,
+
+  -- * Unmanaged memory
+  zeroMem,
+  copyMem,
+  allocaBytes,
+
+  -- * Bytestring memory
+  useByteStringAsCStringLen,
+
+  -- * PinnedSizedBytes
 
   module PSB_Export,
 
+  psbUseAsCPtrLen,
   psbUseAsCPtr,
   psbUseAsSizedPtr,
 
   psbCreate,
+  psbCreateResultLen,
   psbCreateLen,
   psbCreateSized,
   psbCreateSizedResult,
@@ -39,11 +52,12 @@ module Cardano.Crypto.MonadMLock.Class
 )
 where
 
-import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
+import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..), unsafeIOToMonadST)
 
 import qualified Cardano.Crypto.Libsodium.Memory as NaCl
 import Control.Monad (void)
 import Control.Monad.Class.MonadST (MonadST (..))
+import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
 import Control.Monad.ST.Unsafe
 
 import Cardano.Foreign (c_memset, c_memcpy, SizedPtr (..))
@@ -55,6 +69,7 @@ import Foreign.C.String (CStringLen)
 import qualified Foreign.Marshal.Alloc as Foreign
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Unsafe as BS
 import qualified Cardano.Crypto.PinnedSizedBytes as PSB
 import Cardano.Crypto.PinnedSizedBytes as PSB_Export
           ( PinnedSizedBytes
@@ -73,51 +88,52 @@ import GHC.TypeLits (KnownNat)
 --   testing purposes.
 -- - Running mlocked-memory operations directly on some monad stack with 'IO'
 --   at the bottom.
-class MonadUnmanagedMemory m => MonadMLock m where
-  withMLockedForeignPtr :: forall a b. MLockedForeignPtr a -> (Ptr a -> m b) -> m b
-  finalizeMLockedForeignPtr :: forall a. MLockedForeignPtr a -> m ()
-  traceMLockedForeignPtr :: (Storable a, Show a) => MLockedForeignPtr a -> m ()
-  mlockedMalloc :: CSize -> m (MLockedForeignPtr a)
 
-class Monad m => MonadUnmanagedMemory m where
-  zeroMem :: Ptr a -> CSize -> m ()
-  copyMem :: Ptr a -> Ptr a -> CSize -> m ()
-  allocaBytes :: Int -> (Ptr a -> m b) -> m b
+withMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> (Ptr a -> m b) -> m b
+withMLockedForeignPtr = NaCl.withMLockedForeignPtr
 
-class Monad m => MonadByteStringMemory m where
-  useByteStringAsCStringLen :: ByteString -> (CStringLen -> m a) -> m a
+finalizeMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> m ()
+finalizeMLockedForeignPtr = NaCl.finalizeMLockedForeignPtr
 
-class Monad m => MonadPSB m where
-  psbUseAsCPtrLen :: forall n r.
-                     KnownNat n
-                  => PSB.PinnedSizedBytes n
-                  -> (Ptr Word8 -> CSize -> m r)
-                  -> m r
-  psbCreateResultLen :: forall n r.
-                        KnownNat n
-                     => (Ptr Word8 -> CSize -> m r)
-                     -> m (PSB.PinnedSizedBytes n, r)
+traceMLockedForeignPtr :: (Storable a, Show a, MonadST m) => MLockedForeignPtr a -> m ()
+traceMLockedForeignPtr = NaCl.traceMLockedForeignPtr
 
-instance MonadMLock IO where
-  withMLockedForeignPtr = NaCl.withMLockedForeignPtr
-  finalizeMLockedForeignPtr = NaCl.finalizeMLockedForeignPtr
-  traceMLockedForeignPtr = NaCl.traceMLockedForeignPtr
-  mlockedMalloc = NaCl.mlockedMalloc
+mlockedMalloc :: MonadST m => CSize -> m (MLockedForeignPtr a)
+mlockedMalloc = NaCl.mlockedMalloc
 
-instance MonadUnmanagedMemory IO where
-  zeroMem ptr size = void $ c_memset (castPtr ptr) 0 size
-  copyMem dst src size = void $ c_memcpy (castPtr dst) (castPtr src) size
-  allocaBytes = Foreign.allocaBytes
+zeroMem :: MonadST m => Ptr a -> CSize -> m ()
+zeroMem ptr size = unsafeIOToMonadST . void $ c_memset (castPtr ptr) 0 size
 
-instance MonadByteStringMemory IO where
-  useByteStringAsCStringLen = BS.useAsCStringLen
+copyMem :: MonadST m => Ptr a -> Ptr a -> CSize -> m ()
+copyMem dst src size = unsafeIOToMonadST . void $ c_memcpy (castPtr dst) (castPtr src) size
 
-instance MonadPSB IO where
-  psbUseAsCPtrLen = PSB.psbUseAsCPtrLen
-  psbCreateResultLen = PSB.psbCreateResultLen
+allocaBytes :: (MonadST m, MonadThrow m) => Int -> (Ptr a -> m b) -> m b
+allocaBytes size =
+  bracket
+    (unsafeIOToMonadST $ Foreign.mallocBytes size)
+    (unsafeIOToMonadST . Foreign.free)
+  
+
+useByteStringAsCStringLen :: (MonadST m, MonadThrow m) => ByteString -> (CStringLen -> m a) -> m a
+useByteStringAsCStringLen bs f =
+  allocaBytes (BS.length bs + 1) $ \buf -> do
+    len <- unsafeIOToMonadST $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
+      len <$ copyMem buf ptr (fromIntegral len)
+    f (buf, len)
+
+psbUseAsCPtrLen :: (KnownNat n, MonadST m)
+                => PSB.PinnedSizedBytes n
+                -> (Ptr Word8 -> CSize -> m r)
+                -> m r
+psbUseAsCPtrLen = PSB.psbUseAsCPtrLen
+
+psbCreateResultLen :: (KnownNat n, MonadST m)
+                   => (Ptr Word8 -> CSize -> m r)
+                   -> m (PSB.PinnedSizedBytes n, r)
+psbCreateResultLen = PSB.psbCreateResultLen
 
 psbUseAsCPtr :: forall n r m.
-                MonadPSB m
+                MonadST m
              => KnownNat n
              => PinnedSizedBytes n
              -> (Ptr Word8 -> m r)
@@ -126,7 +142,7 @@ psbUseAsCPtr psb action =
   psbUseAsCPtrLen psb $ \ptr _ -> action ptr
 
 psbUseAsSizedPtr :: forall n r m.
-                    MonadPSB m
+                    MonadST m
                  => KnownNat n
                  => PinnedSizedBytes n
                  -> (SizedPtr n -> m r)
@@ -137,7 +153,7 @@ psbUseAsSizedPtr psb action =
 
 psbCreateSized ::
   forall n m.
-  (KnownNat n, MonadPSB m) =>
+  (KnownNat n, MonadST m) =>
   (SizedPtr n -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
@@ -146,7 +162,7 @@ psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
 -- is, the function argument is run only for its side effects.
 psbCreate ::
   forall n m.
-  (KnownNat n, MonadPSB m) =>
+  (KnownNat n, MonadST m) =>
   (Ptr Word8 -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreate f = fst <$> psbCreateResult f
@@ -155,7 +171,7 @@ psbCreate f = fst <$> psbCreateResult f
 -- that is, the function argument is run only for its side effects.
 psbCreateLen ::
   forall n m.
-  (KnownNat n, MonadPSB m) =>
+  (KnownNat n, MonadST m) =>
   (Ptr Word8 -> CSize -> m ()) ->
   m (PinnedSizedBytes n)
 psbCreateLen f = fst <$> psbCreateResultLen f
@@ -177,7 +193,7 @@ psbCreateLen f = fst <$> psbCreateResultLen f
 -- This poses both correctness /and/ security risks, so please don't do it.
 psbCreateResult ::
   forall n r m.
-  (KnownNat n, MonadPSB m) =>
+  (KnownNat n, MonadST m) =>
   (Ptr Word8 -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateResult f = psbCreateResultLen (\p _ -> f p)
@@ -187,7 +203,7 @@ psbCreateResult f = psbCreateResultLen (\p _ -> f p)
 -- given to the function argument /must not/ be resulted as @r@.
 psbCreateSizedResult ::
   forall n r m.
-  (KnownNat n, MonadPSB m) =>
+  (KnownNat n, MonadST m) =>
   (SizedPtr n -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)

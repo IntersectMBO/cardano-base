@@ -33,7 +33,7 @@ import Control.Monad.ST.Unsafe (unsafeIOToST)
 
 expandHash
     :: forall h m proxy.
-       (SodiumHashAlgorithm h, MonadMLock m, MonadST m, MonadThrow m)
+       (SodiumHashAlgorithm h, MonadST m, MonadThrow m)
     => proxy h
     -> MLockedSizedBytes (SizeHash h)
     -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))

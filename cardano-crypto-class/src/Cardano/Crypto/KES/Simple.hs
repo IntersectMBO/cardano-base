@@ -40,7 +40,7 @@ import           Cardano.Crypto.MLockedSeed
 import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
 import           Data.Unit.Strict (forceElemsToWHNF)
-import           Cardano.Crypto.MonadMLock (MonadMLock (..), MEq (..))
+import           Cardano.Crypto.MonadMLock (MEq (..))
 
 
 data SimpleKES d (t :: Nat)
@@ -143,7 +143,6 @@ instance ( KESAlgorithm (SimpleKES d t)
          , KnownNat t
          , KnownNat (SeedSizeDSIGNM d * t)
          , MonadEvaluate m
-         , MonadMLock m
          , MonadST m
          ) =>
          KESSignAlgorithm m (SimpleKES d t) where

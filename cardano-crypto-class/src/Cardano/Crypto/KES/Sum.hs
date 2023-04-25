@@ -223,8 +223,7 @@ instance ( KESAlgorithm d
 instance ( KESSignAlgorithm m d
          , SodiumHashAlgorithm h -- needed for secure forgetting
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , MonadMLock m
-         , MonadST m -- only needed for unsafe raw ser/deser
+         , MonadST m
          , MonadThrow m
          , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
          , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
@@ -297,7 +296,6 @@ instance ( KESSignAlgorithm m d
 
 instance ( KESSignAlgorithm m (SumKES h d)
          , UnsoundKESSignAlgorithm m d
-         , MonadMLock m
          , MonadST m
          ) => UnsoundKESSignAlgorithm m (SumKES h d) where
     --

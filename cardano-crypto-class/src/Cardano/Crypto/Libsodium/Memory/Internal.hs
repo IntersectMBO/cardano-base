@@ -12,9 +12,9 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   finalizeMLockedForeignPtr,
   traceMLockedForeignPtr,
   mlockedMalloc,
-  -- * Low-level memory function
-  sodiumMalloc,
-  sodiumFree,
+
+  -- * Helper
+  unsafeIOToMonadST
 ) where
 
 import Control.DeepSeq (NFData (..), rwhnf)
@@ -25,7 +25,8 @@ import Data.Proxy (Proxy (..))
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.Types (CSize (..))
 import Foreign.Ptr (Ptr, nullPtr)
-import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, finalizeForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, touchForeignPtr)
+import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Foreign.Concurrent (newForeignPtr)
 import Foreign.Storable (Storable (peek))
 import Foreign.Marshal.Utils (fillBytes)
@@ -33,6 +34,9 @@ import GHC.TypeLits (KnownNat, natVal)
 import GHC.IO.Exception (ioException)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
+import Control.Monad.Class.MonadST
+import Control.Monad.ST.Unsafe (unsafeIOToST)
+import Debug.Trace (traceShowM)
 
 import Cardano.Crypto.Libsodium.C
 import Cardano.Memory.Pool (initPool, grabNextBlock, Pool)
@@ -44,18 +48,24 @@ newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: ForeignPtr a }
 instance NFData (MLockedForeignPtr a) where
   rnf = rwhnf . _unwrapMLockedForeignPtr
 
-withMLockedForeignPtr :: forall a b. MLockedForeignPtr a -> (Ptr a -> IO b) -> IO b
-withMLockedForeignPtr = coerce (withForeignPtr @a @b)
+withMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> (Ptr a -> m b) -> m b
+withMLockedForeignPtr (SFP fptr) f = do
+  r <- f (unsafeForeignPtrToPtr fptr)
+  r <$ unsafeIOToMonadST (touchForeignPtr fptr)
 
-finalizeMLockedForeignPtr :: forall a. MLockedForeignPtr a -> IO ()
-finalizeMLockedForeignPtr = coerce (finalizeForeignPtr @a)
+finalizeMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> m ()
+finalizeMLockedForeignPtr (SFP fptr) = withLiftST $ \lift ->
+  (lift . unsafeIOToST) (finalizeForeignPtr fptr)
 
-traceMLockedForeignPtr :: (Storable a, Show a) => MLockedForeignPtr a -> IO ()
+traceMLockedForeignPtr :: (Storable a, Show a, MonadST m) => MLockedForeignPtr a -> m ()
 traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
-    a <- peek ptr
-    print a
+    a <- unsafeIOToMonadST (peek ptr)
+    traceShowM a
 
 {-# DEPRECATED traceMLockedForeignPtr "Don't leave traceMLockedForeignPtr in production" #-}
+
+unsafeIOToMonadST :: MonadST m => IO a -> m a
+unsafeIOToMonadST action = withLiftST ($ unsafeIOToST action)
 
 makeMLockedPool :: forall n. KnownNat n => IO (Pool n)
 makeMLockedPool = do
@@ -92,8 +102,11 @@ mlockedPool512 :: Pool 512
 mlockedPool512 = unsafePerformIO makeMLockedPool
 {-# NOINLINE mlockedPool512 #-}
 
-mlockedMalloc :: CSize -> IO (MLockedForeignPtr a)
-mlockedMalloc size = SFP <$> do
+mlockedMalloc :: MonadST m => CSize -> m (MLockedForeignPtr a)
+mlockedMalloc size = withLiftST ($ unsafeIOToST (mlockedMallocIO size))
+
+mlockedMallocIO :: CSize -> IO (MLockedForeignPtr a)
+mlockedMallocIO size = SFP <$> do
   if
     | size <= 32 -> do
         coerce $ grabNextBlock mlockedPool32
