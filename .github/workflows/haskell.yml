@@ -55,6 +55,8 @@ jobs:
     - name: Check pkg-config
       run: |
         pkg-config --list-all
+        echo $LD_LIBRARY_PATH
+        
 
     - uses: actions/checkout@v3
 
@@ -130,6 +132,8 @@ jobs:
 
     - name: Run tests [non-WIN]
       if: runner.os != 'Windows'
+      env:
+        LD_LIBRARY_PATH: /usr/local/opt/cardano/lib
       run: cabal test all --enable-tests --test-show-details=direct -j1
 
     - uses: actions/upload-artifact@v3
