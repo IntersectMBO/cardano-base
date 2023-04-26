@@ -1,3 +1,7 @@
+## 2.1.0.2
+
+* GHC-9.6 compatibility
+
 ## 2.1.0.1
 
 * Remove `development` flag: #372
