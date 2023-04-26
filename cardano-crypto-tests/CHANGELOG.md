@@ -1,3 +1,5 @@
+# Changelog for `cardano-crypto-tests`
+
 ## 2.1.0.2
 
 * GHC-9.6 compatibility

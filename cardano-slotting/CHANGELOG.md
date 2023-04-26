@@ -1,5 +1,9 @@
 # Changelog for `cardano-slotting`
 
+## 0.1.1.1
+
+*
+
 ## 0.1.1.0
 
 * Remove `development` flag: #372

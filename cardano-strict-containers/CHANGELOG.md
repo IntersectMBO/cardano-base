@@ -1,5 +1,9 @@
 # Changelog for `cardano-strict-containers`
 
+# 0.1.2.2
+
+*
+
 # 0.1.2.1
 
 * Remove `development` flag: #372
