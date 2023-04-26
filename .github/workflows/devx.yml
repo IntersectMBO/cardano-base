@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ x86_64-linux ]
+        platform: [ x86_64-linux, x86_64-darwin ]
         compiler-nix-name: [ ghc8107, ghc927, ghc961 ]
         target-platform: [ "", "-windows" ]
   
@@ -40,8 +40,8 @@ jobs:
         shell: bash
         run: |
           ./devx/fetch-docker.sh input-output-hk/devx ${{ matrix.platform }}.${{ matrix.compiler-nix-name }}${{ matrix.target-platform }}-minimal-iog-env | zstd -d | nix-store --import | tee store-paths.txt
-          sudo ln -s $(tail -n 1 store-paths.txt) /usr/bin/devx-env.sh
-          sudo cp devx/devx /usr/bin
+          sudo ln -s $(tail -n 1 store-paths.txt) /usr/local/bin/devx-env.sh
+          sudo cp devx/devx /usr/local/bin
       - name: cabal update
         run: cabal update
       - name: Cache Cabal store
