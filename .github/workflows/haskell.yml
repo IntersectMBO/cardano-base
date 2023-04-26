@@ -41,14 +41,6 @@ jobs:
       # Modify this value to "invalidate" the cabal cache.
       CABAL_CACHE_VERSION: "2023-03-22"
 
-      # current ref from: 27.02.2022
-      SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
-      # current ref from: 25.11.2022
-      BLST_REF: 03b5124029979755c752eec45f3c29674b558446
-
-      # Modify this value to "invalidate" the secp cache.
-      SECP_CACHE_VERSION: "2023-03-22"
-
     steps:
     - name: Install Haskell
       uses: input-output-hk/setup-haskell@v1
@@ -56,21 +48,13 @@ jobs:
       with:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: 3.10.1.0
-        pacman-packages: >
-          mingw-w64-x86_64-pkg-config
-          mingw-w64-x86_64-libsodium
-          base-devel
-          autoconf-wrapper
-          autoconf
-          automake
-          libtool
-          make
 
-    - name: Report mlock limit (Linux)
-      if: matrix.os == 'ubuntu-latest'
+    # this needs to be _after_ setup-haskell, as that 
+    # mutilates PKG_CONFIG_PATH
+    - uses: input-output-hk/iohk-nix@v1
+    - name: Check pkg-config
       run: |
-        echo "mlock limit:"
-        ulimit -l
+        pkg-config --list-all
 
     - uses: actions/checkout@v3
 
@@ -82,49 +66,6 @@ jobs:
     - name: "[Bash] Add build script path"
       if: runner.os != 'Windows'
       run: echo "$(pwd)/.github/bin" >> $GITHUB_PATH
-
-    - name: "LINUX: Install build environment (apt-get)"
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get -y install libsodium23 libsodium-dev
-        sudo apt-get -y remove --purge software-properties-common
-        sudo apt-get -y autoremove
-
-    - name: "LINUX: Install build environment (for secp256k1)"
-      if: runner.os == 'Linux'
-      run: sudo apt-get -y install autoconf automake libtool
-
-    - name: "MAC: Install build environment (brew)"
-      if: runner.os == 'macOS'
-      run: |
-        brew install libsodium
-
-    - name: "MAC: Install build environment (for secp256k1)"
-      if: runner.os == 'macOS'
-      run: brew install autoconf automake libtool
-
-    - name: "WINDOWS: Install blst"
-      if: runner.os == 'Windows'
-      env:
-        MSYS2_PATH_TYPE: inherit
-        MSYSTEM: MINGW64
-        PREFIX: /mingw64
-      run: C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
-
-    - name: "NON-WINDOWS: Install blst"
-      if: runner.os != 'Windows'
-      env:
-        PREFIX: /usr/local
-      run: |
-        sudo -E .github/workflows/build-blst.bash
-        echo "PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" | tee -a "$GITHUB_ENV"
-
-    - name: Install secp256k1
-      uses: input-output-hk/setup-secp256k1@v1
-      with:
-        git-ref: ${{ env.SECP256K1_REF }}
-        cache-version: ${{ env.SECP_CACHE_VERSION }}
 
     - name: Cabal update
       run: cabal update
