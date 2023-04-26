@@ -123,7 +123,7 @@ library
     build-depends:
       integer-gmp
 
-  pkgconfig-depends: libsodium, libblst 
+  pkgconfig-depends: libsodium, libblst
 
   if flag(secp256k1-support)
     exposed-modules:
@@ -131,7 +131,7 @@ library
       Cardano.Crypto.DSIGN.SchnorrSecp256k1
       Cardano.Crypto.SECP256K1.Constants
       Cardano.Crypto.SECP256K1.C
-    pkgconfig-depends: libsecp256k1 
+    pkgconfig-depends: libsecp256k1
     cpp-options: -DSECP256K1_ENABLED
 
 test-suite test-memory-example

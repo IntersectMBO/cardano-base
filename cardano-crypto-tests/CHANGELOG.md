@@ -1,3 +1,9 @@
+# Changelog for `cardano-crypto-tests`
+
+## 2.1.0.2
+
+*
+
 ## 2.1.0.1
 
 * Remove `development` flag: #372
