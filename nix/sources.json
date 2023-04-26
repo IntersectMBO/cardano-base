@@ -5,10 +5,10 @@
         "homepage": "https://input-output-hk.github.io/cardano-haskell-packages/",
         "owner": "input-output-hk",
         "repo": "cardano-haskell-packages",
-        "rev": "07bb6c7f3d5f6245fbc7b222ea082487736bdb67",
-        "sha256": "1mnms5r7bwjz2raw5v7mnl8svzl7jz6lqv64d1a9ccql3dhyp4wy",
+        "rev": "033a0ffe5e719d0545a201170c5854e6b6ee9800",
+        "sha256": "1wqq156na4g4v29vn1yybmsr5clw9z9vb4nc6i6629nlzls0vilm",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/cardano-haskell-packages/archive/07bb6c7f3d5f6245fbc7b222ea082487736bdb67.tar.gz",
+        "url": "https://github.com/input-output-hk/cardano-haskell-packages/archive/033a0ffe5e719d0545a201170c5854e6b6ee9800.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "hackage.nix": {
@@ -17,10 +17,10 @@
         "homepage": "",
         "owner": "input-output-hk",
         "repo": "hackage.nix",
-        "rev": "f3793d3d9fa159d0f3a652fc4a50b65ed0e86c27",
-        "sha256": "1sv9z7xh401qr6srj5c2hhcchmbi38ddxa177j4jcg2qi3qa00c8",
+        "rev": "1e52cafabbbe68ce59eabdc4103a2cd37da1b118",
+        "sha256": "0qfkmfm7xvkvqn6213mz2whmbkrqwnypyzyks6prmwnh8ysxx5r7",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/hackage.nix/archive/f3793d3d9fa159d0f3a652fc4a50b65ed0e86c27.tar.gz",
+        "url": "https://github.com/input-output-hk/hackage.nix/archive/1e52cafabbbe68ce59eabdc4103a2cd37da1b118.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz",
         "version": "b3c99d7f13df89a9a918c835ecb7114098912962"
     },
