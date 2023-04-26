@@ -3,6 +3,12 @@
 ## 2.1.2.0
 
 * Included bindings to `blst` library to enable operations over curve BLS12-381
+  [#266](https://github.com/input-output-hk/cardano-base/pull/266)
+
+## 2.1.0.2
+
+* Deserialization performance improvements
+* GHC-9.6 compatibility
 
 ## 2.1.0.2
 
