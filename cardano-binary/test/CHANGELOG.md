@@ -1,3 +1,9 @@
+# Changelog for `cardano-binary-test`
+
+## 1.4.0.2
+
+* GHC-9.6 compatibility
+
 ## 1.4.0.1
 
 * Remove `development` flag: #372

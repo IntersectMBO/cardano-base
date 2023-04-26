@@ -522,8 +522,10 @@ instance VRFAlgorithm PraosVRF where
   rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
   rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
   rawDeserialiseVerKeyVRF = fmap VerKeyPraosVRF . vkFromBytes
+  {-# INLINE rawDeserialiseVerKeyVRF #-}
   rawDeserialiseSignKeyVRF = fmap SignKeyPraosVRF . skFromBytes
   rawDeserialiseCertVRF = fmap CertPraosVRF . proofFromBytes
+  {-# INLINE rawDeserialiseCertVRF #-}
 
   sizeVerKeyVRF _ = fromIntegral verKeySizeVRF
   sizeSignKeyVRF _ = fromIntegral signKeySizeVRF
