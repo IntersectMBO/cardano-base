@@ -108,7 +108,7 @@ jobs:
       run: |
         # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
         # we are very deliberate about only adding msys64 to the path where absolutely necessary.
-        # Do remember that Windows looks up shared libraries on PATH, not LD_LIBRARY_PATH like 
+        # Do remember that Windows looks up shared libraries on PATH, not LD_LIBRARY_PATH like
         # Linux. MacOS doesn't really need either of them, due to embedding the full dependency
         # for dylibs in the executable.
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\opt\cardano\bin;C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
