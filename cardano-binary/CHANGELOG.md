@@ -1,5 +1,9 @@
 # Changelog for `cardano-binary`
 
+## 1.7.0.1
+
+*
+
 ## 1.7.0.0
 
 * Remove `development` flag: #372
