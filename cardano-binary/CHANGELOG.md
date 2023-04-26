@@ -1,5 +1,9 @@
 # Changelog for `cardano-binary`
 
+## 1.7.0.2
+
+*
+
 ## 1.7.0.1
 
 * GHC-9.6 compatibility

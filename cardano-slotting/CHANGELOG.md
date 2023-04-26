@@ -1,5 +1,9 @@
 # Changelog for `cardano-slotting`
 
+## 0.1.1.2
+
+*
+
 ## 0.1.1.1
 
 * GHC-9.6 compatibility
