@@ -1,3 +1,9 @@
+# Changelog for `cardano-crypto-class`
+
+## 2.1.0.2
+
+* Deserialization performance improvements
+* GHC-9.6 compatibility
 
 ## 2.1.0.1
 
