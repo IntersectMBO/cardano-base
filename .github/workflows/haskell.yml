@@ -42,10 +42,6 @@ jobs:
       CABAL_CACHE_VERSION: "2023-03-22"
 
     steps:
-    - name: What is the PATH?
-      shell: bash
-      run: echo $PATH
-
     - name: Install Haskell
       uses: input-output-hk/actions/haskell@latest
       id: setup-haskell
@@ -53,8 +49,6 @@ jobs:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: 3.10.1.0
 
-    # this needs to be _after_ setup-haskell, as that
-    # mutilates PKG_CONFIG_PATH
     - name: Install system dependencies
       uses: input-output-hk/actions/base@latest
       with:
@@ -96,35 +90,16 @@ jobs:
         key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
 
     - name: Install dependencies
-      run: |
-        # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
-        # we are very deliberate about only adding msys64 to the path where absolutely necessary.
-        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        echo $PKG_CONFIG_PATH
-        echo $env:PKG_CONFIG_PATH
-        cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
+      run: cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
 
     - name: Build [testing]
       run: cabal build all --enable-tests -j --ghc-option=-j4
 
-    - name: Run tests [WIN]
-      if: runner.os == 'Windows'
+    - name: Run tests
       env:
+        # these two are msys2 env vars, they have no effect on non-msys2 installs.
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
-      run: |
-        # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
-        # we are very deliberate about only adding msys64 to the path where absolutely necessary.
-        # Do remember that Windows looks up shared libraries on PATH, not LD_LIBRARY_PATH like
-        # Linux. MacOS doesn't really need either of them, due to embedding the full dependency
-        # for dylibs in the executable.
-        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\opt\cardano\bin;C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        cabal test all --enable-tests --test-show-details=direct -j1
-
-    - name: Run tests [non-WIN]
-      if: runner.os != 'Windows'
-      env:
-        LD_LIBRARY_PATH: /usr/local/opt/cardano/lib
       run: cabal test all --enable-tests --test-show-details=direct -j1
 
     - uses: actions/upload-artifact@v3
