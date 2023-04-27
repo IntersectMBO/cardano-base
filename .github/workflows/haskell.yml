@@ -42,6 +42,10 @@ jobs:
       CABAL_CACHE_VERSION: "2023-03-22"
 
     steps:
+    - name: What is the PATH?
+      shell: bash
+      run: echo $PATH
+
     - name: Install Haskell
       uses: input-output-hk/actions/haskell@latest
       id: setup-haskell
