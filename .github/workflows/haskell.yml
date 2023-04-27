@@ -41,90 +41,20 @@ jobs:
       # Modify this value to "invalidate" the cabal cache.
       CABAL_CACHE_VERSION: "2023-03-22"
 
-      # current ref from: 27.02.2022
-      SECP256K1_REF: ac83be33d0956faf6b7f61a60ab524ef7d6a473a
-      # current ref from: 25.11.2022
-      BLST_REF: 03b5124029979755c752eec45f3c29674b558446
-
-      # Modify this value to "invalidate" the secp cache.
-      SECP_CACHE_VERSION: "2023-03-22"
-
     steps:
     - name: Install Haskell
-      uses: input-output-hk/setup-haskell@v1
+      uses: input-output-hk/actions/haskell@latest
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
         cabal-version: 3.10.1.0
-        pacman-packages: >
-          mingw-w64-x86_64-pkg-config
-          mingw-w64-x86_64-libsodium
-          base-devel
-          autoconf-wrapper
-          autoconf
-          automake
-          libtool
-          make
 
-    - name: Report mlock limit (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        echo "mlock limit:"
-        ulimit -l
+    - name: Install system dependencies
+      uses: input-output-hk/actions/base@latest
+      with:
+        use-sodium-vrf: false # default is true
 
     - uses: actions/checkout@v3
-
-    - name: "[PowerShell] Add build script path"
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: Add-Content $env:GITHUB_PATH "$(pwd)/.github/bin"
-
-    - name: "[Bash] Add build script path"
-      if: runner.os != 'Windows'
-      run: echo "$(pwd)/.github/bin" >> $GITHUB_PATH
-
-    - name: "LINUX: Install build environment (apt-get)"
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get -y install libsodium23 libsodium-dev
-        sudo apt-get -y remove --purge software-properties-common
-        sudo apt-get -y autoremove
-
-    - name: "LINUX: Install build environment (for secp256k1)"
-      if: runner.os == 'Linux'
-      run: sudo apt-get -y install autoconf automake libtool
-
-    - name: "MAC: Install build environment (brew)"
-      if: runner.os == 'macOS'
-      run: |
-        brew install libsodium
-
-    - name: "MAC: Install build environment (for secp256k1)"
-      if: runner.os == 'macOS'
-      run: brew install autoconf automake libtool
-
-    - name: "WINDOWS: Install blst"
-      if: runner.os == 'Windows'
-      env:
-        MSYS2_PATH_TYPE: inherit
-        MSYSTEM: MINGW64
-        PREFIX: /mingw64
-      run: C:\\msys64\\usr\\bin\\bash.exe .github/workflows/build-blst.bash
-
-    - name: "NON-WINDOWS: Install blst"
-      if: runner.os != 'Windows'
-      env:
-        PREFIX: /usr/local
-      run: |
-        sudo -E .github/workflows/build-blst.bash
-        echo "PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:$PKG_CONFIG_PATH" | tee -a "$GITHUB_ENV"
-
-    - name: Install secp256k1
-      uses: input-output-hk/setup-secp256k1@v1
-      with:
-        git-ref: ${{ env.SECP256K1_REF }}
-        cache-version: ${{ env.SECP_CACHE_VERSION }}
 
     - name: Cabal update
       run: cabal update
@@ -160,35 +90,16 @@ jobs:
         key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
 
     - name: Install dependencies
-      run: |
-        # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
-        # we are very deliberate about only adding msys64 to the path where absolutely necessary.
-        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        echo $PKG_CONFIG_PATH
-        echo $env:PKG_CONFIG_PATH
-        cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
+      run: cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
 
-    - name: Build [WIN - testing]
-      if: runner.os == 'Windows'
+    - name: Build [testing]
       run: cabal build all --enable-tests -j --ghc-option=-j4
 
-    - name: Build [non-WIN - testing]
-      if: runner.os != 'Windows'
-      run: cabal build all --enable-tests -j
-
-    - name: Run tests [WIN]
-      if: runner.os == 'Windows'
+    - name: Run tests
       env:
+        # these two are msys2 env vars, they have no effect on non-msys2 installs.
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
-      run: |
-        # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
-        # we are very deliberate about only adding msys64 to the path where absolutely necessary.
-        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        cabal test all --enable-tests --test-show-details=direct -j1
-
-    - name: Run tests [non-WIN]
-      if: runner.os != 'Windows'
       run: cabal test all --enable-tests --test-show-details=direct -j1
 
     - uses: actions/upload-artifact@v3
