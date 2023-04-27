@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-praos`
 
+## 2.1.1.2
+
+*
+
 ## 2.1.1.1
 
 * GHC-9.6 compatibility
