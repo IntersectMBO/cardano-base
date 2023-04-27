@@ -1,7 +1,23 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.1.1.0
+## 2.2.0.0
+
+**DO NOT RELEASE YET** - MemLocking and secure forgettin interface has not yet
+solidified. Ask @lehins if backport is needed.
+
+* Introduce memory locking and secure forgetting functionality:
+  [#255](https://github.com/input-output-hk/cardano-base/pull/255)
+* KES started using the new memlocking functionality:
+  [#255](https://github.com/input-output-hk/cardano-base/pull/255)
+* Introduction of `DSIGNM` that uses the new memlocking functionality:
+  [#255](https://github.com/input-output-hk/cardano-base/pull/255)
 * Included bindings to `blst` library to enable operations over curve BLS12-381
+  [#266](https://github.com/input-output-hk/cardano-base/pull/266)
+
+## 2.1.0.2
+
+* Deserialization performance improvements
+* GHC-9.6 compatibility
 
 ## 2.1.0.1
 

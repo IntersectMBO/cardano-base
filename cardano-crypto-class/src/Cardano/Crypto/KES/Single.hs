@@ -106,7 +106,9 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
     rawSerialiseSigKES     (SigSingleKES    sig) = rawSerialiseSigDSIGNM sig
 
     rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . rawDeserialiseVerKeyDSIGNM
+    {-# INLINE rawDeserialiseVerKeyKES #-}
     rawDeserialiseSigKES     = fmap SigSingleKES     . rawDeserialiseSigDSIGNM
+    {-# INLINE rawDeserialiseSigKES #-}
 
 
 instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
@@ -159,6 +161,7 @@ instance DSIGNMAlgorithmBase d => ToCBOR (VerKeyKES (SingleKES d)) where
 
 instance DSIGNMAlgorithmBase d => FromCBOR (VerKeyKES (SingleKES d)) where
   fromCBOR = decodeVerKeyKES
+  {-# INLINE fromCBOR #-}
 
 instance DSIGNMAlgorithmBase d => NoThunks (VerKeyKES  (SingleKES d))
 
@@ -184,3 +187,4 @@ instance DSIGNMAlgorithmBase d => ToCBOR (SigKES (SingleKES d)) where
 
 instance DSIGNMAlgorithmBase d => FromCBOR (SigKES (SingleKES d)) where
   fromCBOR = decodeSigKES
+  {-# INLINE fromCBOR #-}
