@@ -43,7 +43,7 @@ jobs:
 
     steps:
     - name: Install Haskell
-      uses: input-output-hk/setup-haskell@v1
+      uses: input-output-hk/actions/haskell@latest
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
@@ -51,7 +51,10 @@ jobs:
 
     # this needs to be _after_ setup-haskell, as that
     # mutilates PKG_CONFIG_PATH
-    - uses: input-output-hk/iohk-nix@v1
+    - name: Install system dependencies
+      uses: input-output-hk/actions/base@latest
+      with:
+        use-sodium-vrf: false # default is true
 
     - uses: actions/checkout@v3
 
