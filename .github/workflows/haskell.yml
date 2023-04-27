@@ -39,7 +39,7 @@ jobs:
 
     env:
       # Modify this value to "invalidate" the cabal cache.
-      CABAL_CACHE_VERSION: "2023-03-22"
+      CABAL_CACHE_VERSION: "2023-04-27"
 
     steps:
     - name: Install Haskell

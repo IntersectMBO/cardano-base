@@ -184,7 +184,7 @@ CHaP. (TODO: implement a script that lists all of the package that fit the above
    `2.20.1.2` section in the `CHANGELOG.md` must be added:
 
    ```markdown
-   # Version history for `cardano-ledger-core`
+   # Version history for `cardano-crypto-class`
 
    ## 2.20.1.2
 
@@ -206,14 +206,19 @@ diverged from a version on `master` significantly enough to make it impossible f
 version to be released from `master`. In other words a patch backporting. In such a
 scenario a few steps should be followed:
 
-1. A branch with a prefix `release/` need to be created from a tag of a package version
-   that is being updated. For example if a current version on `master` is
+1. Two ephemeral branches with a prefix `release/` need to be created from a git tag of a
+   package version that is being updated. For example if a current version on `master` is
    `cardano-binary-1.13.10.0` then the latest released `cardano-binary-1.12.x` should be
    used as base, eg:
 
    ```shell
-   $ git checkout -b release/cardano-ledger-core-1.12.7.0 cardano-ledger-core-1.12.6.2
+   $ git checkout -b release/cardano-binary-1.12.6.2 cardano-binary-1.12.6.2
+   $ git push -u origin release/cardano-binary-1.12.6.2
+   $ git checkout -b release/cardano-binary-1.12.7.0 cardano-binary-1.12.6.2
    ```
+
+   We'll need the first branch in order to use it as base when creating a PR for code
+   review.
 
 2. Changes that need to be released should be `cherry-pick`ed from master. If a fix on
    `master` was implemented in some incompatible fashion to the current release, then it
@@ -221,32 +226,35 @@ scenario a few steps should be followed:
    on master in some form. That requirement also concerns the changelog entry, it should
    be present in both the patched version and in the next version released from `master`.
 
-3. Regular release process should follow from here.
+3. Regular release process should follow from here, except when PR is created it will not
+   be `master` that is used as a base branch, but the one created in 1st step.
 
-4. Once the package has been released and a git tag for that release was created, the
-   `release/` branch can be removed.
+4. Once the package has been released and a git tag for that release was created, both of
+   the `release/` branches can be removed.
 
 This process does not accommodate backporting fixes to versions that are at least two major
 versions behind the one on `master`.
 
 ## Packages excluded from release process
 
-We release most of the packages in this repo to [CHaP (Cardano Haskell
-Packages)](https://github.com/input-output-hk/cardano-haskell-packages). However, there
-can be packages that are either used for testing, debugging or benchmarking and do not
-deserve to be released into the World. They are neither released nor versioned. Bounds on
-the local dependencies do not need to be updated, because they will always use the
-versions for ledger packages from within the repository, rather than from CHaPs.
-
-Currently there are no such packages that fit the above criteria, but this could change in
+Currently there are no such packages that fit the criteria below, but this could change in
 the future.
+
+We release all of the packages in this repo to [CHaP (Cardano Haskell
+Packages)](https://github.com/input-output-hk/cardano-haskell-packages). However, packages
+can be added to the repo that are either used for testing, debugging or benchmarking and
+do not deserve to be released into the World. They will neither be released nor
+versioned. Bounds on the local dependencies do not need to be updated for such packages,
+because they will always use the versions for dependencies from within the repository,
+rather than from CHaPs.
 
 ## Test packages
 
-Here is a test suite package that is still subject to the versioning and release process,
-but is exempt from changelog updates:
+Here are test suite packages that are still subject to the versioning and release process,
+but do not require changelog updates:
 
 * `cardano-crypto-tests`
+* `cardano-binary-test`
 
 It is mostly used internally and is planned to be deprecated and removed in some distant
 future in favor of a public sublibrary `testlib` for each relevant package.
