@@ -50,8 +50,8 @@ Order of the values printed on `ec_operations_test_vectors`:
 - `G1_SUB = G1_P - G1_Q`
 - `G1_MULL = [scalar]G1_Q`
 - `G1_NEG = -G1_P`
-- `G2_P` - random point on `G_1`
-- `G2_Q` - random point on `G_1`
+- `G2_P` - random point on `G_2`
+- `G2_Q` - random point on `G_2`
 - `G2_ADD = G2_P + G2_Q`
 - `G2_SUB = G2_P - G2_Q`
 - `G2_MULL = [scalar]G2_Q`
