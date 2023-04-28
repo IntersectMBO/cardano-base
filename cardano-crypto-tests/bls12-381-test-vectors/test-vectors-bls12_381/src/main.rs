@@ -32,7 +32,7 @@ fn pairing_properties<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let atimesbQ = atimesb * Q;
 
     write_hex_to_file(
-        "pairing_test_vectors",
+        "././test_vectors/pairing_test_vectors",
         &[
             [aP, bP, aplusbP, atimesbP].map(|a| hex::encode(G1Affine::from(a).to_compressed())), // COMMENT: Why we only test aplusb and atimesb in G1?
             [aQ, bQ, aplusbQ, atimesbQ].map(|a| hex::encode(G2Affine::from(a).to_compressed())),
@@ -59,7 +59,7 @@ fn ec_operations<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let G2_NEG = -G2_P;
 
     write_hex_to_file(
-        "ec_operations_test_vectors",
+        "././test_vectors/ec_operations_test_vectors",
         &[
             [G1_P, G1_Q, G1_ADD, G1_SUB, G1_MUL, G1_NEG]
                 .map(|a| hex::encode(G1Affine::from(a).to_compressed())),
@@ -204,7 +204,7 @@ fn serde<R: RngCore>(mut rng: R) -> std::io::Result<()> {
 
     //-----------------------------------------------------------
 
-    write_hex_to_file("serde_test_vectors", &hex_strings)
+    write_hex_to_file("././test_vectors/serde_test_vectors", &hex_strings)
 }
 
 fn bls_sig_with_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
@@ -224,7 +224,7 @@ fn bls_sig_with_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
 
     let sig_hex = hex::encode(sig.to_bytes());
     let pk_hex = hex::encode(pk.to_bytes());
-    let mut file = File::create("bls_sig_aug_test_vectors")?;
+    let mut file = File::create("././test_vectors/bls_sig_aug_test_vectors")?;
     file.write_all(sig_hex.as_ref())?;
     file.write_all(b"\n")?;
     file.write_all(pk_hex.as_ref())?;
@@ -248,7 +248,7 @@ fn bls_sig<R: RngCore>(mut rng: R) -> std::io::Result<()> {
 
     let sig_hex = hex::encode(sig.to_bytes());
     let pk_hex = hex::encode(pk.to_bytes());
-    let mut file = File::create("bls_sig_test_vectors")?;
+    let mut file = File::create("././test_vectors/bls_sig_test_vectors")?;
     file.write_all(sig_hex.as_ref())?;
     file.write_all(b"\n")?;
     file.write_all(pk_hex.as_ref())?;
