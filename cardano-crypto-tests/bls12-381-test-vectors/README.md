@@ -1,39 +1,61 @@
 ## Test vectors for BLS
 ### 1- Test vectors for pairing properties
+The properties to be tested:
 - `e([a]P, Q) = e(P, [a]Q)`
 - `e([a]P, [b]Q) = e([b]P, [a]Q)`
 - `e([a]P, [b]Q) = e([a * b]P, Q)`
 - `e([a]P, Q) * e([b]P, Q) = e([a + b]P, Q)`
+- `e([a]P, [b]Q) = e(P, [a * b]Q)`
+- `e(P, [a]Q) * e(P, [b]Q) = e(P, [a + b]Q)`
+
+The values used to generate test vectors:
+```
+P = 840463aa2f2cda89985b1f3f5eb43b9c29809765d2747d60734b19d6f90610effdfc500af7d458a3e78cee0945ddc669 // G1 point
+Q = b67029fbf3ab8e62ab6b499f541537fc07d9466e668392df2bc19762d7dc48b64be09a448cd46dbfe21819a91cd0ab3205f1316ad1cc32853f3f1a1d06497f5cfbc2d753dfc01bff177adeb93f24d452045435dc6eb29f5610b66cd0dd3fb352 // G2 point
+a = 0x0e51216fa879b2ce727b596d065dd9b7fd8a84d94ffacf9ca30ad114304272d3 // scalar
+b = 0x437c2d7d852637c2ef23645a5abcbb308d6150bfcccbf3a8fdbc9daaa91496ef // scalar
+aplusb = 0x51cd4eed2d9fea91619ebdc7611a94e88aebd5991cc6c345a0c76ebed95709c2 // scalar
+atimesb = 0x2d70bbc706812d56e805ae67934b3275ff67f304a76ea9b3c96d31b9c0d607ba // scalar
+```
 
 Order of the values printed on `pairing_test_vectors`:
 - `[a]P`    
-- `[b]Q`
 - `[b]P`
-- `[a]Q`
 - `[a + b]P`
 - `[a * b]P`
+- `[a]Q`
+- `[b]Q`
+- `[a + b]Q`
+- `[a * b]Q`
+
 
 
 ### 2- Test vectors for elliptic curve operations
 Operations to be tested:
-- Addition - `P + Q`
-- Subtraction - `P - Q`
-- Scalar multiplication - `[scalar]Q`
-- Negation - `-P`
+- Addition 
+- Subtraction
+- Scalar multiplication 
+- Negation 
+
+The scalar used in scalar multiplication:
+```
+0x40df499974f62e2f268cd5096b0d952073900054122ffce0a27c9d96932891a5
+```
 
 Order of the values printed on `ec_operations_test_vectors`:
-- `P \in G_1` 
-- `Q \in G_1`
-- `P + Q \in G_1`
-- `P - Q \in G_1`
-- `[scalar]Q \in G_1`
-- `-P \in G_1`
-- `P \in G_2`
-- `Q \in G_2`
-- `P + Q \in G_2`
-- `P - Q \in G_2`
-- `[scalar]Q \in G_2`
-- `-P \in G_2`
+
+- `G1_P` - random point on `G_1`
+- `G1_Q` - random point on `G_1`
+- `G1_ADD = G1_P + G1_Q`
+- `G1_SUB = G1_P - G1_Q`
+- `G1_MULL = [scalar]G1_Q`
+- `G1_NEG = -G1_P`
+- `G2_P` - random point on `G_1`
+- `G2_Q` - random point on `G_1`
+- `G2_ADD = G2_P + G2_Q`
+- `G2_SUB = G2_P - G2_Q`
+- `G2_MULL = [scalar]G2_Q`
+- `G2_NEG = -G2_P`
 
 
 ### 3- Test vectors for deserialization/decompression

@@ -34,7 +34,7 @@ fn pairing_properties<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     write_hex_to_file(
         "././test_vectors/pairing_test_vectors",
         &[
-            [aP, bP, aplusbP, atimesbP].map(|a| hex::encode(G1Affine::from(a).to_compressed())), // COMMENT: Why we only test aplusb and atimesb in G1?
+            [aP, bP, aplusbP, atimesbP].map(|a| hex::encode(G1Affine::from(a).to_compressed())),
             [aQ, bQ, aplusbQ, atimesbQ].map(|a| hex::encode(G2Affine::from(a).to_compressed())),
         ]
         .concat(),
@@ -112,7 +112,7 @@ fn serde<R: RngCore>(mut rng: R) -> std::io::Result<()> {
                     .unwrap_u8(),
                 1
             );
-            hex_strings.push(hex::encode(G1_random_bytes)); // REMOVE THIS COMMENT: we need to encode within the loop, because if we reach 10 and haven't found anything, we would break and store the zero vector, which we don't want.
+            hex_strings.push(hex::encode(G1_random_bytes));
             break;
         }
     }
