@@ -1,5 +1,5 @@
 [package]
-name = "test-vectors-bls12_381"
+name = "bls12-381-test-vectors"
 version = "0.1.0"
 edition = "2021"
 
