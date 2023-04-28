@@ -224,7 +224,7 @@ fn bls_sig_with_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
 
     let sig_hex = hex::encode(sig.to_bytes());
     let pk_hex = hex::encode(pk.to_bytes());
-    let mut file = File::create("././test_vectors/bls_sig_aug_test_vectors")?;
+    let mut file = File::create("../test_vectors/bls_sig_aug_test_vectors")?;
     file.write_all(sig_hex.as_ref())?;
     file.write_all(b"\n")?;
     file.write_all(pk_hex.as_ref())?;
@@ -248,7 +248,7 @@ fn bls_sig<R: RngCore>(mut rng: R) -> std::io::Result<()> {
 
     let sig_hex = hex::encode(sig.to_bytes());
     let pk_hex = hex::encode(pk.to_bytes());
-    let mut file = File::create("././test_vectors/bls_sig_test_vectors")?;
+    let mut file = File::create("../test_vectors/bls_sig_test_vectors")?;
     file.write_all(sig_hex.as_ref())?;
     file.write_all(b"\n")?;
     file.write_all(pk_hex.as_ref())?;
