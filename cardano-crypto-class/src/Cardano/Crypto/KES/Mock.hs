@@ -24,6 +24,7 @@ import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
+import Control.Monad.Class.MonadST (MonadST)
 
 import Control.Exception (assert)
 
@@ -124,7 +125,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
-instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
+instance (MonadST m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
     data SignKeyKES (MockKES t) =
            SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
         deriving stock    (Show, Eq, Generic)
@@ -132,11 +133,11 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
 
     deriveVerKeyKES (SignKeyMockKES vk _) = return $! vk
 
-    updateKES () (SignKeyMockKES vk t') t =
+    updateKESWith _allocator () (SignKeyMockKES vk t') t =
         assert (t == t') $!
          if t+1 < totalPeriodsKES (Proxy @(MockKES t))
            then return $! Just $! SignKeyMockKES vk (t+1)
-           else return $! Nothing
+           else return Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
     -- allowed KES period.
@@ -150,17 +151,17 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
     -- Key generation
     --
 
-    genKeyKES seed = do
+    genKeyKESWith _allocator seed = do
         let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes . mlsbAsByteString . mlockedSeedMLSB $ seed) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
     forgetSignKeyKES = const $ return ()
 
-instance (Monad m, KnownNat t) => UnsoundKESSignAlgorithm m (MockKES t) where
+instance (MonadST m, KnownNat t) => UnsoundKESSignAlgorithm m (MockKES t) where
     rawSerialiseSignKeyKES sk =
       return $ rawSerialiseSignKeyMockKES sk
 
-    rawDeserialiseSignKeyKES bs =
+    rawDeserialiseSignKeyKESWith _alloc bs =
       return $ rawDeserialiseSignKeyMockKES bs
 
 rawDeserialiseSignKeyMockKES :: KnownNat t

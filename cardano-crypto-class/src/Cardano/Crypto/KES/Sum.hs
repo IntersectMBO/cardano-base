@@ -65,7 +65,6 @@ import           Cardano.Crypto.KES.Single (SingleKES)
 import           Cardano.Crypto.Util
 import           Cardano.Crypto.MLockedSeed
 import           Cardano.Crypto.MonadMLock
-import           Control.Monad.Class.MonadST (MonadST (..))
 import           Control.Monad.Class.MonadThrow (MonadThrow)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Control.DeepSeq (NFData (..))
@@ -225,7 +224,6 @@ instance ( KESAlgorithm d
 instance ( KESSignAlgorithm m d
          , SodiumHashAlgorithm h -- needed for secure forgetting
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , MonadST m
          , MonadThrow m
          , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
          , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
@@ -253,21 +251,21 @@ instance ( KESSignAlgorithm m d
 
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
-    {-# NOINLINE updateKES #-}
-    updateKES ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
+    {-# NOINLINE updateKESWith #-}
+    updateKESWith allocator ctx (SignKeySumKES sk r_1 vk_0 vk_1) t
       | t+1 <  _T = runMaybeT $!
                       do
-                        sk' <- MaybeT $! updateKES ctx sk t
+                        sk' <- MaybeT $! updateKESWith allocator ctx sk t
                         r_1' <- MaybeT $! Just <$!> mlockedSeedCopy r_1
                         return $! SignKeySumKES sk' r_1' vk_0 vk_1
       | t+1 == _T = do
-                        sk' <- genKeyKES r_1
-                        r_1' <- mlockedSeedNewZero
+                        sk' <- genKeyKESWith allocator r_1
+                        r_1' <- mlockedSeedNewZeroWith allocator
                         return $! Just $! SignKeySumKES sk' r_1' vk_0 vk_1
       | otherwise = runMaybeT $
                       do
-                        sk' <- MaybeT $! updateKES ctx sk (t - _T)
-                        r_1' <- MaybeT $! Just <$!> mlockedSeedCopy r_1
+                        sk' <- MaybeT $! updateKESWith allocator ctx sk (t - _T)
+                        r_1' <- MaybeT $! Just <$!> mlockedSeedCopyWith allocator r_1
                         return $! SignKeySumKES sk' r_1' vk_0 vk_1
       where
         _T = totalPeriodsKES (Proxy :: Proxy d)
@@ -276,14 +274,14 @@ instance ( KESSignAlgorithm m d
     -- Key generation
     --
 
-    {-# NOINLINE genKeyKES #-}
-    genKeyKES r = do
-      (r0raw, r1raw) <- expandHash (Proxy :: Proxy h) (mlockedSeedMLSB r)
+    {-# NOINLINE genKeyKESWith #-}
+    genKeyKESWith allocator r = do
+      (r0raw, r1raw) <- expandHashWith allocator (Proxy :: Proxy h) (mlockedSeedMLSB r)
       let r0 = MLockedSeed r0raw
           r1 = MLockedSeed r1raw
-      sk_0 <- genKeyKES r0
+      sk_0 <- genKeyKESWith allocator r0
       vk_0 <- deriveVerKeyKES sk_0
-      sk_1 <- genKeyKES r1
+      sk_1 <- genKeyKESWith allocator r1
       vk_1 <- deriveVerKeyKES sk_1
       forgetSignKeyKES sk_1
       mlockedSeedFinalize r0
@@ -298,7 +296,6 @@ instance ( KESSignAlgorithm m d
 
 instance ( KESSignAlgorithm m (SumKES h d)
          , UnsoundKESSignAlgorithm m d
-         , MonadST m
          ) => UnsoundKESSignAlgorithm m (SumKES h d) where
     --
     -- Raw serialise/deserialise - dangerous, do not use in production code.
@@ -315,11 +312,11 @@ instance ( KESSignAlgorithm m (SumKES h d)
                   , rawSerialiseVerKeyKES vk_1
                   ]
 
-    {-# NOINLINE rawDeserialiseSignKeyKES #-}
-    rawDeserialiseSignKeyKES b = runMaybeT $ do
+    {-# NOINLINE rawDeserialiseSignKeyKESWith #-}
+    rawDeserialiseSignKeyKESWith allocator b = runMaybeT $ do
         guard (BS.length b == fromIntegral size_total)
-        sk   <- MaybeT $ rawDeserialiseSignKeyKES b_sk
-        r <- MaybeT $ mlsbFromByteStringCheck b_r
+        sk   <- MaybeT $ rawDeserialiseSignKeyKESWith allocator b_sk
+        r <- MaybeT $ mlsbFromByteStringCheckWith allocator b_r
         vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk0
         vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES  b_vk1
         return (SignKeySumKES sk (MLockedSeed r) vk_0 vk_1)

@@ -44,11 +44,11 @@ import Cardano.Crypto.Libsodium (MLockedSizedBytes)
 import Cardano.Crypto.MonadMLock
   ( 
   mlsbToByteString
-  , mlsbFromByteStringCheck
+  , mlsbFromByteStringCheckWith
   , mlsbUseAsSizedPtr
-  , mlsbNew
+  , mlsbNewWith
   , mlsbFinalize
-  , mlsbCopy
+  , mlsbCopyWith
   , MEq (..)
   , PinnedSizedBytes
   , psbUseAsSizedPtr
@@ -219,9 +219,9 @@ instance (MonadST m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
     --
     -- Key generation
     --
-    {-# NOINLINE genKeyDSIGNM #-}
-    genKeyDSIGNM seed = SignKeyEd25519DSIGNM <$!> do
-      sk <- mlsbNew
+    {-# NOINLINE genKeyDSIGNMWith #-}
+    genKeyDSIGNMWith allocator seed = SignKeyEd25519DSIGNM <$!> do
+      sk <- mlsbNewWith allocator
       mlsbUseAsSizedPtr sk $ \skPtr ->
         mlockedSeedUseAsCPtr seed $ \seedPtr -> do
           maybeErrno <- withLiftST $ \fromST ->
@@ -234,11 +234,11 @@ instance (MonadST m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
         allocaSizedST k =
           unsafeIOToST $ allocaSized $ \ptr -> stToIO $ k ptr
 
-    cloneKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
-      SignKeyEd25519DSIGNM <$!> mlsbCopy sk
+    cloneKeyDSIGNMWith allocator (SignKeyEd25519DSIGNM sk) =
+      SignKeyEd25519DSIGNM <$!> mlsbCopyWith allocator sk
 
-    getSeedDSIGNM _ (SignKeyEd25519DSIGNM sk) = do
-      seed <- mlockedSeedNew
+    getSeedDSIGNMWith allocator _ (SignKeyEd25519DSIGNM sk) = do
+      seed <- mlockedSeedNewWith allocator
       mlsbUseAsSizedPtr sk $ \skPtr ->
         mlockedSeedUseAsSizedPtr seed $ \seedPtr -> do
           maybeErrno <- withLiftST $ \fromST ->
@@ -270,12 +270,12 @@ instance (MonadST m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM whe
       mlockedSeedFinalize seed
       return raw
 
-    rawDeserialiseSignKeyDSIGNM raw = do
-      mseed <- fmap MLockedSeed <$> mlsbFromByteStringCheck raw
+    rawDeserialiseSignKeyDSIGNMWith allocator raw = do
+      mseed <- fmap MLockedSeed <$> mlsbFromByteStringCheckWith allocator raw
       case mseed of
         Nothing -> return Nothing
         Just seed -> do
-          sk <- Just <$> genKeyDSIGNM seed
+          sk <- Just <$> genKeyDSIGNMWith allocator seed
           mlockedSeedFinalize seed
           return sk
 

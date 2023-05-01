@@ -8,14 +8,17 @@ where
 
 import Cardano.Crypto.MonadMLock
   ( MLockedSizedBytes
-  , mlsbCopy
-  , mlsbNew
-  , mlsbNewZero
+  , mlsbCopyWith
+  , mlsbNewWith
+  , mlsbNewZeroWith
   , mlsbFinalize
   , mlsbUseAsCPtr
   , mlsbUseAsSizedPtr
   , MEq (..)
+  , MLockedAllocator
+  , mlockedMalloc
   )
+import Cardano.Crypto.Libsodium.MLockedBytes (SizedVoid)
 import Cardano.Foreign (SizedPtr)
 import GHC.TypeNats (KnownNat)
 import Control.DeepSeq (NFData)
@@ -42,16 +45,25 @@ withMLockedSeedAsMLSB action =
   fmap MLockedSeed . action . mlockedSeedMLSB
 
 mlockedSeedCopy :: (KnownNat n, MonadST m) => MLockedSeed n -> m (MLockedSeed n)
-mlockedSeedCopy =
-  withMLockedSeedAsMLSB mlsbCopy
+mlockedSeedCopy = mlockedSeedCopyWith mlockedMalloc
+
+mlockedSeedCopyWith :: (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> MLockedSeed n -> m (MLockedSeed n)
+mlockedSeedCopyWith allocator =
+  withMLockedSeedAsMLSB (mlsbCopyWith allocator)
 
 mlockedSeedNew :: (KnownNat n, MonadST m) => m (MLockedSeed n)
-mlockedSeedNew =
-  MLockedSeed <$> mlsbNew
+mlockedSeedNew = mlockedSeedNewWith mlockedMalloc
+
+mlockedSeedNewWith :: (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> m (MLockedSeed n)
+mlockedSeedNewWith allocator =
+  MLockedSeed <$> mlsbNewWith allocator
 
 mlockedSeedNewZero :: (KnownNat n, MonadST m) => m (MLockedSeed n)
-mlockedSeedNewZero =
-  MLockedSeed <$> mlsbNewZero
+mlockedSeedNewZero = mlockedSeedNewZeroWith mlockedMalloc
+
+mlockedSeedNewZeroWith :: (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> m (MLockedSeed n)
+mlockedSeedNewZeroWith allocator =
+  MLockedSeed <$> mlsbNewZeroWith allocator
 
 mlockedSeedFinalize :: (MonadST m) => MLockedSeed n -> m ()
 mlockedSeedFinalize = mlsbFinalize . mlockedSeedMLSB

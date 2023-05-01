@@ -17,6 +17,12 @@ module Cardano.Crypto.Libsodium.MLockedBytes (
     traceMLSB,
     mlsbCompare,
     mlsbEq,
+
+    mlsbNewWith,
+    mlsbNewZeroWith,
+    mlsbCopyWith,
+    mlsbFromByteStringWith,
+    mlsbFromByteStringCheckWith,
 ) where
 
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
