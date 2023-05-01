@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Abstract digital signatures.
 module Cardano.Crypto.DSIGNM.Class
@@ -59,11 +60,13 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (KnownNat, Nat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
+import Control.Monad.Class.MonadST
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.MonadMLock.Alloc (MLockedAllocator, mlockedMalloc)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
 class ( Typeable v
@@ -136,7 +139,7 @@ class ( Typeable v
   rawDeserialiseSigDSIGNM     :: ByteString -> Maybe (SigDSIGNM v)
 
 class ( DSIGNMAlgorithmBase v
-      , Monad m
+      , MonadST m
       )
       => DSIGNMAlgorithm m v where
 
@@ -161,11 +164,21 @@ class ( DSIGNMAlgorithmBase v
   -- Key generation
   --
 
+  genKeyDSIGNMWith :: (forall a. MLockedAllocator m a) -> MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
+
+  {-# NOINLINE genKeyDSIGNM #-}
   genKeyDSIGNM :: MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
+  genKeyDSIGNM = genKeyDSIGNMWith mlockedMalloc
+
+  cloneKeyDSIGNMWith :: (forall a. MLockedAllocator m a) -> SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
 
   cloneKeyDSIGNM :: SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
+  cloneKeyDSIGNM = cloneKeyDSIGNMWith mlockedMalloc
+
+  getSeedDSIGNMWith :: (forall a. MLockedAllocator m a) -> Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
 
   getSeedDSIGNM :: Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
+  getSeedDSIGNM = getSeedDSIGNMWith mlockedMalloc
 
   --
   -- Secure forgetting
@@ -184,6 +197,10 @@ class DSIGNMAlgorithm m v => UnsoundDSIGNMAlgorithm m v where
   rawSerialiseSignKeyDSIGNM   :: SignKeyDSIGNM v -> m ByteString
 
   rawDeserialiseSignKeyDSIGNM :: ByteString -> m (Maybe (SignKeyDSIGNM v))
+  rawDeserialiseSignKeyDSIGNM =
+    rawDeserialiseSignKeyDSIGNMWith mlockedMalloc
+
+  rawDeserialiseSignKeyDSIGNMWith :: (forall a. MLockedAllocator m a) -> ByteString -> m (Maybe (SignKeyDSIGNM v))
 
 --
 -- Do not provide Ord instances for keys, see #38

@@ -64,9 +64,19 @@ module Cardano.Crypto.MonadMLock
   mlsbCompare,
   mlsbEq,
 
+  mlsbNewWith,
+  mlsbNewZeroWith,
+  mlsbCopyWith,
+  mlsbFromByteStringWith,
+  mlsbFromByteStringCheckWith,
+
+  MLockedAllocator,
+  mlockedMalloc,
+
   -- * Hashing
   SodiumHashAlgorithm (..),
   expandHash,
+  expandHashWith,
   digestMLockedStorable,
   digestMLockedBS,
 )

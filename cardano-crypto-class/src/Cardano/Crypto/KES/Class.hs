@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Abstract key evolving signatures.
 module Cardano.Crypto.KES.Class
@@ -71,11 +72,13 @@ import GHC.Generics (Generic)
 import GHC.Stack
 import GHC.TypeLits (Nat, KnownNat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
+import Control.Monad.Class.MonadST (MonadST)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
 import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.MonadMLock (MLockedAllocator, mlockedMalloc)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
 class ( Typeable v
@@ -172,7 +175,7 @@ seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
 
 
 class ( KESAlgorithm v
-      , Monad m
+      , MonadST m
       )
       => KESSignAlgorithm m v where
 
@@ -214,6 +217,16 @@ class ( KESAlgorithm v
     -> SignKeyKES v
     -> Period  -- ^ The /current/ period for the key, not the target period.
     -> m (Maybe (SignKeyKES v))
+  updateKES = updateKESWith mlockedMalloc
+
+  updateKESWith
+    :: HasCallStack
+    => (forall a. MLockedAllocator m a)
+    -> ContextKES v
+    -> SignKeyKES v
+    -> Period  -- ^ The /current/ period for the key, not the target period.
+    -> m (Maybe (SignKeyKES v))
+    
 
   --
   -- Key generation
@@ -222,6 +235,13 @@ class ( KESAlgorithm v
   genKeyKES
     :: MLockedSeed (SeedSizeKES v)
     -> m (SignKeyKES v)
+  genKeyKES = genKeyKESWith mlockedMalloc
+
+  genKeyKESWith
+    :: (forall a. MLockedAllocator m a)
+    -> MLockedSeed (SeedSizeKES v)
+    -> m (SignKeyKES v)
+
 
   --
   -- Secure forgetting
@@ -242,6 +262,11 @@ class ( KESAlgorithm v
 -- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
 class (KESSignAlgorithm m v) => UnsoundKESSignAlgorithm m v where
   rawDeserialiseSignKeyKES  :: ByteString -> m (Maybe (SignKeyKES v))
+  {-# NOINLINE rawDeserialiseSignKeyKES #-}
+  rawDeserialiseSignKeyKES =
+    rawDeserialiseSignKeyKESWith mlockedMalloc
+  rawDeserialiseSignKeyKESWith  :: (forall a. MLockedAllocator m a) -> ByteString -> m (Maybe (SignKeyKES v))
+
   rawSerialiseSignKeyKES   :: SignKeyKES v -> m ByteString
 
 -- | Subclass for KES algorithms that embed a copy of the VerKey into the

@@ -105,8 +105,8 @@ instance
   => KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) m) (ForgetMockKES k) where
     data SignKeyKES (ForgetMockKES k) = SignKeyForgetMockKES !Word !(SignKeyKES k)
 
-    genKeyKES seed = do
-      sk <- genKeyKES seed
+    genKeyKESWith allocator seed = do
+      sk <- genKeyKESWith allocator seed
       nonce <- randomRIO (10000000, 99999999)
       tracer <- ask
       traceWith tracer (GenericEvent $ GEN nonce)
@@ -123,10 +123,10 @@ instance
     signKES ctx p msg (SignKeyForgetMockKES _ sk) =
         SigForgetMockKES <$!> signKES ctx p msg sk
 
-    updateKES ctx (SignKeyForgetMockKES nonce sk) p = do
+    updateKESWith allocator ctx (SignKeyForgetMockKES nonce sk) p = do
       tracer <- ask
       nonce' <- randomRIO (10000000, 99999999)
-      updateKES ctx sk p >>= \case
+      updateKESWith allocator ctx sk p >>= \case
         Just sk' -> do
           traceWith tracer (GenericEvent $ UPD nonce nonce')
           return $! Just $! SignKeyForgetMockKES nonce' sk'
@@ -142,8 +142,8 @@ instance
 
     rawSerialiseSignKeyKES (SignKeyForgetMockKES _ k) = rawSerialiseSignKeyKES k
 
-    rawDeserialiseSignKeyKES bs = do
-      msk <- rawDeserialiseSignKeyKES bs
+    rawDeserialiseSignKeyKESWith allocator bs = do
+      msk <- rawDeserialiseSignKeyKESWith allocator bs
       nonce :: Word <- randomRIO (10000000, 99999999)
       return $ fmap (SignKeyForgetMockKES nonce) msk
 

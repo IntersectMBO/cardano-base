@@ -157,13 +157,13 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
         assert (t == 0) $
         SigCompactSingleKES <$!> signDSIGNM ctxt a sk <*> deriveVerKeyDSIGNM sk
 
-    updateKES _ctx (SignKeyCompactSingleKES _sk) _to = return Nothing
+    updateKESWith _allocator _ctx (SignKeyCompactSingleKES _sk) _to = return Nothing
 
     --
     -- Key generation
     --
 
-    genKeyKES seed = SignKeyCompactSingleKES <$!> genKeyDSIGNM seed
+    genKeyKESWith allocator seed = SignKeyCompactSingleKES <$!> genKeyDSIGNMWith allocator seed
 
     --
     -- forgetting
@@ -185,7 +185,7 @@ instance ( KESAlgorithm (CompactSingleKES d)
 instance (KESSignAlgorithm m (CompactSingleKES d), UnsoundDSIGNMAlgorithm m d)
          => UnsoundKESSignAlgorithm m (CompactSingleKES d) where
     rawSerialiseSignKeyKES (SignKeyCompactSingleKES sk) = rawSerialiseSignKeyDSIGNM sk
-    rawDeserialiseSignKeyKES bs = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNM bs
+    rawDeserialiseSignKeyKESWith allocator bs = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
 
 --

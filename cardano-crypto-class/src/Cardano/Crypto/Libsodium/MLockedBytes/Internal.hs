@@ -7,6 +7,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE RankNTypes #-}
+
 module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     -- * The MLockesSizedBytes type
     MLockedSizedBytes (..),
@@ -25,12 +27,18 @@ module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
     withMLSB,
     withMLSBChunk,
 
+    mlsbNewWith,
+    mlsbNewZeroWith,
+    mlsbCopyWith,
+
     -- * Dangerous Functions
     traceMLSB,
     mlsbFromByteString,
     mlsbFromByteStringCheck,
     mlsbAsByteString,
     mlsbToByteString,
+    mlsbFromByteStringWith,
+    mlsbFromByteStringCheckWith,
 ) where
 
 import Control.DeepSeq (NFData (..))
@@ -124,8 +132,11 @@ mlsbSize mlsb = fromInteger (natVal mlsb)
 -- deallocating it ('mlsbFinalize') when done with it. The contents of the
 -- memory block is undefined.
 mlsbNew :: forall n m. (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
-mlsbNew =
-  MLSB <$> mlockedAllocForeignPtrBytes size align
+mlsbNew = mlsbNewWith mlockedMalloc
+
+mlsbNewWith :: forall n m. MLockedAllocator m (SizedVoid n) -> (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
+mlsbNewWith allocator =
+  MLSB <$> mlockedAllocForeignPtrBytesWith allocator size align
   where
     size = fromInteger (natVal (Proxy @n))
     align = nextPowerOf2 size
@@ -134,8 +145,11 @@ mlsbNew =
 -- The caller is responsible for deallocating it ('mlsbFinalize') when done
 -- with it. (See also 'mlsbNew').
 mlsbNewZero :: forall n m. (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
-mlsbNewZero = do
-  mlsb <- mlsbNew
+mlsbNewZero = mlsbNewZeroWith mlockedMalloc
+
+mlsbNewZeroWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> m (MLockedSizedBytes n)
+mlsbNewZeroWith allocator = do
+  mlsb <- mlsbNewWith allocator
   mlsbZero mlsb
   return mlsb
 
@@ -146,8 +160,11 @@ mlsbZero mlsb = do
 
 -- | Create a deep mlocked copy of an 'MLockedSizedBytes'.
 mlsbCopy :: forall n m. (KnownNat n, MonadST m) => MLockedSizedBytes n -> m (MLockedSizedBytes n)
-mlsbCopy src = mlsbUseAsCPtr src $ \ptrSrc -> do
-  dst <- mlsbNew
+mlsbCopy = mlsbCopyWith mlockedMalloc
+
+mlsbCopyWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> MLockedSizedBytes n -> m (MLockedSizedBytes n)
+mlsbCopyWith allocator src = mlsbUseAsCPtr src $ \ptrSrc -> do
+  dst <- mlsbNewWith allocator
   withMLSB dst $ \ptrDst -> do
     copyMem (castPtr ptrDst) (castPtr ptrSrc) (mlsbSize src)
   return dst
@@ -162,8 +179,12 @@ mlsbCopy src = mlsbUseAsCPtr src $ \ptrSrc -> do
 -- (See also 'mlsbFromByteStringCheck')
 mlsbFromByteString :: forall n m. (KnownNat n, MonadST m)
                    => BS.ByteString -> m (MLockedSizedBytes n)
-mlsbFromByteString bs = do
-  dst <- mlsbNew
+mlsbFromByteString = mlsbFromByteStringWith mlockedMalloc
+
+mlsbFromByteStringWith :: forall n m. (KnownNat n, MonadST m)
+                       => MLockedAllocator m (SizedVoid n) -> BS.ByteString -> m (MLockedSizedBytes n)
+mlsbFromByteStringWith allocator bs = do
+  dst <- mlsbNewWith allocator
   withMLSB dst $ \ptr -> do
     withLiftST $ \liftST -> liftST . unsafeIOToST $ do
       BS.useAsCStringLen bs $ \(ptrBS, len) -> do
@@ -179,9 +200,12 @@ mlsbFromByteString bs = do
 -- manipulate them through 'withMLSB', 'mlsbUseAsCPtr', or 'mlsbUseAsSizedPtr'.
 -- (See also 'mlsbFromByteString')
 mlsbFromByteStringCheck :: forall n m. (KnownNat n, MonadST m) => BS.ByteString -> m (Maybe (MLockedSizedBytes n))
-mlsbFromByteStringCheck bs
+mlsbFromByteStringCheck = mlsbFromByteStringCheckWith mlockedMalloc
+
+mlsbFromByteStringCheckWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> BS.ByteString -> m (Maybe (MLockedSizedBytes n))
+mlsbFromByteStringCheckWith allocator bs
     | BS.length bs /= size = return Nothing
-    | otherwise = Just <$> mlsbFromByteString bs
+    | otherwise = Just <$> mlsbFromByteStringWith allocator bs
   where
     size  :: Int
     size = fromInteger (natVal (Proxy @n))

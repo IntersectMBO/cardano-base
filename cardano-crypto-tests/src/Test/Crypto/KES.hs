@@ -142,7 +142,8 @@ instance ( MonadST m
 
 testKESAlloc
   :: forall v.
-     ( (forall m. (MonadThrow m, MonadST m) => KESSignAlgorithm m v)
+     ( KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) IO) v
+     , KESSignAlgorithm (AllocLogT IO) v
      , ContextKES v ~ ()
      )
   => Proxy v
@@ -228,10 +229,13 @@ testMLockGenKeyKES
   -> Assertion
 testMLockGenKeyKES _p = do
   accumVar <- newIORef []
-  let tracer = Tracer (\ev -> liftIO $ modifyIORef accumVar (++ [ev]))
+  let tracer :: Tracer (AllocLogT IO) AllocEvent
+      tracer = Tracer (\ev -> liftIO $ modifyIORef accumVar (++ [ev]))
+      ioTracer = Tracer (\ev -> modifyIORef accumVar (++ [ev]))
+      allocator = liftIO . loggingMalloc ioTracer (liftIO . mlockedMalloc)
   runAllocLogT tracer $ do
     pushAllocLogEvent $ MarkerEv "gen seed"
-    (seed :: MLockedSeed (SeedSizeKES v)) <- MLockedSeed <$> NaCl.mlsbFromByteString (BS.replicate 1024 23)
+    (seed :: MLockedSeed (SeedSizeKES v)) <- MLockedSeed <$> mlsbFromByteStringWith allocator (BS.replicate 1024 23)
     pushAllocLogEvent $ MarkerEv "gen key"
     sk <- genKeyKES @_ @v seed
     pushAllocLogEvent $ MarkerEv "forget key"
@@ -241,6 +245,7 @@ testMLockGenKeyKES _p = do
     pushAllocLogEvent $ MarkerEv "done"
   after <- readIORef accumVar
   let evset = matchAllocLog after
+  assertBool "some allocations happened" (not . null $ [ () | AllocEv _ <- after ])
   assertEqual "all allocations deallocated" Set.empty evset
 
 {-# NOINLINE testKESAlgorithm#-}
@@ -403,8 +408,7 @@ testKESAlgorithm lock _pm _pv n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: ( MonadST m
-          , MonadThrow m
+withSK :: ( MonadThrow m
           , KESSignAlgorithm m v
           ) => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> m b) -> m b
 withSK seedPSB =
@@ -469,7 +473,6 @@ prop_oneUpdateSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadFail m
-        , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
         )
@@ -487,7 +490,6 @@ prop_allUpdatesSignKeyKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
         )
@@ -505,7 +507,6 @@ prop_totalPeriodsKES
         ( ContextKES v ~ ()
         , RunIO m
         , MonadIO m
-        , MonadST m
         , MonadThrow m
         , KESSignAlgorithm m v
         )
@@ -531,7 +532,6 @@ prop_deriveVerKeyKES
       ( ContextKES v ~ ()
       , RunIO m
       , MonadIO m
-      , MonadST m
       , MonadThrow m
       , KESSignAlgorithm m v
       )
@@ -560,7 +560,6 @@ prop_verifyKES_positive
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
      )
@@ -596,7 +595,6 @@ prop_verifyKES_negative_key
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
      )
@@ -627,7 +625,6 @@ prop_verifyKES_negative_message
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
      )
@@ -658,7 +655,6 @@ prop_verifyKES_negative_period
      , Signable v ~ SignableRepresentation
      , RunIO m
      , MonadIO m
-     , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
      )
@@ -692,7 +688,6 @@ prop_serialise_VerKeyKES
      ( ContextKES v ~ ()
      , RunIO m
      , MonadIO m
-     , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
      )
@@ -723,7 +718,6 @@ prop_serialise_SigKES
      , Show (SignKeyKES v)
      , RunIO m
      , MonadIO m
-     , MonadST m
      , MonadThrow m
      , KESSignAlgorithm m v
      )
@@ -753,7 +747,6 @@ prop_serialise_SigKES _ _ seedPSB x =
 withAllUpdatesKES_ :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadST m
                   , MonadThrow m
                   )
               => PinnedSizedBytes (SeedSizeKES v)
@@ -765,7 +758,6 @@ withAllUpdatesKES_ seedPSB f = do
 withAllUpdatesKES :: forall m v a.
                   ( KESSignAlgorithm m v
                   , ContextKES v ~ ()
-                  , MonadST m
                   , MonadThrow m
                   )
               => PinnedSizedBytes (SeedSizeKES v)

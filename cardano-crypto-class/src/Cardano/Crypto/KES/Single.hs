@@ -124,13 +124,14 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
         assert (t == 0) $!
         SigSingleKES <$!> signDSIGNM ctxt a sk
 
-    updateKES _ctx (SignKeySingleKES _sk) _to = return Nothing
+    updateKESWith _allocator _ctx (SignKeySingleKES _sk) _to = return Nothing
 
     --
     -- Key generation
     --
 
-    genKeyKES seed = SignKeySingleKES <$!> genKeyDSIGNM seed
+    genKeyKESWith allocator seed =
+      SignKeySingleKES <$!> genKeyDSIGNMWith allocator seed
 
     --
     -- forgetting
@@ -143,8 +144,8 @@ instance (KESSignAlgorithm m (SingleKES d), UnsoundDSIGNMAlgorithm m d)
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =
       rawSerialiseSignKeyDSIGNM sk
 
-    rawDeserialiseSignKeyKES bs =
-      fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNM bs
+    rawDeserialiseSignKeyKESWith allocator bs =
+      fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
 --
 -- VerKey instances

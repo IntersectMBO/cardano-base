@@ -9,6 +9,7 @@ module Cardano.Crypto.Libsodium.Hash (
     digestMLockedStorable,
     digestMLockedBS,
     expandHash,
+    expandHashWith,
 ) where
 
 import Data.Proxy (Proxy (..))
@@ -37,15 +38,24 @@ expandHash
     => proxy h
     -> MLockedSizedBytes (SizeHash h)
     -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
-expandHash h (MLSB sfptr) = do
+expandHash = expandHashWith mlockedMalloc
+
+expandHashWith
+    :: forall h m proxy.
+       (SodiumHashAlgorithm h, MonadST m, MonadThrow m)
+    => MLockedAllocator m Word8
+    -> proxy h
+    -> MLockedSizedBytes (SizeHash h)
+    -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
+expandHashWith allocator h (MLSB sfptr) = do
     withMLockedForeignPtr sfptr $ \ptr -> do
-        l <- mlockedAlloca size1 $ \ptr' -> do
+        l <- mlockedAllocaWith allocator size1 $ \ptr' -> do
               withLiftST $ \liftST -> liftST . unsafeIOToST $ do
                 poke ptr' (1 :: Word8)
                 copyMem (castPtr (plusPtr ptr' 1)) ptr size
                 naclDigestPtr h ptr' (fromIntegral size1)
 
-        r <- mlockedAlloca size1 $ \ptr' -> do
+        r <- mlockedAllocaWith allocator size1 $ \ptr' -> do
               withLiftST $ \liftST -> liftST . unsafeIOToST $ do
                 poke ptr' (2 :: Word8)
                 copyMem (castPtr (plusPtr ptr' 1)) ptr size

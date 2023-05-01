@@ -8,9 +8,14 @@ module Test.Crypto.AllocLog where
 import Control.Tracer
 import Control.Monad.Reader
 import Foreign.Ptr
+import Foreign.Concurrent
 import Control.Monad.Class.MonadThrow
 import Control.Monad.Class.MonadST
 import Data.Typeable
+import Data.Coerce
+
+import Cardano.Crypto.MonadMLock (MLockedAllocator, withMLockedForeignPtr)
+import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 
 -- | Allocation log event. These are emitted automatically whenever mlocked
 -- memory is allocated through the 'mlockedAllocForeignPtr' primitive, or
@@ -75,3 +80,13 @@ pushAllocLogEvent = pushLogEvent
 -- | Newtype wrapper over an arbitrary event; we use this to write the generic
 -- 'MonadMLock' instance below while avoiding overlapping instances.
 newtype GenericEvent e = GenericEvent { concreteEvent :: e }
+
+loggingMalloc :: Tracer IO AllocEvent -> MLockedAllocator IO a -> MLockedAllocator IO a
+loggingMalloc tracer allocator size = do
+  fptr <- allocator size
+  addr <- withMLockedForeignPtr fptr (return . ptrToWordPtr)
+  traceWith tracer (AllocEv addr)
+  addForeignPtrFinalizer
+    (coerce fptr)
+    (traceWith tracer (FreeEv addr))
+  return fptr
