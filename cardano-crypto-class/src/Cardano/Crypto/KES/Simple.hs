@@ -40,11 +40,11 @@ import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.DSIGN
 import           Cardano.Crypto.KES.Class
-import           Cardano.Crypto.MLockedSeed
+import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
 import           Data.Unit.Strict (forceElemsToWHNF)
-import           Cardano.Crypto.MonadMLock (MEq (..))
+import           Cardano.Crypto.MEqOrd (MEq (..))
 
 
 data SimpleKES d (t :: Nat)

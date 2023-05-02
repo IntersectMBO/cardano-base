@@ -53,8 +53,7 @@ import GHC.TypeLits (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks)
 
 import Cardano.Foreign
-import Cardano.Crypto.MonadMLock.Class
-import Cardano.Crypto.MonadMLock.Alloc
+import Cardano.Crypto.Libsodium.Memory
 import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.MEqOrd

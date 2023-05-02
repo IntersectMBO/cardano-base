@@ -1,26 +1,48 @@
 module Cardano.Crypto.Libsodium (
   -- * Initialization
   sodiumInit,
+
   -- * MLocked memory management
   MLockedForeignPtr,
-  withMLockedForeignPtr,
-  mlockedAllocForeignPtr,
+  MLockedAllocator,
+
   finalizeMLockedForeignPtr,
+  mlockedAllocForeignPtr,
+  mlockedMalloc,
   traceMLockedForeignPtr,
-  -- * MLocked bytes
+  withMLockedForeignPtr,
+
+  -- * MLocked bytes ('MLockedSizedBytes')
   MLockedSizedBytes,
+
+  mlsbAsByteString,
+  mlsbCompare,
+  mlsbCopy,
+  mlsbCopyWith,
+  mlsbEq,
+  mlsbFinalize,
   mlsbFromByteString,
   mlsbFromByteStringCheck,
-  mlsbAsByteString,
+  mlsbFromByteStringCheckWith,
+  mlsbFromByteStringWith,
+  mlsbNew,
+  mlsbNewWith,
+  mlsbNewZero,
+  mlsbNewZeroWith,
   mlsbToByteString,
-  mlsbFinalize,
-  mlsbCopy,
+  mlsbUseAsCPtr,
+  mlsbUseAsSizedPtr,
+  mlsbZero,
+
   -- * Hashing
-  SodiumHashAlgorithm (..),
-  digestMLockedStorable,
   digestMLockedBS,
+  digestMLockedStorable,
   expandHash,
+  expandHashWith,
+  SodiumHashAlgorithm (..),
 ) where
 
 import Cardano.Crypto.Libsodium.Init
-import Cardano.Crypto.MonadMLock
+import Cardano.Crypto.Libsodium.Memory
+import Cardano.Crypto.Libsodium.Hash
+import Cardano.Crypto.Libsodium.MLockedBytes

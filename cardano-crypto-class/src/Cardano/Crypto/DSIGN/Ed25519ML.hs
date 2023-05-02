@@ -40,25 +40,28 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C
-import Cardano.Crypto.Libsodium (MLockedSizedBytes)
-import Cardano.Crypto.MonadMLock
-  ( 
-  mlsbToByteString
+import Cardano.Crypto.Libsodium
+  ( MLockedSizedBytes
+  , mlsbToByteString
   , mlsbFromByteStringCheckWith
   , mlsbUseAsSizedPtr
   , mlsbNewWith
   , mlsbFinalize
   , mlsbCopyWith
-  , MEq (..)
-  , PinnedSizedBytes
+  )
+import Cardano.Crypto.PinnedSizedBytes
+  ( PinnedSizedBytes
   , psbUseAsSizedPtr
   , psbToByteString
   , psbFromByteStringCheck
   , psbCreateSizedResult
   )
+import Cardano.Crypto.MEqOrd
+  ( MEq (..)
+  )
 
 import Cardano.Crypto.DSIGNM.Class
-import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Util (SignableRepresentation(..))
 
 data Ed25519DSIGNM

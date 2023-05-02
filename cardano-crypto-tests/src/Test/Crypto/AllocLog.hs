@@ -14,7 +14,7 @@ import Control.Monad.Class.MonadST
 import Data.Typeable
 import Data.Coerce
 
-import Cardano.Crypto.MonadMLock (MLockedAllocator, withMLockedForeignPtr)
+import Cardano.Crypto.Libsodium (MLockedAllocator, withMLockedForeignPtr)
 import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 
 -- | Allocation log event. These are emitted automatically whenever mlocked

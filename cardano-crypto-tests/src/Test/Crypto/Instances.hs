@@ -12,8 +12,9 @@ import Data.Proxy (Proxy (Proxy))
 import GHC.TypeLits (KnownNat, natVal)
 import Test.QuickCheck (Arbitrary (..))
 import qualified Test.QuickCheck.Gen as Gen
-import Cardano.Crypto.MonadMLock
-import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.Libsodium
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.PinnedSizedBytes
 import Control.Monad.Class.MonadThrow
 import Control.Monad.Class.MonadST
 

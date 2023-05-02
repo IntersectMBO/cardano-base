@@ -26,7 +26,7 @@ import Criterion
 import qualified Data.ByteString as BS (ByteString)
 import Data.Either (fromRight)
 import Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.Libsodium.MLockedSeed
 import System.IO.Unsafe (unsafePerformIO)
 import GHC.TypeLits (KnownNat)
 import Data.Kind (Type)
