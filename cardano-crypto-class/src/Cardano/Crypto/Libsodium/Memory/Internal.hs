@@ -47,6 +47,7 @@ import Control.Exception (mask_)
 import Control.Monad (when, void)
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
+import Control.Monad.ST
 import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -90,7 +91,7 @@ finalizeMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> m ()
 finalizeMLockedForeignPtr (SFP fptr) = withLiftST $ \lift ->
   (lift . unsafeIOToST) (finalizeForeignPtr fptr)
 
-{-# DEPRECATED traceMLockedForeignPtr "Do not use traceMLockedForeignPtr in production" #-}
+{-# WARNING traceMLockedForeignPtr "Do not use traceMLockedForeignPtr in production" #-}
 
 traceMLockedForeignPtr :: (Storable a, Show a, MonadST m) => MLockedForeignPtr a -> m ()
 traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
@@ -100,11 +101,11 @@ traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
 unsafeIOToMonadST :: MonadST m => IO a -> m a
 unsafeIOToMonadST action = withLiftST ($ unsafeIOToST action)
 
-makeMLockedPool :: forall n. KnownNat n => IO (Pool n)
+makeMLockedPool :: forall n s. KnownNat n => ST s (Pool n s)
 makeMLockedPool = do
   initPool
     (max 1 . fromIntegral $ 4096 `div` natVal (Proxy @n) `div` 64)
-    (\size -> mask_ $ do
+    (\size -> unsafeIOToST $ mask_ $ do
       ptr <- sodiumMalloc (fromIntegral size)
       newForeignPtr ptr (sodiumFree ptr (fromIntegral size))
     )
@@ -115,24 +116,24 @@ makeMLockedPool = do
 eraseMem :: forall n a. KnownNat n => Proxy n -> Ptr a -> IO ()
 eraseMem proxy ptr = fillBytes ptr 0xff (fromIntegral $ natVal proxy)
 
-mlockedPool32 :: Pool 32
-mlockedPool32 = unsafePerformIO makeMLockedPool
+mlockedPool32 :: Pool 32 RealWorld
+mlockedPool32 = unsafePerformIO $ stToIO makeMLockedPool
 {-# NOINLINE mlockedPool32 #-}
 
-mlockedPool64 :: Pool 64
-mlockedPool64 = unsafePerformIO makeMLockedPool
+mlockedPool64 :: Pool 64 RealWorld
+mlockedPool64 = unsafePerformIO $ stToIO makeMLockedPool
 {-# NOINLINE mlockedPool64 #-}
 
-mlockedPool128 :: Pool 128
-mlockedPool128 = unsafePerformIO makeMLockedPool
+mlockedPool128 :: Pool 128 RealWorld
+mlockedPool128 = unsafePerformIO $ stToIO makeMLockedPool
 {-# NOINLINE mlockedPool128 #-}
 
-mlockedPool256 :: Pool 256
-mlockedPool256 = unsafePerformIO makeMLockedPool
+mlockedPool256 :: Pool 256 RealWorld
+mlockedPool256 = unsafePerformIO $ stToIO makeMLockedPool
 {-# NOINLINE mlockedPool256 #-}
 
-mlockedPool512 :: Pool 512
-mlockedPool512 = unsafePerformIO makeMLockedPool
+mlockedPool512 :: Pool 512 RealWorld
+mlockedPool512 = unsafePerformIO $ stToIO makeMLockedPool
 {-# NOINLINE mlockedPool512 #-}
 
 mlockedMalloc :: MonadST m => CSize -> m (MLockedForeignPtr a)
@@ -142,15 +143,15 @@ mlockedMallocIO :: CSize -> IO (MLockedForeignPtr a)
 mlockedMallocIO size = SFP <$> do
   if
     | size <= 32 -> do
-        coerce $ grabNextBlock mlockedPool32
+        coerce $ stToIO $ grabNextBlock mlockedPool32
     | size <= 64 -> do
-        coerce $ grabNextBlock mlockedPool64
+        coerce $ stToIO $ grabNextBlock mlockedPool64
     | size <= 128 -> do
-        coerce $ grabNextBlock mlockedPool128
+        coerce $ stToIO $ grabNextBlock mlockedPool128
     | size <= 256 -> do
-        coerce $ grabNextBlock mlockedPool256
+        coerce $ stToIO $ grabNextBlock mlockedPool256
     | size <= 512 -> do
-        coerce $ grabNextBlock mlockedPool512
+        coerce $ stToIO $ grabNextBlock mlockedPool512
     | otherwise -> do
         mask_ $ do
           ptr <- sodiumMalloc size
@@ -203,7 +204,7 @@ packByteStringCStringLen (ptr, len) =
 type MLockedAllocator m a = CSize -> m (MLockedForeignPtr a)
 
 mlockedAllocaSized :: forall m n b. (MonadST m, MonadThrow m, KnownNat n) => (SizedPtr n -> m b) -> m b
-mlockedAllocaSized = mlockedAllocaSizedWith mlockedMalloc 
+mlockedAllocaSized = mlockedAllocaSizedWith mlockedMalloc
 
 mlockedAllocaSizedWith :: forall m n b. (MonadST m, MonadThrow m, KnownNat n) => MLockedAllocator m Void -> (SizedPtr n -> m b) -> m b
 mlockedAllocaSizedWith allocator k = mlockedAllocaWith allocator size (k . SizedPtr) where
