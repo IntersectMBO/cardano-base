@@ -48,7 +48,7 @@ import Control.Monad (when, void)
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
 import Control.Monad.ST
-import Control.Monad.ST.Unsafe (unsafeIOToST)
+import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeSTToIO)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
@@ -184,16 +184,14 @@ zeroMem ptr size = unsafeIOToMonadST . void $ c_memset (castPtr ptr) 0 size
 copyMem :: MonadST m => Ptr a -> Ptr a -> CSize -> m ()
 copyMem dst src size = unsafeIOToMonadST . void $ c_memcpy (castPtr dst) (castPtr src) size
 
-allocaBytes :: (MonadST m, MonadThrow m) => Int -> (Ptr a -> m b) -> m b
-allocaBytes size =
-  bracket
-    (unsafeIOToMonadST $ Foreign.mallocBytes size)
-    (unsafeIOToMonadST . Foreign.free)
+allocaBytes :: Int -> (Ptr a -> ST s b) -> ST s b
+allocaBytes size f =
+  unsafeIOToST $ Foreign.allocaBytes size (unsafeSTToIO . f)
 
-useByteStringAsCStringLen :: (MonadST m, MonadThrow m) => ByteString -> (CStringLen -> m a) -> m a
+useByteStringAsCStringLen :: ByteString -> (CStringLen -> ST s a) -> ST s a
 useByteStringAsCStringLen bs f =
   allocaBytes (BS.length bs + 1) $ \buf -> do
-    len <- unsafeIOToMonadST $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
+    len <- unsafeIOToST $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
       len <$ copyMem buf ptr (fromIntegral len)
     f (buf, len)
 
