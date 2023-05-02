@@ -31,8 +31,8 @@ import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
 
 import qualified Data.ByteString as BS
-import qualified Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.MonadMLock (MEq (..), (==!))
+import Cardano.Crypto.Libsodium
+import Cardano.Crypto.MEqOrd (MEq (..), (==!))
 
 import Text.Show.Pretty (ppShow)
 
@@ -133,7 +133,7 @@ import Test.Crypto.Util (
   withLock,
   )
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
-import Cardano.Crypto.MLockedSeed
+import Cardano.Crypto.Libsodium.MLockedSeed
 
 #ifdef SECP256K1_ENABLED
 import Cardano.Crypto.DSIGN (
@@ -535,13 +535,13 @@ prop_key_overwritten_after_forget p seedPSB =
     mlockedSeedFinalize seed
 
     seedBefore <- getSeedDSIGNM p sk
-    bsBefore <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seedBefore
+    bsBefore <- mlsbToByteString . mlockedSeedMLSB $ seedBefore
     mlockedSeedFinalize seedBefore
 
     forgetSignKeyDSIGNM sk
 
     seedAfter <- getSeedDSIGNM p sk
-    bsAfter <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seedAfter
+    bsAfter <- mlsbToByteString . mlockedSeedMLSB $ seedAfter
     mlockedSeedFinalize seedAfter
 
     return (bsBefore =/= bsAfter)
@@ -556,8 +556,8 @@ prop_dsignm_seed_roundtrip
 prop_dsignm_seed_roundtrip p seedPSB = ioProperty . withMLockedSeedFromPSB seedPSB $ \seed -> do
   sk <- genKeyDSIGNM seed
   seed' <- getSeedDSIGNM p sk
-  bs <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seed
-  bs' <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seed'
+  bs <- mlsbToByteString . mlockedSeedMLSB $ seed
+  bs' <- mlsbToByteString . mlockedSeedMLSB $ seed'
   forgetSignKeyDSIGNM sk
   mlockedSeedFinalize seed'
   return (bs === bs')

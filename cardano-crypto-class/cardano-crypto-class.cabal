@@ -79,12 +79,9 @@ library
     Cardano.Crypto.Libsodium.Memory.Internal
     Cardano.Crypto.Libsodium.MLockedBytes
     Cardano.Crypto.Libsodium.MLockedBytes.Internal
+    Cardano.Crypto.Libsodium.MLockedSeed
     Cardano.Crypto.Libsodium.UnsafeC
-    Cardano.Crypto.MonadMLock
-    Cardano.Crypto.MonadMLock.Class
-    Cardano.Crypto.MonadMLock.Alloc
     Cardano.Crypto.MEqOrd
-    Cardano.Crypto.MLockedSeed
     Cardano.Crypto.PinnedSizedBytes
     Cardano.Crypto.Seed
     Cardano.Crypto.Util

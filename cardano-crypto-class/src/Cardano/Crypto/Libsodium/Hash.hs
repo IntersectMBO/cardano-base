@@ -20,10 +20,9 @@ import Data.Word (Word8)
 import GHC.TypeLits
 
 import Cardano.Crypto.Hash (HashAlgorithm(SizeHash))
+import Cardano.Crypto.Libsodium.Memory
 import Cardano.Crypto.Libsodium.Hash.Class
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
-import Cardano.Crypto.MonadMLock.Class
-import Cardano.Crypto.MonadMLock.Alloc
 import Control.Monad.Class.MonadST (MonadST (..))
 import Control.Monad.Class.MonadThrow (MonadThrow)
 import Control.Monad.ST.Unsafe (unsafeIOToST)

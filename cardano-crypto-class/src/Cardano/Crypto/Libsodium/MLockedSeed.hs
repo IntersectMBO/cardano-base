@@ -3,10 +3,10 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Cardano.Crypto.MLockedSeed
+module Cardano.Crypto.Libsodium.MLockedSeed
 where
 
-import Cardano.Crypto.MonadMLock
+import Cardano.Crypto.Libsodium.MLockedBytes
   ( MLockedSizedBytes
   , mlsbCopyWith
   , mlsbNewWith
@@ -14,11 +14,15 @@ import Cardano.Crypto.MonadMLock
   , mlsbFinalize
   , mlsbUseAsCPtr
   , mlsbUseAsSizedPtr
-  , MEq (..)
-  , MLockedAllocator
+  , SizedVoid
+  )
+import Cardano.Crypto.Libsodium.Memory
+  ( MLockedAllocator
   , mlockedMalloc
   )
-import Cardano.Crypto.Libsodium.MLockedBytes (SizedVoid)
+import Cardano.Crypto.MEqOrd
+  ( MEq (..)
+  )
 import Cardano.Foreign (SizedPtr)
 import GHC.TypeNats (KnownNat)
 import Control.DeepSeq (NFData)

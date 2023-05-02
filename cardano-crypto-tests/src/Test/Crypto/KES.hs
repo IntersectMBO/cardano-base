@@ -43,9 +43,10 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
 import Cardano.Crypto.KES.ForgetMock
 import Cardano.Crypto.Util (SignableRepresentation(..))
-import Cardano.Crypto.MLockedSeed
-import qualified Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.MonadMLock
+import Cardano.Crypto.Libsodium
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.PinnedSizedBytes
+import Cardano.Crypto.MEqOrd
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
@@ -102,7 +103,7 @@ tests lock =
 
 instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
   show (SignKeySingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = NaCl.mlsbAsByteString mlsb
+    let bytes = mlsbAsByteString mlsb
         hexstr = hexBS bytes
     in "SignKeySingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
 
@@ -111,7 +112,7 @@ instance Show (SignKeyKES (SumKES h d)) where
 
 instance Show (SignKeyKES (CompactSingleKES Ed25519DSIGNM)) where
   show (SignKeyCompactSingleKES (SignKeyEd25519DSIGNM mlsb)) =
-    let bytes = NaCl.mlsbAsByteString mlsb
+    let bytes = mlsbAsByteString mlsb
         hexstr = hexBS bytes
     in "SignKeyCompactSingleKES (SignKeyEd25519DSIGNM " ++ hexstr ++ ")"
 
@@ -196,7 +197,7 @@ testForgetUpdateKeyKES _p = do
   let tracer :: Tracer (LogT (GenericEvent ForgetMockEvent) IO) (GenericEvent ForgetMockEvent)
       tracer = Tracer (\ev -> liftIO $ modifyIORef logVar (++ [ev]))
   runLogT tracer $ do
-    seed <- MLockedSeed <$> NaCl.mlsbFromByteString (BS.replicate 1024 23)
+    seed <- MLockedSeed <$> mlsbFromByteString (BS.replicate 1024 23)
     sk <- genKeyKES @(LogT (GenericEvent ForgetMockEvent) IO) @(ForgetMockKES v) seed
     mlockedSeedFinalize seed
     msk' <- updateKES () sk 0

@@ -97,8 +97,8 @@ import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.CompactSingle (CompactSingleKES)
 import           Cardano.Crypto.Util
-import           Cardano.Crypto.MLockedSeed
-import           Cardano.Crypto.MonadMLock
+import           Cardano.Crypto.Libsodium.MLockedSeed
+import           Cardano.Crypto.Libsodium
 import           Control.Monad.Class.MonadThrow (MonadThrow)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Control.Monad.Trans (lift)

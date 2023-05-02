@@ -77,8 +77,8 @@ import Control.Monad.Class.MonadST (MonadST)
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
 import Cardano.Crypto.Util (Empty)
-import Cardano.Crypto.MLockedSeed
-import Cardano.Crypto.MonadMLock (MLockedAllocator, mlockedMalloc)
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.Libsodium (MLockedAllocator, mlockedMalloc)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 
 class ( Typeable v

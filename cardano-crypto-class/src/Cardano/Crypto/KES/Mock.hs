@@ -34,8 +34,8 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Crypto.MLockedSeed
-import Cardano.Crypto.MonadMLock
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.Libsodium
   ( mlsbAsByteString
   )
 
