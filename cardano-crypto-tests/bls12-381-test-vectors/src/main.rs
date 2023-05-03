@@ -6,11 +6,12 @@ use bls12_381::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar};
 use blst::min_sig::*;
 use blst::BLST_ERROR;
 use ff::Field;
-use group::Group;
+use group::{Curve, Group};
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::fs::File;
 use std::io::prelude::*;
+use bls12_381::hash_to_curve::{ExpandMsgXmd, HashToCurve};
 
 fn pairing_properties<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let P = G1Projective::random(&mut rng);
@@ -207,48 +208,31 @@ fn serde<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     write_hex_to_file("././test_vectors/serde_test_vectors", &hex_strings)
 }
 
-fn bls_sig_with_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
+fn bls_sig_with_dst_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let mut ikm = [0u8; 32];
     rng.fill_bytes(&mut ikm);
 
-    let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
-    let pk = sk.sk_to_pk();
+    let sk = Scalar::random(rng);
+    let pk = sk * G2Projective::generator();
 
     let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
-    let aug = b"Random value for test aug";
+    let aug = b"Random value for test aug. ";
     let msg = b"blst is such a blast";
-    let sig = sk.sign(msg, dst, aug);
+    let mut concat_msg_aug = Vec::new();
+    concat_msg_aug.extend_from_slice(aug);
+    concat_msg_aug.extend_from_slice(msg);
+    let hashed_msg = <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(concat_msg_aug, dst);
 
-    let err = sig.verify(true, msg, dst, aug, &pk, true);
+    let sig = sk * hashed_msg;
+
+    let blst_sig = Signature::from_bytes(&sig.to_affine().to_compressed()).expect("Invalid conversion from zkcrypto to blst");
+    let blst_pk = PublicKey::from_bytes(&pk.to_affine().to_compressed()).expect("Invalid conversion from zkcrypto to blst");
+    let err = blst_sig.verify(true, msg, dst, aug, &blst_pk, true);
     assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
 
-    let sig_hex = hex::encode(sig.to_bytes());
-    let pk_hex = hex::encode(pk.to_bytes());
+    let sig_hex = hex::encode(sig.to_affine().to_compressed());
+    let pk_hex = hex::encode(pk.to_affine().to_compressed());
     let mut file = File::create("././test_vectors/bls_sig_aug_test_vectors")?;
-    file.write_all(sig_hex.as_ref())?;
-    file.write_all(b"\n")?;
-    file.write_all(pk_hex.as_ref())?;
-
-    Ok(())
-}
-
-fn bls_sig<R: RngCore>(mut rng: R) -> std::io::Result<()> {
-    let mut ikm = [0u8; 32];
-    rng.fill_bytes(&mut ikm);
-
-    let sk = SecretKey::key_gen(&ikm, &[]).unwrap();
-    let pk = sk.sk_to_pk();
-
-    let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
-    let msg = b"blst is such a blast";
-    let sig = sk.sign(msg, dst, &[]);
-
-    let err = sig.verify(true, msg, dst, &[], &pk, true);
-    assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
-
-    let sig_hex = hex::encode(sig.to_bytes());
-    let pk_hex = hex::encode(pk.to_bytes());
-    let mut file = File::create("././test_vectors/bls_sig_test_vectors")?;
     file.write_all(sig_hex.as_ref())?;
     file.write_all(b"\n")?;
     file.write_all(pk_hex.as_ref())?;
@@ -271,6 +255,5 @@ fn main() {
     pairing_properties(&mut rng).expect("Failed to create test vectors!");
     ec_operations(&mut rng).expect("Failed to create test vectors!");
     serde(&mut rng).expect("Failed to create test vectors!");
-    bls_sig_with_aug(&mut rng).expect("Failed to create test vectors!");
-    bls_sig(&mut rng).expect("Failed to create test vectors!");
+    bls_sig_with_dst_aug(&mut rng).expect("Failed to create test vectors!");
 }

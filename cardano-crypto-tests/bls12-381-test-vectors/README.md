@@ -77,7 +77,7 @@ Order of the values printed on `serde_test_vectors`:
 ### 4- BLS Signature
 Test vectors for BLS signature, using `blst` bindings.
 
-The explicit usage of `DST` and `aug` is not allowed in Cardano-base bindings. Therefore, before verification, they need to be appended into the message by following [hash-to-curve](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve#name-expand_message) spec.
+The explicit usage of `aug` is not allowed in Cardano-base bindings. Therefore, before verification, they need to be appended into the message by following [hash-to-curve](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve#name-expand_message) spec.
 
 `DST` and `msg` values used to generate test vectors:
 
@@ -86,9 +86,14 @@ let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 let msg = b"blst is such a blast";
 let aug = b"Random value for test aug";
 ```
-Order of the values printed on the files `bls_sig_aug_test_vectors` (BLS signature with `aug`) and `bls_sig_test_vectors` (BLS signature without `aug`):
+Order of the values printed on the files `bls_sig_aug_test_vectors` (BLS signature with `aug`):
 
 - `sig`
 - `pk`
 
+To validate these test vectors, one needs to proceed as follows:
+```
+let hashed_msg = HashToG1Curve(aug || msg, dst);
 
+assert!(pairing(sig, G2Generator) ==  pairing(hashed_msg, pk)) 
+```
