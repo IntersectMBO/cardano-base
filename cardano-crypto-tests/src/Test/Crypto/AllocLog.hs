@@ -12,10 +12,9 @@ import Foreign.Concurrent
 import Control.Monad.Class.MonadThrow
 import Control.Monad.Class.MonadST
 import Data.Typeable
-import Data.Coerce
 
-import Cardano.Crypto.Libsodium (MLockedAllocator, withMLockedForeignPtr)
-import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
+import Cardano.Crypto.Libsodium (withMLockedForeignPtr)
+import Cardano.Crypto.Libsodium.Memory.Internal (MLockedAllocator(..), MLockedForeignPtr (..))
 
 -- | Allocation log event. These are emitted automatically whenever mlocked
 -- memory is allocated through the 'mlockedAllocForeignPtr' primitive, or
@@ -61,11 +60,11 @@ pushAllocLogEvent = pushLogEvent
 --   withMLockedForeignPtr fptr action = LogT $ do
 --     tracer <- ask
 --     lift $ withMLockedForeignPtr fptr (\ptr -> (runReaderT . unLogT) (action ptr) tracer)
--- 
+--
 --   finalizeMLockedForeignPtr = lift . finalizeMLockedForeignPtr
--- 
+--
 --   traceMLockedForeignPtr = lift . traceMLockedForeignPtr
--- 
+--
 --   mlockedMalloc size = do
 --     fptr <- lift (mlockedMalloc size)
 --     addr <- withMLockedForeignPtr fptr (return . ptrToWordPtr)
@@ -81,12 +80,12 @@ pushAllocLogEvent = pushLogEvent
 -- 'MonadMLock' instance below while avoiding overlapping instances.
 newtype GenericEvent e = GenericEvent { concreteEvent :: e }
 
-loggingMalloc :: Tracer IO AllocEvent -> MLockedAllocator IO a -> MLockedAllocator IO a
-loggingMalloc tracer allocator size = do
-  fptr <- allocator size
-  addr <- withMLockedForeignPtr fptr (return . ptrToWordPtr)
+loggingMalloc :: MonadIO m => Tracer IO AllocEvent -> MLockedAllocator IO -> MLockedAllocator m
+loggingMalloc tracer (MLockedAllocator allocator) = MLockedAllocator $ \ size -> liftIO $ do
+  sfptr@(SFP fptr) <- allocator size
+  addr <- withMLockedForeignPtr sfptr (return . ptrToWordPtr)
   traceWith tracer (AllocEv addr)
   addForeignPtrFinalizer
-    (coerce fptr)
+    fptr
     (traceWith tracer (FreeEv addr))
-  return fptr
+  return sfptr
