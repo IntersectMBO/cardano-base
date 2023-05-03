@@ -42,7 +42,7 @@ expandHash = expandHashWith mlockedMalloc
 expandHashWith
     :: forall h m proxy.
        (SodiumHashAlgorithm h, MonadST m, MonadThrow m)
-    => MLockedAllocator m Word8
+    => MLockedAllocator m
     -> proxy h
     -> MLockedSizedBytes (SizeHash h)
     -> m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))

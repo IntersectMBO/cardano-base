@@ -234,10 +234,11 @@ testMLockGenKeyKES _p = do
   let tracer :: Tracer (AllocLogT IO) AllocEvent
       tracer = Tracer (\ev -> liftIO $ modifyIORef accumVar (++ [ev]))
       ioTracer = Tracer (\ev -> modifyIORef accumVar (++ [ev]))
-      allocator = liftIO . loggingMalloc ioTracer (liftIO . mlockedMalloc)
+      allocator = loggingMalloc ioTracer mlockedMalloc
   runAllocLogT tracer $ do
     pushAllocLogEvent $ MarkerEv "gen seed"
-    (seed :: MLockedSeed (SeedSizeKES v)) <- MLockedSeed <$> mlsbFromByteStringWith allocator (BS.replicate 1024 23)
+    seed :: MLockedSeed (SeedSizeKES v) <-
+      MLockedSeed <$> mlsbFromByteStringWith allocator (BS.replicate 1024 23)
     pushAllocLogEvent $ MarkerEv "gen key"
     sk <- genKeyKES @_ @v seed
     pushAllocLogEvent $ MarkerEv "forget key"

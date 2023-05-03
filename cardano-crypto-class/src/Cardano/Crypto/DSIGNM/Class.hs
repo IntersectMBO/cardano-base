@@ -164,18 +164,19 @@ class ( DSIGNMAlgorithmBase v
   -- Key generation
   --
 
-  genKeyDSIGNMWith :: (forall a. MLockedAllocator m a) -> MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
+  genKeyDSIGNMWith :: MLockedAllocator m -> MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
 
   {-# NOINLINE genKeyDSIGNM #-}
   genKeyDSIGNM :: MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
   genKeyDSIGNM = genKeyDSIGNMWith mlockedMalloc
 
-  cloneKeyDSIGNMWith :: (forall a. MLockedAllocator m a) -> SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
+  cloneKeyDSIGNMWith :: MLockedAllocator m -> SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
 
   cloneKeyDSIGNM :: SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
   cloneKeyDSIGNM = cloneKeyDSIGNMWith mlockedMalloc
 
-  getSeedDSIGNMWith :: (forall a. MLockedAllocator m a) -> Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
+  getSeedDSIGNMWith ::
+    MLockedAllocator m -> Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
 
   getSeedDSIGNM :: Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
   getSeedDSIGNM = getSeedDSIGNMWith mlockedMalloc
@@ -200,7 +201,7 @@ class DSIGNMAlgorithm m v => UnsoundDSIGNMAlgorithm m v where
   rawDeserialiseSignKeyDSIGNM =
     rawDeserialiseSignKeyDSIGNMWith mlockedMalloc
 
-  rawDeserialiseSignKeyDSIGNMWith :: (forall a. MLockedAllocator m a) -> ByteString -> m (Maybe (SignKeyDSIGNM v))
+  rawDeserialiseSignKeyDSIGNMWith :: MLockedAllocator m -> ByteString -> m (Maybe (SignKeyDSIGNM v))
 
 --
 -- Do not provide Ord instances for keys, see #38

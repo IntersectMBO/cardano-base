@@ -222,12 +222,12 @@ class ( KESAlgorithm v
 
   updateKESWith
     :: HasCallStack
-    => (forall a. MLockedAllocator m a)
+    => MLockedAllocator m
     -> ContextKES v
     -> SignKeyKES v
     -> Period  -- ^ The /current/ period for the key, not the target period.
     -> m (Maybe (SignKeyKES v))
-    
+
 
   --
   -- Key generation
@@ -239,7 +239,7 @@ class ( KESAlgorithm v
   genKeyKES = genKeyKESWith mlockedMalloc
 
   genKeyKESWith
-    :: (forall a. MLockedAllocator m a)
+    :: MLockedAllocator m
     -> MLockedSeed (SeedSizeKES v)
     -> m (SignKeyKES v)
 
@@ -266,7 +266,7 @@ class (KESSignAlgorithm m v) => UnsoundKESSignAlgorithm m v where
   {-# NOINLINE rawDeserialiseSignKeyKES #-}
   rawDeserialiseSignKeyKES =
     rawDeserialiseSignKeyKESWith mlockedMalloc
-  rawDeserialiseSignKeyKESWith  :: (forall a. MLockedAllocator m a) -> ByteString -> m (Maybe (SignKeyKES v))
+  rawDeserialiseSignKeyKESWith  :: MLockedAllocator m -> ByteString -> m (Maybe (SignKeyKES v))
 
   rawSerialiseSignKeyKES   :: SignKeyKES v -> m ByteString
 

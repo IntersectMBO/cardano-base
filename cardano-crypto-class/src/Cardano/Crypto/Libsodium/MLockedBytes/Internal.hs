@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -133,7 +132,7 @@ mlsbSize mlsb = fromInteger (natVal mlsb)
 mlsbNew :: forall n m. (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
 mlsbNew = mlsbNewWith mlockedMalloc
 
-mlsbNewWith :: forall n m. MLockedAllocator m (SizedVoid n) -> (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
+mlsbNewWith :: forall n m. MLockedAllocator m -> (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
 mlsbNewWith allocator =
   MLSB <$> mlockedAllocForeignPtrBytesWith allocator size align
   where
@@ -146,7 +145,7 @@ mlsbNewWith allocator =
 mlsbNewZero :: forall n m. (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
 mlsbNewZero = mlsbNewZeroWith mlockedMalloc
 
-mlsbNewZeroWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> m (MLockedSizedBytes n)
+mlsbNewZeroWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m -> m (MLockedSizedBytes n)
 mlsbNewZeroWith allocator = do
   mlsb <- mlsbNewWith allocator
   mlsbZero mlsb
@@ -161,7 +160,11 @@ mlsbZero mlsb = do
 mlsbCopy :: forall n m. (KnownNat n, MonadST m) => MLockedSizedBytes n -> m (MLockedSizedBytes n)
 mlsbCopy = mlsbCopyWith mlockedMalloc
 
-mlsbCopyWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> MLockedSizedBytes n -> m (MLockedSizedBytes n)
+mlsbCopyWith ::
+     forall n m. (KnownNat n, MonadST m)
+  => MLockedAllocator m
+  -> MLockedSizedBytes n
+  -> m (MLockedSizedBytes n)
 mlsbCopyWith allocator src = mlsbUseAsCPtr src $ \ptrSrc -> do
   dst <- mlsbNewWith allocator
   withMLSB dst $ \ptrDst -> do
@@ -181,7 +184,7 @@ mlsbFromByteString :: forall n m. (KnownNat n, MonadST m)
 mlsbFromByteString = mlsbFromByteStringWith mlockedMalloc
 
 mlsbFromByteStringWith :: forall n m. (KnownNat n, MonadST m)
-                       => MLockedAllocator m (SizedVoid n) -> BS.ByteString -> m (MLockedSizedBytes n)
+                       => MLockedAllocator m -> BS.ByteString -> m (MLockedSizedBytes n)
 mlsbFromByteStringWith allocator bs = do
   dst <- mlsbNewWith allocator
   withMLSB dst $ \ptr -> do
@@ -201,7 +204,11 @@ mlsbFromByteStringWith allocator bs = do
 mlsbFromByteStringCheck :: forall n m. (KnownNat n, MonadST m) => BS.ByteString -> m (Maybe (MLockedSizedBytes n))
 mlsbFromByteStringCheck = mlsbFromByteStringCheckWith mlockedMalloc
 
-mlsbFromByteStringCheckWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m (SizedVoid n) -> BS.ByteString -> m (Maybe (MLockedSizedBytes n))
+mlsbFromByteStringCheckWith ::
+     forall n m. (KnownNat n, MonadST m)
+  => MLockedAllocator m
+  -> BS.ByteString
+  -> m (Maybe (MLockedSizedBytes n))
 mlsbFromByteStringCheckWith allocator bs
     | BS.length bs /= size = return Nothing
     | otherwise = Just <$> mlsbFromByteStringWith allocator bs
