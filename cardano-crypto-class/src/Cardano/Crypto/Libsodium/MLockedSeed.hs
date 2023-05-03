@@ -38,9 +38,9 @@ newtype MLockedSeed n = MLockedSeed {mlockedSeedMLSB :: MLockedSizedBytes n}
   deriving (NFData, NoThunks)
 
 deriving via
-  (MLockedSizedBytes n)
+  MLockedSizedBytes n
   instance
-    (MonadST m, KnownNat n) => MEq m (MLockedSeed n)
+    KnownNat n => MEq (MLockedSeed n)
 
 withMLockedSeedAsMLSB
   :: Functor m

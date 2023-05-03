@@ -90,8 +90,8 @@ cOrError action = do
     else
       Just <$> unsafeIOToST getErrno
 
--- | Throws an appropriate 'IOException' when 'Just' an 'Errno' is given.
-throwOnErrno :: (MonadThrow m) => String -> String -> Maybe Errno -> m ()
+-- | Throws an error when 'Just' an 'Errno' is given.
+throwOnErrno :: MonadThrow m => String -> String -> Maybe Errno -> m ()
 throwOnErrno contextDesc cFunName maybeErrno = do
   case maybeErrno of
     Just errno -> throwIO $ errnoToIOError (contextDesc ++ ": " ++ cFunName) errno Nothing Nothing
@@ -193,7 +193,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 --   memory passed to them via C pointers.
 -- - 'getErrno'; however, 'ST' guarantees sequentiality in the context where
 --   we use 'getErrno', so this is fine.
-instance (MonadST m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
+instance DSIGNMAlgorithm Ed25519DSIGNM where
     deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
       VerKeyEd25519DSIGNM <$!> do
         mlsbUseAsSizedPtr sk $ \skPtr -> do
@@ -258,9 +258,9 @@ instance (MonadST m, MonadThrow m) => DSIGNMAlgorithm m Ed25519DSIGNM where
       mlsbFinalize sk
 
 deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance (MonadST m) => MEq m (SignKeyDSIGNM Ed25519DSIGNM)
+  instance MEq (SignKeyDSIGNM Ed25519DSIGNM)
 
-instance (MonadST m, MonadThrow m) => UnsoundDSIGNMAlgorithm m Ed25519DSIGNM where
+instance UnsoundDSIGNMAlgorithm Ed25519DSIGNM where
     --
     -- Ser/deser (dangerous - do not use in production code)
     --

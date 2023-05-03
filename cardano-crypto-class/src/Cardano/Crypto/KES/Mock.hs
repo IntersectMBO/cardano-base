@@ -24,7 +24,6 @@ import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
-import Control.Monad.Class.MonadST (MonadST)
 
 import Control.Exception (assert)
 
@@ -125,7 +124,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
-instance (MonadST m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
+instance KnownNat t => KESSignAlgorithm (MockKES t) where
     data SignKeyKES (MockKES t) =
            SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
         deriving stock    (Show, Eq, Generic)
@@ -157,7 +156,7 @@ instance (MonadST m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
 
     forgetSignKeyKES = const $ return ()
 
-instance (MonadST m, KnownNat t) => UnsoundKESSignAlgorithm m (MockKES t) where
+instance KnownNat t => UnsoundKESSignAlgorithm (MockKES t) where
     rawSerialiseSignKeyKES sk =
       return $ rawSerialiseSignKeyMockKES sk
 

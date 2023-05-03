@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -24,6 +23,9 @@ module Cardano.Crypto.DSIGNM.Class
   , sizeVerKeyDSIGNM
   , sizeSignKeyDSIGNM
   , sizeSigDSIGNM
+  , genKeyDSIGNM
+  , cloneKeyDSIGNM
+  , getSeedDSIGNM
 
     -- * 'SignedDSIGNM' wrapper
   , SignedDSIGNM (..)
@@ -57,10 +59,11 @@ import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
-import GHC.Stack
+import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat, Nat, natVal, TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
-import Control.Monad.Class.MonadST
+import Control.Monad.Class.MonadST (MonadST)
+import Control.Monad.Class.MonadThrow (MonadThrow)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
@@ -138,23 +141,20 @@ class ( Typeable v
   rawDeserialiseVerKeyDSIGNM  :: ByteString -> Maybe (VerKeyDSIGNM v)
   rawDeserialiseSigDSIGNM     :: ByteString -> Maybe (SigDSIGNM v)
 
-class ( DSIGNMAlgorithmBase v
-      , MonadST m
-      )
-      => DSIGNMAlgorithm m v where
+class DSIGNMAlgorithmBase v => DSIGNMAlgorithm v where
 
   --
   -- Metadata and basic key operations
   --
 
-  deriveVerKeyDSIGNM :: SignKeyDSIGNM v -> m (VerKeyDSIGNM v)
+  deriveVerKeyDSIGNM :: (MonadThrow m, MonadST m) => SignKeyDSIGNM v -> m (VerKeyDSIGNM v)
 
   --
   -- Core algorithm operations
   --
 
   signDSIGNM
-    :: (SignableM v a, HasCallStack)
+    :: (SignableM v a, MonadST m, MonadThrow m)
     => ContextDSIGNM v
     -> a
     -> SignKeyDSIGNM v
@@ -164,44 +164,64 @@ class ( DSIGNMAlgorithmBase v
   -- Key generation
   --
 
-  genKeyDSIGNMWith :: MLockedAllocator m -> MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
+  genKeyDSIGNMWith :: (MonadST m, MonadThrow m)
+                   => MLockedAllocator m
+                   -> MLockedSeed (SeedSizeDSIGNM v)
+                   -> m (SignKeyDSIGNM v)
 
-  {-# NOINLINE genKeyDSIGNM #-}
-  genKeyDSIGNM :: MLockedSeed (SeedSizeDSIGNM v) -> m (SignKeyDSIGNM v)
-  genKeyDSIGNM = genKeyDSIGNMWith mlockedMalloc
+  cloneKeyDSIGNMWith :: MonadST m => MLockedAllocator m -> SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
 
-  cloneKeyDSIGNMWith :: MLockedAllocator m -> SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
-
-  cloneKeyDSIGNM :: SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
-  cloneKeyDSIGNM = cloneKeyDSIGNMWith mlockedMalloc
-
-  getSeedDSIGNMWith ::
-    MLockedAllocator m -> Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
-
-  getSeedDSIGNM :: Proxy v -> SignKeyDSIGNM v -> m (MLockedSeed (SeedSizeDSIGNM v))
-  getSeedDSIGNM = getSeedDSIGNMWith mlockedMalloc
+  getSeedDSIGNMWith :: (MonadST m, MonadThrow m)
+                    => MLockedAllocator m
+                    -> Proxy v
+                    -> SignKeyDSIGNM v
+                    -> m (MLockedSeed (SeedSizeDSIGNM v))
 
   --
   -- Secure forgetting
   --
 
-  forgetSignKeyDSIGNM :: SignKeyDSIGNM v -> m ()
+  forgetSignKeyDSIGNM :: MonadST m => SignKeyDSIGNM v -> m ()
+
+
+genKeyDSIGNM ::
+     (DSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => MLockedSeed (SeedSizeDSIGNM v)
+  -> m (SignKeyDSIGNM v)
+genKeyDSIGNM = genKeyDSIGNMWith mlockedMalloc
+
+cloneKeyDSIGNM :: (DSIGNMAlgorithm v, MonadST m) => SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
+cloneKeyDSIGNM = cloneKeyDSIGNMWith mlockedMalloc
+
+getSeedDSIGNM ::
+     (DSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => Proxy v
+  -> SignKeyDSIGNM v
+  -> m (MLockedSeed (SeedSizeDSIGNM v))
+getSeedDSIGNM = getSeedDSIGNMWith mlockedMalloc
+
 
 -- | Unsound operations on DSIGNM sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider
 -- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
-class DSIGNMAlgorithm m v => UnsoundDSIGNMAlgorithm m v where
+class DSIGNMAlgorithm v => UnsoundDSIGNMAlgorithm v where
   --
   -- Serialisation/(de)serialisation in fixed-size raw format
   --
 
-  rawSerialiseSignKeyDSIGNM   :: SignKeyDSIGNM v -> m ByteString
+  rawSerialiseSignKeyDSIGNM ::
+    (MonadST m, MonadThrow m) => SignKeyDSIGNM v -> m ByteString
 
-  rawDeserialiseSignKeyDSIGNM :: ByteString -> m (Maybe (SignKeyDSIGNM v))
-  rawDeserialiseSignKeyDSIGNM =
-    rawDeserialiseSignKeyDSIGNMWith mlockedMalloc
+  rawDeserialiseSignKeyDSIGNMWith ::
+    (MonadST m, MonadThrow m) => MLockedAllocator m -> ByteString -> m (Maybe (SignKeyDSIGNM v))
 
-  rawDeserialiseSignKeyDSIGNMWith :: MLockedAllocator m -> ByteString -> m (Maybe (SignKeyDSIGNM v))
+rawDeserialiseSignKeyDSIGNM ::
+     (UnsoundDSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => ByteString
+  -> m (Maybe (SignKeyDSIGNM v))
+rawDeserialiseSignKeyDSIGNM =
+  rawDeserialiseSignKeyDSIGNMWith mlockedMalloc
+
 
 --
 -- Do not provide Ord instances for keys, see #38
@@ -239,7 +259,10 @@ sizeSigDSIGNM     _ = fromInteger (natVal (Proxy @(SizeSigDSIGNM v)))
 encodeVerKeyDSIGNM :: DSIGNMAlgorithmBase v => VerKeyDSIGNM v -> Encoding
 encodeVerKeyDSIGNM = encodeBytes . rawSerialiseVerKeyDSIGNM
 
-encodeSignKeyDSIGNM :: (UnsoundDSIGNMAlgorithm m v) => SignKeyDSIGNM v -> m Encoding
+encodeSignKeyDSIGNM ::
+     (UnsoundDSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => SignKeyDSIGNM v
+  -> m Encoding
 encodeSignKeyDSIGNM = fmap encodeBytes . rawSerialiseSignKeyDSIGNM
 
 encodeSigDSIGNM :: DSIGNMAlgorithmBase v => SigDSIGNM v -> Encoding
@@ -260,7 +283,7 @@ decodeVerKeyDSIGNM = do
           actual   = BS.length bs
 
 decodeSignKeyDSIGNM :: forall m v s
-                     . (UnsoundDSIGNMAlgorithm m v)
+                     . (UnsoundDSIGNMAlgorithm v, MonadST m, MonadThrow m)
                     => Decoder s (m (SignKeyDSIGNM v))
 decodeSignKeyDSIGNM = do
     bs <- decodeBytes
@@ -300,7 +323,7 @@ instance DSIGNMAlgorithmBase v => NoThunks (SignedDSIGNM v a)
   -- use generic instance
 
 signedDSIGNM
-  :: (DSIGNMAlgorithm m v, SignableM v a)
+  :: (DSIGNMAlgorithm v, SignableM v a, MonadST m, MonadThrow m)
   => ContextDSIGNM v
   -> a
   -> SignKeyDSIGNM v

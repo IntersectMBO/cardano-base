@@ -14,7 +14,6 @@ where
 
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
-import Control.Monad.Class.MonadST (MonadST)
 
 import Cardano.Crypto.KES.Class
 
@@ -50,7 +49,7 @@ instance KESAlgorithm NeverKES where
   rawDeserialiseVerKeyKES  _ = Just NeverUsedVerKeyKES
   rawDeserialiseSigKES     _ = Just NeverUsedSigKES
 
-instance MonadST m => KESSignAlgorithm m NeverKES where
+instance KESSignAlgorithm NeverKES where
   data SignKeyKES NeverKES = NeverUsedSignKeyKES
       deriving (Show, Eq, Generic, NoThunks)
 
@@ -64,6 +63,6 @@ instance MonadST m => KESSignAlgorithm m NeverKES where
   forgetSignKeyKES = const $ return ()
 
 
-instance MonadST m => UnsoundKESSignAlgorithm m NeverKES where
+instance UnsoundKESSignAlgorithm NeverKES where
   rawSerialiseSignKeyKES _ = return mempty
   rawDeserialiseSignKeyKESWith _ _ = return $ Just NeverUsedSignKeyKES

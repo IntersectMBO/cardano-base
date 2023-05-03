@@ -65,7 +65,6 @@ import           Cardano.Crypto.KES.Single (SingleKES)
 import           Cardano.Crypto.Util
 import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium
-import           Control.Monad.Class.MonadThrow (MonadThrow)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Control.DeepSeq (NFData (..))
 import           GHC.TypeLits (KnownNat, type (+), type (*))
@@ -221,14 +220,13 @@ instance ( KESAlgorithm d
         off_vk1    = off_vk0 + size_vk
     {-# INLINEABLE rawDeserialiseSigKES #-}
 
-instance ( KESSignAlgorithm m d
+instance ( KESSignAlgorithm d
          , SodiumHashAlgorithm h -- needed for secure forgetting
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , MonadThrow m
          , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
          , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
          )
-      => KESSignAlgorithm m (SumKES h d) where
+      => KESSignAlgorithm (SumKES h d) where
     -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
     --
     data SignKeyKES (SumKES h d) =
@@ -294,9 +292,9 @@ instance ( KESSignAlgorithm m d
       forgetSignKeyKES sk_0
       mlockedSeedFinalize r1
 
-instance ( KESSignAlgorithm m (SumKES h d)
-         , UnsoundKESSignAlgorithm m d
-         ) => UnsoundKESSignAlgorithm m (SumKES h d) where
+instance ( KESSignAlgorithm (SumKES h d)
+         , UnsoundKESSignAlgorithm d
+         ) => UnsoundKESSignAlgorithm (SumKES h d) where
     --
     -- Raw serialise/deserialise - dangerous, do not use in production code.
     --

@@ -84,7 +84,7 @@ instance KnownNat n => Show (MLockedSizedBytes n) where
 --       hexstr = concatMap (printf "%02x") bytes
 --   in "MLSB " ++ hexstr
 
-instance (MonadST m, KnownNat n) => MEq m (MLockedSizedBytes n) where
+instance KnownNat n => MEq (MLockedSizedBytes n) where
   equalsM = mlsbEq
 
 nextPowerOf2 :: forall n. (Num n, Ord n, Bits n) => n -> n

@@ -33,7 +33,6 @@ import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 import           NoThunks.Class (NoThunks)
 import           Control.Monad.Trans.Maybe
-import           Control.Monad.Class.MonadThrow (MonadEvaluate)
 import           Control.Monad ( (<$!>) )
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -143,12 +142,11 @@ instance ( DSIGNMAlgorithmBase d
 
 
 instance ( KESAlgorithm (SimpleKES d t)
-         , DSIGNMAlgorithm m d
+         , DSIGNMAlgorithm d
          , KnownNat t
          , KnownNat (SeedSizeDSIGNM d * t)
-         , MonadEvaluate m
          ) =>
-         KESSignAlgorithm m (SimpleKES d t) where
+         KESSignAlgorithm (SimpleKES d t) where
     newtype SignKeyKES (SimpleKES d t) =
               ThunkySignKeySimpleKES (Vector (SignKeyDSIGNM d))
         deriving Generic
@@ -190,8 +188,8 @@ instance ( KESAlgorithm (SimpleKES d t)
 
 
 
-instance ( UnsoundDSIGNMAlgorithm m d, KnownNat t, KESSignAlgorithm m (SimpleKES d t))
-         => UnsoundKESSignAlgorithm m (SimpleKES d t) where
+instance ( UnsoundDSIGNMAlgorithm d, KnownNat t, KESSignAlgorithm (SimpleKES d t))
+         => UnsoundKESSignAlgorithm (SimpleKES d t) where
     --
     -- raw serialise/deserialise
     --
@@ -219,7 +217,7 @@ deriving instance DSIGNMAlgorithmBase d => Show (SigKES (SimpleKES d t))
 deriving instance DSIGNMAlgorithmBase d => Eq   (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNMAlgorithmBase d => Eq   (SigKES (SimpleKES d t))
 
-instance (Monad m, MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SimpleKES d t)) where
+instance MEq (SignKeyDSIGNM d) => MEq (SignKeyKES (SimpleKES d t)) where
   equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =
     -- No need to check that lengths agree, the types already guarantee this.
     Vec.and <$> Vec.zipWithM equalsM a b

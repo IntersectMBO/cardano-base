@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -8,7 +7,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -99,7 +97,6 @@ import           Cardano.Crypto.KES.CompactSingle (CompactSingleKES)
 import           Cardano.Crypto.Util
 import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium
-import           Control.Monad.Class.MonadThrow (MonadThrow)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Control.Monad.Trans (lift)
 import           Control.DeepSeq (NFData (..))
@@ -248,16 +245,15 @@ instance ( OptimizedKESAlgorithm d
         off_vk     = size_sig
 
 instance ( OptimizedKESAlgorithm d
-         , KESSignAlgorithm m d
+         , KESSignAlgorithm d
          , SodiumHashAlgorithm h -- needed for secure forgetting
          , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , MonadThrow m
          , NoThunks (VerKeyKES (CompactSumKES h d))
          , KnownNat (SizeVerKeyKES (CompactSumKES h d))
          , KnownNat (SizeSignKeyKES (CompactSumKES h d))
          , KnownNat (SizeSigKES (CompactSumKES h d))
          )
-      => KESSignAlgorithm m (CompactSumKES h d) where
+      => KESSignAlgorithm (CompactSumKES h d) where
     -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
     --
     data SignKeyKES (CompactSumKES h d) =
@@ -325,9 +321,9 @@ instance ( OptimizedKESAlgorithm d
       forgetSignKeyKES sk_0
       mlockedSeedFinalize r1
 
-instance ( KESSignAlgorithm m (CompactSumKES h d)
-         , UnsoundKESSignAlgorithm m d
-         ) => UnsoundKESSignAlgorithm m (CompactSumKES h d) where
+instance ( KESSignAlgorithm (CompactSumKES h d)
+         , UnsoundKESSignAlgorithm d
+         ) => UnsoundKESSignAlgorithm (CompactSumKES h d) where
     --
     -- Raw serialise/deserialise - dangerous, do not use in production code.
     --
