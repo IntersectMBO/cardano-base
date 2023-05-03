@@ -32,7 +32,6 @@ import NoThunks.Class (NoThunks (..), allNoThunks)
 import System.Random (randomRIO)
 import Control.Tracer
 import Test.Crypto.AllocLog
-import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (ask)
 import Control.Monad ((<$!>))
 
@@ -66,10 +65,7 @@ isDEL :: ForgetMockEvent -> Bool
 isDEL DEL {} = True
 isDEL _ = False
 
-instance
-  ( KESAlgorithm k
-  )
-  => KESAlgorithm (ForgetMockKES k) where
+instance KESAlgorithm k => KESAlgorithm (ForgetMockKES k) where
     type SeedSizeKES (ForgetMockKES k) = SeedSizeKES k
     type Signable (ForgetMockKES k) = Signable k
 
@@ -98,11 +94,7 @@ instance
     rawDeserialiseSigKES = fmap SigForgetMockKES . rawDeserialiseSigKES
 
 
-instance
-  ( KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) m) k
-  , MonadIO m
-  )
-  => KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) m) (ForgetMockKES k) where
+instance KESSignAlgorithm k => KESSignAlgorithm (ForgetMockKES k) where
     data SignKeyKES (ForgetMockKES k) = SignKeyForgetMockKES !Word !(SignKeyKES k)
 
     genKeyKESWith allocator seed = do
@@ -134,11 +126,7 @@ instance
           traceWith tracer (GenericEvent NOUPD)
           return Nothing
 
-instance
-  ( UnsoundKESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) m) k
-  , MonadIO m
-  )
-  => UnsoundKESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) m) (ForgetMockKES k) where
+instance UnsoundKESSignAlgorithm k => UnsoundKESSignAlgorithm (ForgetMockKES k) where
 
     rawSerialiseSignKeyKES (SignKeyForgetMockKES _ k) = rawSerialiseSignKeyKES k
 

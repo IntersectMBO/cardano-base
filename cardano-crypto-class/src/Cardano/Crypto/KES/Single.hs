@@ -109,8 +109,7 @@ instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
     rawDeserialiseSigKES     = fmap SigSingleKES     . rawDeserialiseSigDSIGNM
 
 
-instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
-         ) => KESSignAlgorithm m (SingleKES d) where
+instance DSIGNMAlgorithm d => KESSignAlgorithm (SingleKES d) where
     newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
 
     deriveVerKeyKES (SignKeySingleKES v) =
@@ -139,8 +138,8 @@ instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
     forgetSignKeyKES (SignKeySingleKES v) =
       forgetSignKeyDSIGNM v
 
-instance (KESSignAlgorithm m (SingleKES d), UnsoundDSIGNMAlgorithm m d)
-         => UnsoundKESSignAlgorithm m (SingleKES d) where
+instance (KESSignAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
+         => UnsoundKESSignAlgorithm (SingleKES d) where
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =
       rawSerialiseSignKeyDSIGNM sk
 

@@ -50,7 +50,7 @@ benchmarks = bgroup "KES"
 
 {-# NOINLINE benchKES #-}
 benchKES :: forall (proxy :: forall k. k -> Type) v
-           . ( KESSignAlgorithm IO v
+           . ( KESSignAlgorithm v
              , ContextKES v ~ ()
              , Signable v BS.ByteString
              , NFData (SignKeyKES v)
@@ -62,21 +62,21 @@ benchKES :: forall (proxy :: forall k. k -> Type) v
 benchKES _ lbl =
   bgroup lbl
     [ bench "genKey" $
-        nfIO $ genKeyKES @IO @v testSeedML >>= forgetSignKeyKES @IO @v
+        nfIO $ genKeyKES @v testSeedML >>= forgetSignKeyKES @v
     , bench "signKES" $
         nfIO $
-          (\sk -> do { sig <- signKES @IO @v () 0 typicalMsg sk; forgetSignKeyKES sk; return sig })
-            =<< (genKeyKES @IO @v testSeedML)
+          (\sk -> do { sig <- signKES @v() 0 typicalMsg sk; forgetSignKeyKES sk; return sig })
+            =<< genKeyKES @v testSeedML
     , bench "verifyKES" $
         nfIO $ do
-          signKey <- genKeyKES @IO @v testSeedML
-          sig <- signKES @IO @v () 0 typicalMsg signKey
+          signKey <- genKeyKES @v testSeedML
+          sig <- signKES @v () 0 typicalMsg signKey
           verKey <- deriveVerKeyKES signKey
           forgetSignKeyKES signKey
           return . fromRight $ verifyKES @v () verKey 0 typicalMsg sig
     , bench "updateKES" $
         nfIO $ do
-          signKey <- genKeyKES @IO @v testSeedML
+          signKey <- genKeyKES @v testSeedML
           sk' <- fromJust <$> updateKES () signKey 0
           forgetSignKeyKES signKey
           return sk'

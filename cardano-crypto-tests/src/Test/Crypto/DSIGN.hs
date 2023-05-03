@@ -92,9 +92,9 @@ import Cardano.Crypto.DSIGN (
                       rawSerialiseSigDSIGNM,
                       rawDeserialiseSigDSIGNM),
   DSIGNMAlgorithm (),
-  UnsoundDSIGNMAlgorithm (
-                  rawSerialiseSignKeyDSIGNM,
-                  rawDeserialiseSignKeyDSIGNM),
+  UnsoundDSIGNMAlgorithm,
+  rawSerialiseSignKeyDSIGNM,
+  rawDeserialiseSignKeyDSIGNM,
   sizeVerKeyDSIGNM,
   sizeSignKeyDSIGNM,
   sizeSigDSIGNM,

@@ -141,10 +141,10 @@ instance ( DSIGNMAlgorithmBase d
         off_sig    = 0 :: Word
         off_vk     = size_sig
 
-instance ( DSIGNMAlgorithm m d -- needed for secure forgetting
+instance ( DSIGNMAlgorithm d -- needed for secure forgetting
          , KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)
          )
-         => KESSignAlgorithm m (CompactSingleKES d) where
+         => KESSignAlgorithm (CompactSingleKES d) where
     newtype SignKeyKES (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM d)
 
     deriveVerKeyKES (SignKeyCompactSingleKES v) =
@@ -182,8 +182,8 @@ instance ( KESAlgorithm (CompactSingleKES d)
       assert (t == 0) $
       VerKeyCompactSingleKES vk
 
-instance (KESSignAlgorithm m (CompactSingleKES d), UnsoundDSIGNMAlgorithm m d)
-         => UnsoundKESSignAlgorithm m (CompactSingleKES d) where
+instance (KESSignAlgorithm (CompactSingleKES d), UnsoundDSIGNMAlgorithm d)
+         => UnsoundKESSignAlgorithm (CompactSingleKES d) where
     rawSerialiseSignKeyKES (SignKeyCompactSingleKES sk) = rawSerialiseSignKeyDSIGNM sk
     rawDeserialiseSignKeyKESWith allocator bs = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
