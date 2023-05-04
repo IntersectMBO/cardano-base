@@ -42,7 +42,6 @@ library
   exposed-modules:      Test.Crypto.DSIGN
                         Test.Crypto.EllipticCurve
                         Test.Crypto.Hash
-                        Test.Crypto.RunIO
                         Test.Crypto.KES
                         Test.Crypto.Util
                         Test.Crypto.AllocLog
