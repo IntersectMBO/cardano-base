@@ -201,7 +201,7 @@ allocaBytes size f =
 
 useByteStringAsCStringLen :: ByteString -> (CStringLen -> ST s a) -> ST s a
 useByteStringAsCStringLen bs f =
-  allocaBytes (BS.length bs + 1) $ \buf -> do
+  allocaBytes (BS.length bs) $ \buf -> do
     len <- unsafeIOToST $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
       len <$ copyMem buf ptr (fromIntegral len)
     f (buf, len)
