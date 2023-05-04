@@ -168,8 +168,8 @@ instance ( DSIGNMAlgorithm d -- needed for secure forgetting
     --
     -- forgetting
     --
-    forgetSignKeyKES (SignKeyCompactSingleKES v) =
-      forgetSignKeyDSIGNM v
+    forgetSignKeyKESWith allocator (SignKeyCompactSingleKES v) =
+      forgetSignKeyDSIGNMWith allocator v
 
 instance ( KESAlgorithm (CompactSingleKES d)
          , DSIGNMAlgorithmBase d

@@ -317,8 +317,8 @@ instance ( OptimizedKESAlgorithm d
     --
     -- forgetting
     --
-    forgetSignKeyKES (SignKeyCompactSumKES sk_0 r1 _ _) = do
-      forgetSignKeyKES sk_0
+    forgetSignKeyKESWith allocator (SignKeyCompactSumKES sk_0 r1 _ _) = do
+      forgetSignKeyKESWith allocator sk_0
       mlockedSeedFinalize r1
 
 instance ( KESSignAlgorithm (CompactSumKES h d)

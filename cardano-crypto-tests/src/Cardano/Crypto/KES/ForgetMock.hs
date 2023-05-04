@@ -18,22 +18,26 @@ module Cardano.Crypto.KES.ForgetMock
   , SignKeyKES (..)
   , SigKES (..)
   , ForgetMockEvent (..)
+  , mkForgetMockAllocator
   , isGEN
   , isUPD
   , isDEL
   )
 where
 
+import Control.Tracer
+import Control.Monad.IO.Class
 import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 
 import Cardano.Crypto.KES.Class
+import Cardano.Crypto.Libsodium.Memory (getAllocatorEvent, AllocatorEvent(..), MLockedAllocator(..))
 import NoThunks.Class (NoThunks (..), allNoThunks)
-import System.Random (randomRIO)
-import Control.Tracer
-import Test.Crypto.AllocLog
-import Control.Monad.Reader (ask)
 import Control.Monad ((<$!>))
+import Control.Monad.Reader.Class
+import System.Random (randomRIO)
+
+import Test.Crypto.AllocLog (LogT(..))
 
 -- | A wrapper for a KES implementation that adds logging functionality, for
 -- the purpose of verifying that invocations of 'genKeyKES' and
@@ -99,15 +103,13 @@ instance KESSignAlgorithm k => KESSignAlgorithm (ForgetMockKES k) where
 
     genKeyKESWith allocator seed = do
       sk <- genKeyKESWith allocator seed
-      nonce <- randomRIO (10000000, 99999999)
-      tracer <- ask
-      traceWith tracer (GenericEvent $ GEN nonce)
+      nonce <- mlUniformWord allocator (10000000, 99999999)
+      mlTrace allocator (AllocatorEvent $ GEN nonce)
       return $! SignKeyForgetMockKES nonce sk
 
-    forgetSignKeyKES (SignKeyForgetMockKES nonce sk) = do
-      tracer <- ask
-      traceWith tracer (GenericEvent $ DEL nonce)
-      forgetSignKeyKES sk
+    forgetSignKeyKESWith allocator (SignKeyForgetMockKES nonce sk) = do
+      mlTrace allocator (AllocatorEvent $ DEL nonce)
+      forgetSignKeyKESWith allocator sk
 
     deriveVerKeyKES (SignKeyForgetMockKES _ k) =
       VerKeyForgetMockKES <$!> deriveVerKeyKES k
@@ -116,14 +118,13 @@ instance KESSignAlgorithm k => KESSignAlgorithm (ForgetMockKES k) where
         SigForgetMockKES <$!> signKES ctx p msg sk
 
     updateKESWith allocator ctx (SignKeyForgetMockKES nonce sk) p = do
-      tracer <- ask
-      nonce' <- randomRIO (10000000, 99999999)
+      nonce' <- mlUniformWord allocator (10000000, 99999999)
       updateKESWith allocator ctx sk p >>= \case
         Just sk' -> do
-          traceWith tracer (GenericEvent $ UPD nonce nonce')
+          mlTrace allocator (AllocatorEvent $ UPD nonce nonce')
           return $! Just $! SignKeyForgetMockKES nonce' sk'
         Nothing -> do
-          traceWith tracer (GenericEvent NOUPD)
+          mlTrace allocator (AllocatorEvent NOUPD)
           return Nothing
 
 instance UnsoundKESSignAlgorithm k => UnsoundKESSignAlgorithm (ForgetMockKES k) where
@@ -132,7 +133,7 @@ instance UnsoundKESSignAlgorithm k => UnsoundKESSignAlgorithm (ForgetMockKES k) 
 
     rawDeserialiseSignKeyKESWith allocator bs = do
       msk <- rawDeserialiseSignKeyKESWith allocator bs
-      nonce :: Word <- randomRIO (10000000, 99999999)
+      nonce <- mlUniformWord allocator (10000000, 99999999)
       return $ fmap (SignKeyForgetMockKES nonce) msk
 
 
@@ -155,3 +156,15 @@ deriving instance Show (SigKES k) => Show (SigKES (ForgetMockKES k))
 deriving instance Eq (SigKES k) => Eq (SigKES (ForgetMockKES k))
 deriving instance Ord (SigKES k) => Ord (SigKES (ForgetMockKES k))
 deriving instance NoThunks (SigKES k) => NoThunks (SigKES (ForgetMockKES k))
+
+
+mkForgetMockAllocator ::
+  MLockedAllocator IO -> LogT ForgetMockEvent IO (MLockedAllocator (LogT ForgetMockEvent IO))
+mkForgetMockAllocator ioAllocator = do
+  tracer <- ask
+  pure $
+    MLockedAllocator
+      { mlAllocate = liftIO . mlAllocate ioAllocator
+      , mlTrace = liftIO . mapM_ (traceWith tracer) . getAllocatorEvent
+      , mlUniformWord = randomRIO
+      }
