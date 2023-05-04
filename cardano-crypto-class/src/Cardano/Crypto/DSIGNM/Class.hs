@@ -26,6 +26,7 @@ module Cardano.Crypto.DSIGNM.Class
   , genKeyDSIGNM
   , cloneKeyDSIGNM
   , getSeedDSIGNM
+  , forgetSignKeyDSIGNM
 
     -- * 'SignedDSIGNM' wrapper
   , SignedDSIGNM (..)
@@ -49,6 +50,7 @@ module Cardano.Crypto.DSIGNM.Class
   , UnsoundDSIGNMAlgorithm (..)
   , encodeSignKeyDSIGNM
   , decodeSignKeyDSIGNM
+  , rawDeserialiseSignKeyDSIGNM
   )
 where
 
@@ -181,7 +183,11 @@ class DSIGNMAlgorithmBase v => DSIGNMAlgorithm v where
   -- Secure forgetting
   --
 
-  forgetSignKeyDSIGNM :: MonadST m => SignKeyDSIGNM v -> m ()
+  forgetSignKeyDSIGNMWith :: (MonadST m, MonadThrow m) => MLockedAllocator m -> SignKeyDSIGNM v -> m ()
+
+
+forgetSignKeyDSIGNM :: (DSIGNMAlgorithm v, MonadST m, MonadThrow m) => SignKeyDSIGNM v -> m ()
+forgetSignKeyDSIGNM = forgetSignKeyDSIGNMWith mlockedMalloc
 
 
 genKeyDSIGNM ::
@@ -190,7 +196,8 @@ genKeyDSIGNM ::
   -> m (SignKeyDSIGNM v)
 genKeyDSIGNM = genKeyDSIGNMWith mlockedMalloc
 
-cloneKeyDSIGNM :: (DSIGNMAlgorithm v, MonadST m) => SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
+cloneKeyDSIGNM ::
+  (DSIGNMAlgorithm v, MonadST m, MonadThrow m) => SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
 cloneKeyDSIGNM = cloneKeyDSIGNMWith mlockedMalloc
 
 getSeedDSIGNM ::

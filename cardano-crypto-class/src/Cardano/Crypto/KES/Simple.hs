@@ -179,7 +179,8 @@ instance ( KESAlgorithm (SimpleKES d t)
     -- Forgetting
     --
 
-    forgetSignKeyKES (SignKeySimpleKES sks) = Vec.mapM_ forgetSignKeyDSIGNM sks
+    forgetSignKeyKESWith allocator (SignKeySimpleKES sks) =
+      Vec.mapM_ (forgetSignKeyDSIGNMWith allocator) sks
 
 
 

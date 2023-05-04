@@ -33,7 +33,7 @@ import Control.Monad.Class.MonadST
 --         size :: Int
 --         size = fromInteger (natVal (Proxy :: Proxy n))
 
-mlsbFromPSB :: (MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSizedBytes n)
+mlsbFromPSB :: (MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSizedBytes n)
 mlsbFromPSB = mlsbFromByteString . psbToByteString
 
 withMLSBFromPSB :: (MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSizedBytes n -> m a) -> m a
@@ -42,7 +42,7 @@ withMLSBFromPSB psb =
     (mlsbFromPSB psb)
     mlsbFinalize
 
-mlockedSeedFromPSB :: (MonadST m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSeed n)
+mlockedSeedFromPSB :: (MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> m (MLockedSeed n)
 mlockedSeedFromPSB = fmap MLockedSeed . mlsbFromPSB
 
 withMLockedSeedFromPSB :: (MonadST m, MonadThrow m, KnownNat n) => PinnedSizedBytes n -> (MLockedSeed n -> m a) -> m a

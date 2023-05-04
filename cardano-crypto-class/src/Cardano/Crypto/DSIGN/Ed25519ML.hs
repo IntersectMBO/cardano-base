@@ -254,8 +254,7 @@ instance DSIGNMAlgorithm Ed25519DSIGNM where
     --
     -- Secure forgetting
     --
-    forgetSignKeyDSIGNM (SignKeyEd25519DSIGNM sk) = do
-      mlsbFinalize sk
+    forgetSignKeyDSIGNMWith _ (SignKeyEd25519DSIGNM sk) = mlsbFinalize sk
 
 deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
   instance MEq (SignKeyDSIGNM Ed25519DSIGNM)

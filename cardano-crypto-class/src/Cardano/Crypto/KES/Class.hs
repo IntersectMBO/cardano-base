@@ -19,6 +19,7 @@ module Cardano.Crypto.KES.Class
   , KESSignAlgorithm (..)
   , genKeyKES
   , updateKES
+  , forgetSignKeyKES
   , Period
 
   , OptimizedKESAlgorithm (..)
@@ -221,11 +222,23 @@ class KESAlgorithm v => KESSignAlgorithm v where
   --
   -- The precondition is that this key value will not be used again.
   --
-  forgetSignKeyKES
-    :: MonadST m
-    => SignKeyKES v
+  forgetSignKeyKESWith
+    :: (MonadST m, MonadThrow m)
+    => MLockedAllocator m
+    -> SignKeyKES v
     -> m ()
 
+-- | Forget a signing key synchronously, rather than waiting for GC. In some
+-- non-mock instances this provides a guarantee that the signing key is no
+-- longer in memory.
+--
+-- The precondition is that this key value will not be used again.
+--
+forgetSignKeyKES
+  :: (KESSignAlgorithm v, MonadST m, MonadThrow m)
+  => SignKeyKES v
+  -> m ()
+forgetSignKeyKES = forgetSignKeyKESWith mlockedMalloc
 
 -- | Key generation
 --

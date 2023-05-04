@@ -26,6 +26,7 @@ import Cardano.Crypto.MEqOrd (
 import Cardano.Foreign (SizedPtr)
 import Control.DeepSeq (NFData)
 import Control.Monad.Class.MonadST (MonadST)
+import Control.Monad.Class.MonadThrow (MonadThrow)
 import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
 import GHC.TypeNats (KnownNat)
@@ -50,7 +51,7 @@ withMLockedSeedAsMLSB
 withMLockedSeedAsMLSB action =
   fmap MLockedSeed . action . mlockedSeedMLSB
 
-mlockedSeedCopy :: (KnownNat n, MonadST m) => MLockedSeed n -> m (MLockedSeed n)
+mlockedSeedCopy :: (KnownNat n, MonadST m, MonadThrow m) => MLockedSeed n -> m (MLockedSeed n)
 mlockedSeedCopy = mlockedSeedCopyWith mlockedMalloc
 
 mlockedSeedCopyWith
@@ -60,14 +61,14 @@ mlockedSeedCopyWith
   -> m (MLockedSeed n)
 mlockedSeedCopyWith allocator = withMLockedSeedAsMLSB (mlsbCopyWith allocator)
 
-mlockedSeedNew :: (KnownNat n, MonadST m) => m (MLockedSeed n)
+mlockedSeedNew :: (KnownNat n, MonadST m, MonadThrow m) => m (MLockedSeed n)
 mlockedSeedNew = mlockedSeedNewWith mlockedMalloc
 
 mlockedSeedNewWith :: (KnownNat n, MonadST m) => MLockedAllocator m -> m (MLockedSeed n)
 mlockedSeedNewWith allocator =
   MLockedSeed <$> mlsbNewWith allocator
 
-mlockedSeedNewZero :: (KnownNat n, MonadST m) => m (MLockedSeed n)
+mlockedSeedNewZero :: (KnownNat n, MonadST m, MonadThrow m) => m (MLockedSeed n)
 mlockedSeedNewZero = mlockedSeedNewZeroWith mlockedMalloc
 
 mlockedSeedNewZeroWith :: (KnownNat n, MonadST m) => MLockedAllocator m -> m (MLockedSeed n)

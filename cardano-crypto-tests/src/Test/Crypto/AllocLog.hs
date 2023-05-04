@@ -1,20 +1,22 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-deprecations #-}
 module Test.Crypto.AllocLog where
 
 import Control.Tracer
 import Control.Monad.Reader
+import Data.Typeable
 import Foreign.Ptr
 import Foreign.Concurrent
 import Control.Monad.Class.MonadThrow
 import Control.Monad.Class.MonadST
-import Data.Typeable
+import System.Random
 
 import Cardano.Crypto.Libsodium (withMLockedForeignPtr)
-import Cardano.Crypto.Libsodium.Memory.Internal (MLockedAllocator(..), MLockedForeignPtr (..))
+import Cardano.Crypto.Libsodium.Memory (getAllocatorEvent, MLockedAllocator(..))
+import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 
 -- | Allocation log event. These are emitted automatically whenever mlocked
 -- memory is allocated through the 'mlockedAllocForeignPtr' primitive, or
@@ -25,33 +27,27 @@ data AllocEvent
   = AllocEv !WordPtr
   | FreeEv !WordPtr
   | MarkerEv !String
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable)
 
-newtype LogT event m a = LogT { unLogT :: ReaderT (Tracer (LogT event m) event) m a }
+newtype LogT event m a = LogT { unLogT :: ReaderT (Tracer m event) m a }
   deriving (Functor, Applicative, Monad, MonadThrow, MonadST, Typeable, MonadIO)
 
 type AllocLogT = LogT AllocEvent
 
-instance Monad m => MonadReader (Tracer (LogT event m) event) (LogT event m) where
+instance Monad m => MonadReader (Tracer m event) (LogT event m) where
   ask = LogT ask
   local f (LogT action) = LogT (local f action)
 
 instance MonadTrans (LogT event) where
   lift action = LogT (lift action)
 
-runLogT :: Tracer (LogT event m) event -> LogT event m a -> m a
+runLogT :: Tracer m event -> LogT event m a -> m a
 runLogT tracer action = runReaderT (unLogT action) tracer
-
-runAllocLogT :: Tracer (LogT AllocEvent m) AllocEvent -> LogT AllocEvent m a -> m a
-runAllocLogT = runLogT
 
 pushLogEvent :: Monad m => event -> LogT event m ()
 pushLogEvent event = do
   tracer <- ask
-  traceWith tracer event
-
-pushAllocLogEvent :: Monad m => AllocEvent -> LogT AllocEvent m ()
-pushAllocLogEvent = pushLogEvent
+  lift $ traceWith tracer event
 
 -- The below no longer works without MonadMLock.
 
@@ -76,16 +72,19 @@ pushAllocLogEvent = pushLogEvent
 --         (io . runLogT tracer . pushAllocLogEvent $ FreeEv addr)
 --     return fptr
 
--- | Newtype wrapper over an arbitrary event; we use this to write the generic
--- 'MonadMLock' instance below while avoiding overlapping instances.
-newtype GenericEvent e = GenericEvent { concreteEvent :: e }
-
-loggingMalloc :: MonadIO m => Tracer IO AllocEvent -> MLockedAllocator IO -> MLockedAllocator m
-loggingMalloc tracer (MLockedAllocator allocator) = MLockedAllocator $ \ size -> liftIO $ do
-  sfptr@(SFP fptr) <- allocator size
-  addr <- withMLockedForeignPtr sfptr (return . ptrToWordPtr)
-  traceWith tracer (AllocEv addr)
-  addForeignPtrFinalizer
-    fptr
-    (traceWith tracer (FreeEv addr))
-  return sfptr
+mkLoggingAllocator ::
+  MLockedAllocator IO -> LogT AllocEvent IO (MLockedAllocator (LogT AllocEvent IO))
+mkLoggingAllocator ioAllocator = do
+  tracer <- ask
+  pure $ MLockedAllocator
+    { mlAllocate =
+        \size ->
+          liftIO $ do
+            sfptr@(SFP fptr) <- mlAllocate ioAllocator size
+            addr <- withMLockedForeignPtr sfptr (return . ptrToWordPtr)
+            traceWith tracer (AllocEv addr)
+            addForeignPtrFinalizer fptr (traceWith tracer (FreeEv addr))
+            return sfptr
+    , mlTrace = liftIO . mapM_ (traceWith tracer) . getAllocatorEvent
+    , mlUniformWord = randomRIO
+    }

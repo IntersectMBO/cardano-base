@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DerivingVia          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -33,9 +34,8 @@ import Data.Foldable (traverse_)
 import GHC.TypeNats (KnownNat)
 
 import Control.Tracer
-import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad (void)
 
 import Cardano.Crypto.DSIGN hiding (Signable)
@@ -70,7 +70,6 @@ import Test.Crypto.Util (
   Lock,
   withLock,
   )
-import Test.Crypto.RunIO (RunIO (..))
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
 import Test.Crypto.AllocLog
 
@@ -83,18 +82,18 @@ import Test.Crypto.AllocLog
 tests :: Lock -> TestTree
 tests lock =
   testGroup "Crypto.KES"
-  [ testKESAlloc (Proxy :: Proxy (SingleKES Ed25519DSIGNM)) "SingleKES"
-  , testKESAlloc (Proxy :: Proxy (Sum1KES Ed25519DSIGNM Blake2b_256)) "Sum1KES"
-  , testKESAlloc (Proxy :: Proxy (Sum2KES Ed25519DSIGNM Blake2b_256)) "Sum2KES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (MockKES 7))               "MockKES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (SimpleKES Ed25519DSIGNM 7)) "SimpleKES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (SingleKES Ed25519DSIGNM))   "SingleKES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (Sum1KES Ed25519DSIGNM Blake2b_256)) "Sum1KES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (Sum2KES Ed25519DSIGNM Blake2b_256)) "Sum2KES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (Sum5KES Ed25519DSIGNM Blake2b_256)) "Sum5KES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (CompactSum1KES Ed25519DSIGNM Blake2b_256)) "CompactSum1KES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (CompactSum2KES Ed25519DSIGNM Blake2b_256)) "CompactSum2KES"
-  , testKESAlgorithm lock (Proxy :: Proxy IO) (Proxy :: Proxy (CompactSum5KES Ed25519DSIGNM Blake2b_256)) "CompactSum5KES"
+  [ testKESAlloc (Proxy @(SingleKES Ed25519DSIGNM)) "SingleKES"
+  , testKESAlloc (Proxy @(Sum1KES Ed25519DSIGNM Blake2b_256)) "Sum1KES"
+  , testKESAlloc (Proxy @(Sum2KES Ed25519DSIGNM Blake2b_256)) "Sum2KES"
+  , testKESAlgorithm @(MockKES 7)               lock "MockKES"
+  , testKESAlgorithm @(SimpleKES Ed25519DSIGNM 7) lock "SimpleKES"
+  , testKESAlgorithm @(SingleKES Ed25519DSIGNM)   lock "SingleKES"
+  , testKESAlgorithm @(Sum1KES Ed25519DSIGNM Blake2b_256) lock "Sum1KES"
+  , testKESAlgorithm @(Sum2KES Ed25519DSIGNM Blake2b_256) lock "Sum2KES"
+  , testKESAlgorithm @(Sum5KES Ed25519DSIGNM Blake2b_256) lock "Sum5KES"
+  , testKESAlgorithm @(CompactSum1KES Ed25519DSIGNM Blake2b_256) lock "CompactSum1KES"
+  , testKESAlgorithm @(CompactSum2KES Ed25519DSIGNM Blake2b_256) lock "CompactSum2KES"
+  , testKESAlgorithm @(CompactSum5KES Ed25519DSIGNM Blake2b_256) lock "CompactSum5KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
@@ -119,32 +118,29 @@ instance Show (SignKeyKES (CompactSingleKES Ed25519DSIGNM)) where
 instance Show (SignKeyKES (CompactSumKES h d)) where
   show _ = "<SignKeyCompactSumKES>"
 
-deriving via (PureMEq (SignKeyKES (MockKES t))) instance Applicative m => MEq m (SignKeyKES (MockKES t))
+deriving via PureMEq (SignKeyKES (MockKES t)) instance MEq (SignKeyKES (MockKES t))
 
-deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SingleKES d))
+deriving newtype instance MEq (SignKeyDSIGNM d) => MEq (SignKeyKES (SingleKES d))
 
-instance ( MonadST m
-         , MEq m (SignKeyKES d)
+instance ( MEq (SignKeyKES d)
          , Eq (VerKeyKES d)
          , KnownNat (SeedSizeKES d)
-         ) => MEq m (SignKeyKES (SumKES h d)) where
+         ) => MEq (SignKeyKES (SumKES h d)) where
   equalsM (SignKeySumKES s r v1 v2) (SignKeySumKES s' r' v1' v2') =
     (s, r, PureMEq v1, PureMEq v2) ==! (s', r', PureMEq v1', PureMEq v2')
 
-deriving newtype instance (MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (CompactSingleKES d))
+deriving newtype instance MEq (SignKeyDSIGNM d) => MEq (SignKeyKES (CompactSingleKES d))
 
-instance ( MonadST m
-         , MEq m (SignKeyKES d)
+instance ( MEq (SignKeyKES d)
          , Eq (VerKeyKES d)
          , KnownNat (SeedSizeKES d)
-         ) => MEq m (SignKeyKES (CompactSumKES h d)) where
+         ) => MEq (SignKeyKES (CompactSumKES h d)) where
   equalsM (SignKeyCompactSumKES s r v1 v2) (SignKeyCompactSumKES s' r' v1' v2') =
     (s, r, PureMEq v1, PureMEq v2) ==! (s', r', PureMEq v1', PureMEq v2')
 
 testKESAlloc
   :: forall v.
-     ( KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) IO) v
-     , KESSignAlgorithm (AllocLogT IO) v
+     ( KESSignAlgorithm v
      , ContextKES v ~ ()
      )
   => Proxy v
@@ -162,22 +158,23 @@ testKESAlloc _p n =
       ]
     ]
 
+eventTracer :: IORef [event] -> Tracer IO event
+eventTracer logVar = Tracer (\ev -> liftIO $ atomicModifyIORef' logVar (\acc -> (acc ++ [ev], ())))
+
 testForgetGenKeyKES
   :: forall v.
-     ( KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) IO) v
-     )
+     KESSignAlgorithm v
   => Proxy v
   -> Assertion
 testForgetGenKeyKES _p = do
   logVar <- newIORef []
-  let tracer :: Tracer (LogT (GenericEvent ForgetMockEvent) IO) (GenericEvent ForgetMockEvent)
-      tracer = Tracer (\ev -> liftIO $ modifyIORef logVar (++ [ev]))
-  runLogT tracer $ do
+  runLogT (eventTracer logVar) $ do
+    allocator <- mkForgetMockAllocator mlockedMalloc
     seed <- MLockedSeed <$> mlsbFromByteString (BS.replicate 1024 23)
-    sk <- genKeyKES @(LogT (GenericEvent ForgetMockEvent) IO) @(ForgetMockKES v) seed
+    sk <- genKeyKESWith @(ForgetMockKES v) allocator seed
     mlockedSeedFinalize seed
-    forgetSignKeyKES sk
-  result <- map concreteEvent <$> readIORef logVar
+    forgetSignKeyKESWith @(ForgetMockKES v) allocator sk
+  result <- readIORef logVar
   assertBool ("Unexpected log: " ++ show result) $ case result of
     [GEN a, DEL b] ->
       -- End of last period, so no update happened
@@ -185,25 +182,21 @@ testForgetGenKeyKES _p = do
     _ -> False
   return ()
 
-testForgetUpdateKeyKES
-  :: forall v.
-     ( KESSignAlgorithm (LogT (GenericEvent ForgetMockEvent) IO) v
-     , ContextKES v ~ ()
-     )
+testForgetUpdateKeyKES ::
+     forall v. (KESSignAlgorithm v, ContextKES v ~ ())
   => Proxy v
   -> Assertion
 testForgetUpdateKeyKES _p = do
   logVar <- newIORef []
-  let tracer :: Tracer (LogT (GenericEvent ForgetMockEvent) IO) (GenericEvent ForgetMockEvent)
-      tracer = Tracer (\ev -> liftIO $ modifyIORef logVar (++ [ev]))
-  runLogT tracer $ do
+  runLogT (eventTracer logVar) $ do
+    allocator <- mkForgetMockAllocator mlockedMalloc
     seed <- MLockedSeed <$> mlsbFromByteString (BS.replicate 1024 23)
-    sk <- genKeyKES @(LogT (GenericEvent ForgetMockEvent) IO) @(ForgetMockKES v) seed
+    sk <- genKeyKESWith @(ForgetMockKES v) allocator seed
     mlockedSeedFinalize seed
-    msk' <- updateKES () sk 0
-    forgetSignKeyKES sk
-    traverse_ forgetSignKeyKES msk'
-  result <- map concreteEvent <$> readIORef logVar
+    msk' <- updateKESWith @(ForgetMockKES v) allocator () sk 0
+    forgetSignKeyKESWith @(ForgetMockKES v) allocator sk
+    traverse_ (forgetSignKeyKESWith @(ForgetMockKES v) allocator) msk'
+  result <- readIORef logVar
 
   assertBool ("Unexpected log: " ++ show result) $ case result of
     [GEN a, UPD b c, DEL d, DEL e] ->
@@ -224,27 +217,23 @@ matchAllocLog = foldl' (flip go) Set.empty
 
 testMLockGenKeyKES
   :: forall v.
-     ( KESSignAlgorithm (AllocLogT IO) v
-     )
+     KESSignAlgorithm v
   => Proxy v
   -> Assertion
 testMLockGenKeyKES _p = do
   accumVar <- newIORef []
-  let tracer :: Tracer (AllocLogT IO) AllocEvent
-      tracer = Tracer (\ev -> liftIO $ modifyIORef accumVar (++ [ev]))
-      ioTracer = Tracer (\ev -> modifyIORef accumVar (++ [ev]))
-      allocator = loggingMalloc ioTracer mlockedMalloc
-  runAllocLogT tracer $ do
-    pushAllocLogEvent $ MarkerEv "gen seed"
+  runLogT (eventTracer accumVar) $ do
+    allocator <- mkLoggingAllocator mlockedMalloc
+    pushLogEvent $ MarkerEv "gen seed"
     seed :: MLockedSeed (SeedSizeKES v) <-
       MLockedSeed <$> mlsbFromByteStringWith allocator (BS.replicate 1024 23)
-    pushAllocLogEvent $ MarkerEv "gen key"
-    sk <- genKeyKES @_ @v seed
-    pushAllocLogEvent $ MarkerEv "forget key"
-    forgetSignKeyKES sk
-    pushAllocLogEvent $ MarkerEv "forget seed"
+    pushLogEvent $ MarkerEv "gen key"
+    sk <- genKeyKESWith @v allocator seed
+    pushLogEvent $ MarkerEv "forget key"
+    forgetSignKeyKESWith allocator sk
+    pushLogEvent $ MarkerEv "forget seed"
     mlockedSeedFinalize seed
-    pushAllocLogEvent $ MarkerEv "done"
+    pushLogEvent $ MarkerEv "done"
   after <- readIORef accumVar
   let evset = matchAllocLog after
   assertBool "some allocations happened" (not . null $ [ () | AllocEv _ <- after ])
@@ -252,31 +241,27 @@ testMLockGenKeyKES _p = do
 
 {-# NOINLINE testKESAlgorithm#-}
 testKESAlgorithm
-  :: forall m v.
+  :: forall v.
      ( ToCBOR (VerKeyKES v)
      , FromCBOR (VerKeyKES v)
-     , MEq IO (SignKeyKES v)   -- only monadic MEq for signing keys
+     , MEq (SignKeyKES v)   -- only monadic MEq for signing keys
      , Show (SignKeyKES v) -- fake instance defined locally
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
-     , KESSignAlgorithm m v
-     -- , KESSignAlgorithm IO v -- redundant for now
-     , UnsoundKESSignAlgorithm IO v
+     , UnsoundKESSignAlgorithm v
      )
   => Lock
-  -> Proxy m
-  -> Proxy v
   -> String
   -> TestTree
-testKESAlgorithm lock _pm _pv n =
+testKESAlgorithm lock n =
   testGroup n
-    [ testProperty "only gen signkey" $ prop_onlyGenSignKeyKES @v lock Proxy
-    , testProperty "only gen verkey" $ prop_onlyGenVerKeyKES @v lock Proxy
-    , testProperty "one update signkey" $ prop_oneUpdateSignKeyKES lock (Proxy @IO) (Proxy @v)
-    , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES lock (Proxy @IO) (Proxy @v)
-    , testProperty "total periods" $ prop_totalPeriodsKES lock (Proxy @IO) (Proxy @v)
+    [ testProperty "only gen signkey" $ prop_onlyGenSignKeyKES @v lock
+    , testProperty "only gen verkey" $ prop_onlyGenVerKeyKES @v lock
+    , testProperty "one update signkey" $ prop_oneUpdateSignKeyKES @v lock
+    , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES @v lock
+    , testProperty "total periods" $ prop_totalPeriodsKES @v lock
     , testGroup "NoThunks"
       [ testProperty "VerKey" $
           ioPropertyWithSK @v lock $ \sk ->
@@ -291,11 +276,11 @@ testKESAlgorithm lock _pm _pv n =
               (maybe (return ()) forgetSignKeyKES)
               (prop_no_thunks_IO . return)
       , testProperty "Sig"     $ \seedPSB (msg :: Message) ->
-          ioProperty $ withLock lock $ fmap conjoin $ withAllUpdatesKES @IO @v seedPSB $ \t sk -> do
+          ioProperty $ withLock lock $ fmap conjoin $ withAllUpdatesKES @v seedPSB $ \t sk -> do
             prop_no_thunks_IO (signKES () t msg sk)
       ]
 
-    , testProperty "same VerKey "  $ prop_deriveVerKeyKES (Proxy @IO) (Proxy @v)
+    , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
     , testGroup "serialisation"
 
       [ testGroup "raw ser only"
@@ -384,16 +369,16 @@ testKESAlgorithm lock _pm _pv n =
       ]
 
     , testGroup "verify"
-      [ testProperty "positive"           $ prop_verifyKES_positive         @IO @v Proxy Proxy
-      , testProperty "negative (key)"     $ prop_verifyKES_negative_key     @IO @v Proxy Proxy
-      , testProperty "negative (message)" $ prop_verifyKES_negative_message @IO @v Proxy Proxy
+      [ testProperty "positive"           $ prop_verifyKES_positive         @v
+      , testProperty "negative (key)"     $ prop_verifyKES_negative_key     @v
+      , testProperty "negative (message)" $ prop_verifyKES_negative_message @v
       , adjustOption (\(QuickCheckMaxSize sz) -> QuickCheckMaxSize (min sz 50)) $
-        testProperty "negative (period)"  $ prop_verifyKES_negative_period  @IO @v Proxy Proxy
+        testProperty "negative (period)"  $ prop_verifyKES_negative_period  @v
       ]
 
     , testGroup "serialisation of all KES evolutions"
-      [ testProperty "VerKey"  $ prop_serialise_VerKeyKES  @IO @v Proxy Proxy
-      , testProperty "Sig"     $ prop_serialise_SigKES     @IO @v Proxy Proxy
+      [ testProperty "VerKey"  $ prop_serialise_VerKeyKES @v
+      , testProperty "Sig"     $ prop_serialise_SigKES    @v
       ]
 
     -- TODO: this doesn't pass right now, see
@@ -410,9 +395,8 @@ testKESAlgorithm lock _pm _pv n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: ( MonadThrow m
-          , KESSignAlgorithm m v
-          ) => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> m b) -> m b
+withSK :: KESSignAlgorithm v
+       => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> IO b) -> IO b
 withSK seedPSB =
   bracket
     (withMLockedSeedFromPSB seedPSB genKeyKES)
@@ -425,7 +409,7 @@ withSK seedPSB =
 -- memory. Special care must be taken to not leak the key outside of the
 -- wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-ioPropertyWithSK :: forall v a. (Testable a, KESSignAlgorithm IO v)
+ioPropertyWithSK :: forall v a. (Testable a, KESSignAlgorithm v)
                  => Lock
                  -> (SignKeyKES v -> IO a)
                  -> PinnedSizedBytes (SeedSizeKES v)
@@ -458,64 +442,55 @@ ioPropertyWithSK lock action seedPSB =
 
 prop_onlyGenSignKeyKES
   :: forall v.
-      KESSignAlgorithm IO v
-  => Lock -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
-prop_onlyGenSignKeyKES lock _ =
+      KESSignAlgorithm v
+  => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_onlyGenSignKeyKES lock =
   ioPropertyWithSK @v lock $ const noExceptionsThrown
 
 prop_onlyGenVerKeyKES
   :: forall v.
-      KESSignAlgorithm IO v
-  => Lock -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
-prop_onlyGenVerKeyKES lock _ =
+      KESSignAlgorithm v
+  => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_onlyGenVerKeyKES lock =
   ioPropertyWithSK @v lock $ doesNotThrow . deriveVerKeyKES
 
 prop_oneUpdateSignKeyKES
-  :: forall m v.
+  :: forall v.
         ( ContextKES v ~ ()
-        , RunIO m
-        , MonadFail m
-        , MonadThrow m
-        , KESSignAlgorithm m v
+        , KESSignAlgorithm v
         )
-  => Lock -> Proxy m -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
-prop_oneUpdateSignKeyKES lock _ _ seedPSB =
-  ioProperty . withLock lock . io . withMLockedSeedFromPSB seedPSB $ \seed -> do
-    sk <- genKeyKES @m @v seed
-    msk' <- updateKES @m () sk 0
+  => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_oneUpdateSignKeyKES lock seedPSB =
+  ioProperty . withLock lock . withMLockedSeedFromPSB seedPSB $ \seed -> do
+    sk <- genKeyKES @v seed
+    msk' <- updateKES () sk 0
     forgetSignKeyKES sk
     maybe (return ()) forgetSignKeyKES msk'
     return True
 
 prop_allUpdatesSignKeyKES
-  :: forall m v.
+  :: forall v.
         ( ContextKES v ~ ()
-        , RunIO m
-        , MonadIO m
-        , MonadThrow m
-        , KESSignAlgorithm m v
+        , KESSignAlgorithm v
         )
-  => Lock -> Proxy m -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
-prop_allUpdatesSignKeyKES lock _ _ seedPSB =
-  ioProperty . withLock lock . io $ do
-    void $ withAllUpdatesKES_ @m @v seedPSB $ const (return ())
+  => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_allUpdatesSignKeyKES lock seedPSB =
+  ioProperty . withLock lock $ do
+    void $ withAllUpdatesKES_ @v seedPSB $ const (return ())
 
 -- | If we start with a signing key, we can evolve it a number of times so that
 -- the total number of signing keys (including the initial one) equals the
 -- total number of periods for this algorithm.
 --
 prop_totalPeriodsKES
-  :: forall m v.
+  :: forall v.
         ( ContextKES v ~ ()
-        , RunIO m
-        , MonadIO m
-        , MonadThrow m
-        , KESSignAlgorithm m v
+        , KESSignAlgorithm v
         )
-  => Lock -> Proxy m -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
-prop_totalPeriodsKES lock _ _ seed =
+  => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_totalPeriodsKES lock seed =
     ioProperty . withLock lock $ do
-        sks <- io $ withAllUpdatesKES_ @m @v seed (const . return $ ())
+        sks <- withAllUpdatesKES_ @v seed (const . return $ ())
         return $
           totalPeriods > 0 ==>
           counterexample (show totalPeriods) $
@@ -530,23 +505,20 @@ prop_totalPeriodsKES lock _ _ seed =
 -- keys we derive from each one are the same.
 --
 prop_deriveVerKeyKES
-  :: forall m v.
+  :: forall v.
       ( ContextKES v ~ ()
-      , RunIO m
-      , MonadIO m
-      , MonadThrow m
-      , KESSignAlgorithm m v
+      , KESSignAlgorithm v
       )
-  => Proxy m -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
-prop_deriveVerKeyKES _ _ seedPSB =
+  => PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_deriveVerKeyKES seedPSB =
     ioProperty $ do
-        vk_0 <- io $ do
-          sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @m @v
-          vk_0 <- deriveVerKeyKES @m sk_0
+        vk_0 <- do
+          sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @v
+          vk_0 <- deriveVerKeyKES sk_0
           forgetSignKeyKES sk_0
           return vk_0
 
-        vks <- io $ withAllUpdatesKES_ seedPSB $ deriveVerKeyKES @m
+        vks <- withAllUpdatesKES_ seedPSB deriveVerKeyKES
         return $
           counterexample (show vks) $
           conjoin (map (vk_0 ===) vks)
@@ -557,23 +529,20 @@ prop_deriveVerKeyKES _ _ seedPSB =
 -- corresponding period.
 --
 prop_verifyKES_positive
-  :: forall m v.
+  :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , RunIO m
-     , MonadIO m
-     , MonadThrow m
-     , KESSignAlgorithm m v
+     , KESSignAlgorithm v
      )
-  => Proxy m -> Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Gen Property
-prop_verifyKES_positive _ _ seedPSB = do
+  => PinnedSizedBytes (SeedSizeKES v) -> Gen Property
+prop_verifyKES_positive seedPSB = do
     xs :: [Message] <- vectorOf totalPeriods arbitrary
     return $ checkCoverage $
       cover 1 (length xs >= totalPeriods) "Message count covers total periods" $
       not (null xs) ==>
-      ioProperty $ fmap conjoin $ io $ do
-        sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @m @v
-        vk <- deriveVerKeyKES @m sk_0
+      ioProperty $ fmap conjoin $ do
+        sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @v
+        vk <- deriveVerKeyKES sk_0
         forgetSignKeyKES sk_0
         withAllUpdatesKES seedPSB $ \t sk -> do
           let x = cycle xs !! fromIntegral t
@@ -592,22 +561,18 @@ prop_verifyKES_positive _ _ seedPSB = do
 -- corresponding to a different signing key, then the verification fails.
 --
 prop_verifyKES_negative_key
-  :: forall m v.
+  :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , RunIO m
-     , MonadIO m
-     , MonadThrow m
-     , KESSignAlgorithm m v
+     , KESSignAlgorithm v
      )
-  => Proxy m -> Proxy v
-  -> PinnedSizedBytes (SeedSizeKES v)
+  => PinnedSizedBytes (SeedSizeKES v)
   -> PinnedSizedBytes (SeedSizeKES v)
   -> Message
   -> Property
-prop_verifyKES_negative_key _ _ seedPSB seedPSB' x =
-    seedPSB /= seedPSB' ==> ioProperty $ fmap conjoin $ io $ do
-        sk_0' <- withMLockedSeedFromPSB seedPSB' $ genKeyKES @m @v
+prop_verifyKES_negative_key seedPSB seedPSB' x =
+    seedPSB /= seedPSB' ==> ioProperty $ fmap conjoin $ do
+        sk_0' <- withMLockedSeedFromPSB seedPSB' $ genKeyKES @v
         vk' <- deriveVerKeyKES sk_0'
         forgetSignKeyKES sk_0'
         withAllUpdatesKES seedPSB $ \t sk -> do
@@ -622,22 +587,18 @@ prop_verifyKES_negative_key _ _ seedPSB seedPSB' x =
 -- verification fails.
 --
 prop_verifyKES_negative_message
-  :: forall m v.
+  :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , RunIO m
-     , MonadIO m
-     , MonadThrow m
-     , KESSignAlgorithm m v
+     , KESSignAlgorithm v
      )
-  => Proxy m -> Proxy v
-  -> PinnedSizedBytes (SeedSizeKES v)
+  => PinnedSizedBytes (SeedSizeKES v)
   -> Message -> Message
   -> Property
-prop_verifyKES_negative_message _ _ seedPSB x x' =
-    x /= x' ==> ioProperty $ fmap conjoin $ io $ do
-        sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @m @v
-        vk <- deriveVerKeyKES @m sk_0
+prop_verifyKES_negative_message seedPSB x x' =
+    x /= x' ==> ioProperty $ fmap conjoin $ do
+        sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @v
+        vk <- deriveVerKeyKES sk_0
         forgetSignKeyKES sk_0
         withAllUpdatesKES seedPSB $ \t sk -> do
           sig <- signKES () t x sk
@@ -652,22 +613,18 @@ prop_verifyKES_negative_message _ _ seedPSB x x' =
 -- verification fails.
 --
 prop_verifyKES_negative_period
-  :: forall m v.
+  :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , RunIO m
-     , MonadIO m
-     , MonadThrow m
-     , KESSignAlgorithm m v
+     , KESSignAlgorithm v
      )
-  => Proxy m -> Proxy v
-  -> PinnedSizedBytes (SeedSizeKES v)
+  => PinnedSizedBytes (SeedSizeKES v)
   -> Message
   -> Property
-prop_verifyKES_negative_period _ _ seedPSB x =
-    ioProperty $ fmap conjoin $ io $ do
-        sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @m @v
-        vk <- deriveVerKeyKES @m sk_0
+prop_verifyKES_negative_period seedPSB x =
+    ioProperty $ fmap conjoin $ do
+        sk_0 <- withMLockedSeedFromPSB seedPSB $ genKeyKES @v
+        vk <- deriveVerKeyKES sk_0
         forgetSignKeyKES sk_0
         withAllUpdatesKES seedPSB $ \t sk -> do
             sig <- signKES () t x sk
@@ -686,20 +643,16 @@ prop_verifyKES_negative_period _ _ seedPSB x =
 -- for 'VerKeyKES' on /all/ the KES key evolutions.
 --
 prop_serialise_VerKeyKES
-  :: forall m v.
+  :: forall v.
      ( ContextKES v ~ ()
-     , RunIO m
-     , MonadIO m
-     , MonadThrow m
-     , KESSignAlgorithm m v
+     , KESSignAlgorithm v
      )
-  => Proxy m -> Proxy v
-  -> PinnedSizedBytes (SeedSizeKES v)
+  => PinnedSizedBytes (SeedSizeKES v)
   -> Property
-prop_serialise_VerKeyKES _ _ seedPSB =
-    ioProperty $ fmap conjoin $ io $ do
-        withAllUpdatesKES @m @v seedPSB $ \t sk -> do
-          vk <- deriveVerKeyKES @m sk
+prop_serialise_VerKeyKES seedPSB =
+    ioProperty $ fmap conjoin $ do
+        withAllUpdatesKES @v seedPSB $ \t sk -> do
+          vk <- deriveVerKeyKES sk
           return $
                  counterexample ("period " ++ show t) $
                  counterexample ("vkey " ++ show vk) $
@@ -714,22 +667,18 @@ prop_serialise_VerKeyKES _ _ seedPSB =
 -- for 'SigKES' on /all/ the KES key evolutions.
 --
 prop_serialise_SigKES
-  :: forall m v.
+  :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
      , Show (SignKeyKES v)
-     , RunIO m
-     , MonadIO m
-     , MonadThrow m
-     , KESSignAlgorithm m v
+     , KESSignAlgorithm v
      )
-  => Proxy m -> Proxy v
-  -> PinnedSizedBytes (SeedSizeKES v)
+  => PinnedSizedBytes (SeedSizeKES v)
   -> Message
   -> Property
-prop_serialise_SigKES _ _ seedPSB x =
-    ioProperty $ fmap conjoin $ io $ do
-        withAllUpdatesKES @m @v seedPSB $ \t sk -> do
+prop_serialise_SigKES seedPSB x =
+    ioProperty $ fmap conjoin $ do
+        withAllUpdatesKES @v seedPSB $ \t sk -> do
             sig <- signKES () t x sk
             return $
               counterexample ("period " ++ show t) $
@@ -746,30 +695,28 @@ prop_serialise_SigKES _ _ seedPSB x =
 -- KES test utils
 --
 
-withAllUpdatesKES_ :: forall m v a.
-                  ( KESSignAlgorithm m v
+withAllUpdatesKES_ :: forall v a.
+                  ( KESSignAlgorithm v
                   , ContextKES v ~ ()
-                  , MonadThrow m
                   )
               => PinnedSizedBytes (SeedSizeKES v)
-              -> (SignKeyKES v -> m a)
-              -> m [a]
+              -> (SignKeyKES v -> IO a)
+              -> IO [a]
 withAllUpdatesKES_ seedPSB f = do
   withAllUpdatesKES seedPSB (const f)
 
-withAllUpdatesKES :: forall m v a.
-                  ( KESSignAlgorithm m v
+withAllUpdatesKES :: forall v a.
+                  ( KESSignAlgorithm v
                   , ContextKES v ~ ()
-                  , MonadThrow m
                   )
               => PinnedSizedBytes (SeedSizeKES v)
-              -> (Word -> SignKeyKES v -> m a)
-              -> m [a]
+              -> (Word -> SignKeyKES v -> IO a)
+              -> IO [a]
 withAllUpdatesKES seedPSB f = withMLockedSeedFromPSB seedPSB $ \seed -> do
   sk_0 <- genKeyKES seed
   go sk_0 0
   where
-    go :: SignKeyKES v -> Word -> m [a]
+    go :: SignKeyKES v -> Word -> IO [a]
     go sk t = do
       x <- f t sk
       msk' <- updateKES () sk t

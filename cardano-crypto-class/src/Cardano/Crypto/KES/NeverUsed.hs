@@ -60,7 +60,7 @@ instance KESSignAlgorithm NeverKES where
 
   genKeyKESWith _ _ = return NeverUsedSignKeyKES
 
-  forgetSignKeyKES = const $ return ()
+  forgetSignKeyKESWith _ = const $ return ()
 
 
 instance UnsoundKESSignAlgorithm NeverKES where

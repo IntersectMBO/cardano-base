@@ -154,7 +154,7 @@ instance KnownNat t => KESSignAlgorithm (MockKES t) where
         let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes . mlsbAsByteString . mlockedSeedMLSB $ seed) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
-    forgetSignKeyKES = const $ return ()
+    forgetSignKeyKESWith _ = const $ return ()
 
 instance KnownNat t => UnsoundKESSignAlgorithm (MockKES t) where
     rawSerialiseSignKeyKES sk =

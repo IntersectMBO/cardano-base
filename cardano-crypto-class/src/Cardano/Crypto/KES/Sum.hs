@@ -286,8 +286,8 @@ instance ( KESSignAlgorithm d
     --
     -- forgetting
     --
-    forgetSignKeyKES (SignKeySumKES sk_0 r1 _ _) = do
-      forgetSignKeyKES sk_0
+    forgetSignKeyKESWith allocator (SignKeySumKES sk_0 r1 _ _) = do
+      forgetSignKeyKESWith allocator sk_0
       mlockedSeedFinalize r1
 
 instance ( KESSignAlgorithm (SumKES h d)

@@ -135,8 +135,8 @@ instance DSIGNMAlgorithm d => KESSignAlgorithm (SingleKES d) where
     --
     -- forgetting
     --
-    forgetSignKeyKES (SignKeySingleKES v) =
-      forgetSignKeyDSIGNM v
+    forgetSignKeyKESWith allocator (SignKeySingleKES v) =
+      forgetSignKeyDSIGNMWith allocator v
 
 instance (KESSignAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
          => UnsoundKESSignAlgorithm (SingleKES d) where
