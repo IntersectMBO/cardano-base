@@ -4,8 +4,9 @@ This is a rust script to generate test vectors for the following:
     - Pairing properties
     - Elliptic curve operations
     - Deserialization/decompression
-- Using [blst](https://github.com/supranational/blst) bindings from [bls12_381](https://github.com/zkcrypto/bls12_381) BLS signature with `aug` and `dst`.
-  The results are in hex encoding and stored under the folder `test_vectors`.
+    - BLS signature with `aug` and `dst`. 
+
+The results are in hex encoding and stored under the folder `test_vectors`.
 
 ### 1- Test vectors for pairing properties
 The properties to be tested:
@@ -83,7 +84,7 @@ Order of the values printed on `serde_test_vectors`:
 - `G2_uncomp_not_on_group`
 
 ### 4- BLS Signature
-Test vectors for BLS signature, using `blst` bindings.
+Test vectors for BLS signature, with successful validation using [blst](https://github.com/supranational/blst).
 
 The explicit usage of `aug` is not allowed in Cardano-base bindings. Therefore, before verification, they need to be appended into the message by following [hash-to-curve](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve#name-expand_message) spec.
 
@@ -92,7 +93,7 @@ The explicit usage of `aug` is not allowed in Cardano-base bindings. Therefore, 
 ```rust
 let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 let msg = b"blst is such a blast";
-let aug = b"Random value for test aug";
+let aug = b"Random value for test aug. ";
 ```
 Order of the values printed on the files `bls_sig_aug_test_vectors` (BLS signature with `aug`):
 
