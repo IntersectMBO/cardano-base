@@ -1,4 +1,12 @@
 ## Test vectors for BLS
+This is a rust script to generate test vectors for the following:
+- Using [bls12_381](https://github.com/zkcrypto/bls12_381)
+    - Pairing properties
+    - Elliptic curve operations
+    - Deserialization/decompression
+- Using [blst](https://github.com/supranational/blst) bindings from [bls12_381](https://github.com/zkcrypto/bls12_381) BLS signature with `aug` and `dst`.
+  The results are in hex encoding and stored under the folder `test_vectors`.
+
 ### 1- Test vectors for pairing properties
 The properties to be tested:
 - `e([a]P, Q) = e(P, [a]Q)`
