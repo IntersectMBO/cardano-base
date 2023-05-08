@@ -9,8 +9,8 @@ import qualified Test.Crypto.VRF
 import qualified Test.Crypto.Regressions
 #ifdef SECP256K1_ENABLED
 import qualified Test.Crypto.Vector.Secp256k1DSIGN
-import qualified Test.Crypto.EllipticCurve
 #endif
+import qualified Test.Crypto.EllipticCurve
 import Test.Tasty (TestTree, adjustOption, testGroup, defaultMain)
 import Test.Tasty.QuickCheck (QuickCheckTests (QuickCheckTests))
 import Cardano.Crypto.Libsodium (sodiumInit)
@@ -41,6 +41,6 @@ tests mlockLock =
       , Test.Crypto.Regressions.tests
 #ifdef SECP256K1_ENABLED
       , Test.Crypto.Vector.Secp256k1DSIGN.tests
-      , Test.Crypto.EllipticCurve.tests
 #endif
+      , Test.Crypto.EllipticCurve.tests
       ]

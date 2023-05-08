@@ -19,6 +19,7 @@ category:           Currency
 build-type:         Simple
 extra-source-files: README.md
                     CHANGELOG.md
+                    cbits/blst_util.c
 
 flag secp256k1-support
     description: Enable support for functions from libsecp256k1. Requires
@@ -38,6 +39,7 @@ common project-config
 library
   import:            base, project-config
   hs-source-dirs:    src
+  c-sources: cbits/blst_util.c
   exposed-modules:
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.Class
