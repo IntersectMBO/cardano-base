@@ -55,9 +55,16 @@ module Test.Crypto.Util
     -- * Formatting
   , hexBS
 
+    -- * Parsing
+  , bsFromHex
+
     -- * Helpers for testing IO actions
   , noExceptionsThrown
   , doesNotThrow
+
+    -- * Error handling
+  , eitherError
+  , eitherShowError
 
     -- * Locking
   , Lock
@@ -66,7 +73,7 @@ module Test.Crypto.Util
   )
 where
 
-import Numeric (showHex)
+import Numeric (showHex, readHex)
 import GHC.Exts (fromListN, fromList, toList)
 import Text.Show.Pretty (ppShow)
 import Data.Kind (Type)
@@ -345,6 +352,22 @@ hexBS :: ByteString -> String
 hexBS bs =
   "0x" <> BS.foldr showHex "" bs <> " (length " <> show (BS.length bs) <> ")"
 
+bsFromHex :: String -> ByteString
+bsFromHex "" = ""
+bsFromHex xs =
+  case readHex cur of
+    [(n, "")] ->
+      BS.cons n $ bsFromHex r
+    [(_, rr)] ->
+      error $ "Incomplete parse: " ++ show rr
+    [] ->
+      error "No parse"
+    ps ->
+      error $ "Too many parses: " ++ show ps
+  where
+    cur = take 2 xs
+    r = drop 2 xs
+
 -- | Return a property that always succeeds in some monad (typically 'IO').
 -- This is useful to express that we are only interested in whether the side
 -- effects of the preceding actions caused any exceptions or not - if they
@@ -366,3 +389,11 @@ withLock (Lock v) = withMVar v . const
 
 mkLock :: IO Lock
 mkLock = Lock <$> newMVar ()
+
+eitherError :: Either String a -> IO a
+eitherError (Left err) = error err
+eitherError (Right a) = return a
+
+eitherShowError :: Show e => Either e a -> IO a
+eitherShowError (Left e) = error (show e)
+eitherShowError (Right a) = return a

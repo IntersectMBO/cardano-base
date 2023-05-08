@@ -6,6 +6,10 @@
 module Test.Crypto.EllipticCurve
 where
 
+import Paths_cardano_crypto_tests
+
+import Test.Crypto.Util (bsFromHex, eitherShowError)
+
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Test.Crypto.Instances ()
@@ -38,6 +42,7 @@ tests =
         , testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
         , testPT "PT"
         , testPairing "Pairing"
+        , testVectors "Vectors"
         ]
     ]
 
@@ -157,6 +162,71 @@ testPairing name =
     ]
     where
       pairingCheck (a, b) (c, d) = BLS.ptFinalVerify (BLS.millerLoop a b) (BLS.millerLoop c d)
+
+loadHexFile :: String -> IO [BS.ByteString]
+loadHexFile filename = do
+  rawStrings <- lines <$> readFile filename
+  return $ map bsFromHex rawStrings
+
+testVectors :: String -> TestTree
+testVectors name =
+  testGroup name
+    [ testVectorPairings "pairings"
+    ]
+
+testVectorPairings :: String -> TestTree
+testVectorPairings name =
+  testCase name $ do
+    [ p_raw,
+      q_raw,
+      _a_raw,
+      _b_raw ] <- loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/pqab"
+
+    [ aP_raw,
+      bP_raw,
+      apbP_raw,
+      axbP_raw,
+      aQ_raw,
+      bQ_raw,
+      apbQ_raw,
+      axbQ_raw ] <- loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/pairing_test_vectors"
+
+    p <- eitherShowError $ BLS.blsUncompress p_raw
+    q <- eitherShowError $ BLS.blsUncompress q_raw
+    aP <- eitherShowError $ BLS.blsUncompress aP_raw
+    aQ <- eitherShowError $ BLS.blsUncompress aQ_raw
+    bP <- eitherShowError $ BLS.blsUncompress bP_raw
+    bQ <- eitherShowError $ BLS.blsUncompress bQ_raw
+    apbP <- eitherShowError $ BLS.blsUncompress apbP_raw
+    axbP <- eitherShowError $ BLS.blsUncompress axbP_raw
+    apbQ <- eitherShowError $ BLS.blsUncompress apbQ_raw
+    axbQ <- eitherShowError $ BLS.blsUncompress axbQ_raw
+
+    assertBool "e([a]P, Q) = e(P, [a]Q)" $
+      BLS.ptFinalVerify
+        (BLS.millerLoop aP q)
+        (BLS.millerLoop p aQ)
+    assertBool "e([a]P, [b]Q) = e([b]P, [a]Q)" $
+      BLS.ptFinalVerify
+        (BLS.millerLoop aP bQ)
+        (BLS.millerLoop bP aQ)
+    assertBool "e([a]P, [b]Q) = e([a * b]P, Q)" $
+      BLS.ptFinalVerify
+        (BLS.millerLoop aP bQ)
+        (BLS.millerLoop axbP q)
+    assertBool "e([a]P, Q) * e([b]P, Q) = e([a + b]P, Q)" $
+      BLS.ptFinalVerify
+        (BLS.ptMult (BLS.millerLoop aP q) (BLS.millerLoop bP q))
+        (BLS.millerLoop apbP q)
+    assertBool "e([a]P, [b]Q) = e(P, [a * b]Q)" $
+      BLS.ptFinalVerify
+        (BLS.millerLoop aP bQ)
+        (BLS.millerLoop p axbQ)
+    assertBool "e(P, [a]Q) * e(P, [b]Q) = e(P, [a + b]Q)" $
+      BLS.ptFinalVerify
+        (BLS.ptMult (BLS.millerLoop p aQ) (BLS.millerLoop p bQ))
+        (BLS.millerLoop p apbQ)
+
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =

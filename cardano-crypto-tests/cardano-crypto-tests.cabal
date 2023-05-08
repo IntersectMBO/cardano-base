@@ -15,6 +15,7 @@ category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
                      CHANGELOG.md
+data-files: bls12-381-test-vectors/test_vectors/*
 
 flag secp256k1-support
     description: Enable support for functions from libsecp256k1. Requires
@@ -56,6 +57,7 @@ library
                         Bench.Crypto.HASH
                         Bench.Crypto.BenchData
                         Test.Crypto.Vector.SerializationUtils
+                        Paths_cardano_crypto_tests
 
   build-depends:        base
                       , bytestring >=0.10.12.0
