@@ -1,7 +1,9 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
+
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Test.Crypto.EllipticCurve
 where
@@ -172,6 +174,9 @@ testVectors :: String -> TestTree
 testVectors name =
   testGroup name
     [ testVectorPairings "pairings"
+    , testVectorOperations "operations"
+    , testVectorSerDe "serialization/compression"
+    , testVectorSigAug "signature"
     ]
 
 testVectorPairings :: String -> TestTree
@@ -227,6 +232,115 @@ testVectorPairings name =
         (BLS.ptMult (BLS.millerLoop p aQ) (BLS.millerLoop p bQ))
         (BLS.millerLoop p apbQ)
 
+testVectorOperations :: String -> TestTree
+testVectorOperations name =
+  testCase name $ do
+    [ g1p_raw,
+      g1q_raw,
+      g1add_raw,
+      g1sub_raw,
+      g1mul_raw,
+      g1neg_raw,
+      g2p_raw,
+      g2q_raw,
+      g2add_raw,
+      g2sub_raw,
+      g2mul_raw,
+      g2neg_raw ] <- loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/ec_operations_test_vectors"
+
+    let scalar = 0x40df499974f62e2f268cd5096b0d952073900054122ffce0a27c9d96932891a5
+    g1p :: BLS.Point1 <- eitherShowError $ BLS.blsUncompress g1p_raw
+    g1q :: BLS.Point1 <- eitherShowError $ BLS.blsUncompress g1q_raw
+    g1add :: BLS.Point1 <- eitherShowError $ BLS.blsUncompress g1add_raw
+    g1sub :: BLS.Point1 <- eitherShowError $ BLS.blsUncompress g1sub_raw
+    g1mul :: BLS.Point1 <- eitherShowError $ BLS.blsUncompress g1mul_raw
+    g1neg :: BLS.Point1 <- eitherShowError $ BLS.blsUncompress g1neg_raw
+    g2p :: BLS.Point2 <- eitherShowError $ BLS.blsUncompress g2p_raw
+    g2q :: BLS.Point2 <- eitherShowError $ BLS.blsUncompress g2q_raw
+    g2add :: BLS.Point2 <- eitherShowError $ BLS.blsUncompress g2add_raw
+    g2sub :: BLS.Point2 <- eitherShowError $ BLS.blsUncompress g2sub_raw
+    g2mul :: BLS.Point2 <- eitherShowError $ BLS.blsUncompress g2mul_raw
+    g2neg :: BLS.Point2 <- eitherShowError $ BLS.blsUncompress g2neg_raw
+
+    assertEqual "g1 add"
+      g1add (BLS.blsAddOrDouble g1p g1q)
+    assertEqual "g1 sub"
+      g1sub (BLS.blsAddOrDouble g1p (BLS.blsNeg g1q))
+    assertEqual "g1 mul"
+      g1mul (BLS.blsMult g1q scalar)
+    assertEqual "g1 neg"
+      g1neg (BLS.blsNeg g1p)
+
+    assertEqual "g2 add"
+      g2add (BLS.blsAddOrDouble g2p g2q)
+    assertEqual "g2 sub"
+      g2sub (BLS.blsAddOrDouble g2p (BLS.blsNeg g2q))
+    assertEqual "g2 mul"
+      g2mul (BLS.blsMult g2q scalar)
+    assertEqual "g2 neg"
+      g2neg (BLS.blsNeg g2p)
+
+testVectorSerDe :: String -> TestTree
+testVectorSerDe name =
+  testCase name $ do
+    [ g1UncompNotOnCurve,
+      g1CompNotOnCurve,
+      g1CompNotInGroup,
+      g1UncompNotInGroup,
+      g2UncompNotOnCurve,
+      g2CompNotOnCurve,
+      g2CompNotInGroup,
+      g2UncompNotInGroup ] <- loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/serde_test_vectors"
+
+    assertEqual "g1UncompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsDeserialize g1UncompNotOnCurve :: Either BLS.BLSTError BLS.Point1)
+
+    assertEqual "g1CompNotInGroup"
+      (Left BLS.BLST_POINT_NOT_IN_GROUP)
+      (BLS.blsUncompress g1CompNotInGroup :: Either BLS.BLSTError BLS.Point1)
+
+    assertEqual "g1CompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsUncompress g1CompNotOnCurve :: Either BLS.BLSTError BLS.Point1)
+
+    assertEqual "g1UncompNotInGroup"
+      (Left BLS.BLST_POINT_NOT_IN_GROUP)
+      (BLS.blsDeserialize g1UncompNotInGroup :: Either BLS.BLSTError BLS.Point1)
+
+
+    assertEqual "g2UncompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsDeserialize g2UncompNotOnCurve :: Either BLS.BLSTError BLS.Point2)
+
+    assertEqual "g2CompNotInGroup"
+      (Left BLS.BLST_POINT_NOT_IN_GROUP)
+      (BLS.blsUncompress g2CompNotInGroup :: Either BLS.BLSTError BLS.Point2)
+
+    assertEqual "g2CompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsUncompress g2CompNotOnCurve :: Either BLS.BLSTError BLS.Point2)
+
+    assertEqual "g2UncompNotInGroup"
+      (Left BLS.BLST_POINT_NOT_IN_GROUP)
+      (BLS.blsDeserialize g2UncompNotInGroup :: Either BLS.BLSTError BLS.Point2)
+
+
+testVectorSigAug :: String -> TestTree
+testVectorSigAug name =
+  testCase name $ do
+    [ sig_raw, pk_raw ] <- loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/bls_sig_aug_test_vectors"
+    let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_"
+    let msg = "blst is such a blast"
+    let aug = "Random value for test aug. "
+    let hashedMsg = BLS.blsHash msg (Just dst) (Just aug)
+    sig <- eitherShowError $ BLS.blsUncompress sig_raw
+    pk <- eitherShowError $ BLS.blsUncompress pk_raw
+    
+    assertBool "valid signature" $
+      BLS.ptFinalVerify
+        (BLS.millerLoop sig BLS.blsGenerator)
+        (BLS.millerLoop hashedMsg pk)
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =
