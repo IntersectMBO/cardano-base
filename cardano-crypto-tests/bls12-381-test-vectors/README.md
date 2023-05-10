@@ -1,12 +1,11 @@
 ## Test vectors for BLS
 This is a rust script to generate test vectors for the following:
 - Using [bls12_381](https://github.com/zkcrypto/bls12_381)
-    - Pairing properties
-    - Elliptic curve operations
-    - Deserialization/decompression
-    - BLS signature with `aug` and `dst`. 
-
-The results are in hex encoding and stored under the folder `test_vectors`.
+  - Pairing properties
+  - Elliptic curve operations
+  - Deserialization/decompression
+- Using [blst](https://github.com/supranational/blst) bindings from [bls12_381](https://github.com/zkcrypto/bls12_381) BLS signature with `aug` and `dst`.
+  The results are in hex encoding and stored under the folder `test_vectors`.
 
 ### 1- Test vectors for pairing properties
 The properties to be tested:
@@ -19,8 +18,6 @@ The properties to be tested:
 
 The values used to generate test vectors:
 ```
-P = 840463aa2f2cda89985b1f3f5eb43b9c29809765d2747d60734b19d6f90610effdfc500af7d458a3e78cee0945ddc669 // G1 point
-Q = b67029fbf3ab8e62ab6b499f541537fc07d9466e668392df2bc19762d7dc48b64be09a448cd46dbfe21819a91cd0ab3205f1316ad1cc32853f3f1a1d06497f5cfbc2d753dfc01bff177adeb93f24d452045435dc6eb29f5610b66cd0dd3fb352 // G2 point
 a = 0x0e51216fa879b2ce727b596d065dd9b7fd8a84d94ffacf9ca30ad114304272d3 // scalar
 b = 0x437c2d7d852637c2ef23645a5abcbb308d6150bfcccbf3a8fdbc9daaa91496ef // scalar
 aplusb = 0x51cd4eed2d9fea91619ebdc7611a94e88aebd5991cc6c345a0c76ebed95709c2 // scalar
@@ -28,10 +25,12 @@ atimesb = 0x2d70bbc706812d56e805ae67934b3275ff67f304a76ea9b3c96d31b9c0d607ba // 
 ```
 
 Order of the values printed on `pairing_test_vectors`:
-- `[a]P`    
+- `P`
+- `[a]P`
 - `[b]P`
 - `[a + b]P`
 - `[a * b]P`
+- `Q`
 - `[a]Q`
 - `[b]Q`
 - `[a + b]Q`
@@ -41,10 +40,10 @@ Order of the values printed on `pairing_test_vectors`:
 
 ### 2- Test vectors for elliptic curve operations
 Operations to be tested:
-- Addition 
+- Addition
 - Subtraction
-- Scalar multiplication 
-- Negation 
+- Scalar multiplication
+- Negation
 
 The scalar used in scalar multiplication:
 ```
@@ -84,7 +83,7 @@ Order of the values printed on `serde_test_vectors`:
 - `G2_uncomp_not_on_group`
 
 ### 4- BLS Signature
-Test vectors for BLS signature, with successful validation using [blst](https://github.com/supranational/blst).
+Test vectors for BLS signature, using `blst` bindings.
 
 The explicit usage of `aug` is not allowed in Cardano-base bindings. Therefore, before verification, they need to be appended into the message by following [hash-to-curve](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve#name-expand_message) spec.
 
@@ -93,7 +92,7 @@ The explicit usage of `aug` is not allowed in Cardano-base bindings. Therefore, 
 ```rust
 let dst = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 let msg = b"blst is such a blast";
-let aug = b"Random value for test aug. ";
+let aug = b"Random value for test aug";
 ```
 Order of the values printed on the files `bls_sig_aug_test_vectors` (BLS signature with `aug`):
 

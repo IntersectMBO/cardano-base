@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 #![allow(non_snake_case)]
 
+use bls12_381::hash_to_curve::{ExpandMsgXmd, HashToCurve};
 use bls12_381::{G1Affine, G1Projective, G2Affine, G2Projective, Scalar};
 use blst::min_sig::*;
 use blst::BLST_ERROR;
@@ -11,7 +12,6 @@ use rand_chacha::rand_core::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::fs::File;
 use std::io::prelude::*;
-use bls12_381::hash_to_curve::{ExpandMsgXmd, HashToCurve};
 
 fn pairing_properties<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let P = G1Projective::random(&mut rng);
@@ -35,8 +35,8 @@ fn pairing_properties<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     write_hex_to_file(
         "././test_vectors/pairing_test_vectors",
         &[
-            [aP, bP, aplusbP, atimesbP].map(|a| hex::encode(G1Affine::from(a).to_compressed())),
-            [aQ, bQ, aplusbQ, atimesbQ].map(|a| hex::encode(G2Affine::from(a).to_compressed())),
+            [P, aP, bP, aplusbP, atimesbP].map(|a| hex::encode(G1Affine::from(a).to_compressed())),
+            [Q, aQ, bQ, aplusbQ, atimesbQ].map(|a| hex::encode(G2Affine::from(a).to_compressed())),
         ]
         .concat(),
     )
@@ -55,7 +55,7 @@ fn ec_operations<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let G2_P = G2Projective::random(&mut rng);
     let G2_Q = G2Projective::random(&mut rng);
     let G2_ADD = G2_P + G2_Q;
-    let G2_SUB = G2_P + G2_Q;
+    let G2_SUB = G2_P - G2_Q;
     let G2_MUL = scalar * G2_Q;
     let G2_NEG = -G2_P;
 
@@ -163,7 +163,7 @@ fn serde<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     hex_strings.push(hex::encode(G2_compressed));
 
     let mut G2_random_bytes = [0u8; 96];
-    for _ in 0..10 {
+    for _ in 0..100 {
         rng.fill_bytes(&mut G2_random_bytes);
         G2_random_bytes[0] |= 0b10000000;
         G2_random_bytes[0] &= 0b10011111;
@@ -221,12 +221,17 @@ fn bls_sig_with_dst_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let mut concat_msg_aug = Vec::new();
     concat_msg_aug.extend_from_slice(aug);
     concat_msg_aug.extend_from_slice(msg);
-    let hashed_msg = <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(concat_msg_aug, dst);
+    let hashed_msg = <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(
+        concat_msg_aug,
+        dst,
+    );
 
     let sig = sk * hashed_msg;
 
-    let blst_sig = Signature::from_bytes(&sig.to_affine().to_compressed()).expect("Invalid conversion from zkcrypto to blst");
-    let blst_pk = PublicKey::from_bytes(&pk.to_affine().to_compressed()).expect("Invalid conversion from zkcrypto to blst");
+    let blst_sig = Signature::from_bytes(&sig.to_affine().to_compressed())
+        .expect("Invalid conversion from zkcrypto to blst");
+    let blst_pk = PublicKey::from_bytes(&pk.to_affine().to_compressed())
+        .expect("Invalid conversion from zkcrypto to blst");
     let err = blst_sig.verify(true, msg, dst, aug, &blst_pk, true);
     assert_eq!(err, BLST_ERROR::BLST_SUCCESS);
 
