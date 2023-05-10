@@ -183,14 +183,11 @@ testVectorPairings :: String -> TestTree
 testVectorPairings name =
   testCase name $ do
     [ p_raw,
-      q_raw,
-      _a_raw,
-      _b_raw ] <- loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/pqab"
-
-    [ aP_raw,
+      aP_raw,
       bP_raw,
       apbP_raw,
       axbP_raw,
+      q_raw,
       aQ_raw,
       bQ_raw,
       apbQ_raw,
