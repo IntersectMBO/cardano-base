@@ -58,7 +58,7 @@ import Control.DeepSeq (NFData)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.Hash.Class
-import Cardano.Crypto.DSIGNM.Class as DSIGNM
+import Cardano.Crypto.DSIGN.Class as DSIGN
 import Cardano.Crypto.KES.Class
 
 
@@ -67,38 +67,41 @@ import Cardano.Crypto.KES.Class
 --
 data CompactSingleKES d
 
-deriving newtype instance NFData (VerKeyDSIGNM d) => NFData (VerKeyKES (CompactSingleKES d))
+deriving newtype instance NFData (VerKeyDSIGN d) => NFData (VerKeyKES (CompactSingleKES d))
 deriving newtype instance NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (CompactSingleKES d))
 
-deriving instance (NFData (SigDSIGNM d), NFData (VerKeyDSIGNM d)) => NFData (SigKES (CompactSingleKES d))
+deriving instance (NFData (SigDSIGN d), NFData (VerKeyDSIGN d)) => NFData (SigKES (CompactSingleKES d))
 
 
 
-instance ( DSIGNMAlgorithmBase d
-         , KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)
+instance ( DSIGNMAlgorithm d
+         , KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)
          )
          => KESAlgorithm (CompactSingleKES d) where
-    type SeedSizeKES (CompactSingleKES d) = SeedSizeDSIGNM d
+    type SeedSizeKES (CompactSingleKES d) = SeedSizeDSIGN d
+
 
     --
     -- Key and signature types
     --
 
-    newtype VerKeyKES (CompactSingleKES d) = VerKeyCompactSingleKES (VerKeyDSIGNM d)
+    newtype VerKeyKES (CompactSingleKES d) = VerKeyCompactSingleKES (VerKeyDSIGN d)
         deriving Generic
 
-    data SigKES (CompactSingleKES d) = SigCompactSingleKES !(SigDSIGNM d) !(VerKeyDSIGNM d)
+    data SigKES (CompactSingleKES d) = SigCompactSingleKES !(SigDSIGN d) !(VerKeyDSIGN d)
         deriving Generic
 
-    type ContextKES (CompactSingleKES d) = ContextDSIGNM d
-    type Signable   (CompactSingleKES d) = DSIGNM.SignableM     d
+    newtype SignKeyKES (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM d)
+
+    type ContextKES (CompactSingleKES d) = ContextDSIGN d
+    type Signable   (CompactSingleKES d) = DSIGN.Signable     d
 
 
     --
     -- Metadata and basic key operations
     --
 
-    algorithmNameKES _ = algorithmNameDSIGNM (Proxy :: Proxy d) ++ "_kes_2^0"
+    algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
     totalPeriodsKES  _ = 1
 
@@ -112,40 +115,34 @@ instance ( DSIGNMAlgorithmBase d
     -- raw serialise/deserialise
     --
 
-    type SizeVerKeyKES (CompactSingleKES d) = SizeVerKeyDSIGNM d
-    type SizeSignKeyKES (CompactSingleKES d) = SizeSignKeyDSIGNM d
-    type SizeSigKES (CompactSingleKES d) = SizeSigDSIGNM d + SizeVerKeyDSIGNM d
+    type SizeVerKeyKES (CompactSingleKES d) = SizeVerKeyDSIGN d
+    type SizeSignKeyKES (CompactSingleKES d) = SizeSignKeyDSIGN d
+    type SizeSigKES (CompactSingleKES d) = SizeSigDSIGN d + SizeVerKeyDSIGN d
 
     hashVerKeyKES (VerKeyCompactSingleKES vk) =
-        castHash (hashVerKeyDSIGNM vk)
+        castHash (hashVerKeyDSIGN vk)
 
 
-    rawSerialiseVerKeyKES  (VerKeyCompactSingleKES  vk) = rawSerialiseVerKeyDSIGNM vk
+    rawSerialiseVerKeyKES  (VerKeyCompactSingleKES  vk) = rawSerialiseVerKeyDSIGN vk
     rawSerialiseSigKES     (SigCompactSingleKES sig vk) =
-      rawSerialiseSigDSIGNM sig <> rawSerialiseVerKeyDSIGNM vk
+      rawSerialiseSigDSIGN sig <> rawSerialiseVerKeyDSIGN vk
 
-    rawDeserialiseVerKeyKES  = fmap VerKeyCompactSingleKES  . rawDeserialiseVerKeyDSIGNM
+    rawDeserialiseVerKeyKES  = fmap VerKeyCompactSingleKES  . rawDeserialiseVerKeyDSIGN
     rawDeserialiseSigKES b   = do
         guard (BS.length b == fromIntegral size_total)
-        sigma <- rawDeserialiseSigDSIGNM  b_sig
-        vk  <- rawDeserialiseVerKeyDSIGNM b_vk
+        sigma <- rawDeserialiseSigDSIGN  b_sig
+        vk  <- rawDeserialiseVerKeyDSIGN b_vk
         return (SigCompactSingleKES sigma vk)
       where
         b_sig = slice off_sig size_sig b
         b_vk = slice off_vk size_vk  b
 
-        size_sig   = sizeSigDSIGNM    (Proxy :: Proxy d)
-        size_vk    = sizeVerKeyDSIGNM (Proxy :: Proxy d)
+        size_sig   = sizeSigDSIGN    (Proxy :: Proxy d)
+        size_vk    = sizeVerKeyDSIGN (Proxy :: Proxy d)
         size_total = sizeSigKES    (Proxy :: Proxy (CompactSingleKES d))
 
         off_sig    = 0 :: Word
         off_vk     = size_sig
-
-instance ( DSIGNMAlgorithm d -- needed for secure forgetting
-         , KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)
-         )
-         => KESSignAlgorithm (CompactSingleKES d) where
-    newtype SignKeyKES (CompactSingleKES d) = SignKeyCompactSingleKES (SignKeyDSIGNM d)
 
     deriveVerKeyKES (SignKeyCompactSingleKES v) =
         VerKeyCompactSingleKES <$!> deriveVerKeyDSIGNM v
@@ -172,18 +169,18 @@ instance ( DSIGNMAlgorithm d -- needed for secure forgetting
       forgetSignKeyDSIGNMWith allocator v
 
 instance ( KESAlgorithm (CompactSingleKES d)
-         , DSIGNMAlgorithmBase d
+         , DSIGNMAlgorithm d
          ) => OptimizedKESAlgorithm (CompactSingleKES d) where
     verifySigKES ctxt t a (SigCompactSingleKES sig vk) =
       assert (t == 0) $
-      verifyDSIGNM ctxt vk a sig
+      verifyDSIGN ctxt vk a sig
 
     verKeyFromSigKES _ctxt t (SigCompactSingleKES _ vk) =
       assert (t == 0) $
       VerKeyCompactSingleKES vk
 
-instance (KESSignAlgorithm (CompactSingleKES d), UnsoundDSIGNMAlgorithm d)
-         => UnsoundKESSignAlgorithm (CompactSingleKES d) where
+instance (KESAlgorithm (CompactSingleKES d), UnsoundDSIGNMAlgorithm d)
+         => UnsoundKESAlgorithm (CompactSingleKES d) where
     rawSerialiseSignKeyKES (SignKeyCompactSingleKES sk) = rawSerialiseSignKeyDSIGNM sk
     rawDeserialiseSignKeyKESWith allocator bs = fmap SignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
@@ -192,39 +189,39 @@ instance (KESSignAlgorithm (CompactSingleKES d), UnsoundDSIGNMAlgorithm d)
 -- VerKey instances
 --
 
-deriving instance DSIGNMAlgorithmBase d => Show (VerKeyKES (CompactSingleKES d))
-deriving instance DSIGNMAlgorithmBase d => Eq   (VerKeyKES (CompactSingleKES d))
+deriving instance DSIGNMAlgorithm d => Show (VerKeyKES (CompactSingleKES d))
+deriving instance DSIGNMAlgorithm d => Eq   (VerKeyKES (CompactSingleKES d))
 
-instance (DSIGNMAlgorithmBase d, KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)) => ToCBOR (VerKeyKES (CompactSingleKES d)) where
+instance (DSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) => ToCBOR (VerKeyKES (CompactSingleKES d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance (DSIGNMAlgorithmBase d, KnownNat (SizeSigDSIGNM d + SizeVerKeyDSIGNM d)) => FromCBOR (VerKeyKES (CompactSingleKES d)) where
+instance (DSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) => FromCBOR (VerKeyKES (CompactSingleKES d)) where
   fromCBOR = decodeVerKeyKES
 
-instance DSIGNMAlgorithmBase d => NoThunks (VerKeyKES  (CompactSingleKES d))
+instance DSIGNMAlgorithm d => NoThunks (VerKeyKES  (CompactSingleKES d))
 
 
 --
 -- SignKey instances
 --
 
-deriving via (SignKeyDSIGNM d) instance DSIGNMAlgorithmBase d => NoThunks (SignKeyKES (CompactSingleKES d))
+deriving via (SignKeyDSIGNM d) instance DSIGNMAlgorithm d => NoThunks (SignKeyKES (CompactSingleKES d))
 
 --
 -- Sig instances
 --
 
-deriving instance DSIGNMAlgorithmBase d => Show (SigKES (CompactSingleKES d))
-deriving instance DSIGNMAlgorithmBase d => Eq   (SigKES (CompactSingleKES d))
+deriving instance DSIGNMAlgorithm d => Show (SigKES (CompactSingleKES d))
+deriving instance DSIGNMAlgorithm d => Eq   (SigKES (CompactSingleKES d))
 
-instance DSIGNMAlgorithmBase d => NoThunks (SigKES (CompactSingleKES d))
+instance DSIGNMAlgorithm d => NoThunks (SigKES (CompactSingleKES d))
 
-instance (DSIGNMAlgorithmBase d, KnownNat (SizeSigKES (CompactSingleKES d))) => ToCBOR (SigKES (CompactSingleKES d)) where
+instance (DSIGNMAlgorithm d, KnownNat (SizeSigKES (CompactSingleKES d))) => ToCBOR (SigKES (CompactSingleKES d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (DSIGNMAlgorithmBase d, KnownNat (SizeSigKES (CompactSingleKES d))) => FromCBOR (SigKES (CompactSingleKES d)) where
+instance (DSIGNMAlgorithm d, KnownNat (SizeSigKES (CompactSingleKES d))) => FromCBOR (SigKES (CompactSingleKES d)) where
   fromCBOR = decodeSigKES
 
 slice :: Word -> Word -> ByteString -> ByteString

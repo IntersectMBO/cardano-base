@@ -15,7 +15,7 @@ import Data.Maybe (fromJust)
 
 import Control.DeepSeq
 
-import Cardano.Crypto.DSIGN.Ed25519ML
+import Cardano.Crypto.DSIGN.Ed25519
 import Cardano.Crypto.Hash.Blake2b
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.KES.Sum
@@ -41,17 +41,17 @@ testSeedML = MLockedSeed . unsafePerformIO $ NaCl.mlsbFromByteString testBytes
 
 benchmarks :: Benchmark
 benchmarks = bgroup "KES"
-  [ benchKES @Proxy @(Sum6KES Ed25519DSIGNM Blake2b_256) Proxy "Sum6KES"
-  , benchKES @Proxy @(Sum7KES Ed25519DSIGNM Blake2b_256) Proxy "Sum7KES"
-  , benchKES @Proxy @(CompactSum6KES Ed25519DSIGNM Blake2b_256) Proxy "CompactSum6KES"
-  , benchKES @Proxy @(CompactSum7KES Ed25519DSIGNM Blake2b_256) Proxy "CompactSum7KES"
+  [ benchKES @Proxy @(Sum6KES Ed25519DSIGN Blake2b_256) Proxy "Sum6KES"
+  , benchKES @Proxy @(Sum7KES Ed25519DSIGN Blake2b_256) Proxy "Sum7KES"
+  , benchKES @Proxy @(CompactSum6KES Ed25519DSIGN Blake2b_256) Proxy "CompactSum6KES"
+  , benchKES @Proxy @(CompactSum7KES Ed25519DSIGN Blake2b_256) Proxy "CompactSum7KES"
   ]
 
 
 
 {-# NOINLINE benchKES #-}
 benchKES :: forall (proxy :: forall k. k -> Type) v
-           . ( KESSignAlgorithm v
+           . ( KESAlgorithm v
              , ContextKES v ~ ()
              , Signable v BS.ByteString
              , NFData (SignKeyKES v)

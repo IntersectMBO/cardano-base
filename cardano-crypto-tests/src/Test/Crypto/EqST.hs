@@ -12,8 +12,8 @@ import Control.Monad.Class.MonadST (MonadST)
 
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
 import Cardano.Crypto.Libsodium.MLockedSeed
-import Cardano.Crypto.DSIGN.Ed25519ML
-import Cardano.Crypto.DSIGNM.Class
+import Cardano.Crypto.DSIGN.Ed25519
+import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.KES.Simple
 
 -- | Monadic flavor of 'Eq', for things that can only be compared in a monadic
@@ -76,8 +76,8 @@ deriving via
   instance
     KnownNat n => EqST (MLockedSeed n)
 
-deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance EqST (SignKeyDSIGNM Ed25519DSIGNM)
+deriving via (MLockedSizedBytes (SizeSignKeyDSIGN Ed25519DSIGN))
+  instance EqST (SignKeyDSIGNM Ed25519DSIGN)
 
 instance EqST (SignKeyDSIGNM d) => EqST (SignKeyKES (SimpleKES d t)) where
   equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =

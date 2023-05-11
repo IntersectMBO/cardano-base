@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -20,6 +21,14 @@ module Cardano.Crypto.DSIGN.Class
   , sizeVerKeyDSIGN
   , sizeSignKeyDSIGN
   , sizeSigDSIGN
+
+    -- * MLocked DSIGN algorithm class
+  , DSIGNMAlgorithm (..)
+
+  , genKeyDSIGNM
+  , cloneKeyDSIGNM
+  , getSeedDSIGNM
+  , forgetSignKeyDSIGNM
 
     -- * 'SignedDSIGN' wrapper
   , SignedDSIGN (..)
@@ -43,12 +52,20 @@ module Cardano.Crypto.DSIGN.Class
 
   -- * Helper
   , failSizeCheck
+
+    -- * Unsound CBOR encoding and decoding of MLocked DSIGN keys
+  , UnsoundDSIGNMAlgorithm (..)
+  , encodeSignKeyDSIGNM
+  , decodeSignKeyDSIGNM
+  , rawDeserialiseSignKeyDSIGNM
   )
 where
 
 import Control.DeepSeq (NFData)
-import qualified Data.ByteString as BS
+import Control.Monad.Class.MonadST (MonadST)
+import Control.Monad.Class.MonadThrow (MonadThrow)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
@@ -60,12 +77,16 @@ import NoThunks.Class (NoThunks)
 
 import Cardano.Binary (Decoder, decodeBytes, Encoding, encodeBytes, Size, withWordSize)
 
-import Cardano.Crypto.Util (Empty)
-import Cardano.Crypto.Seed
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
+import Cardano.Crypto.Libsodium (MLockedAllocator, mlockedMalloc)
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.Seed
+import Cardano.Crypto.Util (Empty)
 
 
 
+-- | The pure DSIGN API, which supports the full set of DSIGN operations, but
+-- does not allow for secure forgetting of private keys.
 class ( Typeable v
       , Show (VerKeyDSIGN v)
       , Eq (VerKeyDSIGN v)
@@ -307,3 +328,126 @@ encodedSigDSIGNSizeExpr _proxy =
       fromIntegral ((withWordSize :: Word -> Integer) (sizeSigDSIGN (Proxy :: Proxy v)))
       -- payload
     + fromIntegral (sizeSigDSIGN (Proxy :: Proxy v))
+
+class (DSIGNAlgorithm v, NoThunks (SignKeyDSIGNM v)) => DSIGNMAlgorithm v where
+
+  data SignKeyDSIGNM v :: Type
+
+  deriveVerKeyDSIGNM :: (MonadThrow m, MonadST m) => SignKeyDSIGNM v -> m (VerKeyDSIGN v)
+
+  --
+  -- Core algorithm operations
+  --
+
+  signDSIGNM
+    :: (Signable v a, MonadST m, MonadThrow m)
+    => ContextDSIGN v
+    -> a
+    -> SignKeyDSIGNM v
+    -> m (SigDSIGN v)
+
+  --
+  -- Key generation
+  --
+
+  genKeyDSIGNMWith :: (MonadST m, MonadThrow m)
+                   => MLockedAllocator m
+                   -> MLockedSeed (SeedSizeDSIGN v)
+                   -> m (SignKeyDSIGNM v)
+
+  cloneKeyDSIGNMWith :: MonadST m => MLockedAllocator m -> SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
+
+  getSeedDSIGNMWith :: (MonadST m, MonadThrow m)
+                    => MLockedAllocator m
+                    -> Proxy v
+                    -> SignKeyDSIGNM v
+                    -> m (MLockedSeed (SeedSizeDSIGN v))
+
+  --
+  -- Secure forgetting
+  --
+
+  forgetSignKeyDSIGNMWith :: (MonadST m, MonadThrow m) => MLockedAllocator m -> SignKeyDSIGNM v -> m ()
+
+
+forgetSignKeyDSIGNM :: (DSIGNMAlgorithm v, MonadST m, MonadThrow m) => SignKeyDSIGNM v -> m ()
+forgetSignKeyDSIGNM = forgetSignKeyDSIGNMWith mlockedMalloc
+
+
+genKeyDSIGNM ::
+     (DSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => MLockedSeed (SeedSizeDSIGN v)
+  -> m (SignKeyDSIGNM v)
+genKeyDSIGNM = genKeyDSIGNMWith mlockedMalloc
+
+cloneKeyDSIGNM ::
+  (DSIGNMAlgorithm v, MonadST m) => SignKeyDSIGNM v -> m (SignKeyDSIGNM v)
+cloneKeyDSIGNM = cloneKeyDSIGNMWith mlockedMalloc
+
+getSeedDSIGNM ::
+     (DSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => Proxy v
+  -> SignKeyDSIGNM v
+  -> m (MLockedSeed (SeedSizeDSIGN v))
+getSeedDSIGNM = getSeedDSIGNMWith mlockedMalloc
+
+
+-- | Unsound operations on DSIGNM sign keys. These operations violate secure
+-- forgetting constraints by leaking secrets to unprotected memory. Consider
+-- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
+class DSIGNMAlgorithm v => UnsoundDSIGNMAlgorithm v where
+  --
+  -- Serialisation/(de)serialisation in fixed-size raw format
+  --
+
+  rawSerialiseSignKeyDSIGNM ::
+    (MonadST m, MonadThrow m) => SignKeyDSIGNM v -> m ByteString
+
+  rawDeserialiseSignKeyDSIGNMWith ::
+    (MonadST m, MonadThrow m) => MLockedAllocator m -> ByteString -> m (Maybe (SignKeyDSIGNM v))
+
+rawDeserialiseSignKeyDSIGNM ::
+     (UnsoundDSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => ByteString
+  -> m (Maybe (SignKeyDSIGNM v))
+rawDeserialiseSignKeyDSIGNM =
+  rawDeserialiseSignKeyDSIGNMWith mlockedMalloc
+
+
+--
+-- Do not provide Ord instances for keys, see #38
+--
+
+instance ( TypeError ('Text "Ord not supported for signing keys, use the hash instead")
+         , Eq (SignKeyDSIGNM v)
+         )
+      => Ord (SignKeyDSIGNM v) where
+    compare = error "unsupported"
+
+--
+-- Convenient CBOR encoding/decoding
+--
+-- Implementations in terms of the raw (de)serialise
+--
+
+encodeSignKeyDSIGNM ::
+     (UnsoundDSIGNMAlgorithm v, MonadST m, MonadThrow m)
+  => SignKeyDSIGNM v
+  -> m Encoding
+encodeSignKeyDSIGNM = fmap encodeBytes . rawSerialiseSignKeyDSIGNM
+
+decodeSignKeyDSIGNM :: forall m v s
+                     . (UnsoundDSIGNMAlgorithm v, MonadST m, MonadThrow m)
+                    => Decoder s (m (SignKeyDSIGNM v))
+decodeSignKeyDSIGNM = do
+    bs <- decodeBytes
+    return $ rawDeserialiseSignKeyDSIGNM bs >>= \case
+      Just vk -> return vk
+      Nothing
+        | actual /= expected
+                    -> error ("decodeSignKeyDSIGNM: wrong length, expected " ++
+                             show expected ++ " bytes but got " ++ show actual)
+        | otherwise -> error "decodeSignKeyDSIGNM: cannot decode key"
+        where
+          expected = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v))
+          actual   = BS.length bs

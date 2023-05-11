@@ -16,7 +16,6 @@ module Cardano.Crypto.KES.Class
   (
     -- * KES algorithm class
     KESAlgorithm (..)
-  , KESSignAlgorithm (..)
   , genKeyKES
   , updateKES
   , forgetSignKeyKES
@@ -50,7 +49,7 @@ module Cardano.Crypto.KES.Class
   , seedSizeKES
 
     -- * Unsound API
-  , UnsoundKESSignAlgorithm (..)
+  , UnsoundKESAlgorithm (..)
   , encodeSignKeyKES
   , decodeSignKeyKES
   , rawDeserialiseSignKeyKES
@@ -106,6 +105,8 @@ class ( Typeable v
   --
   data VerKeyKES  v :: Type
   data SigKES     v :: Type
+  data SignKeyKES v :: Type
+
 
   type SeedSizeKES    v :: Nat
   type SizeVerKeyKES  v :: Nat
@@ -166,24 +167,6 @@ class ( Typeable v
   rawDeserialiseVerKeyKES  :: ByteString -> Maybe (VerKeyKES v)
   rawDeserialiseSigKES     :: ByteString -> Maybe (SigKES v)
 
-sizeVerKeyKES  :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeVerKeyKES _ = fromInteger (natVal (Proxy @(SizeVerKeyKES v)))
-
-sizeSigKES     :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeSigKES _ = fromInteger (natVal (Proxy @(SizeSigKES v)))
-
-sizeSignKeyKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeSignKeyKES _ = fromInteger (natVal (Proxy @(SizeSignKeyKES v)))
-
--- | The upper bound on the 'Seed' size needed by 'genKeyKES'
-seedSizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
-
-
-class KESAlgorithm v => KESSignAlgorithm v where
-
-  data SignKeyKES v :: Type
-
   deriveVerKeyKES :: (MonadST m, MonadThrow m) => SignKeyKES v -> m (VerKeyKES v)
 
   --
@@ -229,6 +212,20 @@ class KESAlgorithm v => KESSignAlgorithm v where
     -> SignKeyKES v
     -> m ()
 
+sizeVerKeyKES  :: forall v proxy. KESAlgorithm v => proxy v -> Word
+sizeVerKeyKES _ = fromInteger (natVal (Proxy @(SizeVerKeyKES v)))
+
+sizeSigKES     :: forall v proxy. KESAlgorithm v => proxy v -> Word
+sizeSigKES _ = fromInteger (natVal (Proxy @(SizeSigKES v)))
+
+sizeSignKeyKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
+sizeSignKeyKES _ = fromInteger (natVal (Proxy @(SizeSignKeyKES v)))
+
+-- | The upper bound on the 'Seed' size needed by 'genKeyKES'
+seedSizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
+seedSizeKES _ = fromInteger (natVal (Proxy @(SeedSizeKES v)))
+
+
 -- | Forget a signing key synchronously, rather than waiting for GC. In some
 -- non-mock instances this provides a guarantee that the signing key is no
 -- longer in memory.
@@ -236,7 +233,7 @@ class KESAlgorithm v => KESSignAlgorithm v where
 -- The precondition is that this key value will not be used again.
 --
 forgetSignKeyKES
-  :: (KESSignAlgorithm v, MonadST m, MonadThrow m)
+  :: (KESAlgorithm v, MonadST m, MonadThrow m)
   => SignKeyKES v
   -> m ()
 forgetSignKeyKES = forgetSignKeyKESWith mlockedMalloc
@@ -244,7 +241,7 @@ forgetSignKeyKES = forgetSignKeyKESWith mlockedMalloc
 -- | Key generation
 --
 genKeyKES
-  :: forall v m. (KESSignAlgorithm v, MonadST m, MonadThrow m)
+  :: forall v m. (KESAlgorithm v, MonadST m, MonadThrow m)
   => MLockedSeed (SeedSizeKES v)
   -> m (SignKeyKES v)
 genKeyKES = genKeyKESWith mlockedMalloc
@@ -267,7 +264,7 @@ genKeyKES = genKeyKESWith mlockedMalloc
 -- increments one period at once.
 --
 updateKES
-  :: forall v m. (KESSignAlgorithm v, MonadST m, MonadThrow m)
+  :: forall v m. (KESAlgorithm v, MonadST m, MonadThrow m)
   => ContextKES v
   -> SignKeyKES v
   -> Period  -- ^ The /current/ period for the key, not the target period.
@@ -278,7 +275,7 @@ updateKES = updateKESWith mlockedMalloc
 -- | Unsound operations on KES sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider
 -- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
-class KESSignAlgorithm v => UnsoundKESSignAlgorithm v where
+class KESAlgorithm v => UnsoundKESAlgorithm v where
   rawDeserialiseSignKeyKESWith :: (MonadST m, MonadThrow m)
                                => MLockedAllocator m
                                -> ByteString
@@ -287,7 +284,7 @@ class KESSignAlgorithm v => UnsoundKESSignAlgorithm v where
   rawSerialiseSignKeyKES :: (MonadST m, MonadThrow m) => SignKeyKES v -> m ByteString
 
 rawDeserialiseSignKeyKES ::
-     (UnsoundKESSignAlgorithm v, MonadST m, MonadThrow m)
+     (UnsoundKESAlgorithm v, MonadST m, MonadThrow m)
   => ByteString
   -> m (Maybe (SignKeyKES v))
 rawDeserialiseSignKeyKES = rawDeserialiseSignKeyKESWith mlockedMalloc
@@ -364,7 +361,7 @@ encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
 encodeSignKeyKES ::
-     forall v m. (UnsoundKESSignAlgorithm v, MonadST m, MonadThrow m)
+     forall v m. (UnsoundKESAlgorithm v, MonadST m, MonadThrow m)
   => SignKeyKES v
   -> m Encoding
 encodeSignKeyKES = fmap encodeBytes . rawSerialiseSignKeyKES
@@ -386,7 +383,7 @@ decodeSigKES = do
 {-# INLINE decodeSigKES #-}
 
 decodeSignKeyKES ::
-     forall v s m. (UnsoundKESSignAlgorithm v, MonadST m, MonadThrow m)
+     forall v s m. (UnsoundKESAlgorithm v, MonadST m, MonadThrow m)
   => Decoder s (m (Maybe (SignKeyKES v)))
 decodeSignKeyKES = do
     bs <- decodeBytes
@@ -415,7 +412,7 @@ instance KESAlgorithm v => NoThunks (SignedKES v a)
   -- use generic instance
 
 signedKES
-  :: (KESSignAlgorithm v, Signable v a, MonadST m, MonadThrow m)
+  :: (KESAlgorithm v, Signable v a, MonadST m, MonadThrow m)
   => ContextKES v
   -> Period
   -> a
