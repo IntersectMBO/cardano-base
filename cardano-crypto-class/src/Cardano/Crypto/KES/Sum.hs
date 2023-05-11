@@ -120,6 +120,15 @@ instance ( KESAlgorithm d
          , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
          )
       => KESAlgorithm (SumKES h d) where
+    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
+    --
+    data SignKeyKES (SumKES h d) =
+           SignKeySumKES !(SignKeyKES d)
+                         !(MLockedSeed (SeedSizeKES d))
+                         !(VerKeyKES d)
+                         !(VerKeyKES d)
+
+
 
     type SeedSizeKES (SumKES h d) = SeedSizeKES d
 
@@ -220,22 +229,6 @@ instance ( KESAlgorithm d
         off_vk1    = off_vk0 + size_vk
     {-# INLINEABLE rawDeserialiseSigKES #-}
 
-instance ( KESSignAlgorithm d
-         , SodiumHashAlgorithm h -- needed for secure forgetting
-         , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
-         , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
-         )
-      => KESSignAlgorithm (SumKES h d) where
-    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
-    --
-    data SignKeyKES (SumKES h d) =
-           SignKeySumKES !(SignKeyKES d)
-                         !(MLockedSeed (SeedSizeKES d))
-                         !(VerKeyKES d)
-                         !(VerKeyKES d)
-
-
     deriveVerKeyKES (SignKeySumKES _ _ vk_0 vk_1) =
         return $! VerKeySumKES (hashPairOfVKeys (vk_0, vk_1))
 
@@ -292,9 +285,9 @@ instance ( KESSignAlgorithm d
       forgetSignKeyKESWith allocator sk_0
       mlockedSeedFinalize r1
 
-instance ( KESSignAlgorithm (SumKES h d)
-         , UnsoundKESSignAlgorithm d
-         ) => UnsoundKESSignAlgorithm (SumKES h d) where
+instance ( KESAlgorithm (SumKES h d)
+         , UnsoundKESAlgorithm d
+         ) => UnsoundKESAlgorithm (SumKES h d) where
     --
     -- Raw serialise/deserialise - dangerous, do not use in production code.
     --

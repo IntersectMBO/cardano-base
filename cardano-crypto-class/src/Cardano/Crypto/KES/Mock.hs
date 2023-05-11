@@ -67,6 +67,12 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
         deriving stock    (Show, Eq, Ord, Generic)
         deriving anyclass (NoThunks)
 
+    data SignKeyKES (MockKES t) =
+           SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
+        deriving stock    (Show, Eq, Generic)
+        deriving anyclass (NoThunks)
+
+
     --
     -- Metadata and basic key operations
     --
@@ -124,12 +130,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
-instance KnownNat t => KESSignAlgorithm (MockKES t) where
-    data SignKeyKES (MockKES t) =
-           SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
-        deriving stock    (Show, Eq, Generic)
-        deriving anyclass (NoThunks)
-
     deriveVerKeyKES (SignKeyMockKES vk _) = return $! vk
 
     updateKESWith _allocator () (SignKeyMockKES vk t') t =
@@ -156,7 +156,7 @@ instance KnownNat t => KESSignAlgorithm (MockKES t) where
 
     forgetSignKeyKESWith _ = const $ return ()
 
-instance KnownNat t => UnsoundKESSignAlgorithm (MockKES t) where
+instance KnownNat t => UnsoundKESAlgorithm (MockKES t) where
     rawSerialiseSignKeyKES sk =
       return $ rawSerialiseSignKeyMockKES sk
 

@@ -33,6 +33,9 @@ instance KESAlgorithm NeverKES where
   data SigKES     NeverKES = NeverUsedSigKES
       deriving (Show, Eq, Generic, NoThunks)
 
+  data SignKeyKES NeverKES = NeverUsedSignKeyKES
+      deriving (Show, Eq, Generic, NoThunks)
+
   algorithmNameKES _ = "never"
 
   verifyKES = error "KES not available"
@@ -49,10 +52,6 @@ instance KESAlgorithm NeverKES where
   rawDeserialiseVerKeyKES  _ = Just NeverUsedVerKeyKES
   rawDeserialiseSigKES     _ = Just NeverUsedSigKES
 
-instance KESSignAlgorithm NeverKES where
-  data SignKeyKES NeverKES = NeverUsedSignKeyKES
-      deriving (Show, Eq, Generic, NoThunks)
-
   deriveVerKeyKES _ = return NeverUsedVerKeyKES
 
   signKES   = error "KES not available"
@@ -63,6 +62,6 @@ instance KESSignAlgorithm NeverKES where
   forgetSignKeyKESWith _ = const $ return ()
 
 
-instance UnsoundKESSignAlgorithm NeverKES where
+instance UnsoundKESAlgorithm NeverKES where
   rawSerialiseSignKeyKES _ = return mempty
   rawDeserialiseSignKeyKESWith _ _ = return $ Just NeverUsedSignKeyKES

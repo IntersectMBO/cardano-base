@@ -81,25 +81,25 @@ import Test.Crypto.AllocLog
 tests :: Lock -> TestTree
 tests lock =
   testGroup "Crypto.KES"
-  [ testKESAlloc (Proxy @(SingleKES Ed25519DSIGNM)) "SingleKES"
-  , testKESAlloc (Proxy @(Sum1KES Ed25519DSIGNM Blake2b_256)) "Sum1KES"
-  , testKESAlloc (Proxy @(Sum2KES Ed25519DSIGNM Blake2b_256)) "Sum2KES"
+  [ testKESAlloc (Proxy @(SingleKES Ed25519DSIGN)) "SingleKES"
+  , testKESAlloc (Proxy @(Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
+  , testKESAlloc (Proxy @(Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
   , testKESAlgorithm @(MockKES 7)               lock "MockKES"
-  , testKESAlgorithm @(SimpleKES Ed25519DSIGNM 7) lock "SimpleKES"
-  , testKESAlgorithm @(SingleKES Ed25519DSIGNM)   lock "SingleKES"
-  , testKESAlgorithm @(Sum1KES Ed25519DSIGNM Blake2b_256) lock "Sum1KES"
-  , testKESAlgorithm @(Sum2KES Ed25519DSIGNM Blake2b_256) lock "Sum2KES"
-  , testKESAlgorithm @(Sum5KES Ed25519DSIGNM Blake2b_256) lock "Sum5KES"
-  , testKESAlgorithm @(CompactSum1KES Ed25519DSIGNM Blake2b_256) lock "CompactSum1KES"
-  , testKESAlgorithm @(CompactSum2KES Ed25519DSIGNM Blake2b_256) lock "CompactSum2KES"
-  , testKESAlgorithm @(CompactSum5KES Ed25519DSIGNM Blake2b_256) lock "CompactSum5KES"
+  , testKESAlgorithm @(SimpleKES Ed25519DSIGN 7) lock "SimpleKES"
+  , testKESAlgorithm @(SingleKES Ed25519DSIGN)   lock "SingleKES"
+  , testKESAlgorithm @(Sum1KES Ed25519DSIGN Blake2b_256) lock "Sum1KES"
+  , testKESAlgorithm @(Sum2KES Ed25519DSIGN Blake2b_256) lock "Sum2KES"
+  , testKESAlgorithm @(Sum5KES Ed25519DSIGN Blake2b_256) lock "Sum5KES"
+  , testKESAlgorithm @(CompactSum1KES Ed25519DSIGN Blake2b_256) lock "CompactSum1KES"
+  , testKESAlgorithm @(CompactSum2KES Ed25519DSIGN Blake2b_256) lock "CompactSum2KES"
+  , testKESAlgorithm @(CompactSum5KES Ed25519DSIGN Blake2b_256) lock "CompactSum5KES"
   ]
 
 -- We normally ensure that we avoid naively comparing signing keys by not
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instances here.
 
-instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
+instance Show (SignKeyKES (SingleKES Ed25519DSIGN)) where
   show (SignKeySingleKES (SignKeyEd25519DSIGNM mlsb)) =
     let bytes = mlsbAsByteString mlsb
         hexstr = hexBS bytes
@@ -108,7 +108,7 @@ instance Show (SignKeyKES (SingleKES Ed25519DSIGNM)) where
 instance Show (SignKeyKES (SumKES h d)) where
   show _ = "<SignKeySumKES>"
 
-instance Show (SignKeyKES (CompactSingleKES Ed25519DSIGNM)) where
+instance Show (SignKeyKES (CompactSingleKES Ed25519DSIGN)) where
   show (SignKeyCompactSingleKES (SignKeyEd25519DSIGNM mlsb)) =
     let bytes = mlsbAsByteString mlsb
         hexstr = hexBS bytes
@@ -139,7 +139,7 @@ instance ( EqST (SignKeyKES d)
 
 testKESAlloc
   :: forall v.
-     ( KESSignAlgorithm v
+     ( KESAlgorithm v
      )
   => Proxy v
   -> String
@@ -164,7 +164,7 @@ matchAllocLog = foldl' (flip go) Set.empty
 
 testMLockGenKeyKES
   :: forall v.
-     KESSignAlgorithm v
+     KESAlgorithm v
   => Proxy v
   -> Assertion
 testMLockGenKeyKES _p = do
@@ -197,7 +197,7 @@ testKESAlgorithm
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
-     , UnsoundKESSignAlgorithm v
+     , UnsoundKESAlgorithm v
      )
   => Lock
   -> String
@@ -342,7 +342,7 @@ testKESAlgorithm lock n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: KESSignAlgorithm v
+withSK :: KESAlgorithm v
        => PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> IO b) -> IO b
 withSK seedPSB =
   bracket
@@ -356,7 +356,7 @@ withSK seedPSB =
 -- memory. Special care must be taken to not leak the key outside of the
 -- wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-ioPropertyWithSK :: forall v a. (Testable a, KESSignAlgorithm v)
+ioPropertyWithSK :: forall v a. (Testable a, KESAlgorithm v)
                  => Lock
                  -> (SignKeyKES v -> IO a)
                  -> PinnedSizedBytes (SeedSizeKES v)
@@ -370,7 +370,7 @@ ioPropertyWithSK lock action seedPSB =
 --   forgetting won't actually erase the key
 -- prop_key_overwritten_after_forget
 --   :: forall v.
---      (KESSignAlgorithm IO v
+--      (KESAlgorithm IO v
 --      )
 --   => Proxy v
 --   -> PinnedSizedBytes (SeedSizeKES v)
@@ -389,14 +389,14 @@ ioPropertyWithSK lock action seedPSB =
 
 prop_onlyGenSignKeyKES
   :: forall v.
-      KESSignAlgorithm v
+      KESAlgorithm v
   => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_onlyGenSignKeyKES lock =
   ioPropertyWithSK @v lock $ const noExceptionsThrown
 
 prop_onlyGenVerKeyKES
   :: forall v.
-      KESSignAlgorithm v
+      KESAlgorithm v
   => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_onlyGenVerKeyKES lock =
   ioPropertyWithSK @v lock $ doesNotThrow . deriveVerKeyKES
@@ -404,7 +404,7 @@ prop_onlyGenVerKeyKES lock =
 prop_oneUpdateSignKeyKES
   :: forall v.
         ( ContextKES v ~ ()
-        , KESSignAlgorithm v
+        , KESAlgorithm v
         )
   => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_oneUpdateSignKeyKES lock seedPSB =
@@ -418,7 +418,7 @@ prop_oneUpdateSignKeyKES lock seedPSB =
 prop_allUpdatesSignKeyKES
   :: forall v.
         ( ContextKES v ~ ()
-        , KESSignAlgorithm v
+        , KESAlgorithm v
         )
   => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_allUpdatesSignKeyKES lock seedPSB =
@@ -432,7 +432,7 @@ prop_allUpdatesSignKeyKES lock seedPSB =
 prop_totalPeriodsKES
   :: forall v.
         ( ContextKES v ~ ()
-        , KESSignAlgorithm v
+        , KESAlgorithm v
         )
   => Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_totalPeriodsKES lock seed =
@@ -454,7 +454,7 @@ prop_totalPeriodsKES lock seed =
 prop_deriveVerKeyKES
   :: forall v.
       ( ContextKES v ~ ()
-      , KESSignAlgorithm v
+      , KESAlgorithm v
       )
   => PinnedSizedBytes (SeedSizeKES v) -> Property
 prop_deriveVerKeyKES seedPSB =
@@ -479,7 +479,7 @@ prop_verifyKES_positive
   :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , KESSignAlgorithm v
+     , KESAlgorithm v
      )
   => PinnedSizedBytes (SeedSizeKES v) -> Gen Property
 prop_verifyKES_positive seedPSB = do
@@ -511,7 +511,7 @@ prop_verifyKES_negative_key
   :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , KESSignAlgorithm v
+     , KESAlgorithm v
      )
   => PinnedSizedBytes (SeedSizeKES v)
   -> PinnedSizedBytes (SeedSizeKES v)
@@ -537,7 +537,7 @@ prop_verifyKES_negative_message
   :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , KESSignAlgorithm v
+     , KESAlgorithm v
      )
   => PinnedSizedBytes (SeedSizeKES v)
   -> Message -> Message
@@ -563,7 +563,7 @@ prop_verifyKES_negative_period
   :: forall v.
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
-     , KESSignAlgorithm v
+     , KESAlgorithm v
      )
   => PinnedSizedBytes (SeedSizeKES v)
   -> Message
@@ -592,7 +592,7 @@ prop_verifyKES_negative_period seedPSB x =
 prop_serialise_VerKeyKES
   :: forall v.
      ( ContextKES v ~ ()
-     , KESSignAlgorithm v
+     , KESAlgorithm v
      )
   => PinnedSizedBytes (SeedSizeKES v)
   -> Property
@@ -618,7 +618,7 @@ prop_serialise_SigKES
      ( ContextKES v ~ ()
      , Signable v ~ SignableRepresentation
      , Show (SignKeyKES v)
-     , KESSignAlgorithm v
+     , KESAlgorithm v
      )
   => PinnedSizedBytes (SeedSizeKES v)
   -> Message
@@ -643,7 +643,7 @@ prop_serialise_SigKES seedPSB x =
 --
 
 withAllUpdatesKES_ :: forall v a.
-                  ( KESSignAlgorithm v
+                  ( KESAlgorithm v
                   , ContextKES v ~ ()
                   )
               => PinnedSizedBytes (SeedSizeKES v)
@@ -653,7 +653,7 @@ withAllUpdatesKES_ seedPSB f = do
   withAllUpdatesKES seedPSB (const f)
 
 withAllUpdatesKES :: forall v a.
-                  ( KESSignAlgorithm v
+                  ( KESAlgorithm v
                   , ContextKES v ~ ()
                   )
               => PinnedSizedBytes (SeedSizeKES v)
