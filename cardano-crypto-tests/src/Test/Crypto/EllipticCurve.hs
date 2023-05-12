@@ -14,6 +14,7 @@ import Test.Crypto.Util (bsFromHex, eitherShowError)
 
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
+import Cardano.Crypto.Hash (SHA256, digest)
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
     (===),
@@ -177,6 +178,7 @@ testVectors name =
     , testVectorOperations "operations"
     , testVectorSerDe "serialization/compression"
     , testVectorSigAug "signature"
+    , testVectorLargeDst "large-dst"
     ]
 
 testVectorPairings :: String -> TestTree
@@ -330,7 +332,7 @@ testVectorSigAug name =
     let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_"
     let msg = "blst is such a blast"
     let aug = "Random value for test aug. "
-    let hashedMsg = BLS.blsHash msg (Just dst) (Just aug)
+    let hashedMsg = BLS.blsHash (aug <> msg) (Just dst) Nothing
     sig <- eitherShowError $ BLS.blsUncompress sig_raw
     pk <- eitherShowError $ BLS.blsUncompress pk_raw
     
@@ -338,6 +340,18 @@ testVectorSigAug name =
       BLS.ptFinalVerify
         (BLS.millerLoop sig BLS.blsGenerator)
         (BLS.millerLoop hashedMsg pk)
+
+testVectorLargeDst :: String -> TestTree
+testVectorLargeDst name =
+  testCase name $ do
+    [ msg_raw, large_dst_raw, output_raw ] <- loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/h2c_large_dst"
+    let prefix = "H2C-OVERSIZE-DST-"
+    let dst_sha = digest (Proxy @SHA256) (prefix <> large_dst_raw)
+    let hashedMsg = BLS.blsHash msg_raw (Just dst_sha) Nothing
+    expected_output :: BLS.Point1 <- eitherShowError $ BLS.blsUncompress output_raw
+
+    assertEqual "expected hash output"
+      hashedMsg expected_output
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =

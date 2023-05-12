@@ -12,6 +12,7 @@ use rand_chacha::rand_core::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::fs::File;
 use std::io::prelude::*;
+use sha2::{Digest, Sha256};
 
 fn pairing_properties<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let P = G1Projective::random(&mut rng);
@@ -212,7 +213,7 @@ fn bls_sig_with_dst_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     let mut concat_msg_aug = Vec::new();
     concat_msg_aug.extend_from_slice(aug);
     concat_msg_aug.extend_from_slice(msg);
-    let hashed_msg = <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(
+    let hashed_msg = <G1Projective as HashToCurve<ExpandMsgXmd<Sha256>>>::hash_to_curve(
         concat_msg_aug,
         dst,
     );
@@ -232,6 +233,55 @@ fn bls_sig_with_dst_aug<R: RngCore>(mut rng: R) -> std::io::Result<()> {
     file.write_all(sig_hex.as_ref())?;
     file.write_all(b"\n")?;
     file.write_all(pk_hex.as_ref())?;
+    file.write_all(b"\n")?;
+
+    Ok(())
+}
+
+fn h2c_large_dst<R: RngCore>(rng: &mut R) -> std::io::Result<()> {
+    let msg = b"Testing large dst.";
+    let mut large_dst = [0u8; 300];
+    rng.fill_bytes(&mut large_dst);
+
+    let hash_output = <G1Projective as HashToCurve<ExpandMsgXmd<Sha256>>>::hash_to_curve(
+        msg,
+        &large_dst,
+    );
+
+    // Given that the DST is larger than 255 bytes, it will first be hashed. Here we test that we can perform that action
+    // manually.
+    // Sanity check
+    let hashed_dst = Sha256::new().chain(b"H2C-OVERSIZE-DST-").chain(&large_dst).finalize();
+
+    let manually_hashed_output = <G1Projective as HashToCurve<ExpandMsgXmd<Sha256>>>::hash_to_curve(
+        msg,
+        &hashed_dst,
+    );
+
+    assert_eq!(hash_output, manually_hashed_output);
+
+    // Sanity check with blst lib
+    use blst::{blst_hash_to_g1, blst_p1, blst_p1_compress};
+
+    let mut out = blst_p1::default();
+    unsafe { blst_hash_to_g1(&mut out, msg.as_ptr(), msg.len(), hashed_dst.as_ptr(), hashed_dst.len(), hashed_dst.as_ptr(), 0) };
+
+    let mut bytes = [0u8; 48];
+    unsafe { blst_p1_compress(bytes.as_mut_ptr(), &out) }
+
+    assert_eq!(bytes, hash_output.to_affine().to_compressed());
+
+    let msg_hex = hex::encode(msg);
+    let large_dst_hex = hex::encode(large_dst);
+    let hash_output_hex = hex::encode(hash_output.to_affine().to_compressed());
+
+    let mut file = File::create("././test_vectors/h2c_large_dst")?;
+    file.write_all(msg_hex.as_ref())?;
+    file.write_all(b"\n")?;
+    file.write_all(large_dst_hex.as_ref())?;
+    file.write_all(b"\n")?;
+    file.write_all(hash_output_hex.as_ref())?;
+    file.write_all(b"\n")?;
 
     Ok(())
 }
@@ -252,4 +302,5 @@ fn main() {
     ec_operations(&mut rng).expect("Failed to create test vectors!");
     serde(&mut rng).expect("Failed to create test vectors!");
     bls_sig_with_dst_aug(&mut rng).expect("Failed to create test vectors!");
+    h2c_large_dst(&mut rng).expect("Failed to create large dst test vectors!");
 }
