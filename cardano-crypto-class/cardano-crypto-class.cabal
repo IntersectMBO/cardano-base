@@ -113,6 +113,7 @@ library
       integer-gmp
 
   pkgconfig-depends: libsodium, libblst
+  c-sources: cbits/blst_util.c
 
   if flag(secp256k1-support)
     exposed-modules:
