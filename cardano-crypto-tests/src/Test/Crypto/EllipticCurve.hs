@@ -335,7 +335,7 @@ testVectorSigAug name =
     let hashedMsg = BLS.blsHash (aug <> msg) (Just dst) Nothing
     sig <- eitherShowError $ BLS.blsUncompress sig_raw
     pk <- eitherShowError $ BLS.blsUncompress pk_raw
-    
+
     assertBool "valid signature" $
       BLS.ptFinalVerify
         (BLS.millerLoop sig BLS.blsGenerator)
