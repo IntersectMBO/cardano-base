@@ -10,7 +10,7 @@ where
 
 import Paths_cardano_crypto_tests
 
-import Test.Crypto.Util (bsFromHex, eitherShowError)
+import Test.Crypto.Util (eitherShowError)
 
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
@@ -31,6 +31,8 @@ import Test.Tasty.QuickCheck (testProperty)
 import Test.Tasty.HUnit (testCase, assertBool, assertEqual)
 import Data.Proxy (Proxy (..))
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Base16 as Base16
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Bits (shiftL)
 import Data.List (foldl')
@@ -168,8 +170,7 @@ testPairing name =
 
 loadHexFile :: String -> IO [BS.ByteString]
 loadHexFile filename = do
-  rawStrings <- lines <$> readFile filename
-  return $ map bsFromHex rawStrings
+  mapM (either error pure . Base16.decode) . BS8.lines =<< BS.readFile filename
 
 testVectors :: String -> TestTree
 testVectors name =

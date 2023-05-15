@@ -55,15 +55,11 @@ module Test.Crypto.Util
     -- * Formatting
   , hexBS
 
-    -- * Parsing
-  , bsFromHex
-
     -- * Helpers for testing IO actions
   , noExceptionsThrown
   , doesNotThrow
 
     -- * Error handling
-  , eitherError
   , eitherShowError
 
     -- * Locking
@@ -73,7 +69,6 @@ module Test.Crypto.Util
   )
 where
 
-import Numeric (showHex, readHex)
 import GHC.Exts (fromListN, fromList, toList)
 import Text.Show.Pretty (ppShow)
 import Data.Kind (Type)
@@ -108,6 +103,8 @@ import Crypto.Random
   )
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Base16 as Base16
 import Data.Proxy (Proxy (Proxy))
 import Data.Word (Word64)
 import NoThunks.Class (NoThunks, unsafeNoThunks, noThunks)
@@ -134,6 +131,7 @@ import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import Formatting.Buildable (Buildable (..), build)
 import Control.Concurrent.MVar (MVar, withMVar, newMVar)
+import GHC.Stack (HasCallStack)
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -350,23 +348,7 @@ showBadInputFor (BadInputFor (_, bs)) =
 
 hexBS :: ByteString -> String
 hexBS bs =
-  "0x" <> BS.foldr showHex "" bs <> " (length " <> show (BS.length bs) <> ")"
-
-bsFromHex :: String -> ByteString
-bsFromHex "" = ""
-bsFromHex xs =
-  case readHex cur of
-    [(n, "")] ->
-      BS.cons n $ bsFromHex r
-    [(_, rr)] ->
-      error $ "Incomplete parse: " ++ show rr
-    [] ->
-      error "No parse"
-    ps ->
-      error $ "Too many parses: " ++ show ps
-  where
-    cur = take 2 xs
-    r = drop 2 xs
+  "0x" <> BS8.unpack (Base16.encode bs) <> " (length " <> show (BS.length bs) <> ")"
 
 -- | Return a property that always succeeds in some monad (typically 'IO').
 -- This is useful to express that we are only interested in whether the side
@@ -390,10 +372,6 @@ withLock (Lock v) = withMVar v . const
 mkLock :: IO Lock
 mkLock = Lock <$> newMVar ()
 
-eitherError :: Either String a -> IO a
-eitherError (Left err) = error err
-eitherError (Right a) = return a
-
-eitherShowError :: Show e => Either e a -> IO a
+eitherShowError :: (HasCallStack, Show e) => Either e a -> IO a
 eitherShowError (Left e) = error (show e)
 eitherShowError (Right a) = return a
