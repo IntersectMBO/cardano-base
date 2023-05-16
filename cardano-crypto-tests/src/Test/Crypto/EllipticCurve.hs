@@ -170,7 +170,7 @@ testPairing name =
 
 loadHexFile :: String -> IO [BS.ByteString]
 loadHexFile filename = do
-  mapM (either error pure . Base16.decode) . BS8.lines =<< BS.readFile filename
+  mapM (either error pure . Base16.decode . BS8.filter (/= '\r')) . BS8.lines =<< BS.readFile filename
 
 testVectors :: String -> TestTree
 testVectors name =
