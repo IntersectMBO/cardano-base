@@ -15,6 +15,11 @@ category:            Currency
 build-type:          Simple
 extra-source-files:  README.md
                      CHANGELOG.md
+data-files: bls12-381-test-vectors/test_vectors/bls_sig_aug_test_vectors
+            bls12-381-test-vectors/test_vectors/ec_operations_test_vectors
+            bls12-381-test-vectors/test_vectors/h2c_large_dst
+            bls12-381-test-vectors/test_vectors/pairing_test_vectors
+            bls12-381-test-vectors/test_vectors/serde_test_vectors
 
 flag secp256k1-support
     description: Enable support for functions from libsecp256k1. Requires
@@ -56,6 +61,7 @@ library
                         Test.Crypto.Vector.Vectors
                         Test.Crypto.Vector.StringConstants
                         Test.Crypto.Vector.SerializationUtils
+                        Paths_cardano_crypto_tests
 
   build-depends:        base
                       , bytestring
@@ -92,6 +98,9 @@ test-suite test-crypto
                       , cardano-crypto-tests
                       , tasty
                       , tasty-quickcheck
+
+  if flag(secp256k1-support)
+    cpp-options: -DSECP256K1_ENABLED
 
   ghc-options:          -threaded -rtsopts -with-rtsopts=-N
   extra-libraries: blst

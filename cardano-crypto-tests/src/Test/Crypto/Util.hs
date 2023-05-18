@@ -46,10 +46,17 @@ module Test.Crypto.Util
   , genBadInputFor
   , shrinkBadInputFor
   , showBadInputFor
+
+    -- * Error handling
+  , eitherShowError
+
+    -- * Locking
+  , Lock
+  , withLock
+  , mkLock
   )
 where
 
-import Numeric (showHex)
 import GHC.Exts (fromListN, fromList, toList)
 import Text.Show.Pretty (ppShow)
 import Data.Kind (Type)
@@ -84,6 +91,8 @@ import Crypto.Random
   )
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Base16 as Base16
 import Data.Proxy (Proxy (Proxy))
 import Data.Word (Word64)
 import NoThunks.Class (NoThunks, unsafeNoThunks)
@@ -107,6 +116,7 @@ import Formatting.Buildable (build)
 import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
+import GHC.Stack (HasCallStack)
 
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
@@ -300,3 +310,7 @@ showBadInputFor ::
   String
 showBadInputFor (BadInputFor (_, bs)) =
   "0x" <> BS.foldr showHex "" bs <> " (length " <> show (BS.length bs) <> ")"
+
+eitherShowError :: (HasCallStack, Show e) => Either e a -> IO a
+eitherShowError (Left e) = error (show e)
+eitherShowError (Right a) = return a
