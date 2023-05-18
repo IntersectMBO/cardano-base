@@ -49,11 +49,6 @@ module Test.Crypto.Util
 
     -- * Error handling
   , eitherShowError
-
-    -- * Locking
-  , Lock
-  , withLock
-  , mkLock
   )
 where
 
@@ -309,7 +304,11 @@ showBadInputFor ::
   BadInputFor a ->
   String
 showBadInputFor (BadInputFor (_, bs)) =
-  "0x" <> BS.foldr showHex "" bs <> " (length " <> show (BS.length bs) <> ")"
+  hexBS bs
+
+hexBS :: ByteString -> String
+hexBS bs =
+  "0x" <> BS8.unpack (Base16.encode bs) <> " (length " <> show (BS.length bs) <> ")"
 
 eitherShowError :: (HasCallStack, Show e) => Either e a -> IO a
 eitherShowError (Left e) = error (show e)
