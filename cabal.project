@@ -10,9 +10,10 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2023-04-18T07:23:09Z
+index-state: 2023-04-24T00:00:00Z
 -- The CHaP index-state
-index-state: cardano-haskell-packages 2023-04-24T15:32:00Z
+index-state: cardano-haskell-packages 2023-04-25T00:00:00Z
+
 
 packages:
   base-deriving-via
@@ -27,6 +28,14 @@ packages:
   heapwords
   measures
   orphans-deriving-via
+
+constraints:
+  -- this is needed to make it compatible with non-gmp
+  -- ghc 9.0+ builds (e.g. with ghc-bignum). Prior to
+  -- 1.1.4.0, it unconditonally incuded the Data.Bit.Gmp
+  -- module, which in turn blew up when loading bitvec
+  -- during TH into a compiler without libgmp.
+  bitvec >= 1.1.4.0
 
 -- Ensures colourized output from test runners
 test-show-details: direct
