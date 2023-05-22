@@ -8,8 +8,6 @@ module Cardano.Crypto.Libsodium.Memory (
   -- * MLocked allocations
   mlockedMalloc,
   MLockedAllocator (..),
-  AllocatorEvent(..),
-  getAllocatorEvent,
 
   mlockedAlloca,
   mlockedAllocaSized,

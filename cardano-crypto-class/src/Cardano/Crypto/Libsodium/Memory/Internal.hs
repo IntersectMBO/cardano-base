@@ -16,8 +16,6 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   -- * MLocked allocations
   mlockedMalloc,
   MLockedAllocator (..),
-  AllocatorEvent(..),
-  getAllocatorEvent,
 
   mlockedAlloca,
   mlockedAllocaSized,
@@ -206,15 +204,6 @@ useByteStringAsCStringLen bs f =
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
 packByteStringCStringLen (ptr, len) =
   withLiftST $ \lift -> lift . unsafeIOToST $ BS.packCStringLen (ptr, len)
-
-data AllocatorEvent where
-  AllocatorEvent :: (Show e, Typeable e) => e -> AllocatorEvent
-
-instance Show AllocatorEvent where
-  show (AllocatorEvent e) = "(AllocatorEvent " ++ show e ++ ")"
-
-getAllocatorEvent :: forall e. Typeable e => AllocatorEvent -> Maybe e
-getAllocatorEvent (AllocatorEvent e) = cast e
 
 newtype MLockedAllocator m =
   MLockedAllocator
