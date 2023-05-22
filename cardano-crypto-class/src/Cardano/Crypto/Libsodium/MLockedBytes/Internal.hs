@@ -55,7 +55,6 @@ import Cardano.Foreign
 import Cardano.Crypto.Libsodium.Memory
 import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 import Cardano.Crypto.Libsodium.C
-import Cardano.Crypto.EqST
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
@@ -83,9 +82,6 @@ instance KnownNat n => Show (MLockedSizedBytes n) where
 --   let bytes = BS.unpack $ mlsbAsByteString mlsb
 --       hexstr = concatMap (printf "%02x") bytes
 --   in "MLSB " ++ hexstr
-
-instance KnownNat n => EqST (MLockedSizedBytes n) where
-  equalsM = mlsbEq
 
 nextPowerOf2 :: forall n. (Num n, Ord n, Bits n) => n -> n
 nextPowerOf2 i =

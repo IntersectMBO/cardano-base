@@ -45,7 +45,6 @@ import Cardano.Crypto.Util (SignableRepresentation(..))
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.PinnedSizedBytes
-import Cardano.Crypto.EqST
 
 import Test.QuickCheck
 import Test.Tasty (TestTree, testGroup, adjustOption)
@@ -69,6 +68,7 @@ import Test.Crypto.Util (
   Lock,
   withLock,
   )
+import Test.Crypto.EqST
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
 import Test.Crypto.AllocLog
 

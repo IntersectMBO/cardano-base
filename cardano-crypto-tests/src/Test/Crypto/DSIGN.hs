@@ -33,7 +33,6 @@ import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
 
 import qualified Data.ByteString as BS
 import Cardano.Crypto.Libsodium
-import Cardano.Crypto.EqST (EqST (..), (==!))
 
 import Text.Show.Pretty (ppShow)
 
@@ -133,8 +132,10 @@ import Test.Crypto.Util (
   Lock,
   withLock,
   )
-import Test.Crypto.Instances (withMLockedSeedFromPSB)
 import Cardano.Crypto.Libsodium.MLockedSeed
+
+import Test.Crypto.Instances (withMLockedSeedFromPSB)
+import Test.Crypto.EqST (EqST (..), (==!))
 
 #ifdef SECP256K1_ENABLED
 import Cardano.Crypto.DSIGN (

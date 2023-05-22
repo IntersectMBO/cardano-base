@@ -56,9 +56,6 @@ import Cardano.Crypto.PinnedSizedBytes
   , psbFromByteStringCheck
   , psbCreateSizedResult
   )
-import Cardano.Crypto.EqST
-  ( EqST (..)
-  )
 
 import Cardano.Crypto.DSIGNM.Class
 import Cardano.Crypto.Libsodium.MLockedSeed
@@ -255,9 +252,6 @@ instance DSIGNMAlgorithm Ed25519DSIGNM where
     -- Secure forgetting
     --
     forgetSignKeyDSIGNMWith _ (SignKeyEd25519DSIGNM sk) = mlsbFinalize sk
-
-deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
-  instance EqST (SignKeyDSIGNM Ed25519DSIGNM)
 
 instance UnsoundDSIGNMAlgorithm Ed25519DSIGNM where
     --

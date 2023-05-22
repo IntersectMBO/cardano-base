@@ -43,8 +43,6 @@ import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
 import           Data.Unit.Strict (forceElemsToWHNF)
-import           Cardano.Crypto.EqST (EqST (..))
-
 
 data SimpleKES d (t :: Nat)
 
@@ -217,12 +215,6 @@ deriving instance DSIGNMAlgorithmBase d => Show (SigKES (SimpleKES d t))
 
 deriving instance DSIGNMAlgorithmBase d => Eq   (VerKeyKES (SimpleKES d t))
 deriving instance DSIGNMAlgorithmBase d => Eq   (SigKES (SimpleKES d t))
-
-instance EqST (SignKeyDSIGNM d) => EqST (SignKeyKES (SimpleKES d t)) where
-  equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =
-    -- No need to check that lengths agree, the types already guarantee this.
-    Vec.and <$> Vec.zipWithM equalsM a b
-
 
 instance DSIGNMAlgorithmBase d => NoThunks (SigKES     (SimpleKES d t))
 instance DSIGNMAlgorithmBase d => NoThunks (SignKeyKES (SimpleKES d t))
