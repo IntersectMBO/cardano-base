@@ -20,9 +20,6 @@ import Cardano.Crypto.Libsodium.Memory (
   MLockedAllocator,
   mlockedMalloc,
  )
-import Cardano.Crypto.EqST (
-  EqST (..),
- )
 import Cardano.Foreign (SizedPtr)
 import Control.DeepSeq (NFData)
 import Control.Monad.Class.MonadST (MonadST)
@@ -36,11 +33,6 @@ import NoThunks.Class (NoThunks)
 -- after its content has been moved.
 newtype MLockedSeed n = MLockedSeed {mlockedSeedMLSB :: MLockedSizedBytes n}
   deriving (NFData, NoThunks)
-
-deriving via
-  MLockedSizedBytes n
-  instance
-    KnownNat n => EqST (MLockedSeed n)
 
 withMLockedSeedAsMLSB
   :: Functor m

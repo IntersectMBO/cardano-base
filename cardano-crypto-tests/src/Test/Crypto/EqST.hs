@@ -1,9 +1,20 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Cardano.Crypto.EqST where
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
+module Test.Crypto.EqST where
+
+import GHC.TypeLits (KnownNat)
+import qualified Data.Vector as Vec
 import Control.Monad.Class.MonadST (MonadST)
+
+import Cardano.Crypto.Libsodium.MLockedBytes.Internal
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.DSIGN.Ed25519ML
+import Cardano.Crypto.DSIGNM.Class
+import Cardano.Crypto.KES.Simple
 
 -- | Monadic flavor of 'Eq', for things that can only be compared in a monadic
 -- context that satisfies 'MonadST'.
@@ -56,3 +67,19 @@ newtype PureEqST a = PureEqST a
 
 instance Eq a => EqST (PureEqST a) where
   equalsM (PureEqST a) (PureEqST b) = pure (a == b)
+
+instance KnownNat n => EqST (MLockedSizedBytes n) where
+  equalsM = mlsbEq
+
+deriving via
+  MLockedSizedBytes n
+  instance
+    KnownNat n => EqST (MLockedSeed n)
+
+deriving via (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
+  instance EqST (SignKeyDSIGNM Ed25519DSIGNM)
+
+instance EqST (SignKeyDSIGNM d) => EqST (SignKeyKES (SimpleKES d t)) where
+  equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =
+    -- No need to check that lengths agree, the types already guarantee this.
+    Vec.and <$> Vec.zipWithM equalsM a b
