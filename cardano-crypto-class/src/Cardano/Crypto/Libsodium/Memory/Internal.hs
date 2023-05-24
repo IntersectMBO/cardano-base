@@ -34,7 +34,7 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   allocaBytes,
 
   -- * ByteString memory access, generalized to 'MonadST'
-  useByteStringAsCStringLen,
+  unpackByteStringCStringLen,
   packByteStringCStringLen,
 
   -- * Helper
@@ -53,6 +53,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
 import Data.Typeable
+import Data.Word (Word8)
 import Debug.Trace (traceShowM)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.String (CStringLen)
@@ -63,7 +64,7 @@ import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import qualified Foreign.Marshal.Alloc as Foreign
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Foreign.Storable (Storable (peek), sizeOf, alignment)
+import Foreign.Storable (Storable (peek), sizeOf, alignment, pokeByteOff)
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -194,11 +195,15 @@ allocaBytes :: Int -> (Ptr a -> ST s b) -> ST s b
 allocaBytes size f =
   unsafeIOToST $ Foreign.allocaBytes size (unsafeSTToIO . f)
 
-useByteStringAsCStringLen :: ByteString -> (CStringLen -> ST s a) -> ST s a
-useByteStringAsCStringLen bs f =
-  allocaBytes (BS.length bs + 1) $ \buf -> do
-    len <- unsafeIOToST $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-      len <$ copyMem buf ptr (fromIntegral len)
+-- | Unpacks a ByteString into a temporary buffer and runs the provided 'ST'
+-- function on it.
+unpackByteStringCStringLen :: ByteString -> (CStringLen -> ST s a) -> ST s a
+unpackByteStringCStringLen bs f = do
+  let len = BS.length bs
+  allocaBytes (len + 1) $ \buf -> do
+    unsafeIOToST $ BS.unsafeUseAsCString bs $ \ptr -> do
+      copyMem buf ptr (fromIntegral len)
+      pokeByteOff buf len (0 :: Word8)
     f (buf, len)
 
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
@@ -226,6 +231,8 @@ mlockedAllocForeignPtrBytes :: MonadST m => CSize -> CSize -> m (MLockedForeignP
 mlockedAllocForeignPtrBytes = mlockedAllocForeignPtrBytesWith mlockedMalloc
 
 mlockedAllocForeignPtrBytesWith :: MLockedAllocator m -> CSize -> CSize -> m (MLockedForeignPtr a)
+mlockedAllocForeignPtrBytesWith _ _ 0 =
+  error "Zero alignment"
 mlockedAllocForeignPtrBytesWith allocator size align = do
   mlAllocate allocator size'
   where

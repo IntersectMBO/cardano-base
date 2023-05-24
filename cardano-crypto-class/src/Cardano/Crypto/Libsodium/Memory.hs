@@ -26,7 +26,7 @@ module Cardano.Crypto.Libsodium.Memory (
   allocaBytes,
 
   -- * ByteString memory access, generalized to 'MonadST'
-  useByteStringAsCStringLen,
+  unpackByteStringCStringLen,
   packByteStringCStringLen,
 ) where
 
