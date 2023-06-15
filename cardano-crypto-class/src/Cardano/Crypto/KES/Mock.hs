@@ -26,6 +26,8 @@ import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
+import Control.Monad.Class.MonadST (MonadST)
+import Control.Monad.Class.MonadThrow (MonadThrow)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -37,6 +39,12 @@ import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Libsodium
   ( mlsbAsByteString
   )
+import Cardano.Crypto.Libsodium.Memory
+  ( unpackByteStringCStringLen
+  , packByteStringCStringLen
+  , allocaBytes
+  )
+import Cardano.Crypto.DirectSerialise
 
 data MockKES (t :: Nat)
 
@@ -194,3 +202,31 @@ instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
 
 instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
   fromCBOR = decodeSigKES
+
+instance (MonadST m, MonadThrow m, KnownNat t) => DirectSerialise m (SignKeyKES (MockKES t)) where
+  directSerialise put sk = do
+    let bs = rawSerialiseSignKeyMockKES sk
+    unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+
+instance (MonadST m, MonadThrow m, KnownNat t) => DirectDeserialise m (SignKeyKES (MockKES t)) where
+  directDeserialise pull = do
+    let len = fromIntegral $ sizeSignKeyKES (Proxy @(MockKES t))
+    bs <- allocaBytes len $ \cstr -> do
+        pull cstr (fromIntegral len)
+        packByteStringCStringLen (cstr, len)
+    maybe (error "directDeserialise @(SignKeyKES (MockKES t))") return $
+        rawDeserialiseSignKeyMockKES bs
+
+instance (MonadST m, MonadThrow m, KnownNat t) => DirectSerialise m (VerKeyKES (MockKES t)) where
+  directSerialise put sk = do
+    let bs = rawSerialiseVerKeyKES sk
+    unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+
+instance (MonadST m, MonadThrow m, KnownNat t) => DirectDeserialise m (VerKeyKES (MockKES t)) where
+  directDeserialise pull = do
+    let len = fromIntegral $ sizeVerKeyKES (Proxy @(MockKES t))
+    bs <- allocaBytes len $ \cstr -> do
+        pull cstr (fromIntegral len)
+        packByteStringCStringLen (cstr, len)
+    maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
+        rawDeserialiseVerKeyKES bs
