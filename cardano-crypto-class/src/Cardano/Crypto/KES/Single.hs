@@ -50,7 +50,7 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGN.Class as DSIGN
 import Cardano.Crypto.KES.Class
-
+import Cardano.Crypto.DirectSerialise
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
 -- single time period.
@@ -187,4 +187,19 @@ instance DSIGNMAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
 
 instance DSIGNMAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
   fromCBOR = decodeSigKES
-  {-# INLINE fromCBOR #-}
+
+--
+-- Direct ser/deser
+--
+
+instance (DirectSerialise (SignKeyDSIGNM d)) => DirectSerialise (SignKeyKES (SingleKES d)) where
+  directSerialise push (SignKeySingleKES sk) = directSerialise push sk
+
+instance (DirectDeserialise (SignKeyDSIGNM d)) => DirectDeserialise (SignKeyKES (SingleKES d)) where
+  directDeserialise pull = SignKeySingleKES <$!> directDeserialise pull
+
+instance (DirectSerialise (VerKeyDSIGN d)) => DirectSerialise (VerKeyKES (SingleKES d)) where
+  directSerialise push (VerKeySingleKES sk) = directSerialise push sk
+
+instance (DirectDeserialise (VerKeyDSIGN d)) => DirectDeserialise (VerKeyKES (SingleKES d)) where
+  directDeserialise pull = VerKeySingleKES <$!> directDeserialise pull

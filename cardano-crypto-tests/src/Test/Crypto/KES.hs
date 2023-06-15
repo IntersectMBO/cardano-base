@@ -29,21 +29,29 @@ import qualified Data.Foldable as F (foldl')
 import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Foreign.Ptr (WordPtr)
+import Foreign.Ptr (WordPtr, plusPtr)
 import Data.IORef
-import GHC.TypeNats (KnownNat)
+import GHC.TypeNats (KnownNat, natVal)
 
-import Control.Tracer
+import Control.Concurrent.MVar (newMVar, takeMVar, putMVar)
+import Control.Monad (void, when)
+import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad (void)
+import Control.Tracer
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
+import Cardano.Crypto.DirectSerialise (DirectSerialise, directSerialise, DirectDeserialise)
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.Libsodium.Memory
+  ( copyMem
+  , allocaBytes
+  , packByteStringCStringLen
+  )
 import Cardano.Crypto.PinnedSizedBytes
 
 import Test.QuickCheck
@@ -67,6 +75,8 @@ import Test.Crypto.Util (
   noExceptionsThrown,
   Lock,
   withLock,
+  directSerialiseToBS,
+  directDeserialiseFromBS,
   )
 import Test.Crypto.EqST
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
@@ -198,6 +208,10 @@ testKESAlgorithm
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
      , UnsoundKESAlgorithm v
+     , DirectSerialise (SignKeyKES v)
+     , DirectSerialise (VerKeyKES v)
+     , DirectDeserialise (SignKeyKES v)
+     , DirectDeserialise (VerKeyKES v)
      )
   => Lock
   -> String
@@ -225,9 +239,32 @@ testKESAlgorithm lock n =
       , testProperty "Sig"     $ \seedPSB (msg :: Message) ->
           ioProperty $ withLock lock $ fmap conjoin $ withAllUpdatesKES @v seedPSB $ \t sk -> do
             prop_no_thunks_IO (signKES () t msg sk)
+
+      , testProperty "VerKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "SignKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "VerKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
+            prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
+      , testProperty "SignKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            bracket
+              (directDeserialiseFromBS @IO @(SignKeyKES v) $! direct)
+              forgetSignKeyKES
+              (prop_no_thunks_IO . return)
       ]
 
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
+    , testProperty "no forgotten chunks in signkey" $ prop_noErasedBlocksInKey (Proxy @v)
     , testGroup "serialisation"
 
       [ testGroup "raw ser only"
@@ -312,6 +349,38 @@ testKESAlgorithm lock n =
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigKES v <- signKES () 0 msg sk
               return $ prop_cbor_direct_vs_class encodeSigKES sig
+        ]
+
+      , testGroup "DirectSerialise"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyKES v <- deriveVerKeyKES sk
+              serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              vk' <- directDeserialiseFromBS serialized
+              return $ vk === vk'
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              equals <- bracket
+                          (directDeserialiseFromBS serialized)
+                          forgetSignKeyKES
+                          (\sk' -> sk ==! sk')
+              return $
+                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
+                equals
+        ]
+      , testGroup "DirectSerialise matches raw"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyKES v <- deriveVerKeyKES sk
+              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              let raw = rawSerialiseVerKeyKES vk
+              return $ direct === raw
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              raw <- rawSerialiseSignKeyKES sk
+              return $ direct === raw
         ]
       ]
 
@@ -675,4 +744,57 @@ withAllUpdatesKES seedPSB f = withMLockedSeedFromPSB seedPSB $ \seed -> do
           forgetSignKeyKES sk
           xs <- go sk' (t + 1)
           return $ x:xs
+
+withNullSeed :: forall m n a. (MonadThrow m, MonadST m, KnownNat n) => (MLockedSeed n -> m a) -> m a
+withNullSeed = bracket
+  (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral $ natVal (Proxy @n)) 0))
+  mlockedSeedFinalize
+
+withNullSK :: forall m v a. (KESAlgorithm v, MonadThrow m, MonadST m)
+           => (SignKeyKES v -> m a) -> m a
+withNullSK = bracket
+  (withNullSeed genKeyKES)
+  forgetSignKeyKES
+
+
+-- | This test detects whether a sign key contains references to pool-allocated
+-- blocks of memory that have been forgotten by the time the key is complete.
+-- We do this based on the fact that the pooled allocator erases memory blocks
+-- by overwriting them with series of 0xff bytes; thus we cut the serialized
+-- key up into chunks of 16 bytes, and if any of those chunks is entirely
+-- filled with 0xff bytes, we assume that we're looking at erased memory.
+prop_noErasedBlocksInKey
+  :: forall v.
+     UnsoundKESAlgorithm v
+  => DirectSerialise (SignKeyKES v)
+  => Proxy v
+  -> Property
+prop_noErasedBlocksInKey kesAlgorithm =
+  ioProperty . withNullSK @IO @v $ \sk -> do
+    let size :: Int = fromIntegral $ sizeSignKeyKES kesAlgorithm
+    serialized <- allocaBytes size $ \ptr -> do
+      positionVar <- newMVar (0 :: Int)
+      directSerialise (\buf nCSize -> do
+          let n = fromIntegral nCSize :: Int
+          bracket
+            (takeMVar positionVar)
+            (putMVar positionVar . (+ n))
+            (\position -> do
+              when (n + position > size) (error "Buffer size exceeded")
+              copyMem (plusPtr ptr position) buf (fromIntegral n)
+            )
+        )
+        sk
+      packByteStringCStringLen (ptr, size)
+    forgetSignKeyKES sk
+    return $ counterexample (hexBS serialized) $ not (hasLongRunOfFF serialized)
+
+hasLongRunOfFF :: ByteString -> Bool
+hasLongRunOfFF bs
+  | BS.length bs < 16
+  = False
+  | otherwise
+  = let first16 = BS.take 16 bs
+        remainder = BS.drop 16 bs
+    in (BS.all (== 0xFF) first16) || hasLongRunOfFF remainder
 

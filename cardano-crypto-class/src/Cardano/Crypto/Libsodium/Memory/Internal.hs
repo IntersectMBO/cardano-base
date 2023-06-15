@@ -34,6 +34,7 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   allocaBytes,
 
   -- * ByteString memory access, generalized to 'MonadST'
+  unpackByteStringCStringLen,
   packByteStringCStringLen,
 
   -- * Helper
@@ -46,11 +47,13 @@ import Control.Monad (when, void)
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
 import Control.Monad.ST (RealWorld, ST)
-import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeSTToIO)
+import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
 import Data.Typeable
+import Data.Word (Word8)
 import Debug.Trace (traceShowM)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.String (CStringLen)
@@ -61,7 +64,7 @@ import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import qualified Foreign.Marshal.Alloc as Foreign
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Foreign.Storable (Storable (peek), sizeOf, alignment)
+import Foreign.Storable (Storable (peek), sizeOf, alignment, pokeByteOff)
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -188,9 +191,29 @@ zeroMem ptr size = unsafeIOToMonadST . void $ c_memset (castPtr ptr) 0 size
 copyMem :: MonadST m => Ptr a -> Ptr a -> CSize -> m ()
 copyMem dst src size = unsafeIOToMonadST . void $ c_memcpy (castPtr dst) (castPtr src) size
 
-allocaBytes :: Int -> (Ptr a -> ST s b) -> ST s b
-allocaBytes size f =
-  unsafeIOToST $ Foreign.allocaBytes size (unsafeSTToIO . f)
+allocaBytes :: (MonadThrow m, MonadST m) => Int -> (Ptr a -> m b) -> m b
+allocaBytes size =
+  bracket
+    (mallocBytes size)
+    free
+
+mallocBytes :: MonadST m => Int -> m (Ptr a)
+mallocBytes size =
+  unsafeIOToMonadST $ Foreign.mallocBytes size
+
+free :: MonadST m => Ptr a -> m ()
+free = unsafeIOToMonadST . Foreign.free
+
+-- | Unpacks a ByteString into a temporary buffer and runs the provided 'ST'
+-- function on it.
+unpackByteStringCStringLen :: (MonadThrow m, MonadST m) => ByteString -> (CStringLen -> m a) -> m a
+unpackByteStringCStringLen bs f = do
+  let len = BS.length bs
+  allocaBytes (len + 1) $ \buf -> do
+    unsafeIOToMonadST $ BS.unsafeUseAsCString bs $ \ptr -> do
+      copyMem buf ptr (fromIntegral len)
+      pokeByteOff buf len (0 :: Word8)
+    f (buf, len)
 
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
 packByteStringCStringLen =
@@ -258,7 +281,6 @@ mlockedAllocaWith ::
   -> (Ptr a -> m b)
   -> m b
 mlockedAllocaWith allocator size =
-  bracket alloc free . flip withMLockedForeignPtr
+  bracket alloc finalizeMLockedForeignPtr . flip withMLockedForeignPtr
   where
     alloc = mlAllocate allocator size
-    free = finalizeMLockedForeignPtr
