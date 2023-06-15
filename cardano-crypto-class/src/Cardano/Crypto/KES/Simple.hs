@@ -43,6 +43,7 @@ import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
+import           Cardano.Crypto.DirectSerialise
 import           Data.Unit.Strict (forceElemsToWHNF)
 
 data SimpleKES d (t :: Nat)
@@ -249,3 +250,22 @@ instance (DSIGNMAlgorithm d
       => FromCBOR (SigKES (SimpleKES d t)) where
   fromCBOR = decodeSigKES
 
+instance (Monad m, DirectSerialise m (VerKeyDSIGN d)) => DirectSerialise m (VerKeyKES (SimpleKES d t)) where
+  directSerialise push (VerKeySimpleKES vks) =
+    mapM_ (directSerialise push) vks
+
+instance (Monad m, DirectDeserialise m (VerKeyDSIGN d), KnownNat t) => DirectDeserialise m (VerKeyKES (SimpleKES d t)) where
+  directDeserialise pull = do
+    let duration = fromIntegral (natVal (Proxy :: Proxy t))
+    vks <- Vec.replicateM duration (directDeserialise pull)
+    return $! VerKeySimpleKES $! vks
+
+instance (Monad m, DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (SimpleKES d t)) where
+  directSerialise push (SignKeySimpleKES sks) =
+    mapM_ (directSerialise push) sks
+
+instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d), KnownNat t) => DirectDeserialise m (SignKeyKES (SimpleKES d t)) where
+  directDeserialise pull = do
+    let duration = fromIntegral (natVal (Proxy :: Proxy t))
+    sks <- Vec.replicateM duration (directDeserialise pull)
+    return $! SignKeySimpleKES $! sks
