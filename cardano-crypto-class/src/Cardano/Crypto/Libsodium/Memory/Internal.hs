@@ -34,7 +34,6 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   allocaBytes,
 
   -- * ByteString memory access, generalized to 'MonadST'
-  unpackByteStringCStringLen,
   packByteStringCStringLen,
 
   -- * Helper
@@ -50,10 +49,8 @@ import Control.Monad.ST
 import Control.Monad.ST.Unsafe (unsafeIOToST, unsafeSTToIO)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
 import Data.Typeable
-import Data.Word (Word8)
 import Debug.Trace (traceShowM)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.String (CStringLen)
@@ -64,7 +61,7 @@ import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import qualified Foreign.Marshal.Alloc as Foreign
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Foreign.Storable (Storable (peek), sizeOf, alignment, pokeByteOff)
+import Foreign.Storable (Storable (peek), sizeOf, alignment)
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -194,17 +191,6 @@ copyMem dst src size = unsafeIOToMonadST . void $ c_memcpy (castPtr dst) (castPt
 allocaBytes :: Int -> (Ptr a -> ST s b) -> ST s b
 allocaBytes size f =
   unsafeIOToST $ Foreign.allocaBytes size (unsafeSTToIO . f)
-
--- | Unpacks a ByteString into a temporary buffer and runs the provided 'ST'
--- function on it.
-unpackByteStringCStringLen :: ByteString -> (CStringLen -> ST s a) -> ST s a
-unpackByteStringCStringLen bs f = do
-  let len = BS.length bs
-  allocaBytes (len + 1) $ \buf -> do
-    unsafeIOToST $ BS.unsafeUseAsCString bs $ \ptr -> do
-      copyMem buf ptr (fromIntegral len)
-      pokeByteOff buf len (0 :: Word8)
-    f (buf, len)
 
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
 packByteStringCStringLen (ptr, len) =
