@@ -107,7 +107,7 @@
           # we also want cross compilation to windows.
           nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
           crossPlatforms = p: [p.mingwW64];
-        })
+        });
       in nixpkgs.lib.recursiveUpdate flake {
         # add a required job, that's basically all hydraJobs.
         hydraJobs = nixpkgs.callPackages inputs.iohkNix.utils.ciJobsAggregates
