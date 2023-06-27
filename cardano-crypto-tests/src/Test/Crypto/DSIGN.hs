@@ -32,8 +32,7 @@ import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
 
 import qualified Data.ByteString as BS
-import qualified Cardano.Crypto.Libsodium as NaCl
-import Cardano.Crypto.MonadSodium (MEq (..), (==!))
+import Cardano.Crypto.Libsodium
 
 import Text.Show.Pretty (ppShow)
 
@@ -93,9 +92,9 @@ import Cardano.Crypto.DSIGN (
                       rawSerialiseSigDSIGNM,
                       rawDeserialiseSigDSIGNM),
   DSIGNMAlgorithm (),
-  UnsoundDSIGNMAlgorithm (
-                  rawSerialiseSignKeyDSIGNM,
-                  rawDeserialiseSignKeyDSIGNM),
+  UnsoundDSIGNMAlgorithm,
+  rawSerialiseSignKeyDSIGNM,
+  rawDeserialiseSignKeyDSIGNM,
   sizeVerKeyDSIGNM,
   sizeSignKeyDSIGNM,
   sizeSigDSIGNM,
@@ -133,8 +132,10 @@ import Test.Crypto.Util (
   Lock,
   withLock,
   )
+import Cardano.Crypto.Libsodium.MLockedSeed
+
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
-import Cardano.Crypto.MLockedSeed
+import Test.Crypto.EqST (EqST (..), (==!))
 
 #ifdef SECP256K1_ENABLED
 import Cardano.Crypto.DSIGN (
@@ -363,7 +364,7 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
 
 testDSIGNMAlgorithm
   :: forall v. ( -- change back to DSIGNMAlgorithm when unsound API is phased out
-                 UnsoundDSIGNMAlgorithm IO v
+                 UnsoundDSIGNMAlgorithm v
                , ToCBOR (VerKeyDSIGNM v)
                , FromCBOR (VerKeyDSIGNM v)
                -- DSIGNM cannot satisfy To/FromCBOR (not even with
@@ -372,7 +373,7 @@ testDSIGNMAlgorithm
                -- test direct encoding/decoding for 'SignKeyDSIGNM'.
                -- , ToCBOR (SignKeyDSIGNM v)
                -- , FromCBOR (SignKeyDSIGNM v)
-               , MEq IO (SignKeyDSIGNM v)   -- only monadic MEq for signing keys
+               , EqST (SignKeyDSIGNM v)   -- only monadic EqST for signing keys
                , ToCBOR (SigDSIGNM v)
                , FromCBOR (SigDSIGNM v)
                , ContextDSIGNM v ~ ()
@@ -406,15 +407,15 @@ testDSIGNMAlgorithm lock _ n =
         [ testProperty "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk <- deriveVerKeyDSIGNM sk
-              return $ (fromIntegral . BS.length . rawSerialiseVerKeyDSIGNM $ vk) === (sizeVerKeyDSIGNM (Proxy @v))
+              return $ (fromIntegral . BS.length . rawSerialiseVerKeyDSIGNM $ vk) === sizeVerKeyDSIGNM (Proxy @v)
         , testProperty "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               serialized <- rawSerialiseSignKeyDSIGNM sk
-              evaluate ((fromIntegral . BS.length $ serialized) == (sizeSignKeyDSIGNM (Proxy @v)))
+              evaluate ((fromIntegral . BS.length $ serialized) == sizeSignKeyDSIGNM (Proxy @v))
         , testProperty "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGNM v <- signDSIGNM () msg sk
-              return $ (fromIntegral . BS.length . rawSerialiseSigDSIGNM $ sig) === (sizeSigDSIGNM (Proxy @v))
+              return $ (fromIntegral . BS.length . rawSerialiseSigDSIGNM $ sig) === sizeSigDSIGNM (Proxy @v)
         ]
 
       , testGroup "direct CBOR"
@@ -432,37 +433,37 @@ testDSIGNMAlgorithm lock _ n =
 
       , testGroup "To/FromCBOR class"
         [ testProperty "VerKey"  $
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
         , testProperty "Sig" $ \(msg :: Message) ->
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGNM v <- signDSIGNM () msg sk
               return $ prop_cbor sig
         ]
 
       , testGroup "ToCBOR size"
         [ testProperty "VerKey"  $
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor_size vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
         , testProperty "Sig" $ \(msg :: Message) ->
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGNM v <- signDSIGNM () msg sk
               return $ prop_cbor_size sig
         ]
 
       , testGroup "direct matches class"
         [ testProperty "VerKey" $
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGNM v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor_direct_vs_class encodeVerKeyDSIGNM vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
         , testProperty "Sig" $ \(msg :: Message) ->
-            ioPropertyWithSK lock $ \sk -> do
+            ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGNM v <- signDSIGNM () msg sk
               return $ prop_cbor_direct_vs_class encodeSigDSIGNM sig
         ]
@@ -500,7 +501,7 @@ testDSIGNMAlgorithm lock _ n =
 -- timely forgetting. Special care must be taken to not leak the key outside of
 -- the wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-withSK :: (DSIGNMAlgorithm IO v) => PinnedSizedBytes (SeedSizeDSIGNM v) -> (SignKeyDSIGNM v -> IO b) -> IO b
+withSK :: (DSIGNMAlgorithm v) => PinnedSizedBytes (SeedSizeDSIGNM v) -> (SignKeyDSIGNM v -> IO b) -> IO b
 withSK seedPSB action =
   withMLockedSeedFromPSB seedPSB $ \seed ->
     bracket
@@ -515,7 +516,7 @@ withSK seedPSB action =
 -- memory. Special care must be taken to not leak the key outside of the
 -- wrapped action (be particularly mindful of thunks and unsafe key access
 -- here).
-ioPropertyWithSK :: forall v a. (Testable a, DSIGNMAlgorithm IO v)
+ioPropertyWithSK :: forall v a. (Testable a, DSIGNMAlgorithm v)
                  => Lock
                  -> (SignKeyDSIGNM v -> IO a)
                  -> PinnedSizedBytes (SeedSizeDSIGNM v)
@@ -525,7 +526,7 @@ ioPropertyWithSK lock action seedPSB =
 
 prop_key_overwritten_after_forget
   :: forall v.
-     (DSIGNMAlgorithm IO v
+     (DSIGNMAlgorithm v
      )
   => Proxy v
   -> PinnedSizedBytes (SeedSizeDSIGNM v)
@@ -536,20 +537,20 @@ prop_key_overwritten_after_forget p seedPSB =
     mlockedSeedFinalize seed
 
     seedBefore <- getSeedDSIGNM p sk
-    bsBefore <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seedBefore
+    bsBefore <- mlsbToByteString . mlockedSeedMLSB $ seedBefore
     mlockedSeedFinalize seedBefore
 
     forgetSignKeyDSIGNM sk
 
     seedAfter <- getSeedDSIGNM p sk
-    bsAfter <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seedAfter
+    bsAfter <- mlsbToByteString . mlockedSeedMLSB $ seedAfter
     mlockedSeedFinalize seedAfter
 
     return (bsBefore =/= bsAfter)
 
 prop_dsignm_seed_roundtrip
   :: forall v.
-     ( DSIGNMAlgorithm IO v
+     ( DSIGNMAlgorithm v
      )
   => Proxy v
   -> PinnedSizedBytes (SeedSizeDSIGNM v)
@@ -557,8 +558,8 @@ prop_dsignm_seed_roundtrip
 prop_dsignm_seed_roundtrip p seedPSB = ioProperty . withMLockedSeedFromPSB seedPSB $ \seed -> do
   sk <- genKeyDSIGNM seed
   seed' <- getSeedDSIGNM p sk
-  bs <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seed
-  bs' <- NaCl.mlsbToByteString . mlockedSeedMLSB $ seed'
+  bs <- mlsbToByteString . mlockedSeedMLSB $ seed
+  bs' <- mlsbToByteString . mlockedSeedMLSB $ seed'
   forgetSignKeyDSIGNM sk
   mlockedSeedFinalize seed'
   return (bs === bs')
@@ -594,7 +595,7 @@ prop_dsign_verify_wrong_key (msg, sk, sk') =
     in verifyDSIGN () vk' msg signed =/= Right ()
 
 prop_dsignm_verify_pos
-  :: forall v. (DSIGNMAlgorithm IO v, ContextDSIGNM v ~ (), SignableM v Message)
+  :: forall v. (DSIGNMAlgorithm v, ContextDSIGNM v ~ (), SignableM v Message)
   => Lock
   -> Proxy v
   -> Message
@@ -611,7 +612,7 @@ prop_dsignm_verify_pos lock _ msg =
 -- different signing key, then the verification fails.
 --
 prop_dsignm_verify_neg_key
-  :: forall v. (DSIGNMAlgorithm IO v, ContextDSIGNM v ~ (), SignableM v Message)
+  :: forall v. (DSIGNMAlgorithm v, ContextDSIGNM v ~ (), SignableM v Message)
   => Lock
   -> Proxy v
   -> Message
@@ -681,7 +682,7 @@ testEcdsaWithHashAlgorithm _ name = adjustOption defaultTestEnough . testGroup n
 #endif
 
 prop_dsignm_verify_neg_msg
-  :: forall v. (DSIGNMAlgorithm IO v, ContextDSIGNM v ~ (), SignableM v Message)
+  :: forall v. (DSIGNMAlgorithm v, ContextDSIGNM v ~ (), SignableM v Message)
   => Lock
   -> Proxy v
   -> Message

@@ -33,8 +33,10 @@ import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
-import Cardano.Crypto.MLockedSeed
-import Cardano.Crypto.MonadSodium (mlsbAsByteString)
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.Libsodium
+  ( mlsbAsByteString
+  )
 
 data MockKES (t :: Nat)
 
@@ -122,7 +124,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
       | otherwise
       = Nothing
 
-instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
+instance KnownNat t => KESSignAlgorithm (MockKES t) where
     data SignKeyKES (MockKES t) =
            SignKeyMockKES !(VerKeyKES (MockKES t)) !Period
         deriving stock    (Show, Eq, Generic)
@@ -130,11 +132,11 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
 
     deriveVerKeyKES (SignKeyMockKES vk _) = return $! vk
 
-    updateKES () (SignKeyMockKES vk t') t =
+    updateKESWith _allocator () (SignKeyMockKES vk t') t =
         assert (t == t') $!
          if t+1 < totalPeriodsKES (Proxy @(MockKES t))
            then return $! Just $! SignKeyMockKES vk (t+1)
-           else return $! Nothing
+           else return Nothing
 
     -- | Produce valid signature only with correct key, i.e., same iteration and
     -- allowed KES period.
@@ -148,17 +150,17 @@ instance (Monad m, KnownNat t) => KESSignAlgorithm m (MockKES t) where
     -- Key generation
     --
 
-    genKeyKES seed = do
+    genKeyKESWith _allocator seed = do
         let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes . mlsbAsByteString . mlockedSeedMLSB $ seed) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
-    forgetSignKeyKES = const $ return ()
+    forgetSignKeyKESWith _ = const $ return ()
 
-instance (Monad m, KnownNat t) => UnsoundKESSignAlgorithm m (MockKES t) where
+instance KnownNat t => UnsoundKESSignAlgorithm (MockKES t) where
     rawSerialiseSignKeyKES sk =
       return $ rawSerialiseSignKeyMockKES sk
 
-    rawDeserialiseSignKeyKES bs =
+    rawDeserialiseSignKeyKESWith _alloc bs =
       return $ rawDeserialiseSignKeyMockKES bs
 
 rawDeserialiseSignKeyMockKES :: KnownNat t

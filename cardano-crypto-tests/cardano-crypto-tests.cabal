@@ -54,7 +54,7 @@ library
                         Test.Crypto.VRF
                         Test.Crypto.Regressions
                         Test.Crypto.Instances
-                        Cardano.Crypto.KES.ForgetMock
+                        Test.Crypto.EqST
                         Bench.Crypto.DSIGN
                         Bench.Crypto.VRF
                         Bench.Crypto.KES
@@ -78,7 +78,6 @@ library
                       , mtl
                       , nothunks
                       , pretty-show
-                      , random
                       , QuickCheck
                       , quickcheck-instances
                       , tasty
@@ -88,6 +87,7 @@ library
                       , criterion
                       , base16-bytestring
                       , tasty-hunit
+                      , vector
 
   if flag(secp256k1-support)
     cpp-options: -DSECP256K1_ENABLED
