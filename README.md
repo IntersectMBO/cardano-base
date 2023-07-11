@@ -35,7 +35,7 @@ Crypotgraphic depencencies needed for building Haskell packages:
 * [`libblst`](https://github.com/supranational/blst)
 
 We provide packaged versions for common Operating Systems for all of the above
-dependencies: [Download](https://github.com/input-output-hk/iohk-nix/releases/tag/latest)
+dependencies: [Download](https://github.com/input-output-hk/iohk-nix/releases/latest)
 
 
 ## GHC
