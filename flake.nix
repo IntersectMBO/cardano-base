@@ -23,7 +23,8 @@
       supportedSystems = [
         "x86_64-linux"
         "x86_64-darwin"
-        "aarch64-linux"
+        # not supported on ci.iog.io right now
+        #"aarch64-linux"
         "aarch64-darwin"
        ]; in
     inputs.flake-utils.lib.eachSystem supportedSystems (system:
