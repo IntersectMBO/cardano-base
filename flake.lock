@@ -135,11 +135,13 @@
     "devshell": {
       "inputs": {
         "flake-utils": [
+          "haskellNix",
           "tullia",
           "std",
           "flake-utils"
         ],
         "nixpkgs": [
+          "haskellNix",
           "tullia",
           "std",
           "nixpkgs"
@@ -162,11 +164,13 @@
     "dmerge": {
       "inputs": {
         "nixlib": [
+          "haskellNix",
           "tullia",
           "std",
           "nixpkgs"
         ],
         "yants": [
+          "haskellNix",
           "tullia",
           "std",
           "yants"
@@ -319,7 +323,7 @@
     },
     "gomod2nix": {
       "inputs": {
-        "nixpkgs": "nixpkgs_3",
+        "nixpkgs": "nixpkgs_2",
         "utils": "utils"
       },
       "locked": {
@@ -379,9 +383,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "old-ghc-nix": "old-ghc-nix",
         "stackage": "stackage",
-        "tullia": [
-          "tullia"
-        ]
+        "tullia": "tullia"
       },
       "locked": {
         "lastModified": 1682124656,
@@ -456,6 +458,7 @@
     "incl": {
       "inputs": {
         "nixlib": [
+          "haskellNix",
           "tullia",
           "std",
           "nixpkgs"
@@ -478,7 +481,7 @@
     "iohkNix": {
       "inputs": {
         "blst": "blst",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs_5",
         "secp256k1": "secp256k1",
         "sodium": "sodium"
       },
@@ -532,11 +535,13 @@
     "n2c": {
       "inputs": {
         "flake-utils": [
+          "haskellNix",
           "tullia",
           "std",
           "flake-utils"
         ],
         "nixpkgs": [
+          "haskellNix",
           "tullia",
           "std",
           "nixpkgs"
@@ -581,16 +586,19 @@
       "inputs": {
         "flake-compat": "flake-compat_3",
         "flake-utils": [
+          "haskellNix",
           "tullia",
           "nix2container",
           "flake-utils"
         ],
         "gomod2nix": "gomod2nix",
         "nixpkgs": [
+          "haskellNix",
           "tullia",
           "nixpkgs"
         ],
         "nixpkgs-lib": [
+          "haskellNix",
           "tullia",
           "nixpkgs"
         ]
@@ -612,7 +620,7 @@
     "nix2container": {
       "inputs": {
         "flake-utils": "flake-utils_3",
-        "nixpkgs": "nixpkgs_4"
+        "nixpkgs": "nixpkgs_3"
       },
       "locked": {
         "lastModified": 1658567952,
@@ -631,16 +639,19 @@
     "nixago": {
       "inputs": {
         "flake-utils": [
+          "haskellNix",
           "tullia",
           "std",
           "flake-utils"
         ],
         "nixago-exts": [
+          "haskellNix",
           "tullia",
           "std",
           "blank"
         ],
         "nixpkgs": [
+          "haskellNix",
           "tullia",
           "std",
           "nixpkgs"
@@ -790,22 +801,6 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1684171562,
-        "narHash": "sha256-BMUWjVWAUdyMWKk0ATMC9H0Bv4qAV/TXwwPUvTiC5IQ=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "55af203d468a6f5032a519cba4f41acf5a74b638",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "ref": "release-22.11",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_3": {
-      "locked": {
         "lastModified": 1653581809,
         "narHash": "sha256-Uvka0V5MTGbeOfWte25+tfRL3moECDh1VwokWSZUdoY=",
         "owner": "NixOS",
@@ -820,7 +815,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_4": {
+    "nixpkgs_3": {
       "locked": {
         "lastModified": 1654807842,
         "narHash": "sha256-ADymZpr6LuTEBXcy6RtFHcUZdjKTBRTMYwu19WOx17E=",
@@ -835,23 +830,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_5": {
-      "locked": {
-        "lastModified": 1674407282,
-        "narHash": "sha256-2qwc8mrPINSFdWffPK+ji6nQ9aGnnZyHSItVcYDZDlk=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "ab1254087f4cdf4af74b552d7fc95175d9bdbb49",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "ref": "nixos-22.11",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_6": {
+    "nixpkgs_4": {
       "locked": {
         "lastModified": 1675940568,
         "narHash": "sha256-epG6pOT9V0kS+FUqd7R6/CWkgnZx2DMT5Veqo+y6G3c=",
@@ -863,6 +842,22 @@
       "original": {
         "owner": "nixos",
         "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_5": {
+      "locked": {
+        "lastModified": 1684171562,
+        "narHash": "sha256-BMUWjVWAUdyMWKk0ATMC9H0Bv4qAV/TXwwPUvTiC5IQ=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "55af203d468a6f5032a519cba4f41acf5a74b638",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "release-22.11",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -902,12 +897,14 @@
     "paisano": {
       "inputs": {
         "nixpkgs": [
+          "haskellNix",
           "tullia",
           "std",
           "nixpkgs"
         ],
         "nosys": "nosys",
         "yants": [
+          "haskellNix",
           "tullia",
           "std",
           "yants"
@@ -930,11 +927,13 @@
     "paisano-tui": {
       "inputs": {
         "nixpkgs": [
+          "haskellNix",
           "tullia",
           "std",
           "blank"
         ],
         "std": [
+          "haskellNix",
           "tullia",
           "std"
         ]
@@ -963,8 +962,7 @@
         "nixpkgs": [
           "haskellNix",
           "nixpkgs-unstable"
-        ],
-        "tullia": "tullia"
+        ]
       }
     },
     "secp256k1": {
@@ -1020,6 +1018,7 @@
     "std": {
       "inputs": {
         "arion": [
+          "haskellNix",
           "tullia",
           "std",
           "blank"
@@ -1030,18 +1029,20 @@
         "flake-utils": "flake-utils_4",
         "incl": "incl",
         "makes": [
+          "haskellNix",
           "tullia",
           "std",
           "blank"
         ],
         "microvm": [
+          "haskellNix",
           "tullia",
           "std",
           "blank"
         ],
         "n2c": "n2c",
         "nixago": "nixago",
-        "nixpkgs": "nixpkgs_6",
+        "nixpkgs": "nixpkgs_4",
         "paisano": "paisano",
         "paisano-tui": "paisano-tui",
         "yants": "yants"
@@ -1079,15 +1080,18 @@
       "inputs": {
         "nix-nomad": "nix-nomad",
         "nix2container": "nix2container",
-        "nixpkgs": "nixpkgs_5",
+        "nixpkgs": [
+          "haskellNix",
+          "nixpkgs"
+        ],
         "std": "std"
       },
       "locked": {
-        "lastModified": 1677666696,
-        "narHash": "sha256-Oga/fHNJba7dM6HSz83RNv/UrUeGs1WRHUHbI8dCUqc=",
+        "lastModified": 1684859161,
+        "narHash": "sha256-wOKutImA7CRL0rN+Ng80E72fD5FkVub7LLP2k9NICpg=",
         "owner": "input-output-hk",
         "repo": "tullia",
-        "rev": "708d1ec45b17923d2452ba8f28795228ba8aafd5",
+        "rev": "2964cff1a16eefe301bdddb508c49d94d04603d6",
         "type": "github"
       },
       "original": {
@@ -1114,6 +1118,7 @@
     "yants": {
       "inputs": {
         "nixpkgs": [
+          "haskellNix",
           "tullia",
           "std",
           "nixpkgs"
