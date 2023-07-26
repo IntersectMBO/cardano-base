@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name:                cardano-crypto-tests
-version:             2.2.0.0
+version:             2.2.0.1
 synopsis:            Tests for cardano-crypto-class and -praos
 description:         Tests for cardano-crypto-class and -praos
 license:             Apache-2.0
@@ -74,7 +74,7 @@ library
                       , contra-tracer ==0.1.0.1
                       , deepseq
                       , formatting
-                      , io-classes
+                      , io-classes >= 1.1
                       , mtl
                       , nothunks
                       , pretty-show
