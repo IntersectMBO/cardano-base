@@ -161,7 +161,7 @@ modifyMVarMasked_ :: (HasCallStack, MonadMVar m)
                   => StrictMVar m a
                   -> (a -> m a)
                   -> m ()
-modifyMVarMasked_ v io = modifyMVar v io'
+modifyMVarMasked_ v io = modifyMVarMasked v io'
   where io' a = (,()) <$> io a
 
 modifyMVarMasked :: (HasCallStack, MonadMVar m)

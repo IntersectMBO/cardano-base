@@ -23,12 +23,12 @@ extra-doc-files:
   CHANGELOG.md
   README.md
 
-bug-reports:     https://github.com/input-output-hk/io-sim/issues
+bug-reports:     https://github.com/input-output-hk/cardano-base/issues
 tested-with:     GHC ==8.10 || ==9.2 || ==9.4 || ==9.6
 
 source-repository head
   type:     git
-  location: https://github.com/input-output-hk/ouroboros-consensus
+  location: https://github.com/input-output-hk/cardano-base
   subdir:   strict-checked-vars
 
 library
@@ -45,9 +45,9 @@ library
     , strict-stm   ^>=1.1
 
   ghc-options:
-    -Wall -Wno-unticked-promoted-constructors -Wcompat
-    -Wincomplete-uni-patterns -Wincomplete-record-updates
-    -Wpartial-fields -Widentities
+    -Wall -Wcompat -Wincomplete-uni-patterns
+    -Wincomplete-record-updates -Wpartial-fields -Widentities
+    -Wunused-packages
 
 test-suite test
   type:             exitcode-stdio-1.0
@@ -61,15 +61,12 @@ test-suite test
   build-depends:
     , base                 >=4.9 && <4.19
     , io-sim
-    , nothunks
     , QuickCheck
     , strict-checked-vars
-    , strict-mvar
-    , strict-stm
     , tasty
     , tasty-quickcheck
 
   ghc-options:
-    -Wall -Wno-unticked-promoted-constructors -Wcompat
-    -Wincomplete-uni-patterns -Wincomplete-record-updates
-    -Wpartial-fields -Widentities -fno-ignore-asserts
+    -Wall -Wcompat -Wincomplete-uni-patterns
+    -Wincomplete-record-updates -Wpartial-fields -Widentities
+    -Wunused-packages -fno-ignore-asserts
