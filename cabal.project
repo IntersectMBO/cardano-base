@@ -45,12 +45,3 @@ if impl(ghc >= 9.6)
     , protolude:binary
     , protolude:bytestring
     , protolude:text
-
--- TODO: remove when a new version of strict-mvar (>1.1.0.0) is released
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/io-sim
-  tag: 1b2c22b376f5cda314b9ab444caaf77764961a18
-  --sha256: 1qdxcqr4sl93n036p3pz1rvk6zf4qbsadzw4lgsp9agkh8pvs16y
-  subdir:
-    strict-mvar

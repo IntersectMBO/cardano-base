@@ -24,30 +24,48 @@ extra-doc-files:
   README.md
 
 bug-reports:     https://github.com/input-output-hk/cardano-base/issues
-tested-with:     GHC ==8.10 || ==9.2 || ==9.4 || ==9.6
+tested-with:     GHC ==8.10 || ==9.2 || ==9.6
 
 source-repository head
   type:     git
   location: https://github.com/input-output-hk/cardano-base
   subdir:   strict-checked-vars
 
+flag checkmvarinvariants
+  description: Enable runtime invariant checks on StrictMVars
+  manual:      True
+  default:     False
+
+flag checktvarinvariants
+  description: Enable runtime invariant checks on StrictTVars
+  manual:      True
+  default:     False
+
 library
   hs-source-dirs:   src
   exposed-modules:
     Control.Concurrent.Class.MonadMVar.Strict.Checked
+    Control.Concurrent.Class.MonadMVar.Strict.Checked.Switch
     Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked
+    Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.Switch
 
   default-language: Haskell2010
   build-depends:
     , base         >=4.9  && <4.19
-    , io-classes   ^>=1.1
-    , strict-mvar  ^>=1.1
-    , strict-stm   ^>=1.1
+    , io-classes   ^>=1.2
+    , strict-mvar  ^>=1.2
+    , strict-stm   ^>=1.2
 
   ghc-options:
     -Wall -Wcompat -Wincomplete-uni-patterns
     -Wincomplete-record-updates -Wpartial-fields -Widentities
     -Wunused-packages
+
+  if flag(checkmvarinvariants)
+    cpp-options: -DCHECK_MVAR_INVARIANTS
+
+  if flag(checktvarinvariants)
+    cpp-options: -DCHECK_TVAR_INVARIANTS
 
 test-suite test
   type:             exitcode-stdio-1.0
