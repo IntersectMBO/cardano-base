@@ -62,7 +62,7 @@ the pinned index state you may need to call `cabal update` in order for `cabal` 
 
 The Nix code which builds our packages also cares about the index state.  This is
 represented by inputs managed by `nix flake`: You can update these by running:
-- `nix flake lock --update-input hackage` for Hackage
+- `nix flake lock --update-input haskellNix/hackage` for Hackage
 - `nix flake lock --update-input CHaP` for CHaP
 
 If you fail to do this you may get an error like this from Nix:
