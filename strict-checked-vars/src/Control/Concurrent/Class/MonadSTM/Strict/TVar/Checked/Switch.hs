@@ -23,12 +23,14 @@ module Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.Switch (
     -- * MonadTraceSTM
   , traceTVar
   , traceTVarIO
+    -- * invariant
+  , checkInvariant
   ) where
 
 import           Control.Concurrent.Class.MonadSTM (MonadSTM, STM)
 #if CHECK_TVAR_INVARIANTS
 import qualified Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked as StrictTVar.Checked
-import           Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked hiding (newTVarWithInvariant, newTVarWithInvariantIO)
+import           Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked hiding (checkInvariant, newTVarWithInvariant, newTVarWithInvariantIO)
 #else
 import qualified Control.Concurrent.Class.MonadSTM.Strict.TVar as StrictTVar
 import           Control.Concurrent.Class.MonadSTM.Strict.TVar
@@ -53,4 +55,11 @@ newTVarWithInvariantIO :: (MonadSTM m, HasCallStack)
 newTVarWithInvariantIO   = StrictTVar.Checked.newTVarWithInvariantIO
 #else
 newTVarWithInvariantIO _ = StrictTVar.newTVarIO
+#endif
+
+checkInvariant :: HasCallStack => Maybe String -> a -> a
+#if CHECK_TVAR_INVARIANTS
+checkInvariant = StrictTVar.Checked.checkInvariant
+#else
+checkInvariant = \_ a -> a
 #endif
