@@ -31,6 +31,8 @@ module Control.Concurrent.Class.MonadMVar.Strict.Checked (
   , tryTakeMVar
   , withMVar
   , withMVarMasked
+    -- * Invariant
+  , checkInvariant
     -- * Re-exports
   , MonadMVar
   ) where

@@ -25,13 +25,15 @@ module Control.Concurrent.Class.MonadMVar.Strict.Checked.Switch (
   , tryTakeMVar
   , withMVar
   , withMVarMasked
+    -- * Invariant
+  , checkInvariant
     -- * Re-exports
   , MonadMVar
   ) where
 
 #if CHECK_MVAR_INVARIANTS
 import qualified Control.Concurrent.Class.MonadMVar.Strict.Checked as StrictMVar.Checked
-import           Control.Concurrent.Class.MonadMVar.Strict.Checked hiding (newMVarWithInvariant, newEmptyMVarWithInvariant)
+import           Control.Concurrent.Class.MonadMVar.Strict.Checked hiding (checkInvariant, newMVarWithInvariant, newEmptyMVarWithInvariant)
 #else
 import qualified Control.Concurrent.Class.MonadMVar.Strict as StrictMVar
 import           Control.Concurrent.Class.MonadMVar.Strict
@@ -55,4 +57,11 @@ newMVarWithInvariant :: (HasCallStack, MonadMVar m)
 newMVarWithInvariant   = StrictMVar.Checked.newMVarWithInvariant
 #else
 newMVarWithInvariant _ = StrictMVar.newMVar
+#endif
+
+checkInvariant :: HasCallStack => Maybe String -> a -> a
+#if CHECK_MVAR_INVARIANTS
+checkInvariant = StrictMVar.Checked.checkInvariant
+#else
+checkInvariant = \_ a -> a
 #endif

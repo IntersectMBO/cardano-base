@@ -29,6 +29,8 @@ module Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked (
     -- * MonadTraceSTM
   , traceTVar
   , traceTVarIO
+    -- * Invariant
+  , checkInvariant
   ) where
 
 import           Control.Concurrent.Class.MonadSTM (InspectMonad,
