@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns  #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies  #-}
 {-# LANGUAGE TypeOperators #-}
@@ -99,7 +100,7 @@ newMVarWithInvariant :: (HasCallStack, MonadMVar m)
                      => (a -> Maybe String)
                      -> a
                      -> m (StrictMVar m a)
-newMVarWithInvariant inv a =
+newMVarWithInvariant inv !a =
   checkInvariant (inv a) $
   StrictMVar inv <$> Strict.newMVar a
 

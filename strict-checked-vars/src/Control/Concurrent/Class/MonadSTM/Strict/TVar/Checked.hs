@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns  #-}
 {-# LANGUAGE TypeFamilies  #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -85,7 +86,7 @@ newTVarWithInvariant :: (MonadSTM m, HasCallStack)
                      => (a -> Maybe String)
                      -> a
                      -> STM m (StrictTVar m a)
-newTVarWithInvariant  inv a =
+newTVarWithInvariant inv !a =
     checkInvariant (inv a) $
     StrictTVar inv <$> Strict.newTVar a
 
@@ -93,7 +94,7 @@ newTVarWithInvariantIO :: (MonadSTM m, HasCallStack)
                        => (a -> Maybe String)
                        -> a
                        -> m (StrictTVar m a)
-newTVarWithInvariantIO  inv a =
+newTVarWithInvariantIO inv !a =
     checkInvariant (inv a) $
     StrictTVar inv <$> Strict.newTVarIO a
 
