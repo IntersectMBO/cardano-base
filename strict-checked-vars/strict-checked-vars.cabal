@@ -73,12 +73,16 @@ test-suite test
   main-is:          Main.hs
   other-modules:
     Test.Control.Concurrent.Class.MonadMVar.Strict.Checked
+    Test.Control.Concurrent.Class.MonadMVar.Strict.Checked.WHNF
+    Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.WHNF
     Test.Utils
 
   default-language: Haskell2010
   build-depends:
     , base                 >=4.9 && <4.19
+    , io-classes
     , io-sim
+    , nothunks
     , QuickCheck
     , strict-checked-vars
     , tasty

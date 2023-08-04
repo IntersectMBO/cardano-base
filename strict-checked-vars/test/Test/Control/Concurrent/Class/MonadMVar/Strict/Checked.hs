@@ -3,6 +3,7 @@
 module Test.Control.Concurrent.Class.MonadMVar.Strict.Checked where
 
 import           Control.Concurrent.Class.MonadMVar.Strict.Checked
+import qualified Test.Control.Concurrent.Class.MonadMVar.Strict.Checked.WHNF as Test.WHNF
 import           Test.QuickCheck.Monadic
 import           Test.Tasty
 import           Test.Tasty.QuickCheck
@@ -23,6 +24,7 @@ tests = testGroup "Test.Control.Concurrent.Class.MonadMVar.Strict" [
             , testProperty "prop_invariantShouldNotFail" $
                 once                 $ monadicSim prop_invariantShouldNotFail
             ]
+        , Test.WHNF.tests
         ]
     ]
 

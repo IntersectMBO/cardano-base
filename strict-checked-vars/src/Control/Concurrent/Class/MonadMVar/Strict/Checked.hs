@@ -96,6 +96,10 @@ newEmptyMVarWithInvariant inv = StrictMVar inv <$> Strict.newEmptyMVar
 newMVar :: MonadMVar m => a -> m (StrictMVar m a)
 newMVar a = StrictMVar (const Nothing) <$> Strict.newMVar a
 
+-- | Create a 'StrictMVar' with an invariant.
+--
+-- Contrary to functions that modify a 'StrictMVar', this function checks the
+-- invariant /before/ putting the value in a new 'StrictMVar'.
 newMVarWithInvariant :: (HasCallStack, MonadMVar m)
                      => (a -> Maybe String)
                      -> a
