@@ -105,7 +105,7 @@ readTVarIO :: MonadSTM m => StrictTVar m a -> m a
 readTVarIO = Strict.readTVarIO . tvar
 
 writeTVar :: (MonadSTM m, HasCallStack) => StrictTVar m a -> a -> STM m ()
-writeTVar v a =
+writeTVar v !a =
     checkInvariant (invariant v a) $
     Strict.writeTVar (tvar v) a
 
