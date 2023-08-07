@@ -5,7 +5,7 @@ module Test.Utils (
     monadicSim
   , runSimGen
     -- * Function composition
-  , (.:)
+  , (..:)
     -- * Invariants
   , Invariant (..)
   , noInvariant
@@ -36,10 +36,10 @@ monadicSim m = property (runSimGen (monadic' m))
   Function composition
 -------------------------------------------------------------------------------}
 
-infixr 9 .:
+infixr 9 ..:
 
-(.:) :: (y -> z) -> (x0 -> x1 -> y) -> (x0 -> x1 -> z)
-(.:) g f x0 x1 = g (f x0 x1)
+(..:) :: (y -> z) -> (x0 -> x1 -> x2 -> y) -> (x0 -> x1 -> x2 -> z)
+(..:) g f x0 x1 x2 = g (f x0 x1 x2)
 
 {-------------------------------------------------------------------------------
   Invariants
