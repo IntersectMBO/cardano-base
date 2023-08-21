@@ -29,6 +29,8 @@ module Cardano.Crypto.Libsodium.C (
     c_crypto_sign_ed25519_detached,
     c_crypto_sign_ed25519_verify_detached,
     c_crypto_sign_ed25519_sk_to_pk,
+    -- * RNG
+    c_sodium_randombytes_buf,
     -- * Helpers
     c_sodium_compare,
     -- * Constants
@@ -182,3 +184,6 @@ foreign import capi unsafe "sodium.h crypto_sign_ed25519_sk_to_pk" c_crypto_sign
 --
 -- <https://libsodium.gitbook.io/doc/helpers#comparing-large-numbers>
 foreign import capi unsafe "sodium.h sodium_compare" c_sodium_compare :: Ptr a -> Ptr a -> CSize -> IO Int
+
+-- | @void randombytes_buf(void * const buf, const size_t size);@
+foreign import capi unsafe "sodium/randombytes.h randombytes_buf" c_sodium_randombytes_buf :: Ptr a -> CSize -> IO ()

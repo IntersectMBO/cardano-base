@@ -2,7 +2,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Cardano.Crypto.Libsodium.MLockedSeed
 where
@@ -20,12 +21,16 @@ import Cardano.Crypto.Libsodium.Memory (
   MLockedAllocator,
   mlockedMalloc,
  )
+import Cardano.Crypto.Libsodium.C (
+  c_sodium_randombytes_buf,
+ )
 import Cardano.Foreign (SizedPtr)
 import Control.DeepSeq (NFData)
 import Control.Monad.Class.MonadST (MonadST)
+import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
 import Foreign.Ptr (Ptr)
-import GHC.TypeNats (KnownNat)
+import GHC.TypeNats (KnownNat, natVal)
 import NoThunks.Class (NoThunks)
 
 -- | A seed of size @n@, stored in mlocked memory. This is required to prevent
@@ -65,6 +70,18 @@ mlockedSeedNewZero = mlockedSeedNewZeroWith mlockedMalloc
 mlockedSeedNewZeroWith :: (KnownNat n, MonadST m) => MLockedAllocator m -> m (MLockedSeed n)
 mlockedSeedNewZeroWith allocator =
   MLockedSeed <$> mlsbNewZeroWith allocator
+
+mlockedSeedNewRandom :: forall n. (KnownNat n) => IO (MLockedSeed n)
+mlockedSeedNewRandom = mlockedSeedNewRandomWith mlockedMalloc
+
+mlockedSeedNewRandomWith :: forall n. (KnownNat n) => MLockedAllocator IO -> IO (MLockedSeed n)
+mlockedSeedNewRandomWith allocator = do
+  mls <- MLockedSeed <$> mlsbNewZeroWith allocator
+  mlockedSeedUseAsCPtr mls $ \dst -> do
+    c_sodium_randombytes_buf dst size
+  return mls
+  where
+    size = fromIntegral $ natVal (Proxy @n)
 
 mlockedSeedFinalize :: (MonadST m) => MLockedSeed n -> m ()
 mlockedSeedFinalize = mlsbFinalize . mlockedSeedMLSB
