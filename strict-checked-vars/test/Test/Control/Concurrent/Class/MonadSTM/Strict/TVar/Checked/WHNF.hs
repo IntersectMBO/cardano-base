@@ -15,8 +15,7 @@ import           NoThunks.Class (OnlyCheckWhnf (..), unsafeNoThunks)
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck (Fun, Property, applyFun, counterexample,
                      ioProperty, property, testProperty)
-import           Test.Utils (Invariant (..), noInvariant, trivialInvariant,
-                     whnfInvariant, (..:))
+import           Test.Utils (Invariant (..), (..:))
 
 {-------------------------------------------------------------------------------
   Main test tree
@@ -24,46 +23,38 @@ import           Test.Utils (Invariant (..), noInvariant, trivialInvariant,
 
 tests :: TestTree
 tests = testGroup "Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.WHNF" [
-      testGroup "IO" [
-          testIO    "No invariant"      noInvariant
-        , testIO    "Trivial invariant" trivialInvariant
-        , testIO    "WHNF invariant"    whnfInvariant
-        ]
-    , testGroup "IOSim" [
-          testIOSim "No invariant"      noInvariant
-        , testIOSim "Trivial invariant" trivialInvariant
-        , testIOSim "WHNF invariant"    whnfInvariant
-        ]
+      testGroup "IO"    testIO
+    , testGroup "IOSim" testIOSim
     ]
   where
-    testIO name inv = testGroup name [
-          testProperty "prop_newTVarWithInvariant_IO" $
-            prop_newTVarWithInvariant_IO inv
-        , testProperty "prop_newTVarWithInvariantIO_IO" $
-            prop_newTVarWithInvariantIO_IO inv
-        , testProperty "prop_writeTVar_IO" $
-            prop_writeTVar_IO inv
-        , testProperty "prop_modifyTVar_IO" $
-            prop_modifyTVar_IO inv
-        , testProperty "prop_stateTVar_IO" $
-            prop_stateTVar_IO inv
-        , testProperty "prop_swapTVar_IO" $
-            prop_swapTVar_IO inv
+    testIO = [
+          testProperty "prop_newTVarWithInvariant_IO"
+            prop_newTVarWithInvariant_IO
+        , testProperty "prop_newTVarWithInvariantIO_IO"
+            prop_newTVarWithInvariantIO_IO
+        , testProperty "prop_writeTVar_IO"
+            prop_writeTVar_IO
+        , testProperty "prop_modifyTVar_IO"
+            prop_modifyTVar_IO
+        , testProperty "prop_stateTVar_IO"
+            prop_stateTVar_IO
+        , testProperty "prop_swapTVar_IO"
+            prop_swapTVar_IO
         ]
 
-    testIOSim name inv = testGroup name [
-          testProperty "prop_newTVarWithInvariant_IOSim" $
-            prop_newTVarWithInvariant_IOSim inv
-        , testProperty "prop_newTVarWithInvariantIO_IOSim" $
-            prop_newTVarWithInvariantIO_IOSim inv
-        , testProperty "prop_writeTVar_IOSim" $
-            prop_writeTVar_IOSim inv
-        , testProperty "prop_modifyTVar_IOSim" $
-            prop_modifyTVar_IOSim inv
-        , testProperty "prop_stateTVar" $
-            prop_stateTVar_IOSim inv
-        , testProperty "prop_swapTVar" $
-            prop_swapTVar_IOSim inv
+    testIOSim = [
+          testProperty "prop_newTVarWithInvariant_IOSim"
+            prop_newTVarWithInvariant_IOSim
+        , testProperty "prop_newTVarWithInvariantIO_IOSim"
+            prop_newTVarWithInvariantIO_IOSim
+        , testProperty "prop_writeTVar_IOSim"
+            prop_writeTVar_IOSim
+        , testProperty "prop_modifyTVar_IOSim"
+            prop_modifyTVar_IOSim
+        , testProperty "prop_stateTVar"
+            prop_stateTVar_IOSim
+        , testProperty "prop_swapTVar"
+            prop_swapTVar_IOSim
         ]
 
 {-------------------------------------------------------------------------------
@@ -81,14 +72,14 @@ isInWHNF v = do
 -- | Wrapper around 'Checked.newTVar' and 'Checked.newTVarWithInvariant'.
 newTVarWithInvariant :: MonadSTM m => Invariant a -> a -> STM m (StrictTVar m a)
 newTVarWithInvariant = \case
-    NoInvariant   -> Checked.newTVar
-    Invariant inv -> Checked.newTVarWithInvariant inv
+    NoInvariant     -> Checked.newTVar
+    Invariant _ inv -> Checked.newTVarWithInvariant inv
 
 -- | Wrapper around 'Checked.newTVarIO' and 'Checked.newTVarWithInvariantIO'.
 newTVarWithInvariantIO :: MonadSTM m => Invariant a -> a -> m (StrictTVar m a)
 newTVarWithInvariantIO = \case
-    NoInvariant   -> Checked.newTVarIO
-    Invariant inv -> Checked.newTVarWithInvariantIO inv
+    NoInvariant     -> Checked.newTVarIO
+    Invariant _ inv -> Checked.newTVarWithInvariantIO inv
 
 -- | The 'isInWHNF' check fails when running tests in 'IOSim', since 'IOSim'
 -- runs in the lazy 'ST' monad. 'withSanityCheckWhnf' can be used to perform the

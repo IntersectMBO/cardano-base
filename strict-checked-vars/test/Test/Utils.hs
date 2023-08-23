@@ -16,7 +16,8 @@ module Test.Utils (
 import           Control.Monad.IOSim (IOSim, runSimOrThrow)
 import           Data.Typeable (Typeable)
 import           NoThunks.Class (OnlyCheckWhnf (..), unsafeNoThunks)
-import           Test.QuickCheck (Gen, Property, Testable (..))
+import           Test.QuickCheck (Arbitrary (..), Gen, Property, Testable (..),
+                     elements)
 import           Test.QuickCheck.Gen.Unsafe (Capture (..), capture)
 import           Test.QuickCheck.Monadic (PropertyM, monadic')
 
@@ -51,13 +52,24 @@ infixr 9 ..:
 -- with 'NoInvariant'.
 data Invariant a =
     NoInvariant
-  | Invariant (a -> Maybe String)
+  | Invariant String (a -> Maybe String)
+
+instance Show (Invariant a) where
+  show NoInvariant        = "NoInvariant"
+  show (Invariant name _) = "Invariant " <> name
+
+instance Typeable a => Arbitrary (Invariant a) where
+  arbitrary = elements [
+        noInvariant
+      , whnfInvariant
+      , trivialInvariant
+      ]
 
 noInvariant :: Invariant a
 noInvariant = NoInvariant
 
 whnfInvariant :: Typeable a => Invariant a
-whnfInvariant = Invariant $ fmap show . unsafeNoThunks . OnlyCheckWhnf
+whnfInvariant = Invariant "WHNF" $ fmap show . unsafeNoThunks . OnlyCheckWhnf
 
 trivialInvariant :: Invariant a
-trivialInvariant = Invariant $ const Nothing
+trivialInvariant = Invariant "Trivial" $ const Nothing

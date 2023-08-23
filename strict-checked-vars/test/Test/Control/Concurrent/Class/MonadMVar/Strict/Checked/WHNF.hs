@@ -13,8 +13,7 @@ import           NoThunks.Class (OnlyCheckWhnf (..), unsafeNoThunks)
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.QuickCheck (Fun, Property, applyFun, counterexample,
                      ioProperty, property, testProperty, (.&&.))
-import           Test.Utils (Invariant (..), noInvariant, trivialInvariant,
-                     whnfInvariant, (..:))
+import           Test.Utils (Invariant (..), (..:))
 
 {-------------------------------------------------------------------------------
   Main test tree
@@ -22,58 +21,50 @@ import           Test.Utils (Invariant (..), noInvariant, trivialInvariant,
 
 tests :: TestTree
 tests = testGroup "WHNF" [
-      testGroup "IO" [
-          testIO    "No invariant"      noInvariant
-        , testIO    "Trivial invariant" trivialInvariant
-        , testIO    "WHNF invariant"    whnfInvariant
-        ]
-    , testGroup "IOSim" [
-          testIOSim "No invariant"      noInvariant
-        , testIOSim "Trivial invariant" trivialInvariant
-        , testIOSim "WHNF invariant"    whnfInvariant
-        ]
+      testGroup "IO"    testIO
+    , testGroup "IOSim" testIOSim
     ]
   where
-    testIO name inv = testGroup name [
-          testProperty "prop_IO_newMVarWithInvariant" $
-            prop_IO_newMVarWithInvariant inv
-        , testProperty "prop_IO_putMVar" $
-            prop_IO_putMVar inv
-        , testProperty "prop_IO_swapMVar" $
-            prop_IO_swapMVar inv
-        , testProperty "prop_IO_tryPutMVarJust" $
-            prop_IO_tryPutMVarJust inv
-        , testProperty "prop_IO_tryPutMVarNothing" $
-            prop_IO_tryPutMVarNothing inv
-        , testProperty "prop_IO_modifyMVar_" $
-            prop_IO_modifyMVar_ inv
-        , testProperty "prop_IO_modifyMVar" $
-            prop_IO_modifyMVar inv
-        , testProperty "prop_IO_modifyMVarMasked_" $
-            prop_IO_modifyMVarMasked_ inv
-        , testProperty "prop_IO_modifyMVarMasked" $
-            prop_IO_modifyMVarMasked inv
+    testIO = [
+          testProperty "prop_IO_newMVarWithInvariant"
+            prop_IO_newMVarWithInvariant
+        , testProperty "prop_IO_putMVar"
+            prop_IO_putMVar
+        , testProperty "prop_IO_swapMVar"
+            prop_IO_swapMVar
+        , testProperty "prop_IO_tryPutMVarJust"
+            prop_IO_tryPutMVarJust
+        , testProperty "prop_IO_tryPutMVarNothing"
+            prop_IO_tryPutMVarNothing
+        , testProperty "prop_IO_modifyMVar_"
+            prop_IO_modifyMVar_
+        , testProperty "prop_IO_modifyMVar"
+            prop_IO_modifyMVar
+        , testProperty "prop_IO_modifyMVarMasked_"
+            prop_IO_modifyMVarMasked_
+        , testProperty "prop_IO_modifyMVarMasked"
+            prop_IO_modifyMVarMasked
         ]
 
-    testIOSim name inv = testGroup name [
-          testProperty "prop_IOSim_newMVarWithInvariant" $
-            prop_IOSim_newMVarWithInvariant inv
-        , testProperty "prop_IOSim_putMVar" $
-            prop_IOSim_putMVar inv
-        , testProperty "prop_IOSim_swapMVar" $
-            prop_IOSim_swapMVar inv
-        , testProperty "prop_IOSim_tryPutMVarJust" $
-            prop_IOSim_tryPutMVarJust inv
-        , testProperty "prop_IOSim_tryPutMVarNothing" $
-            prop_IOSim_tryPutMVarNothing inv
-        , testProperty "prop_IOSim_modifyMVar_" $
-            prop_IOSim_modifyMVar_ inv
-        , testProperty "prop_IOSim_modifyMVar" $
-            prop_IOSim_modifyMVar inv
-        , testProperty "prop_IOSim_modifyMVarMasked_" $
-            prop_IOSim_modifyMVarMasked_ inv
-        , testProperty "prop_IOSim_modifyMVarMasked" $
-            prop_IOSim_modifyMVarMasked inv
+    testIOSim = [
+          testProperty "prop_IOSim_newMVarWithInvariant"
+            prop_IOSim_newMVarWithInvariant
+        , testProperty "prop_IOSim_putMVar"
+            prop_IOSim_putMVar
+        , testProperty "prop_IOSim_swapMVar"
+            prop_IOSim_swapMVar
+        , testProperty "prop_IOSim_tryPutMVarJust"
+            prop_IOSim_tryPutMVarJust
+        , testProperty "prop_IOSim_tryPutMVarNothing"
+            prop_IOSim_tryPutMVarNothing
+        , testProperty "prop_IOSim_modifyMVar_"
+            prop_IOSim_modifyMVar_
+        , testProperty "prop_IOSim_modifyMVar"
+            prop_IOSim_modifyMVar
+        , testProperty "prop_IOSim_modifyMVarMasked_"
+            prop_IOSim_modifyMVarMasked_
+        , testProperty "prop_IOSim_modifyMVarMasked"
+            prop_IOSim_modifyMVarMasked
         ]
 
 {-------------------------------------------------------------------------------
@@ -91,15 +82,15 @@ isInWHNF v = do
 -- | Wrapper around 'Checked.newMVar' and 'Checked.newMVarWithInvariant'.
 newMVarWithInvariant :: MonadMVar m => Invariant a -> a -> m (StrictMVar m a)
 newMVarWithInvariant = \case
-    NoInvariant   -> Checked.newMVar
-    Invariant inv -> Checked.newMVarWithInvariant inv
+    NoInvariant     -> Checked.newMVar
+    Invariant _ inv -> Checked.newMVarWithInvariant inv
 
 -- | Wrapper around 'Checked.newEmptyMVar' and
 -- 'Checked.newEmptyMVarWithInvariant'.
 newEmptyMVarWithInvariant :: MonadMVar m => Invariant a -> m (StrictMVar m a)
 newEmptyMVarWithInvariant = \case
-    NoInvariant   -> Checked.newEmptyMVar
-    Invariant inv -> Checked.newEmptyMVarWithInvariant inv
+    NoInvariant     -> Checked.newEmptyMVar
+    Invariant _ inv -> Checked.newEmptyMVarWithInvariant inv
 
 {-------------------------------------------------------------------------------
   Properties
@@ -152,7 +143,6 @@ prop_IOSim_putMVar :: Invariant Int -> Int -> Fun Int Int -> Property
 prop_IOSim_putMVar inv x f = runSimOrThrow $
     prop_M_putMVar inv x f
 
-
 --
 -- swapMVar
 --
@@ -175,6 +165,7 @@ prop_IO_swapMVar = ioProperty ..:
 prop_IOSim_swapMVar :: Invariant Int -> Int -> Fun Int Int -> Property
 prop_IOSim_swapMVar inv x f = runSimOrThrow $
     prop_M_swapMVar inv x f
+
 --
 -- tryPutMVar
 --

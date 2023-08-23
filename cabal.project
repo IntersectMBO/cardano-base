@@ -37,11 +37,3 @@ benchmarks: true
 
 program-options
   ghc-options: -Werror
-
-if impl(ghc >= 9.6)
-  allow-newer:
-    , *:base
-    , protolude:ghc-prim
-    , protolude:binary
-    , protolude:bytestring
-    , protolude:text
