@@ -37,7 +37,7 @@ import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Libsodium
-  ( mlsbAsByteString
+  ( mlsbToByteString
   )
 import Cardano.Crypto.Libsodium.Memory
   ( unpackByteStringCStringLen
@@ -159,7 +159,8 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     --
 
     genKeyKESWith _allocator seed = do
-        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes . mlsbAsByteString . mlockedSeedMLSB $ seed) getRandomWord64)
+        seedBS <- mlsbToByteString . mlockedSeedMLSB $ seed
+        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes seedBS) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
     forgetSignKeyKESWith _ = const $ return ()
