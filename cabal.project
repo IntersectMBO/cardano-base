@@ -12,7 +12,7 @@ repository cardano-haskell-packages
 -- The hackage index-state
 index-state: 2023-07-31T10:10:32Z
 -- The CHaP index-state
-index-state: cardano-haskell-packages 2023-07-31T10:10:32Z
+index-state: cardano-haskell-packages 2023-08-08T14:32:15Z
 
 packages:
   base-deriving-via
@@ -37,11 +37,3 @@ benchmarks: true
 
 program-options
   ghc-options: -Werror
-
-if impl(ghc >= 9.6)
-  allow-newer:
-    , *:base
-    , protolude:ghc-prim
-    , protolude:binary
-    , protolude:bytestring
-    , protolude:text
