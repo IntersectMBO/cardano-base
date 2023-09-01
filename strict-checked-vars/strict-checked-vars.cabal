@@ -1,6 +1,6 @@
 cabal-version:   3.0
 name:            strict-checked-vars
-version:         0.1.0.3
+version:         0.1.0.4
 synopsis:
   Strict MVars and TVars with invariant checking for IO and IOSim
 

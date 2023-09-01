@@ -32,36 +32,88 @@ module Control.Concurrent.Class.MonadMVar.Strict.Checked.Switch (
   ) where
 
 #if CHECK_MVAR_INVARIANTS
+import           Control.Concurrent.Class.MonadMVar.Strict.Checked hiding
+                                                                   (checkInvariant,
+                                                                    modifyMVar,
+                                                                    modifyMVarMasked,
+                                                                    modifyMVarMasked_,
+                                                                    modifyMVar_,
+                                                                    newEmptyMVarWithInvariant,
+                                                                    newMVarWithInvariant,
+                                                                    putMVar,
+                                                                    swapMVar,
+                                                                    tryPutMVar)
 import qualified Control.Concurrent.Class.MonadMVar.Strict.Checked as StrictMVar.Checked
-import           Control.Concurrent.Class.MonadMVar.Strict.Checked hiding (checkInvariant, newMVarWithInvariant, newEmptyMVarWithInvariant)
 #else
-import qualified Control.Concurrent.Class.MonadMVar.Strict as StrictMVar
-import           Control.Concurrent.Class.MonadMVar.Strict
+import           Control.Concurrent.Class.MonadMVar.Strict         hiding
+                                                                   (modifyMVar,
+                                                                    modifyMVarMasked,
+                                                                    modifyMVarMasked_,
+                                                                    modifyMVar_,
+                                                                    putMVar,
+                                                                    swapMVar,
+                                                                    tryPutMVar)
+import qualified Control.Concurrent.Class.MonadMVar.Strict         as StrictMVar
 #endif
-import           GHC.Stack (HasCallStack)
+import           GHC.Stack                                         (HasCallStack)
 
 newEmptyMVarWithInvariant :: MonadMVar m
                           => (a -> Maybe String)
                           -> m (StrictMVar m a)
-#if CHECK_MVAR_INVARIANTS
-newEmptyMVarWithInvariant   = StrictMVar.Checked.newEmptyMVarWithInvariant
-#else
-newEmptyMVarWithInvariant _ = StrictMVar.newEmptyMVar
-#endif
 
 newMVarWithInvariant :: (HasCallStack, MonadMVar m)
                      => (a -> Maybe String)
                      -> a
                      -> m (StrictMVar m a)
-#if CHECK_MVAR_INVARIANTS
-newMVarWithInvariant   = StrictMVar.Checked.newMVarWithInvariant
-#else
-newMVarWithInvariant _ = StrictMVar.newMVar
-#endif
+
+putMVar :: (HasCallStack, MonadMVar m) => StrictMVar m a -> a -> m ()
+
+swapMVar :: (HasCallStack, MonadMVar m) => StrictMVar m a -> a -> m a
+
+tryPutMVar :: (HasCallStack, MonadMVar m) => StrictMVar m a -> a -> m Bool
+
+modifyMVar_ :: (HasCallStack, MonadMVar m)
+            => StrictMVar m a
+            -> (a -> m a)
+            -> m ()
+
+modifyMVar :: (HasCallStack, MonadMVar m)
+           => StrictMVar m a
+           -> (a -> m (a,b))
+           -> m b
+
+modifyMVarMasked_ :: (HasCallStack, MonadMVar m)
+                  => StrictMVar m a
+                  -> (a -> m a)
+                  -> m ()
+
+modifyMVarMasked :: (HasCallStack, MonadMVar m)
+                 => StrictMVar m a
+                 -> (a -> m (a,b))
+                 -> m b
 
 checkInvariant :: HasCallStack => Maybe String -> a -> a
+
 #if CHECK_MVAR_INVARIANTS
-checkInvariant = StrictMVar.Checked.checkInvariant
+newEmptyMVarWithInvariant   = StrictMVar.Checked.newEmptyMVarWithInvariant
+newMVarWithInvariant        = StrictMVar.Checked.newMVarWithInvariant
+putMVar                     = StrictMVar.Checked.putMVar
+swapMVar                    = StrictMVar.Checked.swapMVar
+tryPutMVar                  = StrictMVar.Checked.tryPutMVar
+modifyMVar_                 = StrictMVar.Checked.modifyMVar_
+modifyMVar                  = StrictMVar.Checked.modifyMVar
+modifyMVarMasked_           = StrictMVar.Checked.modifyMVarMasked_
+modifyMVarMasked            = StrictMVar.Checked.modifyMVarMasked
+checkInvariant              = StrictMVar.Checked.checkInvariant
 #else
-checkInvariant = \_ a -> a
+newEmptyMVarWithInvariant _ = StrictMVar.newEmptyMVar
+newMVarWithInvariant _      = StrictMVar.newMVar
+putMVar                     = StrictMVar.putMVar
+swapMVar                    = StrictMVar.swapMVar
+tryPutMVar                  = StrictMVar.tryPutMVar
+modifyMVar_                 = StrictMVar.modifyMVar_
+modifyMVar                  = StrictMVar.modifyMVar
+modifyMVarMasked_           = StrictMVar.modifyMVarMasked_
+modifyMVarMasked            = StrictMVar.modifyMVarMasked
+checkInvariant              = \_ a -> a
 #endif
