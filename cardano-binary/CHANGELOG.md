@@ -1,8 +1,8 @@
 # Changelog for `cardano-binary`
 
-## 1.7.0.2
+## 1.7.1.0
 
-*
+* Add `FromCBOR` instance for `TermToken`
 
 ## 1.7.0.1
 
