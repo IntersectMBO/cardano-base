@@ -385,9 +385,12 @@ ptrPsbToSizedPtr = SizedPtr . castPtr
 --   then this throws an exception.
 pinnedByteArrayFromListN :: forall a. Prim.Prim a => Int -> [a] -> ByteArray
 pinnedByteArrayFromListN 0 _ =
-    die "pinnedByteArrayFromListN" "list length zero"
+    die "pinnedByteArrayFromListN" "list length zero #1"
 pinnedByteArrayFromListN n ys = runST $ do
-    marr <- newPinnedByteArray (n * Prim.sizeOf (head ys))
+    let headYs = case ys of
+                  [] -> die "pinnedByteArrayFromListN" "list length zero #2"
+                  (y:_) -> y
+    marr <- newPinnedByteArray (n * Prim.sizeOf headYs)
     let go !ix [] = if ix == n
           then return ()
           else die "pinnedByteArrayFromListN" "list length less than specified size"
