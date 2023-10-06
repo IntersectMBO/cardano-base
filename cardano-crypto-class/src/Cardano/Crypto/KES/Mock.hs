@@ -64,7 +64,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     data SigKES (MockKES t) =
            SigMockKES !(Hash ShortHash ()) !(SignKeyKES (MockKES t))
-        deriving stock    (Show, Eq, Ord, Generic)
+        deriving stock    (Show, Eq, Generic)
         deriving anyclass (NoThunks)
 
     --
