@@ -10,9 +10,9 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2023-04-18T07:23:09Z
+index-state: 2023-09-29T19:30:18Z
 -- The CHaP index-state
-index-state: cardano-haskell-packages 2023-04-24T15:32:00Z
+index-state: cardano-haskell-packages 2023-09-29T18:37:37Z
 
 packages:
   base-deriving-via
@@ -34,13 +34,26 @@ test-show-details: direct
 program-options
   ghc-options: -Werror
 
-if impl(ghc >= 9.6)
+if impl(ghc >= 9.8)
   allow-newer:
     , *:base
+    , *:deepseq
     , *:ghc-prim
     , *:template-haskell
-    , hedgehog:*
-    , protolude:binary
-    , protolude:bytestring
-    , protolude:text
-    , th-compat:*
+    , aeson:th-abstraction
+
+  constraints:
+    , aeson >= 2.0.0.0
+    , bytestring >= 0.11
+    , hastache >= 0.6.1
+    , monad-par >= 0.3.5
+    , statistics >= 0.16.2.0
+    , th-abstraction >= 0.6.0.0
+
+  -- https://github.com/recursion-schemes/recursion-schemes/issues/153
+  source-repository-package
+    type: git
+    -- Git head compiles with `ghc-9.8`, but Hackage version does not.
+    location: https://github.com/recursion-schemes/recursion-schemes
+    tag: cc2e88c3400a6548e975830c9addb12ab087545f
+    --sha256: 06shyihy6cpblv3pf18xgdfjgxqw2y2awvpcy33r76fr642gdvgn
