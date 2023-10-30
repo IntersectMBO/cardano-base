@@ -181,6 +181,16 @@ instance ( OptimizedKESAlgorithm d
                             !(VerKeyKES d)
         deriving Generic
 
+    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
+    --
+    data SignKeyKES (CompactSumKES h d) =
+           SignKeyCompactSumKES !(SignKeyKES d)
+                         !(MLockedSeed (SeedSizeKES d))
+                         !(VerKeyKES d)
+                         !(VerKeyKES d)
+
+
+
 
     --
     -- Metadata and basic key operations
@@ -244,25 +254,6 @@ instance ( OptimizedKESAlgorithm d
         off_sig    = 0 :: Word
         off_vk     = size_sig
 
-instance ( OptimizedKESAlgorithm d
-         , KESSignAlgorithm d
-         , SodiumHashAlgorithm h -- needed for secure forgetting
-         , SizeHash h ~ SeedSizeKES d -- can be relaxed
-         , NoThunks (VerKeyKES (CompactSumKES h d))
-         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
-         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
-         , KnownNat (SizeSigKES (CompactSumKES h d))
-         )
-      => KESSignAlgorithm (CompactSumKES h d) where
-    -- | From Figure 3: @(sk_0, r_1, vk_0, vk_1)@
-    --
-    data SignKeyKES (CompactSumKES h d) =
-           SignKeyCompactSumKES !(SignKeyKES d)
-                         !(MLockedSeed (SeedSizeKES d))
-                         !(VerKeyKES d)
-                         !(VerKeyKES d)
-
-
     deriveVerKeyKES (SignKeyCompactSumKES _ _ vk_0 vk_1) =
         return $! VerKeyCompactSumKES (hashPairOfVKeys (vk_0, vk_1))
 
@@ -321,9 +312,9 @@ instance ( OptimizedKESAlgorithm d
       forgetSignKeyKESWith allocator sk_0
       mlockedSeedFinalize r1
 
-instance ( KESSignAlgorithm (CompactSumKES h d)
-         , UnsoundKESSignAlgorithm d
-         ) => UnsoundKESSignAlgorithm (CompactSumKES h d) where
+instance ( KESAlgorithm (CompactSumKES h d)
+         , UnsoundKESAlgorithm d
+         ) => UnsoundKESAlgorithm (CompactSumKES h d) where
     --
     -- Raw serialise/deserialise - dangerous, do not use in production code.
     --

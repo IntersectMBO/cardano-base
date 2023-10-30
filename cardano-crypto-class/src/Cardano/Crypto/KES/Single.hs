@@ -48,7 +48,7 @@ import Control.Monad ((<$!>))
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.Hash.Class
-import Cardano.Crypto.DSIGNM.Class as DSIGNM
+import Cardano.Crypto.DSIGN.Class as DSIGN
 import Cardano.Crypto.KES.Class
 
 
@@ -57,62 +57,62 @@ import Cardano.Crypto.KES.Class
 --
 data SingleKES d
 
-deriving instance NFData (VerKeyDSIGNM d) => NFData (VerKeyKES (SingleKES d))
-deriving instance NFData (SigDSIGNM d) => NFData (SigKES (SingleKES d))
+deriving instance NFData (VerKeyDSIGN d) => NFData (VerKeyKES (SingleKES d))
+deriving instance NFData (SigDSIGN d) => NFData (SigKES (SingleKES d))
 
 deriving via (SignKeyDSIGNM d) instance NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (SingleKES d))
 
-instance (DSIGNMAlgorithmBase d) => KESAlgorithm (SingleKES d) where
-    type SeedSizeKES (SingleKES d) = SeedSizeDSIGNM d
+instance (DSIGNMAlgorithm d) => KESAlgorithm (SingleKES d) where
+    type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
 
     --
     -- Key and signature types
     --
 
-    newtype VerKeyKES (SingleKES d) = VerKeySingleKES (VerKeyDSIGNM d)
+    newtype VerKeyKES (SingleKES d) = VerKeySingleKES (VerKeyDSIGN d)
         deriving Generic
 
-    newtype SigKES (SingleKES d) = SigSingleKES (SigDSIGNM d)
+    newtype SigKES (SingleKES d) = SigSingleKES (SigDSIGN d)
         deriving Generic
 
-    type ContextKES (SingleKES d) = ContextDSIGNM d
-    type Signable   (SingleKES d) = DSIGNM.SignableM     d
+    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
+
+
+    type ContextKES (SingleKES d) = ContextDSIGN d
+    type Signable   (SingleKES d) = DSIGN.Signable     d
 
 
     --
     -- Metadata and basic key operations
     --
 
-    algorithmNameKES _ = algorithmNameDSIGNM (Proxy :: Proxy d) ++ "_kes_2^0"
+    algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
     totalPeriodsKES  _ = 1
 
     verifyKES ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
         assert (t == 0) $
-        verifyDSIGNM ctxt vk a sig
+        verifyDSIGN ctxt vk a sig
 
     --
     -- raw serialise/deserialise
     --
 
-    type SizeVerKeyKES (SingleKES d) = SizeVerKeyDSIGNM d
-    type SizeSignKeyKES (SingleKES d) = SizeSignKeyDSIGNM d
-    type SizeSigKES (SingleKES d) = SizeSigDSIGNM d
+    type SizeVerKeyKES (SingleKES d) = SizeVerKeyDSIGN d
+    type SizeSignKeyKES (SingleKES d) = SizeSignKeyDSIGN d
+    type SizeSigKES (SingleKES d) = SizeSigDSIGN d
 
     hashVerKeyKES (VerKeySingleKES vk) =
-        castHash (hashVerKeyDSIGNM vk)
+        castHash (hashVerKeyDSIGN vk)
 
-    rawSerialiseVerKeyKES  (VerKeySingleKES  vk) = rawSerialiseVerKeyDSIGNM vk
-    rawSerialiseSigKES     (SigSingleKES    sig) = rawSerialiseSigDSIGNM sig
+    rawSerialiseVerKeyKES  (VerKeySingleKES  vk) = rawSerialiseVerKeyDSIGN vk
+    rawSerialiseSigKES     (SigSingleKES    sig) = rawSerialiseSigDSIGN sig
 
-    rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . rawDeserialiseVerKeyDSIGNM
+    rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . rawDeserialiseVerKeyDSIGN
     {-# INLINE rawDeserialiseVerKeyKES #-}
-    rawDeserialiseSigKES     = fmap SigSingleKES     . rawDeserialiseSigDSIGNM
+    rawDeserialiseSigKES     = fmap SigSingleKES     . rawDeserialiseSigDSIGN
     {-# INLINE rawDeserialiseSigKES #-}
 
-
-instance DSIGNMAlgorithm d => KESSignAlgorithm (SingleKES d) where
-    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
 
     deriveVerKeyKES (SignKeySingleKES v) =
       VerKeySingleKES <$!> deriveVerKeyDSIGNM v
@@ -140,8 +140,8 @@ instance DSIGNMAlgorithm d => KESSignAlgorithm (SingleKES d) where
     forgetSignKeyKESWith allocator (SignKeySingleKES v) =
       forgetSignKeyDSIGNMWith allocator v
 
-instance (KESSignAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
-         => UnsoundKESSignAlgorithm (SingleKES d) where
+instance (KESAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
+         => UnsoundKESAlgorithm (SingleKES d) where
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =
       rawSerialiseSignKeyDSIGNM sk
 
@@ -152,39 +152,39 @@ instance (KESSignAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
 -- VerKey instances
 --
 
-deriving instance DSIGNMAlgorithmBase d => Show (VerKeyKES (SingleKES d))
-deriving instance DSIGNMAlgorithmBase d => Eq   (VerKeyKES (SingleKES d))
+deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SingleKES d))
+deriving instance DSIGNAlgorithm d => Eq   (VerKeyKES (SingleKES d))
 
-instance DSIGNMAlgorithmBase d => ToCBOR (VerKeyKES (SingleKES d)) where
+instance DSIGNMAlgorithm d => ToCBOR (VerKeyKES (SingleKES d)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance DSIGNMAlgorithmBase d => FromCBOR (VerKeyKES (SingleKES d)) where
+instance DSIGNMAlgorithm d => FromCBOR (VerKeyKES (SingleKES d)) where
   fromCBOR = decodeVerKeyKES
   {-# INLINE fromCBOR #-}
 
-instance DSIGNMAlgorithmBase d => NoThunks (VerKeyKES  (SingleKES d))
+instance DSIGNMAlgorithm d => NoThunks (VerKeyKES  (SingleKES d))
 
 
 --
 -- SignKey instances
 --
 
-deriving via (SignKeyDSIGNM d) instance DSIGNMAlgorithmBase d => NoThunks (SignKeyKES (SingleKES d))
+deriving via (SignKeyDSIGNM d) instance DSIGNMAlgorithm d => NoThunks (SignKeyKES (SingleKES d))
 
 --
 -- Sig instances
 --
 
-deriving instance DSIGNMAlgorithmBase d => Show (SigKES (SingleKES d))
-deriving instance DSIGNMAlgorithmBase d => Eq   (SigKES (SingleKES d))
+deriving instance DSIGNAlgorithm d => Show (SigKES (SingleKES d))
+deriving instance DSIGNAlgorithm d => Eq   (SigKES (SingleKES d))
 
-instance DSIGNMAlgorithmBase d => NoThunks (SigKES (SingleKES d))
+instance DSIGNAlgorithm d => NoThunks (SigKES (SingleKES d))
 
-instance DSIGNMAlgorithmBase d => ToCBOR (SigKES (SingleKES d)) where
+instance DSIGNMAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance DSIGNMAlgorithmBase d => FromCBOR (SigKES (SingleKES d)) where
+instance DSIGNMAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
   fromCBOR = decodeSigKES
   {-# INLINE fromCBOR #-}
