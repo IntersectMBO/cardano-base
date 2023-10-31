@@ -404,7 +404,7 @@ eitherShowError (Right a) = return a
 --------------------------------------------------------------------------------
 
 directSerialiseToBS :: forall m a.
-                       DirectSerialise m a
+                       DirectSerialise a
                     => MonadST m
                     => MonadThrow m
                     => MonadMVar m
@@ -423,7 +423,7 @@ directSerialiseToBS dstsize val = do
     packByteStringCStringLen (dst, fromIntegral dstsize)
 
 directDeserialiseFromBS :: forall m a.
-                           DirectDeserialise m a
+                           DirectDeserialise a
                            => MonadST m
                            => MonadThrow m
                            => MonadMVar m

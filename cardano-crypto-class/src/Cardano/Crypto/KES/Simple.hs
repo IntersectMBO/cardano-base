@@ -250,21 +250,21 @@ instance (DSIGNMAlgorithm d
       => FromCBOR (SigKES (SimpleKES d t)) where
   fromCBOR = decodeSigKES
 
-instance (Monad m, DirectSerialise m (VerKeyDSIGN d)) => DirectSerialise m (VerKeyKES (SimpleKES d t)) where
+instance (DirectSerialise (VerKeyDSIGN d)) => DirectSerialise (VerKeyKES (SimpleKES d t)) where
   directSerialise push (VerKeySimpleKES vks) =
     mapM_ (directSerialise push) vks
 
-instance (Monad m, DirectDeserialise m (VerKeyDSIGN d), KnownNat t) => DirectDeserialise m (VerKeyKES (SimpleKES d t)) where
+instance (DirectDeserialise (VerKeyDSIGN d), KnownNat t) => DirectDeserialise (VerKeyKES (SimpleKES d t)) where
   directDeserialise pull = do
     let duration = fromIntegral (natVal (Proxy :: Proxy t))
     vks <- Vec.replicateM duration (directDeserialise pull)
     return $! VerKeySimpleKES $! vks
 
-instance (Monad m, DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (SimpleKES d t)) where
+instance (DirectSerialise (SignKeyDSIGNM d)) => DirectSerialise (SignKeyKES (SimpleKES d t)) where
   directSerialise push (SignKeySimpleKES sks) =
     mapM_ (directSerialise push) sks
 
-instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d), KnownNat t) => DirectDeserialise m (SignKeyKES (SimpleKES d t)) where
+instance (DirectDeserialise (SignKeyDSIGNM d), KnownNat t) => DirectDeserialise (SignKeyKES (SimpleKES d t)) where
   directDeserialise pull = do
     let duration = fromIntegral (natVal (Proxy :: Proxy t))
     sks <- Vec.replicateM duration (directDeserialise pull)

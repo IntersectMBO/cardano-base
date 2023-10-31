@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 -- | Direct (de-)serialisation to / from raw memory.
 --
 -- The purpose of the typeclasses in this module is to abstract over data
@@ -18,6 +16,8 @@ where
 
 import Foreign.Ptr
 import Foreign.C.Types
+import Control.Monad.Class.MonadThrow (MonadThrow)
+import Control.Monad.Class.MonadST (MonadST)
 
 -- | Direct deserialization from raw memory.
 --
@@ -27,8 +27,8 @@ import Foreign.C.Types
 -- non-contiguous blocks of memory.
 --
 -- The order in which memory blocks are visited matters.
-class DirectDeserialise m a where
-  directDeserialise :: (Ptr CChar -> CSize -> m ()) -> m a
+class DirectDeserialise a where
+  directDeserialise :: (MonadST m, MonadThrow m) => (Ptr CChar -> CSize -> m ()) -> m a
 
 -- | Direct serialization to raw memory.
 --
@@ -37,5 +37,5 @@ class DirectDeserialise m a where
 -- of memory, @f@ may be called multiple times, once for each block.
 --
 -- The order in which memory blocks are visited matters.
-class DirectSerialise m a where
-  directSerialise :: (Ptr CChar -> CSize -> m ()) -> a -> m ()
+class DirectSerialise a where
+  directSerialise :: (MonadST m, MonadThrow m) => (Ptr CChar -> CSize -> m ()) -> a -> m ()

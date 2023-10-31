@@ -103,8 +103,6 @@ import           Cardano.Crypto.DirectSerialise
 
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Control.Monad.Trans (lift)
-import           Control.Monad.Class.MonadST
-import           Control.Monad.Class.MonadThrow
 import           Control.DeepSeq (NFData (..))
 import           GHC.TypeLits (KnownNat, type (+), type (*))
 import           Foreign.Ptr (castPtr)
@@ -474,11 +472,10 @@ instance ( OptimizedKESAlgorithm d
 -- Direct ser/deser
 --
 
-instance ( DirectSerialise m (SignKeyKES d)
-         , DirectSerialise m (VerKeyKES d)
-         , MonadST m
+instance ( DirectSerialise (SignKeyKES d)
+         , DirectSerialise (VerKeyKES d)
          , KESAlgorithm d
-         ) => DirectSerialise m (SignKeyKES (CompactSumKES h d)) where
+         ) => DirectSerialise (SignKeyKES (CompactSumKES h d)) where
   directSerialise push (SignKeyCompactSumKES sk r vk0 vk1) = do
     directSerialise push sk
     mlockedSeedUseAsCPtr r $ \ptr ->
@@ -486,11 +483,10 @@ instance ( DirectSerialise m (SignKeyKES d)
     directSerialise push vk0
     directSerialise push vk1
 
-instance ( DirectDeserialise m (SignKeyKES d)
-         , DirectDeserialise m (VerKeyKES d)
-         , MonadST m
+instance ( DirectDeserialise (SignKeyKES d)
+         , DirectDeserialise (VerKeyKES d)
          , KESAlgorithm d
-         ) => DirectDeserialise m (SignKeyKES (CompactSumKES h d)) where
+         ) => DirectDeserialise (SignKeyKES (CompactSumKES h d)) where
   directDeserialise pull = do
     sk <- directDeserialise pull
 
@@ -504,18 +500,17 @@ instance ( DirectDeserialise m (SignKeyKES d)
     return $! SignKeyCompactSumKES sk r vk0 vk1
 
 
-instance (MonadST m, MonadThrow m)
-         => DirectSerialise m (VerKeyKES (CompactSumKES h d)) where
+instance DirectSerialise (VerKeyKES (CompactSumKES h d)) where
   directSerialise push (VerKeyCompactSumKES h) =
     unpackByteStringCStringLen (hashToBytes h) $ \(ptr, len) ->
       push (castPtr ptr) (fromIntegral len)
 
-instance (MonadST m, MonadThrow m, MonadFail m, HashAlgorithm h)
-         => DirectDeserialise m (VerKeyKES (CompactSumKES h d)) where
+instance (HashAlgorithm h)
+         => DirectDeserialise (VerKeyKES (CompactSumKES h d)) where
   directDeserialise pull = do
     let len :: Num a => a
         len = fromIntegral $ sizeHash (Proxy @h)
     allocaBytes len $ \ptr -> do
       pull ptr len
       bs <- packByteStringCStringLen (ptr, len)
-      maybe (fail "Invalid hash") return $! VerKeyCompactSumKES <$!> hashFromBytes bs
+      maybe (error "Invalid hash") return $! VerKeyCompactSumKES <$!> hashFromBytes bs
