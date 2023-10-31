@@ -24,6 +24,8 @@ import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
+import qualified Data.ByteString.Internal as BS
+import Foreign.Ptr (castPtr)
 
 import Control.Exception (assert)
 
@@ -39,8 +41,8 @@ import Cardano.Crypto.Libsodium
   )
 import Cardano.Crypto.Libsodium.Memory
   ( unpackByteStringCStringLen
-  , packByteStringCStringLen
-  , allocaBytes
+  , mallocForeignPtrBytes
+  , withForeignPtr
   )
 import Cardano.Crypto.DirectSerialise
 
@@ -210,9 +212,10 @@ instance (KnownNat t) => DirectSerialise (SignKeyKES (MockKES t)) where
 instance (KnownNat t) => DirectDeserialise (SignKeyKES (MockKES t)) where
   directDeserialise pull = do
     let len = fromIntegral $ sizeSignKeyKES (Proxy @(MockKES t))
-    bs <- allocaBytes len $ \cstr -> do
-        pull cstr (fromIntegral len)
-        packByteStringCStringLen (cstr, len)
+    fptr <- mallocForeignPtrBytes len
+    withForeignPtr fptr $ \ptr ->
+        pull (castPtr ptr) (fromIntegral len)
+    let bs = BS.fromForeignPtr0 fptr len
     maybe (error "directDeserialise @(SignKeyKES (MockKES t))") return $
         rawDeserialiseSignKeyMockKES bs
 
@@ -224,8 +227,9 @@ instance (KnownNat t) => DirectSerialise (VerKeyKES (MockKES t)) where
 instance (KnownNat t) => DirectDeserialise (VerKeyKES (MockKES t)) where
   directDeserialise pull = do
     let len = fromIntegral $ sizeVerKeyKES (Proxy @(MockKES t))
-    bs <- allocaBytes len $ \cstr -> do
-        pull cstr (fromIntegral len)
-        packByteStringCStringLen (cstr, len)
+    fptr <- mallocForeignPtrBytes len
+    withForeignPtr fptr $ \ptr ->
+        pull (castPtr ptr) (fromIntegral len)
+    let bs = BS.fromForeignPtr0 fptr len
     maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
         rawDeserialiseVerKeyKES bs
