@@ -58,7 +58,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
 import Data.Typeable
-import Data.Word (Word8)
 import Debug.Trace (traceShowM)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.String (CStringLen)
@@ -70,7 +69,7 @@ import Foreign.ForeignPtr (ForeignPtr)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Foreign.Storable (Storable (peek), sizeOf, alignment, pokeByteOff)
+import Foreign.Storable (Storable (peek), sizeOf, alignment)
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -220,10 +219,9 @@ allocaBytes size action = do
 unpackByteStringCStringLen :: (MonadThrow m, MonadST m) => ByteString -> (CStringLen -> m a) -> m a
 unpackByteStringCStringLen bs f = do
   let len = BS.length bs
-  allocaBytes (len + 1) $ \buf -> do
+  allocaBytes len $ \buf -> do
     unsafeIOToMonadST $ BS.unsafeUseAsCString bs $ \ptr -> do
       copyMem buf ptr (fromIntegral len)
-      pokeByteOff buf len (0 :: Word8)
     f (buf, len)
 
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
