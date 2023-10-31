@@ -33,6 +33,7 @@ import Prelude hiding ((.))
 import Codec.CBOR.Decoding as D
 import Codec.CBOR.ByteArray as BA ( ByteArray(BA) )
 import Codec.CBOR.Term
+import Codec.CBOR.FlatTerm
 import Control.Category (Category((.)))
 import Control.Exception (Exception)
 import Control.Monad (when, replicateM)
@@ -77,6 +78,10 @@ class Typeable a => FromCBOR a where
 
 instance FromCBOR Term where
   fromCBOR = decodeTerm
+
+instance FromCBOR TermToken where
+  fromCBOR = decodeTermToken
+
 
 --------------------------------------------------------------------------------
 -- DecoderError
