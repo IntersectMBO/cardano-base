@@ -208,10 +208,10 @@ testKESAlgorithm
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
      , UnsoundKESAlgorithm v
-     , DirectSerialise IO (SignKeyKES v)
-     , DirectSerialise IO (VerKeyKES v)
-     , DirectDeserialise IO (SignKeyKES v)
-     , DirectDeserialise IO (VerKeyKES v)
+     , DirectSerialise (SignKeyKES v)
+     , DirectSerialise (VerKeyKES v)
+     , DirectDeserialise (SignKeyKES v)
+     , DirectDeserialise (VerKeyKES v)
      )
   => Lock
   -> String
@@ -766,7 +766,7 @@ withNullSK = bracket
 prop_noErasedBlocksInKey
   :: forall v.
      UnsoundKESAlgorithm v
-  => DirectSerialise IO (SignKeyKES v)
+  => DirectSerialise (SignKeyKES v)
   => Proxy v
   -> Property
 prop_noErasedBlocksInKey kesAlgorithm =
