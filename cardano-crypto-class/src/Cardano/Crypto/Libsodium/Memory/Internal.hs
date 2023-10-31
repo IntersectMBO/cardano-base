@@ -29,6 +29,7 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   mlockedAllocForeignPtrBytesWith,
 
   -- * 'ForeignPtr' operations, generalized to 'MonadST'
+  ForeignPtr (..),
   mallocForeignPtrBytes,
   withForeignPtr,
 
@@ -58,7 +59,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
 import Data.Typeable
-import Data.Word (Word8)
 import Debug.Trace (traceShowM)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.String (CStringLen)
@@ -66,22 +66,22 @@ import Foreign.C.Types (CSize (..))
 import qualified Foreign.Concurrent as Foreign
 import qualified Foreign.ForeignPtr as Foreign hiding (newForeignPtr)
 import qualified Foreign.ForeignPtr.Unsafe as Foreign
-import Foreign.ForeignPtr (ForeignPtr)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Foreign.Storable (Storable (peek), sizeOf, alignment, pokeByteOff)
+import Foreign.Storable (Storable (peek), sizeOf, alignment)
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
+import Data.Kind
 
 import Cardano.Crypto.Libsodium.C
 import Cardano.Foreign (c_memset, c_memcpy, SizedPtr (..))
 import Cardano.Memory.Pool (initPool, grabNextBlock, Pool)
 
 -- | Foreign pointer to securely allocated memory.
-newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: ForeignPtr a }
+newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: Foreign.ForeignPtr a }
   deriving NoThunks via OnlyCheckWhnfNamed "MLockedForeignPtr" (MLockedForeignPtr a)
 
 instance NFData (MLockedForeignPtr a) where
@@ -197,15 +197,20 @@ zeroMem ptr size = unsafeIOToMonadST . void $ c_memset (castPtr ptr) 0 size
 copyMem :: MonadST m => Ptr a -> Ptr a -> CSize -> m ()
 copyMem dst src size = unsafeIOToMonadST . void $ c_memcpy (castPtr dst) (castPtr src) size
 
-mallocForeignPtrBytes :: (MonadST m) => Int -> m (ForeignPtr a)
+-- | A 'ForeignPtr' type, generalized to 'MonadST'. The type is tagged with
+-- the correct Monad @m@ in order to ensure that foreign pointers created in
+-- one ST context can only be used within the same ST context.
+newtype ForeignPtr (m :: Type -> Type) a = ForeignPtr { unsafeRawForeignPtr :: Foreign.ForeignPtr a }
+
+mallocForeignPtrBytes :: (MonadST m) => Int -> m (ForeignPtr m a)
 mallocForeignPtrBytes size =
-  unsafeIOToMonadST (Foreign.mallocForeignPtrBytes size)
+  ForeignPtr <$> unsafeIOToMonadST (Foreign.mallocForeignPtrBytes size)
 
 -- | 'Foreign.withForeignPtr', generalized to 'MonadST'.
 -- Caveat: if the monadic action passed to 'withForeignPtr' does not terminate
 -- (e.g., 'forever'), the 'ForeignPtr' finalizer may run prematurely.
-withForeignPtr :: (MonadST m) => ForeignPtr a -> (Ptr a -> m b) -> m b
-withForeignPtr fptr f = do
+withForeignPtr :: (MonadST m) => ForeignPtr m a -> (Ptr a -> m b) -> m b
+withForeignPtr (ForeignPtr fptr) f = do
   result <- f $ Foreign.unsafeForeignPtrToPtr fptr
   stToIO $ touch fptr
   return result
@@ -220,10 +225,9 @@ allocaBytes size action = do
 unpackByteStringCStringLen :: (MonadThrow m, MonadST m) => ByteString -> (CStringLen -> m a) -> m a
 unpackByteStringCStringLen bs f = do
   let len = BS.length bs
-  allocaBytes (len + 1) $ \buf -> do
+  allocaBytes len $ \buf -> do
     unsafeIOToMonadST $ BS.unsafeUseAsCString bs $ \ptr -> do
       copyMem buf ptr (fromIntegral len)
-      pokeByteOff buf len (0 :: Word8)
     f (buf, len)
 
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString

@@ -87,6 +87,7 @@ module Cardano.Crypto.KES.CompactSum (
 import           Data.Proxy (Proxy(..))
 import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
 import           Control.Monad (guard, (<$!>))
 import           NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
@@ -510,7 +511,8 @@ instance (HashAlgorithm h)
   directDeserialise pull = do
     let len :: Num a => a
         len = fromIntegral $ sizeHash (Proxy @h)
-    allocaBytes len $ \ptr -> do
-      pull ptr len
-      bs <- packByteStringCStringLen (ptr, len)
-      maybe (error "Invalid hash") return $! VerKeyCompactSumKES <$!> hashFromBytes bs
+    fptr <- mallocForeignPtrBytes len
+    withForeignPtr fptr $ \ptr -> do
+      pull (castPtr ptr) len
+    let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
+    maybe (error "Invalid hash") return $! VerKeyCompactSumKES <$!> hashFromBytes bs
