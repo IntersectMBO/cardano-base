@@ -28,6 +28,10 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   mlockedAllocForeignPtrWith,
   mlockedAllocForeignPtrBytesWith,
 
+  -- * 'ForeignPtr' operations, generalized to 'MonadST'
+  mallocForeignPtrBytes,
+  withForeignPtr,
+
   -- * Unmanaged memory, generalized to 'MonadST'
   zeroMem,
   copyMem,
@@ -47,6 +51,7 @@ import Control.Monad (when, void)
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
 import Control.Monad.ST (RealWorld, ST)
+import Control.Monad.Primitive (touch)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -58,10 +63,11 @@ import Debug.Trace (traceShowM)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.C.String (CStringLen)
 import Foreign.C.Types (CSize (..))
-import Foreign.Concurrent (newForeignPtr)
-import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, touchForeignPtr)
+import qualified Foreign.Concurrent as Foreign
+import qualified Foreign.ForeignPtr as Foreign hiding (newForeignPtr)
+import qualified Foreign.ForeignPtr.Unsafe as Foreign
+import Foreign.ForeignPtr (ForeignPtr)
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
-import qualified Foreign.Marshal.Alloc as Foreign
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (Ptr, nullPtr, castPtr)
 import Foreign.Storable (Storable (peek), sizeOf, alignment, pokeByteOff)
@@ -84,11 +90,11 @@ instance NFData (MLockedForeignPtr a) where
 withMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> (Ptr a -> m b) -> m b
 withMLockedForeignPtr (SFP fptr) f = do
   r <- f (unsafeForeignPtrToPtr fptr)
-  r <$ unsafeIOToMonadST (touchForeignPtr fptr)
+  r <$ unsafeIOToMonadST (Foreign.touchForeignPtr fptr)
 
 finalizeMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> m ()
 finalizeMLockedForeignPtr (SFP fptr) =
-  unsafeIOToMonadST $ finalizeForeignPtr fptr
+  unsafeIOToMonadST $ Foreign.finalizeForeignPtr fptr
 
 {-# WARNING traceMLockedForeignPtr "Do not use traceMLockedForeignPtr in production" #-}
 
@@ -106,7 +112,7 @@ makeMLockedPool = do
     (max 1 . fromIntegral $ 4096 `div` natVal (Proxy @n) `div` 64)
     (\size -> unsafeIOToST $ mask_ $ do
       ptr <- sodiumMalloc (fromIntegral size)
-      newForeignPtr ptr (sodiumFree ptr (fromIntegral size))
+      Foreign.newForeignPtr ptr (sodiumFree ptr (fromIntegral size))
     )
     (\ptr -> do
       eraseMem (Proxy @n) ptr
@@ -162,7 +168,7 @@ mlockedMallocIO size = SFP <$> do
     | otherwise -> do
         mask_ $ do
           ptr <- sodiumMalloc size
-          newForeignPtr ptr $ do
+          Foreign.newForeignPtr ptr $ do
             sodiumFree ptr size
 
 sodiumMalloc :: CSize -> IO (Ptr a)
@@ -191,18 +197,23 @@ zeroMem ptr size = unsafeIOToMonadST . void $ c_memset (castPtr ptr) 0 size
 copyMem :: MonadST m => Ptr a -> Ptr a -> CSize -> m ()
 copyMem dst src size = unsafeIOToMonadST . void $ c_memcpy (castPtr dst) (castPtr src) size
 
+mallocForeignPtrBytes :: (MonadST m) => Int -> m (ForeignPtr a)
+mallocForeignPtrBytes size =
+  unsafeIOToMonadST (Foreign.mallocForeignPtrBytes size)
+
+-- | 'Foreign.withForeignPtr', generalized to 'MonadST'.
+-- Caveat: if the monadic action passed to 'withForeignPtr' does not terminate
+-- (e.g., 'forever'), the 'ForeignPtr' finalizer may run prematurely.
+withForeignPtr :: (MonadST m) => ForeignPtr a -> (Ptr a -> m b) -> m b
+withForeignPtr fptr f = do
+  result <- f $ Foreign.unsafeForeignPtrToPtr fptr
+  stToIO $ touch fptr
+  return result
+
 allocaBytes :: (MonadThrow m, MonadST m) => Int -> (Ptr a -> m b) -> m b
-allocaBytes size =
-  bracket
-    (mallocBytes size)
-    free
-
-mallocBytes :: MonadST m => Int -> m (Ptr a)
-mallocBytes size =
-  unsafeIOToMonadST $ Foreign.mallocBytes size
-
-free :: MonadST m => Ptr a -> m ()
-free = unsafeIOToMonadST . Foreign.free
+allocaBytes size action = do
+  fptr <- mallocForeignPtrBytes size
+  withForeignPtr fptr action
 
 -- | Unpacks a ByteString into a temporary buffer and runs the provided 'ST'
 -- function on it.
