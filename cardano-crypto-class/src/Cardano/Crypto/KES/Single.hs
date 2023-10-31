@@ -192,14 +192,14 @@ instance DSIGNMAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
 -- Direct ser/deser
 --
 
-instance (DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (SingleKES d)) where
+instance (DirectSerialise (SignKeyDSIGNM d)) => DirectSerialise (SignKeyKES (SingleKES d)) where
   directSerialise push (SignKeySingleKES sk) = directSerialise push sk
 
-instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d)) => DirectDeserialise m (SignKeyKES (SingleKES d)) where
+instance (DirectDeserialise (SignKeyDSIGNM d)) => DirectDeserialise (SignKeyKES (SingleKES d)) where
   directDeserialise pull = SignKeySingleKES <$!> directDeserialise pull
 
-instance (DirectSerialise m (VerKeyDSIGN d)) => DirectSerialise m (VerKeyKES (SingleKES d)) where
+instance (DirectSerialise (VerKeyDSIGN d)) => DirectSerialise (VerKeyKES (SingleKES d)) where
   directSerialise push (VerKeySingleKES sk) = directSerialise push sk
 
-instance (Monad m, DirectDeserialise m (VerKeyDSIGN d)) => DirectDeserialise m (VerKeyKES (SingleKES d)) where
+instance (DirectDeserialise (VerKeyDSIGN d)) => DirectDeserialise (VerKeyKES (SingleKES d)) where
   directDeserialise pull = VerKeySingleKES <$!> directDeserialise pull
