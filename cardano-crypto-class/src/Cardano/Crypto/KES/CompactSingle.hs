@@ -232,14 +232,14 @@ slice offset size = BS.take (fromIntegral size)
 -- Direct ser/deser
 --
 
-instance (DirectSerialise m (SignKeyDSIGNM d)) => DirectSerialise m (SignKeyKES (CompactSingleKES d)) where
+instance (DirectSerialise (SignKeyDSIGNM d)) => DirectSerialise (SignKeyKES (CompactSingleKES d)) where
   directSerialise push (SignKeyCompactSingleKES sk) = directSerialise push sk
 
-instance (Monad m, DirectDeserialise m (SignKeyDSIGNM d)) => DirectDeserialise m (SignKeyKES (CompactSingleKES d)) where
+instance (DirectDeserialise (SignKeyDSIGNM d)) => DirectDeserialise (SignKeyKES (CompactSingleKES d)) where
   directDeserialise pull = SignKeyCompactSingleKES <$!> directDeserialise pull
 
-instance (DirectSerialise m (VerKeyDSIGN d)) => DirectSerialise m (VerKeyKES (CompactSingleKES d)) where
+instance (DirectSerialise (VerKeyDSIGN d)) => DirectSerialise (VerKeyKES (CompactSingleKES d)) where
   directSerialise push (VerKeyCompactSingleKES sk) = directSerialise push sk
 
-instance (Monad m, DirectDeserialise m (VerKeyDSIGN d)) => DirectDeserialise m (VerKeyKES (CompactSingleKES d)) where
+instance (DirectDeserialise (VerKeyDSIGN d)) => DirectDeserialise (VerKeyKES (CompactSingleKES d)) where
   directDeserialise pull = VerKeyCompactSingleKES <$!> directDeserialise pull

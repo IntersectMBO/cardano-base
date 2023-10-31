@@ -367,10 +367,10 @@ testDSIGNMAlgorithm
                , FromCBOR (SigDSIGN v)
                , ContextDSIGN v ~ ()
                , Signable v Message
-               , DirectSerialise IO (SignKeyDSIGNM v)
-               , DirectDeserialise IO (SignKeyDSIGNM v)
-               , DirectSerialise IO (VerKeyDSIGN v)
-               , DirectDeserialise IO (VerKeyDSIGN v)
+               , DirectSerialise (SignKeyDSIGNM v)
+               , DirectDeserialise (SignKeyDSIGNM v)
+               , DirectSerialise (VerKeyDSIGN v)
+               , DirectDeserialise (VerKeyDSIGN v)
                )
   => Lock
   -> Proxy v

@@ -370,9 +370,7 @@ instance TypeError ('Text "CBOR decoding would violate mlocking guarantees")
   => FromCBOR (SignKeyDSIGNM Ed25519DSIGN) where
   fromCBOR = error "unsupported"
 
-instance ( MonadThrow m
-         , MonadST m
-         ) => DirectSerialise m (SignKeyDSIGNM Ed25519DSIGN) where
+instance DirectSerialise (SignKeyDSIGNM Ed25519DSIGN) where
   -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. The
   -- latter contains both the seed and the 32-byte verification key, which is
   -- convenient, but redundant, since we can always reconstruct it from the
@@ -387,11 +385,9 @@ instance ( MonadThrow m
             (castPtr ptr)
             (fromIntegral $ seedSizeDSIGN (Proxy @Ed25519DSIGN)))
 
-instance ( MonadThrow m
-         , MonadST m
-         ) => DirectDeserialise m (SignKeyDSIGNM Ed25519DSIGN) where
+instance DirectDeserialise (SignKeyDSIGNM Ed25519DSIGN) where
   -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. See
-  -- the DirectSerialise m instance above.
+  -- the DirectSerialise instance above.
   directDeserialise pull = do
     bracket
       mlockedSeedNew
@@ -404,14 +400,14 @@ instance ( MonadThrow m
           genKeyDSIGNM seed
       )
 
-instance MonadST m => DirectSerialise m (VerKeyDSIGN Ed25519DSIGN) where
+instance DirectSerialise (VerKeyDSIGN Ed25519DSIGN) where
   directSerialise push (VerKeyEd25519DSIGN psb) = do
     psbUseAsCPtrLen psb $ \ptr _ ->
       push
         (castPtr ptr)
         (fromIntegral $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
 
-instance MonadST m => DirectDeserialise m (VerKeyDSIGN Ed25519DSIGN) where
+instance DirectDeserialise (VerKeyDSIGN Ed25519DSIGN) where
   directDeserialise pull = do
     psb <- psbCreate $ \ptr ->
       pull
