@@ -41,7 +41,7 @@ library
 
   build-depends:        base
                       , bytestring
-                      , cborg              >= 0.2.2 && < 0.3
+                      , cborg              >= 0.2.9 && < 0.3
                       , containers
                       , data-fix
                       , formatting
