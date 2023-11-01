@@ -434,5 +434,5 @@ instance (HashAlgorithm h)
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr -> do
       pull (castPtr ptr) len
-    let bs = BS.fromForeignPtr0 fptr len
+    let bs = BS.fromForeignPtr fptr 0 len
     maybe (error "Invalid hash") return $! VerKeySumKES <$!> hashFromBytes bs
