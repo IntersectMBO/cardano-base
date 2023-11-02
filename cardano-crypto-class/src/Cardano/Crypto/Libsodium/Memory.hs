@@ -26,6 +26,7 @@ module Cardano.Crypto.Libsodium.Memory (
   allocaBytes,
 
   -- * 'ForeignPtr' operations, generalized to 'MonadST'
+  ForeignPtr (..),
   mallocForeignPtrBytes,
   withForeignPtr,
 
