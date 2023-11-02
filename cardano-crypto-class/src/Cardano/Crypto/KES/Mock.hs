@@ -41,6 +41,7 @@ import Cardano.Crypto.Libsodium
   )
 import Cardano.Crypto.Libsodium.Memory
   ( unpackByteStringCStringLen
+  , ForeignPtr (..)
   , mallocForeignPtrBytes
   , withForeignPtr
   )
@@ -215,7 +216,7 @@ instance (KnownNat t) => DirectDeserialise (SignKeyKES (MockKES t)) where
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
         pull (castPtr ptr) (fromIntegral len)
-    let bs = BS.fromForeignPtr fptr 0 len
+    let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(SignKeyKES (MockKES t))") return $
         rawDeserialiseSignKeyMockKES bs
 
@@ -230,6 +231,6 @@ instance (KnownNat t) => DirectDeserialise (VerKeyKES (MockKES t)) where
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
         pull (castPtr ptr) (fromIntegral len)
-    let bs = BS.fromForeignPtr fptr 0 len
+    let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
         rawDeserialiseVerKeyKES bs
