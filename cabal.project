@@ -10,7 +10,7 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2023-10-05T21:19:55Z
+index-state: 2023-11-08T09:44:54Z
 -- The CHaP index-state
 index-state: cardano-haskell-packages 2023-10-05T20:34:14Z
 
