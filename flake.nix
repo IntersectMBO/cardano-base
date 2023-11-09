@@ -38,7 +38,7 @@
         flake = (nixpkgs.haskell-nix.cabalProject' rec {
           src = ./.;
           name = "cardano-base";
-          compiler-nix-name = "ghc927";
+          compiler-nix-name = "ghc928";
 
           # CHaP input map, so we can find CHaP packages (needs to be more
           # recent than the index-state we set!). Can be updated with
