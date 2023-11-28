@@ -1,8 +1,9 @@
 # Changelog for `cardano-slotting`
 
-## 0.1.1.2
+## 0.1.2.0
 
-*
+* New `Test.Cardano.Slotting.TreeDiff` module extracted from
+  `cardano-ledger-binary`. It lives in a new public sublibrary `testlib`.
 
 ## 0.1.1.1
 
@@ -20,4 +21,3 @@
 ## 0.1.0.1
 
 * Initial release
-
