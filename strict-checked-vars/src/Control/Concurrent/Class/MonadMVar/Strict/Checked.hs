@@ -33,6 +33,7 @@ module Control.Concurrent.Class.MonadMVar.Strict.Checked (
   , tryPutMVar
   , tryReadMVar
   , tryTakeMVar
+  , unsafeToUncheckedStrictMVar
   , withMVar
   , withMVarMasked
     -- * Invariant
@@ -95,6 +96,13 @@ toLazyMVar = Strict.toLazyMVar . mvar
 -- The resulting 'StrictMVar' has a trivial invariant.
 fromLazyMVar :: LazyMVar m a -> StrictMVar m a
 fromLazyMVar = mkStrictMVar (const Nothing) . Strict.fromLazyMVar
+
+-- | Create an unchecked reference to the given checked 'StrictMVar'.
+--
+-- Note that the invariant is only guaranteed when modifying the checked MVar.
+-- Any modification to the unchecked reference might break the invariants.
+unsafeToUncheckedStrictMVar :: StrictMVar m a -> Strict.StrictMVar m a
+unsafeToUncheckedStrictMVar = mvar
 
 newEmptyMVar :: MonadMVar m => m (StrictMVar m a)
 newEmptyMVar = mkStrictMVar (const Nothing) <$> Strict.newEmptyMVar

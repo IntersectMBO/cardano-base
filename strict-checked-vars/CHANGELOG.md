@@ -8,6 +8,9 @@
   where compiling projects that depend on `strict-checked-vars` might succeed
   with a flag turned on but fail when it is turned off (and vice versa).
 
+* Add new `unsafeToUncheckedStrictMVar` and `unsafeToUncheckedStrictTVar`
+  functions.
+
 ## 0.1.0.4
 
 * Propagate HasCallStack constraints in the `Switch` module for checked strict
