@@ -1,6 +1,6 @@
 cabal-version:   3.0
 name:            strict-checked-vars
-version:         0.1.0.4
+version:         0.2.0.0
 synopsis:
   Strict MVars and TVars with invariant checking for IO and IOSim
 
@@ -45,9 +45,7 @@ library
   hs-source-dirs:   src
   exposed-modules:
     Control.Concurrent.Class.MonadMVar.Strict.Checked
-    Control.Concurrent.Class.MonadMVar.Strict.Checked.Switch
     Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked
-    Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.Switch
 
   default-language: Haskell2010
   build-depends:

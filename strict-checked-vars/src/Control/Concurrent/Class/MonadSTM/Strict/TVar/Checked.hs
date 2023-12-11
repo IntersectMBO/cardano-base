@@ -1,6 +1,8 @@
-{-# LANGUAGE BangPatterns  #-}
-{-# LANGUAGE TypeFamilies  #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE BangPatterns   #-}
+{-# LANGUAGE CPP            #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies   #-}
+{-# LANGUAGE TypeOperators  #-}
 
 -- | This module corresponds to "Control.Concurrent.STM.TVar" in the @stm@ package.
 --
@@ -46,15 +48,21 @@ import           GHC.Stack (HasCallStack)
 
 type LazyTVar m = Strict.LazyTVar m
 
+#if CHECK_TVAR_INVARIANTS
 data StrictTVar m a = StrictTVar {
     -- | Invariant checked whenever updating the 'StrictTVar'.
     invariant :: !(a -> Maybe String)
   , tvar      :: !(Strict.StrictTVar m a)
   }
+#else
+newtype StrictTVar m a = StrictTVar {
+    tvar :: Strict.StrictTVar m a
+  }
+#endif
 
 castStrictTVar :: LazyTVar m ~ LazyTVar n
                => StrictTVar m a -> StrictTVar n a
-castStrictTVar v = StrictTVar (invariant v) (Strict.castStrictTVar $ tvar v)
+castStrictTVar v = mkStrictTVar (getInvariant v) (Strict.castStrictTVar $ tvar v)
 
 -- | Get the underlying @TVar@
 --
@@ -74,10 +82,10 @@ toLazyTVar = Strict.toLazyTVar . tvar
 --
 -- The resulting 'StrictTVar' has a trivial invariant.
 fromLazyTVar :: LazyTVar m a -> StrictTVar m a
-fromLazyTVar = StrictTVar (const Nothing) . Strict.fromLazyTVar
+fromLazyTVar = mkStrictTVar (const Nothing) . Strict.fromLazyTVar
 
 newTVar :: MonadSTM m => a -> STM m (StrictTVar m a)
-newTVar a = StrictTVar (const Nothing) <$> Strict.newTVar a
+newTVar a = mkStrictTVar (const Nothing) <$> Strict.newTVar a
 
 newTVarIO :: MonadSTM m => a -> m (StrictTVar m a)
 newTVarIO = newTVarWithInvariantIO (const Nothing)
@@ -88,7 +96,7 @@ newTVarWithInvariant :: (MonadSTM m, HasCallStack)
                      -> STM m (StrictTVar m a)
 newTVarWithInvariant inv !a =
     checkInvariant (inv a) $
-    StrictTVar inv <$> Strict.newTVar a
+    mkStrictTVar inv <$> Strict.newTVar a
 
 newTVarWithInvariantIO :: (MonadSTM m, HasCallStack)
                        => (a -> Maybe String)
@@ -96,7 +104,7 @@ newTVarWithInvariantIO :: (MonadSTM m, HasCallStack)
                        -> m (StrictTVar m a)
 newTVarWithInvariantIO inv !a =
     checkInvariant (inv a) $
-    StrictTVar inv <$> Strict.newTVarIO a
+    mkStrictTVar inv <$> Strict.newTVarIO a
 
 readTVar :: MonadSTM m => StrictTVar m a -> STM m a
 readTVar = Strict.readTVar . tvar
@@ -106,7 +114,7 @@ readTVarIO = Strict.readTVarIO . tvar
 
 writeTVar :: (MonadSTM m, HasCallStack) => StrictTVar m a -> a -> STM m ()
 writeTVar v !a =
-    checkInvariant (invariant v a) $
+    checkInvariant (getInvariant v a) $
     Strict.writeTVar (tvar v) a
 
 modifyTVar :: MonadSTM m => StrictTVar m a -> (a -> a) -> STM m ()
@@ -129,13 +137,29 @@ swapTVar v a' = do
 -- Dealing with invariants
 --
 
--- | Check invariant
+
+-- | Check invariant (if enabled) before continuing
 --
--- @checkInvariant mErr x@ is equal to @x@ if @mErr == Nothing@, and throws an
--- error @err@ if @mErr == Just err@.
+-- @checkInvariant mErr x@ is equal to @x@ if @mErr == Nothing@, and throws
+-- an error @err@ if @mErr == Just err@.
+--
+-- This is exported so that other code that wants to conditionally check
+-- invariants can reuse the same logic, rather than having to introduce new
+-- per-package flags.
 checkInvariant :: HasCallStack => Maybe String -> a -> a
+getInvariant :: StrictTVar m a -> a -> Maybe String
+mkStrictTVar :: (a -> Maybe String) -> Strict.StrictTVar m a -> StrictTVar m a
+
+#if CHECK_TVAR_INVARIANTS
 checkInvariant Nothing    k = k
 checkInvariant (Just err) _ = error $ "StrictTVar invariant violation: " ++ err
+getInvariant StrictTVar {invariant} = invariant
+mkStrictTVar invariant  tvar        = StrictTVar {invariant, tvar}
+#else
+checkInvariant _err       k  = k
+getInvariant _               = const Nothing
+mkStrictTVar _invariant tvar = StrictTVar {tvar}
+#endif
 
 {-------------------------------------------------------------------------------
   MonadLabelledSTM
