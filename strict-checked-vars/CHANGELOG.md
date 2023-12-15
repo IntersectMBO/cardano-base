@@ -1,5 +1,9 @@
 # Revision history of strict-checked-vars
 
+## 0.2.1.0
+
+* Add `unsafeFromUncheckedStrictMVar` and `unsafeFromUncheckedStrictTVar` functions.
+
 ## 0.2.0.0
 
 * Remove 'Switch' modules. From now on, instead of switching _imports_, this

@@ -25,6 +25,7 @@ module Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked (
   , stateTVar
   , swapTVar
   , toLazyTVar
+  , unsafeFromUncheckedStrictTVar
   , unsafeToUncheckedStrictTVar
   , writeTVar
     -- * MonadLabelSTM
@@ -91,6 +92,12 @@ fromLazyTVar = mkStrictTVar (const Nothing) . Strict.fromLazyTVar
 -- Any modification to the unchecked reference might break the invariants.
 unsafeToUncheckedStrictTVar :: StrictTVar m a -> Strict.StrictTVar m a
 unsafeToUncheckedStrictTVar = tvar
+
+-- | Create a checked reference to the given unchecked 'StrictTVar'.
+--
+-- The resulting checked reference has a trivial invariant.
+unsafeFromUncheckedStrictTVar ::  Strict.StrictTVar m a -> StrictTVar m a
+unsafeFromUncheckedStrictTVar = mkStrictTVar (const Nothing)
 
 newTVar :: MonadSTM m => a -> STM m (StrictTVar m a)
 newTVar a = mkStrictTVar (const Nothing) <$> Strict.newTVar a
