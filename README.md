@@ -3,7 +3,7 @@
 A collection of miscellaneous packages used by Cardano that cover:
 
 * cryptography
-* serialization
+* serialization 
 * slotting
 
 Each sub-project has its own README.
