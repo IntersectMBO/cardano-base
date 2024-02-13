@@ -2,6 +2,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Strict variants of 'Seq' operations.
@@ -71,6 +72,7 @@ import Data.Foldable (foldl', toList)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Unit.Strict (forceElemsToWHNF)
+import qualified GHC.Exts as GHC (IsList (..))
 import NoThunks.Class (NoThunks (..), noThunksInValues)
 import Prelude hiding
   ( drop,
@@ -136,6 +138,11 @@ instance FromJSON a => FromJSON (StrictSeq a) where
 instance ToJSON a => ToJSON (StrictSeq a) where
   toJSON = toJSON . toList
   toEncoding = toEncoding . toList
+
+instance GHC.IsList (StrictSeq a) where
+  type Item (StrictSeq a) = a
+  fromList = fromList
+  toList = toList . fromStrict
 
 -- | A helper function for the ':<|' pattern.
 viewFront :: StrictSeq a -> Maybe (a, StrictSeq a)
