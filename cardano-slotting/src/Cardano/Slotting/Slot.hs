@@ -17,6 +17,7 @@ module Cardano.Slotting.Slot
     withOriginFromMaybe,
     EpochNo (..),
     EpochSize (..),
+    binOpEpochNo,
   )
 where
 
@@ -114,9 +115,13 @@ withOriginFromMaybe (Just t) = At t
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochNo
-  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+  deriving newtype (Enum, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochSize
-  deriving newtype (Enum, Num, Real, Integral, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+  deriving newtype (Enum, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+
+-- | Convenience function for doing binary operations on two `EpochNo`s
+binOpEpochNo :: (Word64 -> Word64 -> Word64) -> EpochNo -> EpochNo -> EpochNo
+binOpEpochNo op en1 en2 = EpochNo $ op (unEpochNo en1) (unEpochNo en2)
