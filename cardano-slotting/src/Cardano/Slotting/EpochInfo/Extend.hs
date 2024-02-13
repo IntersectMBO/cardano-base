@@ -1,7 +1,12 @@
 module Cardano.Slotting.EpochInfo.Extend where
 
 import Cardano.Slotting.EpochInfo.API (EpochInfo (..))
-import Cardano.Slotting.Slot (EpochNo (EpochNo), EpochSize (EpochSize), SlotNo (SlotNo))
+import Cardano.Slotting.Slot
+  ( EpochNo (EpochNo),
+    EpochSize (EpochSize),
+    SlotNo (SlotNo),
+    binOpEpochNo
+  )
 import Cardano.Slotting.Time
   ( SlotLength (getSlotLength),
     addRelativeTime,
@@ -35,7 +40,7 @@ unsafeLinearExtendEpochInfo basisSlot underlyingEI =
           else do
             SlotNo lkeStart <- epochInfoFirst_ underlyingEI lke
             EpochSize sz <- epochInfoSize_ underlyingEI en
-            let EpochNo numEpochs = en - lke
+            let EpochNo numEpochs = binOpEpochNo (-) en lke
             pure . SlotNo $ lkeStart + (numEpochs * sz)
       goEpoch = \sn ->
         if sn <= basisSlot
@@ -45,7 +50,7 @@ unsafeLinearExtendEpochInfo basisSlot underlyingEI =
             lkeStart <- epochInfoFirst_ underlyingEI lke
             EpochSize sz <- epochInfoSize_ underlyingEI lke
             let SlotNo slotsForward = sn - lkeStart
-            pure . (lke +) . EpochNo $ slotsForward `div` sz
+            pure . binOpEpochNo (+) lke . EpochNo $ slotsForward `div` sz
       goTime = \sn ->
         if sn <= basisSlot
           then epochInfoSlotToRelativeTime_ underlyingEI sn
