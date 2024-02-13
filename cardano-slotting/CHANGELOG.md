@@ -2,6 +2,7 @@
 
 ## 0.2.0.0
 
+* Add `EpochInterval` and `addEpochInterval` from `cardano-ledger`.
 * Add `binOpEpochNo` helper function to facilitate binary operations on
   `EpochNo`.
 * Remove numeric instances (`Num`, `Integral`, `Real`) of `EpochNo` and
