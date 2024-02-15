@@ -55,7 +55,7 @@
             ghcid = "0.8.8";
             haskell-language-server = "latest";
             hlint = "3.8";
-            weeder = "2.4.1";
+            weeder = "2.7.0";
           };
           # Now we use pkgsBuildBuild, to make sure that even in the cross
           # compilation setting, we don't run into issues where we pick tools
