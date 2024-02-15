@@ -54,8 +54,11 @@
             cabal = "3.10.1.0";
             ghcid = "0.8.8";
             haskell-language-server = "latest";
-            hlint = "3.8";
-            weeder = "2.7.0";
+            # ghc 9.2.8 comes with base 4.16.
+            # this disqualifies weeder > 2.4.1
+            # and hlint > 3.6.1
+            hlint = "3.6.1";
+            weeder = "2.4.1";
           };
           # Now we use pkgsBuildBuild, to make sure that even in the cross
           # compilation setting, we don't run into issues where we pick tools
