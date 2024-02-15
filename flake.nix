@@ -54,7 +54,7 @@
             cabal = "3.10.1.0";
             ghcid = "0.8.8";
             haskell-language-server = "latest";
-            hlint = "3.8";
+            hlint = "3.6.1";
             weeder = "2.7.0";
           };
           # Now we use pkgsBuildBuild, to make sure that even in the cross
