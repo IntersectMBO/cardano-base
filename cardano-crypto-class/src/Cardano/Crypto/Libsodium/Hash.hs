@@ -49,13 +49,13 @@ expandHashWith
 expandHashWith allocator h (MLSB sfptr) = do
     withMLockedForeignPtr sfptr $ \ptr -> do
         l <- mlockedAllocaWith allocator size1 $ \ptr' -> do
-              withLiftST $ \liftST -> liftST . unsafeIOToST $ do
+              stToIO . unsafeIOToST $ do
                 poke ptr' (1 :: Word8)
                 copyMem (castPtr (plusPtr ptr' 1)) ptr size
                 naclDigestPtr h ptr' (fromIntegral size1)
 
         r <- mlockedAllocaWith allocator size1 $ \ptr' -> do
-              withLiftST $ \liftST -> liftST . unsafeIOToST $ do
+              stToIO . unsafeIOToST $ do
                 poke ptr' (2 :: Word8)
                 copyMem (castPtr (plusPtr ptr' 1)) ptr size
                 naclDigestPtr h ptr' (fromIntegral size1)

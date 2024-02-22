@@ -280,9 +280,9 @@ psbUseAsSizedPtr ::
   PinnedSizedBytes n ->
   (SizedPtr n -> m r) ->
   m r
-psbUseAsSizedPtr (PSB ba) k = withLiftST $ \lift -> do
+psbUseAsSizedPtr (PSB ba) k = do
     r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
-    r <$ lift (touch ba)
+    r <$ stToIO (touch ba)
 
 -- | As 'psbCreateResult', but presumes that no useful value is produced: that
 -- is, the function argument is run only for its side effects.
@@ -345,11 +345,11 @@ psbCreateResultLen ::
   (KnownNat n, MonadST m) =>
   (Ptr Word8 -> CSize -> m r) ->
   m (PinnedSizedBytes n, r)
-psbCreateResultLen f = withLiftST $ \lift -> do
+psbCreateResultLen f = do
   let len :: Int = fromIntegral . natVal $ Proxy @n
-  mba <- lift (newPinnedByteArray len)
+  mba <- stToIO (newPinnedByteArray len)
   res <- f (mutableByteArrayContents mba) (fromIntegral len)
-  arr <- lift (unsafeFreezeByteArray mba)
+  arr <- stToIO (unsafeFreezeByteArray mba)
   pure (PSB arr, res)
 
 -- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
@@ -413,6 +413,6 @@ runAndTouch ::
   ByteArray ->
   (Ptr Word8 -> m a) ->
   m a
-runAndTouch ba f = withLiftST $ \lift -> do
+runAndTouch ba f = do
   r <- f (byteArrayContents ba)
-  r <$ lift (touch ba)
+  r <$ stToIO (touch ba)
