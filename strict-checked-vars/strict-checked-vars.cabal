@@ -16,7 +16,7 @@ license-files:
 
 copyright:       2019-2023 Input Output Global Inc (IOG).
 author:          IOG Engineering Team
-maintainer:      operations@iohk.io
+maintainer:      operations@iohk.io, Joris Dral
 category:        Concurrency
 build-type:      Simple
 extra-doc-files:
