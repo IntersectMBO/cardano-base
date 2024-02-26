@@ -66,14 +66,19 @@ jobs:
         echo "# cabal.project.local"
         cat cabal.project.local
 
+    - name: Build dry run
+      run: cabal build all --enable-tests --dry-run --minimize-conflict-set
+
     - name: Record dependencies
       id: record-deps
       run: |
         # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
         # we are very deliberate about only adding msys64 to the path where absolutely necessary.
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
-        cabal build all --dry-run
         cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
+
+    - name: Install dependencies
+      run: cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
 
     - name: Cache Cabal store
       uses: actions/cache@v3
@@ -82,9 +87,6 @@ jobs:
           ${{ steps.setup-haskell.outputs.cabal-store }}
           dist-newstyle
         key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
-
-    - name: Install dependencies
-      run: cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
 
     - name: Build [testing]
       run: cabal build all --enable-tests -j --ghc-option=-j4
@@ -99,7 +101,8 @@ jobs:
     - name: Build strict-checked-vars with invariants
       run: cabal build -f+checktvarinvariants -f+checkmvarinvariants strict-checked-vars
 
-    - uses: actions/upload-artifact@v3
+    - name: Save Artifact
+      uses: actions/upload-artifact@v3
       with:
         name: Build & test logs
         path: |
