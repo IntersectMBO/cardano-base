@@ -66,9 +66,12 @@ jobs:
         echo "# cabal.project.local"
         cat cabal.project.local
 
+    # A dry run `build all` operation does *NOT* downlaod anything, it just looks at the package
+    # indices to generate an install plan.
     - name: Build dry run
       run: cabal build all --enable-tests --dry-run --minimize-conflict-set
 
+    # From the install plan we generate a dependency list.
     - name: Record dependencies
       id: record-deps
       run: |
@@ -77,17 +80,35 @@ jobs:
         ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
         cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
 
-    - name: Install dependencies
-      run: cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
-
-    - name: Cache Cabal store
-      uses: actions/cache@v3
+    # From the dependency list we restore the cached dependencies.
+    # We use the hash of `dependencies.txt` as part of the cache key because that will be stable
+    # until the `index-state` values in the `cabal.project` file changes.
+    - name: Restore cached dependencies
+      uses: actions/cache/restore@v4
+      id: cache
       with:
         path: |
           ${{ steps.setup-haskell.outputs.cabal-store }}
           dist-newstyle
         key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
 
+    # Now we install the dependencies. If the cache was found and restored in the previous step,
+    # this should be a no-op, but if the cache key was not found we need to build stuff so we can
+    # cache it for the next step.
+    - name: Install dependencies
+      run: cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
+
+    # Always store the cabal cache.
+    # This may fail (benign failure) if the cache key is already populated.
+    - name: Cache Cabal store
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ${{ steps.setup-haskell.outputs.cabal-store }}
+          dist-newstyle
+        key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
+
+    # Now we build.
     - name: Build [testing]
       run: cabal build all --enable-tests -j --ghc-option=-j4
 
