@@ -101,7 +101,7 @@ library
     , cryptonite
     , deepseq
     , heapwords
-    , io-classes
+    , io-classes >= 1.4.1
     , memory
     , mtl
     , nothunks
