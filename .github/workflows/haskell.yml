@@ -148,3 +148,10 @@ jobs:
     #  uses: mxschmitt/action-tmate@v3
     #  with:
     #     limit-access-to-actor: true
+
+    - name: Cache build artifacts (used to speed up GitHub Codespaces bootstrapping)
+      if: runner.os == 'Linux'
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache
+        key: cache-${{ github.ref }}
