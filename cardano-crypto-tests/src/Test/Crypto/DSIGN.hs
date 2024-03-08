@@ -27,6 +27,7 @@ import Test.QuickCheck (
   forAllShow,
   forAllShrinkShow,
   ioProperty,
+  counterexample,
   )
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
@@ -94,6 +95,7 @@ import Cardano.Crypto.DSIGN (
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
+import Cardano.Crypto.DirectSerialise
 import Test.Crypto.Util (
   Message,
   prop_raw_serialise,
@@ -111,6 +113,9 @@ import Test.Crypto.Util (
   showBadInputFor,
   Lock,
   withLock,
+  directSerialiseToBS,
+  directDeserialiseFromBS,
+  hexBS,
   )
 import Cardano.Crypto.Libsodium.MLockedSeed
 
@@ -362,6 +367,10 @@ testDSIGNMAlgorithm
                , FromCBOR (SigDSIGN v)
                , ContextDSIGN v ~ ()
                , Signable v Message
+               , DirectSerialise (SignKeyDSIGNM v)
+               , DirectDeserialise (SignKeyDSIGNM v)
+               , DirectSerialise (VerKeyDSIGN v)
+               , DirectDeserialise (VerKeyDSIGN v)
                )
   => Lock
   -> Proxy v
@@ -451,6 +460,36 @@ testDSIGNMAlgorithm lock _ n =
               sig :: SigDSIGN v <- signDSIGNM () msg sk
               return $ prop_cbor_direct_vs_class encodeSigDSIGN sig
         ]
+      , testGroup "DirectSerialise"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
+              serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
+              vk' <- directDeserialiseFromBS serialized
+              return $ vk === vk'
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
+              sk' <- directDeserialiseFromBS serialized
+              equals <- sk ==! sk'
+              forgetSignKeyDSIGNM sk'
+              return $
+                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
+                equals
+        ]
+      , testGroup "DirectSerialise matches raw"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
+              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
+              let raw = rawSerialiseVerKeyDSIGN vk
+              return $ direct === raw
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
+              raw <- rawSerialiseSignKeyDSIGNM sk
+              return $ direct === raw
+        ]
       ]
 
     , testGroup "verify"
@@ -477,6 +516,24 @@ testDSIGNMAlgorithm lock _ n =
           ioPropertyWithSK @v lock $ prop_no_thunks_IO . return
       , testProperty "Sig"     $ \(msg :: Message) ->
           ioPropertyWithSK @v lock $ prop_no_thunks_IO . signDSIGNM () msg
+      , testProperty "SignKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "SignKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
+            prop_no_thunks_IO (directDeserialiseFromBS @IO @(SignKeyDSIGNM v) $! direct)
+      , testProperty "VerKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk <- deriveVerKeyDSIGNM sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "VerKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk <- deriveVerKeyDSIGNM sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
+            prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyDSIGN v) $! direct)
       ]
     ]
 

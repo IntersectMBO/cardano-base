@@ -54,6 +54,7 @@ module Cardano.Crypto.KES.Sum (
 import           Data.Proxy (Proxy(..))
 import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
 import           Control.Monad (guard, (<$!>))
 import           NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
@@ -65,10 +66,13 @@ import           Cardano.Crypto.KES.Single (SingleKES)
 import           Cardano.Crypto.Util
 import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium
+import           Cardano.Crypto.Libsodium.Memory
+import           Cardano.Crypto.DirectSerialise
+
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Control.DeepSeq (NFData (..))
 import           GHC.TypeLits (KnownNat, type (+), type (*))
-
+import           Foreign.Ptr (castPtr)
 
 -- | A 2^0 period KES
 type Sum0KES d   = SingleKES d
@@ -383,4 +387,52 @@ instance (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSiz
 instance (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
-  {-# INLINE fromCBOR #-}
+
+
+--
+-- Direct ser/deser
+--
+
+instance ( DirectSerialise (SignKeyKES d)
+         , DirectSerialise (VerKeyKES d)
+         , KESAlgorithm d
+         ) => DirectSerialise (SignKeyKES (SumKES h d)) where
+  directSerialise push (SignKeySumKES sk r vk0 vk1) = do
+    directSerialise push sk
+    mlockedSeedUseAsCPtr r $ \ptr ->
+      push (castPtr ptr) (fromIntegral $ seedSizeKES (Proxy :: Proxy d))
+    directSerialise push vk0
+    directSerialise push vk1
+
+instance ( DirectDeserialise (SignKeyKES d)
+         , DirectDeserialise (VerKeyKES d)
+         , KESAlgorithm d
+         ) => DirectDeserialise (SignKeyKES (SumKES h d)) where
+  directDeserialise pull = do
+    sk <- directDeserialise pull
+
+    r <- mlockedSeedNew
+    mlockedSeedUseAsCPtr r $ \ptr ->
+      pull (castPtr ptr) (fromIntegral $ seedSizeKES (Proxy :: Proxy d))
+
+    vk0 <- directDeserialise pull
+    vk1 <- directDeserialise pull
+
+    return $! SignKeySumKES sk r vk0 vk1
+
+
+instance DirectSerialise (VerKeyKES (SumKES h d)) where
+  directSerialise push (VerKeySumKES h) =
+    unpackByteStringCStringLen (hashToBytes h) $ \(ptr, len) ->
+      push (castPtr ptr) (fromIntegral len)
+
+instance (HashAlgorithm h)
+         => DirectDeserialise (VerKeyKES (SumKES h d)) where
+  directDeserialise pull = do
+    let len :: Num a => a
+        len = fromIntegral $ sizeHash (Proxy @h)
+    fptr <- mallocForeignPtrBytes len
+    withForeignPtr fptr $ \ptr -> do
+      pull (castPtr ptr) len
+    let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
+    maybe (error "Invalid hash") return $! VerKeySumKES <$!> hashFromBytes bs
