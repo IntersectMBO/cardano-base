@@ -10,9 +10,9 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2024-02-14T22:42:30Z
+index-state: 2024-03-11T03:33:05Z
 -- The CHaP index-state
-index-state: cardano-haskell-packages 2024-02-14T10:17:08Z
+index-state: cardano-haskell-packages 2024-03-08T10:14:14Z
 
 packages:
   base-deriving-via
@@ -21,6 +21,7 @@ packages:
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
+  cardano-git-rev
   cardano-slotting
   cardano-strict-containers
   cardano-mempool
