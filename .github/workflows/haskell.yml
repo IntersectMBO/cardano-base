@@ -154,4 +154,4 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ~/.cache
-        key: cache-${{ github.ref }}
+        key: cache-${{ github.sha }}
