@@ -34,7 +34,6 @@ library
   c-sources:            cbits/rev.c
 
   exposed-modules:      Cardano.Git.Rev
-                        Cardano.Git.RevFromGit
 
   build-depends:        process
                       , template-haskell
