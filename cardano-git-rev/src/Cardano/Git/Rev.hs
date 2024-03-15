@@ -32,10 +32,11 @@ foreign import ccall "&_cardano_git_rev" c_gitrev :: CString
 -- This must be a TH splice to ensure the git commit is captured at build time.
 -- ie called as `$(gitRev)`.
 gitRev :: Q Exp
-gitRev
-  | gitRevEmbed /= zeroRev = textE gitRevEmbed
-  | otherwise              =
-      textE =<< TH.runIO runGitRevParse
+gitRev =
+    [| if
+         | gitRevEmbed /= zeroRev -> gitRevEmbed
+         | otherwise              -> $(textE =<< TH.runIO runGitRevParse)
+    |]
 
 -- Git revision embedded after compilation using
 -- Data.FileEmbed.injectWith. If nothing has been injected,
