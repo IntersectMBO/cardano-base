@@ -1,8 +1,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+
+#if __GLASGOW_HASKELL__ >= 900
+{-# LANGUAGE TemplateHaskellQuotes #-}
+#else
+-- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2288
+{-# LANGUAGE TemplateHaskell #-}
+#endif
 
 module Cardano.Git.Rev
   ( gitRev
