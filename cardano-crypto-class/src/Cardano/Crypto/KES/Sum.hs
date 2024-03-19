@@ -64,6 +64,7 @@ import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.Single (SingleKES)
 import           Cardano.Crypto.Util
+import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium
 import           Cardano.Crypto.Libsodium.Memory
@@ -387,6 +388,68 @@ instance (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSiz
 instance (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d)
       => FromCBOR (SigKES (SumKES h d)) where
   fromCBOR = decodeSigKES
+
+--
+-- Unsound pure KES API
+--
+instance ( KESAlgorithm (SumKES h d)
+         , HashAlgorithm h
+         , UnsoundPureKESAlgorithm d
+         )
+         => UnsoundPureKESAlgorithm (SumKES h d) where
+    data UnsoundPureSignKeyKES (SumKES h d) =
+           UnsoundPureSignKeySumKES !(UnsoundPureSignKeyKES d)
+                         !Seed
+                         !(VerKeyKES d)
+                         !(VerKeyKES d)
+
+    unsoundPureSignKES ctxt t a (UnsoundPureSignKeySumKES sk _r_1 vk_0 vk_1) =
+        SigSumKES sigma vk_0 vk_1
+      where
+        sigma
+          | t < _T    = unsoundPureSignKES ctxt  t       a sk
+          | otherwise = unsoundPureSignKES ctxt (t - _T) a sk
+
+        _T = totalPeriodsKES (Proxy :: Proxy d)
+
+    unsoundPureUpdateKES ctx (UnsoundPureSignKeySumKES sk r_1 vk_0 vk_1) t
+      | t+1 <  _T = do
+                        sk' <- unsoundPureUpdateKES ctx sk t
+                        let r_1' = r_1
+                        return $! UnsoundPureSignKeySumKES sk' r_1' vk_0 vk_1
+      | t+1 == _T = do
+                        let sk' = unsoundPureGenKeyKES r_1
+                        let r_1' = mkSeedFromBytes (BS.replicate (fromIntegral (seedSizeKES (Proxy @d))) 0)
+                        return $! UnsoundPureSignKeySumKES sk' r_1' vk_0 vk_1
+      | otherwise = do
+                        sk' <- unsoundPureUpdateKES ctx sk (t - _T)
+                        let r_1' = r_1
+                        return $! UnsoundPureSignKeySumKES sk' r_1' vk_0 vk_1
+      where
+        _T = totalPeriodsKES (Proxy :: Proxy d)
+
+    --
+    -- Key generation
+    --
+
+    unsoundPureGenKeyKES r =
+      let r0 = mkSeedFromBytes $ digest (Proxy @h) (BS.cons 1 $ getSeedBytes r)
+          r1 = mkSeedFromBytes $ digest (Proxy @h) (BS.cons 2 $ getSeedBytes r)
+          sk_0 = unsoundPureGenKeyKES r0
+          vk_0 = unsoundPureDeriveVerKeyKES sk_0
+          sk_1 = unsoundPureGenKeyKES r1
+          vk_1 = unsoundPureDeriveVerKeyKES sk_1
+      in UnsoundPureSignKeySumKES sk_0 r1 vk_0 vk_1
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeySumKES _ _ vk_0 vk_1) =
+      VerKeySumKES (hashPairOfVKeys (vk_0, vk_1))
+
+    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeySumKES sk r_1 vk_0 vk_1) =
+      SignKeySumKES
+        <$> unsoundPureSignKeyKESToSoundSignKeyKES sk
+        <*> (fmap MLockedSeed . mlsbFromByteString . getSeedBytes $ r_1)
+        <*> pure vk_0
+        <*> pure vk_1
 
 
 --

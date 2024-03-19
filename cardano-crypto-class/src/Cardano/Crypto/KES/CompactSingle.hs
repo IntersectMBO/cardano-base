@@ -169,6 +169,33 @@ instance ( DSIGNMAlgorithm d
       forgetSignKeyDSIGNMWith allocator v
 
 instance ( KESAlgorithm (CompactSingleKES d)
+         , UnsoundDSIGNMAlgorithm d
+         )
+         => UnsoundPureKESAlgorithm (CompactSingleKES d) where
+    data UnsoundPureSignKeyKES (CompactSingleKES d) =
+              UnsoundPureSignKeyCompactSingleKES (SignKeyDSIGN d)
+
+    unsoundPureSignKES ctxt t a (UnsoundPureSignKeyCompactSingleKES sk) =
+        assert (t == 0) $!
+        SigCompactSingleKES (signDSIGN ctxt a sk) (deriveVerKeyDSIGN sk)
+
+    unsoundPureUpdateKES _ctx _sk _to = Nothing
+
+    --
+    -- Key generation
+    --
+
+    unsoundPureGenKeyKES seed =
+      UnsoundPureSignKeyCompactSingleKES $! genKeyDSIGN seed
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeyCompactSingleKES v) =
+      VerKeyCompactSingleKES $! deriveVerKeyDSIGN v
+
+    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeyCompactSingleKES sk) =
+      maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") (return . SignKeyCompactSingleKES)
+      =<< (rawDeserialiseSignKeyDSIGNM . rawSerialiseSignKeyDSIGN $ sk)
+
+instance ( KESAlgorithm (CompactSingleKES d)
          , DSIGNMAlgorithm d
          ) => OptimizedKESAlgorithm (CompactSingleKES d) where
     verifySigKES ctxt t a (SigCompactSingleKES sig vk) =

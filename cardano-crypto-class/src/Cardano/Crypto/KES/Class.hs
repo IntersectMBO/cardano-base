@@ -52,11 +52,14 @@ module Cardano.Crypto.KES.Class
   , sizeSignKeyKES
   , seedSizeKES
 
-    -- * Unsound API
+    -- * Unsound APIs
+
   , UnsoundKESAlgorithm (..)
   , encodeSignKeyKES
   , decodeSignKeyKES
   , rawDeserialiseSignKeyKES
+
+  , UnsoundPureKESAlgorithm (..)
 
     -- * Utility functions
     -- These are used between multiple KES implementations. User code will
@@ -90,6 +93,7 @@ import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Libsodium (MLockedAllocator, mlockedMalloc)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 import Cardano.Crypto.DSIGN.Class (failSizeCheck)
+import Cardano.Crypto.Seed
 
 class ( Typeable v
       , Show (VerKeyKES v)
@@ -275,6 +279,43 @@ updateKES
   -> Period  -- ^ The /current/ period for the key, not the target period.
   -> m (Maybe (SignKeyKES v))
 updateKES = updateKESWith mlockedMalloc
+
+
+-- | Pure implementations of the core KES operations. These are unsound, because
+-- proper handling of KES secrets (seeds, sign keys) requires mlocking and
+-- deterministic erasure (\"secure forgetting\"), which is not possible in pure
+-- code.
+-- This API is only provided for testing purposes; it must not be used to
+-- generate or use real KES keys.
+class KESAlgorithm v => UnsoundPureKESAlgorithm v where
+  data UnsoundPureSignKeyKES v :: Type
+
+  unsoundPureSignKES
+    :: forall a. (Signable v a)
+    => ContextKES v
+    -> Period  -- ^ The /current/ period for the key
+    -> a
+    -> UnsoundPureSignKeyKES v
+    -> SigKES v
+
+  unsoundPureUpdateKES
+    :: ContextKES v
+    -> UnsoundPureSignKeyKES v
+    -> Period  -- ^ The /current/ period for the key, not the target period.
+    -> Maybe (UnsoundPureSignKeyKES v)
+
+  unsoundPureGenKeyKES
+    :: Seed
+    -> UnsoundPureSignKeyKES v
+
+  unsoundPureDeriveVerKeyKES
+    :: UnsoundPureSignKeyKES v
+    -> VerKeyKES v
+
+  unsoundPureSignKeyKESToSoundSignKeyKES
+    :: (MonadST m, MonadThrow m)
+    => UnsoundPureSignKeyKES v
+    -> m (SignKeyKES v)
 
 
 -- | Unsound operations on KES sign keys. These operations violate secure

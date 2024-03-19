@@ -22,6 +22,7 @@ module Cardano.Crypto.KES.Simple
   ( SimpleKES
   , SigKES (..)
   , SignKeyKES (SignKeySimpleKES, ThunkySignKeySimpleKES)
+  , UnsoundPureSignKeyKES (UnsoundPureSignKeySimpleKES, UnsoundPureThunkySignKeySimpleKES)
   )
 where
 
@@ -45,6 +46,7 @@ import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
 import           Cardano.Crypto.DirectSerialise
 import           Data.Unit.Strict (forceElemsToWHNF)
+import           Data.Maybe (fromMaybe)
 
 data SimpleKES d (t :: Nat)
 
@@ -68,6 +70,14 @@ pattern SignKeySimpleKES v <- ThunkySignKeySimpleKES v
     SignKeySimpleKES v = ThunkySignKeySimpleKES (forceElemsToWHNF v)
 
 {-# COMPLETE SignKeySimpleKES #-}
+
+-- | See 'VerKeySimpleKES'.
+pattern UnsoundPureSignKeySimpleKES :: Vector (SignKeyDSIGN d) -> UnsoundPureSignKeyKES (SimpleKES d t)
+pattern UnsoundPureSignKeySimpleKES v <- UnsoundPureThunkySignKeySimpleKES v
+  where
+    UnsoundPureSignKeySimpleKES v = UnsoundPureThunkySignKeySimpleKES (forceElemsToWHNF v)
+
+{-# COMPLETE UnsoundPureSignKeySimpleKES #-}
 
 instance ( DSIGNMAlgorithm d
          , KnownNat t
@@ -177,6 +187,46 @@ instance ( DSIGNMAlgorithm d
     forgetSignKeyKESWith allocator (SignKeySimpleKES sks) =
       Vec.mapM_ (forgetSignKeyDSIGNMWith allocator) sks
 
+instance ( KESAlgorithm (SimpleKES d t)
+         , KnownNat t
+         , DSIGNAlgorithm d
+         , UnsoundDSIGNMAlgorithm d
+         )
+         => UnsoundPureKESAlgorithm (SimpleKES d t) where
+
+    newtype UnsoundPureSignKeyKES (SimpleKES d t) =
+              UnsoundPureThunkySignKeySimpleKES (Vector (SignKeyDSIGN d))
+        deriving Generic
+
+    unsoundPureGenKeyKES seed =
+      let -- seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+          duration = fromIntegral (natVal (Proxy @t))
+      in
+        UnsoundPureSignKeySimpleKES $
+          Vec.generate duration (\_t ->
+            genKeyDSIGN seed)
+
+    unsoundPureSignKES ctxt j a (UnsoundPureSignKeySimpleKES sks) =
+        case sks !? fromIntegral j of
+          Nothing -> error ("SimpleKES.unsoundPureSignKES: period out of range " ++ show j)
+          Just sk -> SigSimpleKES $! (signDSIGN ctxt a $! sk)
+
+    unsoundPureUpdateKES _ (UnsoundPureThunkySignKeySimpleKES sk) t
+      | t+1 < fromIntegral (natVal (Proxy @t))
+      = Just $! UnsoundPureThunkySignKeySimpleKES sk
+      | otherwise
+      = Nothing
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeySimpleKES sks) =
+      VerKeySimpleKES $! Vec.map deriveVerKeyDSIGN sks
+
+    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureThunkySignKeySimpleKES sks) = do
+      SignKeySimpleKES <$> mapM convertSK sks
+      where
+        convertSK = fmap (fromMaybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failed"))
+                      . rawDeserialiseSignKeyDSIGNM
+                      . rawSerialiseSignKeyDSIGN
+          
 
 
 instance ( UnsoundDSIGNMAlgorithm d, KnownNat t, KESAlgorithm (SimpleKES d t))
