@@ -38,7 +38,7 @@ import Data.Kind (Type)
 import Control.DeepSeq (NFData)
 import Control.Monad.ST (runST)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
-import Control.Monad.Class.MonadST
+import Control.Monad.Class.MonadST (MonadST, stToIO)
 import Control.Monad.Primitive  (primitive_, touch)
 import Data.Primitive.ByteArray
           ( ByteArray (..)

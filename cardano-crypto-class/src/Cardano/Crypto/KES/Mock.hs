@@ -15,6 +15,7 @@ module Cardano.Crypto.KES.Mock
   ( MockKES
   , VerKeyKES (..)
   , SignKeyKES (..)
+  , UnsoundPureSignKeyKES (..)
   , SigKES (..)
   )
 where
@@ -166,6 +167,50 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
     forgetSignKeyKESWith _ = const $ return ()
 
+instance KnownNat t => UnsoundPureKESAlgorithm (MockKES t) where
+    --
+    -- Key and signature types
+    --
+
+    data UnsoundPureSignKeyKES (MockKES t) =
+           UnsoundPureSignKeyMockKES !(VerKeyKES (MockKES t)) !Period
+        deriving stock    (Show, Eq, Generic)
+        deriving anyclass (NoThunks)
+
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeyMockKES vk _) = vk
+
+    unsoundPureUpdateKES () (UnsoundPureSignKeyMockKES vk t') t =
+        assert (t == t') $!
+         if t+1 < totalPeriodsKES (Proxy @(MockKES t))
+           then Just $! UnsoundPureSignKeyMockKES vk (t+1)
+           else Nothing
+
+    -- | Produce valid signature only with correct key, i.e., same iteration and
+    -- allowed KES period.
+    unsoundPureSignKES () t a (UnsoundPureSignKeyMockKES vk t') =
+        assert (t == t') $!
+        SigMockKES (castHash (hashWith getSignableRepresentation a))
+                   (SignKeyMockKES vk t)
+
+    --
+    -- Key generation
+    --
+
+    unsoundPureGenKeyKES seed =
+        let vk = VerKeyMockKES (runMonadRandomWithSeed seed getRandomWord64)
+        in UnsoundPureSignKeyMockKES vk 0
+
+    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeyMockKES vk t) =
+      return $ SignKeyMockKES vk t
+
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyMockKES vk t) =
+      rawSerialiseSignKeyMockKES (SignKeyMockKES vk t)
+
+    rawDeserialiseUnsoundPureSignKeyKES bs = do
+      SignKeyMockKES vt t <- rawDeserialiseSignKeyMockKES bs
+      return $ UnsoundPureSignKeyMockKES vt t
+
 instance KnownNat t => UnsoundKESAlgorithm (MockKES t) where
     rawSerialiseSignKeyKES sk =
       return $ rawSerialiseSignKeyMockKES sk
@@ -204,6 +249,13 @@ instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
 
 instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
   fromCBOR = decodeSigKES
+
+instance KnownNat t => ToCBOR (UnsoundPureSignKeyKES (MockKES t)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (MockKES t)))
+
+instance KnownNat t => FromCBOR (UnsoundPureSignKeyKES (MockKES t)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
 
 instance (KnownNat t) => DirectSerialise (SignKeyKES (MockKES t)) where
   directSerialise put sk = do
