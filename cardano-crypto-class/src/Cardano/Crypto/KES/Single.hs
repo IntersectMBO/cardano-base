@@ -140,6 +140,38 @@ instance (DSIGNMAlgorithm d) => KESAlgorithm (SingleKES d) where
     forgetSignKeyKESWith allocator (SignKeySingleKES v) =
       forgetSignKeyDSIGNMWith allocator v
 
+instance ( KESAlgorithm (SingleKES d)
+         , UnsoundDSIGNMAlgorithm d
+         )
+         => UnsoundPureKESAlgorithm (SingleKES d) where
+    newtype UnsoundPureSignKeyKES (SingleKES d) = UnsoundPureSignKeySingleKES (SignKeyDSIGN d)
+      deriving (Generic)
+
+    unsoundPureSignKES ctxt t a (UnsoundPureSignKeySingleKES sk) =
+        assert (t == 0) $!
+        SigSingleKES $! signDSIGN ctxt a sk
+
+    unsoundPureUpdateKES _ctx _sk _to = Nothing
+
+    --
+    -- Key generation
+    --
+
+    unsoundPureGenKeyKES seed =
+      UnsoundPureSignKeySingleKES $! genKeyDSIGN seed
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeySingleKES v) =
+      VerKeySingleKES $! deriveVerKeyDSIGN v
+
+    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeySingleKES sk) =
+      maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") (return . SignKeySingleKES)
+      =<< (rawDeserialiseSignKeyDSIGNM . rawSerialiseSignKeyDSIGN $ sk)
+
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySingleKES sk) =
+      rawSerialiseSignKeyDSIGN sk
+    rawDeserialiseUnsoundPureSignKeyKES b =
+      UnsoundPureSignKeySingleKES <$> rawDeserialiseSignKeyDSIGN b
+
 instance (KESAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
          => UnsoundKESAlgorithm (SingleKES d) where
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =
@@ -187,6 +219,22 @@ instance DSIGNMAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
 
 instance DSIGNMAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
   fromCBOR = decodeSigKES
+
+--
+-- UnsoundPureSignKey instances
+--
+
+deriving instance DSIGNAlgorithm d => Show (UnsoundPureSignKeyKES (SingleKES d))
+deriving instance Eq (SignKeyDSIGN d) => Eq   (UnsoundPureSignKeyKES (SingleKES d))
+
+instance (UnsoundDSIGNMAlgorithm d) => ToCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (SingleKES d)))
+
+instance (UnsoundDSIGNMAlgorithm d) => FromCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
+
+instance DSIGNAlgorithm d => NoThunks (UnsoundPureSignKeyKES  (SingleKES d))
 
 --
 -- Direct ser/deser
