@@ -169,6 +169,39 @@ instance ( DSIGNMAlgorithm d
       forgetSignKeyDSIGNMWith allocator v
 
 instance ( KESAlgorithm (CompactSingleKES d)
+         , UnsoundDSIGNMAlgorithm d
+         )
+         => UnsoundPureKESAlgorithm (CompactSingleKES d) where
+    data UnsoundPureSignKeyKES (CompactSingleKES d) =
+              UnsoundPureSignKeyCompactSingleKES (SignKeyDSIGN d)
+        deriving (Generic)
+
+    unsoundPureSignKES ctxt t a (UnsoundPureSignKeyCompactSingleKES sk) =
+        assert (t == 0) $!
+        SigCompactSingleKES (signDSIGN ctxt a sk) (deriveVerKeyDSIGN sk)
+
+    unsoundPureUpdateKES _ctx _sk _to = Nothing
+
+    --
+    -- Key generation
+    --
+
+    unsoundPureGenKeyKES seed =
+      UnsoundPureSignKeyCompactSingleKES $! genKeyDSIGN seed
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeyCompactSingleKES v) =
+      VerKeyCompactSingleKES $! deriveVerKeyDSIGN v
+
+    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeyCompactSingleKES sk) =
+      maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") (return . SignKeyCompactSingleKES)
+      =<< (rawDeserialiseSignKeyDSIGNM . rawSerialiseSignKeyDSIGN $ sk)
+
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyCompactSingleKES sk) =
+      rawSerialiseSignKeyDSIGN sk
+    rawDeserialiseUnsoundPureSignKeyKES b =
+      UnsoundPureSignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGN b
+
+instance ( KESAlgorithm (CompactSingleKES d)
          , DSIGNMAlgorithm d
          ) => OptimizedKESAlgorithm (CompactSingleKES d) where
     verifySigKES ctxt t a (SigCompactSingleKES sig vk) =
@@ -227,6 +260,22 @@ instance (DSIGNMAlgorithm d, KnownNat (SizeSigKES (CompactSingleKES d))) => From
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size = BS.take (fromIntegral size)
                   . BS.drop (fromIntegral offset)
+
+--
+-- UnsoundPureSignKey instances
+--
+
+deriving instance DSIGNAlgorithm d => Show (UnsoundPureSignKeyKES (CompactSingleKES d))
+deriving instance (DSIGNAlgorithm d, Eq (SignKeyDSIGN d)) => Eq   (UnsoundPureSignKeyKES (CompactSingleKES d))
+
+instance (UnsoundDSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) => ToCBOR (UnsoundPureSignKeyKES (CompactSingleKES d)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (CompactSingleKES d)))
+
+instance (UnsoundDSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) => FromCBOR (UnsoundPureSignKeyKES (CompactSingleKES d)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
+
+instance DSIGNAlgorithm d => NoThunks (UnsoundPureSignKeyKES  (CompactSingleKES d))
 
 --
 -- Direct ser/deser
