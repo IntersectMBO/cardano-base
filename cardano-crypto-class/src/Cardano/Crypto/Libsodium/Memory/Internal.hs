@@ -49,7 +49,7 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
 import Control.DeepSeq (NFData (..), rwhnf)
 import Control.Exception (Exception, mask_)
 import Control.Monad (when, void)
-import Control.Monad.Class.MonadST
+import Control.Monad.Class.MonadST (MonadST, stToIO)
 import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
 import Control.Monad.ST (RealWorld, ST)
 import Control.Monad.Primitive (touch)
