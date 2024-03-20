@@ -1,8 +1,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+
+#if __GLASGOW_HASKELL__ >= 900
+{-# LANGUAGE TemplateHaskellQuotes #-}
+#else
+-- https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2288
+{-# LANGUAGE TemplateHaskell #-}
+#endif
 
 module Cardano.Git.Rev
   ( gitRev
@@ -32,15 +38,11 @@ foreign import ccall "&_cardano_git_rev" c_gitrev :: CString
 -- This must be a TH splice to ensure the git commit is captured at build time.
 -- ie called as `$(gitRev)`.
 gitRev :: Q Exp
-gitRev
-  | gitRevEmbed /= zeroRev = textE gitRevEmbed
-  | otherwise              =
-#if defined(arm_HOST_ARCH)
-      -- cross compiling to arm fails; due to a linker bug
-      textE zeroRev
-#else
-      textE =<< TH.runIO runGitRevParse
-#endif
+gitRev =
+    [| if
+         | gitRevEmbed /= zeroRev -> gitRevEmbed
+         | otherwise              -> $(textE =<< TH.runIO runGitRevParse)
+    |]
 
 -- Git revision embedded after compilation using
 -- Data.FileEmbed.injectWith. If nothing has been injected,
@@ -48,8 +50,11 @@ gitRev
 gitRevEmbed :: Text
 gitRevEmbed = Text.pack $ drop 28 $ unsafeDupablePerformIO (peekCStringLen utf8 (c_gitrev, 68))
 
-#if !defined(arm_HOST_ARCH)
 runGitRevParse :: IO Text
+#if defined(arm_HOST_ARCH)
+-- cross compiling to arm fails; due to a linker bug
+runGitRevParse = pure zeroRev
+#else
 runGitRevParse = do
     (exitCode, output, errorMessage) <- readProcessWithExitCode_ "git" ["rev-parse", "--verify", "HEAD"] ""
     case exitCode of
