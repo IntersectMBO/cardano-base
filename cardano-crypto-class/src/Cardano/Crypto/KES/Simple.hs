@@ -44,6 +44,7 @@ import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
+import           Cardano.Crypto.Seed
 import           Cardano.Crypto.DirectSerialise
 import           Data.Unit.Strict (forceElemsToWHNF)
 import           Data.Maybe (fromMaybe)
@@ -199,12 +200,14 @@ instance ( KESAlgorithm (SimpleKES d t)
         deriving Generic
 
     unsoundPureGenKeyKES seed =
-      let -- seedSize = seedSizeDSIGN (Proxy :: Proxy d)
+      let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
           duration = fromIntegral (natVal (Proxy @t))
+          seedChunk t =
+            mkSeedFromBytes (BS.take seedSize . BS.drop (seedSize * t) $ getSeedBytes seed)
       in
         UnsoundPureSignKeySimpleKES $
-          Vec.generate duration (\_t ->
-            genKeyDSIGN seed)
+          Vec.generate duration (\t ->
+            genKeyDSIGN (seedChunk t))
 
     unsoundPureSignKES ctxt j a (UnsoundPureSignKeySimpleKES sks) =
         case sks !? fromIntegral j of
