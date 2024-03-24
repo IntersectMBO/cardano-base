@@ -1,0 +1,1 @@
+-L/nix/store/srvp94k0f4kq70mgy94fgxml742lb30w-libsodium-vrf-dbb48cc/lib -lsodium -pthread
