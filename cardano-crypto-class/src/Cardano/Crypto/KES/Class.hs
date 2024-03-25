@@ -60,6 +60,7 @@ module Cardano.Crypto.KES.Class
   , rawDeserialiseSignKeyKES
 
   , UnsoundPureKESAlgorithm (..)
+  , unsoundPureSignedKES
 
     -- * Utility functions
     -- These are used between multiple KES implementations. User code will
@@ -475,6 +476,16 @@ verifySignedKES
   -> SignedKES v a
   -> Either String ()
 verifySignedKES ctxt vk j a (SignedKES sig) = verifyKES ctxt vk j a sig
+
+unsoundPureSignedKES
+  :: (UnsoundPureKESAlgorithm v, Signable v a)
+  => ContextKES v
+  -> Period
+  -> a
+  -> UnsoundPureSignKeyKES v
+  -> SignedKES v a
+unsoundPureSignedKES ctxt time a key = SignedKES $ unsoundPureSignKES ctxt time a key
+
 
 encodeSignedKES :: KESAlgorithm v => SignedKES v a -> Encoding
 encodeSignedKES (SignedKES s) = encodeSigKES s
