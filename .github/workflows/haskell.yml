@@ -150,8 +150,8 @@ jobs:
     #     limit-access-to-actor: true
 
     - name: Cache build artifacts (used to speed up GitHub Codespaces bootstrapping)
-      if: runner.os == 'Linux'
-      uses: actions/cache@v2
+      if: runner.os == 'Linux' && (matrix.ghc == '8.10.7' || matrix.ghc == '9.6.2')
+      uses: actions/upload-artifact@v2
       with:
+        name: cache-${{ github.sha }}-${{ matrix.ghc == '8.10.7' && 'ghc810' || matrix.ghc == '9.6.2' && 'ghc96' }}
         path: ~/.cache
-        key: cache-${{ github.sha }}
