@@ -74,7 +74,7 @@ library
                       , contra-tracer ==0.1.0.1
                       , deepseq
                       , formatting
-                      , io-classes >= 1.1
+                      , io-classes >= 1.4.0
                       , mtl
                       , nothunks
                       , pretty-show

@@ -37,7 +37,7 @@ import Control.DeepSeq (NFData (..), rwhnf)
 import Control.Monad ((<$!>), unless, guard)
 import Control.Monad.Class.MonadST (MonadST (..))
 import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO)
-import Control.Monad.ST (ST, stToIO)
+import Control.Monad.ST (ST)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
 import qualified Data.ByteString as BS
 import Data.Proxy
@@ -114,7 +114,7 @@ cOrThrowError contextDesc cFunName action = do
 -- return it.
 cOrError :: MonadST m => (forall s. ST s Int) -> m (Maybe Errno)
 cOrError action = do
-  withLiftST $ \fromST -> fromST $ do
+  stToIO $ do
     res <- action
     if res == 0 then
       return Nothing
@@ -263,7 +263,7 @@ instance DSIGNMAlgorithm Ed25519DSIGN where
         mlsbUseAsSizedPtr sk $ \skPtr -> do
           (psb, maybeErrno) <-
             psbCreateSizedResult $ \pkPtr ->
-              withLiftST $ \fromST -> fromST $ do
+              stToIO $ do
                 cOrError $ unsafeIOToST $
                   c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
           throwOnErrno "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
@@ -276,7 +276,7 @@ instance DSIGNMAlgorithm Ed25519DSIGN where
           mlsbUseAsSizedPtr sk $ \skPtr -> do
             (psb, maybeErrno) <-
               psbCreateSizedResult $ \sigPtr -> do
-                withLiftST $ \fromST -> fromST $ do
+                stToIO $ do
                   cOrError $ unsafeIOToST $ do
                     BS.useAsCStringLen bs $ \(ptr, len) ->
                       c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
@@ -291,8 +291,7 @@ instance DSIGNMAlgorithm Ed25519DSIGN where
       sk <- mlsbNewWith allocator
       mlsbUseAsSizedPtr sk $ \skPtr ->
         mlockedSeedUseAsCPtr seed $ \seedPtr -> do
-          maybeErrno <- withLiftST $ \fromST ->
-            fromST $ allocaSizedST $ \pkPtr -> do
+          maybeErrno <- stToIO $ allocaSizedST $ \pkPtr -> do
               cOrError $ unsafeIOToST $
                 c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
           throwOnErrno "genKeyDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair" maybeErrno
@@ -308,8 +307,7 @@ instance DSIGNMAlgorithm Ed25519DSIGN where
       seed <- mlockedSeedNewWith allocator
       mlsbUseAsSizedPtr sk $ \skPtr ->
         mlockedSeedUseAsSizedPtr seed $ \seedPtr -> do
-          maybeErrno <- withLiftST $ \fromST ->
-            fromST $
+          maybeErrno <- stToIO $
               cOrError $ unsafeIOToST $
                 c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
           throwOnErrno "genKeyDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair" maybeErrno

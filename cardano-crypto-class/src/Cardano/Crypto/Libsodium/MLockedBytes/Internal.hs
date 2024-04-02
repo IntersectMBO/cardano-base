@@ -112,8 +112,8 @@ withMLSBChunk mlsb offset action
   = error $ "Overrun (" ++ show offset ++ " + " ++ show chunkSize ++ " > " ++ show parentSize ++ ")"
   | otherwise
   = withMLSB mlsb $ \ptr -> do
-      fptr <- withLiftST $ \lift -> do
-        lift $ unsafeIOToST (newForeignPtr_ . castPtr $ plusPtr ptr offset)
+      fptr <-
+        stToIO $ unsafeIOToST (newForeignPtr_ . castPtr $ plusPtr ptr offset)
       action (MLSB $! SFP $! fptr)
   where
     chunkSize = fromIntegral (natVal (Proxy @n'))
@@ -186,7 +186,7 @@ mlsbFromByteStringWith :: forall n m. (KnownNat n, MonadST m)
 mlsbFromByteStringWith allocator bs = do
   dst <- mlsbNewWith allocator
   withMLSB dst $ \ptr -> do
-    withLiftST $ \liftST -> liftST . unsafeIOToST $ do
+    stToIO . unsafeIOToST $ do
       BS.useAsCStringLen bs $ \(ptrBS, len) -> do
         copyMem (castPtr ptr) ptrBS (min (fromIntegral len) (mlsbSize dst))
   return dst
@@ -233,7 +233,7 @@ mlsbAsByteString mlsb@(MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size
 mlsbToByteString :: forall n m. (KnownNat n, MonadST m) => MLockedSizedBytes n -> m BS.ByteString
 mlsbToByteString mlsb =
   withMLSB mlsb $ \ptr ->
-    withLiftST $ \liftST -> liftST . unsafeIOToST $ BS.packCStringLen (castPtr ptr, size)
+    stToIO . unsafeIOToST $ BS.packCStringLen (castPtr ptr, size)
   where
     size  :: Int
     size = fromIntegral (mlsbSize mlsb)
@@ -265,7 +265,7 @@ mlsbCompare :: forall n m. (MonadST m, KnownNat n) => MLockedSizedBytes n -> MLo
 mlsbCompare (MLSB x) (MLSB y) =
   withMLockedForeignPtr x $ \x' ->
     withMLockedForeignPtr y $ \y' -> do
-      res <- withLiftST $ \fromST -> fromST . unsafeIOToST $ c_sodium_compare x' y' size
+      res <- stToIO . unsafeIOToST $ c_sodium_compare x' y' size
       return $ compare res 0
   where
     size = fromInteger $ natVal (Proxy @n)

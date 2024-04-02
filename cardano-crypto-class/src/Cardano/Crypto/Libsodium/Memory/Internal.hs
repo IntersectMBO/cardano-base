@@ -49,10 +49,10 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
 import Control.DeepSeq (NFData (..), rwhnf)
 import Control.Exception (Exception, mask_)
 import Control.Monad (when, void)
-import Control.Monad.Class.MonadST
+import Control.Monad.Class.MonadST (MonadST, stToIO)
 import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
 import Control.Monad.Primitive (touch)
-import Control.Monad.ST
+import Control.Monad.ST (ST, RealWorld)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -93,8 +93,8 @@ withMLockedForeignPtr (SFP fptr) f = do
   r <$ unsafeIOToMonadST (Foreign.touchForeignPtr fptr)
 
 finalizeMLockedForeignPtr :: MonadST m => MLockedForeignPtr a -> m ()
-finalizeMLockedForeignPtr (SFP fptr) = withLiftST $ \lift ->
-  (lift . unsafeIOToST) (Foreign.finalizeForeignPtr fptr)
+finalizeMLockedForeignPtr (SFP fptr) =
+  (stToIO . unsafeIOToST) (Foreign.finalizeForeignPtr fptr)
 
 {-# WARNING traceMLockedForeignPtr "Do not use traceMLockedForeignPtr in production" #-}
 
@@ -104,7 +104,7 @@ traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
     traceShowM a
 
 unsafeIOToMonadST :: MonadST m => IO a -> m a
-unsafeIOToMonadST action = withLiftST ($ unsafeIOToST action)
+unsafeIOToMonadST action = (stToIO . unsafeIOToST) action
 
 makeMLockedPool :: forall n s. KnownNat n => ST s (Pool n s)
 makeMLockedPool = do
@@ -150,21 +150,21 @@ instance Exception AllocatorException
 
 mlockedMalloc :: MonadST m => MLockedAllocator m
 mlockedMalloc =
-  MLockedAllocator { mlAllocate = \ size -> withLiftST ($ unsafeIOToST (mlockedMallocIO size)) }
+  MLockedAllocator { mlAllocate = \ size -> (stToIO . unsafeIOToST) (mlockedMallocIO size) }
 
 mlockedMallocIO :: CSize -> IO (MLockedForeignPtr a)
 mlockedMallocIO size = SFP <$> do
   if
     | size <= 32 -> do
-        coerce $ stToIO $ grabNextBlock mlockedPool32
+        fmap coerce $ stToIO $ grabNextBlock mlockedPool32
     | size <= 64 -> do
-        coerce $ stToIO $ grabNextBlock mlockedPool64
+        fmap coerce $ stToIO $ grabNextBlock mlockedPool64
     | size <= 128 -> do
-        coerce $ stToIO $ grabNextBlock mlockedPool128
+        fmap coerce $ stToIO $ grabNextBlock mlockedPool128
     | size <= 256 -> do
-        coerce $ stToIO $ grabNextBlock mlockedPool256
+        fmap coerce $ stToIO $ grabNextBlock mlockedPool256
     | size <= 512 -> do
-        coerce $ stToIO $ grabNextBlock mlockedPool512
+        fmap coerce $ stToIO $ grabNextBlock mlockedPool512
     | otherwise -> do
         mask_ $ do
           ptr <- sodiumMalloc size
@@ -212,7 +212,7 @@ mallocForeignPtrBytes size =
 withForeignPtr :: (MonadST m) => ForeignPtr m a -> (Ptr a -> m b) -> m b
 withForeignPtr (ForeignPtr fptr) f = do
   result <- f $ Foreign.unsafeForeignPtrToPtr fptr
-  withLiftST ($ touch fptr)
+  stToIO (touch fptr)
   return result
 
 allocaBytes :: (MonadThrow m, MonadST m) => Int -> (Ptr a -> m b) -> m b
@@ -232,7 +232,7 @@ unpackByteStringCStringLen bs f = do
 
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
 packByteStringCStringLen (ptr, len) =
-  withLiftST $ \lift -> lift . unsafeIOToST $ BS.packCStringLen (ptr, len)
+  stToIO . unsafeIOToST $ BS.packCStringLen (ptr, len)
 
 newtype MLockedAllocator m =
   MLockedAllocator
