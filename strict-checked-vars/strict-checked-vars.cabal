@@ -16,7 +16,7 @@ license-files:
 
 copyright:       2019-2023 Input Output Global Inc (IOG).
 author:          IOG Engineering Team
-maintainer:      operations@iohk.io
+maintainer:      operations@iohk.io, Joris Dral
 category:        Concurrency
 build-type:      Simple
 extra-doc-files:
@@ -50,9 +50,9 @@ library
   default-language: Haskell2010
   build-depends:
     , base         >=4.9 && <5
-    , io-classes   >=1.2 && <1.4
-    , strict-mvar  >=1.2 && <1.4
-    , strict-stm   >=1.2 && <1.4
+    , io-classes   >=1.2 && <1.5
+    , strict-mvar  >=1.2 && <1.5
+    , strict-stm   >=1.2 && <1.5
 
   ghc-options:
     -Wall -Wcompat -Wincomplete-uni-patterns
