@@ -1,13 +1,11 @@
 {
-   "dockerFile":"./Dockerfile",
+   "image":"ghcr.io/input-output-hk/devx-devcontainer:x86_64-linux.ghc96-iog",
+   "postCreateCommand": "post-create-command",
    "customizations":{
       "vscode":{
          "extensions":[
             "haskell.haskell"
-         ],
-         "settings":{
-            "haskell.manageHLS":"PATH"
-         }
+         ]
       }
    }
 }
