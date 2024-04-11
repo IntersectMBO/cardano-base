@@ -15,6 +15,7 @@ module Cardano.Crypto.KES.Mock
   ( MockKES
   , VerKeyKES (..)
   , SignKeyKES (..)
+  , UnsoundPureSignKeyKES (..)
   , SigKES (..)
   )
 where
