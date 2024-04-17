@@ -15,11 +15,11 @@ jobs:
         platform: [ x86_64-linux, x86_64-darwin ]
         compiler-nix-name: [ ghc810, ghc96 ]
         target-platform: [ "", "-windows" ]
-  
+
     env:
       # Modify this value to "invalidate" the cabal cache.
       CABAL_CACHE_VERSION: "2023-04-18"
-    
+
     runs-on: ${{ matrix.platform == 'x86_64-linux' && 'ubuntu-latest' || 'macos-latest' }}
     steps:
       - name: Checkout code
@@ -41,8 +41,7 @@ jobs:
             /home/runner/.cabal${{ matrix.target-platform }}/store
             dist-newstyle
           key: cache-devx-${{ env.CABAL_CACHE_VERSION }}-${{ matrix.platform }}.${{ matrix.compiler-nix-name }}${{ matrix.target-platform }}-${{ hashFiles('dependencies.txt') }}
-  
-  
+
       - name: cabal build dependencies
         run: cabal build all -j --enable-tests --only-dependencies
       - name: cabal build
