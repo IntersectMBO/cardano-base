@@ -204,6 +204,13 @@ instance KnownNat t => UnsoundPureKESAlgorithm (MockKES t) where
     unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeyMockKES vk t) =
       return $ SignKeyMockKES vk t
 
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyMockKES vk t) =
+      rawSerialiseSignKeyMockKES (SignKeyMockKES vk t)
+
+    rawDeserialiseUnsoundPureSignKeyKES bs = do
+      SignKeyMockKES vt t <- rawDeserialiseSignKeyMockKES bs
+      return $ UnsoundPureSignKeyMockKES vt t
+
 instance KnownNat t => UnsoundKESAlgorithm (MockKES t) where
     rawSerialiseSignKeyKES sk =
       return $ rawSerialiseSignKeyMockKES sk

@@ -318,6 +318,9 @@ class KESAlgorithm v => UnsoundPureKESAlgorithm v where
     => UnsoundPureSignKeyKES v
     -> m (SignKeyKES v)
 
+  rawSerialiseUnsoundPureSignKeyKES    :: UnsoundPureSignKeyKES  v -> ByteString
+  rawDeserialiseUnsoundPureSignKeyKES  :: ByteString -> Maybe (UnsoundPureSignKeyKES v)
+
 
 -- | Unsound operations on KES sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider

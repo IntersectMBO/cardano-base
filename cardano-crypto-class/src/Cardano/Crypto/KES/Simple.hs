@@ -230,6 +230,22 @@ instance ( KESAlgorithm (SimpleKES d t)
                       . rawDeserialiseSignKeyDSIGNM
                       . rawSerialiseSignKeyDSIGN
           
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySimpleKES sks) =
+        BS.concat $! map rawSerialiseSignKeyDSIGN (Vec.toList sks)
+
+
+    rawDeserialiseUnsoundPureSignKeyKES bs
+      | let duration = fromIntegral (natVal (Proxy :: Proxy t))
+            sizeKey  = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
+            skbs     = splitsAt (replicate duration sizeKey) bs
+      , length skbs == duration
+      = do
+          sks <- mapM rawDeserialiseSignKeyDSIGN skbs
+          return $! UnsoundPureSignKeySimpleKES (Vec.fromList sks)
+
+      | otherwise
+      = Nothing
+
 
 
 instance ( UnsoundDSIGNMAlgorithm d, KnownNat t, KESAlgorithm (SimpleKES d t))

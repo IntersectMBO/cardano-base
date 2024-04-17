@@ -166,6 +166,11 @@ instance ( KESAlgorithm (SingleKES d)
       maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") (return . SignKeySingleKES)
       =<< (rawDeserialiseSignKeyDSIGNM . rawSerialiseSignKeyDSIGN $ sk)
 
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySingleKES sk) =
+      rawSerialiseSignKeyDSIGN sk
+    rawDeserialiseUnsoundPureSignKeyKES b =
+      UnsoundPureSignKeySingleKES <$> rawDeserialiseSignKeyDSIGN b
+
 instance (KESAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
          => UnsoundKESAlgorithm (SingleKES d) where
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =

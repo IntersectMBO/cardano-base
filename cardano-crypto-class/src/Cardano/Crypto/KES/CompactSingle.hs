@@ -195,6 +195,11 @@ instance ( KESAlgorithm (CompactSingleKES d)
       maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") (return . SignKeyCompactSingleKES)
       =<< (rawDeserialiseSignKeyDSIGNM . rawSerialiseSignKeyDSIGN $ sk)
 
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyCompactSingleKES sk) =
+      rawSerialiseSignKeyDSIGN sk
+    rawDeserialiseUnsoundPureSignKeyKES b =
+      UnsoundPureSignKeyCompactSingleKES <$> rawDeserialiseSignKeyDSIGN b
+
 instance ( KESAlgorithm (CompactSingleKES d)
          , DSIGNMAlgorithm d
          ) => OptimizedKESAlgorithm (CompactSingleKES d) where

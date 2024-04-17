@@ -75,3 +75,5 @@ instance UnsoundPureKESAlgorithm NeverKES where
   unsoundPureDeriveVerKeyKES _ = NeverUsedVerKeyKES
   unsoundPureUpdateKES _ = error "KES not available"
   unsoundPureSignKeyKESToSoundSignKeyKES _ = return NeverUsedSignKeyKES
+  rawSerialiseUnsoundPureSignKeyKES _ = mempty
+  rawDeserialiseUnsoundPureSignKeyKES _ = Just NeverUsedUnsoundPureSignKeyKES

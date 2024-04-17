@@ -532,6 +532,38 @@ instance ( KESAlgorithm (CompactSumKES h d)
         <*> pure vk_0
         <*> pure vk_1
 
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyCompactSumKES sk r_1 vk_0 vk_1) =
+      let ssk = rawSerialiseUnsoundPureSignKeyKES sk
+          sr1 = getSeedBytes r_1
+      in mconcat
+          [ ssk
+          , sr1
+          , rawSerialiseVerKeyKES vk_0
+          , rawSerialiseVerKeyKES vk_1
+          ]
+
+    rawDeserialiseUnsoundPureSignKeyKES b = do
+        guard (BS.length b == fromIntegral size_total)
+        sk   <- rawDeserialiseUnsoundPureSignKeyKES b_sk
+        let r = mkSeedFromBytes b_r
+        vk_0 <- rawDeserialiseVerKeyKES  b_vk0
+        vk_1 <- rawDeserialiseVerKeyKES  b_vk1
+        return (UnsoundPureSignKeyCompactSumKES sk r vk_0 vk_1)
+      where
+        b_sk  = slice off_sk  size_sk b
+        b_r   = slice off_r   size_r  b
+        b_vk0 = slice off_vk0 size_vk b
+        b_vk1 = slice off_vk1 size_vk b
+
+        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
+        size_r     = seedSizeKES    (Proxy :: Proxy d)
+        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
+        size_total = sizeSignKeyKES (Proxy :: Proxy (CompactSumKES h d))
+
+        off_sk     = 0 :: Word
+        off_r      = size_sk
+        off_vk0    = off_r + size_r
+        off_vk1    = off_vk0 + size_vk
 
 
 --
