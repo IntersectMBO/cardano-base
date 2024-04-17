@@ -17,6 +17,9 @@ module Cardano.Slotting.Slot
     withOriginFromMaybe,
     EpochNo (..),
     EpochSize (..),
+    EpochInterval (..),
+    binOpEpochNo,
+    addEpochInterval,
   )
 where
 
@@ -25,7 +28,7 @@ import Codec.Serialise (Serialise (..))
 import Control.DeepSeq (NFData (rnf))
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String))
 import Data.Typeable (Typeable)
-import Data.Word (Word64)
+import Data.Word (Word64, Word32)
 import GHC.Generics (Generic)
 import Quiet (Quiet (..))
 import NoThunks.Class (NoThunks)
@@ -114,9 +117,24 @@ withOriginFromMaybe (Just t) = At t
 newtype EpochNo = EpochNo {unEpochNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochNo
-  deriving newtype (Enum, Num, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+  deriving newtype (Enum, Serialise, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
 
 newtype EpochSize = EpochSize {unEpochSize :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving Show via Quiet EpochSize
-  deriving newtype (Enum, Num, Real, Integral, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+  deriving newtype (Enum, ToCBOR, FromCBOR, NoThunks, ToJSON, FromJSON, NFData)
+
+newtype EpochInterval = EpochInterval
+  { unEpochInterval :: Word32
+  }
+  deriving (Eq, Ord, Generic)
+  deriving (Show) via Quiet EpochInterval
+  deriving newtype (NoThunks, NFData, ToJSON, FromJSON, ToCBOR, FromCBOR)
+
+-- | Convenience function for doing binary operations on two `EpochNo`s
+binOpEpochNo :: (Word64 -> Word64 -> Word64) -> EpochNo -> EpochNo -> EpochNo
+binOpEpochNo op en1 en2 = EpochNo $ op (unEpochNo en1) (unEpochNo en2)
+
+-- | Add a EpochInterval (a positive change) to an EpochNo to get a new EpochNo
+addEpochInterval :: EpochNo -> EpochInterval -> EpochNo
+addEpochInterval (EpochNo n) (EpochInterval m) = EpochNo (n + fromIntegral m)

@@ -3,9 +3,13 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 -- According to the documentation for unsafePerformIO:
 --
 -- > Make sure that the either you switch off let-floating
@@ -23,30 +27,54 @@ module Cardano.Crypto.DSIGN.Ed25519
   ( Ed25519DSIGN
   , SigDSIGN (..)
   , SignKeyDSIGN (..)
+  , SignKeyDSIGNM (..)
   , VerKeyDSIGN (..)
   )
 where
 
-import Control.DeepSeq (NFData)
+import Control.DeepSeq (NFData (..), rwhnf)
+import Control.Monad ((<$!>), unless, guard)
+import Control.Monad.Class.MonadST (MonadST (..))
+import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO)
+import Control.Monad.ST (ST)
+import Control.Monad.ST.Unsafe (unsafeIOToST)
+import qualified Data.ByteString as BS
+import Data.Proxy
+import Foreign.C.Error (errnoToIOError, getErrno, Errno)
+import Foreign.Ptr (castPtr, nullPtr)
 import GHC.Generics (Generic)
+import GHC.IO.Exception (ioException)
+import GHC.TypeLits (TypeError, ErrorMessage (..))
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
-import GHC.IO.Exception (ioException)
-import Control.Monad (unless, guard)
-import Foreign.C.Error (errnoToIOError, getErrno)
-import Foreign.Ptr (castPtr, nullPtr)
-import qualified Data.ByteString as BS
+
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
-import Cardano.Foreign
-import Cardano.Crypto.PinnedSizedBytes
-import Cardano.Crypto.Libsodium.C
-
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.Libsodium
+  ( MLockedSizedBytes
+  , mlsbToByteString
+  , mlsbFromByteStringCheckWith
+  , mlsbUseAsSizedPtr
+  , mlsbNewWith
+  , mlsbFinalize
+  , mlsbCopyWith
+  )
+import Cardano.Crypto.Libsodium.C
+import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.PinnedSizedBytes
+  ( PinnedSizedBytes
+  , psbUseAsSizedPtr
+  , psbToByteString
+  , psbFromByteStringCheck
+  , psbCreateSized
+  , psbCreateSizedResult
+  )
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (SignableRepresentation(..))
-import Data.Proxy
+import Cardano.Foreign
+
 
 
 data Ed25519DSIGN
@@ -55,18 +83,46 @@ instance NoThunks (VerKeyDSIGN Ed25519DSIGN)
 instance NoThunks (SignKeyDSIGN Ed25519DSIGN)
 instance NoThunks (SigDSIGN Ed25519DSIGN)
 
+deriving via (MLockedSizedBytes (SizeSignKeyDSIGN Ed25519DSIGN))
+  instance NoThunks (SignKeyDSIGNM Ed25519DSIGN)
+
+instance NFData (SignKeyDSIGNM Ed25519DSIGN) where
+  rnf = rwhnf
+
 -- | Convert C-style return code / errno error reporting into Haskell
 -- exceptions.
 --
 -- Runs an IO action (which should be some FFI call into C) that returns a
 -- result code; if the result code returned is nonzero, fetch the errno, and
 -- throw a suitable IO exception.
-cOrError :: String -> String -> IO Int -> IO ()
-cOrError contextDesc cFunName action = do
+cOrThrowError :: String -> String -> IO Int -> IO ()
+cOrThrowError contextDesc cFunName action = do
   res <- action
   unless (res == 0) $ do
       errno <- getErrno
       ioException $ errnoToIOError (contextDesc ++ ": " ++ cFunName) errno Nothing Nothing
+--
+-- | Convert C-style return code / errno error reporting into Haskell
+-- exceptions.
+--
+-- Runs an IO action (which should be some FFI call into C) that returns a
+-- result code; if the result code returned is nonzero, fetch the errno, and
+-- return it.
+cOrError :: MonadST m => (forall s. ST s Int) -> m (Maybe Errno)
+cOrError action = stToIO $ do
+  res <- action
+  if res == 0 then
+    return Nothing
+  else
+    Just <$> unsafeIOToST getErrno
+
+-- | Throws an error when 'Just' an 'Errno' is given.
+throwOnErrno :: MonadThrow m => String -> String -> Maybe Errno -> m ()
+throwOnErrno contextDesc cFunName maybeErrno = do
+  case maybeErrno of
+    Just errno -> throwIO $ errnoToIOError (contextDesc ++ ": " ++ cFunName) errno Nothing Nothing
+    Nothing -> return ()
+
 
 instance DSIGNAlgorithm Ed25519DSIGN where
     -- | Seed size is 32 octets, the same as sign key size, because generating
@@ -121,7 +177,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
         unsafeDupablePerformIO $
         psbUseAsSizedPtr sk $ \skPtr ->
         psbCreateSized $ \pkPtr ->
-          cOrError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk"
+          cOrThrowError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk"
             $ c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
 
     --
@@ -136,10 +192,10 @@ instance DSIGNAlgorithm Ed25519DSIGN where
             BS.useAsCStringLen bs $ \(ptr, len) ->
             psbUseAsSizedPtr sk $ \skPtr ->
             allocaSized $ \pkPtr -> do
-                cOrError "signDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk"
+                cOrThrowError "signDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk"
                   $ c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
                 psbCreateSized $ \sigPtr -> do
-                  cOrError "signDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_detached"
+                  cOrThrowError "signDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_detached"
                     $ c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
 
     verifyDSIGN () (VerKeyEd25519DSIGN vk) a (SigEd25519DSIGN sig) =
@@ -164,7 +220,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
           psbCreateSized $ \skPtr ->
             BS.useAsCStringLen sb $ \(seedPtr, _) ->
             allocaSized $ \pkPtr -> do
-                cOrError "genKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair"
+                cOrThrowError "genKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair"
                   $ c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
     --
     -- raw serialise/deserialise
@@ -175,7 +231,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
         psbToByteString @(SeedSizeDSIGN Ed25519DSIGN) $ unsafeDupablePerformIO $ do
           psbCreateSized $ \seedPtr ->
             psbUseAsSizedPtr sk $ \skPtr ->
-              cOrError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_seed"
+              cOrThrowError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_seed"
                 $ c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
 
     rawSerialiseSigDSIGN      (SigEd25519DSIGN sig) = psbToByteString sig
@@ -188,6 +244,96 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     rawDeserialiseSigDSIGN     = fmap SigEd25519DSIGN . psbFromByteStringCheck
     {-# INLINE rawDeserialiseSigDSIGN #-}
 
+instance DSIGNMAlgorithm Ed25519DSIGN where
+    -- Note that the size of the internal key data structure is the SECRET KEY
+    -- bytes as per libsodium, while the declared key size (for serialization)
+    -- is libsodium's SEED bytes. We expand 32-octet keys to 64-octet ones
+    -- during deserialization, and we delete the 32 octets that contain the
+    -- public key from the secret key before serializing.
+    newtype SignKeyDSIGNM Ed25519DSIGN = SignKeyEd25519DSIGNM (MLockedSizedBytes CRYPTO_SIGN_ED25519_SECRETKEYBYTES)
+        deriving (Show)
+
+    deriveVerKeyDSIGNM (SignKeyEd25519DSIGNM sk) =
+      VerKeyEd25519DSIGN <$!> do
+        mlsbUseAsSizedPtr sk $ \skPtr -> do
+          (psb, maybeErrno) <-
+            psbCreateSizedResult $ \pkPtr ->
+              stToIO $ do
+                cOrError $ unsafeIOToST $
+                  c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
+          throwOnErrno "deriveVerKeyDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
+          return psb
+
+
+    signDSIGNM () a (SignKeyEd25519DSIGNM sk) =
+      let bs = getSignableRepresentation a
+      in SigEd25519DSIGN <$!> do
+          mlsbUseAsSizedPtr sk $ \skPtr -> do
+            (psb, maybeErrno) <-
+              psbCreateSizedResult $ \sigPtr ->
+                stToIO $ do
+                  cOrError $ unsafeIOToST $ do
+                    BS.useAsCStringLen bs $ \(ptr, len) ->
+                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
+            throwOnErrno "signDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_detached" maybeErrno
+            return psb
+
+    --
+    -- Key generation
+    --
+    {-# NOINLINE genKeyDSIGNMWith #-}
+    genKeyDSIGNMWith allocator seed = SignKeyEd25519DSIGNM <$!> do
+      sk <- mlsbNewWith allocator
+      mlsbUseAsSizedPtr sk $ \skPtr ->
+        mlockedSeedUseAsCPtr seed $ \seedPtr -> do
+          maybeErrno <- stToIO $ allocaSizedST $ \pkPtr -> do
+              cOrError $ unsafeIOToST $
+                c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
+          throwOnErrno "genKeyDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair" maybeErrno
+      return sk
+      where
+        allocaSizedST k =
+          unsafeIOToST $ allocaSized $ \ptr -> stToIO $ k ptr
+
+    cloneKeyDSIGNMWith allocator (SignKeyEd25519DSIGNM sk) =
+      SignKeyEd25519DSIGNM <$!> mlsbCopyWith allocator sk
+
+    getSeedDSIGNMWith allocator _ (SignKeyEd25519DSIGNM sk) = do
+      seed <- mlockedSeedNewWith allocator
+      mlsbUseAsSizedPtr sk $ \skPtr ->
+        mlockedSeedUseAsSizedPtr seed $ \seedPtr -> do
+          maybeErrno <-
+            stToIO $ cOrError $ unsafeIOToST $
+              c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
+          throwOnErrno "genKeyDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair" maybeErrno
+      return seed
+
+    --
+    -- Secure forgetting
+    --
+    forgetSignKeyDSIGNMWith _ (SignKeyEd25519DSIGNM sk) = mlsbFinalize sk
+
+instance UnsoundDSIGNMAlgorithm Ed25519DSIGN where
+    --
+    -- Ser/deser (dangerous - do not use in production code)
+    --
+    rawSerialiseSignKeyDSIGNM sk = do
+      seed <- getSeedDSIGNM (Proxy @Ed25519DSIGN) sk
+      -- We need to copy the seed into unsafe memory and finalize the MLSB, in
+      -- order to avoid leaking mlocked memory. This will, however, expose the
+      -- secret seed to the unprotected Haskell heap (see 'mlsbToByteString').
+      raw <- mlsbToByteString . mlockedSeedMLSB $ seed
+      mlockedSeedFinalize seed
+      return raw
+
+    rawDeserialiseSignKeyDSIGNMWith allocator raw = do
+      mseed <- fmap MLockedSeed <$> mlsbFromByteStringCheckWith allocator raw
+      case mseed of
+        Nothing -> return Nothing
+        Just seed -> do
+          sk <- Just <$> genKeyDSIGNMWith allocator seed
+          mlockedSeedFinalize seed
+          return sk
 
 instance ToCBOR (VerKeyDSIGN Ed25519DSIGN) where
   toCBOR = encodeVerKeyDSIGN
@@ -209,3 +355,13 @@ instance ToCBOR (SigDSIGN Ed25519DSIGN) where
 
 instance FromCBOR (SigDSIGN Ed25519DSIGN) where
   fromCBOR = decodeSigDSIGN
+
+
+instance TypeError ('Text "CBOR encoding would violate mlocking guarantees")
+  => ToCBOR (SignKeyDSIGNM Ed25519DSIGN) where
+  toCBOR = error "unsupported"
+  encodedSizeExpr _ = error "unsupported"
+
+instance TypeError ('Text "CBOR decoding would violate mlocking guarantees")
+  => FromCBOR (SignKeyDSIGNM Ed25519DSIGN) where
+  fromCBOR = error "unsupported"

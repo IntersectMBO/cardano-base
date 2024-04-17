@@ -33,20 +33,17 @@ import           GHC.Generics (Generic)
 import           GHC.TypeNats (Nat, KnownNat, natVal, type (*))
 import           NoThunks.Class (NoThunks)
 import           Control.Monad.Trans.Maybe
-import           Control.Monad.Class.MonadThrow (MonadEvaluate)
-import           Control.Monad.Class.MonadST (MonadST)
 import           Control.Monad ( (<$!>) )
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import           Cardano.Crypto.DSIGN
+import qualified Cardano.Crypto.DSIGN.Class as DSIGN
 import           Cardano.Crypto.KES.Class
-import           Cardano.Crypto.MLockedSeed
+import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium.MLockedBytes
 import           Cardano.Crypto.Util
 import           Data.Unit.Strict (forceElemsToWHNF)
-import           Cardano.Crypto.MonadSodium (MonadSodium (..), MEq (..))
-
 
 data SimpleKES d (t :: Nat)
 
@@ -56,7 +53,7 @@ data SimpleKES d (t :: Nat)
 --
 -- The alternative is to use an unboxed vector, but that would require an
 -- unreasonable 'Unbox' constraint.
-pattern VerKeySimpleKES :: Vector (VerKeyDSIGNM d) -> VerKeyKES (SimpleKES d t)
+pattern VerKeySimpleKES :: Vector (VerKeyDSIGN d) -> VerKeyKES (SimpleKES d t)
 pattern VerKeySimpleKES v <- ThunkyVerKeySimpleKES v
   where
     VerKeySimpleKES v = ThunkyVerKeySimpleKES (forceElemsToWHNF v)
@@ -71,28 +68,31 @@ pattern SignKeySimpleKES v <- ThunkySignKeySimpleKES v
 
 {-# COMPLETE SignKeySimpleKES #-}
 
-instance ( DSIGNMAlgorithmBase d
+instance ( DSIGNMAlgorithm d
          , KnownNat t
-         , KnownNat (SeedSizeDSIGNM d * t)
-         , KnownNat (SizeVerKeyDSIGNM d * t)
-         , KnownNat (SizeSignKeyDSIGNM d * t)
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
          )
          => KESAlgorithm (SimpleKES d t) where
 
-    type SeedSizeKES (SimpleKES d t) = SeedSizeDSIGNM d * t
+    type SeedSizeKES (SimpleKES d t) = SeedSizeDSIGN d * t
 
     --
     -- Key and signature types
     --
 
     newtype VerKeyKES (SimpleKES d t) =
-              ThunkyVerKeySimpleKES (Vector (VerKeyDSIGNM d))
+              ThunkyVerKeySimpleKES (Vector (VerKeyDSIGN d))
         deriving Generic
 
     newtype SigKES (SimpleKES d t) =
-              SigSimpleKES (SigDSIGNM d)
+              SigSimpleKES (SigDSIGN d)
         deriving Generic
 
+    newtype SignKeyKES (SimpleKES d t) =
+              ThunkySignKeySimpleKES (Vector (SignKeyDSIGNM d))
+        deriving Generic
 
     --
     -- Metadata and basic key operations
@@ -106,56 +106,40 @@ instance ( DSIGNMAlgorithmBase d
     -- Core algorithm operations
     --
 
-    type ContextKES (SimpleKES d t) = ContextDSIGNM d
-    type Signable   (SimpleKES d t) = SignableM d
+    type ContextKES (SimpleKES d t) = ContextDSIGN d
+    type Signable   (SimpleKES d t) = DSIGN.Signable d
 
     verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
         case vks !? fromIntegral j of
           Nothing -> Left "KES verification failed: out of range"
-          Just vk -> verifyDSIGNM ctxt vk a sig
+          Just vk -> verifyDSIGN ctxt vk a sig
 
     --
     -- raw serialise/deserialise
     --
 
-    type SizeVerKeyKES  (SimpleKES d t) = SizeVerKeyDSIGNM d * t
-    type SizeSignKeyKES (SimpleKES d t) = SizeSignKeyDSIGNM d * t
-    type SizeSigKES     (SimpleKES d t) = SizeSigDSIGNM d
+    type SizeVerKeyKES  (SimpleKES d t) = SizeVerKeyDSIGN d * t
+    type SizeSignKeyKES (SimpleKES d t) = SizeSignKeyDSIGN d * t
+    type SizeSigKES     (SimpleKES d t) = SizeSigDSIGN d
 
     rawSerialiseVerKeyKES (VerKeySimpleKES vks) =
-        BS.concat [ rawSerialiseVerKeyDSIGNM vk | vk <- Vec.toList vks ]
+        BS.concat [ rawSerialiseVerKeyDSIGN vk | vk <- Vec.toList vks ]
 
     rawSerialiseSigKES (SigSimpleKES sig) =
-        rawSerialiseSigDSIGNM sig
+        rawSerialiseSigDSIGN sig
 
     rawDeserialiseVerKeyKES bs
       | let duration = fromIntegral (natVal (Proxy :: Proxy t))
-            sizeKey  = fromIntegral (sizeVerKeyDSIGNM (Proxy :: Proxy d))
+            sizeKey  = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy d))
       , vkbs     <- splitsAt (replicate duration sizeKey) bs
       , length vkbs == duration
-      , Just vks <- mapM rawDeserialiseVerKeyDSIGNM vkbs
+      , Just vks <- mapM rawDeserialiseVerKeyDSIGN vkbs
       = Just $! VerKeySimpleKES (Vec.fromList vks)
 
       | otherwise
       = Nothing
 
-    rawDeserialiseSigKES = fmap SigSimpleKES . rawDeserialiseSigDSIGNM
-
-
-
-instance ( KESAlgorithm (SimpleKES d t)
-         , DSIGNMAlgorithm m d
-         , KnownNat t
-         , KnownNat (SeedSizeDSIGNM d * t)
-         , MonadEvaluate m
-         , MonadSodium m
-         , MonadST m
-         ) =>
-         KESSignAlgorithm m (SimpleKES d t) where
-    newtype SignKeyKES (SimpleKES d t) =
-              ThunkySignKeySimpleKES (Vector (SignKeyDSIGNM d))
-        deriving Generic
-
+    rawDeserialiseSigKES = fmap SigSimpleKES . rawDeserialiseSigDSIGN
 
     deriveVerKeyKES (SignKeySimpleKES sks) =
       VerKeySimpleKES <$!> Vec.mapM deriveVerKeyDSIGNM sks
@@ -166,9 +150,9 @@ instance ( KESAlgorithm (SimpleKES d t)
           Nothing -> error ("SimpleKES.signKES: period out of range " ++ show j)
           Just sk -> SigSimpleKES <$!> (signDSIGNM ctxt a $! sk)
 
-    updateKES _ (ThunkySignKeySimpleKES sk) t
+    updateKESWith allocator _ (ThunkySignKeySimpleKES sk) t
       | t+1 < fromIntegral (natVal (Proxy @t)) = do
-          sk' <- Vec.mapM cloneKeyDSIGNM sk
+          sk' <- Vec.mapM (cloneKeyDSIGNMWith allocator) sk
           return $! Just $! SignKeySimpleKES sk'
       | otherwise                               = return Nothing
 
@@ -177,24 +161,25 @@ instance ( KESAlgorithm (SimpleKES d t)
     -- Key generation
     --
 
-    genKeyKES (MLockedSeed mlsb) = do
-      let seedSize = seedSizeDSIGNM (Proxy :: Proxy d)
+    genKeyKESWith allocator (MLockedSeed mlsb) = do
+      let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
           duration = fromIntegral (natVal (Proxy @t))
       sks <- Vec.generateM duration $ \t -> do
         withMLSBChunk mlsb (fromIntegral t * fromIntegral seedSize) $ \mlsb' -> do
-          genKeyDSIGNM (MLockedSeed mlsb')
+          genKeyDSIGNMWith allocator (MLockedSeed mlsb')
       return $! SignKeySimpleKES sks
 
     --
     -- Forgetting
     --
 
-    forgetSignKeyKES (SignKeySimpleKES sks) = Vec.mapM_ forgetSignKeyDSIGNM sks
+    forgetSignKeyKESWith allocator (SignKeySimpleKES sks) =
+      Vec.mapM_ (forgetSignKeyDSIGNMWith allocator) sks
 
 
 
-instance ( UnsoundDSIGNMAlgorithm m d, KnownNat t, KESSignAlgorithm m (SimpleKES d t))
-         => UnsoundKESSignAlgorithm m (SimpleKES d t) where
+instance ( UnsoundDSIGNMAlgorithm d, KnownNat t, KESAlgorithm (SimpleKES d t))
+         => UnsoundKESAlgorithm (SimpleKES d t) where
     --
     -- raw serialise/deserialise
     --
@@ -203,69 +188,63 @@ instance ( UnsoundDSIGNMAlgorithm m d, KnownNat t, KESSignAlgorithm m (SimpleKES
         BS.concat <$!> mapM rawSerialiseSignKeyDSIGNM (Vec.toList sks)
 
 
-    rawDeserialiseSignKeyKES bs
+    rawDeserialiseSignKeyKESWith allocator bs
       | let duration = fromIntegral (natVal (Proxy :: Proxy t))
-            sizeKey  = fromIntegral (sizeSignKeyDSIGNM (Proxy :: Proxy d))
+            sizeKey  = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
       , skbs     <- splitsAt (replicate duration sizeKey) bs
       , length skbs == duration
       = runMaybeT $ do
-          sks <- mapM (MaybeT . rawDeserialiseSignKeyDSIGNM) skbs
+          sks <- mapM (MaybeT . rawDeserialiseSignKeyDSIGNMWith allocator) skbs
           return $! SignKeySimpleKES (Vec.fromList sks)
 
       | otherwise
       = return Nothing
 
-deriving instance DSIGNMAlgorithmBase d => Show (VerKeyKES (SimpleKES d t))
-deriving instance DSIGNMAlgorithmBase d => Show (SignKeyKES (SimpleKES d t))
-deriving instance DSIGNMAlgorithmBase d => Show (SigKES (SimpleKES d t))
+deriving instance DSIGNMAlgorithm d => Show (VerKeyKES (SimpleKES d t))
+deriving instance (DSIGNMAlgorithm d, Show (SignKeyDSIGNM d)) => Show (SignKeyKES (SimpleKES d t))
+deriving instance DSIGNMAlgorithm d => Show (SigKES (SimpleKES d t))
 
-deriving instance DSIGNMAlgorithmBase d => Eq   (VerKeyKES (SimpleKES d t))
-deriving instance DSIGNMAlgorithmBase d => Eq   (SigKES (SimpleKES d t))
+deriving instance DSIGNMAlgorithm d => Eq   (VerKeyKES (SimpleKES d t))
+deriving instance DSIGNMAlgorithm d => Eq   (SigKES (SimpleKES d t))
 
-instance (Monad m, MEq m (SignKeyDSIGNM d)) => MEq m (SignKeyKES (SimpleKES d t)) where
-  equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =
-    -- No need to check that lengths agree, the types already guarantee this.
-    Vec.and <$> Vec.zipWithM equalsM a b
+instance DSIGNMAlgorithm d => NoThunks (SigKES     (SimpleKES d t))
+instance DSIGNMAlgorithm d => NoThunks (SignKeyKES (SimpleKES d t))
+instance DSIGNMAlgorithm d => NoThunks (VerKeyKES  (SimpleKES d t))
 
-
-instance DSIGNMAlgorithmBase d => NoThunks (SigKES     (SimpleKES d t))
-instance DSIGNMAlgorithmBase d => NoThunks (SignKeyKES (SimpleKES d t))
-instance DSIGNMAlgorithmBase d => NoThunks (VerKeyKES  (SimpleKES d t))
-
-instance ( DSIGNMAlgorithmBase d
+instance ( DSIGNMAlgorithm d
          , KnownNat t
-         , KnownNat (SeedSizeDSIGNM d * t)
-         , KnownNat (SizeVerKeyDSIGNM d * t)
-         , KnownNat (SizeSignKeyDSIGNM d * t)
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
          )
       => ToCBOR (VerKeyKES (SimpleKES d t)) where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
-instance ( DSIGNMAlgorithmBase d
+instance ( DSIGNMAlgorithm d
          , KnownNat t
-         , KnownNat (SeedSizeDSIGNM d * t)
-         , KnownNat (SizeVerKeyDSIGNM d * t)
-         , KnownNat (SizeSignKeyDSIGNM d * t)
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
          )
       => FromCBOR (VerKeyKES (SimpleKES d t)) where
   fromCBOR = decodeVerKeyKES
 
-instance ( DSIGNMAlgorithmBase d
+instance ( DSIGNMAlgorithm d
          , KnownNat t
-         , KnownNat (SeedSizeDSIGNM d * t)
-         , KnownNat (SizeVerKeyDSIGNM d * t)
-         , KnownNat (SizeSignKeyDSIGNM d * t)
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
          )
       => ToCBOR (SigKES (SimpleKES d t)) where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
-instance (DSIGNMAlgorithmBase d
+instance (DSIGNMAlgorithm d
          , KnownNat t
-         , KnownNat (SeedSizeDSIGNM d * t)
-         , KnownNat (SizeVerKeyDSIGNM d * t)
-         , KnownNat (SizeSignKeyDSIGNM d * t)
+         , KnownNat (SeedSizeDSIGN d * t)
+         , KnownNat (SizeVerKeyDSIGN d * t)
+         , KnownNat (SizeSignKeyDSIGN d * t)
          )
       => FromCBOR (SigKES (SimpleKES d t)) where
   fromCBOR = decodeSigKES

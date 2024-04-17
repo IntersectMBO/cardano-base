@@ -1,8 +1,10 @@
 # Changelog for `cardano-binary`
 
-## 1.7.0.2
+## 1.7.1.0
 
-*
+* New `Test.Cardano.Binary.TreeDiff` module extracted from
+  `cardano-ledger-binary`. It lives in a new public sublibrary `testlib`.
+* Add `FromCBOR` instance for `TermToken`
 
 ## 1.7.0.1
 

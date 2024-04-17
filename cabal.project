@@ -1,5 +1,5 @@
 repository cardano-haskell-packages
-  url: https://input-output-hk.github.io/cardano-haskell-packages
+  url: https://chap.intersectmbo.org/
   secure: True
   root-keys:
     3e0cce471cf09815f930210f7827266fd09045445d65923e6d0238a6cd15126f
@@ -10,10 +10,9 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2023-04-24T00:00:00Z
+index-state: 2024-03-11T03:33:05Z
 -- The CHaP index-state
-index-state: cardano-haskell-packages 2023-04-25T00:00:00Z
-
+index-state: cardano-haskell-packages 2024-03-08T10:14:14Z
 
 packages:
   base-deriving-via
@@ -22,12 +21,14 @@ packages:
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
+  cardano-git-rev
   cardano-slotting
   cardano-strict-containers
   cardano-mempool
   heapwords
   measures
   orphans-deriving-via
+  strict-checked-vars
 
 constraints:
   -- this is needed to make it compatible with non-gmp
@@ -40,16 +41,31 @@ constraints:
 -- Ensures colourized output from test runners
 test-show-details: direct
 
+tests: true
+benchmarks: true
+
 program-options
   ghc-options: -Werror
 
-if impl(ghc >= 9.6)
+if impl(ghc >= 9.8)
   allow-newer:
     , *:base
+    , *:deepseq
     , *:ghc-prim
     , *:template-haskell
-    , hedgehog:*
-    , protolude:binary
-    , protolude:bytestring
-    , protolude:text
-    , th-compat:*
+    , aeson:th-abstraction
+
+  constraints:
+    , aeson >= 2.0.0.0
+    , bytestring >= 0.11
+    , hastache >= 0.6.1
+    , monad-par >= 0.3.5
+    , statistics >= 0.16.2.0
+    , th-abstraction >= 0.6.0.0
+
+  -- Git head compiles with `ghc-9.8`, but Hackage version does not.
+  source-repository-package
+    type: git
+    location: https://github.com/recursion-schemes/recursion-schemes
+    tag: cc2e88c3400a6548e975830c9addb12ab087545f
+    --sha256: 06shyihy6cpblv3pf18xgdfjgxqw2y2awvpcy33r76fr642gdvgn

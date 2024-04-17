@@ -232,6 +232,10 @@ type Point2 = Point Curve2
 
 newtype Affine curve = Affine (ForeignPtr Void)
 
+-- Making sure different 'Affine's are not 'Coercible', which would ruin the
+-- intended type safety:
+type role Affine nominal
+
 type Affine1 = Affine Curve1
 type Affine2 = Affine Curve2
 
