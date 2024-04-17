@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [ x86_64-linux, x86_64-darwin ]
-        compiler-nix-name: [ ghc8107, ghc964 ]
+        compiler-nix-name: [ ghc810, ghc96 ]
         target-platform: [ "", "-windows" ]
 
     env:
@@ -30,7 +30,8 @@ jobs:
           platform: ${{ matrix.platform }}
           target-platform: ${{ matrix.target-platform }}
           compiler-nix-name: ${{ matrix.compiler-nix-name }}
-          minimal: true
+          # for now we'll set minimal to false, as minimal-iog images don't exist.
+          minimal: false
           iog: true
       - name: cabal update
         run: cabal update
