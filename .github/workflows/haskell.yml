@@ -5,6 +5,7 @@ on:
     branches: [ "**" ]
   push:
     branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
   whitespace:
@@ -18,7 +19,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Trailing whitespace check
       if: matrix.os != 'windows-latest'
@@ -56,7 +57,7 @@ jobs:
       with:
         use-sodium-vrf: false # default is true
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Cabal update
       run: cabal update
@@ -125,7 +126,7 @@ jobs:
       run: cabal build -f+checktvarinvariants -f+checkmvarinvariants strict-checked-vars
 
     - name: Save Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Build & test logs
         path: |
@@ -147,7 +148,7 @@ jobs:
     #
     # - name: Setup tmate session
     #  if: ${{ failure() }}
-    #  uses: mxschmitt/action-tmate@v3
+    #  uses: mxschmitt/action-tmate@v4
     #  with:
     #     limit-access-to-actor: true
 
