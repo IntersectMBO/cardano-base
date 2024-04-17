@@ -128,7 +128,7 @@ jobs:
     - name: Save logs
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.ghc }} Build & test logs
+        name: ${{ runner.os }}-${{ matrix.ghc }} Build & test logs
         path: |
           dist-newstyle/**/*.log
 
