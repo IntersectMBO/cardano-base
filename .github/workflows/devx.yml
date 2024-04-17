@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [ x86_64-linux, x86_64-darwin ]
-        compiler-nix-name: [ ghc8107, ghc927, ghc961 ]
+        compiler-nix-name: [ ghc810, ghc96 ]
         target-platform: [ "", "-windows" ]
   
     env:
