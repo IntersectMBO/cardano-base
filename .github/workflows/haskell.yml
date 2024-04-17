@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.7", "9.6.4", "9.8.1"]
+        ghc: ["8.10.7", "9.6.4", "9.8.1"]
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     env:
