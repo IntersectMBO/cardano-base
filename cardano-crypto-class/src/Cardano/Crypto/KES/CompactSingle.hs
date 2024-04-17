@@ -174,6 +174,7 @@ instance ( KESAlgorithm (CompactSingleKES d)
          => UnsoundPureKESAlgorithm (CompactSingleKES d) where
     data UnsoundPureSignKeyKES (CompactSingleKES d) =
               UnsoundPureSignKeyCompactSingleKES (SignKeyDSIGN d)
+        deriving (Generic)
 
     unsoundPureSignKES ctxt t a (UnsoundPureSignKeyCompactSingleKES sk) =
         assert (t == 0) $!
@@ -259,6 +260,22 @@ instance (DSIGNMAlgorithm d, KnownNat (SizeSigKES (CompactSingleKES d))) => From
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size = BS.take (fromIntegral size)
                   . BS.drop (fromIntegral offset)
+
+--
+-- UnsoundPureSignKey instances
+--
+
+deriving instance DSIGNAlgorithm d => Show (UnsoundPureSignKeyKES (CompactSingleKES d))
+deriving instance (DSIGNAlgorithm d, Eq (SignKeyDSIGN d)) => Eq   (UnsoundPureSignKeyKES (CompactSingleKES d))
+
+instance (UnsoundDSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) => ToCBOR (UnsoundPureSignKeyKES (CompactSingleKES d)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (CompactSingleKES d)))
+
+instance (UnsoundDSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) => FromCBOR (UnsoundPureSignKeyKES (CompactSingleKES d)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
+
+instance DSIGNAlgorithm d => NoThunks (UnsoundPureSignKeyKES  (CompactSingleKES d))
 
 --
 -- Direct ser/deser

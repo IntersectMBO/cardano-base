@@ -272,13 +272,16 @@ instance ( UnsoundDSIGNMAlgorithm d, KnownNat t, KESAlgorithm (SimpleKES d t))
 
 deriving instance DSIGNMAlgorithm d => Show (VerKeyKES (SimpleKES d t))
 deriving instance (DSIGNMAlgorithm d, Show (SignKeyDSIGNM d)) => Show (SignKeyKES (SimpleKES d t))
+deriving instance (DSIGNMAlgorithm d, Show (SignKeyDSIGNM d)) => Show (UnsoundPureSignKeyKES (SimpleKES d t))
 deriving instance DSIGNMAlgorithm d => Show (SigKES (SimpleKES d t))
 
-deriving instance DSIGNMAlgorithm d => Eq   (VerKeyKES (SimpleKES d t))
-deriving instance DSIGNMAlgorithm d => Eq   (SigKES (SimpleKES d t))
+deriving instance DSIGNMAlgorithm d => Eq (VerKeyKES (SimpleKES d t))
+deriving instance DSIGNMAlgorithm d => Eq (SigKES (SimpleKES d t))
+deriving instance Eq (SignKeyDSIGN d) => Eq (UnsoundPureSignKeyKES (SimpleKES d t))
 
 instance DSIGNMAlgorithm d => NoThunks (SigKES     (SimpleKES d t))
 instance DSIGNMAlgorithm d => NoThunks (SignKeyKES (SimpleKES d t))
+instance DSIGNMAlgorithm d => NoThunks (UnsoundPureSignKeyKES (SimpleKES d t))
 instance DSIGNMAlgorithm d => NoThunks (VerKeyKES  (SimpleKES d t))
 
 instance ( DSIGNMAlgorithm d

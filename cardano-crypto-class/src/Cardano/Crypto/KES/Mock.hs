@@ -250,6 +250,13 @@ instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
 instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
   fromCBOR = decodeSigKES
 
+instance KnownNat t => ToCBOR (UnsoundPureSignKeyKES (MockKES t)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (MockKES t)))
+
+instance KnownNat t => FromCBOR (UnsoundPureSignKeyKES (MockKES t)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
+
 instance (KnownNat t) => DirectSerialise (SignKeyKES (MockKES t)) where
   directSerialise put sk = do
     let bs = rawSerialiseSignKeyMockKES sk

@@ -483,6 +483,7 @@ instance ( KESAlgorithm (CompactSumKES h d)
                          !Seed
                          !(VerKeyKES d)
                          !(VerKeyKES d)
+           deriving (Generic)
 
     unsoundPureSignKES ctxt t a (UnsoundPureSignKeyCompactSumKES sk _r_1 vk_0 vk_1) =
         SigCompactSumKES sigma vk_other
@@ -564,6 +565,36 @@ instance ( KESAlgorithm (CompactSumKES h d)
         off_r      = size_sk
         off_vk0    = off_r + size_r
         off_vk1    = off_vk0 + size_vk
+
+--
+-- UnsoundPureSignKey instances
+--
+
+deriving instance (KESAlgorithm d, Show (UnsoundPureSignKeyKES d)) => Show (UnsoundPureSignKeyKES (CompactSumKES h d))
+deriving instance (KESAlgorithm d, Eq (UnsoundPureSignKeyKES d)) => Eq   (UnsoundPureSignKeyKES (CompactSumKES h d))
+
+instance ( SizeHash h ~ SeedSizeKES d
+         , OptimizedKESAlgorithm d
+         , UnsoundPureKESAlgorithm d
+         , SodiumHashAlgorithm h
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         ) => ToCBOR (UnsoundPureSignKeyKES (CompactSumKES h d)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (CompactSumKES h d)))
+
+instance ( SizeHash h ~ SeedSizeKES d
+         , OptimizedKESAlgorithm d
+         , UnsoundPureKESAlgorithm d
+         , SodiumHashAlgorithm h
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         ) => FromCBOR (UnsoundPureSignKeyKES (CompactSumKES h d)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
+
+instance (NoThunks (UnsoundPureSignKeyKES d), KESAlgorithm d) => NoThunks (UnsoundPureSignKeyKES  (CompactSumKES h d))
 
 
 --

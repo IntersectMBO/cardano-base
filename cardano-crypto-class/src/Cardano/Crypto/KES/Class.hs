@@ -61,6 +61,8 @@ module Cardano.Crypto.KES.Class
 
   , UnsoundPureKESAlgorithm (..)
   , unsoundPureSignedKES
+  , encodeUnsoundPureSignKeyKES
+  , decodeUnsoundPureSignKeyKES
 
     -- * Utility functions
     -- These are used between multiple KES implementations. User code will
@@ -407,6 +409,9 @@ instance ( TypeError ('Text "Ord not supported for verification keys, use the ha
 encodeVerKeyKES :: KESAlgorithm v => VerKeyKES v -> Encoding
 encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 
+encodeUnsoundPureSignKeyKES :: UnsoundPureKESAlgorithm v => UnsoundPureSignKeyKES v -> Encoding
+encodeUnsoundPureSignKeyKES = encodeBytes . rawSerialiseUnsoundPureSignKeyKES
+
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
@@ -423,6 +428,14 @@ decodeVerKeyKES = do
     Just vk -> return vk
     Nothing -> failSizeCheck "decodeVerKeyKES" "key" bs (sizeVerKeyKES (Proxy :: Proxy v))
 {-# INLINE decodeVerKeyKES #-}
+
+decodeUnsoundPureSignKeyKES :: forall v s. UnsoundPureKESAlgorithm v => Decoder s (UnsoundPureSignKeyKES v)
+decodeUnsoundPureSignKeyKES = do
+  bs <- decodeBytes
+  case rawDeserialiseUnsoundPureSignKeyKES bs of
+    Just vk -> return vk
+    Nothing -> failSizeCheck "decodeUnsoundPureSignKeyKES" "key" bs (sizeSignKeyKES (Proxy :: Proxy v))
+{-# INLINE decodeUnsoundPureSignKeyKES #-}
 
 decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
 decodeSigKES = do

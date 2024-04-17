@@ -204,6 +204,8 @@ testKESAlgorithm
      , FromCBOR (VerKeyKES v)
      , EqST (SignKeyKES v)   -- only monadic EqST for signing keys
      , Show (SignKeyKES v) -- fake instance defined locally
+     , Eq (UnsoundPureSignKeyKES v)
+     , Show (UnsoundPureSignKeyKES v)
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
@@ -314,6 +316,9 @@ testKESAlgorithm lock n =
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigKES v <- signKES () 0 msg sk
               return $ prop_cbor_with encodeSigKES decodeSigKES sig
+        , testProperty "UnsoundSignKeyKES" $ \seedPSB ->
+              let sk :: UnsoundPureSignKeyKES v = mkUnsoundPureSignKeyKES seedPSB
+              in prop_cbor_with encodeUnsoundPureSignKeyKES decodeUnsoundPureSignKeyKES sk
         ]
 
       , testGroup "To/FromCBOR class"
@@ -425,6 +430,12 @@ withSK seedPSB =
   bracket
     (withMLockedSeedFromPSB seedPSB genKeyKES)
     forgetSignKeyKES
+
+mkUnsoundPureSignKeyKES :: UnsoundPureKESAlgorithm v
+                        => PinnedSizedBytes (SeedSizeKES v) -> UnsoundPureSignKeyKES v
+mkUnsoundPureSignKeyKES psb =
+  let seed = mkSeedFromBytes . psbToByteString $ psb
+  in unsoundPureGenKeyKES seed
 
 -- | Wrap an IO action that requires a 'SignKeyKES' into a 'Property' that
 -- takes a non-mlocked seed (provided as a 'PinnedSizedBytes' of the
