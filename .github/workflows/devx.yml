@@ -39,8 +39,14 @@ jobs:
       - name: cabal update
         run: PATH=$HOME/bin:$PATH cabal update
       - name: cabal build dependencies
+        env:
+          CABAL_AWS_ACCESS_KEY_ID: ${{ secrets.CABAL_AWS_ACCESS_KEY_ID }}
+          CABAL_AWS_SECRET_ACCESS_KEY: ${{ secrets.CABAL_AWS_SECRET_ACCESS_KEY }}
         run: PATH=$HOME/bin:$PATH cabal build all -j --enable-tests --only-dependencies
       - name: cabal build
+        env:
+          CABAL_AWS_ACCESS_KEY_ID: ${{ secrets.CABAL_AWS_ACCESS_KEY_ID }}
+          CABAL_AWS_SECRET_ACCESS_KEY: ${{ secrets.CABAL_AWS_SECRET_ACCESS_KEY }}
         run: PATH=$HOME/bin:$PATH cabal build all -j --enable-tests
       - name: cabal test
         run: PATH=$HOME/bin:$PATH cabal test all -j --enable-tests --test-show-details=direct
