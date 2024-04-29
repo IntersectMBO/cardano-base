@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -66,14 +67,17 @@ import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.PinnedSizedBytes
   ( PinnedSizedBytes
   , psbUseAsSizedPtr
+  , psbUseAsCPtrLen
   , psbToByteString
   , psbFromByteStringCheck
+  , psbCreate
   , psbCreateSized
   , psbCreateSizedResult
   )
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import Cardano.Foreign
+import Cardano.Crypto.DirectSerialise
 
 
 
@@ -261,7 +265,7 @@ instance DSIGNMAlgorithm Ed25519DSIGN where
               stToIO $ do
                 cOrError $ unsafeIOToST $
                   c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
-          throwOnErrno "deriveVerKeyDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
+          throwOnErrno "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_pk" maybeErrno
           return psb
 
 
@@ -365,3 +369,48 @@ instance TypeError ('Text "CBOR encoding would violate mlocking guarantees")
 instance TypeError ('Text "CBOR decoding would violate mlocking guarantees")
   => FromCBOR (SignKeyDSIGNM Ed25519DSIGN) where
   fromCBOR = error "unsupported"
+
+instance DirectSerialise (SignKeyDSIGNM Ed25519DSIGN) where
+  -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. The
+  -- latter contains both the seed and the 32-byte verification key, which is
+  -- convenient, but redundant, since we can always reconstruct it from the
+  -- seed. This is also reflected in the 'SizeSignKeyDSIGNM', which equals
+  -- 'SeedSizeDSIGNM' == 32, rather than reporting the in-memory size of 64.
+  directSerialise push sk = do
+    bracket
+      (getSeedDSIGNM (Proxy @Ed25519DSIGN) sk)
+      mlockedSeedFinalize
+      (\seed -> mlockedSeedUseAsCPtr seed $ \ptr ->
+          push
+            (castPtr ptr)
+            (fromIntegral $ seedSizeDSIGN (Proxy @Ed25519DSIGN)))
+
+instance DirectDeserialise (SignKeyDSIGNM Ed25519DSIGN) where
+  -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. See
+  -- the DirectSerialise instance above.
+  directDeserialise pull = do
+    bracket
+      mlockedSeedNew
+      mlockedSeedFinalize
+      (\seed -> do
+          mlockedSeedUseAsCPtr seed $ \ptr -> do
+            pull
+              (castPtr ptr)
+              (fromIntegral $ seedSizeDSIGN (Proxy @Ed25519DSIGN))
+          genKeyDSIGNM seed
+      )
+
+instance DirectSerialise (VerKeyDSIGN Ed25519DSIGN) where
+  directSerialise push (VerKeyEd25519DSIGN psb) = do
+    psbUseAsCPtrLen psb $ \ptr _ ->
+      push
+        (castPtr ptr)
+        (fromIntegral $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
+
+instance DirectDeserialise (VerKeyDSIGN Ed25519DSIGN) where
+  directDeserialise pull = do
+    psb <- psbCreate $ \ptr ->
+      pull
+        (castPtr ptr)
+        (fromIntegral $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
+    return $! VerKeyEd25519DSIGN $! psb
