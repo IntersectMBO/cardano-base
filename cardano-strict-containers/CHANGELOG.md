@@ -1,5 +1,9 @@
 # Changelog for `cardano-strict-containers`
 
+# next version
+
+* Added `takeWhileR` and `takeWhileL` to `Data.Sequence.Strict`
+
 # 0.1.3.1
 
 *
