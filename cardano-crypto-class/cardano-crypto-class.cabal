@@ -52,6 +52,7 @@ library
     Cardano.Crypto.Hash.Class
     Cardano.Crypto.Hash.Keccak256
     Cardano.Crypto.Hash.NeverUsed
+    Cardano.Crypto.Hash.RIPEMD160
     Cardano.Crypto.Hash.SHA256
     Cardano.Crypto.Hash.SHA3_256
     Cardano.Crypto.Hash.Short
