@@ -1,6 +1,6 @@
 cabal-version:      2.2
 name:               cardano-crypto-class
-version:            2.1.4.0
+version:            2.1.5.0
 synopsis:
   Type classes abstracting over cryptography primitives for Cardano
 
@@ -52,6 +52,7 @@ library
     Cardano.Crypto.Hash.Class
     Cardano.Crypto.Hash.Keccak256
     Cardano.Crypto.Hash.NeverUsed
+    Cardano.Crypto.Hash.RIPEMD160
     Cardano.Crypto.Hash.SHA256
     Cardano.Crypto.Hash.SHA3_256
     Cardano.Crypto.Hash.Short
