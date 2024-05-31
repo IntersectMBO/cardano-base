@@ -34,8 +34,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.7", "9.6.1"]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        ghc: ["8.10.7", "9.2.8", "9.6.4", "9.8.2"]
+        os: [ubuntu-latest, macos-13, macos-latest, windows-latest]
+        # GHC versions older than ghc-9.2 are not supported on macos-latest
+        exclude:
+          - os: macos-latest
+            ghc: "8.10.7"
+          - os: macos-13
+            ghc: "9.2.8"
+          - os: macos-13
+            ghc: "9.6.4"
+          - os: macos-13
+            ghc: "9.8.2"
 
     env:
       # Modify this value to "invalidate" the cabal cache.

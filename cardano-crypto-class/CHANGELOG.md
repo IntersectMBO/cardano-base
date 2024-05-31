@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.1.5.0
+* Add `RIMPEMD160` hashing function using `cryptonite` library
+  [#480](https://github.com/input-output-hk/cardano-base/pull/480)
+
 ## 2.1.2.0
 
 * Included bindings to `blst` library to enable operations over curve BLS12-381
