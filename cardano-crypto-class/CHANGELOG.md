@@ -20,6 +20,8 @@ solidified. Ask @lehins if backport is needed.
   [#404](https://github.com/input-output-hk/cardano-base/pull/404)
 * Restructuring of libsodium bindings and related APIs:
   [#404](https://github.com/input-output-hk/cardano-base/pull/404)
+* Add `RIMPEMD160` hashing function using `cryptonite` library
+  [#479](https://github.com/IntersectMBO/cardano-base/pull/479)
 
 ## 2.1.0.2
 
