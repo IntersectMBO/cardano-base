@@ -50,9 +50,9 @@ library
   default-language: Haskell2010
   build-depends:
     , base         >=4.9 && <5
-    , io-classes   >=1.2 && <1.5
-    , strict-mvar  >=1.2 && <1.5
-    , strict-stm   >=1.2 && <1.5
+    , io-classes   >=1.2 && <1.6
+    , strict-mvar  >=1.2 && <1.6
+    , strict-stm   >=1.2 && <1.6
 
   ghc-options:
     -Wall -Wcompat -Wincomplete-uni-patterns
