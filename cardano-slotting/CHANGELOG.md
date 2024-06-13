@@ -2,7 +2,10 @@
 
 ## 0.2.0.1
 
-*
+* ToCBOR and FromCBOR instances for SlotNo directly encode the slot number
+* Made FromCBOR and ToCBOR instances for WithOrigin overlappable. One specific
+  use case is an overlapping instance for WithOrigin SlotNo in
+  ouroboros-network-api.
 
 ## 0.2.0.0
 
