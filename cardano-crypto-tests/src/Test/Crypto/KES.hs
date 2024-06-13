@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes  #-}
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DerivingVia          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -25,7 +26,9 @@ module Test.Crypto.KES
 where
 
 import Data.Proxy (Proxy(..))
-import Data.List (foldl')
+#if ! MIN_VERSION_base(4,20,0)
+import Data.Foldable (foldl')
+#endif
 import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set

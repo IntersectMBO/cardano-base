@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -54,7 +55,9 @@ module Cardano.Crypto.Hash.Class
   )
 where
 
-import Data.List (foldl')
+#if ! MIN_VERSION_base(4,20,0)
+import Data.Foldable (foldl')
+#endif
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)

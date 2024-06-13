@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -53,7 +54,11 @@ where
 
 import Data.FingerTree (Measured (..), ViewL (..), ViewR (..))
 import qualified Data.FingerTree as FT
-import Data.Foldable (foldl', toList)
+import Data.Foldable (
+#if ! MIN_VERSION_base(4,20,0)
+        foldl',
+#endif
+        toList)
 import Data.Unit.Strict (forceElemsToWHNF)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks (..), noThunksInValues)

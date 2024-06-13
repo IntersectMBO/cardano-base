@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -68,7 +69,11 @@ import Codec.Serialise (Serialise)
 import Control.Arrow ((***))
 import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON(..), ToJSON(..))
-import Data.Foldable (foldl', toList)
+import Data.Foldable (
+#if ! MIN_VERSION_base(4,20,0)
+        foldl',
+#endif
+        toList)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Unit.Strict (forceElemsToWHNF)
