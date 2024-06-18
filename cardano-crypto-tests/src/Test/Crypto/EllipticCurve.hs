@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
@@ -36,9 +35,7 @@ import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Base16 as Base16
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Bits (shiftL)
-#if ! MIN_VERSION_base(4,20,0)
-import Data.Foldable (foldl')
-#endif
+import qualified Data.Foldable as F (foldl')
 
 tests :: TestTree
 tests =
@@ -370,7 +367,7 @@ prop_repeatedAddition a p = BLS.blsMult p (fromIntegral a) === repeatedAdd a p
     where
     repeatedAdd :: Int -> BLS.Point curve -> BLS.Point curve
     repeatedAdd scalar point =
-         foldl' BLS.blsAddOrDouble BLS.blsZero $ replicate (abs scalar) (BLS.blsCneg point (scalar < 0))
+         F.foldl' BLS.blsAddOrDouble BLS.blsZero $ replicate (abs scalar) (BLS.blsCneg point (scalar < 0))
 
 testAddNegYieldsInf :: forall curve. BLS.BLS curve
         => BLS.Point curve -> Bool

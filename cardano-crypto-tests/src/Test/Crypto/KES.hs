@@ -1,5 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes  #-}
-{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE DerivingVia          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -26,9 +25,7 @@ module Test.Crypto.KES
 where
 
 import Data.Proxy (Proxy(..))
-#if ! MIN_VERSION_base(4,20,0)
-import Data.Foldable (foldl')
-#endif
+import qualified Data.Foldable as F (foldl')
 import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -159,7 +156,7 @@ eventTracer :: IORef [event] -> Tracer IO event
 eventTracer logVar = Tracer (\ev -> liftIO $ atomicModifyIORef' logVar (\acc -> (acc ++ [ev], ())))
 
 matchAllocLog :: [AllocEvent] -> Set WordPtr
-matchAllocLog = foldl' (flip go) Set.empty
+matchAllocLog = F.foldl' (flip go) Set.empty
   where
     go (AllocEv ptr) = Set.insert ptr
     go (FreeEv ptr) = Set.delete ptr
