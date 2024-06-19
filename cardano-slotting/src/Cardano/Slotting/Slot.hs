@@ -40,11 +40,11 @@ newtype SlotNo = SlotNo {unSlotNo :: Word64}
   deriving newtype (Enum, Bounded, Num, NFData, Serialise, NoThunks, ToJSON, FromJSON)
 
 instance ToCBOR SlotNo where
-  toCBOR = encode
+  toCBOR (SlotNo word64) = toCBOR word64
   encodedSizeExpr size = encodedSizeExpr size . fmap unSlotNo
 
 instance FromCBOR SlotNo where
-  fromCBOR = decode
+  fromCBOR = SlotNo <$> fromCBOR
 
 {-------------------------------------------------------------------------------
   WithOrigin
@@ -63,10 +63,10 @@ data WithOrigin t = Origin | At !t
       NoThunks
     )
 
-instance (Serialise t, Typeable t) => ToCBOR (WithOrigin t) where
+instance {-# OVERLAPPABLE #-} (Serialise t, Typeable t) => ToCBOR (WithOrigin t) where
   toCBOR = encode
 
-instance (Serialise t, Typeable t) => FromCBOR (WithOrigin t) where
+instance {-# OVERLAPPABLE #-} (Serialise t, Typeable t) => FromCBOR (WithOrigin t) where
   fromCBOR = decode
 
 instance Bounded t => Bounded (WithOrigin t) where
