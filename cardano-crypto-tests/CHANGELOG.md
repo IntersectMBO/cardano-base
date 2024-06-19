@@ -1,5 +1,13 @@
 # Changelog for `cardano-crypto-tests`
 
+## 2.2.0.0
+
+*
+
+## 2.1.2.0
+
+* Add tests for BLST
+
 ## 2.1.1.0
 
 * Add benchmark for `HASH`
