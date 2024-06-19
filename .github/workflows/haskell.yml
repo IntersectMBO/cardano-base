@@ -49,6 +49,8 @@ jobs:
             ghc: "9.6.4"
           - os: macos-13
             ghc: "9.8.2"
+          - os: macos-13
+            ghc: "9.10.1"
 
     env:
       # Modify this value to "invalidate" the cabal cache.
