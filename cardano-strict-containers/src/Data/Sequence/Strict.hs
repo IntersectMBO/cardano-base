@@ -35,6 +35,8 @@ module Data.Sequence.Strict
     -- * Sublists
 
     -- ** Sequential searches
+    takeWhileL,
+    takeWhileR,
     dropWhileL,
     dropWhileR,
     spanl,
@@ -240,6 +242,20 @@ scanl f !z0 (StrictSeq xs) = StrictSeq $ forceElemsToWHNF (Seq.scanl f z0 xs)
 {-------------------------------------------------------------------------------
   Sublists
 -------------------------------------------------------------------------------}
+
+-- | \( O(i) \) where \( i \) is the prefix length. 'takeWhileL', applied
+-- to a predicate @p@ and a sequence @xs@, returns the longest prefix
+-- (possibly empty) of @xs@ of elements that satisfy @p@.
+takeWhileL :: (a -> Bool) -> StrictSeq a -> StrictSeq a
+takeWhileL p (StrictSeq xs) = StrictSeq (Seq.takeWhileL p xs)
+
+-- | \( O(i) \) where \( i \) is the suffix length.  'takeWhileR', applied
+-- to a predicate @p@ and a sequence @xs@, returns the longest suffix
+-- (possibly empty) of @xs@ of elements that satisfy @p@.
+--
+-- @'takeWhileR' p xs@ is equivalent to @'reverse' ('takeWhileL' p ('reverse' xs))@.
+takeWhileR :: (a -> Bool) -> StrictSeq a -> StrictSeq a
+takeWhileR p (StrictSeq xs) = StrictSeq (Seq.takeWhileR p xs)
 
 -- | \( O(i) \) where \( i \) is the prefix length.  @'dropWhileL' p xs@ returns
 -- the suffix remaining after @'takeWhileL' p xs@.
