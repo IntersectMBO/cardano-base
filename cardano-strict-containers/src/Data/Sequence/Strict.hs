@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -71,11 +70,8 @@ import Codec.Serialise (Serialise)
 import Control.Arrow ((***))
 import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON(..), ToJSON(..))
-import Data.Foldable (
-#if ! MIN_VERSION_base(4,20,0)
-        foldl',
-#endif
-        toList)
+import qualified Data.Foldable as F (foldl')
+import Data.Foldable (toList)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Unit.Strict (forceElemsToWHNF)
@@ -210,7 +206,7 @@ StrictSeq s |> (!x) = StrictSeq (s Seq.|> x)
 StrictSeq xs >< StrictSeq ys = StrictSeq (xs Seq.>< ys)
 
 fromList :: [a] -> StrictSeq a
-fromList !xs = foldl' (|>) empty xs
+fromList !xs = F.foldl' (|>) empty xs
 
 -- | Convert a 'Seq' into a 'StrictSeq' by forcing each element to WHNF.
 forceToStrict :: Seq a -> StrictSeq a

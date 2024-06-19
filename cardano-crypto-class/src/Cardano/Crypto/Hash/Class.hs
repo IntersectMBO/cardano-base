@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -55,9 +54,7 @@ module Cardano.Crypto.Hash.Class
   )
 where
 
-#if ! MIN_VERSION_base(4,20,0)
-import Data.Foldable (foldl')
-#endif
+import qualified Data.Foldable as F (foldl')
 import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy(..))
 import Data.Typeable (Typeable)
@@ -375,7 +372,7 @@ hash = hashWithSerialiser toCBOR
 
 {-# DEPRECATED fromHash "Use bytesToNatural . hashToBytes" #-}
 fromHash :: Hash h a -> Natural
-fromHash = foldl' f 0 . BS.unpack . hashToBytes
+fromHash = F.foldl' f 0 . BS.unpack . hashToBytes
   where
     f :: Natural -> Word8 -> Natural
     f n b = n * 256 + fromIntegral b

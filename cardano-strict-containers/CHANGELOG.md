@@ -1,12 +1,9 @@
 # Changelog for `cardano-strict-containers`
 
-# next version
+# 0.1.4.0
 
+* GHC-8.10 compatibility
 * Added `takeWhileR` and `takeWhileL` to `Data.Sequence.Strict`
-
-# 0.1.3.1
-
-*
 
 # 0.1.3.0
 

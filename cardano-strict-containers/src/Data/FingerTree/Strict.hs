@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -54,11 +53,8 @@ where
 
 import Data.FingerTree (Measured (..), ViewL (..), ViewR (..))
 import qualified Data.FingerTree as FT
-import Data.Foldable (
-#if ! MIN_VERSION_base(4,20,0)
-        foldl',
-#endif
-        toList)
+import qualified Data.Foldable as F (foldl')
+import Data.Foldable (toList)
 import Data.Unit.Strict (forceElemsToWHNF)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks (..), noThunksInValues)
@@ -100,7 +96,7 @@ singleton !a = SFT (FT.singleton a)
 -- | /O(n)/. Create a sequence from a finite list of elements.
 -- The opposite operation 'toList' is supplied by the 'Foldable' instance.
 fromList :: (Measured v a) => [a] -> StrictFingerTree v a
-fromList !xs = foldl' (|>) (SFT FT.empty) xs
+fromList !xs = F.foldl' (|>) (SFT FT.empty) xs
 
 -- | /O(1)/. Add an element to the left end of a sequence.
 -- Mnemonic: a triangle with the single element at the pointy end.
