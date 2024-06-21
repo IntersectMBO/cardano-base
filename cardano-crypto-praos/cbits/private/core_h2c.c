@@ -12,7 +12,7 @@
 #define HASH_BLOCKBYTES 64U
 
 static void
-core_h2c_string_to_hash_sha256(unsigned char *h, const size_t h_len, const char *ctx,
+cardano_core_h2c_string_to_hash_sha256(unsigned char *h, const size_t h_len, const char *ctx,
                                const unsigned char *msg, size_t msg_len)
 {
     crypto_hash_sha256_state st;
@@ -67,7 +67,7 @@ core_h2c_string_to_hash_sha256(unsigned char *h, const size_t h_len, const char 
 #define HASH_BLOCKBYTES 128U
 
 static void
-core_h2c_string_to_hash_sha512(unsigned char *h, const size_t h_len, const char *ctx,
+cardano_core_h2c_string_to_hash_sha512(unsigned char *h, const size_t h_len, const char *ctx,
                                const unsigned char *msg, size_t msg_len)
 {
     crypto_hash_sha512_state st;
@@ -116,15 +116,15 @@ core_h2c_string_to_hash_sha512(unsigned char *h, const size_t h_len, const char 
 }
 
 int
-core_h2c_string_to_hash(unsigned char *h, const size_t h_len, const char *ctx,
+cardano_core_h2c_string_to_hash(unsigned char *h, const size_t h_len, const char *ctx,
                         const unsigned char *msg, size_t msg_len, int hash_alg)
 {
     switch (hash_alg) {
         case CORE_H2C_SHA256:
-            core_h2c_string_to_hash_sha256(h, h_len, ctx, msg, msg_len);
+            cardano_core_h2c_string_to_hash_sha256(h, h_len, ctx, msg, msg_len);
             return 0;
         case CORE_H2C_SHA512:
-            core_h2c_string_to_hash_sha512(h, h_len, ctx, msg, msg_len);
+            cardano_core_h2c_string_to_hash_sha512(h, h_len, ctx, msg, msg_len);
             return 0;
         default:
             errno = EINVAL;

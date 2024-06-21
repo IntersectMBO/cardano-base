@@ -34,23 +34,23 @@ crypto_vrf_ietfdraft03_prove(unsigned char *proof, const unsigned char *skpk,
     crypto_hash_sha512_final(&hs, r_string);
 
     r_string[31] &= 0x7f; /* clear sign bit */
-    ge25519_from_uniform(H_string, r_string); /* elligator2 */
+    cardano_ge25519_from_uniform(H_string, r_string); /* elligator2 */
 
-    ge25519_frombytes(&H, H_string);
-    ge25519_scalarmult(&Gamma, az, &H);
+    cardano_ge25519_frombytes(&H, H_string);
+    cardano_ge25519_scalarmult(&Gamma, az, &H);
 
     crypto_hash_sha512_init(&hs);
     crypto_hash_sha512_update(&hs, az + 32, 32);
     crypto_hash_sha512_update(&hs, H_string, 32);
     crypto_hash_sha512_final(&hs, nonce);
 
-    sc25519_reduce(nonce);
-    ge25519_scalarmult_base(&kB, nonce);
-    ge25519_scalarmult(&kH, nonce, &H);
+    cardano_sc25519_reduce(nonce);
+    cardano_ge25519_scalarmult_base(&kB, nonce);
+    cardano_ge25519_scalarmult(&kH, nonce, &H);
 
-    ge25519_p3_tobytes(proof, &Gamma);
-    ge25519_p3_tobytes(kB_string, &kB);
-    ge25519_p3_tobytes(kH_string, &kH);
+    cardano_ge25519_p3_tobytes(proof, &Gamma);
+    cardano_ge25519_p3_tobytes(kB_string, &kB);
+    cardano_ge25519_p3_tobytes(kH_string, &kH);
 
     crypto_hash_sha512_init(&hs);
     crypto_hash_sha512_update(&hs, &SUITE, 1);
@@ -63,7 +63,7 @@ crypto_vrf_ietfdraft03_prove(unsigned char *proof, const unsigned char *skpk,
 
     memmove(proof + 32, hram, 16);
     memset(hram + 16, 0, 48); /* we zero out the last 48 bytes of the challenge */
-    sc25519_muladd(proof + 48, hram, az, nonce);
+    cardano_sc25519_muladd(proof + 48, hram, az, nonce);
 
     sodium_memzero(az, sizeof az);
     sodium_memzero(nonce, sizeof nonce);
