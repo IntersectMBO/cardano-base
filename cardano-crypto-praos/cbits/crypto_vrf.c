@@ -4,39 +4,39 @@
 #include "crypto_vrf.h"
 
 size_t
-crypto_vrf_publickeybytes(void)
+cardano_crypto_vrf_publickeybytes(void)
 {
-    return crypto_vrf_PUBLICKEYBYTES;
+    return cardano_crypto_vrf_PUBLICKEYBYTES;
 }
 
 size_t
-crypto_vrf_secretkeybytes(void)
+cardano_crypto_vrf_secretkeybytes(void)
 {
-    return crypto_vrf_SECRETKEYBYTES;
+    return cardano_crypto_vrf_SECRETKEYBYTES;
 }
 
 size_t
-crypto_vrf_seedbytes(void)
+cardano_crypto_vrf_seedbytes(void)
 {
-    return crypto_vrf_SEEDBYTES;
+    return cardano_crypto_vrf_SEEDBYTES;
 }
 
 size_t
-crypto_vrf_proofbytes(void)
+cardano_crypto_vrf_proofbytes(void)
 {
     return crypto_vrf_PROOFBYTES;
 }
 
 size_t
-crypto_vrf_outputbytes(void)
+cardano_crypto_vrf_outputbytes(void)
 {
-    return crypto_vrf_OUTPUTBYTES;
+    return cardano_crypto_vrf_OUTPUTBYTES;
 }
 
 const char *
-crypto_vrf_primitive(void)
+cardano_crypto_vrf_primitive(void)
 {
-    return crypto_vrf_PRIMITIVE;
+    return cardano_crypto_vrf_PRIMITIVE;
 }
 
 int
@@ -50,8 +50,8 @@ crypto_vrf_seed_keypair(unsigned char *pk, unsigned char *skpk,
     skpk[31] &= 127;
     skpk[31] |= 64;
 
-    ge25519_scalarmult_base(&A, skpk);
-    ge25519_p3_tobytes(pk, &A);
+    cardano_ge25519_scalarmult_base(&A, skpk);
+    cardano_ge25519_p3_tobytes(pk, &A);
 
     memmove(skpk, seed, 32);
     memmove(skpk + 32, pk, 32);
@@ -60,7 +60,7 @@ crypto_vrf_seed_keypair(unsigned char *pk, unsigned char *skpk,
 }
 
 int
-crypto_vrf_keypair(unsigned char *pk, unsigned char *skpk)
+cardano_crypto_vrf_keypair(unsigned char *pk, unsigned char *skpk)
 {
     unsigned char seed[32];
     int           ret;
@@ -73,14 +73,14 @@ crypto_vrf_keypair(unsigned char *pk, unsigned char *skpk)
 }
 
 int
-crypto_vrf_prove(unsigned char *proof, const unsigned char *skpk,
+cardano_crypto_vrf_prove(unsigned char *proof, const unsigned char *skpk,
 		 const unsigned char *m, const unsigned long long mlen)
 {
     return crypto_vrf_ietfdraft13_prove(proof, skpk, m, mlen);
 }
 
 int
-crypto_vrf_verify(unsigned char *output, const unsigned char *pk,
+cardano_crypto_vrf_verify(unsigned char *output, const unsigned char *pk,
 		  const unsigned char *proof, const unsigned char *m,
 		  const unsigned long long mlen)
 {
@@ -88,7 +88,7 @@ crypto_vrf_verify(unsigned char *output, const unsigned char *pk,
 }
 
 int
-crypto_vrf_proof_to_hash(unsigned char *hash, const unsigned char *proof)
+cardano_crypto_vrf_proof_to_hash(unsigned char *hash, const unsigned char *proof)
 {
     return crypto_vrf_ietfdraft13_proof_to_hash(hash, proof);
 }

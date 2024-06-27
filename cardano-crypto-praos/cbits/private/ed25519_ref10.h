@@ -15,9 +15,9 @@ typedef uint64_t fe25519[5];
 typedef int32_t fe25519[10];
 #endif
 
-void fe25519_invert(fe25519 out, const fe25519 z);
-void fe25519_frombytes(fe25519 h, const unsigned char *s);
-void fe25519_tobytes(unsigned char *s, const fe25519 h);
+void cardano_fe25519_invert(fe25519 out, const fe25519 z);
+void cardano_fe25519_frombytes(fe25519 h, const unsigned char *s);
+void cardano_fe25519_tobytes(unsigned char *s, const fe25519 h);
 
 #ifdef HAVE_TI_MODE
 # include "ed25519_ref10_fe_51.h"
@@ -73,83 +73,83 @@ typedef struct {
     fe25519 T2d;
 } ge25519_cached;
 
-void ge25519_tobytes(unsigned char *s, const ge25519_p2 *h);
+void cardano_ge25519_tobytes(unsigned char *s, const ge25519_p2 *h);
 
-void ge25519_p3_tobytes(unsigned char *s, const ge25519_p3 *h);
+void cardano_ge25519_p3_tobytes(unsigned char *s, const ge25519_p3 *h);
 
-int ge25519_frombytes(ge25519_p3 *h, const unsigned char *s);
+int cardano_ge25519_frombytes(ge25519_p3 *h, const unsigned char *s);
 
-int ge25519_frombytes_negate_vartime(ge25519_p3 *h, const unsigned char *s);
+int cardano_ge25519_frombytes_negate_vartime(ge25519_p3 *h, const unsigned char *s);
 
-void ge25519_p3_to_cached(ge25519_cached *r, const ge25519_p3 *p);
+void cardano_ge25519_p3_to_cached(ge25519_cached *r, const ge25519_p3 *p);
 
-void ge25519_p2_dbl(ge25519_p1p1 *r, const ge25519_p2 *p);
+void cardano_ge25519_p2_dbl(ge25519_p1p1 *r, const ge25519_p2 *p);
 
-void ge25519_p3_dbl(ge25519_p1p1 *r, const ge25519_p3 *p);
+void cardano_ge25519_p3_dbl(ge25519_p1p1 *r, const ge25519_p3 *p);
 
-void ge25519_p1p1_to_p2(ge25519_p2 *r, const ge25519_p1p1 *p);
+void cardano_ge25519_p1p1_to_p2(ge25519_p2 *r, const ge25519_p1p1 *p);
 
-void ge25519_p1p1_to_p3(ge25519_p3 *r, const ge25519_p1p1 *p);
+void cardano_ge25519_p1p1_to_p3(ge25519_p3 *r, const ge25519_p1p1 *p);
 
-void ge25519_add(ge25519_p1p1 *r, const ge25519_p3 *p, const ge25519_cached *q);
+void cardano_ge25519_add(ge25519_p1p1 *r, const ge25519_p3 *p, const ge25519_cached *q);
 
-void ge25519_sub(ge25519_p1p1 *r, const ge25519_p3 *p, const ge25519_cached *q);
+void cardano_ge25519_sub(ge25519_p1p1 *r, const ge25519_p3 *p, const ge25519_cached *q);
 
-void ge25519_scalarmult_base(ge25519_p3 *h, const unsigned char *a);
+void cardano_ge25519_scalarmult_base(ge25519_p3 *h, const unsigned char *a);
 
-void ge25519_double_scalarmult_vartime(ge25519_p2 *r, const unsigned char *a,
+void cardano_ge25519_double_scalarmult_vartime(ge25519_p2 *r, const unsigned char *a,
                                        const ge25519_p3 *A,
                                        const unsigned char *b);
 
-void ge25519_double_scalarmult_vartime_variable(ge25519_p2 *r, const unsigned char *a,
+void cardano_ge25519_double_scalarmult_vartime_variable(ge25519_p2 *r, const unsigned char *a,
                                                 const ge25519_p3 *A, const unsigned char *b, const ge25519_p3 *B);
 
-int crypto_core_ed25519_from_string(unsigned char *p,
+int cardano_crypto_core_ed25519_from_string(unsigned char *p,
                                 const char *ctx, const unsigned char *msg,
                                 size_t msg_len, int hash_alg);
 
-void ge25519_clear_cofactor(ge25519_p3 *p3);
+void cardano_ge25519_clear_cofactor(ge25519_p3 *p3);
 
-void ge25519_scalarmult(ge25519_p3 *h, const unsigned char *a,
+void cardano_ge25519_scalarmult(ge25519_p3 *h, const unsigned char *a,
                         const ge25519_p3 *p);
 
-int ge25519_is_canonical(const unsigned char *s);
+int cardano_ge25519_is_canonical(const unsigned char *s);
 
-int ge25519_is_on_curve(const ge25519_p3 *p);
+int cardano_ge25519_is_on_curve(const ge25519_p3 *p);
 
-int ge25519_is_on_main_subgroup(const ge25519_p3 *p);
+int cardano_ge25519_is_on_main_subgroup(const ge25519_p3 *p);
 
-int ge25519_has_small_order(const unsigned char s[32]);
+int cardano_ge25519_has_small_order(const unsigned char s[32]);
 
-void ge25519_from_uniform(unsigned char s[32], const unsigned char r[32]);
+void cardano_ge25519_from_uniform(unsigned char s[32], const unsigned char r[32]);
 
-void ge25519_from_hash(unsigned char s[32], const unsigned char h[64]);
+void cardano_ge25519_from_hash(unsigned char s[32], const unsigned char h[64]);
 
 /*
  Ristretto group
  */
 
-int ristretto255_frombytes(ge25519_p3 *h, const unsigned char *s);
+int cardano_ristretto255_frombytes(ge25519_p3 *h, const unsigned char *s);
 
-void ristretto255_p3_tobytes(unsigned char *s, const ge25519_p3 *h);
+void cardano_ristretto255_p3_tobytes(unsigned char *s, const ge25519_p3 *h);
 
-void ristretto255_from_hash(unsigned char s[32], const unsigned char h[64]);
+void cardano_ristretto255_from_hash(unsigned char s[32], const unsigned char h[64]);
 
 /*
  The set of scalars is \Z/l
  where l = 2^252 + 27742317777372353535851937790883648493.
  */
 
-void sc25519_invert(unsigned char recip[32], const unsigned char s[32]);
+void cardano_sc25519_invert(unsigned char recip[32], const unsigned char s[32]);
 
-void sc25519_reduce(unsigned char s[64]);
+void cardano_sc25519_reduce(unsigned char s[64]);
 
-void sc25519_mul(unsigned char s[32], const unsigned char a[32],
+void cardano_sc25519_mul(unsigned char s[32], const unsigned char a[32],
                  const unsigned char b[32]);
 
-void sc25519_muladd(unsigned char s[32], const unsigned char a[32],
+void cardano_sc25519_muladd(unsigned char s[32], const unsigned char a[32],
                     const unsigned char b[32], const unsigned char c[32]);
 
-int sc25519_is_canonical(const unsigned char s[32]);
+int cardano_sc25519_is_canonical(const unsigned char s[32]);
 
 #endif

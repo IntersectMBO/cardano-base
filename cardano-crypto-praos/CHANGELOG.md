@@ -1,8 +1,9 @@
 # Changelog for `cardano-crypto-praos`
 
-## 2.1.2.1
+## 2.2.0.0
 
-*
+* Prefixed private bundled c functions with `cardano_` to ensure they are not
+  silently overwritten.
 
 ## 2.1.2.0
 

@@ -16,18 +16,18 @@ crypto_vrf_ietfdraft03_proof_to_hash(unsigned char *beta,
     ge25519_p3    Gamma;
     unsigned char gamma_string[32];
 
-    if (ge25519_is_canonical(pi) == 0 ||
-        ge25519_frombytes(&Gamma, pi) != 0) {
+    if (cardano_ge25519_is_canonical(pi) == 0 ||
+        cardano_ge25519_frombytes(&Gamma, pi) != 0) {
         return -1;
     }
 
     if (pi[48 + 31] & 240 &&
-        sc25519_is_canonical(pi + 48) == 0) {
+        cardano_sc25519_is_canonical(pi + 48) == 0) {
         return -1;
     }
 
-    ge25519_clear_cofactor(&Gamma);
-    ge25519_p3_tobytes(gamma_string, &Gamma);
+    cardano_ge25519_clear_cofactor(&Gamma);
+    cardano_ge25519_p3_tobytes(gamma_string, &Gamma);
 
     /* beta_string = Hash(suite_string || three_string || point_to_string(cofactor * Gamma) || zero_string ) */
     crypto_hash_sha512_state hs;
@@ -55,10 +55,10 @@ vrf_verify(const unsigned char *pi,
     ge25519_p1p1   tmp_p1p1_point;
     ge25519_cached tmp_cached_point;
 
-    ge25519_p3_tobytes(Y_string, Y_point);
+    cardano_ge25519_p3_tobytes(Y_string, Y_point);
 
-    if (ge25519_is_canonical(pi) == 0 ||
-        ge25519_frombytes(&Gamma, pi) != 0) {
+    if (cardano_ge25519_is_canonical(pi) == 0 ||
+        cardano_ge25519_frombytes(&Gamma, pi) != 0) {
         return -1;
     }
 
@@ -66,7 +66,7 @@ vrf_verify(const unsigned char *pi,
     memmove(s, pi+48, 32); /* s = pi[48:80] */
 
     if (s[31] & 240 &&
-        sc25519_is_canonical(s) == 0) {
+        cardano_sc25519_is_canonical(s) == 0) {
         return -1;
     }
 
@@ -80,17 +80,17 @@ vrf_verify(const unsigned char *pi,
     crypto_hash_sha512_final(&hs, r_string);
 
     r_string[31] &= 0x7f; /* clear sign bit */
-    ge25519_from_uniform(H_string, r_string); /* elligator2 */
+    cardano_ge25519_from_uniform(H_string, r_string); /* elligator2 */
 
-    ge25519_frombytes(&H, H_string);
+    cardano_ge25519_frombytes(&H, H_string);
     crypto_core_ed25519_scalar_negate(cn, c); /* negate scalar c */
 
-    ge25519_double_scalarmult_vartime(&U, cn, Y_point, s);
+    cardano_ge25519_double_scalarmult_vartime(&U, cn, Y_point, s);
 
-    ge25519_double_scalarmult_vartime_variable(&V, cn, &Gamma, s, &H);
+    cardano_ge25519_double_scalarmult_vartime_variable(&V, cn, &Gamma, s, &H);
 
-    ge25519_tobytes(U_string, &U);
-    ge25519_tobytes(V_string, &V);
+    cardano_ge25519_tobytes(U_string, &U);
+    cardano_ge25519_tobytes(V_string, &V);
 
     crypto_hash_sha512_init(&hs);
     crypto_hash_sha512_update(&hs, &SUITE, 1);
@@ -111,8 +111,8 @@ crypto_vrf_ietfdraft03_verify(unsigned char *output,
                               const unsigned char *msg, const unsigned long long msglen)
 {
     ge25519_p3 Y;
-    if (ge25519_has_small_order(pk) == 0 && ge25519_is_canonical(pk) == 1 &&
-        ge25519_frombytes(&Y, pk) == 0 && (vrf_verify(proof, msg, msglen, &Y) == 0)) {
+    if (cardano_ge25519_has_small_order(pk) == 0 && cardano_ge25519_is_canonical(pk) == 1 &&
+        cardano_ge25519_frombytes(&Y, pk) == 0 && (vrf_verify(proof, msg, msglen, &Y) == 0)) {
         return crypto_vrf_ietfdraft03_proof_to_hash(output, proof);
     } else {
         return -1;

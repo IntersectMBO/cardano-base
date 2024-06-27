@@ -3,7 +3,7 @@
  */
 
 void
-fe25519_frombytes(fe25519 h, const unsigned char *s)
+cardano_fe25519_frombytes(fe25519 h, const unsigned char *s)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint64_t h0, h1, h2, h3, h4;
@@ -22,7 +22,7 @@ fe25519_frombytes(fe25519 h, const unsigned char *s)
 }
 
 static void
-fe25519_reduce(fe25519 h, const fe25519 f)
+cardano_fe25519_reduce(fe25519 h, const fe25519 f)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint128_t t[5];
@@ -99,12 +99,12 @@ fe25519_reduce(fe25519 h, const fe25519 f)
 }
 
 void
-fe25519_tobytes(unsigned char *s, const fe25519 h)
+cardano_fe25519_tobytes(unsigned char *s, const fe25519 h)
 {
     fe25519  t;
     uint64_t t0, t1, t2, t3;
 
-    fe25519_reduce(t, h);
+    cardano_fe25519_reduce(t, h);
     t0 = t[0] | (t[1] << 51);
     t1 = (t[1] >> 13) | (t[2] << 38);
     t2 = (t[2] >> 26) | (t[3] << 25);

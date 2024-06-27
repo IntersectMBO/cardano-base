@@ -8,7 +8,7 @@
  */
 
 static inline void
-fe25519_0(fe25519 h)
+cardano_fe25519_0(fe25519 h)
 {
     memset(&h[0], 0, 5 * sizeof h[0]);
 }
@@ -18,7 +18,7 @@ fe25519_0(fe25519 h)
  */
 
 static inline void
-fe25519_1(fe25519 h)
+cardano_fe25519_1(fe25519 h)
 {
     h[0] = 1;
     memset(&h[1], 0, 4 * sizeof h[0]);
@@ -30,7 +30,7 @@ fe25519_1(fe25519 h)
  */
 
 static inline void
-fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
+cardano_fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
 {
     uint64_t h0 = f[0] + g[0];
     uint64_t h1 = f[1] + g[1];
@@ -50,7 +50,7 @@ fe25519_add(fe25519 h, const fe25519 f, const fe25519 g)
  */
 
 static void
-fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
+cardano_fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint64_t h0, h1, h2, h3, h4;
@@ -90,12 +90,12 @@ fe25519_sub(fe25519 h, const fe25519 f, const fe25519 g)
  */
 
 static inline void
-fe25519_neg(fe25519 h, const fe25519 f)
+cardano_fe25519_neg(fe25519 h, const fe25519 f)
 {
     fe25519 zero;
 
-    fe25519_0(zero);
-    fe25519_sub(h, zero, f);
+    cardano_fe25519_0(zero);
+    cardano_fe25519_sub(h, zero, f);
 }
 
 /*
@@ -106,7 +106,7 @@ fe25519_neg(fe25519 h, const fe25519 f)
  */
 
 static void
-fe25519_cmov(fe25519 f, const fe25519 g, unsigned int b)
+cardano_fe25519_cmov(fe25519 f, const fe25519 g, unsigned int b)
 {
     const uint64_t mask = (uint64_t) (-(int64_t) b);
 
@@ -143,7 +143,7 @@ Preconditions: b in {0,1}.
 */
 
 static void
-fe25519_cswap(fe25519 f, fe25519 g, unsigned int b)
+cardano_fe25519_cswap(fe25519 f, fe25519 g, unsigned int b)
 {
     const uint64_t mask = (uint64_t) (-(int64_t) b);
 
@@ -189,7 +189,7 @@ fe25519_cswap(fe25519 f, fe25519 g, unsigned int b)
  */
 
 static inline void
-fe25519_copy(fe25519 h, const fe25519 f)
+cardano_fe25519_copy(fe25519 h, const fe25519 f)
 {
     uint64_t f0 = f[0];
     uint64_t f1 = f[1];
@@ -210,11 +210,11 @@ fe25519_copy(fe25519 h, const fe25519 f)
  */
 
 static inline int
-fe25519_isnegative(const fe25519 f)
+cardano_fe25519_isnegative(const fe25519 f)
 {
     unsigned char s[32];
 
-    fe25519_tobytes(s, f);
+    cardano_fe25519_tobytes(s, f);
 
     return s[0] & 1;
 }
@@ -225,11 +225,11 @@ fe25519_isnegative(const fe25519 f)
  */
 
 static inline int
-fe25519_iszero(const fe25519 f)
+cardano_fe25519_iszero(const fe25519 f)
 {
     unsigned char s[32];
 
-    fe25519_tobytes(s, f);
+    cardano_fe25519_tobytes(s, f);
 
     return sodium_is_zero(s, 32);
 }
@@ -240,7 +240,7 @@ fe25519_iszero(const fe25519 f)
  */
 
 static void
-fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
+cardano_fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint128_t r0, r1, r2, r3, r4, carry;
@@ -331,7 +331,7 @@ fe25519_mul(fe25519 h, const fe25519 f, const fe25519 g)
  */
 
 static void
-fe25519_sq(fe25519 h, const fe25519 f)
+cardano_fe25519_sq(fe25519 h, const fe25519 f)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint128_t r0, r1, r2, r3, r4, carry;
@@ -410,7 +410,7 @@ fe25519_sq(fe25519 h, const fe25519 f)
 */
 
 static void
-fe25519_sq2(fe25519 h, const fe25519 f)
+cardano_fe25519_sq2(fe25519 h, const fe25519 f)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint128_t r0, r1, r2, r3, r4, carry;
@@ -490,7 +490,7 @@ fe25519_sq2(fe25519 h, const fe25519 f)
 }
 
 static void
-fe25519_scalar_product(fe25519 h, const fe25519 f, uint32_t n)
+cardano_fe25519_scalar_product(fe25519 h, const fe25519 f, uint32_t n)
 {
     const uint64_t mask = 0x7ffffffffffffULL;
     uint128_t a;
