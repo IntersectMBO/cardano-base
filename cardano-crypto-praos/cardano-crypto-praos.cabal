@@ -1,7 +1,7 @@
 cabal-version: 2.2
 
 name:                cardano-crypto-praos
-version:             2.1.2.0
+version:             2.2.0.0
 synopsis:            Crypto primitives from libsodium
 description:         VRF (and KES, tba) primitives from libsodium.
 license:             Apache-2.0
