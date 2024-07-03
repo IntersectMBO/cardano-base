@@ -32,21 +32,21 @@ infix 4 <=, >=
 --
 -- It's only true if every component on the left is @<=@ the corresponding
 -- component on the right.
-(<=) :: Measure a => a -> a -> Prelude.Bool
+(<=) :: (Prelude.Eq a, Measure a) => a -> a -> Prelude.Bool
 x <= y = x Prelude.== min x y
 
 -- | The partial order induced by 'max'
 --
 -- It's only true if every component on the left is @>=@ the corresponding
 -- component on the right.
-(>=) :: Measure a => a -> a -> Prelude.Bool
+(>=) :: (Prelude.Eq a, Measure a) => a -> a -> Prelude.Bool
 x >= y = x Prelude.== max x y
 
 -- | Split a list once a prefix fills up the given capacity
 --
 -- Note that this just splits the given list; it does not attempt anything
 -- clever like bin-packing etc.
-splitAt :: Measure a => (e -> a) -> a -> [e] -> ([e], [e])
+splitAt :: (Prelude.Eq a, Measure a) => (e -> a) -> a -> [e] -> ([e], [e])
 splitAt measure limit =
     go zero []
   where
@@ -60,7 +60,7 @@ splitAt measure limit =
           tot' = plus tot (measure e)
 
 -- | @fst . 'splitAt' measure limit@, but non-strict
-take :: Measure a => (e -> a) -> a -> [e] -> [e]
+take :: (Prelude.Eq a, Measure a) => (e -> a) -> a -> [e] -> [e]
 take measure limit =
     go zero
   where
@@ -74,7 +74,7 @@ take measure limit =
           tot' = plus tot (measure e)
 
 -- | @snd . 'splitAt' measure limit@, with a bit less allocation
-drop :: Measure a => (e -> a) -> a -> [e] -> [e]
+drop :: (Prelude.Eq a, Measure a) => (e -> a) -> a -> [e] -> [e]
 drop measure limit =
     go zero
   where

@@ -52,7 +52,7 @@ import qualified Prelude
 --
 -- Note that the bounded join-semilattice precludes negative (components of)
 -- measurements.
-class Prelude.Eq a => Measure a where
+class Measure a where
   -- | The measurement of nothing
   --
   -- See 'Measure' for laws.
@@ -212,14 +212,14 @@ instance (Prelude.Bounded a, Prelude.Monoid a, Prelude.Ord a)
       => BoundedMeasure (InstantiatedAt Prelude.Ord a) where
   maxBound = coerce $ Prelude.maxBound @a
 
-instance (Prelude.Eq a, Generic a, GMeasure (Rep a))
+instance (Generic a, GMeasure (Rep a))
       => Measure (InstantiatedAt Generic a) where
   zero = coerce $     to @a gzero
   plus = coerce $ gbinop @a gplus
   min  = coerce $ gbinop @a gmin
   max  = coerce $ gbinop @a gmax
 
-instance (Prelude.Eq a, Generic a, GBoundedMeasure (Rep a), GMeasure (Rep a))
+instance (Generic a, GBoundedMeasure (Rep a), GMeasure (Rep a))
       => BoundedMeasure (InstantiatedAt Generic a) where
   maxBound = coerce $ to @a gmaxBound
 
