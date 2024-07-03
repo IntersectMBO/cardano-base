@@ -29,10 +29,16 @@ library
 
   exposed-modules:
                         Data.Measure
+                        Data.Measure.ByteSize
                         Data.Measure.Class
 
   build-depends:        base
                       , base-deriving-via
+                      , cardano-binary
+                      , cardano-strict-containers
+                      , deepseq
+                      , nothunks
+                      , quiet
 
 test-suite test
   hs-source-dirs:       test
