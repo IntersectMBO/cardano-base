@@ -1,0 +1,151 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-3"></span><span>
+</span><span id="line-4"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Concurrent.Class.MonadSTM</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadSTM</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">atomically</span></span><span class="hs-special">)</span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/strict-checked-vars-0.2.0.0/doc/html/strict-checked-vars/src"><span class="hs-identifier">Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked</span></a></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Test.QuickCheck.Monadic</span></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../file:///nix/store/9vpxfh8j09kkn9fmmla9a2q76jr4qpbv-tasty-lib-tasty-1.5-haddock-doc/share/doc/tasty/html/src"><span class="hs-identifier">Test.Tasty</span></a></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../file:///nix/store/hgzs22b9rrhljy7q87g5nnq932w4ph27-tasty-quickcheck-lib-tasty-quickcheck-0.10.3-haddock-doc/share/doc/tasty-quickcheck/html/src"><span class="hs-identifier">Test.Tasty.QuickCheck</span></a></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Test.Utils.html"><span class="hs-identifier">Test.Utils</span></a></span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="annot"><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#tests"><span class="hs-identifier hs-type">tests</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/9vpxfh8j09kkn9fmmla9a2q76jr4qpbv-tasty-lib-tasty-1.5-haddock-doc/share/doc/tasty/html/src"><span class="hs-identifier hs-type">TestTree</span></a></span><span>
+</span><span id="line-14"></span><span id="tests"><span class="annot"><span class="annottext">tests :: TestTree
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#tests"><span class="hs-identifier hs-var hs-var">tests</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; [TestTree] -&gt; TestTree
+</span><a href="../file:///nix/store/9vpxfh8j09kkn9fmmla9a2q76jr4qpbv-tasty-lib-tasty-1.5-haddock-doc/share/doc/tasty/html/src"><span class="hs-identifier hs-var">testGroup</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked&quot;</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-15"></span><span>      </span><span class="annot"><span class="annottext">String -&gt; [TestTree] -&gt; TestTree
+</span><a href="../file:///nix/store/9vpxfh8j09kkn9fmmla9a2q76jr4qpbv-tasty-lib-tasty-1.5-haddock-doc/share/doc/tasty/html/src"><span class="hs-identifier hs-var">testGroup</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Checked&quot;</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-16"></span><span>          </span><span class="annot"><span class="annottext">String -&gt; [TestTree] -&gt; TestTree
+</span><a href="../file:///nix/store/9vpxfh8j09kkn9fmmla9a2q76jr4qpbv-tasty-lib-tasty-1.5-haddock-doc/share/doc/tasty/html/src"><span class="hs-identifier hs-var">testGroup</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;IO&quot;</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-17"></span><span>              </span><span class="annot"><span class="annottext">forall a. Testable a =&gt; String -&gt; a -&gt; TestTree
+</span><a href="../file:///nix/store/hgzs22b9rrhljy7q87g5nnq932w4ph27-tasty-quickcheck-lib-tasty-quickcheck-0.10.3-haddock-doc/share/doc/tasty-quickcheck/html/src"><span class="hs-identifier hs-var">testProperty</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;prop_invariantShouldFail&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-18"></span><span>                </span><span class="annot"><span class="annottext">forall prop. Testable prop =&gt; prop -&gt; Property
+</span><span class="hs-identifier hs-var">once</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Property -&gt; Property
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#cppToggle"><span class="hs-identifier hs-var">cppToggle</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Testable a =&gt; PropertyM IO a -&gt; Property
+</span><span class="hs-identifier hs-var">monadicIO</span></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *). MonadSTM m =&gt; PropertyM m ()
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldFail"><span class="hs-identifier hs-var">prop_invariantShouldFail</span></a></span><span>
+</span><span id="line-19"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a. Testable a =&gt; String -&gt; a -&gt; TestTree
+</span><a href="../file:///nix/store/hgzs22b9rrhljy7q87g5nnq932w4ph27-tasty-quickcheck-lib-tasty-quickcheck-0.10.3-haddock-doc/share/doc/tasty-quickcheck/html/src"><span class="hs-identifier hs-var">testProperty</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;prop_invariantShouldNotFail&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-20"></span><span>                </span><span class="annot"><span class="annottext">forall prop. Testable prop =&gt; prop -&gt; Property
+</span><span class="hs-identifier hs-var">once</span></span><span>             </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Testable a =&gt; PropertyM IO a -&gt; Property
+</span><span class="hs-identifier hs-var">monadicIO</span></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *). MonadSTM m =&gt; PropertyM m ()
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldNotFail"><span class="hs-identifier hs-var">prop_invariantShouldNotFail</span></a></span><span>
+</span><span id="line-21"></span><span>            </span><span class="hs-special">]</span><span>
+</span><span id="line-22"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String -&gt; [TestTree] -&gt; TestTree
+</span><a href="../file:///nix/store/9vpxfh8j09kkn9fmmla9a2q76jr4qpbv-tasty-lib-tasty-1.5-haddock-doc/share/doc/tasty/html/src"><span class="hs-identifier hs-var">testGroup</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;IOSim&quot;</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-23"></span><span>              </span><span class="annot"><span class="annottext">forall a. Testable a =&gt; String -&gt; a -&gt; TestTree
+</span><a href="../file:///nix/store/hgzs22b9rrhljy7q87g5nnq932w4ph27-tasty-quickcheck-lib-tasty-quickcheck-0.10.3-haddock-doc/share/doc/tasty-quickcheck/html/src"><span class="hs-identifier hs-var">testProperty</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;prop_invariantShouldFail&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-24"></span><span>                </span><span class="annot"><span class="annottext">forall prop. Testable prop =&gt; prop -&gt; Property
+</span><span class="hs-identifier hs-var">once</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Property -&gt; Property
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#cppToggle"><span class="hs-identifier hs-var">cppToggle</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a.
+Testable a =&gt;
+(forall s. PropertyM (IOSim s) a) -&gt; Property
+</span><a href="Test.Utils.html#monadicSim"><span class="hs-identifier hs-var">monadicSim</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *). MonadSTM m =&gt; PropertyM m ()
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldFail"><span class="hs-identifier hs-var">prop_invariantShouldFail</span></a></span><span>
+</span><span id="line-25"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a. Testable a =&gt; String -&gt; a -&gt; TestTree
+</span><a href="../file:///nix/store/hgzs22b9rrhljy7q87g5nnq932w4ph27-tasty-quickcheck-lib-tasty-quickcheck-0.10.3-haddock-doc/share/doc/tasty-quickcheck/html/src"><span class="hs-identifier hs-var">testProperty</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;prop_invariantShouldNotFail&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-26"></span><span>                </span><span class="annot"><span class="annottext">forall prop. Testable prop =&gt; prop -&gt; Property
+</span><span class="hs-identifier hs-var">once</span></span><span>             </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a.
+Testable a =&gt;
+(forall s. PropertyM (IOSim s) a) -&gt; Property
+</span><a href="Test.Utils.html#monadicSim"><span class="hs-identifier hs-var">monadicSim</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *). MonadSTM m =&gt; PropertyM m ()
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldNotFail"><span class="hs-identifier hs-var">prop_invariantShouldNotFail</span></a></span><span>
+</span><span id="line-27"></span><span>            </span><span class="hs-special">]</span><span>
+</span><span id="line-28"></span><span>        </span><span class="hs-special">]</span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">]</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- | Invariant that checks whether an @Int@ is positive.</span><span>
+</span><span id="line-32"></span><span class="annot"><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#invPositiveInt"><span class="hs-identifier hs-type">invPositiveInt</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-33"></span><span id="invPositiveInt"><span class="annot"><span class="annottext">invPositiveInt :: Int -&gt; Maybe String
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#invPositiveInt"><span class="hs-identifier hs-var hs-var">invPositiveInt</span></a></span></span><span> </span><span id="local-6989586621679077481"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679077481"><span class="hs-identifier hs-var">x</span></a></span></span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679077481"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;x&lt;0 for x=&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679077481"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span id="local-6989586621679077479"><span class="annot"><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldNotFail"><span class="hs-identifier hs-type">prop_invariantShouldNotFail</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadSTM</span></span><span> </span><span class="annot"><a href="#local-6989586621679077479"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">PropertyM</span></span><span> </span><span class="annot"><a href="#local-6989586621679077479"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-38"></span><span id="prop_invariantShouldNotFail"><span class="annot"><span class="annottext">prop_invariantShouldNotFail :: forall (m :: * -&gt; *). MonadSTM m =&gt; PropertyM m ()
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldNotFail"><span class="hs-identifier hs-var hs-var">prop_invariantShouldNotFail</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; m a -&gt; PropertyM m a
+</span><span class="hs-identifier hs-var">run</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a.
+(MonadSTM m, HasCallStack) =&gt;
+STM m a -&gt; m a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-39"></span><span>    </span><span id="local-6989586621679077460"><span class="annot"><span class="annottext">StrictTVar m Int
+</span><a href="#local-6989586621679077460"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a.
+(MonadSTM m, HasCallStack) =&gt;
+(a -&gt; Maybe String) -&gt; a -&gt; STM m (StrictTVar m a)
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/strict-checked-vars-0.2.0.0/doc/html/strict-checked-vars/src"><span class="hs-identifier hs-var">newTVarWithInvariant</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Maybe String
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#invPositiveInt"><span class="hs-identifier hs-var">invPositiveInt</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-40"></span><span>    </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a.
+MonadSTM m =&gt;
+StrictTVar m a -&gt; (a -&gt; a) -&gt; STM m ()
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/strict-checked-vars-0.2.0.0/doc/html/strict-checked-vars/src"><span class="hs-identifier hs-var">modifyTVar</span></a></span><span> </span><span class="annot"><span class="annottext">StrictTVar m Int
+</span><a href="#local-6989586621679077460"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span id="local-6989586621679077546"><span class="annot"><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldFail"><span class="hs-identifier hs-type">prop_invariantShouldFail</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadSTM</span></span><span> </span><span class="annot"><a href="#local-6989586621679077546"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">PropertyM</span></span><span> </span><span class="annot"><a href="#local-6989586621679077546"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-43"></span><span id="prop_invariantShouldFail"><span class="annot"><span class="annottext">prop_invariantShouldFail :: forall (m :: * -&gt; *). MonadSTM m =&gt; PropertyM m ()
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#prop_invariantShouldFail"><span class="hs-identifier hs-var hs-var">prop_invariantShouldFail</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; m a -&gt; PropertyM m a
+</span><span class="hs-identifier hs-var">run</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a.
+(MonadSTM m, HasCallStack) =&gt;
+STM m a -&gt; m a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-44"></span><span>    </span><span id="local-6989586621679077441"><span class="annot"><span class="annottext">StrictTVar m Int
+</span><a href="#local-6989586621679077441"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a.
+(MonadSTM m, HasCallStack) =&gt;
+(a -&gt; Maybe String) -&gt; a -&gt; STM m (StrictTVar m a)
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/strict-checked-vars-0.2.0.0/doc/html/strict-checked-vars/src"><span class="hs-identifier hs-var">newTVarWithInvariant</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Maybe String
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#invPositiveInt"><span class="hs-identifier hs-var">invPositiveInt</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-45"></span><span>    </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a.
+MonadSTM m =&gt;
+StrictTVar m a -&gt; (a -&gt; a) -&gt; STM m ()
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/strict-checked-vars-0.2.0.0/doc/html/strict-checked-vars/src"><span class="hs-identifier hs-var">modifyTVar</span></a></span><span> </span><span class="annot"><span class="annottext">StrictTVar m Int
+</span><a href="#local-6989586621679077441"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">subtract</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="annot"><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#cppToggle"><span class="hs-identifier hs-type">cppToggle</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Property</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Property</span></span><span class="hs-cpp">
+#if CHECK_TVAR_INVARIANTS
+</span><span class="hs-identifier">cppToggle</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">expectFailure</span><span class="hs-cpp">
+#else
+</span><span id="cppToggle"><span class="annot"><span class="annottext">cppToggle :: Property -&gt; Property
+</span><a href="Test.Control.Concurrent.Class.MonadSTM.Strict.TVar.Checked.html#cppToggle"><span class="hs-identifier hs-var hs-var">cppToggle</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; a
+</span><a href="../file:///nix/store/biyi9kkik889n04fc74kj5fxx5b9pdns-ghc-9.2.8-doc/share/doc/ghc/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">id</span></a></span><span class="hs-cpp">
+#endif
+</span></pre></body></html>

@@ -1,0 +1,27 @@
+= Cardano Ledger Repository Hackage Documentation
+
+[skip to module list](#module-list)
+
+This site contains Haskell documentation of:
+
+* __[base-deriving-via](base-deriving-via/index.html)__
+* __[cardano-binary](cardano-binary/index.html)__
+* __[cardano-binary-test](cardano-binary-test/index.html)__
+* __[cardano-binary:test](cardano-binary%3Atest/index.html)__
+* __[cardano-binary:testlib](cardano-binary%3Atestlib/index.html)__
+* __[cardano-crypto-class](cardano-crypto-class/index.html)__
+* __[cardano-crypto-praos](cardano-crypto-praos/index.html)__
+* __[cardano-crypto-tests](cardano-crypto-tests/index.html)__
+* __[cardano-git-rev](cardano-git-rev/index.html)__
+* __[cardano-mempool](cardano-mempool/index.html)__
+* __[cardano-mempool:tests](cardano-mempool%3Atests/index.html)__
+* __[cardano-slotting](cardano-slotting/index.html)__
+* __[cardano-slotting:testlib](cardano-slotting%3Atestlib/index.html)__
+* __[cardano-slotting:tests](cardano-slotting%3Atests/index.html)__
+* __[cardano-strict-containers](cardano-strict-containers/index.html)__
+* __[heapwords](heapwords/index.html)__
+* __[measures](measures/index.html)__
+* __[measures:test](measures%3Atest/index.html)__
+* __[orphans-deriving-via](orphans-deriving-via/index.html)__
+* __[strict-checked-vars](strict-checked-vars/index.html)__
+* __[strict-checked-vars:test](strict-checked-vars%3Atest/index.html)__

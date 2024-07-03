@@ -1,0 +1,1 @@
+-L/nix/store/pb1g3ayg0qljjfq0j340sbi2rpdr32gx-blst-03b5124/lib -L/nix/store/srvp94k0f4kq70mgy94fgxml742lb30w-libsodium-vrf-dbb48cc/lib -L/nix/store/7q573ggd63yaypmxbf6qicyshixv2j1r-secp256k1-acf5c55/lib -lsodium -pthread -lblst -lsecp256k1
