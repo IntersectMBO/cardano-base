@@ -197,6 +197,10 @@ instance Measure a => Prelude.Monoid (InstantiatedAt Measure a) where
 instance Measure a => Prelude.Semigroup (InstantiatedAt Measure a) where
   (<>) = coerce $ plus @a
 
+instance BoundedMeasure a => Prelude.Bounded (InstantiatedAt Measure a) where
+  minBound = coerce $ zero     @a
+  maxBound = coerce $ maxBound @a
+
 --------------------------------------------------------------------------------
 -- DerivingVia instances of these classes
 --------------------------------------------------------------------------------
