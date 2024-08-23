@@ -17,6 +17,7 @@ index-state: cardano-haskell-packages 2024-06-12T11:52:25Z
 packages:
   base-deriving-via
   cardano-addresses/cardano-addresses
+  cardano-addresses/cardano-addresses-cli
   cardano-binary
   cardano-binary/test
   cardano-crypto-class
