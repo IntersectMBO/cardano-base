@@ -3,11 +3,47 @@ cradle:
     - path: "base-deriving-via/src"
       component: "lib:base-deriving-via"
 
-    - path: "binary/src"
+    - path: "cardano-addresses/cardano-addresses/lib"
+      component: "lib:cardano-addresses"
+
+    - path: "cardano-addresses/cardano-addresses/test"
+      component: "cardano-addresses:test:unit"
+
+    - path: "cardano-addresses/cardano-addresses-cli/lib"
+      component: "lib:cardano-addresses-cli"
+
+    - path: "cardano-addresses/cardano-addresses-cli/exe/Main.hs"
+      component: "cardano-addresses-cli:exe:cardano-address"
+
+    - path: "cardano-addresses/cardano-addresses-cli/exe/Paths_cardano_addresses_cli.hs"
+      component: "cardano-addresses-cli:exe:cardano-address"
+
+    - path: "cardano-addresses/cardano-addresses-cli/test"
+      component: "cardano-addresses-cli:test:unit"
+
+    - path: "cardano-addresses/cardano-addresses-jsapi/lib"
+      component: "lib:cardano-addresses-jsapi"
+
+    - path: "cardano-addresses/cardano-addresses-jsapi/exe/Main.hs"
+      component: "cardano-addresses-jsapi:exe:cardano-addresses-jsapi"
+
+    - path: "cardano-addresses/cardano-addresses-jsapi/exe/Paths_cardano_addresses_jsapi.hs"
+      component: "cardano-addresses-jsapi:exe:cardano-addresses-jsapi"
+
+    - path: "cardano-addresses/cardano-addresses-jsapi/test"
+      component: "cardano-addresses-jsapi:test:jsapi-test"
+
+    - path: "cardano-binary/src"
       component: "lib:cardano-binary"
 
-    - path: "binary/test"
+    - path: "cardano-binary/testlib"
+      component: "cardano-binary:lib:testlib"
+
+    - path: "cardano-binary/test"
       component: "cardano-binary:test:test"
+
+    - path: "cardano-binary/test/./"
+      component: "lib:cardano-binary-test"
 
     - path: "cardano-crypto-class/src"
       component: "lib:cardano-crypto-class"
@@ -24,7 +60,34 @@ cradle:
     - path: "cardano-crypto-tests/test"
       component: "cardano-crypto-tests:test:test-crypto"
 
-    - path: "heapwords"
+    - path: "cardano-crypto-tests/bench/Main.hs"
+      component: "cardano-crypto-tests:bench:bench-crypto"
+
+    - path: "cardano-git-rev/src"
+      component: "lib:cardano-git-rev"
+
+    - path: "cardano-mempool/src"
+      component: "lib:cardano-mempool"
+
+    - path: "cardano-mempool/tests"
+      component: "cardano-mempool:test:tests"
+
+    - path: "cardano-mempool/bench/Bench.hs"
+      component: "cardano-mempool:bench:bench"
+
+    - path: "cardano-slotting/src"
+      component: "lib:cardano-slotting"
+
+    - path: "cardano-slotting/testlib"
+      component: "cardano-slotting:lib:testlib"
+
+    - path: "cardano-slotting/test"
+      component: "cardano-slotting:test:tests"
+
+    - path: "cardano-strict-containers/src"
+      component: "lib:cardano-strict-containers"
+
+    - path: "heapwords/src"
       component: "lib:heapwords"
 
     - path: "measures/src"
@@ -36,8 +99,8 @@ cradle:
     - path: "orphans-deriving-via/src"
       component: "lib:orphans-deriving-via"
 
-    - path: "slotting/src"
-      component: "lib:cardano-slotting"
+    - path: "strict-checked-vars/src"
+      component: "lib:strict-checked-vars"
 
-    - path: "cardano-strict-containers"
-      component: "lib:cardano-strict-containers"
+    - path: "strict-checked-vars/test"
+      component: "strict-checked-vars:test:test"
