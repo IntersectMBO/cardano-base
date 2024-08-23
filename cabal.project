@@ -18,6 +18,7 @@ packages:
   base-deriving-via
   cardano-addresses/cardano-addresses
   cardano-addresses/cardano-addresses-cli
+  cardano-addresses/cardano-addresses-jsapi
   cardano-binary
   cardano-binary/test
   cardano-crypto-class
