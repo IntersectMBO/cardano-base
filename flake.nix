@@ -170,7 +170,15 @@
             # also provide hydraJobs through legacyPackages to allow building without system prefix:
             inherit hydraJobs;
           };
-
+          docker = { cardano-address =
+                       let cardano-address-pkg = flake.packages."cardano-addresses-cli:exe:cardano-address";
+                       in nixpkgs.dockerTools.buildLayeredImage {
+                            name = "cardano-address";
+                            tag = "latest";
+                            contents = [ cardano-address-pkg ];
+                            config.Cmd = [ "cardano-address" ];
+                          };
+                   };
           devShells = let
             mkDevShells = p: {
               # `nix develop .#profiling` (or `.#ghc966.profiling): a shell with profiling enabled
