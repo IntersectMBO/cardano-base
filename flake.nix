@@ -112,6 +112,15 @@
         # add a required job, that's basically all hydraJobs.
         hydraJobs = nixpkgs.callPackages inputs.iohkNix.utils.ciJobsAggregates
           { ciJobs = flake.hydraJobs; };
+        docker = { cardano-address =
+                     let cardano-address-pkg = flake.packages."cardano-addresses-cli:exe:cardano-address";
+                     in nixpkgs.dockerTools.buildLayeredImage {
+                          name = "cardano-address";
+                          tag = "latest";
+                          contents = [ cardano-address-pkg ];
+                          config.Cmd = [ "cardano-address" ];
+                        };
+                 };
       }
     );
 
