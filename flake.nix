@@ -39,7 +39,10 @@
         # ... and construct a flake from the cabal.project file.
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
-        flake = (nixpkgs.haskell-nix.cabalProject' ({config, ...}: {
+        flake = (nixpkgs.haskell-nix.cabalProject' ({config, ...}:
+        let 
+          isCrossBuild = nixpkgs.hostPlatform != nixpkgs.buildPlatform;
+        in {
           src = ./.;
           name = "cardano-base";
           compiler-nix-name = lib.mkDefault defaultCompilerVersion;
@@ -89,9 +92,11 @@
               packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
               enableLibraryProfiling = profiling;
             })
-            ({pkgs, ...}: with pkgs; lib.mkIf stdenv.hostPlatform.isWindows {
+
+            ({pkgs, ...}: with pkgs; lib.mkIf isCrossBuild {
               packages.text.flags.simdutf = false;
               # Disable cabal-doctest tests by turning off custom setups
+              packages.pretty-simple.package.buildType = lib.mkForce "Simple";
               packages.comonad.package.buildType = lib.mkForce "Simple";
               packages.distributive.package.buildType = lib.mkForce "Simple";
               packages.lens.package.buildType = lib.mkForce "Simple";
@@ -134,7 +139,6 @@
               in
               lib.mkIf (pkgs.stdenv.hostPlatform.isGhcjs) {
                 reinstallableLibGhc = false;
-      
                 # TODO replace this with `zlib` build with `emcc` if possible.
                 # Replace zlib with a derivation including just the header files
                 packages.digest.components.library.libs = lib.mkForce [(
@@ -162,6 +166,7 @@
                   pkgs.buildPackages.nodejs
                ];
              })
+
             ({ pkgs, ... }: lib.mkIf (!pkgs.stdenv.hostPlatform.isGhcjs) {
                 # Disable jsapi-test on jsaddle/native. It's not working yet.
                 packages.cardano-addresses-jsapi.components.tests.jsapi-test.preCheck = ''

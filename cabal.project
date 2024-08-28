@@ -9,6 +9,13 @@ repository cardano-haskell-packages
     c00aae8461a256275598500ea0e187588c35a5d5d7454fb57eac18d9edb86a56
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
+repository ghcjs-overlay
+  url: https://raw.githubusercontent.com/input-output-hk/hackage-overlay-ghcjs/b91c23d847a5ecedc3eca2e054afd1e8c4155256
+  secure: True
+  root-keys:
+  key-threshold: 0
+  --sha256: sha256-d+GumypPpDWxt4PtareJBHkIiWb09l/GskWnWcgDOQE=
+
 -- The hackage index-state
 index-state: 2024-06-12T11:52:25Z
 -- The CHaP index-state
@@ -33,6 +40,15 @@ packages:
   measures
   orphans-deriving-via
   strict-checked-vars
+
+if os(ghcjs)
+  active-repositories: hackage.haskell.org, cardano-haskell-packages, ghcjs-overlay:override
+else
+  active-repositories: hackage.haskell.org, cardano-haskell-packages
+
+constraints:
+    ghcjs-base >=0.2.0.3
+  , optparse-applicative >= 0.18.1.0
 
 -- Ensures colourized output from test runners
 test-show-details: direct
