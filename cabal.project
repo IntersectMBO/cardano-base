@@ -19,6 +19,7 @@ packages:
   cardano-addresses/cardano-addresses
   cardano-addresses/cardano-addresses-cli
   cardano-addresses/cardano-addresses-jsapi
+  cardano-addresses/cardano-addresses-jsbits
   cardano-binary
   cardano-binary/test
   cardano-crypto-class

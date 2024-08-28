@@ -20,8 +20,8 @@
 
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
   };
-
   outputs = inputs: let
+    lib = inputs.nixpkgs.lib;
     supportedSystems = [
       "x86_64-linux"
       "x86_64-darwin"
@@ -52,7 +52,11 @@
         fourmoluVersion = "0.16.2.0";
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
-        cabalProject = nixpkgs.haskell-nix.cabalProject' ({config, ...}: {
+        cabalProject = nixpkgs.haskell-nix.cabalProject' ({config, ...}:
+        let
+        isCrossBuild = nixpkgs.hostPlatform != nixpkgs.buildPlatform;
+        compareGhc = builtins.compareVersions nixpkgs.buildPackages.haskell-nix.compiler.${config.compiler-nix-name}.version;
+        in {
           src = ./.;
           name = "cardano-base";
           compiler-nix-name = lib.mkDefault defaultCompiler;
@@ -101,8 +105,7 @@
               ];
             # disable Hoogle until someone request it
             withHoogle = false;
-            # Skip cross compilers for the shell
-            crossPlatforms = _: [];
+            crossPlatforms = p: lib.optional (compareGhc "9.0" < 0) p.ghcjs;
           };
 
           # package customizations as needed. Where cabal.project is not
@@ -120,7 +123,7 @@
               packages.cardano-crypto-class.configureFlags = [ "--ghc-option=-Werror" ];
               packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
             })
-            ({pkgs, ...}: with pkgs; nixpkgs.lib.mkIf stdenv.hostPlatform.isWindows {
+            ({pkgs, ...}: with pkgs; lib.mkIf stdenv.hostPlatform.isWindows {
               packages.text.flags.simdutf = false;
               # Disable cabal-doctest tests by turning off custom setups
               packages.comonad.package.buildType = lib.mkForce "Simple";
@@ -137,20 +140,84 @@
               packages.terminal-size.components.library.build-tools = lib.mkForce [];
               packages.network.components.library.build-tools = lib.mkForce [];
             })
+
+            # GHCJS build configuration
+            ({ config, pkgs, ... }:
+              let
+                # Run the script to build the C sources from cryptonite and cardano-crypto
+                # and place the result in jsbits/cardano-crypto.js
+                jsbits = pkgs.runCommand "cardano-addresses-jsbits" { } ''
+                  script=$(mktemp -d)
+                  cp -r ${cardano-addresses/cardano-addresses-jsbits/emscripten}/* $script
+                  ln -s ${pkgs.srcOnly {name = "cryptonite-src"; src = config.packages.cryptonite.src;}}/cbits $script/cryptonite
+                  ln -s ${pkgs.srcOnly {name = "cardano-crypto-src"; src = config.packages.cardano-crypto.src;}}/cbits $script/cardano-crypto
+                  patchShebangs $script/build.sh
+                  (cd $script && PATH=${
+                      # The extra buildPackages here is for closurecompiler.
+                      # Without it we get `unknown emulation for platform: js-unknown-ghcjs` errors.
+                      lib.makeBinPath (with pkgs.buildPackages.buildPackages;
+                        [emscripten closurecompiler coreutils])
+                    }:$PATH ./build.sh)
+                  mkdir -p $out
+                  cp $script/cardano-crypto.js $out
+                '';
+                addJsbits = ''
+                  mkdir -p jsbits
+                  cp ${jsbits}/* jsbits
+                '';
+              in
+              lib.mkIf (pkgs.stdenv.hostPlatform.isGhcjs) {
+                reinstallableLibGhc = false;
+      
+                # TODO replace this with `zlib` build with `emcc` if possible.
+                # Replace zlib with a derivation including just the header files
+                packages.digest.components.library.libs = lib.mkForce [(
+                  pkgs.pkgsBuildBuild.runCommand "zlib" { nativeBuildInputs = [ pkgs.pkgsBuildBuild.xorg.lndir ]; } ''
+                    mkdir -p $out/include
+                    lndir ${pkgs.pkgsBuildBuild.lib.getDev pkgs.pkgsBuildBuild.zlib}/include $out/include
+                '')];
+                # Prevent downstream packages from looking for zlib
+                packages.digest.components.library.postInstall = ''
+                  sed -i 's/^extra-libraries: *z//g' $out/package.conf.d/digest-*.conf
+                '';
+                # Prevent errors from missing zlib function _adler32
+                packages.cardano-addresses.configureFlags = [ "--gcc-options=-Wno-undefined" ];
+                packages.cardano-addresses-cli.configureFlags = [ "--gcc-options=-Wno-undefined" ];
+                packages.cardano-addresses-jsapi.configureFlags = [ "--gcc-options=-Wno-undefined" ];
+      
+                packages.cardano-addresses-cli.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
+                packages.cardano-addresses-jsapi.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
+                packages.cardano-addresses-jsbits.components.library.preConfigure = addJsbits;
+                packages.cardano-addresses-cli.components.tests.unit.preCheck = ''
+                  export CARDANO_ADDRESSES_CLI="${config.hsPkgs.cardano-addresses-cli.components.exes.cardano-address}/bin"
+                '';
+                packages.cardano-addresses-cli.components.tests.unit.build-tools = pkgs.lib.mkForce [
+                  config.hsPkgs.buildPackages.hspec-discover.components.exes.hspec-discover
+                  pkgs.buildPackages.nodejs
+               ];
+             })
+            ({ pkgs, ... }: lib.mkIf (!pkgs.stdenv.hostPlatform.isGhcjs) {
+                # Disable jsapi-test on jsaddle/native. It's not working yet.
+                packages.cardano-addresses-jsapi.components.tests.jsapi-test.preCheck = ''
+                  echo "Tests disabled on non-ghcjs"
+                  exit 0
+                '';
+              })
           ];
-        });
-        # ... and construct a flake from the cabal project
-        flake =
-          cabalProject.flake (
-            lib.optionalAttrs (system == "x86_64-linux") {
+          # ... and construct a flake from the cabal project
+          flake = {
+            # on linux, build/test other supported compilers
+            variants = lib.optionalAttrs (system == "x86_64-linux")
               # on linux, build/test other supported compilers
-              variants = lib.genAttrs ["ghc8107" "ghc982"] (compiler-nix-name: {
+              (lib.genAttrs ["ghc8107" "ghc982"] (compiler-nix-name: {
                 inherit compiler-nix-name;
-              });
-              # we also want cross compilation to windows.
-              crossPlatforms = p: [p.mingwW64];
-            }
-          );
+              }));
+            crossPlatforms = p:
+              lib.optional (system == "x86_64-linux" && builtins.elem config.compiler-nix-name ["ghc8107"]) p.ghcjs ++
+              lib.optional (system == "x86_64-linux" && config.compiler-nix-name == defaultCompiler) p.mingwW64;
+          };
+        });
+        flake = cabalProject.flake {};
       in
         lib.recursiveUpdate flake rec {
           project = cabalProject;
