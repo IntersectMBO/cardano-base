@@ -8,9 +8,9 @@ set -euo pipefail
 #  ln -s ../cryptonite/cbits cryptonite
 #  ln -s ../cardano-crypto/cbits cardano-crypto
 
-
-emcc -o crypto-cbits.js -s WASM=0 \
-  -s "EXTRA_EXPORTED_RUNTIME_METHODS=['printErr']" \
+export CACHE_DIR=$(mktemp -d)
+emcc -o crypto-cbits.js --cache $CACHE_DIR -s WASM=0 \
+  -s "EXPORTED_RUNTIME_METHODS=['printErr']" \
   -s "EXPORTED_FUNCTIONS=['_malloc', '_free'\
                          ,'_cryptonite_md5_init', '_cryptonite_md5_update', '_cryptonite_md5_finalize'\
                          ,'_cryptonite_sha256_init', '_cryptonite_sha256_update', '_cryptonite_sha256_finalize'\
@@ -45,3 +45,6 @@ emcc -o crypto-cbits.js -s WASM=0 \
 closure-compiler --js=crypto-cbits.js --js_output_file=crypto-cbits.min.js
 
 cat crc32.js crypto-cbits.pre.js crypto-cbits.js crypto-cbits.post.js crypto-wrappers.js > cardano-crypto.js
+
+rm -fr $CACHE_DIR
+
