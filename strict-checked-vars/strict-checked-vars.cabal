@@ -1,6 +1,6 @@
 cabal-version:   3.0
 name:            strict-checked-vars
-version:         0.2.0.0
+version:         0.2.0.1
 synopsis:
   Strict MVars and TVars with invariant checking for IO and IOSim
 
@@ -50,9 +50,7 @@ library
   default-language: Haskell2010
   build-depends:
     , base         >=4.9 && <5
-    , io-classes   >=1.2 && <1.6
-    , strict-mvar  >=1.2 && <1.6
-    , strict-stm   >=1.2 && <1.6
+    , io-classes:{io-classes,strict-mvar,strict-stm}  ^>=1.7
 
   ghc-options:
     -Wall -Wcompat -Wincomplete-uni-patterns
@@ -79,7 +77,7 @@ test-suite test
   default-language: Haskell2010
   build-depends:
     , base
-    , io-classes
+    , io-classes:io-classes
     , io-sim
     , nothunks
     , QuickCheck
