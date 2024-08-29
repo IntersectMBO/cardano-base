@@ -42,6 +42,7 @@
         flake = (nixpkgs.haskell-nix.cabalProject' ({config, ...}:
         let 
           isCrossBuild = nixpkgs.hostPlatform != nixpkgs.buildPlatform;
+          compareGhc = builtins.compareVersions nixpkgs.buildPackages.haskell-nix.compiler.${config.compiler-nix-name}.version;
         in {
           src = ./.;
           name = "cardano-base";
@@ -57,24 +58,30 @@
           };
 
           # tools we want in our shell
-          shell.tools = {
-            cabal = "3.10.1.0";
-            ghcid = "0.8.8";
-            haskell-language-server = "latest";
-            # ghc 9.2.8 comes with base 4.16.
-            # this disqualifies weeder > 2.4.1
-            # and hlint > 3.6.1
-            hlint = "3.6.1";
-            weeder = "2.4.1";
+          shell = {
+            crossPlatforms = p: lib.optional (compareGhc "9.0" < 0) p.ghcjs;
+            tools = ({
+              cabal = "3.10.1.0";
+              ghcid = "0.8.8";
+              haskell-language-server = if compareGhc "9" < 0
+                                        then { src = nixpkgs.buildPackages.haskell-nix.sources."hls-2.2"; }
+                                        else "latest";
+            } // (lib.optionalAttrs (compareGhc "9.0" >= 0) {
+              # ghc 9.2.8 comes with base 4.16.
+              # this disqualifies weeder > 2.4.1
+              # and hlint > 3.6.1
+               hlint = "3.6.1";
+               weeder = "2.4.1";
+            }));
+            # Now we use pkgsBuildBuild, to make sure that even in the cross
+            # compilation setting, we don't run into issues where we pick tools
+            # for the target.
+            buildInputs = with nixpkgs.pkgsBuildBuild; [
+              gitAndTools.git
+              sqlite-interactive
+            ];
+            withHoogle = compareGhc "9.0" >= 0;
           };
-          # Now we use pkgsBuildBuild, to make sure that even in the cross
-          # compilation setting, we don't run into issues where we pick tools
-          # for the target.
-          shell.buildInputs = with nixpkgs.pkgsBuildBuild; [
-            gitAndTools.git
-            sqlite-interactive
-          ];
-          shell.withHoogle = true;
 
           # package customizations as needed. Where cabal.project is not
           # specific enough, or doesn't allow setting these.

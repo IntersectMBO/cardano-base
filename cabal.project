@@ -22,24 +22,26 @@ index-state: 2024-06-12T11:52:25Z
 index-state: cardano-haskell-packages 2024-06-12T11:52:25Z
 
 packages:
-  base-deriving-via
   cardano-addresses/cardano-addresses
   cardano-addresses/cardano-addresses-cli
   cardano-addresses/cardano-addresses-jsapi
   cardano-addresses/cardano-addresses-jsbits
-  cardano-binary
-  cardano-binary/test
-  cardano-crypto-class
-  cardano-crypto-praos
-  cardano-crypto-tests
-  cardano-git-rev
-  cardano-slotting
-  cardano-strict-containers
-  cardano-mempool
-  heapwords
-  measures
-  orphans-deriving-via
-  strict-checked-vars
+if !os(ghcjs)
+  packages:
+    base-deriving-via
+    cardano-binary
+    cardano-binary/test
+    cardano-crypto-class
+    cardano-crypto-praos
+    cardano-crypto-tests
+    cardano-git-rev
+    cardano-slotting
+    cardano-strict-containers
+    cardano-mempool
+    heapwords
+    measures
+    orphans-deriving-via
+    strict-checked-vars
 
 if os(ghcjs)
   active-repositories: hackage.haskell.org, cardano-haskell-packages, ghcjs-overlay:override
