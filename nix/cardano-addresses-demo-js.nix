@@ -8,7 +8,7 @@ stdenv.mkDerivation rec {
 
   src = lib.cleanSourceWith {
     name = pname;
-    src = lib.sourceFilesBySuffices ../jsapi [ ".js" ".map" ".html" ".in" ];
+    src = lib.sourceFilesBySuffices ../cardano-addresses/cardano-addresses-jsapi [ ".js" ".map" ".html" ".in" ];
   };
 
   buildPhase = "true";
