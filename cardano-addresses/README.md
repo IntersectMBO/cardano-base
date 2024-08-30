@@ -807,4 +807,5 @@ cardanoAddresses.inspectAddress(addr)
 - [NPM Package](https://www.npmjs.com/package/cardano-addresses)
 - [API Documentation](https://IntersectMBO.github.io/cardano-addresses/typescript/)
 - [Web Demo](https://IntersectMBO.github.io/cardano-addresses/demo/)
+- [Development Info](./cardano-addresses-jsapi/README.md)
 

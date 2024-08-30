@@ -21,23 +21,27 @@ $ cat result/test-stdout
 
 ## With Cabal in nix-shell
 
+Note: The package `cardano-addresses-jsbits` depends on the file `jsbits/cardano-crypto.js`. In order to build it manually, we need to generate that first, and put it in `cardano-addresses/cardano-addresses-jsbits/jsbits/`. We can do that easily with nix. For example, in linux we may write:
+
+```terminal
+nix build .#jsbits.x86_64-linux
+mkdir cardano-addresses/cardano-addresses-jsbits/jsbits/
+cp result/jsbits/cardano-crypto.js  cardano-addresses/cardano-addresses-jsbits/jsbits/
+```
+
 The `nix-shell` development environment provides
 `js-unknown-ghcjs-cabal`, which is a cross-compiling Cabal for ghcjs.
 
 Build and run CLI:
 
 ```terminal
-$ nix develop
+$ nix develop .#ghc810-javascript-unknown-ghcjs
 $ js-unknown-ghcjs-cabal --builddir=dist-ghcjs build all
 ...
-
 $ js-unknown-ghcjs-cabal --builddir=dist-ghcjs run cardano-addresses-cli:exe:cardano-address
 ...
-/home/rodney/iohk/cardano-addresses/dist-ghcjs/build/wasm32-none/ghcjs-8.6.5/cardano-addresses-cli-3.3.0/x/cardano-address/build/cardano-address/cardano-address: createProcess: runInteractiveProcess: exec: does not exist (No such file or directory)
-cardano-address: createProcess: runInteractiveProcess: exec: does not exist (No such file or directory)
-
-$ node dist-ghcjs/build/wasm32-none/ghcjs-8.6.5/cardano-addresses-cli-3.3.0/x/cardano-address/build/cardano-address/cardano-address.jsexe/all.js recovery-phrase generate
-culture fringe exercise stumble gold current balance ....
+$ node dist-ghcjs/build/js-ghcjs/ghcjs-8.10.7/cardano-addresses-cli-3.12.0/x/cardano-address/build/cardano-address/cardano-address.jsexe/all.js recovery-phrase generate
+indoor apology bracket motor lecture logic range elder lizard resemble penalty can normal pond couch corn forget snow hard setup fire actual plate earth
 ```
 
 ### Limitations
