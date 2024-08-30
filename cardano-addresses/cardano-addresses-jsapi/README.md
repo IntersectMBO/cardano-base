@@ -6,7 +6,7 @@
 - λ [Haskell Library](https://IntersectMBO.github.io/cardano-addresses/haddock/)
 
 This is a Typescript (or Javascript) version of the
-[`cardano-addresses`](https://github.com/IntersectMBO/cardano-addresses)
+[`cardano-addresses`](../README.md)
 API.
 
 For the time being, this module is **experimental**, and exposes only
@@ -23,7 +23,7 @@ This package comprises of four parts:
 
  * An [emscripten](https://emscripten.org/) build of the
    [libsodium](https://github.com/input-output-hk/libsodium) crypto library,
-   supported by the [`cardano-addresses-jsbits`](../jsbits/cardano-addresses-jsbits.cabal) package.
+   supported by the [`cardano-addresses-jsbits`](../cardano-addresses-jsbits/cardano-addresses-jsbits.cabal) package.
 
  * A Cabal package [`cardano-addresses-jsapi`](./cardano-addresses-jsapi.cabal)
    containing GHCJS foreign exports for translating Javascript
@@ -42,7 +42,7 @@ Start a `nix develop .#cardano-addresses-js-shell` in the repo top-level directo
 
 ```shell
 $ nix develop .#cardano-addresses-js-shell
-$ cd jsapi
+$ cd cardano-addresses/cardano-addresses-jsapi
 $ npm install && npm run build
 ...
 $ npm run test
@@ -52,11 +52,19 @@ Behind the scenes, this will use Nix to make the `ghcjs` build of the `cardano-a
 
 ### Haskell module: Building and testing
 
+Note: The package `cardano-addresses-jsbits` depends on the file `jsbits/cardano-crypto.js`. In order to build it manually, we need to generate that first, and put it in `cardano-addresses/cardano-addresses-jsbits/jsbits/`. We can do that easily with nix. For example, in linux we may write:
+
+```terminal
+nix build .#jsbits.x86_64-linux
+mkdir cardano-addresses/cardano-addresses-jsbits/jsbits/
+cp result/jsbits/cardano-crypto.js  cardano-addresses/cardano-addresses-jsbits/jsbits/
+```
+
 To try it out run `nix develop .#` from the repo top-level directory:
 
 ```shell
-$ nix develop .#
-$ cd jsapi
+$ nix develop .#ghc810-javascript-unknown-ghcjs
+$ cd cardano-addresses/cardano-addresses-jsapi
 $ js-unknown-ghcjs-cabal build cardano-addresses-jsapi:jsapi-test
 $ node dist-newstyle/build/js-ghcjs/ghcjs-8.10.4/cardano-addresses-jsapi-3.5.0/t/jsapi-test/build/jsapi-test/jsapi-test.jsexe/all.js
 ```

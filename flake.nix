@@ -164,7 +164,7 @@
       
                 packages.cardano-addresses-cli.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
                 packages.cardano-addresses-jsapi.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
-                packages.cardano-addresses-jsbits.components.library.preConfigure = addJsbits;
+                packages.cardano-addresses-jsbits.components.library.postPatch = addJsbits;
                 packages.cardano-addresses-cli.components.tests.unit.preCheck = ''
                   export CARDANO_ADDRESSES_CLI="${config.hsPkgs.cardano-addresses-cli.components.exes.cardano-address}/bin"
                 '';
@@ -210,6 +210,7 @@
                           config.Cmd = [ "cardano-address" ];
                         };
                  };
+        jsbits = nixpkgs.srcOnly flake.packages."ghc810-javascript-unknown-ghcjs:cardano-addresses-jsbits:lib:cardano-addresses-jsbits";
         packages = { inherit cardano-addresses-js; inherit cardano-addresses-demo-js; inherit cardano-addresses-js-shell; };
       }
     );
