@@ -219,6 +219,9 @@
               lib.optional (system == "x86_64-linux" && config.compiler-nix-name == defaultCompiler) p.mingwW64;
           };
         });
+        cardano-addresses-js = nixpkgs.callPackage ./nix/cardano-addresses-js.nix { cardano-addresses-jsapi = flake.packages."ghc810-javascript-unknown-ghcjs:cardano-addresses-jsapi:exe:cardano-addresses-jsapi".package; };
+        cardano-addresses-demo-js = nixpkgs.callPackage ./nix/cardano-addresses-demo-js.nix { inherit cardano-addresses-js; };
+        cardano-addresses-js-shell = nixpkgs.callPackage ./nix/cardano-addresses-js-shell.nix { inherit cardano-addresses-js;};
         flake = cabalProject.flake {};
       in
         lib.recursiveUpdate flake rec {
@@ -248,6 +251,7 @@
                             config.Cmd = [ "cardano-address" ];
                           };
                    };
+          packages = { inherit cardano-addresses-js; inherit cardano-addresses-demo-js; inherit cardano-addresses-js-shell; };
           devShells = let
             mkDevShells = p: {
               # `nix develop .#profiling` (or `.#ghc966.profiling): a shell with profiling enabled

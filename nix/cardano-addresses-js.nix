@@ -7,7 +7,7 @@ stdenv.mkDerivation rec {
     cardano-addresses-jsapi.components.exes.cardano-addresses-jsapi
     (lib.cleanSourceWith {
       name = "cardano-addresses-jsapi-glue";
-      src = lib.sourceFilesBySuffices ../jsapi/glue [ ".js" ];
+      src = lib.sourceFilesBySuffices ../cardano-addresses/cardano-addresses-jsapi/glue [ ".js" ];
     })
   ];
   setSourceRoot = ''
