@@ -48,6 +48,19 @@ if os(ghcjs)
 else
   active-repositories: hackage.haskell.org, cardano-haskell-packages
 
+-- Avoid conflict in `hjsonschema`
+-- src/Import.hs:2:16: error: [GHC-69158]
+--     Conflicting exports for ‘witness’:
+--        ‘module Export’ exports ‘Export.witness’
+--          imported from ‘Protolude’ at src/Import.hs:4:1-36
+--          (and originally defined in ‘Protolude.Debug’)
+--        ‘module Export’ exports ‘Export.witness’
+--          imported from ‘Test.QuickCheck’ at src/Import.hs:(9,1)-(10,50)
+--          (and originally defined in ‘Test.QuickCheck.Property’)
+-- TODO update https://github.com/input-output-hk/hjsonschema to
+-- hide `witness` when importing from `Test.QuickCheck`
+constraints: QuickCheck <2.15
+
 constraints:
     ghcjs-base >=0.2.0.3
   , optparse-applicative >= 0.18.1.0
