@@ -40,7 +40,7 @@
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
         flake = (nixpkgs.haskell-nix.cabalProject' ({config, ...}:
-        let 
+        let
           isCrossBuild = nixpkgs.hostPlatform != nixpkgs.buildPlatform;
           compareGhc = builtins.compareVersions nixpkgs.buildPackages.haskell-nix.compiler.${config.compiler-nix-name}.version;
         in {
@@ -161,7 +161,7 @@
                 packages.cardano-addresses.configureFlags = [ "--gcc-options=-Wno-undefined" ];
                 packages.cardano-addresses-cli.configureFlags = [ "--gcc-options=-Wno-undefined" ];
                 packages.cardano-addresses-jsapi.configureFlags = [ "--gcc-options=-Wno-undefined" ];
-      
+
                 packages.cardano-addresses-cli.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
                 packages.cardano-addresses-jsapi.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
                 packages.cardano-addresses-jsbits.components.library.postPatch = addJsbits;

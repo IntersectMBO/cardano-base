@@ -48,6 +48,18 @@ if os(ghcjs)
 else
   active-repositories: hackage.haskell.org, cardano-haskell-packages
 
+-- If not ghcjs, we disable cardano-addresses-jsapi
+-- because they only work on JS 
+if os(ghcjs)
+  package cardano-addresses-jsapi
+    tests: true
+else
+  package cardano-addresses-jsapi
+    tests: false
+
+constraints:
+    ghcjs-base >=0.2.0.3
+  , optparse-applicative >= 0.18.1.0
 -- Avoid conflict in `hjsonschema`
 -- src/Import.hs:2:16: error: [GHC-69158]
 --     Conflicting exports for ‘witness’:
@@ -59,11 +71,8 @@ else
 --          (and originally defined in ‘Test.QuickCheck.Property’)
 -- TODO update https://github.com/input-output-hk/hjsonschema to
 -- hide `witness` when importing from `Test.QuickCheck`
-constraints: QuickCheck <2.15
+  , QuickCheck < 2.15
 
-constraints:
-    ghcjs-base >=0.2.0.3
-  , optparse-applicative >= 0.18.1.0
 
 -- Ensures colourized output from test runners
 test-show-details: direct
