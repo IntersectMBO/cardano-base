@@ -57,22 +57,6 @@ jobs:
       CABAL_CACHE_VERSION: "2023-04-27"
 
     steps:
-    - name: "WIN: Install System Dependencies via pacman (msys2)"
-      if: runner.os == 'Windows'
-      run: |
-         # ghcup should be installed on current GHA Windows runners. Let's use ghcup to run
-         # pacman, to install the necessary dependencies, ...
-         ghcup run -- pacman --noconfirm -S `
-            mingw-w64-x86_64-pkg-config `
-            mingw-w64-x86_64-pcre `
-            mingw-w64-x86_64-libsodium `
-            base-devel `
-            autoconf-wrapper `
-            autoconf `
-            automake `
-            libtool `
-            make
-
     - name: Install Haskell
       uses: input-output-hk/actions/haskell@latest
       id: setup-haskell
@@ -106,6 +90,11 @@ jobs:
       uses: input-output-hk/actions/base@latest
       with:
         use-sodium-vrf: false # default is true
+
+    - name: "WIN: Install libs"
+      if: runner.os == 'Windows'
+      run: |
+        C:/msys64/usr/bin/pacman.exe --noconfirm -S mingw-w64-x86_64-pcre
 
     - name: "LINUX: Install build environment (apt-get)"
       if: runner.os == 'Linux'
@@ -184,7 +173,7 @@ jobs:
         # these two are msys2 env vars, they have no effect on non-msys2 installs.
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
-      run: cabal test all --enable-tests --test-show-details=direct -j1
+      run: cabal test all
 
     - name: Build strict-checked-vars with invariants
       run: cabal build -f+checktvarinvariants -f+checkmvarinvariants strict-checked-vars

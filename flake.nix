@@ -185,7 +185,7 @@
                 packages.cardano-addresses.configureFlags = [ "--gcc-options=-Wno-undefined" ];
                 packages.cardano-addresses-cli.configureFlags = [ "--gcc-options=-Wno-undefined" ];
                 packages.cardano-addresses-jsapi.configureFlags = [ "--gcc-options=-Wno-undefined" ];
-      
+
                 packages.cardano-addresses-cli.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
                 packages.cardano-addresses-jsapi.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
                 packages.cardano-addresses-jsbits.components.library.postPatch = addJsbits;

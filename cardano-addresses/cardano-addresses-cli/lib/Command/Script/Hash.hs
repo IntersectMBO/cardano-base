@@ -82,10 +82,9 @@ run Cmd{script} = do
     getRole (KeyHash r _) = r
     allRoles = map getRole allKeyHashes
     checkRoles =
-        if length (L.nub allRoles) == 1 then
-            Just $ head allRoles
-        else
-            Nothing
+        case L.nub allRoles of
+          (h:_) -> Just h
+          _ -> Nothing
     pickCIP5 = \case
         Representative -> CIP5.drep_script
         CommitteeCold -> CIP5.cc_cold_script
