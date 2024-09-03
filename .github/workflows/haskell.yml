@@ -109,6 +109,10 @@ jobs:
       run: |
         brew install libsodium
         brew install pcre
+        sudo mkdir -p /usr/local/include
+        if [ ! -f /usr/local/include/pcre.h ]; then
+          sudo ln -s /opt/homebrew/Cellar/pcre/8.45/include/pcre.h /usr/local/include
+        fi
 
     - uses: actions/checkout@v4
 
