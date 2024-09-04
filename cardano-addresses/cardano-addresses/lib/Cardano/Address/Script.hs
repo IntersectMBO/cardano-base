@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -50,7 +51,11 @@ module Cardano.Address.Script
     , prettyErrKeyHashFromText
     ) where
 
+#if MIN_VERSION_base(4,20,0)
+import Prelude hiding (foldl')
+#else
 import Prelude
+#endif
 
 import Cardano.Address.Derivation
     ( XPub, credentialHashSize, hashCredential, xpubFromBytes, xpubToBytes )
@@ -303,7 +308,7 @@ keyHashToText (KeyHash cred keyHash) = case cred of
 -- @since 3.1.0
 keyHashFromText :: Text -> Either ErrKeyHashFromText KeyHash
 keyHashFromText txt =
-    case (fromBase16 $ T.encodeUtf8 txt) of
+    case fromBase16 $ T.encodeUtf8 txt of
         Right bs ->
             if checkBSLength bs 28 then
                 pure $ KeyHash Unknown bs
@@ -442,7 +447,7 @@ validateScript
     -> Either ErrValidateScript ()
 validateScript level script = do
     let validateKeyHash (KeyHash _ bytes) =
-            (BS.length bytes == credentialHashSize)
+            BS.length bytes == credentialHashSize
     let allSigs = foldScript (:) [] script
     unless (L.all validateKeyHash allSigs) $ Left WrongKeyHash
 
@@ -633,19 +638,19 @@ prettyErrValidateScript = \case
         "All keys of a script must have the same role: payment, delegation, policy, \
         \representative, committee cold or committee hot."
     Malformed ->
-        "Parsing of the script failed. The script should be composed of nested \
-        \lists, the verification keys should be bech32-encoded with prefix \
-        \'X_vkh', 'X_vk', 'X_xvk' where X is 'addr_shared', 'stake_shared', 'policy', \
-        \'drep', 'cc_cold' or 'cc_hot' and timelocks must use non-negative \
-        \numbers as slots."
+        "Parsing of the script failed. The script should be composed of nested " ++
+        "lists, the verification keys should be bech32-encoded with prefix " ++
+        "'X_vkh', 'X_vk', 'X_xvk' where X is 'addr_shared', 'stake_shared', 'policy', " ++
+        "'drep', 'cc_cold' or 'cc_hot' and timelocks must use non-negative " ++
+        "numbers as slots."
     NotRecommended EmptyList ->
-        "The list inside a script is empty or only contains timelocks \
-        \(which is not recommended)."
+        "The list inside a script is empty or only contains timelocks " ++
+        "(which is not recommended)."
     NotRecommended MZero ->
         "At least's coefficient is 0 (which is not recommended)."
     NotRecommended ListTooSmall ->
-        "At least's coefficient is larger than the number of non-timelock \
-        \elements in the list (which is not recommended)."
+        "At least's coefficient is larger than the number of non-timelock " ++
+        "elements in the list (which is not recommended)."
     NotRecommended DuplicateSignatures ->
         "The list inside a script has duplicate keys (which is not recommended)."
     NotRecommended RedundantTimelocks ->

@@ -70,7 +70,6 @@ import Cardano.Address
     ( Address
     , AddressDiscrimination (..)
     , HasNetworkDiscriminant (..)
-    , NetworkDiscriminant (..)
     , NetworkTag (..)
     , unAddress
     , unsafeMkAddress
@@ -281,10 +280,10 @@ instance Internal.SoftDerivation Icarus where
             return $ Icarus addrXPub
       where
         errWrongIndex = error $
-            "deriveAddressPublicKey failed: was given an hardened (or too big) \
-            \index for soft path derivation ( " ++ show addrIx ++ "). This is \
-            \either a programmer error, or, we may have reached the maximum \
-            \number of addresses for a given wallet."
+            "deriveAddressPublicKey failed: was given an hardened (or too big) " ++
+            "index for soft path derivation ( " ++ show addrIx ++ "). This is " ++
+            "either a programmer error, or, we may have reached the maximum " ++
+            "number of addresses for a given wallet."
 
 -- | Generate a root key from a corresponding mnemonic.
 --
@@ -448,7 +447,7 @@ eitherInspectAddress addr = do
         CBOR.deserialiseCbor CBOR.decodeProtocolMagicAttr payload
     (root, attrs) <- first DeserialiseError $
         CBOR.deserialiseCbor decodePayload payload
-    if (elem 1 $ fst <$> attrs)
+    if elem 1 $ fst <$> attrs
         then Left UnexpectedDerivationPath
         else Right AddressInfo
             { infoAddressRoot = root

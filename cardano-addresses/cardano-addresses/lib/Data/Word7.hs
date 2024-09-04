@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 -- |
@@ -28,8 +29,11 @@ import Data.Binary.Put
     ( Put, putWord8 )
 import Data.Bits
     ( shiftL, shiftR, (.&.), (.|.) )
+
+#if !MIN_VERSION_base(4,20,0)
 import Data.List
     ( foldl' )
+#endif
 import Data.Word
     ( Word8 )
 import Numeric.Natural
@@ -73,13 +77,13 @@ toWord7s = reverse . go
 word7sToNat :: [Word7] -> Natural
 word7sToNat = foldl' f 0
   where
-    f n (Word7 r) = shiftL n 7 .|. (fromIntegral r)
+    f n (Word7 r) = shiftL n 7 .|. fromIntegral r
 
 toNatural :: [Word7] -> Natural
 toNatural =
     fst .
     foldr (\(Word7 x) (res, pow) ->
-               (res + (fromIntegral x)*(limit pow + 1), pow + 7)
+               (res + fromIntegral x * (limit pow + 1), pow + 7)
           )
     (0,0)
   where

@@ -95,7 +95,6 @@ import Cardano.Address
     , AddressDiscrimination (..)
     , ChainPointer (..)
     , HasNetworkDiscriminant (..)
-    , NetworkDiscriminant (..)
     , NetworkTag (..)
     , invariantNetworkTag
     , invariantSize
