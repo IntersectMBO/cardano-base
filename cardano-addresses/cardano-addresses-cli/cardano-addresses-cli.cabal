@@ -161,7 +161,7 @@ test-suite unit
         Win32
   if flag(release)
     ghc-options: -Werror
-  if !(impl(ghcjs) || os(ghcjs))
+  if !(impl(ghcjs) || os(ghcjs) || impl(ghc > 9.8.2))
     cpp-options: -DHJSONSCHEMA
     build-depends:
         hjsonschema >=1.10.0
