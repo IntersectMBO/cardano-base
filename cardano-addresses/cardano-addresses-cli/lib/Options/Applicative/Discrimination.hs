@@ -16,7 +16,7 @@ module Options.Applicative.Discrimination
 import Prelude
 
 import Cardano.Address
-    ( NetworkDiscriminant (..), NetworkTag (..) )
+    ( NetworkDiscriminant, NetworkTag (..) )
 import Cardano.Address.Style.Shelley
     ( Shelley )
 import Data.List
