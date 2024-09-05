@@ -137,9 +137,10 @@ test-suite unit
   default-extensions:
       NoImplicitPrelude
   ghc-options: -Wall -Wcompat -fwarn-redundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-tools:
+      cardano-address
   build-tool-depends:
-      cardano-addresses-cli:cardano-address
-    , hspec-discover:hspec-discover
+      hspec-discover:hspec-discover
   build-depends:
       QuickCheck >=2.14.2
     , aeson >= 2.0

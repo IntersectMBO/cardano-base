@@ -111,6 +111,21 @@
           # package customizations as needed. Where cabal.project is not
           # specific enough, or doesn't allow setting these.
           modules = [
+            ({ config, ... }: {
+              # This works around an issue with `cardano-addresses-cli.cabal`
+              # Haskell.nix does not like `build-tool: cardano-address` as it looks in the
+              # cardano-address package instead of the `cardano-addresses-cli`.
+              # For some reason `cabal configure` fails if it is changed to:
+              # `build-tool-depends: cardano-address-cli:cardano-address
+              # Explicitly overriding the `build-tools` allows `build-tool: cardano-address`
+              # for now.  A better fix would be to work out why cabal fails when
+              # `build-tool-depends` is used.
+              packages.cardano-addresses-cli.components.tests.unit.build-tools = nixpkgs.lib.mkForce [
+                config.hsPkgs.buildPackages.hspec-discover.components.exes.hspec-discover
+                config.hsPkgs.cardano-addresses-cli.components.exes.cardano-address
+              ];
+            })
+
             ({pkgs, ...}: {
               # Packages we wish to ignore version bounds of.
               # This is similar to jailbreakCabal, however it
