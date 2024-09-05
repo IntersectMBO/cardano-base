@@ -36,6 +36,20 @@
 
         defaultCompilerVersion = "ghc928";
 
+        # Recursive function to remove an entry based on the given path (as a list of strings)
+        removeAtPath = attrSet: path: 
+          if path == [] then attrSet else
+          let
+            key = builtins.head path;
+            restPath = builtins.tail path;
+          in
+            if restPath == [] then
+              builtins.removeAttrs attrSet [ key ]
+            else
+              (if lib.attrsets.hasAttr key attrSet then
+                 attrSet // { ${key} = removeAtPath (attrSet.${key}) restPath; }
+               else attrSet);
+
         # ... and construct a flake from the cabal.project file.
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
@@ -212,10 +226,13 @@
         cardano-addresses-js = nixpkgs.callPackage ./nix/cardano-addresses-js.nix { cardano-addresses-jsapi = flake.packages."ghc810-javascript-unknown-ghcjs:cardano-addresses-jsapi:exe:cardano-addresses-jsapi".package; };
         cardano-addresses-demo-js = nixpkgs.callPackage ./nix/cardano-addresses-demo-js.nix { inherit cardano-addresses-js; };
         cardano-addresses-js-shell = nixpkgs.callPackage ./nix/cardano-addresses-js-shell.nix { inherit cardano-addresses-js;};
-      in lib.recursiveUpdate flake {
+        # We disable the node test in CI because it takes more than two hours to run
+        removeNodeTest = derivs : removeAtPath derivs [ "hydraJobs" "ghc810-javascript-unknown-ghcjs" "checks" "cardano-addresses:test:unit" ]; 
+        flakeWithoutNodeTest = removeNodeTest flake;
+      in lib.recursiveUpdate flakeWithoutNodeTest {
         # add a required job, that's basically all hydraJobs.
         hydraJobs = nixpkgs.callPackages inputs.iohkNix.utils.ciJobsAggregates
-          { ciJobs = flake.hydraJobs; };
+          { ciJobs = flakeWithoutNodeTest.hydraJobs; };
         docker = { cardano-address =
                      let cardano-address-pkg = flake.packages."cardano-addresses-cli:exe:cardano-address";
                      in nixpkgs.dockerTools.buildLayeredImage {
