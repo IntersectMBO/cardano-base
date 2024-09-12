@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.8", "9.6.4", "9.8.2", "9.10.1"]
+        ghc: ["8.10.7", "9.2.8", "9.6.6", "9.8.2", "9.10.1"]
         os: [ubuntu-latest, macos-13, macos-latest, windows-latest]
         # GHC versions older than ghc-9.2 are not supported on macos-latest
         exclude:
@@ -71,7 +71,7 @@ jobs:
           - os: macos-13
             ghc: "9.2.8"
           - os: macos-13
-            ghc: "9.6.4"
+            ghc: "9.6.6"
           - os: macos-13
             ghc: "9.8.2"
           - os: macos-13
@@ -190,7 +190,7 @@ jobs:
     #     limit-access-to-actor: true
 
     - name: Cache HLS artifacts (used to speed up GitHub Codespaces bootstrapping)
-      if: runner.os == 'Linux' && (matrix.ghc == '8.10.7' || matrix.ghc == '9.6.4')
+      if: runner.os == 'Linux' && (matrix.ghc == '8.10.7' || matrix.ghc == '9.6.6')
       uses: input-output-hk/actions/cache@latest
       with:
-        ghc_version: ${{ matrix.ghc == '8.10.7' && 'ghc810' || matrix.ghc == '9.6.4' && 'ghc96' }}
+        ghc_version: ${{ matrix.ghc == '8.10.7' && 'ghc810' || matrix.ghc == '9.6.6' && 'ghc96' }}
