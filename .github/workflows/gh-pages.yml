@@ -27,10 +27,26 @@ jobs:
         run: |
               git config --local user.name ${{ github.actor }}
               git config --local user.email "${{ github.actor }}@users.noreply.github.com"
-              cp -r ./haddocks/* ./
-              rm -rf haddocks
-              git add -A --force
-              git commit -m "Updated"
+
+              # Start a new version of the gh-pages branch
+              git for-each-ref refs/heads/gh-pages --format='%(refname:short)' |
+                while read -r REFNAME; do
+                  git branch -D "$REFNAME"
+                done
+              git checkout -b gh-pages
+
+              git rm -rfq .
+              git commit -qm "Remove all existing files"
+
+              echo "cardano-base.cardano.intersectmbo.org" >CNAME
+              touch .nojekyll
+              git add CNAME .nojekyll
+              git commit -qm "Add CNAME and .nojekyll"
+
+              # Add Haddocks
+              git add -A --force ./haddocks
+              git mv ./haddocks/* .
+              git commit -qm "Updated from ${GITHUB_SHA} via ${GITHUB_EVENT_NAME}"
 
       - name: Push to gh-pages
         uses: ad-m/github-push-action@v0.6.0
