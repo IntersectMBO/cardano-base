@@ -29,9 +29,6 @@ CABAL_OPTS=(
 
 # Generate  `doc-index.json` and `doc-index.html` per package, to assemble them later at the top level.
 HADDOCK_OPTS=(
-  --haddock-executables
-  --haddock-tests
-  --haddock-benchmarks
   --haddock-html
   --haddock-hyperlink-source
   --haddock-option "--use-unicode"
