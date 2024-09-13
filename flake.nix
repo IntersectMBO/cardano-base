@@ -20,8 +20,8 @@
 
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
   };
-
   outputs = inputs: let
+    lib = inputs.nixpkgs.lib;
     supportedSystems = [
       "x86_64-linux"
       "x86_64-darwin"
@@ -52,7 +52,11 @@
         fourmoluVersion = "0.16.2.0";
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
-        cabalProject = nixpkgs.haskell-nix.cabalProject' ({config, ...}: {
+        cabalProject = nixpkgs.haskell-nix.cabalProject' ({config, ...}:
+        let
+        isCrossBuild = nixpkgs.hostPlatform != nixpkgs.buildPlatform;
+        compareGhc = builtins.compareVersions nixpkgs.buildPackages.haskell-nix.compiler.${config.compiler-nix-name}.version;
+        in {
           src = ./.;
           name = "cardano-base";
           compiler-nix-name = lib.mkDefault defaultCompiler;
@@ -101,13 +105,27 @@
               ];
             # disable Hoogle until someone request it
             withHoogle = false;
-            # Skip cross compilers for the shell
-            crossPlatforms = _: [];
+            crossPlatforms = p: lib.optional (compareGhc "9.0" < 0) p.ghcjs;
           };
 
           # package customizations as needed. Where cabal.project is not
           # specific enough, or doesn't allow setting these.
           modules = [
+            ({ config, ... }: {
+              # This works around an issue with `cardano-addresses-cli.cabal`
+              # Haskell.nix does not like `build-tool: cardano-address` as it looks in the
+              # cardano-address package instead of the `cardano-addresses-cli`.
+              # For some reason `cabal configure` fails if it is changed to:
+              # `build-tool-depends: cardano-address-cli:cardano-address
+              # Explicitly overriding the `build-tools` allows `build-tool: cardano-address`
+              # for now.  A better fix would be to work out why cabal fails when
+              # `build-tool-depends` is used.
+              packages.cardano-addresses-cli.components.tests.unit.build-tools = nixpkgs.lib.mkForce [
+                config.hsPkgs.buildPackages.hspec-discover.components.exes.hspec-discover
+                config.hsPkgs.cardano-addresses-cli.components.exes.cardano-address
+              ];
+            })
+
             ({pkgs, ...}: {
               # Packages we wish to ignore version bounds of.
               # This is similar to jailbreakCabal, however it
@@ -120,9 +138,11 @@
               packages.cardano-crypto-class.configureFlags = [ "--ghc-option=-Werror" ];
               packages.slotting.configureFlags = [ "--ghc-option=-Werror" ];
             })
-            ({pkgs, ...}: with pkgs; nixpkgs.lib.mkIf stdenv.hostPlatform.isWindows {
+
+            ({pkgs, ...}: with pkgs; lib.mkIf isCrossBuild {
               packages.text.flags.simdutf = false;
               # Disable cabal-doctest tests by turning off custom setups
+              packages.pretty-simple.package.buildType = lib.mkForce "Simple";
               packages.comonad.package.buildType = lib.mkForce "Simple";
               packages.distributive.package.buildType = lib.mkForce "Simple";
               packages.lens.package.buildType = lib.mkForce "Simple";
@@ -137,20 +157,87 @@
               packages.terminal-size.components.library.build-tools = lib.mkForce [];
               packages.network.components.library.build-tools = lib.mkForce [];
             })
+
+            # GHCJS build configuration
+            ({ config, pkgs, ... }:
+              let
+                # Run the script to build the C sources from cryptonite and cardano-crypto
+                # and place the result in jsbits/cardano-crypto.js
+                jsbits = pkgs.runCommand "cardano-addresses-jsbits" { } ''
+                  script=$(mktemp -d)
+                  cp -r ${cardano-addresses/cardano-addresses-jsbits/emscripten}/* $script
+                  ln -s ${pkgs.srcOnly {name = "cryptonite-src"; src = config.packages.cryptonite.src;}}/cbits $script/cryptonite
+                  ln -s ${pkgs.srcOnly {name = "cardano-crypto-src"; src = config.packages.cardano-crypto.src;}}/cbits $script/cardano-crypto
+                  patchShebangs $script/build.sh
+                  (cd $script && PATH=${
+                      # The extra buildPackages here is for closurecompiler.
+                      # Without it we get `unknown emulation for platform: js-unknown-ghcjs` errors.
+                      lib.makeBinPath (with pkgs.buildPackages.buildPackages;
+                        [emscripten closurecompiler coreutils])
+                    }:$PATH ./build.sh)
+                  mkdir -p $out
+                  cp $script/cardano-crypto.js $out
+                '';
+                addJsbits = ''
+                  mkdir -p jsbits
+                  cp ${jsbits}/* jsbits
+                '';
+              in
+              lib.mkIf (pkgs.stdenv.hostPlatform.isGhcjs) {
+                reinstallableLibGhc = false;
+                # TODO replace this with `zlib` build with `emcc` if possible.
+                # Replace zlib with a derivation including just the header files
+                packages.digest.components.library.libs = lib.mkForce [(
+                  pkgs.pkgsBuildBuild.runCommand "zlib" { nativeBuildInputs = [ pkgs.pkgsBuildBuild.xorg.lndir ]; } ''
+                    mkdir -p $out/include
+                    lndir ${pkgs.pkgsBuildBuild.lib.getDev pkgs.pkgsBuildBuild.zlib}/include $out/include
+                '')];
+                # Prevent downstream packages from looking for zlib
+                packages.digest.components.library.postInstall = ''
+                  sed -i 's/^extra-libraries: *z//g' $out/package.conf.d/digest-*.conf
+                '';
+                # Prevent errors from missing zlib function _adler32
+                packages.cardano-addresses.configureFlags = [ "--gcc-options=-Wno-undefined" ];
+                packages.cardano-addresses-cli.configureFlags = [ "--gcc-options=-Wno-undefined" ];
+                packages.cardano-addresses-jsapi.configureFlags = [ "--gcc-options=-Wno-undefined" ];
+
+                packages.cardano-addresses-cli.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
+                packages.cardano-addresses-jsapi.components.library.build-tools = [ pkgs.buildPackages.buildPackages.gitMinimal ];
+                packages.cardano-addresses-jsbits.components.library.postPatch = addJsbits;
+                packages.cardano-addresses-cli.components.tests.unit.preCheck = ''
+                  export CARDANO_ADDRESSES_CLI="${config.hsPkgs.cardano-addresses-cli.components.exes.cardano-address}/bin"
+                '';
+                packages.cardano-addresses-cli.components.tests.unit.build-tools = pkgs.lib.mkForce [
+                  config.hsPkgs.buildPackages.hspec-discover.components.exes.hspec-discover
+                  pkgs.buildPackages.nodejs
+               ];
+             })
+
+            ({ pkgs, ... }: lib.mkIf (!pkgs.stdenv.hostPlatform.isGhcjs) {
+                # Disable jsapi-test on jsaddle/native. It's not working yet.
+                packages.cardano-addresses-jsapi.components.tests.jsapi-test.preCheck = ''
+                  echo "Tests disabled on non-ghcjs"
+                  exit 0
+                '';
+              })
           ];
-        });
-        # ... and construct a flake from the cabal project
-        flake =
-          cabalProject.flake (
-            lib.optionalAttrs (system == "x86_64-linux") {
+          # ... and construct a flake from the cabal project
+          flake = {
+            # on linux, build/test other supported compilers
+            variants = lib.optionalAttrs (system == "x86_64-linux")
               # on linux, build/test other supported compilers
-              variants = lib.genAttrs ["ghc8107" "ghc982"] (compiler-nix-name: {
+              (lib.genAttrs ["ghc8107" "ghc982"] (compiler-nix-name: {
                 inherit compiler-nix-name;
-              });
-              # we also want cross compilation to windows.
-              crossPlatforms = p: [p.mingwW64];
-            }
-          );
+              }));
+            crossPlatforms = p:
+              lib.optional (system == "x86_64-linux" && builtins.elem config.compiler-nix-name ["ghc8107"]) p.ghcjs ++
+              lib.optional (system == "x86_64-linux" && config.compiler-nix-name == defaultCompiler) p.mingwW64;
+          };
+        });
+        cardano-addresses-js = nixpkgs.callPackage ./nix/cardano-addresses-js.nix { cardano-addresses-jsapi = flake.packages."ghc810-javascript-unknown-ghcjs:cardano-addresses-jsapi:exe:cardano-addresses-jsapi".package; };
+        cardano-addresses-demo-js = nixpkgs.callPackage ./nix/cardano-addresses-demo-js.nix { inherit cardano-addresses-js; };
+        cardano-addresses-js-shell = nixpkgs.callPackage ./nix/cardano-addresses-js-shell.nix { inherit cardano-addresses-js;};
+        flake = cabalProject.flake {};
       in
         lib.recursiveUpdate flake rec {
           project = cabalProject;
@@ -170,7 +257,17 @@
             # also provide hydraJobs through legacyPackages to allow building without system prefix:
             inherit hydraJobs;
           };
-
+          docker = { cardano-address =
+                       let cardano-address-pkg = flake.packages."cardano-addresses-cli:exe:cardano-address";
+                       in nixpkgs.dockerTools.buildLayeredImage {
+                            name = "cardano-address";
+                            tag = "latest";
+                            contents = [ cardano-address-pkg ];
+                            config.Cmd = [ "cardano-address" ];
+                          };
+                   };
+        jsbits = nixpkgs.srcOnly flake.packages."ghc810-javascript-unknown-ghcjs:cardano-addresses-jsbits:lib:cardano-addresses-jsbits";
+          packages = { inherit cardano-addresses-js; inherit cardano-addresses-demo-js; inherit cardano-addresses-js-shell; };
           devShells = let
             mkDevShells = p: {
               # `nix develop .#profiling` (or `.#ghc966.profiling): a shell with profiling enabled
