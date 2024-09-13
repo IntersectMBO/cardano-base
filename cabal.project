@@ -14,7 +14,7 @@ repository ghcjs-overlay
   secure: True
   root-keys:
   key-threshold: 0
-  --sha256: sha256-0l0pJQYWJzqaQFgFw/ahoNzYM98l0D2q2xyq9AG988c=
+  --sha256: sha256-w1WpLfHixvH2ki88pUXOSgEs05+vMzheQfjyQ5ZaqH0=
 
 -- The hackage index-state
 index-state: 2024-06-12T11:52:25Z
