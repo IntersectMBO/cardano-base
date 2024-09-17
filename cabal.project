@@ -57,3 +57,10 @@ if impl(ghc >= 9.8)
     location: https://github.com/recursion-schemes/recursion-schemes
     tag: cc2e88c3400a6548e975830c9addb12ab087545f
     --sha256: 06shyihy6cpblv3pf18xgdfjgxqw2y2awvpcy33r76fr642gdvgn
+
+
+source-repository-package
+  type: git
+  location: https://github.com/lehins/mempack.git
+  tag: f07b53fbfc3c56d4d60e072e277ffdf655aee59e
+  --sha256: sha256-tkgPmpFQ2h5hX8gh3tQ5T5H756tmqgUNGb2hLQUgLWc=

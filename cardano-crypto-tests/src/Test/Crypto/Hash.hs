@@ -16,6 +16,7 @@ import qualified Data.Bits as Bits (xor)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as SBS
 import Data.Maybe (fromJust)
+import Data.MemPack
 import Data.Proxy (Proxy(..))
 import Data.String (fromString)
 import GHC.TypeLits
@@ -62,8 +63,14 @@ testHashAlgorithm p =
     , testProperty "hashFromStringAsHex/fromString" $ prop_hash_hashFromStringAsHex_fromString @h @Float
     , testProperty "show/read" $ prop_hash_show_read @h @Float
     , testProperty "NoThunks" $ prop_no_thunks @(Hash h Int)
+    , testProperty "MemPack RoundTrip" $ prop_MemPackRoundTrip @(Hash h Int)
     ]
     where n = hashAlgorithmName p
+
+prop_MemPackRoundTrip :: forall a. (MemPack a, Eq a, Show a) => a -> Property
+prop_MemPackRoundTrip a =
+  unpackError (pack a) === a .&&.
+  unpackError (packByteString a) === a
 
 testSodiumHashAlgorithm
   :: forall proxy h. NaCl.SodiumHashAlgorithm h
