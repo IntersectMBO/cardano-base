@@ -7,6 +7,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -66,6 +67,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
+import Data.MemPack (StateT(StateT), FailT(FailT), MemPack, Unpack(Unpack))
 import Data.Word (Word8)
 import Numeric.Natural (Natural)
 
@@ -109,6 +111,8 @@ sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
 
 newtype Hash h a = UnsafeHashRep (PackedBytes (SizeHash h))
   deriving (Eq, Ord, Generic, NoThunks, NFData)
+
+deriving instance HashAlgorithm h => MemPack (Hash h a)
 
 -- | This instance is meant to be used with @TemplateHaskell@
 --

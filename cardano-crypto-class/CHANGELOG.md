@@ -5,6 +5,8 @@
 **DO NOT RELEASE YET** - MemLocking and secure forgettin interface has not yet
 solidified. Ask @lehins if backport is needed.
 
+* Add required `HashAlgorithm` constraint to `Hash` serialization.
+* Add `MemPack` instance for `Hash` and `PackedBytes`
 * Introduce memory locking and secure forgetting functionality:
   [#255](https://github.com/input-output-hk/cardano-base/pull/255)
   [#404](https://github.com/input-output-hk/cardano-base/pull/404)
