@@ -27,8 +27,8 @@ import Codec.Serialise.Encoding (encodeBytes)
 import Control.DeepSeq
 import Control.Monad (guard)
 import Control.Monad.Primitive
-import Control.Monad.Reader
-import Control.Monad.State.Strict
+import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
+import Control.Monad.State.Strict (MonadState(state))
 import Data.Bits
 import Data.ByteString
 import Data.ByteString.Internal as BS (accursedUnutterablePerformIO,
