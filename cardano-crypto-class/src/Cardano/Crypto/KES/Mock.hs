@@ -24,6 +24,8 @@ import Data.Proxy (Proxy(..))
 import GHC.Generics (Generic)
 import GHC.TypeNats (Nat, KnownNat, natVal)
 import NoThunks.Class (NoThunks)
+import qualified Data.ByteString.Internal as BS
+import Foreign.Ptr (castPtr)
 
 import Control.Exception (assert)
 
@@ -35,8 +37,15 @@ import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Util
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Libsodium
-  ( mlsbAsByteString
+  ( mlsbToByteString
   )
+import Cardano.Crypto.Libsodium.Memory
+  ( unpackByteStringCStringLen
+  , ForeignPtr (..)
+  , mallocForeignPtrBytes
+  , withForeignPtr
+  )
+import Cardano.Crypto.DirectSerialise
 
 data MockKES (t :: Nat)
 
@@ -151,7 +160,8 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     --
 
     genKeyKESWith _allocator seed = do
-        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes . mlsbAsByteString . mlockedSeedMLSB $ seed) getRandomWord64)
+        seedBS <- mlsbToByteString . mlockedSeedMLSB $ seed
+        let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes seedBS) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
     forgetSignKeyKESWith _ = const $ return ()
@@ -194,3 +204,33 @@ instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
 
 instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
   fromCBOR = decodeSigKES
+
+instance (KnownNat t) => DirectSerialise (SignKeyKES (MockKES t)) where
+  directSerialise put sk = do
+    let bs = rawSerialiseSignKeyMockKES sk
+    unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+
+instance (KnownNat t) => DirectDeserialise (SignKeyKES (MockKES t)) where
+  directDeserialise pull = do
+    let len = fromIntegral $ sizeSignKeyKES (Proxy @(MockKES t))
+    fptr <- mallocForeignPtrBytes len
+    withForeignPtr fptr $ \ptr ->
+        pull (castPtr ptr) (fromIntegral len)
+    let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
+    maybe (error "directDeserialise @(SignKeyKES (MockKES t))") return $
+        rawDeserialiseSignKeyMockKES bs
+
+instance (KnownNat t) => DirectSerialise (VerKeyKES (MockKES t)) where
+  directSerialise put sk = do
+    let bs = rawSerialiseVerKeyKES sk
+    unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+
+instance (KnownNat t) => DirectDeserialise (VerKeyKES (MockKES t)) where
+  directDeserialise pull = do
+    let len = fromIntegral $ sizeVerKeyKES (Proxy @(MockKES t))
+    fptr <- mallocForeignPtrBytes len
+    withForeignPtr fptr $ \ptr ->
+        pull (castPtr ptr) (fromIntegral len)
+    let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
+    maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
+        rawDeserialiseVerKeyKES bs
