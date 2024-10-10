@@ -73,7 +73,7 @@ testSodiumHashAlgorithm
   -> TestTree
 testSodiumHashAlgorithm lock p =
   testGroup n
-    [ testProperty "sodium and cryptonite work the same" $ prop_libsodium_model @h lock Proxy
+    [ testProperty "sodium and crypton work the same" $ prop_libsodium_model @h lock Proxy
     ]
     where n = hashAlgorithmName p
 
