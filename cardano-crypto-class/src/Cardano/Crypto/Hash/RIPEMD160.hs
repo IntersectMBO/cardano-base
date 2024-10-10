@@ -9,7 +9,7 @@ module Cardano.Crypto.Hash.RIPEMD160
   where
 
 import Cardano.Crypto.Hash.Class
-import qualified "cryptonite" Crypto.Hash as H
+import qualified "crypton" Crypto.Hash as H
 import qualified Data.ByteArray as BA
 
 data RIPEMD160
