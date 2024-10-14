@@ -1,0 +1,1114 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveTraversable #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Slotting.Slot</span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#SlotNo"><span class="hs-identifier">SlotNo</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier">WithOrigin</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#at"><span class="hs-identifier">at</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#origin"><span class="hs-identifier">origin</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#fromWithOrigin"><span class="hs-identifier">fromWithOrigin</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#withOrigin"><span class="hs-identifier">withOrigin</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#withOriginToMaybe"><span class="hs-identifier">withOriginToMaybe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-17"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#withOriginFromMaybe"><span class="hs-identifier">withOriginFromMaybe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-18"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier">EpochNo</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-19"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochSize"><span class="hs-identifier">EpochSize</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-20"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochInterval"><span class="hs-identifier">EpochInterval</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#binOpEpochNo"><span class="hs-identifier">binOpEpochNo</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#addEpochInterval"><span class="hs-identifier">addEpochInterval</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">Cardano.Binary</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier">Codec.Serialise</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier">Serialise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">rnf</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier">FromJSON</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier">ToJSON</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier">Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier">String</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Data.Typeable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Typeable</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Data.Word</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Word64</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Word32</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier">Quiet</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier">Quiet</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-9cd7d5c278d8e3188521cfa83d6fa94dddccffbdc0f87b5862cf3cc8cadc66b2/share/doc/html/src"><span class="hs-identifier">NoThunks.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-9cd7d5c278d8e3188521cfa83d6fa94dddccffbdc0f87b5862cf3cc8cadc66b2/share/doc/html/src"><span class="hs-identifier">NoThunks</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- | The 0-based index for the Ourboros time slot.</span><span>
+</span><span id="line-37"></span><span id="local-6989586621679111880"><span id="local-6989586621679111881"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="SlotNo"><span class="annot"><a href="Cardano.Slotting.Slot.html#SlotNo"><span class="hs-identifier hs-var">SlotNo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SlotNo"><span class="annot"><a href="Cardano.Slotting.Slot.html#SlotNo"><span class="hs-identifier hs-var">SlotNo</span></a></span></span><span> </span><span class="hs-special">{</span><span id="unSlotNo"><span class="annot"><span class="annottext">SlotNo -&gt; Word64
+</span><a href="Cardano.Slotting.Slot.html#unSlotNo"><span class="hs-identifier hs-var hs-var">unSlotNo</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word64</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111872"><span id="local-6989586621679111876"><span class="annot"><span class="annottext">SlotNo -&gt; SlotNo -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SlotNo -&gt; SlotNo -&gt; Bool
+$c/= :: SlotNo -&gt; SlotNo -&gt; Bool
+== :: SlotNo -&gt; SlotNo -&gt; Bool
+$c== :: SlotNo -&gt; SlotNo -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111849"><span id="local-6989586621679111851"><span id="local-6989586621679111854"><span id="local-6989586621679111857"><span id="local-6989586621679111860"><span id="local-6989586621679111863"><span id="local-6989586621679111867"><span class="annot"><span class="annottext">Eq SlotNo
+SlotNo -&gt; SlotNo -&gt; Bool
+SlotNo -&gt; SlotNo -&gt; Ordering
+SlotNo -&gt; SlotNo -&gt; SlotNo
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: SlotNo -&gt; SlotNo -&gt; SlotNo
+$cmin :: SlotNo -&gt; SlotNo -&gt; SlotNo
+max :: SlotNo -&gt; SlotNo -&gt; SlotNo
+$cmax :: SlotNo -&gt; SlotNo -&gt; SlotNo
+&gt;= :: SlotNo -&gt; SlotNo -&gt; Bool
+$c&gt;= :: SlotNo -&gt; SlotNo -&gt; Bool
+&gt; :: SlotNo -&gt; SlotNo -&gt; Bool
+$c&gt; :: SlotNo -&gt; SlotNo -&gt; Bool
+&lt;= :: SlotNo -&gt; SlotNo -&gt; Bool
+$c&lt;= :: SlotNo -&gt; SlotNo -&gt; Bool
+&lt; :: SlotNo -&gt; SlotNo -&gt; Bool
+$c&lt; :: SlotNo -&gt; SlotNo -&gt; Bool
+compare :: SlotNo -&gt; SlotNo -&gt; Ordering
+$ccompare :: SlotNo -&gt; SlotNo -&gt; Ordering
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep SlotNo x -&gt; SlotNo
+forall x. SlotNo -&gt; Rep SlotNo x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SlotNo x -&gt; SlotNo
+$cfrom :: forall x. SlotNo -&gt; Rep SlotNo x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679111829"><span id="local-6989586621679111835"><span id="local-6989586621679111842"><span class="annot"><span class="annottext">Int -&gt; SlotNo -&gt; ShowS
+[SlotNo] -&gt; ShowS
+SlotNo -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SlotNo] -&gt; ShowS
+$cshowList :: [SlotNo] -&gt; ShowS
+show :: SlotNo -&gt; String
+$cshow :: SlotNo -&gt; String
+showsPrec :: Int -&gt; SlotNo -&gt; ShowS
+$cshowsPrec :: Int -&gt; SlotNo -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#SlotNo"><span class="hs-identifier hs-type">SlotNo</span></a></span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111757"><span id="local-6989586621679111761"><span id="local-6989586621679111765"><span id="local-6989586621679111769"><span id="local-6989586621679111773"><span id="local-6989586621679111777"><span id="local-6989586621679111781"><span id="local-6989586621679111786"><span class="annot"><span class="annottext">Int -&gt; SlotNo
+SlotNo -&gt; Int
+SlotNo -&gt; [SlotNo]
+SlotNo -&gt; SlotNo
+SlotNo -&gt; SlotNo -&gt; [SlotNo]
+SlotNo -&gt; SlotNo -&gt; SlotNo -&gt; [SlotNo]
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+enumFromThenTo :: SlotNo -&gt; SlotNo -&gt; SlotNo -&gt; [SlotNo]
+$cenumFromThenTo :: SlotNo -&gt; SlotNo -&gt; SlotNo -&gt; [SlotNo]
+enumFromTo :: SlotNo -&gt; SlotNo -&gt; [SlotNo]
+$cenumFromTo :: SlotNo -&gt; SlotNo -&gt; [SlotNo]
+enumFromThen :: SlotNo -&gt; SlotNo -&gt; [SlotNo]
+$cenumFromThen :: SlotNo -&gt; SlotNo -&gt; [SlotNo]
+enumFrom :: SlotNo -&gt; [SlotNo]
+$cenumFrom :: SlotNo -&gt; [SlotNo]
+fromEnum :: SlotNo -&gt; Int
+$cfromEnum :: SlotNo -&gt; Int
+toEnum :: Int -&gt; SlotNo
+$ctoEnum :: Int -&gt; SlotNo
+pred :: SlotNo -&gt; SlotNo
+$cpred :: SlotNo -&gt; SlotNo
+succ :: SlotNo -&gt; SlotNo
+$csucc :: SlotNo -&gt; SlotNo
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></a></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111746"><span id="local-6989586621679111751"><span class="annot"><span class="annottext">SlotNo
+forall a. a -&gt; a -&gt; Bounded a
+maxBound :: SlotNo
+$cmaxBound :: SlotNo
+minBound :: SlotNo
+$cminBound :: SlotNo
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111716"><span id="local-6989586621679111720"><span id="local-6989586621679111724"><span id="local-6989586621679111728"><span id="local-6989586621679111732"><span id="local-6989586621679111736"><span id="local-6989586621679111740"><span class="annot"><span class="annottext">Integer -&gt; SlotNo
+SlotNo -&gt; SlotNo
+SlotNo -&gt; SlotNo -&gt; SlotNo
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Integer -&gt; a)
+-&gt; Num a
+fromInteger :: Integer -&gt; SlotNo
+$cfromInteger :: Integer -&gt; SlotNo
+signum :: SlotNo -&gt; SlotNo
+$csignum :: SlotNo -&gt; SlotNo
+abs :: SlotNo -&gt; SlotNo
+$cabs :: SlotNo -&gt; SlotNo
+negate :: SlotNo -&gt; SlotNo
+$cnegate :: SlotNo -&gt; SlotNo
+* :: SlotNo -&gt; SlotNo -&gt; SlotNo
+$c* :: SlotNo -&gt; SlotNo -&gt; SlotNo
+- :: SlotNo -&gt; SlotNo -&gt; SlotNo
+$c- :: SlotNo -&gt; SlotNo -&gt; SlotNo
++ :: SlotNo -&gt; SlotNo -&gt; SlotNo
+$c+ :: SlotNo -&gt; SlotNo -&gt; SlotNo
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Num</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111710"><span class="annot"><span class="annottext">SlotNo -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: SlotNo -&gt; ()
+$crnf :: SlotNo -&gt; ()
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111690"><span id="local-6989586621679111694"><span id="local-6989586621679111698"><span id="local-6989586621679111703"><span class="annot"><span class="annottext">[SlotNo] -&gt; Encoding
+SlotNo -&gt; Encoding
+forall s. Decoder s [SlotNo]
+forall s. Decoder s SlotNo
+forall a.
+(a -&gt; Encoding)
+-&gt; (forall s. Decoder s a)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (forall s. Decoder s [a])
+-&gt; Serialise a
+decodeList :: forall s. Decoder s [SlotNo]
+$cdecodeList :: forall s. Decoder s [SlotNo]
+encodeList :: [SlotNo] -&gt; Encoding
+$cencodeList :: [SlotNo] -&gt; Encoding
+decode :: forall s. Decoder s SlotNo
+$cdecode :: forall s. Decoder s SlotNo
+encode :: SlotNo -&gt; Encoding
+$cencode :: SlotNo -&gt; Encoding
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Serialise</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111675"><span id="local-6989586621679111679"><span id="local-6989586621679111684"><span class="annot"><span class="annottext">Context -&gt; SlotNo -&gt; IO (Maybe ThunkInfo)
+Proxy SlotNo -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy SlotNo -&gt; String
+$cshowTypeOf :: Proxy SlotNo -&gt; String
+wNoThunks :: Context -&gt; SlotNo -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SlotNo -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SlotNo -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SlotNo -&gt; IO (Maybe ThunkInfo)
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-9cd7d5c278d8e3188521cfa83d6fa94dddccffbdc0f87b5862cf3cc8cadc66b2/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111652"><span id="local-6989586621679111656"><span id="local-6989586621679111660"><span id="local-6989586621679111664"><span id="local-6989586621679111669"><span class="annot"><span class="annottext">[SlotNo] -&gt; Encoding
+[SlotNo] -&gt; Value
+SlotNo -&gt; Bool
+SlotNo -&gt; Encoding
+SlotNo -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (a -&gt; Bool)
+-&gt; ToJSON a
+omitField :: SlotNo -&gt; Bool
+$comitField :: SlotNo -&gt; Bool
+toEncodingList :: [SlotNo] -&gt; Encoding
+$ctoEncodingList :: [SlotNo] -&gt; Encoding
+toJSONList :: [SlotNo] -&gt; Value
+$ctoJSONList :: [SlotNo] -&gt; Value
+toEncoding :: SlotNo -&gt; Encoding
+$ctoEncoding :: SlotNo -&gt; Encoding
+toJSON :: SlotNo -&gt; Value
+$ctoJSON :: SlotNo -&gt; Value
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111637"><span id="local-6989586621679111641"><span id="local-6989586621679111646"><span class="annot"><span class="annottext">Maybe SlotNo
+Value -&gt; Parser [SlotNo]
+Value -&gt; Parser SlotNo
+forall a.
+(Value -&gt; Parser a)
+-&gt; (Value -&gt; Parser [a]) -&gt; Maybe a -&gt; FromJSON a
+omittedField :: Maybe SlotNo
+$comittedField :: Maybe SlotNo
+parseJSONList :: Value -&gt; Parser [SlotNo]
+$cparseJSONList :: Value -&gt; Parser [SlotNo]
+parseJSON :: Value -&gt; Parser SlotNo
+$cparseJSON :: Value -&gt; Parser SlotNo
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111627"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#SlotNo"><span class="hs-identifier hs-type">SlotNo</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-43"></span><span>  </span><span id="local-6989586621679111624"><span class="annot"><span class="annottext">toCBOR :: SlotNo -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Serialise a =&gt; a -&gt; Encoding
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span>
+</span><span id="line-44"></span><span>  </span><span id="local-6989586621679111617"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy SlotNo -&gt; Size
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span id="local-6989586621679111615"><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><a href="#local-6989586621679111615"><span class="hs-identifier hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a.
+ToCBOR a =&gt;
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy a -&gt; Size
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">encodedSizeExpr</span></a></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><a href="#local-6989586621679111615"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">SlotNo -&gt; Word64
+</span><a href="Cardano.Slotting.Slot.html#unSlotNo"><span class="hs-identifier hs-var">unSlotNo</span></a></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111607"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#SlotNo"><span class="hs-identifier hs-type">SlotNo</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-47"></span><span>  </span><span id="local-6989586621679111604"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s SlotNo
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a s. Serialise a =&gt; Decoder s a
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">{-------------------------------------------------------------------------------
+  WithOrigin
+-------------------------------------------------------------------------------}</span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span id="local-6989586621679111600"><span id="local-6989586621679111601"></span></span><span class="hs-keyword">data</span><span> </span><span id="WithOrigin"><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-var">WithOrigin</span></a></span></span><span> </span><span id="local-6989586621679112151"><span class="annot"><a href="#local-6989586621679112151"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Origin"><span class="annot"><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="At"><span class="annot"><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-var">At</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="#local-6989586621679112151"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-keyword">deriving</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679111593"><span id="local-6989586621679111596"><span class="annot"><span class="annottext">WithOrigin t -&gt; WithOrigin t -&gt; Bool
+forall t. Eq t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: WithOrigin t -&gt; WithOrigin t -&gt; Bool
+$c/= :: forall t. Eq t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+== :: WithOrigin t -&gt; WithOrigin t -&gt; Bool
+$c== :: forall t. Eq t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-56"></span><span>      </span><span id="local-6989586621679111572"><span id="local-6989586621679111574"><span id="local-6989586621679111577"><span id="local-6989586621679111580"><span id="local-6989586621679111583"><span id="local-6989586621679111586"><span id="local-6989586621679111589"><span class="annot"><span class="annottext">WithOrigin t -&gt; WithOrigin t -&gt; Bool
+WithOrigin t -&gt; WithOrigin t -&gt; Ordering
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall {t}. Ord t =&gt; Eq (WithOrigin t)
+forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Ordering
+forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; WithOrigin t
+min :: WithOrigin t -&gt; WithOrigin t -&gt; WithOrigin t
+$cmin :: forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; WithOrigin t
+max :: WithOrigin t -&gt; WithOrigin t -&gt; WithOrigin t
+$cmax :: forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; WithOrigin t
+&gt;= :: WithOrigin t -&gt; WithOrigin t -&gt; Bool
+$c&gt;= :: forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+&gt; :: WithOrigin t -&gt; WithOrigin t -&gt; Bool
+$c&gt; :: forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+&lt;= :: WithOrigin t -&gt; WithOrigin t -&gt; Bool
+$c&lt;= :: forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+&lt; :: WithOrigin t -&gt; WithOrigin t -&gt; Bool
+$c&lt; :: forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Bool
+compare :: WithOrigin t -&gt; WithOrigin t -&gt; Ordering
+$ccompare :: forall t. Ord t =&gt; WithOrigin t -&gt; WithOrigin t -&gt; Ordering
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-57"></span><span>      </span><span id="local-6989586621679111563"><span id="local-6989586621679111565"><span id="local-6989586621679111570"><span class="annot"><span class="annottext">Int -&gt; WithOrigin t -&gt; ShowS
+forall t. Show t =&gt; Int -&gt; WithOrigin t -&gt; ShowS
+forall t. Show t =&gt; [WithOrigin t] -&gt; ShowS
+forall t. Show t =&gt; WithOrigin t -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [WithOrigin t] -&gt; ShowS
+$cshowList :: forall t. Show t =&gt; [WithOrigin t] -&gt; ShowS
+show :: WithOrigin t -&gt; String
+$cshow :: forall t. Show t =&gt; WithOrigin t -&gt; String
+showsPrec :: Int -&gt; WithOrigin t -&gt; ShowS
+$cshowsPrec :: forall t. Show t =&gt; Int -&gt; WithOrigin t -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-58"></span><span>      </span><span class="annot"><span class="annottext">forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall t x. Rep (WithOrigin t) x -&gt; WithOrigin t
+forall t x. WithOrigin t -&gt; Rep (WithOrigin t) x
+$cto :: forall t x. Rep (WithOrigin t) x -&gt; WithOrigin t
+$cfrom :: forall t x. WithOrigin t -&gt; Rep (WithOrigin t) x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-59"></span><span>      </span><span id="local-6989586621679111557"><span id="local-6989586621679111559"><span class="annot"><span class="annottext">forall a b. a -&gt; WithOrigin b -&gt; WithOrigin a
+forall a b. (a -&gt; b) -&gt; WithOrigin a -&gt; WithOrigin b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: forall a b. a -&gt; WithOrigin b -&gt; WithOrigin a
+$c&lt;$ :: forall a b. a -&gt; WithOrigin b -&gt; WithOrigin a
+fmap :: forall a b. (a -&gt; b) -&gt; WithOrigin a -&gt; WithOrigin b
+$cfmap :: forall a b. (a -&gt; b) -&gt; WithOrigin a -&gt; WithOrigin b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-60"></span><span>      </span><span id="local-6989586621679111519"><span id="local-6989586621679111521"><span id="local-6989586621679111523"><span id="local-6989586621679111525"><span id="local-6989586621679111527"><span id="local-6989586621679111529"><span id="local-6989586621679111531"><span id="local-6989586621679111533"><span id="local-6989586621679111535"><span id="local-6989586621679111537"><span id="local-6989586621679111539"><span id="local-6989586621679111541"><span id="local-6989586621679111543"><span id="local-6989586621679111545"><span id="local-6989586621679111547"><span id="local-6989586621679111551"><span id="local-6989586621679111553"><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; WithOrigin a -&gt; Bool
+forall a. Num a =&gt; WithOrigin a -&gt; a
+forall a. Ord a =&gt; WithOrigin a -&gt; a
+forall m. Monoid m =&gt; WithOrigin m -&gt; m
+forall a. WithOrigin a -&gt; Bool
+forall a. WithOrigin a -&gt; Int
+forall a. WithOrigin a -&gt; [a]
+forall a. (a -&gt; a -&gt; a) -&gt; WithOrigin a -&gt; a
+forall m a. Monoid m =&gt; (a -&gt; m) -&gt; WithOrigin a -&gt; m
+forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+forall (t :: * -&gt; *).
+(forall m. Monoid m =&gt; t m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. t a -&gt; [a])
+-&gt; (forall a. t a -&gt; Bool)
+-&gt; (forall a. t a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; t a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; Foldable t
+product :: forall a. Num a =&gt; WithOrigin a -&gt; a
+$cproduct :: forall a. Num a =&gt; WithOrigin a -&gt; a
+sum :: forall a. Num a =&gt; WithOrigin a -&gt; a
+$csum :: forall a. Num a =&gt; WithOrigin a -&gt; a
+minimum :: forall a. Ord a =&gt; WithOrigin a -&gt; a
+$cminimum :: forall a. Ord a =&gt; WithOrigin a -&gt; a
+maximum :: forall a. Ord a =&gt; WithOrigin a -&gt; a
+$cmaximum :: forall a. Ord a =&gt; WithOrigin a -&gt; a
+elem :: forall a. Eq a =&gt; a -&gt; WithOrigin a -&gt; Bool
+$celem :: forall a. Eq a =&gt; a -&gt; WithOrigin a -&gt; Bool
+length :: forall a. WithOrigin a -&gt; Int
+$clength :: forall a. WithOrigin a -&gt; Int
+null :: forall a. WithOrigin a -&gt; Bool
+$cnull :: forall a. WithOrigin a -&gt; Bool
+toList :: forall a. WithOrigin a -&gt; [a]
+$ctoList :: forall a. WithOrigin a -&gt; [a]
+foldl1 :: forall a. (a -&gt; a -&gt; a) -&gt; WithOrigin a -&gt; a
+$cfoldl1 :: forall a. (a -&gt; a -&gt; a) -&gt; WithOrigin a -&gt; a
+foldr1 :: forall a. (a -&gt; a -&gt; a) -&gt; WithOrigin a -&gt; a
+$cfoldr1 :: forall a. (a -&gt; a -&gt; a) -&gt; WithOrigin a -&gt; a
+foldl' :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+$cfoldl' :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+foldl :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+$cfoldl :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+foldr' :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+$cfoldr' :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+foldr :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+$cfoldr :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; WithOrigin a -&gt; b
+foldMap' :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; WithOrigin a -&gt; m
+$cfoldMap' :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; WithOrigin a -&gt; m
+foldMap :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; WithOrigin a -&gt; m
+$cfoldMap :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; WithOrigin a -&gt; m
+fold :: forall m. Monoid m =&gt; WithOrigin m -&gt; m
+$cfold :: forall m. Monoid m =&gt; WithOrigin m -&gt; m
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Foldable</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-61"></span><span>      </span><span id="local-6989586621679111502"><span id="local-6989586621679111504"><span id="local-6989586621679111506"><span id="local-6989586621679111512"><span class="annot"><span class="annottext">Functor WithOrigin
+Foldable WithOrigin
+forall (t :: * -&gt; *).
+Functor t
+-&gt; Foldable t
+-&gt; (forall (f :: * -&gt; *) a b.
+    Applicative f =&gt;
+    (a -&gt; f b) -&gt; t a -&gt; f (t b))
+-&gt; (forall (f :: * -&gt; *) a. Applicative f =&gt; t (f a) -&gt; f (t a))
+-&gt; (forall (m :: * -&gt; *) a b.
+    Monad m =&gt;
+    (a -&gt; m b) -&gt; t a -&gt; m (t b))
+-&gt; (forall (m :: * -&gt; *) a. Monad m =&gt; t (m a) -&gt; m (t a))
+-&gt; Traversable t
+forall (m :: * -&gt; *) a.
+Monad m =&gt;
+WithOrigin (m a) -&gt; m (WithOrigin a)
+forall (f :: * -&gt; *) a.
+Applicative f =&gt;
+WithOrigin (f a) -&gt; f (WithOrigin a)
+forall (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; WithOrigin a -&gt; m (WithOrigin b)
+forall (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; WithOrigin a -&gt; f (WithOrigin b)
+sequence :: forall (m :: * -&gt; *) a.
+Monad m =&gt;
+WithOrigin (m a) -&gt; m (WithOrigin a)
+$csequence :: forall (m :: * -&gt; *) a.
+Monad m =&gt;
+WithOrigin (m a) -&gt; m (WithOrigin a)
+mapM :: forall (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; WithOrigin a -&gt; m (WithOrigin b)
+$cmapM :: forall (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; WithOrigin a -&gt; m (WithOrigin b)
+sequenceA :: forall (f :: * -&gt; *) a.
+Applicative f =&gt;
+WithOrigin (f a) -&gt; f (WithOrigin a)
+$csequenceA :: forall (f :: * -&gt; *) a.
+Applicative f =&gt;
+WithOrigin (f a) -&gt; f (WithOrigin a)
+traverse :: forall (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; WithOrigin a -&gt; f (WithOrigin b)
+$ctraverse :: forall (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; WithOrigin a -&gt; f (WithOrigin b)
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Traversable</span></a></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-62"></span><span>      </span><span id="local-6989586621679111492"><span id="local-6989586621679111494"><span id="local-6989586621679111496"><span id="local-6989586621679111498"><span class="annot"><span class="annottext">forall t. Serialise t =&gt; [WithOrigin t] -&gt; Encoding
+forall t. Serialise t =&gt; WithOrigin t -&gt; Encoding
+forall t s. Serialise t =&gt; Decoder s [WithOrigin t]
+forall t s. Serialise t =&gt; Decoder s (WithOrigin t)
+forall a.
+(a -&gt; Encoding)
+-&gt; (forall s. Decoder s a)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (forall s. Decoder s [a])
+-&gt; Serialise a
+decodeList :: forall s. Decoder s [WithOrigin t]
+$cdecodeList :: forall t s. Serialise t =&gt; Decoder s [WithOrigin t]
+encodeList :: [WithOrigin t] -&gt; Encoding
+$cencodeList :: forall t. Serialise t =&gt; [WithOrigin t] -&gt; Encoding
+decode :: forall s. Decoder s (WithOrigin t)
+$cdecode :: forall t s. Serialise t =&gt; Decoder s (WithOrigin t)
+encode :: WithOrigin t -&gt; Encoding
+$cencode :: forall t. Serialise t =&gt; WithOrigin t -&gt; Encoding
+</span><a href="#local-6989586621679111492"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Serialise</span></a></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-63"></span><span>      </span><span id="local-6989586621679111486"><span id="local-6989586621679111488"><span id="local-6989586621679111490"><span class="annot"><span class="annottext">forall t.
+NoThunks t =&gt;
+Context -&gt; WithOrigin t -&gt; IO (Maybe ThunkInfo)
+forall t. NoThunks t =&gt; Proxy (WithOrigin t) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (WithOrigin t) -&gt; String
+$cshowTypeOf :: forall t. NoThunks t =&gt; Proxy (WithOrigin t) -&gt; String
+wNoThunks :: Context -&gt; WithOrigin t -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: forall t.
+NoThunks t =&gt;
+Context -&gt; WithOrigin t -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; WithOrigin t -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: forall t.
+NoThunks t =&gt;
+Context -&gt; WithOrigin t -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679111486"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111478"><span id="local-6989586621679111480"><span id="local-6989586621679112114"><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier hs-type">Serialise</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112114"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112114"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112114"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-67"></span><span>  </span><span id="local-6989586621679111476"><span class="annot"><span class="annottext">toCBOR :: WithOrigin t -&gt; Encoding
+</span><a href="#local-6989586621679111476"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Serialise a =&gt; a -&gt; Encoding
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111470"><span id="local-6989586621679112113"><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier hs-type">Serialise</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112113"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112113"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112113"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-70"></span><span>  </span><span id="local-6989586621679111468"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (WithOrigin t)
+</span><a href="#local-6989586621679111468"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a s. Serialise a =&gt; Decoder s a
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-d006a7b431d0783134d21c93c49785fd8b36040352af8ad253b49dd81e1ae947/share/doc/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679112111"><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Bounded</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112111"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Bounded</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112111"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-73"></span><span>  </span><span id="local-6989586621679111463"><span class="annot"><span class="annottext">minBound :: WithOrigin t
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">minBound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall t. WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span>
+</span><span id="line-74"></span><span>  </span><span id="local-6989586621679111460"><span class="annot"><span class="annottext">maxBound :: WithOrigin t
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">maxBound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall t. t -&gt; WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-var">At</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Bounded a =&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">maxBound</span></a></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679112109"><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-type">NFData</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112109"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-type">NFData</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112109"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-77"></span><span>  </span><span id="local-6989586621679111454"><span class="annot"><span class="annottext">rnf :: WithOrigin a -&gt; ()
+</span><a href="#local-6989586621679111454"><span class="hs-identifier hs-var hs-var hs-var hs-var">rnf</span></a></span></span><span> </span><span class="annot"><span class="annottext">WithOrigin a
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>  </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var">rnf</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-type">At</span></a></span><span> </span><span id="local-6989586621679111453"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679111453"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. NFData a =&gt; a -&gt; ()
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var">rnf</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679111453"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111444"><span id="local-6989586621679111446"><span id="local-6989586621679111448"><span id="local-6989586621679111450"><span id="local-6989586621679112108"><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-type">ToJSON</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112108"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-type">ToJSON</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112108"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-81"></span><span>  </span><span id="local-6989586621679111440"><span class="annot"><span class="annottext">toJSON :: WithOrigin a -&gt; Value
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-82"></span><span>    </span><span class="annot"><span class="annottext">WithOrigin a
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Value
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-var">String</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;origin&quot;</span></span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-type">At</span></a></span><span> </span><span id="local-6989586621679111438"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679111438"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. ToJSON a =&gt; a -&gt; Value
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-var">toJSON</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679111438"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111433"><span id="local-6989586621679111435"><span id="local-6989586621679112107"><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-type">FromJSON</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112107"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-type">FromJSON</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112107"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-86"></span><span>  </span><span id="local-6989586621679111424"><span class="annot"><span class="annottext">parseJSON :: Value -&gt; Parser (WithOrigin a)
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">parseJSON</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-87"></span><span>    </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;origin&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall t. WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span>
+</span><span id="line-88"></span><span>    </span><span id="local-6989586621679111422"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679111422"><span class="hs-identifier hs-var">value</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall t. t -&gt; WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-var">At</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. FromJSON a =&gt; Value -&gt; Parser a
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-2004b0b948cb55e8ba23822910366edfd68fe1ba8cee7418966154fc8a04f5a5/share/doc/html/src"><span class="hs-identifier hs-var">parseJSON</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679111422"><span class="hs-identifier hs-var">value</span></a></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span id="local-6989586621679111420"><span class="annot"><a href="Cardano.Slotting.Slot.html#at"><span class="hs-identifier hs-type">at</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679111420"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111420"><span class="hs-identifier hs-type">t</span></a></span></span><span>
+</span><span id="line-91"></span><span id="at"><span class="annot"><span class="annottext">at :: forall t. t -&gt; WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#at"><span class="hs-identifier hs-var hs-var">at</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall t. t -&gt; WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-var">At</span></a></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span id="local-6989586621679111419"><span class="annot"><a href="Cardano.Slotting.Slot.html#origin"><span class="hs-identifier hs-type">origin</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111419"><span class="hs-identifier hs-type">t</span></a></span></span><span>
+</span><span id="line-94"></span><span id="origin"><span class="annot"><span class="annottext">origin :: forall t. WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#origin"><span class="hs-identifier hs-var hs-var">origin</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall t. WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span id="local-6989586621679112102"><span class="annot"><a href="Cardano.Slotting.Slot.html#fromWithOrigin"><span class="hs-identifier hs-type">fromWithOrigin</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679112102"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112102"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679112102"><span class="hs-identifier hs-type">t</span></a></span></span><span>
+</span><span id="line-97"></span><span id="fromWithOrigin"><span class="annot"><span class="annottext">fromWithOrigin :: forall t. t -&gt; WithOrigin t -&gt; t
+</span><a href="Cardano.Slotting.Slot.html#fromWithOrigin"><span class="hs-identifier hs-var hs-var">fromWithOrigin</span></a></span></span><span> </span><span id="local-6989586621679111418"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111418"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="annot"><span class="annottext">WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111418"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-98"></span><span class="annot"><a href="Cardano.Slotting.Slot.html#fromWithOrigin"><span class="hs-identifier hs-var">fromWithOrigin</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-type">At</span></a></span><span> </span><span id="local-6989586621679111417"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111417"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111417"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span id="local-6989586621679112099"><span id="local-6989586621679112100"><span class="annot"><a href="Cardano.Slotting.Slot.html#withOrigin"><span class="hs-identifier hs-type">withOrigin</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679112100"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679112099"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679112100"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112099"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679112100"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-101"></span><span id="withOrigin"><span class="annot"><span class="annottext">withOrigin :: forall b t. b -&gt; (t -&gt; b) -&gt; WithOrigin t -&gt; b
+</span><a href="Cardano.Slotting.Slot.html#withOrigin"><span class="hs-identifier hs-var hs-var">withOrigin</span></a></span></span><span> </span><span id="local-6989586621679111416"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679111416"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">t -&gt; b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679111416"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-102"></span><span class="annot"><a href="Cardano.Slotting.Slot.html#withOrigin"><span class="hs-identifier hs-var">withOrigin</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679111415"><span class="annot"><span class="annottext">t -&gt; b
+</span><a href="#local-6989586621679111415"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-type">At</span></a></span><span> </span><span id="local-6989586621679111414"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111414"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">t -&gt; b
+</span><a href="#local-6989586621679111415"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111414"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span id="local-6989586621679112096"><span class="annot"><a href="Cardano.Slotting.Slot.html#withOriginToMaybe"><span class="hs-identifier hs-type">withOriginToMaybe</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112096"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112096"><span class="hs-identifier hs-type">t</span></a></span></span><span>
+</span><span id="line-105"></span><span id="withOriginToMaybe"><span class="annot"><span class="annottext">withOriginToMaybe :: forall t. WithOrigin t -&gt; Maybe t
+</span><a href="Cardano.Slotting.Slot.html#withOriginToMaybe"><span class="hs-identifier hs-var hs-var">withOriginToMaybe</span></a></span></span><span> </span><span class="annot"><span class="annottext">WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-106"></span><span class="annot"><a href="Cardano.Slotting.Slot.html#withOriginToMaybe"><span class="hs-identifier hs-var">withOriginToMaybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-type">At</span></a></span><span> </span><span id="local-6989586621679111413"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111413"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111413"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span id="local-6989586621679112093"><span class="annot"><a href="Cardano.Slotting.Slot.html#withOriginFromMaybe"><span class="hs-identifier hs-type">withOriginFromMaybe</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112093"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#WithOrigin"><span class="hs-identifier hs-type">WithOrigin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679112093"><span class="hs-identifier hs-type">t</span></a></span></span><span>
+</span><span id="line-109"></span><span id="withOriginFromMaybe"><span class="annot"><span class="annottext">withOriginFromMaybe :: forall t. Maybe t -&gt; WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#withOriginFromMaybe"><span class="hs-identifier hs-var hs-var">withOriginFromMaybe</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe t
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall t. WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#Origin"><span class="hs-identifier hs-var">Origin</span></a></span><span>
+</span><span id="line-110"></span><span class="annot"><a href="Cardano.Slotting.Slot.html#withOriginFromMaybe"><span class="hs-identifier hs-var">withOriginFromMaybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679111412"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111412"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall t. t -&gt; WithOrigin t
+</span><a href="Cardano.Slotting.Slot.html#At"><span class="hs-identifier hs-var">At</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679111412"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">{-------------------------------------------------------------------------------
+  Epochs
+-------------------------------------------------------------------------------}</span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- | An epoch, i.e. the number of the epoch.</span><span>
+</span><span id="line-117"></span><span id="local-6989586621679111410"><span id="local-6989586621679111411"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="EpochNo"><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-var">EpochNo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="EpochNo"><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-var">EpochNo</span></a></span></span><span> </span><span class="hs-special">{</span><span id="unEpochNo"><span class="annot"><span class="annottext">EpochNo -&gt; Word64
+</span><a href="Cardano.Slotting.Slot.html#unEpochNo"><span class="hs-identifier hs-var hs-var">unEpochNo</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word64</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-118"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111403"><span id="local-6989586621679111406"><span class="annot"><span class="annottext">EpochNo -&gt; EpochNo -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: EpochNo -&gt; EpochNo -&gt; Bool
+$c/= :: EpochNo -&gt; EpochNo -&gt; Bool
+== :: EpochNo -&gt; EpochNo -&gt; Bool
+$c== :: EpochNo -&gt; EpochNo -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111382"><span id="local-6989586621679111384"><span id="local-6989586621679111387"><span id="local-6989586621679111390"><span id="local-6989586621679111393"><span id="local-6989586621679111396"><span id="local-6989586621679111399"><span class="annot"><span class="annottext">Eq EpochNo
+EpochNo -&gt; EpochNo -&gt; Bool
+EpochNo -&gt; EpochNo -&gt; Ordering
+EpochNo -&gt; EpochNo -&gt; EpochNo
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: EpochNo -&gt; EpochNo -&gt; EpochNo
+$cmin :: EpochNo -&gt; EpochNo -&gt; EpochNo
+max :: EpochNo -&gt; EpochNo -&gt; EpochNo
+$cmax :: EpochNo -&gt; EpochNo -&gt; EpochNo
+&gt;= :: EpochNo -&gt; EpochNo -&gt; Bool
+$c&gt;= :: EpochNo -&gt; EpochNo -&gt; Bool
+&gt; :: EpochNo -&gt; EpochNo -&gt; Bool
+$c&gt; :: EpochNo -&gt; EpochNo -&gt; Bool
+&lt;= :: EpochNo -&gt; EpochNo -&gt; Bool
+$c&lt;= :: EpochNo -&gt; EpochNo -&gt; Bool
+&lt; :: EpochNo -&gt; EpochNo -&gt; Bool
+$c&lt; :: EpochNo -&gt; EpochNo -&gt; Bool
+compare :: EpochNo -&gt; EpochNo -&gt; Ordering
+$ccompare :: EpochNo -&gt; EpochNo -&gt; Ordering
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep EpochNo x -&gt; EpochNo
+forall x. EpochNo -&gt; Rep EpochNo x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep EpochNo x -&gt; EpochNo
+$cfrom :: forall x. EpochNo -&gt; Rep EpochNo x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-119"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679111365"><span id="local-6989586621679111371"><span id="local-6989586621679111377"><span class="annot"><span class="annottext">Int -&gt; EpochNo -&gt; ShowS
+[EpochNo] -&gt; ShowS
+EpochNo -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [EpochNo] -&gt; ShowS
+$cshowList :: [EpochNo] -&gt; ShowS
+show :: EpochNo -&gt; String
+$cshow :: EpochNo -&gt; String
+showsPrec :: Int -&gt; EpochNo -&gt; ShowS
+$cshowsPrec :: Int -&gt; EpochNo -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-type">EpochNo</span></a></span><span>
+</span><span id="line-120"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111303"><span id="local-6989586621679111307"><span id="local-6989586621679111311"><span id="local-6989586621679111315"><span id="local-6989586621679111319"><span id="local-6989586621679111323"><span id="local-6989586621679111327"><span id="local-6989586621679111331"><span class="annot"><span class="annottext">Int -&gt; EpochNo
+EpochNo -&gt; Int
+EpochNo -&gt; [EpochNo]
+EpochNo -&gt; EpochNo
+EpochNo -&gt; EpochNo -&gt; [EpochNo]
+EpochNo -&gt; EpochNo -&gt; EpochNo -&gt; [EpochNo]
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+enumFromThenTo :: EpochNo -&gt; EpochNo -&gt; EpochNo -&gt; [EpochNo]
+$cenumFromThenTo :: EpochNo -&gt; EpochNo -&gt; EpochNo -&gt; [EpochNo]
+enumFromTo :: EpochNo -&gt; EpochNo -&gt; [EpochNo]
+$cenumFromTo :: EpochNo -&gt; EpochNo -&gt; [EpochNo]
+enumFromThen :: EpochNo -&gt; EpochNo -&gt; [EpochNo]
+$cenumFromThen :: EpochNo -&gt; EpochNo -&gt; [EpochNo]
+enumFrom :: EpochNo -&gt; [EpochNo]
+$cenumFrom :: EpochNo -&gt; [EpochNo]
+fromEnum :: EpochNo -&gt; Int
+$cfromEnum :: EpochNo -&gt; Int
+toEnum :: Int -&gt; EpochNo
+$ctoEnum :: Int -&gt; EpochNo
+pred :: EpochNo -&gt; EpochNo
+$cpred :: EpochNo -&gt; EpochNo
+succ :: EpochNo -&gt; EpochNo
+$csucc :: EpochNo -&gt; EpochNo
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></a></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111286"><span id="local-6989586621679111290"><span id="local-6989586621679111294"><span id="local-6989586621679111298"><span class="annot"><span class="annottext">[EpochNo] -&gt; Encoding
+EpochNo -&gt; Encoding
+forall s. Decoder s [EpochNo]
+forall s. Decoder s EpochNo
+forall a.
+(a -&gt; Encoding)
+-&gt; (forall s. Decoder s a)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (forall s. Decoder s [a])
+-&gt; Serialise a
+decodeList :: forall s. Decoder s [EpochNo]
+$cdecodeList :: forall s. Decoder s [EpochNo]
+encodeList :: [EpochNo] -&gt; Encoding
+$cencodeList :: [EpochNo] -&gt; Encoding
+decode :: forall s. Decoder s EpochNo
+$cdecode :: forall s. Decoder s EpochNo
+encode :: EpochNo -&gt; Encoding
+$cencode :: EpochNo -&gt; Encoding
+</span><a href="#local-6989586621679111286"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Serialise</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111267"><span id="local-6989586621679111273"><span id="local-6989586621679111279"><span class="annot"><span class="annottext">Typeable EpochNo
+EpochNo -&gt; Encoding
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy [EpochNo] -&gt; Size
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy EpochNo -&gt; Size
+forall a.
+Typeable a
+-&gt; (a -&gt; Encoding)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy a -&gt; Size)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy [a] -&gt; Size)
+-&gt; ToCBOR a
+encodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy [EpochNo] -&gt; Size
+$cencodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy [EpochNo] -&gt; Size
+encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy EpochNo -&gt; Size
+$cencodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy EpochNo -&gt; Size
+toCBOR :: EpochNo -&gt; Encoding
+$ctoCBOR :: EpochNo -&gt; Encoding
+</span><a href="#local-6989586621679111267"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToCBOR</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111255"><span id="local-6989586621679111260"><span class="annot"><span class="annottext">Typeable EpochNo
+Proxy EpochNo -&gt; Text
+forall s. Decoder s EpochNo
+forall a.
+Typeable a
+-&gt; (forall s. Decoder s a) -&gt; (Proxy a -&gt; Text) -&gt; FromCBOR a
+label :: Proxy EpochNo -&gt; Text
+$clabel :: Proxy EpochNo -&gt; Text
+fromCBOR :: forall s. Decoder s EpochNo
+$cfromCBOR :: forall s. Decoder s EpochNo
+</span><a href="#local-6989586621679111255"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromCBOR</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111242"><span id="local-6989586621679111246"><span id="local-6989586621679111250"><span class="annot"><span class="annottext">Context -&gt; EpochNo -&gt; IO (Maybe ThunkInfo)
+Proxy EpochNo -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy EpochNo -&gt; String
+$cshowTypeOf :: Proxy EpochNo -&gt; String
+wNoThunks :: Context -&gt; EpochNo -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; EpochNo -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; EpochNo -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; EpochNo -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679111242"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111221"><span id="local-6989586621679111225"><span id="local-6989586621679111229"><span id="local-6989586621679111233"><span id="local-6989586621679111237"><span class="annot"><span class="annottext">[EpochNo] -&gt; Encoding
+[EpochNo] -&gt; Value
+EpochNo -&gt; Bool
+EpochNo -&gt; Encoding
+EpochNo -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (a -&gt; Bool)
+-&gt; ToJSON a
+omitField :: EpochNo -&gt; Bool
+$comitField :: EpochNo -&gt; Bool
+toEncodingList :: [EpochNo] -&gt; Encoding
+$ctoEncodingList :: [EpochNo] -&gt; Encoding
+toJSONList :: [EpochNo] -&gt; Value
+$ctoJSONList :: [EpochNo] -&gt; Value
+toEncoding :: EpochNo -&gt; Encoding
+$ctoEncoding :: EpochNo -&gt; Encoding
+toJSON :: EpochNo -&gt; Value
+$ctoJSON :: EpochNo -&gt; Value
+</span><a href="#local-6989586621679111221"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111208"><span id="local-6989586621679111212"><span id="local-6989586621679111216"><span class="annot"><span class="annottext">Maybe EpochNo
+Value -&gt; Parser [EpochNo]
+Value -&gt; Parser EpochNo
+forall a.
+(Value -&gt; Parser a)
+-&gt; (Value -&gt; Parser [a]) -&gt; Maybe a -&gt; FromJSON a
+omittedField :: Maybe EpochNo
+$comittedField :: Maybe EpochNo
+parseJSONList :: Value -&gt; Parser [EpochNo]
+$cparseJSONList :: Value -&gt; Parser [EpochNo]
+parseJSON :: Value -&gt; Parser EpochNo
+$cparseJSON :: Value -&gt; Parser EpochNo
+</span><a href="#local-6989586621679111208"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111203"><span class="annot"><span class="annottext">EpochNo -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: EpochNo -&gt; ()
+$crnf :: EpochNo -&gt; ()
+</span><a href="#local-6989586621679111203"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span id="local-6989586621679111198"><span id="local-6989586621679111199"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="EpochSize"><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochSize"><span class="hs-identifier hs-var">EpochSize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="EpochSize"><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochSize"><span class="hs-identifier hs-var">EpochSize</span></a></span></span><span> </span><span class="hs-special">{</span><span id="unEpochSize"><span class="annot"><span class="annottext">EpochSize -&gt; Word64
+</span><a href="Cardano.Slotting.Slot.html#unEpochSize"><span class="hs-identifier hs-var hs-var">unEpochSize</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word64</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-123"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111191"><span id="local-6989586621679111194"><span class="annot"><span class="annottext">EpochSize -&gt; EpochSize -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: EpochSize -&gt; EpochSize -&gt; Bool
+$c/= :: EpochSize -&gt; EpochSize -&gt; Bool
+== :: EpochSize -&gt; EpochSize -&gt; Bool
+$c== :: EpochSize -&gt; EpochSize -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111170"><span id="local-6989586621679111172"><span id="local-6989586621679111175"><span id="local-6989586621679111178"><span id="local-6989586621679111181"><span id="local-6989586621679111184"><span id="local-6989586621679111187"><span class="annot"><span class="annottext">Eq EpochSize
+EpochSize -&gt; EpochSize -&gt; Bool
+EpochSize -&gt; EpochSize -&gt; Ordering
+EpochSize -&gt; EpochSize -&gt; EpochSize
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: EpochSize -&gt; EpochSize -&gt; EpochSize
+$cmin :: EpochSize -&gt; EpochSize -&gt; EpochSize
+max :: EpochSize -&gt; EpochSize -&gt; EpochSize
+$cmax :: EpochSize -&gt; EpochSize -&gt; EpochSize
+&gt;= :: EpochSize -&gt; EpochSize -&gt; Bool
+$c&gt;= :: EpochSize -&gt; EpochSize -&gt; Bool
+&gt; :: EpochSize -&gt; EpochSize -&gt; Bool
+$c&gt; :: EpochSize -&gt; EpochSize -&gt; Bool
+&lt;= :: EpochSize -&gt; EpochSize -&gt; Bool
+$c&lt;= :: EpochSize -&gt; EpochSize -&gt; Bool
+&lt; :: EpochSize -&gt; EpochSize -&gt; Bool
+$c&lt; :: EpochSize -&gt; EpochSize -&gt; Bool
+compare :: EpochSize -&gt; EpochSize -&gt; Ordering
+$ccompare :: EpochSize -&gt; EpochSize -&gt; Ordering
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep EpochSize x -&gt; EpochSize
+forall x. EpochSize -&gt; Rep EpochSize x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep EpochSize x -&gt; EpochSize
+$cfrom :: forall x. EpochSize -&gt; Rep EpochSize x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-124"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679111153"><span id="local-6989586621679111159"><span id="local-6989586621679111165"><span class="annot"><span class="annottext">Int -&gt; EpochSize -&gt; ShowS
+[EpochSize] -&gt; ShowS
+EpochSize -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [EpochSize] -&gt; ShowS
+$cshowList :: [EpochSize] -&gt; ShowS
+show :: EpochSize -&gt; String
+$cshow :: EpochSize -&gt; String
+showsPrec :: Int -&gt; EpochSize -&gt; ShowS
+$cshowsPrec :: Int -&gt; EpochSize -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochSize"><span class="hs-identifier hs-type">EpochSize</span></a></span><span>
+</span><span id="line-125"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111091"><span id="local-6989586621679111095"><span id="local-6989586621679111099"><span id="local-6989586621679111103"><span id="local-6989586621679111107"><span id="local-6989586621679111111"><span id="local-6989586621679111115"><span id="local-6989586621679111119"><span class="annot"><span class="annottext">Int -&gt; EpochSize
+EpochSize -&gt; Int
+EpochSize -&gt; [EpochSize]
+EpochSize -&gt; EpochSize
+EpochSize -&gt; EpochSize -&gt; [EpochSize]
+EpochSize -&gt; EpochSize -&gt; EpochSize -&gt; [EpochSize]
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+enumFromThenTo :: EpochSize -&gt; EpochSize -&gt; EpochSize -&gt; [EpochSize]
+$cenumFromThenTo :: EpochSize -&gt; EpochSize -&gt; EpochSize -&gt; [EpochSize]
+enumFromTo :: EpochSize -&gt; EpochSize -&gt; [EpochSize]
+$cenumFromTo :: EpochSize -&gt; EpochSize -&gt; [EpochSize]
+enumFromThen :: EpochSize -&gt; EpochSize -&gt; [EpochSize]
+$cenumFromThen :: EpochSize -&gt; EpochSize -&gt; [EpochSize]
+enumFrom :: EpochSize -&gt; [EpochSize]
+$cenumFrom :: EpochSize -&gt; [EpochSize]
+fromEnum :: EpochSize -&gt; Int
+$cfromEnum :: EpochSize -&gt; Int
+toEnum :: Int -&gt; EpochSize
+$ctoEnum :: Int -&gt; EpochSize
+pred :: EpochSize -&gt; EpochSize
+$cpred :: EpochSize -&gt; EpochSize
+succ :: EpochSize -&gt; EpochSize
+$csucc :: EpochSize -&gt; EpochSize
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></a></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111072"><span id="local-6989586621679111078"><span id="local-6989586621679111084"><span class="annot"><span class="annottext">Typeable EpochSize
+EpochSize -&gt; Encoding
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [EpochSize] -&gt; Size
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy EpochSize -&gt; Size
+forall a.
+Typeable a
+-&gt; (a -&gt; Encoding)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy a -&gt; Size)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy [a] -&gt; Size)
+-&gt; ToCBOR a
+encodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [EpochSize] -&gt; Size
+$cencodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [EpochSize] -&gt; Size
+encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy EpochSize -&gt; Size
+$cencodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy EpochSize -&gt; Size
+toCBOR :: EpochSize -&gt; Encoding
+$ctoCBOR :: EpochSize -&gt; Encoding
+</span><a href="#local-6989586621679111072"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToCBOR</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111061"><span id="local-6989586621679111065"><span class="annot"><span class="annottext">Typeable EpochSize
+Proxy EpochSize -&gt; Text
+forall s. Decoder s EpochSize
+forall a.
+Typeable a
+-&gt; (forall s. Decoder s a) -&gt; (Proxy a -&gt; Text) -&gt; FromCBOR a
+label :: Proxy EpochSize -&gt; Text
+$clabel :: Proxy EpochSize -&gt; Text
+fromCBOR :: forall s. Decoder s EpochSize
+$cfromCBOR :: forall s. Decoder s EpochSize
+</span><a href="#local-6989586621679111061"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromCBOR</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111048"><span id="local-6989586621679111052"><span id="local-6989586621679111056"><span class="annot"><span class="annottext">Context -&gt; EpochSize -&gt; IO (Maybe ThunkInfo)
+Proxy EpochSize -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy EpochSize -&gt; String
+$cshowTypeOf :: Proxy EpochSize -&gt; String
+wNoThunks :: Context -&gt; EpochSize -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; EpochSize -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; EpochSize -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; EpochSize -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679111048"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111027"><span id="local-6989586621679111031"><span id="local-6989586621679111035"><span id="local-6989586621679111039"><span id="local-6989586621679111043"><span class="annot"><span class="annottext">[EpochSize] -&gt; Encoding
+[EpochSize] -&gt; Value
+EpochSize -&gt; Bool
+EpochSize -&gt; Encoding
+EpochSize -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (a -&gt; Bool)
+-&gt; ToJSON a
+omitField :: EpochSize -&gt; Bool
+$comitField :: EpochSize -&gt; Bool
+toEncodingList :: [EpochSize] -&gt; Encoding
+$ctoEncodingList :: [EpochSize] -&gt; Encoding
+toJSONList :: [EpochSize] -&gt; Value
+$ctoJSONList :: [EpochSize] -&gt; Value
+toEncoding :: EpochSize -&gt; Encoding
+$ctoEncoding :: EpochSize -&gt; Encoding
+toJSON :: EpochSize -&gt; Value
+$ctoJSON :: EpochSize -&gt; Value
+</span><a href="#local-6989586621679111027"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111014"><span id="local-6989586621679111018"><span id="local-6989586621679111022"><span class="annot"><span class="annottext">Maybe EpochSize
+Value -&gt; Parser [EpochSize]
+Value -&gt; Parser EpochSize
+forall a.
+(Value -&gt; Parser a)
+-&gt; (Value -&gt; Parser [a]) -&gt; Maybe a -&gt; FromJSON a
+omittedField :: Maybe EpochSize
+$comittedField :: Maybe EpochSize
+parseJSONList :: Value -&gt; Parser [EpochSize]
+$cparseJSONList :: Value -&gt; Parser [EpochSize]
+parseJSON :: Value -&gt; Parser EpochSize
+$cparseJSON :: Value -&gt; Parser EpochSize
+</span><a href="#local-6989586621679111014"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111009"><span class="annot"><span class="annottext">EpochSize -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: EpochSize -&gt; ()
+$crnf :: EpochSize -&gt; ()
+</span><a href="#local-6989586621679111009"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span id="local-6989586621679111004"><span id="local-6989586621679111005"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="EpochInterval"><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochInterval"><span class="hs-identifier hs-var">EpochInterval</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="EpochInterval"><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochInterval"><span class="hs-identifier hs-var">EpochInterval</span></a></span></span><span>
+</span><span id="line-128"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="unEpochInterval"><span class="annot"><span class="annottext">EpochInterval -&gt; Word32
+</span><a href="Cardano.Slotting.Slot.html#unEpochInterval"><span class="hs-identifier hs-var hs-var">unEpochInterval</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word32</span></a></span><span>
+</span><span id="line-129"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-130"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110995"><span id="local-6989586621679111000"><span class="annot"><span class="annottext">EpochInterval -&gt; EpochInterval -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: EpochInterval -&gt; EpochInterval -&gt; Bool
+$c/= :: EpochInterval -&gt; EpochInterval -&gt; Bool
+== :: EpochInterval -&gt; EpochInterval -&gt; Bool
+$c== :: EpochInterval -&gt; EpochInterval -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110963"><span id="local-6989586621679110967"><span id="local-6989586621679110971"><span id="local-6989586621679110975"><span id="local-6989586621679110979"><span id="local-6989586621679110983"><span id="local-6989586621679110988"><span class="annot"><span class="annottext">Eq EpochInterval
+EpochInterval -&gt; EpochInterval -&gt; Bool
+EpochInterval -&gt; EpochInterval -&gt; Ordering
+EpochInterval -&gt; EpochInterval -&gt; EpochInterval
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: EpochInterval -&gt; EpochInterval -&gt; EpochInterval
+$cmin :: EpochInterval -&gt; EpochInterval -&gt; EpochInterval
+max :: EpochInterval -&gt; EpochInterval -&gt; EpochInterval
+$cmax :: EpochInterval -&gt; EpochInterval -&gt; EpochInterval
+&gt;= :: EpochInterval -&gt; EpochInterval -&gt; Bool
+$c&gt;= :: EpochInterval -&gt; EpochInterval -&gt; Bool
+&gt; :: EpochInterval -&gt; EpochInterval -&gt; Bool
+$c&gt; :: EpochInterval -&gt; EpochInterval -&gt; Bool
+&lt;= :: EpochInterval -&gt; EpochInterval -&gt; Bool
+$c&lt;= :: EpochInterval -&gt; EpochInterval -&gt; Bool
+&lt; :: EpochInterval -&gt; EpochInterval -&gt; Bool
+$c&lt; :: EpochInterval -&gt; EpochInterval -&gt; Bool
+compare :: EpochInterval -&gt; EpochInterval -&gt; Ordering
+$ccompare :: EpochInterval -&gt; EpochInterval -&gt; Ordering
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep EpochInterval x -&gt; EpochInterval
+forall x. EpochInterval -&gt; Rep EpochInterval x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep EpochInterval x -&gt; EpochInterval
+$cfrom :: forall x. EpochInterval -&gt; Rep EpochInterval x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110943"><span id="local-6989586621679110949"><span id="local-6989586621679110955"><span class="annot"><span class="annottext">Int -&gt; EpochInterval -&gt; ShowS
+[EpochInterval] -&gt; ShowS
+EpochInterval -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [EpochInterval] -&gt; ShowS
+$cshowList :: [EpochInterval] -&gt; ShowS
+show :: EpochInterval -&gt; String
+$cshow :: EpochInterval -&gt; String
+showsPrec :: Int -&gt; EpochInterval -&gt; ShowS
+$cshowsPrec :: Int -&gt; EpochInterval -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochInterval"><span class="hs-identifier hs-type">EpochInterval</span></a></span><span>
+</span><span id="line-132"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110899"><span id="local-6989586621679110903"><span id="local-6989586621679110908"><span class="annot"><span class="annottext">Context -&gt; EpochInterval -&gt; IO (Maybe ThunkInfo)
+Proxy EpochInterval -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy EpochInterval -&gt; String
+$cshowTypeOf :: Proxy EpochInterval -&gt; String
+wNoThunks :: Context -&gt; EpochInterval -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; EpochInterval -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; EpochInterval -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; EpochInterval -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679110899"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110894"><span class="annot"><span class="annottext">EpochInterval -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: EpochInterval -&gt; ()
+$crnf :: EpochInterval -&gt; ()
+</span><a href="#local-6989586621679110894"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110871"><span id="local-6989586621679110875"><span id="local-6989586621679110879"><span id="local-6989586621679110883"><span id="local-6989586621679110888"><span class="annot"><span class="annottext">[EpochInterval] -&gt; Encoding
+[EpochInterval] -&gt; Value
+EpochInterval -&gt; Bool
+EpochInterval -&gt; Encoding
+EpochInterval -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (a -&gt; Bool)
+-&gt; ToJSON a
+omitField :: EpochInterval -&gt; Bool
+$comitField :: EpochInterval -&gt; Bool
+toEncodingList :: [EpochInterval] -&gt; Encoding
+$ctoEncodingList :: [EpochInterval] -&gt; Encoding
+toJSONList :: [EpochInterval] -&gt; Value
+$ctoJSONList :: [EpochInterval] -&gt; Value
+toEncoding :: EpochInterval -&gt; Encoding
+$ctoEncoding :: EpochInterval -&gt; Encoding
+toJSON :: EpochInterval -&gt; Value
+$ctoJSON :: EpochInterval -&gt; Value
+</span><a href="#local-6989586621679110871"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110857"><span id="local-6989586621679110861"><span id="local-6989586621679110866"><span class="annot"><span class="annottext">Maybe EpochInterval
+Value -&gt; Parser [EpochInterval]
+Value -&gt; Parser EpochInterval
+forall a.
+(Value -&gt; Parser a)
+-&gt; (Value -&gt; Parser [a]) -&gt; Maybe a -&gt; FromJSON a
+omittedField :: Maybe EpochInterval
+$comittedField :: Maybe EpochInterval
+parseJSONList :: Value -&gt; Parser [EpochInterval]
+$cparseJSONList :: Value -&gt; Parser [EpochInterval]
+parseJSON :: Value -&gt; Parser EpochInterval
+$cparseJSON :: Value -&gt; Parser EpochInterval
+</span><a href="#local-6989586621679110857"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110837"><span id="local-6989586621679110843"><span id="local-6989586621679110850"><span class="annot"><span class="annottext">Typeable EpochInterval
+EpochInterval -&gt; Encoding
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [EpochInterval] -&gt; Size
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy EpochInterval -&gt; Size
+forall a.
+Typeable a
+-&gt; (a -&gt; Encoding)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy a -&gt; Size)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy [a] -&gt; Size)
+-&gt; ToCBOR a
+encodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [EpochInterval] -&gt; Size
+$cencodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [EpochInterval] -&gt; Size
+encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy EpochInterval -&gt; Size
+$cencodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy EpochInterval -&gt; Size
+toCBOR :: EpochInterval -&gt; Encoding
+$ctoCBOR :: EpochInterval -&gt; Encoding
+</span><a href="#local-6989586621679110837"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToCBOR</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110825"><span id="local-6989586621679110830"><span class="annot"><span class="annottext">Typeable EpochInterval
+Proxy EpochInterval -&gt; Text
+forall s. Decoder s EpochInterval
+forall a.
+Typeable a
+-&gt; (forall s. Decoder s a) -&gt; (Proxy a -&gt; Text) -&gt; FromCBOR a
+label :: Proxy EpochInterval -&gt; Text
+$clabel :: Proxy EpochInterval -&gt; Text
+fromCBOR :: forall s. Decoder s EpochInterval
+$cfromCBOR :: forall s. Decoder s EpochInterval
+</span><a href="#local-6989586621679110825"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromCBOR</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-133"></span><span>
+</span><span id="line-134"></span><span class="hs-comment">-- | Convenience function for doing binary operations on two `EpochNo`s</span><span>
+</span><span id="line-135"></span><span class="annot"><a href="Cardano.Slotting.Slot.html#binOpEpochNo"><span class="hs-identifier hs-type">binOpEpochNo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word64</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-type">EpochNo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-type">EpochNo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-type">EpochNo</span></a></span><span>
+</span><span id="line-136"></span><span id="binOpEpochNo"><span class="annot"><span class="annottext">binOpEpochNo :: (Word64 -&gt; Word64 -&gt; Word64) -&gt; EpochNo -&gt; EpochNo -&gt; EpochNo
+</span><a href="Cardano.Slotting.Slot.html#binOpEpochNo"><span class="hs-identifier hs-var hs-var">binOpEpochNo</span></a></span></span><span> </span><span id="local-6989586621679110821"><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+</span><a href="#local-6989586621679110821"><span class="hs-identifier hs-var">op</span></a></span></span><span> </span><span id="local-6989586621679110820"><span class="annot"><span class="annottext">EpochNo
+</span><a href="#local-6989586621679110820"><span class="hs-identifier hs-var">en1</span></a></span></span><span> </span><span id="local-6989586621679110819"><span class="annot"><span class="annottext">EpochNo
+</span><a href="#local-6989586621679110819"><span class="hs-identifier hs-var">en2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; EpochNo
+</span><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-var">EpochNo</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+</span><a href="#local-6989586621679110821"><span class="hs-identifier hs-var">op</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">EpochNo -&gt; Word64
+</span><a href="Cardano.Slotting.Slot.html#unEpochNo"><span class="hs-identifier hs-var">unEpochNo</span></a></span><span> </span><span class="annot"><span class="annottext">EpochNo
+</span><a href="#local-6989586621679110820"><span class="hs-identifier hs-var">en1</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">EpochNo -&gt; Word64
+</span><a href="Cardano.Slotting.Slot.html#unEpochNo"><span class="hs-identifier hs-var">unEpochNo</span></a></span><span> </span><span class="annot"><span class="annottext">EpochNo
+</span><a href="#local-6989586621679110819"><span class="hs-identifier hs-var">en2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span class="hs-comment">-- | Add a EpochInterval (a positive change) to an EpochNo to get a new EpochNo</span><span>
+</span><span id="line-139"></span><span class="annot"><a href="Cardano.Slotting.Slot.html#addEpochInterval"><span class="hs-identifier hs-type">addEpochInterval</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-type">EpochNo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochInterval"><span class="hs-identifier hs-type">EpochInterval</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-type">EpochNo</span></a></span><span>
+</span><span id="line-140"></span><span id="addEpochInterval"><span class="annot"><span class="annottext">addEpochInterval :: EpochNo -&gt; EpochInterval -&gt; EpochNo
+</span><a href="Cardano.Slotting.Slot.html#addEpochInterval"><span class="hs-identifier hs-var hs-var">addEpochInterval</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-type">EpochNo</span></a></span><span> </span><span id="local-6989586621679110818"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679110818"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Slot.html#EpochInterval"><span class="hs-identifier hs-type">EpochInterval</span></a></span><span> </span><span id="local-6989586621679110817"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679110817"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; EpochNo
+</span><a href="Cardano.Slotting.Slot.html#EpochNo"><span class="hs-identifier hs-var">EpochNo</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679110818"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679110817"><span class="hs-identifier hs-var">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span></pre></body></html>
