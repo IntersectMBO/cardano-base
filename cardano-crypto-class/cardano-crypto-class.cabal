@@ -99,7 +99,7 @@ library
     , cardano-binary >= 1.6
     , cardano-mempool
     , cardano-strict-containers
-    , cryptonite
+    , crypton
     , deepseq
     , heapwords
     , io-classes >= 1.4.1
