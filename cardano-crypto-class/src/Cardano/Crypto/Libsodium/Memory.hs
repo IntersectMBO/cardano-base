@@ -25,7 +25,13 @@ module Cardano.Crypto.Libsodium.Memory (
   copyMem,
   allocaBytes,
 
+  -- * 'ForeignPtr' operations, generalized to 'MonadST'
+  ForeignPtr (..),
+  mallocForeignPtrBytes,
+  withForeignPtr,
+
   -- * ByteString memory access, generalized to 'MonadST'
+  unpackByteStringCStringLen,
   packByteStringCStringLen,
 ) where
 
