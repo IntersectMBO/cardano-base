@@ -52,11 +52,17 @@ module Cardano.Crypto.KES.Class
   , sizeSignKeyKES
   , seedSizeKES
 
-    -- * Unsound API
+    -- * Unsound APIs
+
   , UnsoundKESAlgorithm (..)
   , encodeSignKeyKES
   , decodeSignKeyKES
   , rawDeserialiseSignKeyKES
+
+  , UnsoundPureKESAlgorithm (..)
+  , unsoundPureSignedKES
+  , encodeUnsoundPureSignKeyKES
+  , decodeUnsoundPureSignKeyKES
 
     -- * Utility functions
     -- These are used between multiple KES implementations. User code will
@@ -90,6 +96,7 @@ import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Libsodium (MLockedAllocator, mlockedMalloc)
 import Cardano.Crypto.Hash.Class (HashAlgorithm, Hash, hashWith)
 import Cardano.Crypto.DSIGN.Class (failSizeCheck)
+import Cardano.Crypto.Seed
 
 class ( Typeable v
       , Show (VerKeyKES v)
@@ -277,6 +284,46 @@ updateKES
 updateKES = updateKESWith mlockedMalloc
 
 
+-- | Pure implementations of the core KES operations. These are unsound, because
+-- proper handling of KES secrets (seeds, sign keys) requires mlocking and
+-- deterministic erasure (\"secure forgetting\"), which is not possible in pure
+-- code.
+-- This API is only provided for testing purposes; it must not be used to
+-- generate or use real KES keys.
+class KESAlgorithm v => UnsoundPureKESAlgorithm v where
+  data UnsoundPureSignKeyKES v :: Type
+
+  unsoundPureSignKES
+    :: forall a. (Signable v a)
+    => ContextKES v
+    -> Period  -- ^ The /current/ period for the key
+    -> a
+    -> UnsoundPureSignKeyKES v
+    -> SigKES v
+
+  unsoundPureUpdateKES
+    :: ContextKES v
+    -> UnsoundPureSignKeyKES v
+    -> Period  -- ^ The /current/ period for the key, not the target period.
+    -> Maybe (UnsoundPureSignKeyKES v)
+
+  unsoundPureGenKeyKES
+    :: Seed
+    -> UnsoundPureSignKeyKES v
+
+  unsoundPureDeriveVerKeyKES
+    :: UnsoundPureSignKeyKES v
+    -> VerKeyKES v
+
+  unsoundPureSignKeyKESToSoundSignKeyKES
+    :: (MonadST m, MonadThrow m)
+    => UnsoundPureSignKeyKES v
+    -> m (SignKeyKES v)
+
+  rawSerialiseUnsoundPureSignKeyKES    :: UnsoundPureSignKeyKES  v -> ByteString
+  rawDeserialiseUnsoundPureSignKeyKES  :: ByteString -> Maybe (UnsoundPureSignKeyKES v)
+
+
 -- | Unsound operations on KES sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider
 -- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
@@ -362,6 +409,9 @@ instance ( TypeError ('Text "Ord not supported for verification keys, use the ha
 encodeVerKeyKES :: KESAlgorithm v => VerKeyKES v -> Encoding
 encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
 
+encodeUnsoundPureSignKeyKES :: UnsoundPureKESAlgorithm v => UnsoundPureSignKeyKES v -> Encoding
+encodeUnsoundPureSignKeyKES = encodeBytes . rawSerialiseUnsoundPureSignKeyKES
+
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
 encodeSigKES = encodeBytes . rawSerialiseSigKES
 
@@ -378,6 +428,14 @@ decodeVerKeyKES = do
     Just vk -> return vk
     Nothing -> failSizeCheck "decodeVerKeyKES" "key" bs (sizeVerKeyKES (Proxy :: Proxy v))
 {-# INLINE decodeVerKeyKES #-}
+
+decodeUnsoundPureSignKeyKES :: forall v s. UnsoundPureKESAlgorithm v => Decoder s (UnsoundPureSignKeyKES v)
+decodeUnsoundPureSignKeyKES = do
+  bs <- decodeBytes
+  case rawDeserialiseUnsoundPureSignKeyKES bs of
+    Just vk -> return vk
+    Nothing -> failSizeCheck "decodeUnsoundPureSignKeyKES" "key" bs (sizeSignKeyKES (Proxy :: Proxy v))
+{-# INLINE decodeUnsoundPureSignKeyKES #-}
 
 decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
 decodeSigKES = do
@@ -434,6 +492,16 @@ verifySignedKES
   -> SignedKES v a
   -> Either String ()
 verifySignedKES ctxt vk j a (SignedKES sig) = verifyKES ctxt vk j a sig
+
+unsoundPureSignedKES
+  :: (UnsoundPureKESAlgorithm v, Signable v a)
+  => ContextKES v
+  -> Period
+  -> a
+  -> UnsoundPureSignKeyKES v
+  -> SignedKES v a
+unsoundPureSignedKES ctxt time a key = SignedKES $ unsoundPureSignKES ctxt time a key
+
 
 encodeSignedKES :: KESAlgorithm v => SignedKES v a -> Encoding
 encodeSignedKES (SignedKES s) = encodeSigKES s

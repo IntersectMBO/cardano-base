@@ -65,3 +65,15 @@ instance KESAlgorithm NeverKES where
 instance UnsoundKESAlgorithm NeverKES where
   rawSerialiseSignKeyKES _ = return mempty
   rawDeserialiseSignKeyKESWith _ _ = return $ Just NeverUsedSignKeyKES
+
+instance UnsoundPureKESAlgorithm NeverKES where
+  data UnsoundPureSignKeyKES NeverKES = NeverUsedUnsoundPureSignKeyKES
+      deriving (Show, Eq, Generic, NoThunks)
+
+  unsoundPureSignKES = error "KES not available"
+  unsoundPureGenKeyKES _ = NeverUsedUnsoundPureSignKeyKES
+  unsoundPureDeriveVerKeyKES _ = NeverUsedVerKeyKES
+  unsoundPureUpdateKES _ = error "KES not available"
+  unsoundPureSignKeyKESToSoundSignKeyKES _ = return NeverUsedSignKeyKES
+  rawSerialiseUnsoundPureSignKeyKES _ = mempty
+  rawDeserialiseUnsoundPureSignKeyKES _ = Just NeverUsedUnsoundPureSignKeyKES
