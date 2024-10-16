@@ -3,7 +3,7 @@
 
   inputs = {
     # freeze haskell.nix prior to the nixpkgs update that broken 8.10 cross-windows
-    haskellNix.url = "github:input-output-hk/haskell.nix?ref=fbebee6c8afd92f2e3b283872656957c647250c3";
+    haskellNix.url = "github:input-output-hk/haskell.nix?ref=cb139fa956158397aa398186bb32dd26f7318784";
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     iohkNix.url = "github:input-output-hk/iohk-nix";
     flake-utils.url = "github:hamishmack/flake-utils/hkm/nested-hydraJobs";
