@@ -92,7 +92,7 @@
                 # tools that work only with default compiler
                 fourmolu = fourmoluVersion;
                 hlint = "3.8";
-                haskell-language-server = "2.9.0.0";
+                haskell-language-server = "2.2.0.0";
               };
 
             # and from nixpkgs or other inputs
