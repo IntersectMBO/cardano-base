@@ -9,26 +9,70 @@ repository cardano-haskell-packages
     c00aae8461a256275598500ea0e187588c35a5d5d7454fb57eac18d9edb86a56
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
+repository ghcjs-overlay
+  url: https://input-output-hk.github.io/hackage-overlay-ghcjs/
+  secure: True
+  root-keys:
+  key-threshold: 0
+  --sha256: sha256-w1WpLfHixvH2ki88pUXOSgEs05+vMzheQfjyQ5ZaqH0=
+
 -- The hackage index-state
 index-state: 2024-10-10T00:52:24Z
 -- The CHaP index-state
 index-state: cardano-haskell-packages 2024-10-10T04:22:19Z
 
 packages:
-  base-deriving-via
-  cardano-binary
-  cardano-binary/test
-  cardano-crypto-class
-  cardano-crypto-praos
-  cardano-crypto-tests
-  cardano-git-rev
-  cardano-slotting
-  cardano-strict-containers
-  cardano-mempool
-  heapwords
-  measures
-  orphans-deriving-via
-  strict-checked-vars
+  cardano-addresses/cardano-addresses
+  cardano-addresses/cardano-addresses-cli
+  cardano-addresses/cardano-addresses-jsapi
+  cardano-addresses/cardano-addresses-jsbits
+if !os(ghcjs)
+  packages:
+    base-deriving-via
+    cardano-binary
+    cardano-binary/test
+    cardano-crypto-class
+    cardano-crypto-praos
+    cardano-crypto-tests
+    cardano-git-rev
+    cardano-slotting
+    cardano-strict-containers
+    cardano-mempool
+    heapwords
+    measures
+    orphans-deriving-via
+    strict-checked-vars
+
+if os(ghcjs)
+  active-repositories: hackage.haskell.org, cardano-haskell-packages, ghcjs-overlay:override
+else
+  active-repositories: hackage.haskell.org, cardano-haskell-packages
+
+-- If not ghcjs, we disable cardano-addresses-jsapi
+-- because they only work on JS 
+if os(ghcjs)
+  package cardano-addresses-jsapi
+    tests: true
+else
+  package cardano-addresses-jsapi
+    tests: false
+
+constraints:
+    ghcjs-base >=0.2.0.3
+  , optparse-applicative >= 0.18.1.0
+-- Avoid conflict in `hjsonschema`
+-- src/Import.hs:2:16: error: [GHC-69158]
+--     Conflicting exports for ‘witness’:
+--        ‘module Export’ exports ‘Export.witness’
+--          imported from ‘Protolude’ at src/Import.hs:4:1-36
+--          (and originally defined in ‘Protolude.Debug’)
+--        ‘module Export’ exports ‘Export.witness’
+--          imported from ‘Test.QuickCheck’ at src/Import.hs:(9,1)-(10,50)
+--          (and originally defined in ‘Test.QuickCheck.Property’)
+-- TODO update https://github.com/input-output-hk/hjsonschema to
+-- hide `witness` when importing from `Test.QuickCheck`
+  , QuickCheck < 2.15
+
 
 -- Ensures colourized output from test runners
 test-show-details: direct
