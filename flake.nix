@@ -4,9 +4,16 @@
   inputs = {
     # freeze haskell.nix prior to the nixpkgs update that broken 8.10 cross-windows
     haskellNix.url = "github:input-output-hk/haskell.nix?ref=cb139fa956158397aa398186bb32dd26f7318784";
+    # allow us to independently update hackageNix
+    haskellNix.inputs.hackage.follows = "hackageNix";
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     iohkNix.url = "github:input-output-hk/iohk-nix";
     flake-utils.url = "github:hamishmack/flake-utils/hkm/nested-hydraJobs";
+
+    hackageNix = {
+      url = "github:input-output-hk/hackage.nix";
+      flake = false;
+    };
 
     CHaP = {
       url = "github:intersectmbo/cardano-haskell-packages?ref=repo";
