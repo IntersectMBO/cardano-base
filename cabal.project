@@ -39,3 +39,7 @@ benchmarks: true
 program-options
   ghc-options: -Werror
 
+-- Windows cross with bitvec/simd is broken.
+package bitvec
+  -- Workaround for windows cross-compilation
+  flags: -simd
