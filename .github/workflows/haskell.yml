@@ -159,9 +159,6 @@ jobs:
         MSYSTEM: MINGW64
       run: cabal test all --enable-tests --test-show-details=direct -j1
 
-    - name: Build strict-checked-vars with invariants
-      run: cabal build -f+checktvarinvariants -f+checkmvarinvariants strict-checked-vars
-
     - name: Save logs
       uses: actions/upload-artifact@v4
       with:

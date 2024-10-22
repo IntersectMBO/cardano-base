@@ -28,7 +28,6 @@ packages:
   heapwords
   measures
   orphans-deriving-via
-  strict-checked-vars
 
 -- Ensures colourized output from test runners
 test-show-details: direct

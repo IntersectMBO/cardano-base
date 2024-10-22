@@ -21,5 +21,3 @@ orphans-deriving-via @nfrisby @lehins
 measures             @nfrisby @lehins
 
 cardano-git-rev @erikd @lehins
-
-strict-checked-vars @jorisdral @coot @lehins
