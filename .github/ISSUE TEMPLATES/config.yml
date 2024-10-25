@@ -4,10 +4,6 @@ contact_links:
     url: https://github.com/IntersectMBO/cardano-base/blob/master/CONTRIBUTING.md
     about: Some rules & processes we honor.
 
-  - name: Feature ideas
-    url: https://github.com/cardano-base/discussions/categories/ideas
-    about: Maybe someone else had the same or a similar idea already?
-
   - name: All issues
     url: https://github.com/cardano-base/issues
     about: Check whether your issue is not already covered here.
