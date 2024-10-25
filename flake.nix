@@ -2,10 +2,18 @@
   description = "cardano-base";
 
   inputs = {
-    haskellNix.url = "github:input-output-hk/haskell.nix";
+    # freeze haskell.nix prior to the nixpkgs update that broken 8.10 cross-windows
+    haskellNix.url = "github:input-output-hk/haskell.nix?ref=cb139fa956158397aa398186bb32dd26f7318784";
+    # allow us to independently update hackageNix
+    haskellNix.inputs.hackage.follows = "hackageNix";
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     iohkNix.url = "github:input-output-hk/iohk-nix";
     flake-utils.url = "github:hamishmack/flake-utils/hkm/nested-hydraJobs";
+
+    hackageNix = {
+      url = "github:input-output-hk/hackage.nix";
+      flake = false;
+    };
 
     CHaP = {
       url = "github:intersectmbo/cardano-haskell-packages?ref=repo";
@@ -48,7 +56,7 @@
         inherit (nixpkgs) lib;
 
         # see flake `variants` below for alternative compilers
-        defaultCompiler = "ghc966";
+        defaultCompiler = "ghc964";
         fourmoluVersion = "0.16.2.0";
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
@@ -144,7 +152,7 @@
           cabalProject.flake (
             lib.optionalAttrs (system == "x86_64-linux") {
               # on linux, build/test other supported compilers
-              variants = lib.genAttrs ["ghc8107" "ghc982"] (compiler-nix-name: {
+              variants = lib.genAttrs ["ghc8107"] (compiler-nix-name: {
                 inherit compiler-nix-name;
               });
               # we also want cross compilation to windows.
