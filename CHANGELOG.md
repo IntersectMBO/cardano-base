@@ -13,4 +13,3 @@ Changelogs for components can be found as follows:
 - [heapwords](https://github.com/IntersectMBO/cardano-base/blob/master/heapwords/CHANGELOG.md) 
 - [measures](https://github.com/IntersectMBO/cardano-base/blob/master/measures/CHANGELOG.md) 
 - [orphans-deriving-via](https://github.com/IntersectMBO/cardano-base/blob/master/orphans-deriving-via/CHANGELOG.md)
-- [strict-checked-vars](https://github.com/IntersectMBO/cardano-base/blob/master/strict-checked-vars/CHANGELOG.md)  
