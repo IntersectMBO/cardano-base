@@ -56,7 +56,7 @@
         inherit (nixpkgs) lib;
 
         # see flake `variants` below for alternative compilers
-        defaultCompiler = "ghc965";
+        defaultCompiler = "ghc964";
         fourmoluVersion = "0.16.2.0";
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
@@ -92,7 +92,7 @@
             # tools we want in our shell, from hackage
             tools =
               {
-                cabal = "3.10.3.0";
+                cabal = "3.12.1.0";
                 ghcid = "0.8.9";
               }
               // lib.optionalAttrs (config.compiler-nix-name == defaultCompiler) {
