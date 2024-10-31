@@ -607,8 +607,7 @@ instance ( DirectSerialise (SignKeyKES d)
          ) => DirectSerialise (SignKeyKES (CompactSumKES h d)) where
   directSerialise push (SignKeyCompactSumKES sk r vk0 vk1) = do
     directSerialise push sk
-    mlockedSeedUseAsCPtr r $ \ptr ->
-      push (castPtr ptr) (fromIntegral $ seedSizeKES (Proxy :: Proxy d))
+    directSerialise push r
     directSerialise push vk0
     directSerialise push vk1
 
@@ -618,11 +617,7 @@ instance ( DirectDeserialise (SignKeyKES d)
          ) => DirectDeserialise (SignKeyKES (CompactSumKES h d)) where
   directDeserialise pull = do
     sk <- directDeserialise pull
-
-    r <- mlockedSeedNew
-    mlockedSeedUseAsCPtr r $ \ptr ->
-      pull (castPtr ptr) (fromIntegral $ seedSizeKES (Proxy :: Proxy d))
-
+    r <- directDeserialise pull
     vk0 <- directDeserialise pull
     vk1 <- directDeserialise pull
 

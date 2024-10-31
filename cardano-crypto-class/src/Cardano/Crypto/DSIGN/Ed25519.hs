@@ -413,4 +413,4 @@ instance DirectDeserialise (VerKeyDSIGN Ed25519DSIGN) where
       pull
         (castPtr ptr)
         (fromIntegral $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
-    return $! VerKeyEd25519DSIGN $! psb
+    return $! VerKeyEd25519DSIGN psb

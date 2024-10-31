@@ -72,6 +72,7 @@ module Cardano.Crypto.KES.Class
     -- convenience.
   , hashPairOfVKeys
   , mungeName
+  , unsoundPureSignKeyKESToSoundSignKeyKESViaSer
   )
 where
 
@@ -340,6 +341,18 @@ rawDeserialiseSignKeyKES ::
   => ByteString
   -> m (Maybe (SignKeyKES v))
 rawDeserialiseSignKeyKES = rawDeserialiseSignKeyKESWith mlockedMalloc
+
+-- | Helper function for implementing 'unsoundPureSignKeyKESToSoundSignKeyKES'
+-- for KES algorithms that support both 'UnsoundKESAlgorithm' and
+-- 'UnsoundPureKESAlgorithm'. For such KES algorithms, unsound sign keys can be
+-- marshalled to sound sign keys by serializing and then deserializing them.
+unsoundPureSignKeyKESToSoundSignKeyKESViaSer
+  :: (MonadST m, MonadThrow m, UnsoundKESAlgorithm k, UnsoundPureKESAlgorithm k)
+  => UnsoundPureSignKeyKES k
+  -> m (SignKeyKES k)
+unsoundPureSignKeyKESToSoundSignKeyKESViaSer sk =
+  maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") return =<<
+  (rawDeserialiseSignKeyKES . rawSerialiseUnsoundPureSignKeyKES $ sk)
 
 
 -- | Subclass for KES algorithms that embed a copy of the VerKey into the

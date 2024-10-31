@@ -29,12 +29,11 @@ import qualified Data.Foldable as F (foldl')
 import qualified Data.ByteString as BS
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Foreign.Ptr (WordPtr, plusPtr)
+import Foreign.Ptr (WordPtr)
 import Data.IORef
 import GHC.TypeNats (KnownNat, natVal)
 
-import Control.Concurrent.MVar (newMVar, takeMVar, putMVar)
-import Control.Monad (void, when)
+import Control.Monad (void)
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow
 import Control.Monad.IO.Class (liftIO)
@@ -43,16 +42,11 @@ import Control.Tracer
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
-import Cardano.Crypto.DirectSerialise (DirectSerialise, directSerialise, DirectDeserialise)
+import Cardano.Crypto.DirectSerialise (DirectSerialise, DirectDeserialise)
 import Cardano.Crypto.Util (SignableRepresentation(..))
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
-import Cardano.Crypto.Libsodium.Memory
-  ( copyMem
-  , allocaBytes
-  , packByteStringCStringLen
-  )
 import Cardano.Crypto.PinnedSizedBytes
 
 import Test.QuickCheck
@@ -106,6 +100,10 @@ tests lock =
   , testKESAlgorithm @(CompactSum5KES Ed25519DSIGN Blake2b_256) lock "CompactSum5KES"
   ]
 
+--------------------------------------------------------------------------------
+-- Show and Eq instances
+--------------------------------------------------------------------------------
+
 -- We normally ensure that we avoid naively comparing signing keys by not
 -- providing instances, but for tests it is fine, so we provide the orphan
 -- instances here.
@@ -147,6 +145,48 @@ instance ( EqST (SignKeyKES d)
          ) => EqST (SignKeyKES (CompactSumKES h d)) where
   equalsM (SignKeyCompactSumKES s r v1 v2) (SignKeyCompactSumKES s' r' v1' v2') =
     (s, r, PureEqST v1, PureEqST v2) ==! (s', r', PureEqST v1', PureEqST v2')
+
+--------------------------------------------------------------------------------
+-- Arbitrary instances
+--------------------------------------------------------------------------------
+
+genInitialSignKeyKES :: forall k. UnsoundPureKESAlgorithm k => Gen (UnsoundPureSignKeyKES k)
+genInitialSignKeyKES = do
+    bytes <- BS.pack <$> vector (fromIntegral $ seedSizeKES (Proxy @k))
+    let seed = mkSeedFromBytes bytes
+    return $ unsoundPureGenKeyKES seed
+
+instance (UnsoundPureKESAlgorithm k, Arbitrary (ContextKES k)) => Arbitrary (UnsoundPureSignKeyKES k) where
+  arbitrary = do
+    ctx <- arbitrary
+    let updateTo :: Period -> Period -> UnsoundPureSignKeyKES k -> Maybe (UnsoundPureSignKeyKES k)
+        updateTo target current sk
+          | target == current
+          = Just sk
+          | target > current
+          = updateTo target (succ current) =<< unsoundPureUpdateKES ctx sk current
+          | otherwise
+          = Nothing
+    period <- chooseBoundedIntegral (0, totalPeriodsKES (Proxy @k) - 1)
+    sk0 <- genInitialSignKeyKES
+    let skMay = updateTo period 0 sk0
+    case skMay of
+      Just sk -> return sk
+      Nothing -> error "Attempted to generate SignKeyKES evolved beyond max period"
+
+instance (UnsoundPureKESAlgorithm k, Arbitrary (ContextKES k)) => Arbitrary (VerKeyKES k) where
+  arbitrary = unsoundPureDeriveVerKeyKES <$> arbitrary
+
+instance (UnsoundPureKESAlgorithm k, Signable k ByteString, Arbitrary (ContextKES k)) => Arbitrary (SigKES k) where
+  arbitrary = do
+    sk <- arbitrary
+    signable <- BS.pack <$> listOf arbitrary
+    ctx <- arbitrary
+    return $ unsoundPureSignKES ctx 0 signable sk
+
+--------------------------------------------------------------------------------
+-- Tests
+--------------------------------------------------------------------------------
 
 testKESAlloc
   :: forall v.
@@ -371,7 +411,7 @@ testKESAlgorithm lock n =
               equals <- bracket
                           (directDeserialiseFromBS serialized)
                           forgetSignKeyKES
-                          (\sk' -> sk ==! sk')
+                          (sk ==!)
               return $
                 counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
                 equals
@@ -791,20 +831,7 @@ prop_noErasedBlocksInKey
 prop_noErasedBlocksInKey kesAlgorithm =
   ioProperty . withNullSK @IO @v $ \sk -> do
     let size :: Int = fromIntegral $ sizeSignKeyKES kesAlgorithm
-    serialized <- allocaBytes size $ \ptr -> do
-      positionVar <- newMVar (0 :: Int)
-      directSerialise (\buf nCSize -> do
-          let n = fromIntegral nCSize :: Int
-          bracket
-            (takeMVar positionVar)
-            (putMVar positionVar . (+ n))
-            (\position -> do
-              when (n + position > size) (error "Buffer size exceeded")
-              copyMem (plusPtr ptr position) buf (fromIntegral n)
-            )
-        )
-        sk
-      packByteStringCStringLen (ptr, size)
+    serialized <- directSerialiseToBS size sk
     forgetSignKeyKES sk
     return $ counterexample (hexBS serialized) $ not (hasLongRunOfFF serialized)
 
@@ -815,7 +842,7 @@ hasLongRunOfFF bs
   | otherwise
   = let first16 = BS.take 16 bs
         remainder = BS.drop 16 bs
-    in (BS.all (== 0xFF) first16) || hasLongRunOfFF remainder
+    in BS.all (== 0xFF) first16 || hasLongRunOfFF remainder
 
 prop_unsoundPureGenKey :: forall v.
                           ( UnsoundPureKESAlgorithm v

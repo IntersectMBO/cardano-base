@@ -416,16 +416,14 @@ instance ( KESAlgorithm (SumKES h d)
     unsoundPureUpdateKES ctx (UnsoundPureSignKeySumKES sk r_1 vk_0 vk_1) t
       | t+1 <  _T = do
                         sk' <- unsoundPureUpdateKES ctx sk t
-                        let r_1' = r_1
-                        return $! UnsoundPureSignKeySumKES sk' r_1' vk_0 vk_1
+                        return $! UnsoundPureSignKeySumKES sk' r_1 vk_0 vk_1
       | t+1 == _T = do
                         let sk' = unsoundPureGenKeyKES r_1
                         let r_1' = mkSeedFromBytes (BS.replicate (fromIntegral (seedSizeKES (Proxy @d))) 0)
                         return $! UnsoundPureSignKeySumKES sk' r_1' vk_0 vk_1
       | otherwise = do
                         sk' <- unsoundPureUpdateKES ctx sk (t - _T)
-                        let r_1' = r_1
-                        return $! UnsoundPureSignKeySumKES sk' r_1' vk_0 vk_1
+                        return $! UnsoundPureSignKeySumKES sk' r_1 vk_0 vk_1
       where
         _T = totalPeriodsKES (Proxy :: Proxy d)
 
@@ -434,8 +432,7 @@ instance ( KESAlgorithm (SumKES h d)
     --
 
     unsoundPureGenKeyKES r =
-      let r0 = mkSeedFromBytes $ digest (Proxy @h) (BS.cons 1 $ getSeedBytes r)
-          r1 = mkSeedFromBytes $ digest (Proxy @h) (BS.cons 2 $ getSeedBytes r)
+      let (r0, r1) = expandSeed (Proxy @h) r
           sk_0 = unsoundPureGenKeyKES r0
           vk_0 = unsoundPureDeriveVerKeyKES sk_0
           sk_1 = unsoundPureGenKeyKES r1

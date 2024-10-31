@@ -110,7 +110,6 @@ import Cardano.Crypto.Libsodium.Memory
   ( unpackByteStringCStringLen
   , packByteStringCStringLen
   , allocaBytes
-  , copyMem
   )
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -141,18 +140,13 @@ import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import Formatting.Buildable (Buildable (..), build)
-import Foreign.Ptr (Ptr, plusPtr)
-import Foreign.C.Types (CChar, CSize)
 import Control.Monad.Class.MonadST (MonadST)
 import Control.Monad.Class.MonadThrow (MonadThrow)
 import Control.Concurrent.Class.MonadMVar
   ( MVar
   , withMVar
   , newMVar
-  , putMVar
-  , takeMVar
   , newMVar
-  , MonadMVar
   )
 import GHC.Stack (HasCallStack)
 
@@ -407,35 +401,20 @@ directSerialiseToBS :: forall m a.
                        DirectSerialise a
                     => MonadST m
                     => MonadThrow m
-                    => MonadMVar m
-                    => Int -> a -> m ByteString
+                    => Int
+                    -> a
+                    -> m ByteString
 directSerialiseToBS dstsize val = do
   allocaBytes dstsize $ \dst -> do
-    posVar <- newMVar 0
-    let pusher :: Ptr CChar -> CSize -> m ()
-        pusher src srcsize = do
-          pos <- takeMVar posVar
-          let pos' = pos + fromIntegral srcsize
-          when (pos' > dstsize) (error "Buffer overrun")
-          copyMem (plusPtr dst pos) src (fromIntegral srcsize)
-          putMVar posVar pos'
-    directSerialise pusher val
+    directSerialiseBufChecked dst dstsize val
     packByteStringCStringLen (dst, fromIntegral dstsize)
 
 directDeserialiseFromBS :: forall m a.
                            DirectDeserialise a
                            => MonadST m
                            => MonadThrow m
-                           => MonadMVar m
-                           => ByteString -> m a
+                           => ByteString
+                           -> m a
 directDeserialiseFromBS bs = do
   unpackByteStringCStringLen bs $ \(src, srcsize) -> do
-    posVar <- newMVar 0
-    let puller :: Ptr CChar -> CSize -> m ()
-        puller dst dstsize = do
-          pos <- takeMVar posVar
-          let pos' = pos + fromIntegral dstsize
-          when (pos' > srcsize) (error "Buffer overrun")
-          copyMem dst (plusPtr src pos) (fromIntegral dstsize)
-          putMVar posVar pos'
-    directDeserialise puller
+    directDeserialiseBufChecked src srcsize

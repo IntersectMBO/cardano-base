@@ -8,6 +8,7 @@
 module Cardano.Crypto.Libsodium.MLockedSeed
 where
 
+import Cardano.Crypto.DirectSerialise
 import Cardano.Crypto.Libsodium.MLockedBytes (
   MLockedSizedBytes,
   mlsbCopyWith,
@@ -29,7 +30,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Class.MonadST (MonadST)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
-import Foreign.Ptr (Ptr)
+import Foreign.Ptr (Ptr, castPtr)
 import GHC.TypeNats (KnownNat, natVal)
 import NoThunks.Class (NoThunks)
 
@@ -38,6 +39,18 @@ import NoThunks.Class (NoThunks)
 -- after its content has been moved.
 newtype MLockedSeed n = MLockedSeed {mlockedSeedMLSB :: MLockedSizedBytes n}
   deriving (NFData, NoThunks)
+
+instance KnownNat n => DirectSerialise (MLockedSeed n) where
+  directSerialise push seed =
+    mlockedSeedUseAsCPtr seed $ \ptr ->
+      push (castPtr ptr) (fromIntegral $ natVal seed)
+
+instance KnownNat n => DirectDeserialise (MLockedSeed n) where
+  directDeserialise pull = do
+    seed <- mlockedSeedNew
+    mlockedSeedUseAsCPtr seed $ \ptr ->
+      pull (castPtr ptr) (fromIntegral $ natVal seed)
+    return seed
 
 withMLockedSeedAsMLSB
   :: Functor m

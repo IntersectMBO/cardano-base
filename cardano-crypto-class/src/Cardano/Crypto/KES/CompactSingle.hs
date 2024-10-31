@@ -192,9 +192,8 @@ instance ( KESAlgorithm (CompactSingleKES d)
     unsoundPureDeriveVerKeyKES (UnsoundPureSignKeyCompactSingleKES v) =
       VerKeyCompactSingleKES $! deriveVerKeyDSIGN v
 
-    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeyCompactSingleKES sk) =
-      maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") (return . SignKeyCompactSingleKES)
-      =<< (rawDeserialiseSignKeyDSIGNM . rawSerialiseSignKeyDSIGN $ sk)
+    unsoundPureSignKeyKESToSoundSignKeyKES =
+      unsoundPureSignKeyKESToSoundSignKeyKESViaSer
 
     rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyCompactSingleKES sk) =
       rawSerialiseSignKeyDSIGN sk

@@ -206,13 +206,12 @@ instance ( KESAlgorithm (SimpleKES d t)
             mkSeedFromBytes (BS.take seedSize . BS.drop (seedSize * t) $ getSeedBytes seed)
       in
         UnsoundPureSignKeySimpleKES $
-          Vec.generate duration (\t ->
-            genKeyDSIGN (seedChunk t))
+          Vec.generate duration (genKeyDSIGN . seedChunk)
 
     unsoundPureSignKES ctxt j a (UnsoundPureSignKeySimpleKES sks) =
         case sks !? fromIntegral j of
           Nothing -> error ("SimpleKES.unsoundPureSignKES: period out of range " ++ show j)
-          Just sk -> SigSimpleKES $! (signDSIGN ctxt a $! sk)
+          Just sk -> SigSimpleKES $! signDSIGN ctxt a sk
 
     unsoundPureUpdateKES _ (UnsoundPureThunkySignKeySimpleKES sk) t
       | t+1 < fromIntegral (natVal (Proxy @t))
@@ -231,7 +230,7 @@ instance ( KESAlgorithm (SimpleKES d t)
                       . rawSerialiseSignKeyDSIGN
 
     rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySimpleKES sks) =
-        BS.concat $! map rawSerialiseSignKeyDSIGN (Vec.toList sks)
+        foldMap rawSerialiseSignKeyDSIGN sks
 
 
     rawDeserialiseUnsoundPureSignKeyKES bs
@@ -330,7 +329,7 @@ instance (DirectDeserialise (VerKeyDSIGN d), KnownNat t) => DirectDeserialise (V
   directDeserialise pull = do
     let duration = fromIntegral (natVal (Proxy :: Proxy t))
     vks <- Vec.replicateM duration (directDeserialise pull)
-    return $! VerKeySimpleKES $! vks
+    return $! VerKeySimpleKES vks
 
 instance (DirectSerialise (SignKeyDSIGNM d)) => DirectSerialise (SignKeyKES (SimpleKES d t)) where
   directSerialise push (SignKeySimpleKES sks) =
@@ -340,4 +339,4 @@ instance (DirectDeserialise (SignKeyDSIGNM d), KnownNat t) => DirectDeserialise 
   directDeserialise pull = do
     let duration = fromIntegral (natVal (Proxy :: Proxy t))
     sks <- Vec.replicateM duration (directDeserialise pull)
-    return $! SignKeySimpleKES $! sks
+    return $! SignKeySimpleKES sks

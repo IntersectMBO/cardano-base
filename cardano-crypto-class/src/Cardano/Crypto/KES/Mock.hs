@@ -161,7 +161,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     --
 
     genKeyKESWith _allocator seed = do
-        seedBS <- mlsbToByteString . mlockedSeedMLSB $ seed
+        seedBS <- mlsbToByteString $ mlockedSeedMLSB seed
         let vk = VerKeyMockKES (runMonadRandomWithSeed (mkSeedFromBytes seedBS) getRandomWord64)
         return $! SignKeyMockKES vk 0
 
@@ -273,9 +273,9 @@ instance (KnownNat t) => DirectDeserialise (SignKeyKES (MockKES t)) where
         rawDeserialiseSignKeyMockKES bs
 
 instance (KnownNat t) => DirectSerialise (VerKeyKES (MockKES t)) where
-  directSerialise put sk = do
+  directSerialise push sk = do
     let bs = rawSerialiseVerKeyKES sk
-    unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+    unpackByteStringCStringLen bs $ \(cstr, len) -> push cstr (fromIntegral len)
 
 instance (KnownNat t) => DirectDeserialise (VerKeyKES (MockKES t)) where
   directDeserialise pull = do
