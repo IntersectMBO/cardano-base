@@ -2,8 +2,7 @@
   description = "cardano-base";
 
   inputs = {
-    # freeze haskell.nix prior to the nixpkgs update that broken 8.10 cross-windows
-    haskellNix.url = "github:input-output-hk/haskell.nix?ref=cb139fa956158397aa398186bb32dd26f7318784";
+    haskellNix.url = "github:input-output-hk/haskell.nix";
     # allow us to independently update hackageNix
     haskellNix.inputs.hackage.follows = "hackageNix";
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
@@ -56,7 +55,7 @@
         inherit (nixpkgs) lib;
 
         # see flake `variants` below for alternative compilers
-        defaultCompiler = "ghc964";
+        defaultCompiler = "ghc966";
         fourmoluVersion = "0.16.2.0";
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
@@ -112,11 +111,23 @@
             # Skip cross compilers for the shell
             crossPlatforms = _: [];
           };
+          flake = {
+            # on linux, build/test other supported compilers
+            variants = lib.genAttrs ["ghc8107"] (compiler-nix-name: {
+              inherit compiler-nix-name;
+            });
+            # we also want cross compilation to windows.
+            crossPlatforms = p: lib.optional (system == "x86_64-linux" && config.compiler-nix-name != "ghc8107") p.mingwW64;
+          };
 
           # package customizations as needed. Where cabal.project is not
           # specific enough, or doesn't allow setting these.
           modules = [
             ({pkgs, ...}: {
+              # Packages that are not always in the plan need to be listed so that haskell.nix does not
+              # complain about overrides on packages that do not exist.
+              package-keys = ["katip" "ekg" "slotting" "lens" "nonempty-vector"];
+
               # Packages we wish to ignore version bounds of.
               # This is similar to jailbreakCabal, however it
               # does not require any messing with cabal files.
@@ -148,17 +159,7 @@
           ];
         });
         # ... and construct a flake from the cabal project
-        flake =
-          cabalProject.flake (
-            lib.optionalAttrs (system == "x86_64-linux") {
-              # on linux, build/test other supported compilers
-              variants = lib.genAttrs ["ghc8107"] (compiler-nix-name: {
-                inherit compiler-nix-name;
-              });
-              # we also want cross compilation to windows.
-              crossPlatforms = p: [p.mingwW64];
-            }
-          );
+        flake = cabalProject.flake {};
       in
         lib.recursiveUpdate flake rec {
           project = cabalProject;
