@@ -67,6 +67,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short as SBS
 import Data.MemPack (StateT(StateT), FailT(FailT), MemPack, Unpack(Unpack))
 import Data.Word (Word8)
 import Numeric.Natural (Natural)
@@ -86,8 +87,7 @@ import Control.DeepSeq (NFData)
 
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (Encoding, FromCBOR(..), Size, ToCBOR(..), decodeBytes,
-                       serialize')
+import Cardano.Binary (Encoding, FromCBOR(..), Size, ToCBOR(..), serialize')
 import Cardano.Crypto.PackedBytes
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.HeapWords (HeapWords (..))
@@ -357,14 +357,14 @@ instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
 
 instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
   fromCBOR = do
-    bs <- decodeBytes
-    case hashFromBytes bs of
+    sbs <- fromCBOR
+    case hashFromBytesShort sbs of
       Just x  -> return x
       Nothing -> fail $ "hash bytes wrong size, expected " ++ show expected
                      ++ " but got " ++ show actual
         where
           expected = sizeHash (Proxy :: Proxy h)
-          actual   = BS.length bs
+          actual   = SBS.length sbs
 
 --
 -- Deprecated
