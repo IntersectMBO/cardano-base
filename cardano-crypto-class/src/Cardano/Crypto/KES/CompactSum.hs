@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -86,7 +87,8 @@ module Cardano.Crypto.KES.CompactSum (
 import           Data.Proxy (Proxy(..))
 import           GHC.Generics (Generic)
 import qualified Data.ByteString as BS
-import           Control.Monad (guard)
+import qualified Data.ByteString.Internal as BS
+import           Control.Monad (guard, (<$!>))
 import           NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -95,12 +97,17 @@ import           Cardano.Crypto.Hash.Class
 import           Cardano.Crypto.KES.Class
 import           Cardano.Crypto.KES.CompactSingle (CompactSingleKES)
 import           Cardano.Crypto.Util
+import           Cardano.Crypto.Seed
 import           Cardano.Crypto.Libsodium.MLockedSeed
 import           Cardano.Crypto.Libsodium
+import           Cardano.Crypto.Libsodium.Memory
+import           Cardano.Crypto.DirectSerialise
+
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Control.Monad.Trans (lift)
 import           Control.DeepSeq (NFData (..))
 import           GHC.TypeLits (KnownNat, type (+), type (*))
+import           Foreign.Ptr (castPtr)
 
 -- | A 2^0 period KES
 type CompactSum0KES d   = CompactSingleKES d
@@ -461,3 +468,174 @@ instance ( OptimizedKESAlgorithm d
          )
       => FromCBOR (SigKES (CompactSumKES h d)) where
   fromCBOR = decodeSigKES
+
+
+--
+-- Unsound pure KES API
+--
+instance ( KESAlgorithm (CompactSumKES h d)
+         , HashAlgorithm h
+         , UnsoundPureKESAlgorithm d
+         )
+         => UnsoundPureKESAlgorithm (CompactSumKES h d) where
+    data UnsoundPureSignKeyKES (CompactSumKES h d) =
+           UnsoundPureSignKeyCompactSumKES !(UnsoundPureSignKeyKES d)
+                         !Seed
+                         !(VerKeyKES d)
+                         !(VerKeyKES d)
+           deriving (Generic)
+
+    unsoundPureSignKES ctxt t a (UnsoundPureSignKeyCompactSumKES sk _r_1 vk_0 vk_1) =
+        SigCompactSumKES sigma vk_other
+      where
+        (sigma, vk_other)
+          | t < _T    = (unsoundPureSignKES ctxt  t       a sk, vk_1)
+          | otherwise = (unsoundPureSignKES ctxt (t - _T) a sk, vk_0)
+
+        _T = totalPeriodsKES (Proxy :: Proxy d)
+
+    unsoundPureUpdateKES ctx (UnsoundPureSignKeyCompactSumKES sk r_1 vk_0 vk_1) t
+      | t+1 <  _T = do
+                        sk' <- unsoundPureUpdateKES ctx sk t
+                        let r_1' = r_1
+                        return $! UnsoundPureSignKeyCompactSumKES sk' r_1' vk_0 vk_1
+      | t+1 == _T = do
+                        let sk' = unsoundPureGenKeyKES r_1
+                        let r_1' = mkSeedFromBytes (BS.replicate (fromIntegral (seedSizeKES (Proxy @d))) 0)
+                        return $! UnsoundPureSignKeyCompactSumKES sk' r_1' vk_0 vk_1
+      | otherwise = do
+                        sk' <- unsoundPureUpdateKES ctx sk (t - _T)
+                        let r_1' = r_1
+                        return $! UnsoundPureSignKeyCompactSumKES sk' r_1' vk_0 vk_1
+      where
+        _T = totalPeriodsKES (Proxy :: Proxy d)
+
+    --
+    -- Key generation
+    --
+
+    unsoundPureGenKeyKES r =
+      let r0 = mkSeedFromBytes $ digest (Proxy @h) (BS.cons 1 $ getSeedBytes r)
+          r1 = mkSeedFromBytes $ digest (Proxy @h) (BS.cons 2 $ getSeedBytes r)
+          sk_0 = unsoundPureGenKeyKES r0
+          vk_0 = unsoundPureDeriveVerKeyKES sk_0
+          sk_1 = unsoundPureGenKeyKES r1
+          vk_1 = unsoundPureDeriveVerKeyKES sk_1
+      in UnsoundPureSignKeyCompactSumKES sk_0 r1 vk_0 vk_1
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeyCompactSumKES _ _ vk_0 vk_1) =
+      VerKeyCompactSumKES (hashPairOfVKeys (vk_0, vk_1))
+
+    unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeyCompactSumKES sk r_1 vk_0 vk_1) =
+      SignKeyCompactSumKES
+        <$> unsoundPureSignKeyKESToSoundSignKeyKES sk
+        <*> (fmap MLockedSeed . mlsbFromByteString . getSeedBytes $ r_1)
+        <*> pure vk_0
+        <*> pure vk_1
+
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyCompactSumKES sk r_1 vk_0 vk_1) =
+      let ssk = rawSerialiseUnsoundPureSignKeyKES sk
+          sr1 = getSeedBytes r_1
+      in mconcat
+          [ ssk
+          , sr1
+          , rawSerialiseVerKeyKES vk_0
+          , rawSerialiseVerKeyKES vk_1
+          ]
+
+    rawDeserialiseUnsoundPureSignKeyKES b = do
+        guard (BS.length b == fromIntegral size_total)
+        sk   <- rawDeserialiseUnsoundPureSignKeyKES b_sk
+        let r = mkSeedFromBytes b_r
+        vk_0 <- rawDeserialiseVerKeyKES  b_vk0
+        vk_1 <- rawDeserialiseVerKeyKES  b_vk1
+        return (UnsoundPureSignKeyCompactSumKES sk r vk_0 vk_1)
+      where
+        b_sk  = slice off_sk  size_sk b
+        b_r   = slice off_r   size_r  b
+        b_vk0 = slice off_vk0 size_vk b
+        b_vk1 = slice off_vk1 size_vk b
+
+        size_sk    = sizeSignKeyKES (Proxy :: Proxy d)
+        size_r     = seedSizeKES    (Proxy :: Proxy d)
+        size_vk    = sizeVerKeyKES  (Proxy :: Proxy d)
+        size_total = sizeSignKeyKES (Proxy :: Proxy (CompactSumKES h d))
+
+        off_sk     = 0 :: Word
+        off_r      = size_sk
+        off_vk0    = off_r + size_r
+        off_vk1    = off_vk0 + size_vk
+
+--
+-- UnsoundPureSignKey instances
+--
+
+deriving instance (KESAlgorithm d, Show (UnsoundPureSignKeyKES d)) => Show (UnsoundPureSignKeyKES (CompactSumKES h d))
+deriving instance (KESAlgorithm d, Eq (UnsoundPureSignKeyKES d)) => Eq   (UnsoundPureSignKeyKES (CompactSumKES h d))
+
+instance ( SizeHash h ~ SeedSizeKES d
+         , OptimizedKESAlgorithm d
+         , UnsoundPureKESAlgorithm d
+         , SodiumHashAlgorithm h
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         ) => ToCBOR (UnsoundPureSignKeyKES (CompactSumKES h d)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (CompactSumKES h d)))
+
+instance ( SizeHash h ~ SeedSizeKES d
+         , OptimizedKESAlgorithm d
+         , UnsoundPureKESAlgorithm d
+         , SodiumHashAlgorithm h
+         , KnownNat (SizeVerKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSignKeyKES (CompactSumKES h d))
+         , KnownNat (SizeSigKES (CompactSumKES h d))
+         ) => FromCBOR (UnsoundPureSignKeyKES (CompactSumKES h d)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
+
+instance (NoThunks (UnsoundPureSignKeyKES d), KESAlgorithm d) => NoThunks (UnsoundPureSignKeyKES  (CompactSumKES h d))
+
+
+--
+-- Direct ser/deser
+--
+
+instance ( DirectSerialise (SignKeyKES d)
+         , DirectSerialise (VerKeyKES d)
+         , KESAlgorithm d
+         ) => DirectSerialise (SignKeyKES (CompactSumKES h d)) where
+  directSerialise push (SignKeyCompactSumKES sk r vk0 vk1) = do
+    directSerialise push sk
+    directSerialise push r
+    directSerialise push vk0
+    directSerialise push vk1
+
+instance ( DirectDeserialise (SignKeyKES d)
+         , DirectDeserialise (VerKeyKES d)
+         , KESAlgorithm d
+         ) => DirectDeserialise (SignKeyKES (CompactSumKES h d)) where
+  directDeserialise pull = do
+    sk <- directDeserialise pull
+    r <- directDeserialise pull
+    vk0 <- directDeserialise pull
+    vk1 <- directDeserialise pull
+
+    return $! SignKeyCompactSumKES sk r vk0 vk1
+
+
+instance DirectSerialise (VerKeyKES (CompactSumKES h d)) where
+  directSerialise push (VerKeyCompactSumKES h) =
+    unpackByteStringCStringLen (hashToBytes h) $ \(ptr, len) ->
+      push (castPtr ptr) (fromIntegral len)
+
+instance (HashAlgorithm h)
+         => DirectDeserialise (VerKeyKES (CompactSumKES h d)) where
+  directDeserialise pull = do
+    let len :: Num a => a
+        len = fromIntegral $ sizeHash (Proxy @h)
+    fptr <- mallocForeignPtrBytes len
+    withForeignPtr fptr $ \ptr -> do
+      pull (castPtr ptr) len
+    let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
+    maybe (error "Invalid hash") return $! VerKeyCompactSumKES <$!> hashFromBytes bs

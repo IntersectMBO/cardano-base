@@ -59,6 +59,10 @@ module Test.Crypto.Util
   , noExceptionsThrown
   , doesNotThrow
 
+  -- * Direct ser/deser helpers
+  , directSerialiseToBS
+  , directDeserialiseFromBS
+
     -- * Error handling
   , eitherShowError
 
@@ -95,11 +99,17 @@ import Codec.CBOR.Write (
   )
 import Cardano.Crypto.Seed (Seed, mkSeedFromBytes)
 import Cardano.Crypto.Util (SignableRepresentation(..))
+import Cardano.Crypto.DirectSerialise
 import Crypto.Random
   ( ChaChaDRG
   , MonadPseudoRandom
   , drgNewTest
   , withDRG
+  )
+import Cardano.Crypto.Libsodium.Memory
+  ( unpackByteStringCStringLen
+  , packByteStringCStringLen
+  , allocaBytes
   )
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -130,7 +140,14 @@ import qualified Test.QuickCheck.Gen as Gen
 import Control.Monad (guard, when)
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import Formatting.Buildable (Buildable (..), build)
-import Control.Concurrent.Class.MonadMVar (MVar, withMVar, newMVar)
+import Control.Monad.Class.MonadST (MonadST)
+import Control.Monad.Class.MonadThrow (MonadThrow)
+import Control.Concurrent.Class.MonadMVar
+  ( MVar
+  , withMVar
+  , newMVar
+  , newMVar
+  )
 import GHC.Stack (HasCallStack)
 
 --------------------------------------------------------------------------------
@@ -375,3 +392,29 @@ mkLock = Lock <$> newMVar ()
 eitherShowError :: (HasCallStack, Show e) => Either e a -> IO a
 eitherShowError (Left e) = error (show e)
 eitherShowError (Right a) = return a
+
+--------------------------------------------------------------------------------
+-- Helpers for direct ser/deser
+--------------------------------------------------------------------------------
+
+directSerialiseToBS :: forall m a.
+                       DirectSerialise a
+                    => MonadST m
+                    => MonadThrow m
+                    => Int
+                    -> a
+                    -> m ByteString
+directSerialiseToBS dstsize val = do
+  allocaBytes dstsize $ \dst -> do
+    directSerialiseBufChecked dst dstsize val
+    packByteStringCStringLen (dst, fromIntegral dstsize)
+
+directDeserialiseFromBS :: forall m a.
+                           DirectDeserialise a
+                           => MonadST m
+                           => MonadThrow m
+                           => ByteString
+                           -> m a
+directDeserialiseFromBS bs = do
+  unpackByteStringCStringLen bs $ \(src, srcsize) -> do
+    directDeserialiseBufChecked src srcsize

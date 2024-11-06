@@ -50,7 +50,7 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGN.Class as DSIGN
 import Cardano.Crypto.KES.Class
-
+import Cardano.Crypto.DirectSerialise
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
 -- single time period.
@@ -140,6 +140,37 @@ instance (DSIGNMAlgorithm d) => KESAlgorithm (SingleKES d) where
     forgetSignKeyKESWith allocator (SignKeySingleKES v) =
       forgetSignKeyDSIGNMWith allocator v
 
+instance ( KESAlgorithm (SingleKES d)
+         , UnsoundDSIGNMAlgorithm d
+         )
+         => UnsoundPureKESAlgorithm (SingleKES d) where
+    newtype UnsoundPureSignKeyKES (SingleKES d) = UnsoundPureSignKeySingleKES (SignKeyDSIGN d)
+      deriving (Generic)
+
+    unsoundPureSignKES ctxt t a (UnsoundPureSignKeySingleKES sk) =
+        assert (t == 0) $!
+        SigSingleKES $! signDSIGN ctxt a sk
+
+    unsoundPureUpdateKES _ctx _sk _to = Nothing
+
+    --
+    -- Key generation
+    --
+
+    unsoundPureGenKeyKES seed =
+      UnsoundPureSignKeySingleKES $! genKeyDSIGN seed
+
+    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeySingleKES v) =
+      VerKeySingleKES $! deriveVerKeyDSIGN v
+
+    unsoundPureSignKeyKESToSoundSignKeyKES =
+      unsoundPureSignKeyKESToSoundSignKeyKESViaSer
+
+    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySingleKES sk) =
+      rawSerialiseSignKeyDSIGN sk
+    rawDeserialiseUnsoundPureSignKeyKES b =
+      UnsoundPureSignKeySingleKES <$> rawDeserialiseSignKeyDSIGN b
+
 instance (KESAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
          => UnsoundKESAlgorithm (SingleKES d) where
     rawSerialiseSignKeyKES (SignKeySingleKES sk) =
@@ -187,4 +218,35 @@ instance DSIGNMAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
 
 instance DSIGNMAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
   fromCBOR = decodeSigKES
-  {-# INLINE fromCBOR #-}
+
+--
+-- UnsoundPureSignKey instances
+--
+
+deriving instance DSIGNAlgorithm d => Show (UnsoundPureSignKeyKES (SingleKES d))
+deriving instance Eq (SignKeyDSIGN d) => Eq   (UnsoundPureSignKeyKES (SingleKES d))
+
+instance (UnsoundDSIGNMAlgorithm d) => ToCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
+  toCBOR = encodeUnsoundPureSignKeyKES
+  encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (SingleKES d)))
+
+instance (UnsoundDSIGNMAlgorithm d) => FromCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
+  fromCBOR = decodeUnsoundPureSignKeyKES
+
+instance DSIGNAlgorithm d => NoThunks (UnsoundPureSignKeyKES  (SingleKES d))
+
+--
+-- Direct ser/deser
+--
+
+instance (DirectSerialise (SignKeyDSIGNM d)) => DirectSerialise (SignKeyKES (SingleKES d)) where
+  directSerialise push (SignKeySingleKES sk) = directSerialise push sk
+
+instance (DirectDeserialise (SignKeyDSIGNM d)) => DirectDeserialise (SignKeyKES (SingleKES d)) where
+  directDeserialise pull = SignKeySingleKES <$!> directDeserialise pull
+
+instance (DirectSerialise (VerKeyDSIGN d)) => DirectSerialise (VerKeyKES (SingleKES d)) where
+  directSerialise push (VerKeySingleKES sk) = directSerialise push sk
+
+instance (DirectDeserialise (VerKeyDSIGN d)) => DirectDeserialise (VerKeyKES (SingleKES d)) where
+  directDeserialise pull = VerKeySingleKES <$!> directDeserialise pull

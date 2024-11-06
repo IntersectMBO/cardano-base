@@ -31,17 +31,20 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
 import Data.IORef
-import GHC.TypeNats (KnownNat)
+import GHC.TypeNats (KnownNat, natVal)
 
-import Control.Tracer
+import Control.Monad (void)
+import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad (void)
+import Control.Tracer
 
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
+import Cardano.Crypto.DirectSerialise (DirectSerialise, DirectDeserialise)
 import Cardano.Crypto.Util (SignableRepresentation(..))
+import Cardano.Crypto.Seed (mkSeedFromBytes)
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.PinnedSizedBytes
@@ -67,6 +70,8 @@ import Test.Crypto.Util (
   noExceptionsThrown,
   Lock,
   withLock,
+  directSerialiseToBS,
+  directDeserialiseFromBS,
   )
 import Test.Crypto.EqST
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
@@ -94,6 +99,10 @@ tests lock =
   , testKESAlgorithm @(CompactSum2KES Ed25519DSIGN Blake2b_256) lock "CompactSum2KES"
   , testKESAlgorithm @(CompactSum5KES Ed25519DSIGN Blake2b_256) lock "CompactSum5KES"
   ]
+
+--------------------------------------------------------------------------------
+-- Show and Eq instances
+--------------------------------------------------------------------------------
 
 -- We normally ensure that we avoid naively comparing signing keys by not
 -- providing instances, but for tests it is fine, so we provide the orphan
@@ -136,6 +145,48 @@ instance ( EqST (SignKeyKES d)
          ) => EqST (SignKeyKES (CompactSumKES h d)) where
   equalsM (SignKeyCompactSumKES s r v1 v2) (SignKeyCompactSumKES s' r' v1' v2') =
     (s, r, PureEqST v1, PureEqST v2) ==! (s', r', PureEqST v1', PureEqST v2')
+
+--------------------------------------------------------------------------------
+-- Arbitrary instances
+--------------------------------------------------------------------------------
+
+genInitialSignKeyKES :: forall k. UnsoundPureKESAlgorithm k => Gen (UnsoundPureSignKeyKES k)
+genInitialSignKeyKES = do
+    bytes <- BS.pack <$> vector (fromIntegral $ seedSizeKES (Proxy @k))
+    let seed = mkSeedFromBytes bytes
+    return $ unsoundPureGenKeyKES seed
+
+instance (UnsoundPureKESAlgorithm k, Arbitrary (ContextKES k)) => Arbitrary (UnsoundPureSignKeyKES k) where
+  arbitrary = do
+    ctx <- arbitrary
+    let updateTo :: Period -> Period -> UnsoundPureSignKeyKES k -> Maybe (UnsoundPureSignKeyKES k)
+        updateTo target current sk
+          | target == current
+          = Just sk
+          | target > current
+          = updateTo target (succ current) =<< unsoundPureUpdateKES ctx sk current
+          | otherwise
+          = Nothing
+    period <- chooseBoundedIntegral (0, totalPeriodsKES (Proxy @k) - 1)
+    sk0 <- genInitialSignKeyKES
+    let skMay = updateTo period 0 sk0
+    case skMay of
+      Just sk -> return sk
+      Nothing -> error "Attempted to generate SignKeyKES evolved beyond max period"
+
+instance (UnsoundPureKESAlgorithm k, Arbitrary (ContextKES k)) => Arbitrary (VerKeyKES k) where
+  arbitrary = unsoundPureDeriveVerKeyKES <$> arbitrary
+
+instance (UnsoundPureKESAlgorithm k, Signable k ByteString, Arbitrary (ContextKES k)) => Arbitrary (SigKES k) where
+  arbitrary = do
+    sk <- arbitrary
+    signable <- BS.pack <$> listOf arbitrary
+    ctx <- arbitrary
+    return $ unsoundPureSignKES ctx 0 signable sk
+
+--------------------------------------------------------------------------------
+-- Tests
+--------------------------------------------------------------------------------
 
 testKESAlloc
   :: forall v.
@@ -193,11 +244,18 @@ testKESAlgorithm
      , FromCBOR (VerKeyKES v)
      , EqST (SignKeyKES v)   -- only monadic EqST for signing keys
      , Show (SignKeyKES v) -- fake instance defined locally
+     , Eq (UnsoundPureSignKeyKES v)
+     , Show (UnsoundPureSignKeyKES v)
      , ToCBOR (SigKES v)
      , FromCBOR (SigKES v)
      , Signable v ~ SignableRepresentation
      , ContextKES v ~ ()
      , UnsoundKESAlgorithm v
+     , UnsoundPureKESAlgorithm v
+     , DirectSerialise (SignKeyKES v)
+     , DirectSerialise (VerKeyKES v)
+     , DirectDeserialise (SignKeyKES v)
+     , DirectDeserialise (VerKeyKES v)
      )
   => Lock
   -> String
@@ -225,9 +283,32 @@ testKESAlgorithm lock n =
       , testProperty "Sig"     $ \seedPSB (msg :: Message) ->
           ioProperty $ withLock lock $ fmap conjoin $ withAllUpdatesKES @v seedPSB $ \t sk -> do
             prop_no_thunks_IO (signKES () t msg sk)
+
+      , testProperty "VerKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "SignKey DirectSerialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            prop_no_thunks_IO (return $! direct)
+      , testProperty "VerKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
+            prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
+      , testProperty "SignKey DirectDeserialise" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            bracket
+              (directDeserialiseFromBS @IO @(SignKeyKES v) $! direct)
+              forgetSignKeyKES
+              (prop_no_thunks_IO . return)
       ]
 
     , testProperty "same VerKey "  $ prop_deriveVerKeyKES @v
+    , testProperty "no forgotten chunks in signkey" $ prop_noErasedBlocksInKey (Proxy @v)
     , testGroup "serialisation"
 
       [ testGroup "raw ser only"
@@ -275,6 +356,9 @@ testKESAlgorithm lock n =
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigKES v <- signKES () 0 msg sk
               return $ prop_cbor_with encodeSigKES decodeSigKES sig
+        , testProperty "UnsoundSignKeyKES" $ \seedPSB ->
+              let sk :: UnsoundPureSignKeyKES v = mkUnsoundPureSignKeyKES seedPSB
+              in prop_cbor_with encodeUnsoundPureSignKeyKES decodeUnsoundPureSignKeyKES sk
         ]
 
       , testGroup "To/FromCBOR class"
@@ -313,6 +397,38 @@ testKESAlgorithm lock n =
               sig :: SigKES v <- signKES () 0 msg sk
               return $ prop_cbor_direct_vs_class encodeSigKES sig
         ]
+
+      , testGroup "DirectSerialise"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyKES v <- deriveVerKeyKES sk
+              serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              vk' <- directDeserialiseFromBS serialized
+              return $ vk === vk'
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              equals <- bracket
+                          (directDeserialiseFromBS serialized)
+                          forgetSignKeyKES
+                          (sk ==!)
+              return $
+                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
+                equals
+        ]
+      , testGroup "DirectSerialise matches raw"
+        [ testProperty "VerKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              vk :: VerKeyKES v <- deriveVerKeyKES sk
+              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+              let raw = rawSerialiseVerKeyKES vk
+              return $ direct === raw
+        , testProperty "SignKey" $
+            ioPropertyWithSK @v lock $ \sk -> do
+              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+              raw <- rawSerialiseSignKeyKES sk
+              return $ direct === raw
+        ]
       ]
 
     , testGroup "verify"
@@ -335,6 +451,12 @@ testKESAlgorithm lock n =
     --   [ testProperty "key overwritten after forget" $ prop_key_overwritten_after_forget (Proxy @v)
     --   ]
 
+    , testGroup "unsound pure"
+      [ testProperty "genKey" $ prop_unsoundPureGenKey @v Proxy
+      , testProperty "updateKES" $ prop_unsoundPureUpdateKES @v Proxy
+      , testProperty "deriveVerKey" $ prop_unsoundPureDeriveVerKey @v Proxy
+      , testProperty "sign" $ prop_unsoundPureSign @v Proxy
+      ]
     ]
 
 -- | Wrap an IO action that requires a 'SignKeyKES' into one that takes an
@@ -348,6 +470,12 @@ withSK seedPSB =
   bracket
     (withMLockedSeedFromPSB seedPSB genKeyKES)
     forgetSignKeyKES
+
+mkUnsoundPureSignKeyKES :: UnsoundPureKESAlgorithm v
+                        => PinnedSizedBytes (SeedSizeKES v) -> UnsoundPureSignKeyKES v
+mkUnsoundPureSignKeyKES psb =
+  let seed = mkSeedFromBytes . psbToByteString $ psb
+  in unsoundPureGenKeyKES seed
 
 -- | Wrap an IO action that requires a 'SignKeyKES' into a 'Property' that
 -- takes a non-mlocked seed (provided as a 'PinnedSizedBytes' of the
@@ -675,4 +803,114 @@ withAllUpdatesKES seedPSB f = withMLockedSeedFromPSB seedPSB $ \seed -> do
           forgetSignKeyKES sk
           xs <- go sk' (t + 1)
           return $ x:xs
+
+withNullSeed :: forall m n a. (MonadThrow m, MonadST m, KnownNat n) => (MLockedSeed n -> m a) -> m a
+withNullSeed = bracket
+  (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral $ natVal (Proxy @n)) 0))
+  mlockedSeedFinalize
+
+withNullSK :: forall m v a. (KESAlgorithm v, MonadThrow m, MonadST m)
+           => (SignKeyKES v -> m a) -> m a
+withNullSK = bracket
+  (withNullSeed genKeyKES)
+  forgetSignKeyKES
+
+
+-- | This test detects whether a sign key contains references to pool-allocated
+-- blocks of memory that have been forgotten by the time the key is complete.
+-- We do this based on the fact that the pooled allocator erases memory blocks
+-- by overwriting them with series of 0xff bytes; thus we cut the serialized
+-- key up into chunks of 16 bytes, and if any of those chunks is entirely
+-- filled with 0xff bytes, we assume that we're looking at erased memory.
+prop_noErasedBlocksInKey
+  :: forall v.
+     UnsoundKESAlgorithm v
+  => DirectSerialise (SignKeyKES v)
+  => Proxy v
+  -> Property
+prop_noErasedBlocksInKey kesAlgorithm =
+  ioProperty . withNullSK @IO @v $ \sk -> do
+    let size :: Int = fromIntegral $ sizeSignKeyKES kesAlgorithm
+    serialized <- directSerialiseToBS size sk
+    forgetSignKeyKES sk
+    return $ counterexample (hexBS serialized) $ not (hasLongRunOfFF serialized)
+
+hasLongRunOfFF :: ByteString -> Bool
+hasLongRunOfFF bs
+  | BS.length bs < 16
+  = False
+  | otherwise
+  = let first16 = BS.take 16 bs
+        remainder = BS.drop 16 bs
+    in BS.all (== 0xFF) first16 || hasLongRunOfFF remainder
+
+prop_unsoundPureGenKey :: forall v.
+                          ( UnsoundPureKESAlgorithm v
+                          , EqST (SignKeyKES v)
+                          )
+                       => Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_unsoundPureGenKey _ seedPSB = ioProperty $ do
+  let seed = mkSeedFromBytes $ psbToByteString seedPSB
+  let skPure = unsoundPureGenKeyKES @v seed
+  withSK seedPSB $ \sk -> do
+    bracket
+      (unsoundPureSignKeyKESToSoundSignKeyKES skPure)
+      forgetSignKeyKES
+      (equalsM sk)
+
+prop_unsoundPureDeriveVerKey :: forall v.
+                          ( UnsoundPureKESAlgorithm v
+                          )
+                       => Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_unsoundPureDeriveVerKey _ seedPSB = ioProperty $ do
+  let seed = mkSeedFromBytes $ psbToByteString seedPSB
+  let skPure = unsoundPureGenKeyKES @v seed
+      vkPure = unsoundPureDeriveVerKeyKES @v skPure
+  vk <- withSK seedPSB deriveVerKeyKES
+  return $ vkPure === vk
+
+prop_unsoundPureUpdateKES :: forall v.
+                             ( UnsoundPureKESAlgorithm v
+                             , ContextKES v ~ ()
+                             , EqST (SignKeyKES v)
+                             )
+                       => Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
+prop_unsoundPureUpdateKES _ seedPSB = ioProperty $ do
+  let seed = mkSeedFromBytes $ psbToByteString seedPSB
+  let skPure = unsoundPureGenKeyKES @v seed
+      skPure'Maybe = unsoundPureUpdateKES () skPure 0
+  withSK seedPSB $ \sk -> do
+    bracket
+      (updateKES () sk 0)
+      (maybe (return ()) forgetSignKeyKES) $ \sk'Maybe -> do
+        case skPure'Maybe of
+          Nothing ->
+            case sk'Maybe of
+              Nothing -> return $ property True
+              Just _ -> return $ counterexample "pure does not update, but should" $ property False
+          Just skPure' ->
+            bracket
+              (unsoundPureSignKeyKESToSoundSignKeyKES skPure')
+              forgetSignKeyKES $ \sk'' ->
+                case sk'Maybe of
+                  Nothing ->
+                    return (counterexample "pure updates, but shouldn't" $ property False)
+                  Just sk' ->
+                    property <$> equalsM sk' sk''
+
+prop_unsoundPureSign :: forall v.
+                          ( UnsoundPureKESAlgorithm v
+                          , ContextKES v ~ ()
+                          , Signable v Message
+                          )
+                       => Proxy v
+                       -> PinnedSizedBytes (SeedSizeKES v)
+                       -> Message
+                       -> Property
+prop_unsoundPureSign _ seedPSB msg = ioProperty $ do
+  let seed = mkSeedFromBytes $ psbToByteString seedPSB
+  let skPure = unsoundPureGenKeyKES @v seed
+      sigPure = unsoundPureSignKES () 0 msg skPure
+  sig <- withSK seedPSB $ signKES () 0 msg
+  return $ sigPure === sig
 

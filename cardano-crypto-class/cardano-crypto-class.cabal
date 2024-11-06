@@ -39,6 +39,7 @@ library
   import:            base, project-config
   hs-source-dirs:    src
   exposed-modules:
+    Cardano.Crypto.DirectSerialise
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.Class
     Cardano.Crypto.DSIGN.Ed25519
