@@ -11,7 +11,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
 (
   -- * Unsafe Types
     ScalarPtr
-  , PointPtr
+  , PointPtr (..)
   , AffinePtr
 
   , Point1Ptr
@@ -40,11 +40,12 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , Affine1
   , Affine2
   , BLSTError (..)
-  , Point
+  , Point (..)
   , Point1
-  , Point2
+  , Point2 
   , PT
-  , Scalar
+  , Scalar (..)
+  , Fr (..)
 
   , unsafePointFromPointPtr
 
