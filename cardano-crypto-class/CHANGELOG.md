@@ -23,6 +23,7 @@ solidified. Ask @lehins if backport is needed.
 * Re-introduction of non-mlocked KES implementations to support a smoother
   migration path:
   [#504](https://github.com/IntersectMBO/cardano-base/pull/504)
+* Exposing constructors of the BLS12-381 internals: [#509](https://github.com/IntersectMBO/cardano-base/pull/509)
 
 ## 2.1.0.2
 
