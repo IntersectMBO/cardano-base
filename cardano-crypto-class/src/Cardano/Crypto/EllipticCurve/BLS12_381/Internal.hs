@@ -42,7 +42,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal
   , BLSTError (..)
   , Point (..)
   , Point1
-  , Point2 
+  , Point2
   , PT
   , Scalar (..)
   , Fr (..)
