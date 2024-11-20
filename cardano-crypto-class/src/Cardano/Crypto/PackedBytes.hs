@@ -123,6 +123,12 @@ instance KnownNat n => MemPack (PackedBytes n) where
     buf <- ask
     pure $! buffer buf
       (\ba# -> packBytes (SBS.SBS ba#) curPos)
+      -- Usage of `accursedUnutterablePerformIO` is safe below because there are no memory
+      -- allocations happening that depend on the IO monad that we are excaping here. All
+      -- IO actions are morally pure reads using pointers into the immutable
+      -- memory. Furthermore, in the place where ByteArray is allocated in
+      -- `packPinnedPtrN`, mutation and freezing are encapsulated with `runST` and is not
+      -- related to the `IO` we are escaping.
       (\addr# -> accursedUnutterablePerformIO $ packPinnedPtr (Ptr (addr# `plusAddr#` curPos#)))
   {-# INLINE unpackM #-}
 
