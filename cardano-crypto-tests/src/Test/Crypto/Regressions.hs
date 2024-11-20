@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
+{- FOURMOLU_DISABLE -}
 module Test.Crypto.Regressions (
   tests
   ) where

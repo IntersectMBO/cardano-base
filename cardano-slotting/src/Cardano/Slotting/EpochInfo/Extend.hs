@@ -1,17 +1,17 @@
 module Cardano.Slotting.EpochInfo.Extend where
 
 import Cardano.Slotting.EpochInfo.API (EpochInfo (..))
-import Cardano.Slotting.Slot
-  ( EpochNo (EpochNo),
-    EpochSize (EpochSize),
-    SlotNo (SlotNo),
-    binOpEpochNo
-  )
-import Cardano.Slotting.Time
-  ( SlotLength (getSlotLength),
-    addRelativeTime,
-    multNominalDiffTime,
-  )
+import Cardano.Slotting.Slot (
+  EpochNo (EpochNo),
+  EpochSize (EpochSize),
+  SlotNo (SlotNo),
+  binOpEpochNo,
+ )
+import Cardano.Slotting.Time (
+  SlotLength (getSlotLength),
+  addRelativeTime,
+  multNominalDiffTime,
+ )
 
 -- | Given a basis point, use it and its slot length to impute a linear
 -- relationship between slots and time in order to extend an 'EpochInfo' to
@@ -69,9 +69,9 @@ unsafeLinearExtendEpochInfo basisSlot underlyingEI =
           then epochInfoSlotLength_ underlyingEI sn
           else epochInfoSlotLength_ underlyingEI basisSlot
    in EpochInfo
-        { epochInfoSize_ = goSize,
-          epochInfoFirst_ = goFirst,
-          epochInfoEpoch_ = goEpoch,
-          epochInfoSlotToRelativeTime_ = goTime,
-          epochInfoSlotLength_ = goLength
+        { epochInfoSize_ = goSize
+        , epochInfoFirst_ = goFirst
+        , epochInfoEpoch_ = goEpoch
+        , epochInfoSlotToRelativeTime_ = goTime
+        , epochInfoSlotLength_ = goLength
         }

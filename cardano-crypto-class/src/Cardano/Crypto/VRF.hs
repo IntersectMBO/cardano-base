@@ -1,7 +1,7 @@
 -- | Verifiable random functions.
-module Cardano.Crypto.VRF
-  ( module X
-  )
+module Cardano.Crypto.VRF (
+  module X,
+)
 where
 
 import Cardano.Crypto.VRF.Class as X

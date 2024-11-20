@@ -1,14 +1,14 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE NumDecimals       #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NumDecimals #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-module Test.Cardano.Binary.Serialization
-  (tests)
-  where
+{-# LANGUAGE TemplateHaskell #-}
+
+module Test.Cardano.Binary.Serialization (tests)
+where
 
 import Cardano.Binary hiding (Range)
-import Codec.CBOR.Encoding as E
 import Codec.CBOR.Decoding as D
+import Codec.CBOR.Encoding as E
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BS.Lazy
@@ -33,38 +33,39 @@ tests :: IO Bool
 tests = checkParallel $$(discover)
 
 data TestStruct = TestStruct
-  { tsUnit                  ::  ()
-  , tsBool                  :: !Bool
-  , tsInteger               :: !Integer
-  , tsWord                  :: !Word
-  , tsWord8                 :: !Word8
-  , tsWord16                :: !Word16
-  , tsWord32                :: !Word32
-  , tsWord64                :: !Word64
-  , tsInt                   :: !Int
-  , tsFloat                 :: !Float
-  , tsInt32                 :: !Int32
-  , tsInt64                 :: !Int64
-  , tsTupleBoolBool         :: !(Bool, Bool)
-  , tsTupleBoolBoolBool     :: !(Bool, Bool, Bool)
+  { tsUnit :: ()
+  , tsBool :: !Bool
+  , tsInteger :: !Integer
+  , tsWord :: !Word
+  , tsWord8 :: !Word8
+  , tsWord16 :: !Word16
+  , tsWord32 :: !Word32
+  , tsWord64 :: !Word64
+  , tsInt :: !Int
+  , tsFloat :: !Float
+  , tsInt32 :: !Int32
+  , tsInt64 :: !Int64
+  , tsTupleBoolBool :: !(Bool, Bool)
+  , tsTupleBoolBoolBool :: !(Bool, Bool, Bool)
   , tsTupleBoolBoolBoolBool :: !(Bool, Bool, Bool, Bool)
-  , tsByteString            :: !BS.ByteString
-  , tsText                  :: !Text
-  , tsListBool              :: ![Bool]
-  , tsEitherBoolBool        :: !(Either Bool Bool)
-  , tsNonEmptyBool          :: !(NonEmpty Bool)
-  , tsMaybeBool             :: !(Maybe Bool)
-  , tsMapBoolBool           :: !(Map Bool Bool)
-  , tsSetBool               :: !(Set Bool)
-  , tsVectorBool            :: !(V.Vector Bool)
-  , tsLByteString           :: BS.Lazy.ByteString
-  , tsSByteString           :: BS.Short.ShortByteString
-  , tsUTCTime               :: Time.UTCTime
+  , tsByteString :: !BS.ByteString
+  , tsText :: !Text
+  , tsListBool :: ![Bool]
+  , tsEitherBoolBool :: !(Either Bool Bool)
+  , tsNonEmptyBool :: !(NonEmpty Bool)
+  , tsMaybeBool :: !(Maybe Bool)
+  , tsMapBoolBool :: !(Map Bool Bool)
+  , tsSetBool :: !(Set Bool)
+  , tsVectorBool :: !(V.Vector Bool)
+  , tsLByteString :: BS.Lazy.ByteString
+  , tsSByteString :: BS.Short.ShortByteString
+  , tsUTCTime :: Time.UTCTime
   }
   deriving (Show, Eq)
 
 genTestStruct :: Gen TestStruct
-genTestStruct = TestStruct
+genTestStruct =
+  TestStruct
     <$> pure ()
     <*> Gen.bool
     <*> Gen.integral (Range.linearFrom 0 (-1e40) 1e40 :: Range Integer)
@@ -94,34 +95,35 @@ genTestStruct = TestStruct
     <*> genUTCTime
 
 instance ToCBOR TestStruct where
-  toCBOR ts = E.encodeListLen 1
-    <> toCBOR (tsUnit                  ts)
-    <> toCBOR (tsBool                  ts)
-    <> toCBOR (tsInteger               ts)
-    <> toCBOR (tsWord                  ts)
-    <> toCBOR (tsWord8                 ts)
-    <> toCBOR (tsWord16                ts)
-    <> toCBOR (tsWord32                ts)
-    <> toCBOR (tsWord64                ts)
-    <> toCBOR (tsInt                   ts)
-    <> toCBOR (tsFloat                 ts)
-    <> toCBOR (tsInt32                 ts)
-    <> toCBOR (tsInt64                 ts)
-    <> toCBOR (tsTupleBoolBool         ts)
-    <> toCBOR (tsTupleBoolBoolBool     ts)
-    <> toCBOR (tsTupleBoolBoolBoolBool ts)
-    <> toCBOR (tsByteString            ts)
-    <> toCBOR (tsText                  ts)
-    <> toCBOR (tsListBool              ts)
-    <> toCBOR (tsEitherBoolBool        ts)
-    <> toCBOR (tsNonEmptyBool          ts)
-    <> toCBOR (tsMaybeBool             ts)
-    <> toCBOR (tsMapBoolBool           ts)
-    <> toCBOR (tsSetBool               ts)
-    <> toCBOR (tsVectorBool            ts)
-    <> toCBOR (tsLByteString           ts)
-    <> toCBOR (tsSByteString           ts)
-    <> toCBOR (tsUTCTime               ts)
+  toCBOR ts =
+    E.encodeListLen 1
+      <> toCBOR (tsUnit ts)
+      <> toCBOR (tsBool ts)
+      <> toCBOR (tsInteger ts)
+      <> toCBOR (tsWord ts)
+      <> toCBOR (tsWord8 ts)
+      <> toCBOR (tsWord16 ts)
+      <> toCBOR (tsWord32 ts)
+      <> toCBOR (tsWord64 ts)
+      <> toCBOR (tsInt ts)
+      <> toCBOR (tsFloat ts)
+      <> toCBOR (tsInt32 ts)
+      <> toCBOR (tsInt64 ts)
+      <> toCBOR (tsTupleBoolBool ts)
+      <> toCBOR (tsTupleBoolBoolBool ts)
+      <> toCBOR (tsTupleBoolBoolBoolBool ts)
+      <> toCBOR (tsByteString ts)
+      <> toCBOR (tsText ts)
+      <> toCBOR (tsListBool ts)
+      <> toCBOR (tsEitherBoolBool ts)
+      <> toCBOR (tsNonEmptyBool ts)
+      <> toCBOR (tsMaybeBool ts)
+      <> toCBOR (tsMapBoolBool ts)
+      <> toCBOR (tsSetBool ts)
+      <> toCBOR (tsVectorBool ts)
+      <> toCBOR (tsLByteString ts)
+      <> toCBOR (tsSByteString ts)
+      <> toCBOR (tsUTCTime ts)
 
 instance FromCBOR TestStruct where
   fromCBOR = do
@@ -156,14 +158,16 @@ instance FromCBOR TestStruct where
       <*> fromCBOR
 
 genUTCTime :: Gen Time.UTCTime
-genUTCTime = Time.UTCTime
-  <$> genDay
-  <*> genDiffTimeOfDay
+genUTCTime =
+  Time.UTCTime
+    <$> genDay
+    <*> genDiffTimeOfDay
   where
-  -- UTC time takes a DiffTime s.t. 0 <= t < 86401s
-  genDiffTimeOfDay :: Gen Time.DiffTime
-  genDiffTimeOfDay = Time.picosecondsToDiffTime <$>
-    Gen.integral (Range.constantFrom 0 0 ((86401e12) - 1))
+    -- UTC time takes a DiffTime s.t. 0 <= t < 86401s
+    genDiffTimeOfDay :: Gen Time.DiffTime
+    genDiffTimeOfDay =
+      Time.picosecondsToDiffTime
+        <$> Gen.integral (Range.constantFrom 0 0 ((86401e12) - 1))
 
 genDay :: Gen Time.Day
 genDay = Time.fromOrdinalDate <$> genYear <*> genDayOfYear
@@ -189,7 +193,7 @@ prop_decodeContainerSkelWithReplicate :: Property
 prop_decodeContainerSkelWithReplicate = property $
   assert $ case decode vec of
     Right _ -> True
-    _       -> False
+    _ -> False
   where
     decode :: Encoding -> Either DecoderError (V.Vector ())
     decode enc = decodeFull (serialize enc)

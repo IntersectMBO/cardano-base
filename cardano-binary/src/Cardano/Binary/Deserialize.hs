@@ -1,30 +1,28 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Deserialization primitives built on top of the @FromCBOR@ typeclass
-
-module Cardano.Binary.Deserialize
-  (
+module Cardano.Binary.Deserialize (
   -- * Unsafe deserialization
-    unsafeDeserialize
-  , unsafeDeserialize'
-  , CBOR.Write.toStrictByteString
+  unsafeDeserialize,
+  unsafeDeserialize',
+  CBOR.Write.toStrictByteString,
 
   -- * Decoding
-  , decodeFull
-  , decodeFull'
-  , decodeFullDecoder
-  , decodeFullDecoder'
+  decodeFull,
+  decodeFull',
+  decodeFullDecoder,
+  decodeFullDecoder',
 
   -- * CBOR in CBOR
-  , decodeNestedCbor
-  , decodeNestedCborBytes
-  )
+  decodeNestedCbor,
+  decodeNestedCborBytes,
+)
 where
 
 import qualified Codec.CBOR.Decoding as D
@@ -37,11 +35,10 @@ import Data.Bifunctor (bimap)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.Internal as BSL
-import Data.Proxy (Proxy(Proxy))
+import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 
-import Cardano.Binary.FromCBOR (DecoderError(..), FromCBOR(..), cborError, toCborError)
-
+import Cardano.Binary.FromCBOR (DecoderError (..), FromCBOR (..), cborError, toCborError)
 
 -- | Deserialize a Haskell value from the external binary representation
 --   (which must have been made using 'serialize' or related function).
@@ -61,57 +58,57 @@ unsafeDeserialize' = unsafeDeserialize . BSL.fromStrict
 --   failing if there are leftovers. In a nutshell, the `full` here implies
 --   the contract of this function is that what you feed as input needs to
 --   be consumed entirely.
-decodeFull :: forall a . FromCBOR a => BSL.ByteString -> Either DecoderError a
+decodeFull :: forall a. FromCBOR a => BSL.ByteString -> Either DecoderError a
 decodeFull = decodeFullDecoder (label $ Proxy @a) fromCBOR
 
-decodeFull' :: forall a . FromCBOR a => BS.ByteString -> Either DecoderError a
+decodeFull' :: forall a. FromCBOR a => BS.ByteString -> Either DecoderError a
 decodeFull' = decodeFull . BSL.fromStrict
 
-decodeFullDecoder
-  :: Text
-  -- ^ Label for error reporting
-  -> (forall s . D.Decoder s a)
-  -- ^ The parser for the @ByteString@ to decode. It should decode the given
+decodeFullDecoder ::
+  -- | Label for error reporting
+  Text ->
+  -- | The parser for the @ByteString@ to decode. It should decode the given
   -- @ByteString@ into a value of type @a@
-  -> BSL.ByteString
-  -- ^ The @ByteString@ to decode
-  -> Either DecoderError a
+  (forall s. D.Decoder s a) ->
+  -- | The @ByteString@ to decode
+  BSL.ByteString ->
+  Either DecoderError a
 decodeFullDecoder lbl decoder bs0 = case deserialiseDecoder decoder bs0 of
-  Right (x, leftover) -> if BS.null leftover
-    then pure x
-    else Left $ DecoderErrorLeftover lbl leftover
+  Right (x, leftover) ->
+    if BS.null leftover
+      then pure x
+      else Left $ DecoderErrorLeftover lbl leftover
   Left (e, _) -> Left $ DecoderErrorDeserialiseFailure lbl e
 
-decodeFullDecoder'
-  :: Text
-  -- ^ Label for error reporting
-  -> (forall s . D.Decoder s a)
-  -- ^ The parser for the @ByteString@ to decode. It should decode the given
+decodeFullDecoder' ::
+  -- | Label for error reporting
+  Text ->
+  -- | The parser for the @ByteString@ to decode. It should decode the given
   -- @ByteString@ into a value of type @a@
-  -> BS.ByteString
-  -- ^ The @ByteString@ to decode
-  -> Either DecoderError a
+  (forall s. D.Decoder s a) ->
+  -- | The @ByteString@ to decode
+  BS.ByteString ->
+  Either DecoderError a
 decodeFullDecoder' lbl decoder = decodeFullDecoder lbl decoder . BSL.fromStrict
 
 -- | Deserialise a 'LByteString' incrementally using the provided 'Decoder'
-deserialiseDecoder
-  :: (forall s . D.Decoder s a)
-  -> BSL.ByteString
-  -> Either (Read.DeserialiseFailure, BS.ByteString) (a, BS.ByteString)
+deserialiseDecoder ::
+  (forall s. D.Decoder s a) ->
+  BSL.ByteString ->
+  Either (Read.DeserialiseFailure, BS.ByteString) (a, BS.ByteString)
 deserialiseDecoder decoder bs0 =
   runST (supplyAllInput bs0 =<< Read.deserialiseIncremental decoder)
 
-supplyAllInput
-  :: BSL.ByteString
-  -> Read.IDecode s a
-  -> ST s (Either (Read.DeserialiseFailure, BS.ByteString) (a, BS.ByteString))
+supplyAllInput ::
+  BSL.ByteString ->
+  Read.IDecode s a ->
+  ST s (Either (Read.DeserialiseFailure, BS.ByteString) (a, BS.ByteString))
 supplyAllInput bs' (Read.Done bs _ x) =
   return (Right (x, bs <> BSL.toStrict bs'))
 supplyAllInput bs (Read.Partial k) = case bs of
   BSL.Chunk chunk bs' -> k (Just chunk) >>= supplyAllInput bs'
-  BSL.Empty           -> k Nothing >>= supplyAllInput BSL.Empty
+  BSL.Empty -> k Nothing >>= supplyAllInput BSL.Empty
 supplyAllInput _ (Read.Fail bs _ exn) = return (Left (exn, bs))
-
 
 --------------------------------------------------------------------------------
 -- Nested CBOR-in-CBOR
@@ -123,9 +120,11 @@ supplyAllInput _ (Read.Fail bs _ exn) = return (Left (exn, bs))
 decodeNestedCborTag :: D.Decoder s ()
 decodeNestedCborTag = do
   t <- D.decodeTag
-  when (t /= 24) $ cborError $ DecoderErrorUnknownTag
-    "decodeNestedCborTag"
-    (fromIntegral t)
+  when (t /= 24) $
+    cborError $
+      DecoderErrorUnknownTag
+        "decodeNestedCborTag"
+        (fromIntegral t)
 
 -- | Remove the the semantic tag 24 from the enclosed CBOR data item,
 -- decoding back the inner `ByteString` as a proper Haskell type.

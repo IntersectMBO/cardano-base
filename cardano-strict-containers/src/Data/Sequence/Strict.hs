@@ -6,89 +6,89 @@
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Strict variants of 'Seq' operations.
-module Data.Sequence.Strict
-  ( StrictSeq (Empty, (:<|), (:|>)),
-    fromStrict,
-    forceToStrict,
+module Data.Sequence.Strict (
+  StrictSeq (Empty, (:<|), (:|>)),
+  fromStrict,
+  forceToStrict,
 
-    -- * Construction
-    empty,
-    singleton,
-    (<|),
-    (|>),
-    (><),
-    fromList,
+  -- * Construction
+  empty,
+  singleton,
+  (<|),
+  (|>),
+  (><),
+  fromList,
 
-    -- * Deconstruction
+  -- * Deconstruction
 
-    -- | Additional functions for deconstructing sequences are available
-    -- via the 'Foldable' instance of 'Seq'.
+  -- | Additional functions for deconstructing sequences are available
+  -- via the 'Foldable' instance of 'Seq'.
 
-    -- ** Queries
-    null,
-    length,
+  -- ** Queries
+  null,
+  length,
 
-    -- * Scans
-    scanl,
+  -- * Scans
+  scanl,
 
-    -- * Sublists
+  -- * Sublists
 
-    -- ** Sequential searches
-    takeWhileL,
-    takeWhileR,
-    dropWhileL,
-    dropWhileR,
-    spanl,
-    spanr,
+  -- ** Sequential searches
+  takeWhileL,
+  takeWhileR,
+  dropWhileL,
+  dropWhileR,
+  spanl,
+  spanr,
 
-    -- * Indexing
-    lookup,
-    (!?),
-    take,
-    takeLast,
-    drop,
-    dropLast,
-    splitAt,
-    splitAtEnd,
+  -- * Indexing
+  lookup,
+  (!?),
+  take,
+  takeLast,
+  drop,
+  dropLast,
+  splitAt,
+  splitAtEnd,
 
-    -- * Indexing with predicates
-    findIndexL,
-    findIndicesL,
-    findIndexR,
-    findIndicesR,
+  -- * Indexing with predicates
+  findIndexL,
+  findIndicesL,
+  findIndexR,
+  findIndicesR,
 
-    -- * Zips and unzips
-    zip,
-    zipWith,
-    unzip,
-    unzipWith,
-  )
+  -- * Zips and unzips
+  zip,
+  zipWith,
+  unzip,
+  unzipWith,
+)
 where
 
-import Cardano.Binary (FromCBOR(..), ToCBOR(..))
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Codec.Serialise (Serialise)
 import Control.Arrow ((***))
 import Control.DeepSeq (NFData)
-import Data.Aeson (FromJSON(..), ToJSON(..))
-import qualified Data.Foldable as F (foldl')
+import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Foldable (toList)
+import qualified Data.Foldable as F (foldl')
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import Data.Unit.Strict (forceElemsToWHNF)
 import qualified GHC.Exts as GHC (IsList (..))
 import NoThunks.Class (NoThunks (..), noThunksInValues)
-import Prelude hiding
-  ( drop,
-    length,
-    lookup,
-    null,
-    scanl,
-    splitAt,
-    take,
-    unzip,
-    zip,
-    zipWith,
-  )
+import Prelude hiding (
+  drop,
+  length,
+  lookup,
+  null,
+  scanl,
+  splitAt,
+  take,
+  unzip,
+  zip,
+  zipWith,
+ )
 
 infixr 5 ><
 

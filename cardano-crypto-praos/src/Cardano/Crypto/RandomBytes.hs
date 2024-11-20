@@ -1,4 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
+
 module Cardano.Crypto.RandomBytes
 where
 

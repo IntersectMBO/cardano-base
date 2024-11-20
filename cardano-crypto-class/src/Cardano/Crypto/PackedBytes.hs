@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UnboxedTuples #-}
 
+{- FOURMOLU_DISABLE -}
 module Cardano.Crypto.PackedBytes
   ( PackedBytes(..)
   , packBytes

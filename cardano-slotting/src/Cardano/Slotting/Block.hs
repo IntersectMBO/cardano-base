@@ -2,15 +2,15 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Cardano.Slotting.Block
-  ( BlockNo (..)
-  )
+module Cardano.Slotting.Block (
+  BlockNo (..),
+)
 where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Codec.Serialise (Serialise (..))
 import Control.DeepSeq (NFData)
-import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson (FromJSON, ToJSON)
 import Data.Word (Word64)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
@@ -21,7 +21,7 @@ import Quiet (Quiet (..))
 -- for every slot where N <= SlotNo.
 newtype BlockNo = BlockNo {unBlockNo :: Word64}
   deriving stock (Eq, Ord, Generic)
-  deriving Show via Quiet BlockNo
+  deriving (Show) via Quiet BlockNo
   deriving newtype (Enum, Bounded, Num, Serialise, NoThunks, NFData, ToJSON, FromJSON)
 
 instance ToCBOR BlockNo where

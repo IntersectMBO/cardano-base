@@ -1,43 +1,42 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE RankNTypes #-}
 
 module Cardano.Crypto.Libsodium.MLockedBytes.Internal (
-    -- * The MLockesSizedBytes type
-    MLockedSizedBytes (..),
-    SizedVoid,
+  -- * The MLockesSizedBytes type
+  MLockedSizedBytes (..),
+  SizedVoid,
 
-    -- * Safe Functions
-    mlsbNew,
-    mlsbNewZero,
-    mlsbZero,
-    mlsbUseAsCPtr,
-    mlsbUseAsSizedPtr,
-    mlsbCopy,
-    mlsbFinalize,
-    mlsbCompare,
-    mlsbEq,
-    withMLSB,
-    withMLSBChunk,
+  -- * Safe Functions
+  mlsbNew,
+  mlsbNewZero,
+  mlsbZero,
+  mlsbUseAsCPtr,
+  mlsbUseAsSizedPtr,
+  mlsbCopy,
+  mlsbFinalize,
+  mlsbCompare,
+  mlsbEq,
+  withMLSB,
+  withMLSBChunk,
+  mlsbNewWith,
+  mlsbNewZeroWith,
+  mlsbCopyWith,
 
-    mlsbNewWith,
-    mlsbNewZeroWith,
-    mlsbCopyWith,
-
-    -- * Dangerous Functions
-    traceMLSB,
-    mlsbFromByteString,
-    mlsbFromByteStringCheck,
-    mlsbAsByteString,
-    mlsbToByteString,
-    mlsbFromByteStringWith,
-    mlsbFromByteStringCheckWith,
+  -- * Dangerous Functions
+  traceMLSB,
+  mlsbFromByteString,
+  mlsbFromByteStringCheck,
+  mlsbAsByteString,
+  mlsbToByteString,
+  mlsbFromByteStringWith,
+  mlsbFromByteStringCheckWith,
 ) where
 
 import Control.DeepSeq (NFData (..))
@@ -51,14 +50,14 @@ import Foreign.Ptr (Ptr, castPtr, plusPtr)
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks)
 
-import Cardano.Foreign
+import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium.Memory
 import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
-import Cardano.Crypto.Libsodium.C
+import Cardano.Foreign
 
+import Data.Bits (Bits, shiftL)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
-import Data.Bits (Bits, shiftL)
 
 -- | A void type with a type-level size attached to it. We need this in order
 -- to express \"pointer to a block of memory of a particular size that can be
@@ -69,8 +68,8 @@ data SizedVoid (n :: Nat)
 
 -- | A block of raw memory of a known size, protected with @mlock()@.
 newtype MLockedSizedBytes (n :: Nat) = MLSB (MLockedForeignPtr (SizedVoid n))
-  deriving newtype NoThunks
-  deriving newtype NFData
+  deriving newtype (NoThunks)
+  deriving newtype (NFData)
 
 -- | This instance is /unsafe/, it will leak secrets from mlocked memory to the
 -- Haskell heap. Do not use outside of testing.
@@ -90,31 +89,32 @@ nextPowerOf2 i =
     go :: n -> n
     go c =
       let c' = c `shiftL` 1
-      in if c >= i then c else go c'
+       in if c >= i then c else go c'
 
 traceMLSB :: KnownNat n => MLockedSizedBytes n -> IO ()
 traceMLSB = print
 {-# DEPRECATED traceMLSB "Don't leave traceMLockedForeignPtr in production" #-}
 
-withMLSB :: forall b n m. (MonadST m) => MLockedSizedBytes n -> (Ptr (SizedVoid n) -> m b) -> m b
+withMLSB :: forall b n m. MonadST m => MLockedSizedBytes n -> (Ptr (SizedVoid n) -> m b) -> m b
 withMLSB (MLSB fptr) action = withMLockedForeignPtr fptr action
 
-withMLSBChunk :: forall b n n' m.
-                 (MonadST m, KnownNat n, KnownNat n')
-              => MLockedSizedBytes n
-              -> Int
-              -> (MLockedSizedBytes n' -> m b)
-              -> m b
+withMLSBChunk ::
+  forall b n n' m.
+  (MonadST m, KnownNat n, KnownNat n') =>
+  MLockedSizedBytes n ->
+  Int ->
+  (MLockedSizedBytes n' -> m b) ->
+  m b
 withMLSBChunk mlsb offset action
-  | offset < 0
-  = error "Negative offset not allowed"
-  | offset > parentSize - chunkSize
-  = error $ "Overrun (" ++ show offset ++ " + " ++ show chunkSize ++ " > " ++ show parentSize ++ ")"
-  | otherwise
-  = withMLSB mlsb $ \ptr -> do
-      fptr <-
-        stToIO $ unsafeIOToST (newForeignPtr_ . castPtr $ plusPtr ptr offset)
-      action (MLSB $! SFP $! fptr)
+  | offset < 0 =
+      error "Negative offset not allowed"
+  | offset > parentSize - chunkSize =
+      error $ "Overrun (" ++ show offset ++ " + " ++ show chunkSize ++ " > " ++ show parentSize ++ ")"
+  | otherwise =
+      withMLSB mlsb $ \ptr -> do
+        fptr <-
+          stToIO $ unsafeIOToST (newForeignPtr_ . castPtr $ plusPtr ptr offset)
+        action (MLSB $! SFP $! fptr)
   where
     chunkSize = fromIntegral (natVal (Proxy @n'))
     parentSize = fromIntegral (natVal mlsb)
@@ -141,7 +141,8 @@ mlsbNewWith allocator =
 mlsbNewZero :: forall n m. (KnownNat n, MonadST m) => m (MLockedSizedBytes n)
 mlsbNewZero = mlsbNewZeroWith mlockedMalloc
 
-mlsbNewZeroWith :: forall n m. (KnownNat n, MonadST m) => MLockedAllocator m -> m (MLockedSizedBytes n)
+mlsbNewZeroWith ::
+  forall n m. (KnownNat n, MonadST m) => MLockedAllocator m -> m (MLockedSizedBytes n)
 mlsbNewZeroWith allocator = do
   mlsb <- mlsbNewWith allocator
   mlsbZero mlsb
@@ -153,16 +154,19 @@ mlsbZero mlsb = do
   withMLSB mlsb $ \ptr -> zeroMem ptr (mlsbSize mlsb)
 
 -- | Create a deep mlocked copy of an 'MLockedSizedBytes'.
-mlsbCopy :: forall n m. (KnownNat n, MonadST m)
-         => MLockedSizedBytes n
-         -> m (MLockedSizedBytes n)
+mlsbCopy ::
+  forall n m.
+  (KnownNat n, MonadST m) =>
+  MLockedSizedBytes n ->
+  m (MLockedSizedBytes n)
 mlsbCopy = mlsbCopyWith mlockedMalloc
 
 mlsbCopyWith ::
-     forall n m. (KnownNat n, MonadST m)
-  => MLockedAllocator m
-  -> MLockedSizedBytes n
-  -> m (MLockedSizedBytes n)
+  forall n m.
+  (KnownNat n, MonadST m) =>
+  MLockedAllocator m ->
+  MLockedSizedBytes n ->
+  m (MLockedSizedBytes n)
 mlsbCopyWith allocator src = mlsbUseAsCPtr src $ \ptrSrc -> do
   dst <- mlsbNewWith allocator
   withMLSB dst $ \ptrDst -> do
@@ -177,17 +181,21 @@ mlsbCopyWith allocator src = mlsbUseAsCPtr src $ \ptrSrc -> do
 -- 'mlsbNew' or 'mlsbNewZero' to create 'MLockedSizedBytes' values, and
 -- manipulate them through 'withMLSB', 'mlsbUseAsCPtr', or 'mlsbUseAsSizedPtr'.
 -- (See also 'mlsbFromByteStringCheck')
-mlsbFromByteString :: forall n m. (KnownNat n, MonadST m)
-                   => BS.ByteString -> m (MLockedSizedBytes n)
+mlsbFromByteString ::
+  forall n m.
+  (KnownNat n, MonadST m) =>
+  BS.ByteString -> m (MLockedSizedBytes n)
 mlsbFromByteString = mlsbFromByteStringWith mlockedMalloc
 
-mlsbFromByteStringWith :: forall n m. (KnownNat n, MonadST m)
-                       => MLockedAllocator m -> BS.ByteString -> m (MLockedSizedBytes n)
+mlsbFromByteStringWith ::
+  forall n m.
+  (KnownNat n, MonadST m) =>
+  MLockedAllocator m -> BS.ByteString -> m (MLockedSizedBytes n)
 mlsbFromByteStringWith allocator bs = do
   dst <- mlsbNewWith allocator
   withMLSB dst $ \ptr -> stToIO . unsafeIOToST $ do
-      BS.useAsCStringLen bs $ \(ptrBS, len) -> do
-        copyMem (castPtr ptr) ptrBS (min (fromIntegral len) (mlsbSize dst))
+    BS.useAsCStringLen bs $ \(ptrBS, len) -> do
+      copyMem (castPtr ptr) ptrBS (min (fromIntegral len) (mlsbSize dst))
   return dst
 
 -- | Allocate a new 'MLockedSizedBytes', and fill it with the contents of a
@@ -198,21 +206,24 @@ mlsbFromByteStringWith allocator bs = do
 -- 'mlsbNew' or 'mlsbNewZero' to create 'MLockedSizedBytes' values, and
 -- manipulate them through 'withMLSB', 'mlsbUseAsCPtr', or 'mlsbUseAsSizedPtr'.
 -- (See also 'mlsbFromByteString')
-mlsbFromByteStringCheck :: forall n m. (KnownNat n, MonadST m)
-                        => BS.ByteString
-                        -> m (Maybe (MLockedSizedBytes n))
+mlsbFromByteStringCheck ::
+  forall n m.
+  (KnownNat n, MonadST m) =>
+  BS.ByteString ->
+  m (Maybe (MLockedSizedBytes n))
 mlsbFromByteStringCheck = mlsbFromByteStringCheckWith mlockedMalloc
 
 mlsbFromByteStringCheckWith ::
-     forall n m. (KnownNat n, MonadST m)
-  => MLockedAllocator m
-  -> BS.ByteString
-  -> m (Maybe (MLockedSizedBytes n))
+  forall n m.
+  (KnownNat n, MonadST m) =>
+  MLockedAllocator m ->
+  BS.ByteString ->
+  m (Maybe (MLockedSizedBytes n))
 mlsbFromByteStringCheckWith allocator bs
-    | BS.length bs /= size = return Nothing
-    | otherwise = Just <$> mlsbFromByteStringWith allocator bs
+  | BS.length bs /= size = return Nothing
+  | otherwise = Just <$> mlsbFromByteStringWith allocator bs
   where
-    size  :: Int
+    size :: Int
     size = fromInteger (natVal (Proxy @n))
 
 -- | /Note:/ the resulting 'BS.ByteString' will still refer to secure memory,
@@ -224,7 +235,7 @@ mlsbFromByteStringCheckWith allocator bs
 mlsbAsByteString :: forall n. KnownNat n => MLockedSizedBytes n -> BS.ByteString
 mlsbAsByteString mlsb@(MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size
   where
-    size  :: Int
+    size :: Int
     size = fromIntegral (mlsbSize mlsb)
 
 -- | /Note:/ this function will leak mlocked memory to the Haskell heap
@@ -234,7 +245,7 @@ mlsbToByteString mlsb =
   withMLSB mlsb $ \ptr ->
     stToIO . unsafeIOToST $ BS.packCStringLen (castPtr ptr, size)
   where
-    size  :: Int
+    size :: Int
     size = fromIntegral (mlsbSize mlsb)
 
 -- | Use an 'MLockedSizedBytes' value as a raw C pointer. Care should be taken
@@ -249,18 +260,18 @@ mlsbUseAsCPtr (MLSB x) k =
 -- should be taken to never copy the contents of the 'MLockedSizedBytes' value
 -- into managed memory through the sized pointer, because that would violate
 -- the secure-forgetting property of mlocked memory.
-mlsbUseAsSizedPtr :: forall n r m. (MonadST m) => MLockedSizedBytes n -> (SizedPtr n -> m r) -> m r
+mlsbUseAsSizedPtr :: forall n r m. MonadST m => MLockedSizedBytes n -> (SizedPtr n -> m r) -> m r
 mlsbUseAsSizedPtr (MLSB x) k =
   withMLockedForeignPtr x (k . SizedPtr . castPtr)
 
 -- | Calls 'finalizeMLockedForeignPtr' on underlying pointer.
 -- This function invalidates argument.
---
 mlsbFinalize :: MonadST m => MLockedSizedBytes n -> m ()
 mlsbFinalize (MLSB ptr) = finalizeMLockedForeignPtr ptr
 
 -- | 'compareM' on 'MLockedSizedBytes'
-mlsbCompare :: forall n m. (MonadST m, KnownNat n) => MLockedSizedBytes n -> MLockedSizedBytes n -> m Ordering
+mlsbCompare ::
+  forall n m. (MonadST m, KnownNat n) => MLockedSizedBytes n -> MLockedSizedBytes n -> m Ordering
 mlsbCompare (MLSB x) (MLSB y) =
   withMLockedForeignPtr x $ \x' ->
     withMLockedForeignPtr y $ \y' -> do
@@ -270,5 +281,6 @@ mlsbCompare (MLSB x) (MLSB y) =
     size = fromInteger $ natVal (Proxy @n)
 
 -- | 'equalsM' on 'MLockedSizedBytes'
-mlsbEq :: forall n m. (MonadST m, KnownNat n) => MLockedSizedBytes n -> MLockedSizedBytes n -> m Bool
+mlsbEq ::
+  forall n m. (MonadST m, KnownNat n) => MLockedSizedBytes n -> MLockedSizedBytes n -> m Bool
 mlsbEq a b = (== EQ) <$> mlsbCompare a b

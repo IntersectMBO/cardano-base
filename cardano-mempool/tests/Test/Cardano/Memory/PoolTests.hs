@@ -70,8 +70,8 @@ propFindNextZeroIndex w = monadicIO . run $
             ("Expected found index to be different, but got same: " ++ show ix)
             (ix' /= ix)
           assertBool
-            ("Expected the bit under index: " ++ show ix' ++ " to not be set") $
-            not (testBit w ix')
+            ("Expected the bit under index: " ++ show ix' ++ " to not be set")
+            $ not (testBit w ix')
 
 -- We allow one extra page be allocated due to concurrency false positives in block
 -- reservations
@@ -80,20 +80,21 @@ checkNumPages pool n numBlocks = do
   let estimatedUpperBoundOfPages = 1 + max 1 (numBlocks `div` n `div` 64)
   numPages <- stToPrim $ countPages pool
   assertBool
-    (concat
-       [ "Number of pages should not exceed the expected amount: "
-       , show estimatedUpperBoundOfPages
-       , " but allocated: "
-       , show numPages
-       ])
+    ( concat
+        [ "Number of pages should not exceed the expected amount: "
+        , show estimatedUpperBoundOfPages
+        , " but allocated: "
+        , show numPages
+        ]
+    )
     (numPages <= estimatedUpperBoundOfPages)
 
 checkBlockBytes ::
-     (KnownNat n, Storable a, Eq a, Show a)
-  => Block n
-  -> a
-  -> Ptr b
-  -> Assertion
+  (KnownNat n, Storable a, Eq a, Show a) =>
+  Block n ->
+  a ->
+  Ptr b ->
+  Assertion
 checkBlockBytes block byte ptr =
   let checkFillByte i =
         when (i >= 0) $ do
@@ -108,7 +109,6 @@ mallocPreFilled preFillByte bc = unsafeIOToPrim $ do
   withForeignPtr mfp $ \ptr -> setPtr (castPtr ptr) bc preFillByte
   pure mfp
 
-
 -- | @ensureAllGCedWith iterations delay expectedCount registerCounter@ waits
 -- for all items to be GCed by triggering garbage collection @iterations@
 -- times, once every @delay@ milliseconds. After @iterations@ attempts, if the
@@ -116,18 +116,18 @@ mallocPreFilled preFillByte bc = unsafeIOToPrim $ do
 -- raised via 'assertFailure'. Garbage collection is tracked via finalizers
 -- (see below).
 ensureAllGCedWith ::
-     Int
-  -- ^ Number of GC attempts to make before failing
-  -> Int
-  -- ^ Delay between attempts, in milliseconds
-  -> Int
-  -- ^ Expected number of counter hook firings (in practice: individual
+  -- | Number of GC attempts to make before failing
+  Int ->
+  -- | Delay between attempts, in milliseconds
+  Int ->
+  -- | Expected number of counter hook firings (in practice: individual
   -- garbage collections on 'ForeignPtr's, as per their finalizers).
-  -> (IO () -> IO a)
-  -- ^ Function for registering the counter hook. The argument to this
+  Int ->
+  -- | Function for registering the counter hook. The argument to this
   -- function should be attached to each 'ForeignPtr' we're interested in
   -- as a finalizer.
-  -> IO a
+  (IO () -> IO a) ->
+  IO a
 ensureAllGCedWith iterations delay expectedCount registerCounter = do
   countRef <- newPVar (0 :: Int)
   res <- registerCounter (void $ atomicAddIntPVar countRef 1)
@@ -137,29 +137,31 @@ ensureAllGCedWith iterations delay expectedCount registerCounter = do
         n <- atomicReadIntPVar countRef
         unless (n == expectedCount) $ do
           if i <= 1
-            then assertFailure $
-                 "Expected all " ++
-                 show expectedCount ++
-                 " pointers to be GCed in " ++
-                 show (delay * iterations) ++
-                 "ms, but " ++ show n ++ " where GCed instead"
+            then
+              assertFailure $
+                "Expected all "
+                  ++ show expectedCount
+                  ++ " pointers to be GCed in "
+                  ++ show (delay * iterations)
+                  ++ "ms, but "
+                  ++ show n
+                  ++ " where GCed instead"
             else go (i - 1)
   res <$ go iterations
-
 
 -- | 'ensureAllGCedWith' with default values: 100 iterations, 10ms delay.
 ensureAllGCed :: Int -> (IO () -> IO a) -> IO a
 ensureAllGCed = ensureAllGCedWith 100 10
 
-
 propPoolGarbageCollected ::
-     forall n. KnownNat n
-  => Block n
-  -> Positive Int
-  -> Word16
-  -> Word8
-  -> Word8
-  -> Property
+  forall n.
+  KnownNat n =>
+  Block n ->
+  Positive Int ->
+  Word16 ->
+  Word8 ->
+  Word8 ->
+  Property
 propPoolGarbageCollected block (Positive n) numBlocks16 preFillByte fillByte =
   monadicIO . run $ do
     let numBlocks = 1 + (fromIntegral numBlocks16 `div` 20) -- make it not too big
@@ -187,13 +189,14 @@ propPoolGarbageCollected block (Positive n) numBlocks16 preFillByte fillByte =
     touch pool
 
 propPoolAllocateAndFinalize ::
-     forall n. KnownNat n
-  => Block n
-  -> Positive Int
-  -> Word16
-  -> Word8
-  -> Word8
-  -> Property
+  forall n.
+  KnownNat n =>
+  Block n ->
+  Positive Int ->
+  Word16 ->
+  Word8 ->
+  Word8 ->
+  Property
 propPoolAllocateAndFinalize block (Positive n) numBlocks16 emptyByte fullByte =
   monadicIO . run $ do
     let numBlocks = 1 + (fromIntegral numBlocks16 `div` 20)
@@ -205,23 +208,26 @@ propPoolAllocateAndFinalize block (Positive n) numBlocks16 emptyByte fullByte =
             setPtr (castPtr ptr) (blockByteCount block) emptyByte
             countOneBlockGCed
         -- allocate and finalize blocks concurrently
-        pool <$
-          concurrently_
-            (do replicateConcurrently_ numBlocks $ do
+        pool
+          <$ concurrently_
+            ( do
+                replicateConcurrently_ numBlocks $ do
                   fp <- stToPrim $ grabNextBlock pool
                   withForeignPtr fp (checkBlockBytes block emptyByte)
                   writeChan chan (Just fp)
                 -- place Nothing to indicate that we are done allocating blocks
-                writeChan chan Nothing)
-            (fix $ \loop -> do
-               mfp <- readChan chan
-               forM_ mfp $ \fp -> do
-                 withForeignPtr fp $ \ptr ->
-                   -- fill the newly allocated block
-                   setPtr (castPtr ptr) (blockByteCount block) fullByte
-                 -- manually finalize every other block and let the GC to pick the rest
-                 shouldFinalize <- uniformM globalStdGen
-                 when shouldFinalize $ finalizeForeignPtr fp
-                 loop)
+                writeChan chan Nothing
+            )
+            ( fix $ \loop -> do
+                mfp <- readChan chan
+                forM_ mfp $ \fp -> do
+                  withForeignPtr fp $ \ptr ->
+                    -- fill the newly allocated block
+                    setPtr (castPtr ptr) (blockByteCount block) fullByte
+                  -- manually finalize every other block and let the GC to pick the rest
+                  shouldFinalize <- uniformM globalStdGen
+                  when shouldFinalize $ finalizeForeignPtr fp
+                  loop
+            )
     -- verify number of pages
     checkNumPages pool n numBlocks

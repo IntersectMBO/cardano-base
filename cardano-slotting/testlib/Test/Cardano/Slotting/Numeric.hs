@@ -5,10 +5,10 @@
 
 module Test.Cardano.Slotting.Numeric () where
 
-import Cardano.Slotting.Slot
-  ( EpochSize (EpochSize),
-    EpochNo (EpochNo),
-  )
+import Cardano.Slotting.Slot (
+  EpochNo (EpochNo),
+  EpochSize (EpochSize),
+ )
 
 deriving newtype instance Num EpochNo
 

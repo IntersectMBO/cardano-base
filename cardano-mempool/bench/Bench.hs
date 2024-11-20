@@ -22,7 +22,7 @@ instance NFData (Pool n s) where
 instance NFData (ForeignPtr a) where
   rnf !_ = ()
 
-initHaskellPool :: (KnownNat n) => Int -> IO (Pool n RealWorld)
+initHaskellPool :: KnownNat n => Int -> IO (Pool n RealWorld)
 initHaskellPool n = stToIO $ initPool n (ioToST . mallocForeignPtrBytes) (const (pure ()))
 
 cmallocForeignPtr :: Int -> IO (ForeignPtr a)

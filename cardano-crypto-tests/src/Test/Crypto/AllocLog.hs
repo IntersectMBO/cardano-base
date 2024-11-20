@@ -2,15 +2,16 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
 module Test.Crypto.AllocLog where
 
 import Control.Tracer
 import Data.Typeable
-import Foreign.Ptr
 import Foreign.Concurrent
+import Foreign.Ptr
 
 import Cardano.Crypto.Libsodium (withMLockedForeignPtr)
-import Cardano.Crypto.Libsodium.Memory (MLockedAllocator(..))
+import Cardano.Crypto.Libsodium.Memory (MLockedAllocator (..))
 import Cardano.Crypto.Libsodium.Memory.Internal (MLockedForeignPtr (..))
 
 -- | Allocation log event. These are emitted automatically whenever mlocked
@@ -30,9 +31,9 @@ mkLoggingAllocator tracer ioAllocator =
   MLockedAllocator
     { mlAllocate =
         \size -> do
-            sfptr@(SFP fptr) <- mlAllocate ioAllocator size
-            addr <- withMLockedForeignPtr sfptr (return . ptrToWordPtr)
-            traceWith tracer (AllocEv addr)
-            addForeignPtrFinalizer fptr (traceWith tracer (FreeEv addr))
-            return sfptr
+          sfptr@(SFP fptr) <- mlAllocate ioAllocator size
+          addr <- withMLockedForeignPtr sfptr (return . ptrToWordPtr)
+          traceWith tracer (AllocEv addr)
+          addForeignPtrFinalizer fptr (traceWith tracer (FreeEv addr))
+          return sfptr
     }

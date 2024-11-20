@@ -9,6 +9,9 @@ module Cardano.Crypto.Libsodium.MLockedSeed
 where
 
 import Cardano.Crypto.DirectSerialise
+import Cardano.Crypto.Libsodium.C (
+  c_sodium_randombytes_buf,
+ )
 import Cardano.Crypto.Libsodium.MLockedBytes (
   MLockedSizedBytes,
   mlsbCopyWith,
@@ -21,9 +24,6 @@ import Cardano.Crypto.Libsodium.MLockedBytes (
 import Cardano.Crypto.Libsodium.Memory (
   MLockedAllocator,
   mlockedMalloc,
- )
-import Cardano.Crypto.Libsodium.C (
-  c_sodium_randombytes_buf,
  )
 import Cardano.Foreign (SizedPtr)
 import Control.DeepSeq (NFData)
@@ -52,22 +52,22 @@ instance KnownNat n => DirectDeserialise (MLockedSeed n) where
       pull (castPtr ptr) (fromIntegral $ natVal seed)
     return seed
 
-withMLockedSeedAsMLSB
-  :: Functor m
-  => (MLockedSizedBytes n -> m (MLockedSizedBytes n))
-  -> MLockedSeed n
-  -> m (MLockedSeed n)
+withMLockedSeedAsMLSB ::
+  Functor m =>
+  (MLockedSizedBytes n -> m (MLockedSizedBytes n)) ->
+  MLockedSeed n ->
+  m (MLockedSeed n)
 withMLockedSeedAsMLSB action =
   fmap MLockedSeed . action . mlockedSeedMLSB
 
 mlockedSeedCopy :: (KnownNat n, MonadST m) => MLockedSeed n -> m (MLockedSeed n)
 mlockedSeedCopy = mlockedSeedCopyWith mlockedMalloc
 
-mlockedSeedCopyWith
-  :: (KnownNat n, MonadST m)
-  => MLockedAllocator m
-  -> MLockedSeed n
-  -> m (MLockedSeed n)
+mlockedSeedCopyWith ::
+  (KnownNat n, MonadST m) =>
+  MLockedAllocator m ->
+  MLockedSeed n ->
+  m (MLockedSeed n)
 mlockedSeedCopyWith allocator = withMLockedSeedAsMLSB (mlsbCopyWith allocator)
 
 mlockedSeedNew :: (KnownNat n, MonadST m) => m (MLockedSeed n)
@@ -84,10 +84,10 @@ mlockedSeedNewZeroWith :: (KnownNat n, MonadST m) => MLockedAllocator m -> m (ML
 mlockedSeedNewZeroWith allocator =
   MLockedSeed <$> mlsbNewZeroWith allocator
 
-mlockedSeedNewRandom :: forall n. (KnownNat n) => IO (MLockedSeed n)
+mlockedSeedNewRandom :: forall n. KnownNat n => IO (MLockedSeed n)
 mlockedSeedNewRandom = mlockedSeedNewRandomWith mlockedMalloc
 
-mlockedSeedNewRandomWith :: forall n. (KnownNat n) => MLockedAllocator IO -> IO (MLockedSeed n)
+mlockedSeedNewRandomWith :: forall n. KnownNat n => MLockedAllocator IO -> IO (MLockedSeed n)
 mlockedSeedNewRandomWith allocator = do
   mls <- MLockedSeed <$> mlsbNewZeroWith allocator
   mlockedSeedUseAsCPtr mls $ \dst -> do
@@ -96,11 +96,11 @@ mlockedSeedNewRandomWith allocator = do
   where
     size = fromIntegral $ natVal (Proxy @n)
 
-mlockedSeedFinalize :: (MonadST m) => MLockedSeed n -> m ()
+mlockedSeedFinalize :: MonadST m => MLockedSeed n -> m ()
 mlockedSeedFinalize = mlsbFinalize . mlockedSeedMLSB
 
-mlockedSeedUseAsCPtr :: (MonadST m) => MLockedSeed n -> (Ptr Word8 -> m b) -> m b
+mlockedSeedUseAsCPtr :: MonadST m => MLockedSeed n -> (Ptr Word8 -> m b) -> m b
 mlockedSeedUseAsCPtr seed = mlsbUseAsCPtr (mlockedSeedMLSB seed)
 
-mlockedSeedUseAsSizedPtr :: (MonadST m) => MLockedSeed n -> (SizedPtr n -> m b) -> m b
+mlockedSeedUseAsSizedPtr :: MonadST m => MLockedSeed n -> (SizedPtr n -> m b) -> m b
 mlockedSeedUseAsSizedPtr seed = mlsbUseAsSizedPtr (mlockedSeedMLSB seed)

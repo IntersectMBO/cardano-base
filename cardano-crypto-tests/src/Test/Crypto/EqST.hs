@@ -6,15 +6,15 @@
 
 module Test.Crypto.EqST where
 
-import GHC.TypeLits (KnownNat)
-import qualified Data.Vector as Vec
 import Control.Monad.Class.MonadST (MonadST)
+import qualified Data.Vector as Vec
+import GHC.TypeLits (KnownNat)
 
+import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.DSIGN.Ed25519
+import Cardano.Crypto.KES.Simple
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
 import Cardano.Crypto.Libsodium.MLockedSeed
-import Cardano.Crypto.DSIGN.Ed25519
-import Cardano.Crypto.DSIGN.Class
-import Cardano.Crypto.KES.Simple
 
 -- | Monadic flavor of 'Eq', for things that can only be compared in a monadic
 -- context that satisfies 'MonadST'.
@@ -29,11 +29,13 @@ nequalsM a b = not <$> equalsM a b
 -- | Infix version of 'equalsM'
 (==!) :: (MonadST m, EqST a) => a -> a -> m Bool
 (==!) = equalsM
+
 infix 4 ==!
 
 -- | Infix version of 'nequalsM'
 (!=!) :: (MonadST m, EqST a) => a -> a -> m Bool
 (!=!) = nequalsM
+
 infix 4 !=!
 
 instance EqST a => EqST (Maybe a) where
@@ -76,8 +78,10 @@ deriving via
   instance
     KnownNat n => EqST (MLockedSeed n)
 
-deriving via (MLockedSizedBytes (SizeSignKeyDSIGN Ed25519DSIGN))
-  instance EqST (SignKeyDSIGNM Ed25519DSIGN)
+deriving via
+  (MLockedSizedBytes (SizeSignKeyDSIGN Ed25519DSIGN))
+  instance
+    EqST (SignKeyDSIGNM Ed25519DSIGN)
 
 instance EqST (SignKeyDSIGNM d) => EqST (SignKeyKES (SimpleKES d t)) where
   equalsM (ThunkySignKeySimpleKES a) (ThunkySignKeySimpleKES b) =

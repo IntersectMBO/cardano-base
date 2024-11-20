@@ -7,18 +7,18 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Ed448 digital signatures.
-module Cardano.Crypto.DSIGN.Ed448
-  ( Ed448DSIGN
-  , SigDSIGN (..)
-  , SignKeyDSIGN (..)
-  , VerKeyDSIGN (..)
-  )
+module Cardano.Crypto.DSIGN.Ed448 (
+  Ed448DSIGN,
+  SigDSIGN (..),
+  SignKeyDSIGN (..),
+  VerKeyDSIGN (..),
+)
 where
 
 import Control.DeepSeq (NFData)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
-import NoThunks.Class (NoThunks, InspectHeap(..))
+import NoThunks.Class (InspectHeap (..), NoThunks)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
@@ -27,84 +27,88 @@ import Crypto.PubKey.Ed448 as Ed448
 
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Seed
-import Cardano.Crypto.Util (SignableRepresentation(..))
-
+import Cardano.Crypto.Util (SignableRepresentation (..))
 
 data Ed448DSIGN
 
 instance DSIGNAlgorithm Ed448DSIGN where
-    type SeedSizeDSIGN Ed448DSIGN = 57
-    -- | Goldilocks points are 448 bits long
-    type SizeVerKeyDSIGN  Ed448DSIGN = 57
-    type SizeSignKeyDSIGN Ed448DSIGN = 57
-    type SizeSigDSIGN     Ed448DSIGN = 114
+  type SeedSizeDSIGN Ed448DSIGN = 57
 
-    --
-    -- Key and signature types
-    --
+  -- \| Goldilocks points are 448 bits long
+  type SizeVerKeyDSIGN Ed448DSIGN = 57
+  type SizeSignKeyDSIGN Ed448DSIGN = 57
+  type SizeSigDSIGN Ed448DSIGN = 114
 
-    newtype VerKeyDSIGN Ed448DSIGN = VerKeyEd448DSIGN PublicKey
-        deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving newtype NFData
-        deriving NoThunks via InspectHeap PublicKey
+  --
+  -- Key and signature types
+  --
 
-    newtype SignKeyDSIGN Ed448DSIGN = SignKeyEd448DSIGN SecretKey
-        deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving newtype NFData
-        deriving NoThunks via InspectHeap SecretKey
+  newtype VerKeyDSIGN Ed448DSIGN = VerKeyEd448DSIGN PublicKey
+    deriving (Show, Eq, Generic, ByteArrayAccess)
+    deriving newtype (NFData)
+    deriving (NoThunks) via InspectHeap PublicKey
 
-    newtype SigDSIGN Ed448DSIGN = SigEd448DSIGN Signature
-        deriving (Show, Eq, Generic, ByteArrayAccess)
-        deriving NoThunks via InspectHeap Signature
+  newtype SignKeyDSIGN Ed448DSIGN = SignKeyEd448DSIGN SecretKey
+    deriving (Show, Eq, Generic, ByteArrayAccess)
+    deriving newtype (NFData)
+    deriving (NoThunks) via InspectHeap SecretKey
 
-    --
-    -- Metadata and basic key operations
-    --
+  newtype SigDSIGN Ed448DSIGN = SigEd448DSIGN Signature
+    deriving (Show, Eq, Generic, ByteArrayAccess)
+    deriving (NoThunks) via InspectHeap Signature
 
-    algorithmNameDSIGN _ = "ed448"
+  --
+  -- Metadata and basic key operations
+  --
 
-    deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
+  algorithmNameDSIGN _ = "ed448"
 
+  deriveVerKeyDSIGN (SignKeyEd448DSIGN sk) = VerKeyEd448DSIGN $ toPublic sk
 
-    --
-    -- Core algorithm operations
-    --
+  --
+  -- Core algorithm operations
+  --
 
-    type Signable Ed448DSIGN = SignableRepresentation
+  type Signable Ed448DSIGN = SignableRepresentation
 
-    signDSIGN () a (SignKeyEd448DSIGN sk) =
-        let vk = toPublic sk
-            bs = getSignableRepresentation a
-         in SigEd448DSIGN $ sign sk vk bs
+  signDSIGN () a (SignKeyEd448DSIGN sk) =
+    let vk = toPublic sk
+        bs = getSignableRepresentation a
+     in SigEd448DSIGN $ sign sk vk bs
 
-    verifyDSIGN () (VerKeyEd448DSIGN vk) a (SigEd448DSIGN sig) =
-        if verify vk (getSignableRepresentation a) sig
-          then Right ()
-          else Left "Verification failed"
+  verifyDSIGN () (VerKeyEd448DSIGN vk) a (SigEd448DSIGN sig) =
+    if verify vk (getSignableRepresentation a) sig
+      then Right ()
+      else Left "Verification failed"
 
-    --
-    -- Key generation
-    --
+  --
+  -- Key generation
+  --
 
-    genKeyDSIGN seed =
-        let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
-         in SignKeyEd448DSIGN sk
+  genKeyDSIGN seed =
+    let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
+     in SignKeyEd448DSIGN sk
 
-    --
-    -- raw serialise/deserialise
-    --
+  --
+  -- raw serialise/deserialise
+  --
 
-    rawSerialiseVerKeyDSIGN   = BA.convert
-    rawSerialiseSignKeyDSIGN  = BA.convert
-    rawSerialiseSigDSIGN      = BA.convert
+  rawSerialiseVerKeyDSIGN = BA.convert
+  rawSerialiseSignKeyDSIGN = BA.convert
+  rawSerialiseSigDSIGN = BA.convert
 
-    rawDeserialiseVerKeyDSIGN  = fmap VerKeyEd448DSIGN
-                               . cryptoFailableToMaybe . Ed448.publicKey
-    rawDeserialiseSignKeyDSIGN = fmap SignKeyEd448DSIGN
-                               . cryptoFailableToMaybe . Ed448.secretKey
-    rawDeserialiseSigDSIGN     = fmap SigEd448DSIGN
-                               . cryptoFailableToMaybe . Ed448.signature
-
+  rawDeserialiseVerKeyDSIGN =
+    fmap VerKeyEd448DSIGN
+      . cryptoFailableToMaybe
+      . Ed448.publicKey
+  rawDeserialiseSignKeyDSIGN =
+    fmap SignKeyEd448DSIGN
+      . cryptoFailableToMaybe
+      . Ed448.secretKey
+  rawDeserialiseSigDSIGN =
+    fmap SigEd448DSIGN
+      . cryptoFailableToMaybe
+      . Ed448.signature
 
 instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
   toCBOR = encodeVerKeyDSIGN
@@ -127,8 +131,6 @@ instance ToCBOR (SigDSIGN Ed448DSIGN) where
 instance FromCBOR (SigDSIGN Ed448DSIGN) where
   fromCBOR = decodeSigDSIGN
 
-
 cryptoFailableToMaybe :: CryptoFailable a -> Maybe a
 cryptoFailableToMaybe (CryptoPassed a) = Just a
 cryptoFailableToMaybe (CryptoFailed _) = Nothing
-

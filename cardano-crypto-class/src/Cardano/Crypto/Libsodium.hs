@@ -5,7 +5,6 @@ module Cardano.Crypto.Libsodium (
   -- * MLocked memory management
   MLockedForeignPtr,
   MLockedAllocator,
-
   finalizeMLockedForeignPtr,
   mlockedAllocForeignPtr,
   mlockedMalloc,
@@ -14,7 +13,6 @@ module Cardano.Crypto.Libsodium (
 
   -- * MLocked bytes ('MLockedSizedBytes')
   MLockedSizedBytes,
-
   mlsbAsByteString,
   mlsbCompare,
   mlsbCopy,
@@ -42,7 +40,7 @@ module Cardano.Crypto.Libsodium (
   SodiumHashAlgorithm (..),
 ) where
 
-import Cardano.Crypto.Libsodium.Init
-import Cardano.Crypto.Libsodium.Memory
 import Cardano.Crypto.Libsodium.Hash
+import Cardano.Crypto.Libsodium.Init
 import Cardano.Crypto.Libsodium.MLockedBytes
+import Cardano.Crypto.Libsodium.Memory

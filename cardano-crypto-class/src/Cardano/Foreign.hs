@@ -1,27 +1,28 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
 -- | Utilities for FFI
 module Cardano.Foreign (
-    -- * Sized pointer
-    SizedPtr (..),
-    allocaSized,
-    memcpySized,
-    memsetSized,
-    -- * Low-level C functions
-    c_memcpy,
-    c_memset,
+  -- * Sized pointer
+  SizedPtr (..),
+  allocaSized,
+  memcpySized,
+  memsetSized,
+
+  -- * Low-level C functions
+  c_memcpy,
+  c_memset,
 ) where
 
 import Control.Monad (void)
+import Data.Proxy (Proxy (..))
 import Data.Void (Void)
 import Data.Word (Word8)
-import Data.Proxy (Proxy (..))
-import Foreign.Ptr (Ptr)
 import Foreign.C.Types (CSize (..))
 import Foreign.Marshal.Alloc (allocaBytes)
+import Foreign.Ptr (Ptr)
 import GHC.TypeLits
 
 -------------------------------------------------------------------------------
@@ -58,10 +59,10 @@ memsetSized (SizedPtr s) c = void (c_memset s (fromIntegral c) size)
 --
 -- Note: this is safe foreign import
 foreign import ccall "memcpy"
-    c_memcpy :: Ptr a -> Ptr a -> CSize -> IO (Ptr ())
+  c_memcpy :: Ptr a -> Ptr a -> CSize -> IO (Ptr ())
 
 -- | @void *memset(void *s, int c, size_t n);@
 --
 -- Note: for sure zeroing memory use @c_sodium_memzero@.
 foreign import ccall "memset"
-    c_memset :: Ptr a -> Int -> CSize -> IO (Ptr ())
+  c_memset :: Ptr a -> Int -> CSize -> IO (Ptr ())

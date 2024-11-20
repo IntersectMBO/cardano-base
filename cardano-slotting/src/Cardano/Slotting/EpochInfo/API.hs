@@ -3,24 +3,24 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Cardano.Slotting.EpochInfo.API
-  ( EpochInfo (..),
-    epochInfoSize,
-    epochInfoFirst,
-    epochInfoEpoch,
-    epochInfoRange,
-    epochInfoSlotToRelativeTime,
-    epochInfoSlotToUTCTime,
-    epochInfoSlotLength,
+module Cardano.Slotting.EpochInfo.API (
+  EpochInfo (..),
+  epochInfoSize,
+  epochInfoFirst,
+  epochInfoEpoch,
+  epochInfoRange,
+  epochInfoSlotToRelativeTime,
+  epochInfoSlotToUTCTime,
+  epochInfoSlotLength,
 
-    -- * Utility
-    hoistEpochInfo,
-    generalizeEpochInfo,
-  )
+  -- * Utility
+  hoistEpochInfo,
+  generalizeEpochInfo,
+)
 where
 
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
-import Cardano.Slotting.Time (RelativeTime, SystemStart, fromRelativeTime, SlotLength)
+import Cardano.Slotting.Time (RelativeTime, SlotLength, SystemStart, fromRelativeTime)
 import Control.Monad.Morph (generalize)
 import Data.Functor.Identity
 import Data.Time.Clock (UTCTime)
@@ -38,34 +38,36 @@ import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 -- query.
 data EpochInfo m
   = EpochInfo
-      { -- | Return the size of the given epoch as a number of slots
-        --
-        -- Note that the number of slots does /not/ bound the number of blocks,
-        -- since the EBB and a regular block share a slot number.
-        epochInfoSize_ :: HasCallStack => EpochNo -> m EpochSize,
-        -- | First slot in the specified epoch
-        --
-        -- See also 'epochInfoRange'
-        epochInfoFirst_ :: HasCallStack => EpochNo -> m SlotNo,
-        -- | Epoch containing the given slot
-        --
-        -- We should have the property that
-        --
-        -- > s `inRange` epochInfoRange (epochInfoEpoch s)
-        epochInfoEpoch_ :: HasCallStack => SlotNo -> m EpochNo,
-        -- | The 'RelativeTime' of the start of the given slot
-        --
-        -- This calculation depends on the varying slot lengths of the relevant
-        -- epochs.
-        --
-        -- See also 'epochInfoSlotToUTCTime'.
-        epochInfoSlotToRelativeTime_ ::
-          HasCallStack => SlotNo -> m RelativeTime,
-        -- | Return the length of the specified slot.
-        epochInfoSlotLength_ ::
-          HasCallStack => SlotNo -> m SlotLength
-      }
-  deriving NoThunks via OnlyCheckWhnfNamed "EpochInfo" (EpochInfo m)
+  { epochInfoSize_ :: HasCallStack => EpochNo -> m EpochSize
+  -- ^ Return the size of the given epoch as a number of slots
+  --
+  -- Note that the number of slots does /not/ bound the number of blocks,
+  -- since the EBB and a regular block share a slot number.
+  , epochInfoFirst_ :: HasCallStack => EpochNo -> m SlotNo
+  -- ^ First slot in the specified epoch
+  --
+  -- See also 'epochInfoRange'
+  , epochInfoEpoch_ :: HasCallStack => SlotNo -> m EpochNo
+  -- ^ Epoch containing the given slot
+  --
+  -- We should have the property that
+  --
+  -- > s `inRange` epochInfoRange (epochInfoEpoch s)
+  , epochInfoSlotToRelativeTime_ ::
+      HasCallStack =>
+      SlotNo -> m RelativeTime
+  -- ^ The 'RelativeTime' of the start of the given slot
+  --
+  -- This calculation depends on the varying slot lengths of the relevant
+  -- epochs.
+  --
+  -- See also 'epochInfoSlotToUTCTime'.
+  , epochInfoSlotLength_ ::
+      HasCallStack =>
+      SlotNo -> m SlotLength
+  -- ^ Return the length of the specified slot.
+  }
+  deriving (NoThunks) via OnlyCheckWhnfNamed "EpochInfo" (EpochInfo m)
 
 -- | Unhelpful instance, but this type occurs in records (eg @Shelley.Globals@)
 -- that we want to be able to 'show'
@@ -74,7 +76,8 @@ instance Show (EpochInfo f) where
 
 epochInfoRange :: Monad m => EpochInfo m -> EpochNo -> m (SlotNo, SlotNo)
 epochInfoRange epochInfo epochNo =
-  aux <$> epochInfoFirst epochInfo epochNo
+  aux
+    <$> epochInfoFirst epochInfo epochNo
     <*> epochInfoSize epochInfo epochNo
   where
     aux :: SlotNo -> EpochSize -> (SlotNo, SlotNo)
@@ -82,11 +85,11 @@ epochInfoRange epochInfo epochNo =
 
 -- | The start of the given slot
 epochInfoSlotToUTCTime ::
-     (HasCallStack, Monad m)
-  => EpochInfo m
-  -> SystemStart
-  -> SlotNo
-  -> m UTCTime
+  (HasCallStack, Monad m) =>
+  EpochInfo m ->
+  SystemStart ->
+  SlotNo ->
+  m UTCTime
 epochInfoSlotToUTCTime ei start sl =
   fromRelativeTime start <$> epochInfoSlotToRelativeTime ei sl
 
@@ -118,13 +121,14 @@ epochInfoSlotLength = epochInfoSlotLength_
 -------------------------------------------------------------------------------}
 
 hoistEpochInfo :: (forall a. m a -> n a) -> EpochInfo m -> EpochInfo n
-hoistEpochInfo f ei = EpochInfo
-  { epochInfoSize_ = f . epochInfoSize ei,
-    epochInfoFirst_ = f . epochInfoFirst ei,
-    epochInfoEpoch_ = f . epochInfoEpoch ei,
-    epochInfoSlotToRelativeTime_ = f . epochInfoSlotToRelativeTime ei,
-    epochInfoSlotLength_ = f . epochInfoSlotLength ei
-  }
+hoistEpochInfo f ei =
+  EpochInfo
+    { epochInfoSize_ = f . epochInfoSize ei
+    , epochInfoFirst_ = f . epochInfoFirst ei
+    , epochInfoEpoch_ = f . epochInfoEpoch ei
+    , epochInfoSlotToRelativeTime_ = f . epochInfoSlotToRelativeTime ei
+    , epochInfoSlotLength_ = f . epochInfoSlotLength ei
+    }
 
 generalizeEpochInfo :: Monad m => EpochInfo Identity -> EpochInfo m
 generalizeEpochInfo = hoistEpochInfo generalize

@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -- | Combinators for a possibly-multidimensional measurement
@@ -14,13 +14,13 @@
 --
 -- See the 'Measure' class for more.
 module Data.Measure (
-    module Data.Measure.Class
-  , (<=)
-  , (>=)
-  , drop
-  , splitAt
-  , take
-  )
+  module Data.Measure.Class,
+  (<=),
+  (>=),
+  drop,
+  splitAt,
+  take,
+)
 where
 
 import Data.Measure.Class
@@ -48,26 +48,26 @@ x >= y = x Prelude.== max x y
 -- clever like bin-packing etc.
 splitAt :: Measure a => (e -> a) -> a -> [e] -> ([e], [e])
 splitAt measure limit =
-    go zero []
+  go zero []
   where
     go !tot acc = \case
-      []   -> (Prelude.reverse acc, [])
-      e:es ->
-          if tot' <= limit
+      [] -> (Prelude.reverse acc, [])
+      e : es ->
+        if tot' <= limit
           then go tot' (e : acc) es
-          else (Prelude.reverse acc, e:es)
+          else (Prelude.reverse acc, e : es)
         where
           tot' = plus tot (measure e)
 
 -- | @fst . 'splitAt' measure limit@, but non-strict
 take :: Measure a => (e -> a) -> a -> [e] -> [e]
 take measure limit =
-    go zero
+  go zero
   where
     go !tot = \case
-      []   -> []
-      e:es ->
-          if tot' <= limit
+      [] -> []
+      e : es ->
+        if tot' <= limit
           then e : go tot' es
           else []
         where
@@ -76,13 +76,13 @@ take measure limit =
 -- | @snd . 'splitAt' measure limit@, with a bit less allocation
 drop :: Measure a => (e -> a) -> a -> [e] -> [e]
 drop measure limit =
-    go zero
+  go zero
   where
     go !tot = \case
-      []   -> []
-      e:es ->
-          if tot' <= limit
+      [] -> []
+      e : es ->
+        if tot' <= limit
           then go tot' es
-          else e:es
+          else e : es
         where
           tot' = plus tot (measure e)

@@ -1,14 +1,14 @@
 module Bench.Crypto.BenchData where
 
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import           Data.ByteString (ByteString)
 
-import           Cardano.Crypto.Seed
-
+import Cardano.Crypto.Seed
 
 testSeed :: Seed
 testSeed = mkSeedFromBytes testBytes
 
+{- FOURMOLU_DISABLE -}
 testBytes :: ByteString
 testBytes = BS.pack
     -- Totally random, determined by fair dice rolls
@@ -37,4 +37,4 @@ typicalMsg = BS.pack
   , 0x39, 0xde, 0x6c, 0xc3, 0x29, 0x6a, 0xf2, 0xd5
   , 0xff, 0x0e, 0xbc, 0xf6, 0xac, 0x81, 0xc2, 0x02
   ]
-
+{- FOURMOLU_ENABLE -}

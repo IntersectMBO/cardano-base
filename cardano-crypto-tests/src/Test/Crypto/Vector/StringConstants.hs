@@ -1,19 +1,23 @@
-
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Crypto.Vector.StringConstants
-  ( invalidEcdsaSigLengthError,
-    invalidSchnorrVerKeyLengthError,
-    invalidEcdsaVerKeyLengthError,
-    invalidSchnorrSigLengthError,
-    cannotDecodeVerificationKeyError,
-    unexpectedDecodingError,
-  )
+module Test.Crypto.Vector.StringConstants (
+  invalidEcdsaSigLengthError,
+  invalidSchnorrVerKeyLengthError,
+  invalidEcdsaVerKeyLengthError,
+  invalidSchnorrSigLengthError,
+  cannotDecodeVerificationKeyError,
+  unexpectedDecodingError,
+)
 where
 
+import Cardano.Crypto.SECP256K1.Constants (
+  SECP256K1_ECDSA_PUBKEY_BYTES,
+  SECP256K1_ECDSA_SIGNATURE_BYTES,
+  SECP256K1_SCHNORR_PUBKEY_BYTES,
+  SECP256K1_SCHNORR_SIGNATURE_BYTES,
+ )
 import Data.Data (Proxy (Proxy))
 import GHC.TypeLits (natVal)
-import Cardano.Crypto.SECP256K1.Constants (SECP256K1_ECDSA_PUBKEY_BYTES, SECP256K1_SCHNORR_PUBKEY_BYTES, SECP256K1_ECDSA_SIGNATURE_BYTES, SECP256K1_SCHNORR_SIGNATURE_BYTES)
 
 invalidEcdsaVerKeyLengthError :: Integer -> String
 invalidEcdsaVerKeyLengthError = invalidVerKeyLengthError $ natVal $ Proxy @SECP256K1_ECDSA_PUBKEY_BYTES
@@ -23,7 +27,10 @@ invalidSchnorrVerKeyLengthError = invalidVerKeyLengthError $ natVal $ Proxy @SEC
 
 invalidVerKeyLengthError :: Integer -> Integer -> String
 invalidVerKeyLengthError expectedLength actualLength =
-  "decodeVerKeyDSIGN: wrong length, expected " ++ show expectedLength ++ " bytes but got " ++ show actualLength
+  "decodeVerKeyDSIGN: wrong length, expected "
+    ++ show expectedLength
+    ++ " bytes but got "
+    ++ show actualLength
 
 invalidEcdsaSigLengthError :: Integer -> String
 invalidEcdsaSigLengthError = invalidSigLengthError $ natVal $ Proxy @SECP256K1_ECDSA_SIGNATURE_BYTES
@@ -33,7 +40,10 @@ invalidSchnorrSigLengthError = invalidSigLengthError $ natVal $ Proxy @SECP256K1
 
 invalidSigLengthError :: Integer -> Integer -> String
 invalidSigLengthError expectedLength actualLength =
-  "decodeSigDSIGN: wrong length, expected " ++ show expectedLength ++ " bytes but got " ++ show actualLength
+  "decodeSigDSIGN: wrong length, expected "
+    ++ show expectedLength
+    ++ " bytes but got "
+    ++ show actualLength
 
 cannotDecodeVerificationKeyError :: String
 cannotDecodeVerificationKeyError = "decodeVerKeyDSIGN: cannot decode key"

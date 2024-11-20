@@ -2,19 +2,19 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the Blake2b hashing algorithm, with various sizes.
-module Cardano.Crypto.Hash.Blake2b
-  ( Blake2b_224
-  , Blake2b_256
-  , blake2b_libsodium -- Used for Hash.Short
-  )
+module Cardano.Crypto.Hash.Blake2b (
+  Blake2b_224,
+  Blake2b_256,
+  blake2b_libsodium, -- Used for Hash.Short
+)
 where
 
-import Control.Monad (unless)
 import Cardano.Crypto.Libsodium.C (c_crypto_generichash_blake2b)
+import Control.Monad (unless)
 
-import Cardano.Crypto.Hash.Class (HashAlgorithm (..), SizeHash, hashAlgorithmName, digest)
-import Foreign.Ptr (castPtr, nullPtr)
+import Cardano.Crypto.Hash.Class (HashAlgorithm (..), SizeHash, digest, hashAlgorithmName)
 import Foreign.C.Error (errnoToIOError, getErrno)
+import Foreign.Ptr (castPtr, nullPtr)
 import GHC.IO.Exception (ioException)
 
 import qualified Data.ByteString as B
@@ -37,7 +37,14 @@ blake2b_libsodium :: Int -> B.ByteString -> B.ByteString
 blake2b_libsodium size input =
   BI.unsafeCreate size $ \outptr ->
     B.useAsCStringLen input $ \(inptr, inputlen) -> do
-      res <- c_crypto_generichash_blake2b (castPtr outptr) (fromIntegral size) (castPtr inptr) (fromIntegral inputlen) nullPtr 0 -- we used unkeyed hash
+      res <-
+        c_crypto_generichash_blake2b
+          (castPtr outptr)
+          (fromIntegral size)
+          (castPtr inptr)
+          (fromIntegral inputlen)
+          nullPtr
+          0 -- we used unkeyed hash
       unless (res == 0) $ do
         errno <- getErrno
         ioException $ errnoToIOError "digest @Blake2b: crypto_generichash_blake2b" errno Nothing Nothing

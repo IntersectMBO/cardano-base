@@ -2,19 +2,19 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
-module Cardano.Crypto.VRF.NeverUsed
-  ( NeverVRF
-  , VerKeyVRF (..)
-  , SignKeyVRF (..)
-  , CertVRF (..)
-  )
+
+module Cardano.Crypto.VRF.NeverUsed (
+  NeverVRF,
+  VerKeyVRF (..),
+  SignKeyVRF (..),
+  CertVRF (..),
+)
 where
 
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
 import Cardano.Crypto.VRF.Class
-
 
 -- | VRF not available
 --
@@ -23,7 +23,6 @@ import Cardano.Crypto.VRF.Class
 data NeverVRF
 
 instance VRFAlgorithm NeverVRF where
-
   data VerKeyVRF NeverVRF = NeverUsedVerKeyVRF
     deriving (Show, Eq, Generic, NoThunks)
 
@@ -46,14 +45,14 @@ instance VRFAlgorithm NeverVRF where
   genKeyVRF _ = NeverUsedSignKeyVRF
   seedSizeVRF _ = 0
 
-  sizeVerKeyVRF  _ = 0
+  sizeVerKeyVRF _ = 0
   sizeSignKeyVRF _ = 0
-  sizeCertVRF    _ = 0
+  sizeCertVRF _ = 0
 
-  rawSerialiseVerKeyVRF  _ = mempty
+  rawSerialiseVerKeyVRF _ = mempty
   rawSerialiseSignKeyVRF _ = mempty
-  rawSerialiseCertVRF    _ = mempty
+  rawSerialiseCertVRF _ = mempty
 
-  rawDeserialiseVerKeyVRF  _ = Just NeverUsedVerKeyVRF
+  rawDeserialiseVerKeyVRF _ = Just NeverUsedVerKeyVRF
   rawDeserialiseSignKeyVRF _ = Just NeverUsedSignKeyVRF
-  rawDeserialiseCertVRF    _ = Just NeverUsedCertVRF
+  rawDeserialiseCertVRF _ = Just NeverUsedCertVRF
