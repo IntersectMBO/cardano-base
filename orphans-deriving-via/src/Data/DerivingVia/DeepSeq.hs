@@ -1,24 +1,25 @@
-{-# LANGUAGE EmptyCase            #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE LambdaCase           #-}
-{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | "GHC.Generics" definition of 'rnf'
-module Data.DerivingVia.DeepSeq
-  (
-  )
+module Data.DerivingVia.DeepSeq (
+
+)
 where
 
 import Control.DeepSeq
 import Data.DerivingVia
 import GHC.Generics
 
-instance (Generic a, GNFData (Rep a))
-      => NFData (InstantiatedAt Generic a) where
+instance
+  (Generic a, GNFData (Rep a)) =>
+  NFData (InstantiatedAt Generic a)
+  where
   rnf (InstantiatedAt x) = grnf (from x)
 
 class GNFData rep where

@@ -5,17 +5,17 @@
 {-# LANGUAGE TypeOperators #-}
 
 -- | Implementation of short hashing algorithm, suitable for testing.
-module Cardano.Crypto.Hash.Short
-  ( ShortHash
-  , Blake2bPrefix
-  )
+module Cardano.Crypto.Hash.Short (
+  ShortHash,
+  Blake2bPrefix,
+)
 where
 
-import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.Hash.Blake2b (blake2b_libsodium)
+import Cardano.Crypto.Hash.Class
 
-import GHC.TypeLits (Nat, KnownNat, CmpNat, natVal)
 import Data.Proxy (Proxy (..))
+import GHC.TypeLits (CmpNat, KnownNat, Nat, natVal)
 
 type ShortHash = Blake2bPrefix 8
 

@@ -14,50 +14,50 @@
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Abstract hashing functionality.
-module Cardano.Crypto.Hash.Class
-  ( HashAlgorithm (..)
-  , sizeHash
-  , ByteString
-  , Hash(UnsafeHash)
-  , PackedBytes(PackedBytes8, PackedBytes28, PackedBytes32)
+module Cardano.Crypto.Hash.Class (
+  HashAlgorithm (..),
+  sizeHash,
+  ByteString,
+  Hash (UnsafeHash),
+  PackedBytes (PackedBytes8, PackedBytes28, PackedBytes32),
 
-    -- * Core operations
-  , hashWith
-  , hashWithSerialiser
+  -- * Core operations
+  hashWith,
+  hashWithSerialiser,
 
-    -- * Conversions
-  , castHash
-  , hashToBytes
-  , hashFromBytes
-  , hashToBytesShort
-  , hashFromBytesShort
-  , hashFromOffsetBytesShort
-  , hashToPackedBytes
-  , hashFromPackedBytes
+  -- * Conversions
+  castHash,
+  hashToBytes,
+  hashFromBytes,
+  hashToBytesShort,
+  hashFromBytesShort,
+  hashFromOffsetBytesShort,
+  hashToPackedBytes,
+  hashFromPackedBytes,
 
-    -- * Rendering and parsing
-  , hashToBytesAsHex
-  , hashFromBytesAsHex
-  , hashToTextAsHex
-  , hashFromTextAsHex
-  , hashToStringAsHex
-  , hashFromStringAsHex
+  -- * Rendering and parsing
+  hashToBytesAsHex,
+  hashFromBytesAsHex,
+  hashToTextAsHex,
+  hashFromTextAsHex,
+  hashToStringAsHex,
+  hashFromStringAsHex,
 
-    -- * Other operations
-  , xor
+  -- * Other operations
+  xor,
 
-    -- * Deprecated
-  , hash
-  , fromHash
-  , hashRaw
-  , getHash
-  , getHashBytesAsHex
-  )
+  -- * Deprecated
+  hash,
+  fromHash,
+  hashRaw,
+  getHash,
+  getHashBytesAsHex,
+)
 where
 
 import qualified Data.Foldable as F (foldl')
 import Data.Maybe (maybeToList)
-import Data.Proxy (Proxy(..))
+import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat, natVal)
@@ -68,18 +68,18 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as SBS
-import Data.MemPack (StateT(StateT), FailT(FailT), MemPack, Unpack(Unpack))
+import Data.MemPack (FailT (FailT), MemPack, StateT (StateT), Unpack (Unpack))
 import Data.Word (Word8)
 import Numeric.Natural (Natural)
 
-import Data.String (IsString(..))
+import Data.String (IsString (..))
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import Language.Haskell.TH.Syntax (Q, TExp(..))
+import Language.Haskell.TH.Syntax (Q, TExp (..))
 import Language.Haskell.TH.Syntax.Compat (Code (Code), examineSplice)
 
-import Data.Aeson (FromJSON(..), FromJSONKey(..), ToJSON(..), ToJSONKey(..))
+import Data.Aeson (FromJSON (..), FromJSONKey (..), ToJSON (..), ToJSONKey (..))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 
@@ -87,7 +87,7 @@ import Control.DeepSeq (NFData)
 
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (Encoding, FromCBOR(..), Size, ToCBOR(..), serialize')
+import Cardano.Binary (Encoding, FromCBOR (..), Size, ToCBOR (..), serialize')
 import Cardano.Crypto.PackedBytes
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.HeapWords (HeapWords (..))
@@ -95,7 +95,7 @@ import Cardano.HeapWords (HeapWords (..))
 import qualified Data.ByteString.Short.Internal as SBSI
 
 class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
-  --TODO: eliminate this Typeable constraint needed only for the ToCBOR
+  -- TODO: eliminate this Typeable constraint needed only for the ToCBOR
   -- the ToCBOR should not need it either
 
   -- | Size of hash digest
@@ -144,7 +144,7 @@ instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
     let n = fromInteger $ natVal (Proxy @(SizeHash h))
     case decodeHexString hexStr n of
       Left err -> fail $ "<Hash " ++ hashAlgorithmName (Proxy :: Proxy h) ++ ">: " ++ err
-      Right _  -> examineSplice [|| either error (UnsafeHashRep . packPinnedBytes) (decodeHexString hexStr n) ||]
+      Right _ -> examineSplice [||either error (UnsafeHashRep . packPinnedBytes) (decodeHexString hexStr n)||]
 
 instance HashAlgorithm h => IsString (Code Q (Hash h a)) where
   fromString = Code . fromString
@@ -152,11 +152,11 @@ instance HashAlgorithm h => IsString (Code Q (Hash h a)) where
 pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
 pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)
   where
-  UnsafeHash bytes =
-    case hashFromBytesShort bytes of
-      Nothing ->
-        error "UnsafeHash: mismatched size of the supplied ShortByteString and the expected digest"
-      Just h -> h
+    UnsafeHash bytes =
+      case hashFromBytesShort bytes of
+        Nothing ->
+          error "UnsafeHash: mismatched size of the supplied ShortByteString and the expected digest"
+        Just h -> h
 {-# COMPLETE UnsafeHash #-}
 
 --
@@ -164,20 +164,16 @@ pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)
 --
 
 -- | Hash the given value, using a serialisation function to turn it into bytes.
---
 hashWith :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
 hashWith serialise =
-    UnsafeHashRep
-  . packPinnedBytes
-  . digest (Proxy :: Proxy h)
-  . serialise
-
+  UnsafeHashRep
+    . packPinnedBytes
+    . digest (Proxy :: Proxy h)
+    . serialise
 
 -- | A variation on 'hashWith', but specially for CBOR encodings.
---
 hashWithSerialiser :: forall h a. HashAlgorithm h => (a -> Encoding) -> a -> Hash h a
 hashWithSerialiser toEnc = hashWith (serialize' . toEnc)
-
 
 --
 -- Conversions
@@ -188,64 +184,55 @@ hashWithSerialiser toEnc = hashWith (serialize' . toEnc)
 -- The 'Hash' type has a phantom type parameter to indicate what type the
 -- hash is of. It is sometimes necessary to fake this and hash a value of one
 -- type and use it where as hash of a different type is expected.
---
 castHash :: Hash h a -> Hash h b
 castHash (UnsafeHashRep h) = UnsafeHashRep h
 
-
 -- | The representation of the hash as bytes.
---
 hashToBytes :: Hash h a -> ByteString
 hashToBytes (UnsafeHashRep h) = unpackPinnedBytes h
 
-
 -- | Make a hash from it bytes representation.
---
 hashFromBytes ::
-     forall h a. HashAlgorithm h
-  => ByteString
-  -- ^ It must have an exact length, as given by 'sizeHash'.
-  -> Maybe (Hash h a)
+  forall h a.
+  HashAlgorithm h =>
+  -- | It must have an exact length, as given by 'sizeHash'.
+  ByteString ->
+  Maybe (Hash h a)
 hashFromBytes bytes
-  | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h))
-  = Just $ UnsafeHashRep (packPinnedBytes bytes)
-
-  | otherwise
-  = Nothing
+  | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h)) =
+      Just $ UnsafeHashRep (packPinnedBytes bytes)
+  | otherwise =
+      Nothing
 
 -- | Make a hash from it bytes representation, as a 'ShortByteString'.
---
 hashFromBytesShort ::
-     forall h a. HashAlgorithm h
-  => ShortByteString
-  -- ^ It must be a buffer of exact length, as given by 'sizeHash'.
-  -> Maybe (Hash h a)
+  forall h a.
+  HashAlgorithm h =>
+  -- | It must be a buffer of exact length, as given by 'sizeHash'.
+  ShortByteString ->
+  Maybe (Hash h a)
 hashFromBytesShort bytes = UnsafeHashRep <$> packBytesMaybe bytes 0
 
 -- | Just like `hashFromBytesShort`, but allows using a region of a 'ShortByteString'.
---
 hashFromOffsetBytesShort ::
-     forall h a. HashAlgorithm h
-  => ShortByteString
-  -- ^ It must be a buffer that contains at least 'sizeHash' many bytes staring at an offset.
-  -> Int
-  -- ^ Offset in number of bytes
-  -> Maybe (Hash h a)
+  forall h a.
+  HashAlgorithm h =>
+  -- | It must be a buffer that contains at least 'sizeHash' many bytes staring at an offset.
+  ShortByteString ->
+  -- | Offset in number of bytes
+  Int ->
+  Maybe (Hash h a)
 hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packBytesMaybe bytes offset
 
-
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
---
 hashToBytesShort :: Hash h a -> ShortByteString
 hashToBytesShort (UnsafeHashRep h) = unpackBytes h
 
 -- | /O(1)/ - Get the underlying hash representation
---
 hashToPackedBytes :: Hash h a -> PackedBytes (SizeHash h)
 hashToPackedBytes (UnsafeHashRep pb) = pb
 
 -- | /O(1)/ - Construct hash from the underlying representation
---
 hashFromPackedBytes :: PackedBytes (SizeHash h) -> Hash h a
 hashFromPackedBytes = UnsafeHashRep
 
@@ -261,12 +248,10 @@ hashToStringAsHex = Text.unpack . hashToTextAsHex
 --
 -- This can fail for the same reason as 'hashFromBytes', or because the input
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
---
 hashFromStringAsHex :: HashAlgorithm h => String -> Maybe (Hash h a)
 hashFromStringAsHex = hashFromTextAsHex . Text.pack
 
 -- | Convert the hash to hex encoding, as 'Text'.
---
 hashToTextAsHex :: Hash h a -> Text
 hashToTextAsHex = Text.decodeLatin1 . hashToBytesAsHex
 
@@ -274,12 +259,10 @@ hashToTextAsHex = Text.decodeLatin1 . hashToBytesAsHex
 --
 -- This can fail for the same reason as 'hashFromBytes', or because the input
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
---
 hashFromTextAsHex :: HashAlgorithm h => Text -> Maybe (Hash h a)
 hashFromTextAsHex = hashFromBytesAsHex . Text.encodeUtf8
 
 -- | Convert the hash to hex encoding, as 'ByteString'.
---
 hashToBytesAsHex :: Hash h a -> ByteString
 hashToBytesAsHex = Base16.encode . hashToBytes
 
@@ -287,7 +270,6 @@ hashToBytesAsHex = Base16.encode . hashToBytes
 --
 -- This can fail for the same reason as 'hashFromBytes', or because the input
 -- is invalid hex. The whole byte string must be valid hex, not just a prefix.
---
 hashFromBytesAsHex :: HashAlgorithm h => ByteString -> Maybe (Hash h a)
 hashFromBytesAsHex bsHex = do
   Right bs <- Just $ Base16.decode bsHex
@@ -297,12 +279,12 @@ instance Show (Hash h a) where
   show = show . hashToStringAsHex
 
 instance HashAlgorithm h => Read (Hash h a) where
-  readsPrec p str = [ (h, y) | (x, y) <- readsPrec p str, h <- maybeToList (hashFromStringAsHex x) ]
+  readsPrec p str = [(h, y) | (x, y) <- readsPrec p str, h <- maybeToList (hashFromStringAsHex x)]
 
 instance HashAlgorithm h => IsString (Hash h a) where
   fromString str =
     case hashFromBytesAsHex (BSC.pack str) of
-      Just x  -> x
+      Just x -> x
       Nothing -> error ("fromString: cannot decode hash " ++ show str)
 
 instance HashAlgorithm h => ToJSONKey (Hash h a) where
@@ -326,9 +308,9 @@ instance HeapWords (Hash h a) where
 
 parseHash :: HashAlgorithm crypto => Text -> Aeson.Parser (Hash crypto a)
 parseHash t =
-    case Base16.decode (Text.encodeUtf8 t) of
-      Right bytes -> maybe badSize return (hashFromBytes bytes)
-      Left _      -> badHex
+  case Base16.decode (Text.encodeUtf8 t) of
+    Right bytes -> maybe badSize return (hashFromBytes bytes)
+    Left _ -> badHex
   where
     badHex :: Aeson.Parser b
     badHex = fail "Hashes are expected in hex encoding"
@@ -343,14 +325,13 @@ parseHash t =
 instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
   toCBOR (UnsafeHash h) = toCBOR h
 
-  -- | 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
+  -- \| 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
   -- instance for 'ByteString' (as is the above 'toCBOR' method).  'Size'
   -- computation of length of the bytestring is passed as the first argument to
   -- 'encodedSizeExpr'.  The 'ByteString' instance will use it to calculate
   -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
-  --
   encodedSizeExpr _size proxy =
-      encodedSizeExpr (const hashSize) (hashToBytes <$> proxy)
+    encodedSizeExpr (const hashSize) (hashToBytes <$> proxy)
     where
       hashSize :: Size
       hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))
@@ -359,12 +340,16 @@ instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
   fromCBOR = do
     sbs <- fromCBOR
     case hashFromBytesShort sbs of
-      Just x  -> return x
-      Nothing -> fail $ "hash bytes wrong size, expected " ++ show expected
-                     ++ " but got " ++ show actual
+      Just x -> return x
+      Nothing ->
+        fail $
+          "hash bytes wrong size, expected "
+            ++ show expected
+            ++ " but got "
+            ++ show actual
         where
           expected = sizeHash (Proxy :: Proxy h)
-          actual   = SBS.length sbs
+          actual = SBS.length sbs
 
 --
 -- Deprecated

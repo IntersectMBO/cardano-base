@@ -2,49 +2,49 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MagicHash #-}
 
-module Cardano.HeapWords
-  ( HeapWords(..)
-  , heapSizeMb
-  , heapSizeKb
-  , heapWords0
-  , heapWords1
-  , heapWords2
-  , heapWords3
-  , heapWords4
-  , heapWords5
-  , heapWords6
-  , heapWords7
-  , heapWords8
-  , heapWords9
-  , heapWords10
-  , heapWords11
-  , heapWords12
-  , heapWords13
-  , heapWordsUArray
-  , heapWordsUVector
-  , heapWordsUnpacked
-  )
+module Cardano.HeapWords (
+  HeapWords (..),
+  heapSizeMb,
+  heapSizeKb,
+  heapWords0,
+  heapWords1,
+  heapWords2,
+  heapWords3,
+  heapWords4,
+  heapWords5,
+  heapWords6,
+  heapWords7,
+  heapWords8,
+  heapWords9,
+  heapWords10,
+  heapWords11,
+  heapWords12,
+  heapWords13,
+  heapWordsUArray,
+  heapWordsUVector,
+  heapWordsUnpacked,
+)
 where
 
 import qualified Data.Array.Unboxed as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Short as BSS
+import Data.Foldable (toList)
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet as IntSet
-import Data.Sequence (Seq)
-import Data.Foldable (toList)
 import Data.Ix
 import qualified Data.Map.Strict as Map
+import Data.Sequence (Seq)
 import qualified Data.Set as Set
-import Data.Word (Word8, Word32, Word64)
 import Data.Text as Text
 import Data.Time (Day, UTCTime)
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as V.U
-import GHC.Natural (Natural(NatS#, NatJ#))
+import Data.Word (Word32, Word64, Word8)
+import GHC.Natural (Natural (NatJ#, NatS#))
 import GHC.Prim (ByteArray#, sizeofByteArray#)
-import GHC.Types (Int(I#))
+import GHC.Types (Int (I#))
 
 #if __GLASGOW_HASKELL__ >= 900
 -- Use the GHC version here because this is compiler dependent, and only indirectly lib dependent.
@@ -78,199 +78,197 @@ heapWords0 :: Int
 heapWords1 :: HeapWords a => a -> Int
 heapWords2 :: (HeapWords a1, HeapWords a) => a -> a1 -> Int
 heapWords3 :: (HeapWords a2, HeapWords a1, HeapWords a) => a -> a1 -> a2 -> Int
-heapWords4
-  :: (HeapWords a3, HeapWords a2, HeapWords a1, HeapWords a)
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> Int
-heapWords5
-  :: (HeapWords a4, HeapWords a3, HeapWords a2, HeapWords a1, HeapWords a)
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> Int
-heapWords6
-  :: ( HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> Int
-heapWords7
-  :: ( HeapWords a6
-     , HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> a6
-  -> Int
-heapWords8
-  :: ( HeapWords a7
-     , HeapWords a6
-     , HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> a6
-  -> a7
-  -> Int
-heapWords9
-  :: ( HeapWords a8
-     , HeapWords a7
-     , HeapWords a6
-     , HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> a6
-  -> a7
-  -> a8
-  -> Int
-heapWords10
-  :: ( HeapWords a9
-     , HeapWords a8
-     , HeapWords a7
-     , HeapWords a6
-     , HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> a6
-  -> a7
-  -> a8
-  -> a9
-  -> Int
-heapWords11
-  :: ( HeapWords a10
-     , HeapWords a9
-     , HeapWords a8
-     , HeapWords a7
-     , HeapWords a6
-     , HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> a6
-  -> a7
-  -> a8
-  -> a9
-  -> a10
-  -> Int
-heapWords12
-  :: ( HeapWords a11
-     , HeapWords a10
-     , HeapWords a9
-     , HeapWords a8
-     , HeapWords a7
-     , HeapWords a6
-     , HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> a6
-  -> a7
-  -> a8
-  -> a9
-  -> a10
-  -> a11
-  -> Int
-heapWords13
-  :: ( HeapWords a12
-     , HeapWords a11
-     , HeapWords a10
-     , HeapWords a9
-     , HeapWords a8
-     , HeapWords a7
-     , HeapWords a6
-     , HeapWords a5
-     , HeapWords a4
-     , HeapWords a3
-     , HeapWords a2
-     , HeapWords a1
-     , HeapWords a
-     )
-  => a
-  -> a1
-  -> a2
-  -> a3
-  -> a4
-  -> a5
-  -> a6
-  -> a7
-  -> a8
-  -> a9
-  -> a10
-  -> a11
-  -> a12
-  -> Int
-
-
+heapWords4 ::
+  (HeapWords a3, HeapWords a2, HeapWords a1, HeapWords a) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  Int
+heapWords5 ::
+  (HeapWords a4, HeapWords a3, HeapWords a2, HeapWords a1, HeapWords a) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  Int
+heapWords6 ::
+  ( HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  Int
+heapWords7 ::
+  ( HeapWords a6
+  , HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  a6 ->
+  Int
+heapWords8 ::
+  ( HeapWords a7
+  , HeapWords a6
+  , HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  a6 ->
+  a7 ->
+  Int
+heapWords9 ::
+  ( HeapWords a8
+  , HeapWords a7
+  , HeapWords a6
+  , HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  a6 ->
+  a7 ->
+  a8 ->
+  Int
+heapWords10 ::
+  ( HeapWords a9
+  , HeapWords a8
+  , HeapWords a7
+  , HeapWords a6
+  , HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  a6 ->
+  a7 ->
+  a8 ->
+  a9 ->
+  Int
+heapWords11 ::
+  ( HeapWords a10
+  , HeapWords a9
+  , HeapWords a8
+  , HeapWords a7
+  , HeapWords a6
+  , HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  a6 ->
+  a7 ->
+  a8 ->
+  a9 ->
+  a10 ->
+  Int
+heapWords12 ::
+  ( HeapWords a11
+  , HeapWords a10
+  , HeapWords a9
+  , HeapWords a8
+  , HeapWords a7
+  , HeapWords a6
+  , HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  a6 ->
+  a7 ->
+  a8 ->
+  a9 ->
+  a10 ->
+  a11 ->
+  Int
+heapWords13 ::
+  ( HeapWords a12
+  , HeapWords a11
+  , HeapWords a10
+  , HeapWords a9
+  , HeapWords a8
+  , HeapWords a7
+  , HeapWords a6
+  , HeapWords a5
+  , HeapWords a4
+  , HeapWords a3
+  , HeapWords a2
+  , HeapWords a1
+  , HeapWords a
+  ) =>
+  a ->
+  a1 ->
+  a2 ->
+  a3 ->
+  a4 ->
+  a5 ->
+  a6 ->
+  a7 ->
+  a8 ->
+  a9 ->
+  a10 ->
+  a11 ->
+  a12 ->
+  Int
 heapWords0 = 0
 heapWords1 a = 2 + heapWords a
 heapWords2 a b = 3 + heapWords a + heapWords b
@@ -371,7 +369,6 @@ heapWords13 a b c d e f g h i j k l m =
     + heapWords l
     + heapWords m
 
-
 instance HeapWords (a -> b) where
   heapWords _ = 0
 
@@ -406,6 +403,7 @@ instance HeapWords Bool where
   -- tends to 0.
   heapWords _ = 0
 
+{- FOURMOLU_DISABLE -}
 instance HeapWords Integer where
 #if __GLASGOW_HASKELL__ >= 900
   heapWords (IS _) = 2
@@ -438,6 +436,7 @@ instance HeapWords Integer where
     -- └──┴──────┘
     --
 #endif
+{- FOURMOLU_ENABLE -}
 
 #if __GLASGOW_HASKELL__ >= 900
   heapWords (IP bigNat) = 4 + I# (sizeofByteArray# bigNat)
@@ -556,47 +555,48 @@ instance HeapWords Day where
   heapWords _ = 2
 
 instance HeapWords a => HeapWords [a] where
-  heapWords []     = heapWords0
-  heapWords (x:xs) = heapWords2 x xs
+  heapWords [] = heapWords0
+  heapWords (x : xs) = heapWords2 x xs
 
-instance (HeapWords a, HeapWords b) => HeapWords (a,b) where
-  heapWords (a,b) = heapWords2 a b
+instance (HeapWords a, HeapWords b) => HeapWords (a, b) where
+  heapWords (a, b) = heapWords2 a b
 
-instance (HeapWords a, HeapWords b, HeapWords c) => HeapWords (a,b,c) where
-  heapWords (a,b,c) = heapWords3 a b c
+instance (HeapWords a, HeapWords b, HeapWords c) => HeapWords (a, b, c) where
+  heapWords (a, b, c) = heapWords3 a b c
 
-instance (HeapWords a, HeapWords b, HeapWords c, HeapWords d) => HeapWords (a,b,c,d) where
-  heapWords (a,b,c,d) = heapWords4 a b c d
+instance (HeapWords a, HeapWords b, HeapWords c, HeapWords d) => HeapWords (a, b, c, d) where
+  heapWords (a, b, c, d) = heapWords4 a b c d
 
 instance HeapWords a => HeapWords (Maybe a) where
-  heapWords Nothing  = heapWords0
+  heapWords Nothing = heapWords0
   heapWords (Just a) = heapWords1 a
 
 instance (HeapWords a, HeapWords b) => HeapWords (Either a b) where
-  heapWords (Left  a) = heapWords1 a
+  heapWords (Left a) = heapWords1 a
   heapWords (Right b) = heapWords1 b
 
 instance (HeapWords a, HeapWords b) => HeapWords (Map.Map a b) where
-  heapWords m = sum [ 6 + heapWords k + heapWords v | (k,v) <- Map.toList m ]
+  heapWords m = sum [6 + heapWords k + heapWords v | (k, v) <- Map.toList m]
 
 instance HeapWords a => HeapWords (IntMap.IntMap a) where
-  heapWords m = sum [ 8 + heapWords v | v <- IntMap.elems m ]
+  heapWords m = sum [8 + heapWords v | v <- IntMap.elems m]
 
 instance HeapWords a => HeapWords (Set.Set a) where
-  heapWords m = sum [ 5 + heapWords v | v <- Set.elems m ]
+  heapWords m = sum [5 + heapWords v | v <- Set.elems m]
 
 instance HeapWords IntSet.IntSet where
-  heapWords s = 4 * IntSet.size s --estimate
+  heapWords s = 4 * IntSet.size s -- estimate
 
 instance HeapWords a => HeapWords (Seq a) where
-  heapWords s = sum [ 5 + heapWords v | v <- toList s ] --estimate
+  heapWords s = sum [5 + heapWords v | v <- toList s] -- estimate
 
 instance HeapWords BS.ByteString where
-  heapWords s = let (w,t) = divMod (BS.length s) wordSize
-               in 5 + w + signum t
+  heapWords s =
+    let (w, t) = divMod (BS.length s) wordSize
+     in 5 + w + signum t
 
 instance HeapWords BSS.ShortByteString where
-  heapWords s
+  heapWords s =
     -- We have
     --
     -- > data ShortByteString = SBS ByteArray#
@@ -617,15 +617,16 @@ instance HeapWords BSS.ShortByteString where
     --      │BA#│ sz│   │       │   │   2 + n Words
     --      └───┴───┴───┴─┈   ┈─┴───┘
     --
-    = let (w,t) = divMod (BSS.length s) wordSize
-      in 4 + w + signum t
+    let (w, t) = divMod (BSS.length s) wordSize
+     in 4 + w + signum t
 
 instance HeapWords LBS.ByteString where
-  heapWords s = sum [ 1 + heapWords c | c <- LBS.toChunks s ]
+  heapWords s = sum [1 + heapWords c | c <- LBS.toChunks s]
 
 instance HeapWords Text.Text where
-  heapWords s = let (w,t) = divMod (Text.length s) (wordSize `div` 2)
-               in 5 + w + signum t
+  heapWords s =
+    let (w, t) = divMod (Text.length s) (wordSize `div` 2)
+     in 5 + w + signum t
 
 heapWordsUArray :: (Ix i, A.IArray a e) => Int -> a i e -> Int
 heapWordsUArray sz a = 13 + (rangeSize (A.bounds a) * sz) `div` wordSize
@@ -637,7 +638,7 @@ heapWordsUVector :: V.U.Unbox e => Int -> V.U.Vector e -> Int
 heapWordsUVector sz a = 5 + (V.U.length a * sz) `div` wordSize
 
 instance HeapWords Natural where
-  heapWords (NatS# _)
+  heapWords (NatS# _) =
     -- We have
     --
     -- > NatS# GmpLimb#
@@ -652,8 +653,8 @@ instance HeapWords Natural where
     -- │NatS#│ Word#'│
     -- └─────┴───────┘
     --
-    = 1 + 1
-  heapWords (NatJ# bn)
+    1 + 1
+  heapWords (NatJ# bn) =
     -- We have
     --
     -- > NatJ# {-# UNPACK #-} !BigNat
@@ -675,7 +676,7 @@ instance HeapWords Natural where
     --        │BA#│ sz│   │       │   │   2 + n Words
     --        └───┴───┴───┴─┈   ┈─┴───┘
     --
-    = 1 + 1 + heapWordsUnpacked bn
+    1 + 1 + heapWordsUnpacked bn
 
 instance HeapWords BigNat where
   heapWords (BN# arr) =
@@ -699,21 +700,21 @@ instance HeapWords BigNat where
     1 + 1 + heapWordsByteArray# arr
 
 -- | Calculate the heap words required to store a 'ByteArray#' object.
---
 heapWordsByteArray# :: ByteArray# -> Int
 heapWordsByteArray# ba# = 2 + n
-  -- We require:
-  --
-  -- - 2 for the 'ByteArray#' heap object (1 for header, and 1 for storing its
-  --   size)
-  -- - @n@ for the variable sized part
-  --
-  -- ┌───┬───┬───┬─┈   ┈─┬───┐
-  -- │BA#│ sz│   │       │   │   2 + n Words
-  -- └───┴───┴───┴─┈   ┈─┴───┘
- where
-  n      = 1 + ((nbytes - 1) `div` wordSize)
-  nbytes = I# (sizeofByteArray# ba#)
+  where
+    -- We require:
+    --
+    -- - 2 for the 'ByteArray#' heap object (1 for header, and 1 for storing its
+    --   size)
+    -- - @n@ for the variable sized part
+    --
+    -- ┌───┬───┬───┬─┈   ┈─┬───┐
+    -- │BA#│ sz│   │       │   │   2 + n Words
+    -- └───┴───┴───┴─┈   ┈─┴───┘
+
+    n = 1 + ((nbytes - 1) `div` wordSize)
+    nbytes = I# (sizeofByteArray# ba#)
 
 -- | Calculate the number of heap words used by a field unpacked within another
 -- constructor.
@@ -723,6 +724,5 @@ heapWordsByteArray# ba# = 2 + n
 --
 -- - a word for the pointer to the inner structure.
 -- - a word for the constructor that is being unpacked.
---
 heapWordsUnpacked :: HeapWords a => a -> Int
 heapWordsUnpacked x = heapWords x - 2

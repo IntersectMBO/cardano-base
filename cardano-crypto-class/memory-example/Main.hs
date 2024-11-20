@@ -1,10 +1,11 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
-
 -- traceMLockedForeignPtr is deprecated
 {-# OPTIONS_GHC -Wno-deprecations #-}
+
+{- FOURMOLU_DISABLE -}
 module Main (main) where
 
 import           Data.Proxy (Proxy (..))

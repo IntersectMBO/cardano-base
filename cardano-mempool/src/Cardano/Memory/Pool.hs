@@ -94,7 +94,7 @@ data Pool n s = Pool
 countPages :: Pool n s -> ST s Int
 countPages pool = go 1 (poolFirstPage pool)
   where
-    go n Page{pageNextPage} = do
+    go n Page {pageNextPage} = do
       readMutVar pageNextPage >>= \case
         Nothing -> pure n
         Just nextPage -> go (n + 1) nextPage
@@ -104,23 +104,23 @@ ixBitSize = finiteBitSize (0 :: Word)
 
 -- | Initilizes the `Pool` that can be used for further allocation of @`ForeignPtr`
 -- `Block` n@ with `grabNextBlock`.
-initPool
-  :: forall n s
-   . KnownNat n
-  => Int
-  -- ^ Number of groups per page. Must be a posititve number, otherwise error. One group
+initPool ::
+  forall n s.
+  KnownNat n =>
+  -- | Number of groups per page. Must be a posititve number, otherwise error. One group
   -- contains as many blocks as the operating system has bits. A 64bit architecture will
   -- have 64 blocks per group. For example, if program is compiled on a 64 bit OS and you
   -- know ahead of time the maximum number of blocks that will be allocated through out
   -- the program, then the optimal value for this argument will @maxBlockNum/64@
-  -> (forall a. Int -> ST s (ForeignPtr a))
-  -- ^ Mempool page allocator. Some allocated pages might be immediately discarded,
+  Int ->
+  -- | Mempool page allocator. Some allocated pages might be immediately discarded,
   -- therefore number of pages utilized will not necessesarely match the number of times
   -- this action will be called.
-  -> (Ptr (Block n) -> IO ())
-  -- ^ Finalizer to use for each block. It is an IO action because it will be executed by
+  (forall a. Int -> ST s (ForeignPtr a)) ->
+  -- | Finalizer to use for each block. It is an IO action because it will be executed by
   -- the Garbage Collector in a separate thread once the `Block` is no longer referenced.
-  -> ST s (Pool n s)
+  (Ptr (Block n) -> IO ()) ->
+  ST s (Pool n s)
 initPool groupsPerPage memAlloc blockFinalizer = do
   unless (groupsPerPage > 0) $
     error $
@@ -133,7 +133,7 @@ initPool groupsPerPage memAlloc blockFinalizer = do
         setPrimArray pageBitArray 0 groupsPerPage 0
         pageFull <- newPVar 0
         pageNextPage <- newMutVar Nothing
-        pure Page{..}
+        pure Page {..}
   firstPage <- pageInit
   pure
     Pool
@@ -153,10 +153,10 @@ grabNextBlock = grabNextPoolBlockWith grabNextPageForeignPtr
 -- | This is a helper function that will allocate a `Page` if the current `Page` in the
 -- `Pool` is full. Whenever there are still block slots are available then supplied
 -- @grabNext@ function will be used to reserve the slot in that `Page`.
-grabNextPoolBlockWith
-  :: (Page n s -> (Ptr (Block n) -> IO ()) -> ST s (Maybe (ForeignPtr (Block n))))
-  -> Pool n s
-  -> ST s (ForeignPtr (Block n))
+grabNextPoolBlockWith ::
+  (Page n s -> (Ptr (Block n) -> IO ()) -> ST s (Maybe (ForeignPtr (Block n)))) ->
+  Pool n s ->
+  ST s (ForeignPtr (Block n))
 grabNextPoolBlockWith grabNext pool = go (poolFirstPage pool)
   where
     go page = do
@@ -198,14 +198,14 @@ intToBool _ = True
 -- | This is a helper function that will attempt to find the next available slot for the
 -- `Block` and create a `ForeignPtr` with the size of `Block` in the `Page`. In case when
 -- `Page` is full it will return `Nothing`.
-grabNextPageForeignPtr
-  :: forall n s
-   . KnownNat n
-  => Page n s
-  -- ^ Page to grab the block from
-  -> (Ptr (Block n) -> IO ())
-  -- ^ Finalizer to run, once the `ForeignPtr` holding on to `Ptr` `Block` is no longer used
-  -> ST s (Maybe (ForeignPtr (Block n)))
+grabNextPageForeignPtr ::
+  forall n s.
+  KnownNat n =>
+  -- | Page to grab the block from
+  Page n s ->
+  -- | Finalizer to run, once the `ForeignPtr` holding on to `Ptr` `Block` is no longer used
+  (Ptr (Block n) -> IO ()) ->
+  ST s (Maybe (ForeignPtr (Block n)))
 grabNextPageForeignPtr page finalizer =
   grabNextPageWithAllocator page $ \blockPtr resetIndex -> do
     fp <- newForeignPtr_ blockPtr
@@ -213,13 +213,13 @@ grabNextPageForeignPtr page finalizer =
     pure fp
 {-# INLINE grabNextPageForeignPtr #-}
 
-grabNextPageWithAllocator
-  :: forall n s
-   . KnownNat n
-  => Page n s
-  -> (Ptr (Block n) -> IO () -> IO (ForeignPtr (Block n)))
-  -> ST s (Maybe (ForeignPtr (Block n)))
-grabNextPageWithAllocator Page{..} allocator = do
+grabNextPageWithAllocator ::
+  forall n s.
+  KnownNat n =>
+  Page n s ->
+  (Ptr (Block n) -> IO () -> IO (ForeignPtr (Block n))) ->
+  ST s (Maybe (ForeignPtr (Block n)))
+grabNextPageWithAllocator Page {..} allocator = do
   setNextZero pageBitArray >>= \case
     -- There is a slight chance that some Blocks will be cleared before the pageFull is
     -- set to True. This is not a problem because that memory will be recovered as soon as
@@ -284,10 +284,10 @@ setNextZero ma = ifindAtomicMutablePrimArray ma f
         Just !bitIx -> (setBit w bitIx, Just (ixBitSize * i + bitIx))
 {-# INLINE setNextZero #-}
 
-ifindAtomicMutablePrimArray
-  :: MutablePrimArray s Int
-  -> (Int -> Int -> (Int, Maybe a))
-  -> ST s (Maybe a)
+ifindAtomicMutablePrimArray ::
+  MutablePrimArray s Int ->
+  (Int -> Int -> (Int, Maybe a)) ->
+  ST s (Maybe a)
 ifindAtomicMutablePrimArray ma f = do
   n <- getSizeofMutablePrimArray ma
   let go i

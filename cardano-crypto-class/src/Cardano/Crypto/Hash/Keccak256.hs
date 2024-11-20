@@ -3,14 +3,14 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the Keccak256 hashing algorithm.
-module Cardano.Crypto.Hash.Keccak256
-  ( Keccak256
-  )
+module Cardano.Crypto.Hash.Keccak256 (
+  Keccak256,
+)
 where
 
 import Cardano.Crypto.Hash.Class
-import qualified "crypton" Crypto.Hash as H
 import qualified Data.ByteArray as BA
+import qualified "crypton" Crypto.Hash as H
 
 data Keccak256
 

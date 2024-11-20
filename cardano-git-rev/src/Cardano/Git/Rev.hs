@@ -1,7 +1,9 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
+
+{- FOURMOLU_DISABLE -}
 
 #if __GLASGOW_HASKELL__ >= 900
 {-# LANGUAGE TemplateHaskellQuotes #-}

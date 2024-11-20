@@ -1,8 +1,9 @@
 {-# LANGUAGE CPP #-}
+
 -- | Digital signatures.
-module Cardano.Crypto.DSIGN
-  ( module X
-  )
+module Cardano.Crypto.DSIGN (
+  module X,
+)
 where
 
 import Cardano.Crypto.DSIGN.Class as X

@@ -13,59 +13,54 @@
 
 -- | Verifiable Random Function (VRF) implemented as FFI wrappers around the
 -- implementation in <https://github.com/input-output-hk/libsodium>
-module Cardano.Crypto.VRF.Praos
-  (
+module Cardano.Crypto.VRF.Praos (
   -- * VRFAlgorithm API
-    PraosVRF
+  PraosVRF,
 
   -- * Key sizes
-  , certSizeVRF
-  , signKeySizeVRF
-  , verKeySizeVRF
-  , vrfKeySizeVRF
+  certSizeVRF,
+  signKeySizeVRF,
+  verKeySizeVRF,
+  vrfKeySizeVRF,
 
   -- * Seed and key generation
-  , Seed
-  , genSeed
-  , keypairFromSeed
+  Seed,
+  genSeed,
+  keypairFromSeed,
 
   -- * Conversions
-  , outputBytes
-  , proofBytes
-  , skBytes
-  , vkBytes
-  , skToVerKey
-  , skToSeed
-
-  , proofFromBytes
-  , skFromBytes
-  , vkFromBytes
-
-  , vkToBatchCompat
-  , skToBatchCompat
-  , outputToBatchCompat
-
+  outputBytes,
+  proofBytes,
+  skBytes,
+  vkBytes,
+  skToVerKey,
+  skToSeed,
+  proofFromBytes,
+  skFromBytes,
+  vkFromBytes,
+  vkToBatchCompat,
+  skToBatchCompat,
+  outputToBatchCompat,
 
   -- * Core VRF operations
-  , prove
-  , verify
-
-  , SignKeyVRF (..)
-  , VerKeyVRF (..)
-  , CertVRF (..)
+  prove,
+  verify,
+  SignKeyVRF (..),
+  VerKeyVRF (..),
+  CertVRF (..),
 
   -- * Internal types
-  , Proof
-  , SignKey
-  , VerKey
-  , Output
-  )
+  Proof,
+  SignKey,
+  VerKey,
+  Output,
+)
 where
 
-import Cardano.Binary
-  ( FromCBOR (..)
-  , ToCBOR (..)
-  )
+import Cardano.Binary (
+  FromCBOR (..),
+  ToCBOR (..),
+ )
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -125,40 +120,40 @@ type OutputPtr = Ptr OutputValue
 -- finalizers that automatically free the memory for us.
 
 -- | A random seed, used to derive a key pair.
-newtype Seed = Seed { unSeed :: ForeignPtr SeedValue }
-  deriving NoThunks via OnlyCheckWhnf Seed
+newtype Seed = Seed {unSeed :: ForeignPtr SeedValue}
+  deriving (NoThunks) via OnlyCheckWhnf Seed
 
 -- | Signing key. In this implementation, the signing key is actually a 64-byte
 -- value that contains both the 32-byte signing key and the corresponding
 -- 32-byte verification key.
-newtype SignKey = SignKey { unSignKey :: ForeignPtr SignKeyValue }
+newtype SignKey = SignKey {unSignKey :: ForeignPtr SignKeyValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf SignKey
+  deriving (NoThunks) via OnlyCheckWhnf SignKey
 
 instance NFData SignKey where
   rnf a = seq a ()
 
 -- | Verification key.
-newtype VerKey = VerKey { unVerKey :: ForeignPtr VerKeyValue }
+newtype VerKey = VerKey {unVerKey :: ForeignPtr VerKeyValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf VerKey
+  deriving (NoThunks) via OnlyCheckWhnf VerKey
 
 instance NFData VerKey where
   rnf a = seq a ()
 
 -- | A proof, as constructed by the 'prove' function.
-newtype Proof = Proof { unProof :: ForeignPtr ProofValue }
+newtype Proof = Proof {unProof :: ForeignPtr ProofValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf Proof
+  deriving (NoThunks) via OnlyCheckWhnf Proof
 
 instance NFData Proof where
   rnf a = seq a ()
 
 -- | Hashed output of a proof verification, as returned by the 'verify'
 -- function.
-newtype Output = Output { unOutput :: ForeignPtr OutputValue }
+newtype Output = Output {unOutput :: ForeignPtr OutputValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf Output
+  deriving (NoThunks) via OnlyCheckWhnf Output
 
 -- Raw low-level FFI bindings.
 --
@@ -234,9 +229,12 @@ copyFromByteString ptr bs lenExpected =
   BS.unsafeUseAsCStringLen bs $ \(cstr, lenActual) ->
     if lenActual >= lenExpected
       then copyBytes (castPtr ptr) cstr lenExpected
-      else error $
-           "Invalid input size, expected at least " <>
-           show lenExpected <> ", but got " <> show lenActual
+      else
+        error $
+          "Invalid input size, expected at least "
+            <> show lenExpected
+            <> ", but got "
+            <> show lenActual
 
 seedFromBytes :: ByteString -> Seed
 seedFromBytes bs = unsafePerformIO $ do
@@ -326,19 +324,18 @@ mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 proofFromBytes :: MonadFail m => ByteString -> m Proof
 proofFromBytes bs
   | bsLen /= certSizeVRF =
-    fail $
-      "Invalid proof length "
-        <> show @Int bsLen
-        <> ", expecting "
-        <> show @Int certSizeVRF
+      fail $
+        "Invalid proof length "
+          <> show @Int bsLen
+          <> ", expecting "
+          <> show @Int certSizeVRF
   | otherwise = pure $! unsafePerformIO $ do
       proof <- mkProof
       withForeignPtr (unProof proof) $ \ptr ->
         copyFromByteString ptr bs certSizeVRF
       return proof
-    where
-      bsLen = BS.length bs
-
+  where
+    bsLen = BS.length bs
 
 skFromBytes :: MonadFail m => ByteString -> m SignKey
 skFromBytes bs = do
@@ -366,12 +363,11 @@ vkFromBytes bs = do
           <> show @Int bsLen
           <> ", expecting "
           <> show @Int verKeySizeVRF
-    else
-      pure $! unsafePerformIO $ do
-        pk <- mkVerKey
-        withForeignPtr (unVerKey pk) $ \ptr ->
-          copyFromByteString ptr bs verKeySizeVRF
-        return pk
+    else pure $! unsafePerformIO $ do
+      pk <- mkVerKey
+      withForeignPtr (unVerKey pk) $ \ptr ->
+        copyFromByteString ptr bs verKeySizeVRF
+      return pk
   where
     bsLen = BS.length bs
 
@@ -441,10 +437,9 @@ skToBatchCompat praosSk =
 outputToBatchCompat :: OutputVRF PraosVRF -> OutputVRF BC.PraosBatchCompatVRF
 outputToBatchCompat praosOutput =
   if vrfKeySizeVRF /= BC.vrfKeySizeVRF
-  then error "OutputVRF: Unable to convert PraosSK to BatchCompatSK."
-  else
-  OutputVRF (getOutputVRFBytes praosOutput)
-
+    then error "OutputVRF: Unable to convert PraosSK to BatchCompatSK."
+    else
+      OutputVRF (getOutputVRFBytes praosOutput)
 
 -- | Verify a VRF proof and validate the Verification Key. Returns 'Just' a hash of
 -- the verification result on success, 'Nothing' if the verification did not
@@ -478,21 +473,21 @@ data PraosVRF
 
 instance VRFAlgorithm PraosVRF where
   newtype VerKeyVRF PraosVRF = VerKeyPraosVRF VerKey
-    deriving stock   (Show, Eq, Generic)
+    deriving stock (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "VerKeyVRF PraosVRF" VerKey
+    deriving (NoThunks) via OnlyCheckWhnfNamed "VerKeyVRF PraosVRF" VerKey
     deriving newtype (NFData)
 
   newtype SignKeyVRF PraosVRF = SignKeyPraosVRF SignKey
-    deriving stock   (Show, Eq, Generic)
+    deriving stock (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "SignKeyVRF PraosVRF" SignKey
+    deriving (NoThunks) via OnlyCheckWhnfNamed "SignKeyVRF PraosVRF" SignKey
     deriving newtype (NFData)
 
   newtype CertVRF PraosVRF = CertPraosVRF Proof
-    deriving stock   (Show, Eq, Generic)
+    deriving stock (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "CertKeyVRF PraosVRF" Proof
+    deriving (NoThunks) via OnlyCheckWhnfNamed "CertKeyVRF PraosVRF" Proof
     deriving newtype (NFData)
 
   type Signable PraosVRF = SignableRepresentation

@@ -7,54 +7,54 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
 -- | Strict variants of 'FingerTree' operations.
-module Data.FingerTree.Strict
-  ( StrictFingerTree,
-    fromStrict,
-    forceToStrict,
+module Data.FingerTree.Strict (
+  StrictFingerTree,
+  fromStrict,
+  forceToStrict,
 
-    -- * Construction
-    empty,
-    singleton,
-    (<|),
-    (|>),
-    (><),
-    fromList,
+  -- * Construction
+  empty,
+  singleton,
+  (<|),
+  (|>),
+  (><),
+  fromList,
 
-    -- * Deconstruction
-    null,
+  -- * Deconstruction
+  null,
 
-    -- ** Examining the ends
-    viewl,
-    viewr,
+  -- ** Examining the ends
+  viewl,
+  viewr,
 
-    -- ** Search
-    SearchResult (..),
-    search,
+  -- ** Search
+  SearchResult (..),
+  search,
 
-    -- ** Splitting
+  -- ** Splitting
 
-    -- | These functions are special cases of 'search'.
-    split,
-    takeUntil,
-    dropUntil,
+  -- | These functions are special cases of 'search'.
+  split,
+  takeUntil,
+  dropUntil,
 
-    -- * Transformation
-    reverse,
+  -- * Transformation
+  reverse,
 
-    -- ** Maps
-    fmap',
-    unsafeFmap,
-    -- Re-export from "Data.FingerTree"
-    Measured (..),
-    ViewL (..),
-    ViewR (..),
-  )
+  -- ** Maps
+  fmap',
+  unsafeFmap,
+  -- Re-export from "Data.FingerTree"
+  Measured (..),
+  ViewL (..),
+  ViewR (..),
+)
 where
 
 import Data.FingerTree (Measured (..), ViewL (..), ViewR (..))
 import qualified Data.FingerTree as FT
-import qualified Data.Foldable as F (foldl')
 import Data.Foldable (toList)
+import qualified Data.Foldable as F (foldl')
 import Data.Unit.Strict (forceElemsToWHNF)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks (..), noThunksInValues)
@@ -95,22 +95,22 @@ singleton !a = SFT (FT.singleton a)
 
 -- | /O(n)/. Create a sequence from a finite list of elements.
 -- The opposite operation 'toList' is supplied by the 'Foldable' instance.
-fromList :: (Measured v a) => [a] -> StrictFingerTree v a
+fromList :: Measured v a => [a] -> StrictFingerTree v a
 fromList !xs = F.foldl' (|>) (SFT FT.empty) xs
 
 -- | /O(1)/. Add an element to the left end of a sequence.
 -- Mnemonic: a triangle with the single element at the pointy end.
-(<|) :: (Measured v a) => a -> StrictFingerTree v a -> StrictFingerTree v a
+(<|) :: Measured v a => a -> StrictFingerTree v a -> StrictFingerTree v a
 (!a) <| SFT ft = SFT (a FT.<| ft)
 
 -- | /O(1)/. Add an element to the right end of a sequence.
 -- Mnemonic: a triangle with the single element at the pointy end.
-(|>) :: (Measured v a) => StrictFingerTree v a -> a -> StrictFingerTree v a
+(|>) :: Measured v a => StrictFingerTree v a -> a -> StrictFingerTree v a
 SFT ft |> (!a) = SFT (ft FT.|> a)
 
 -- | /O(log(min(n1,n2)))/. Concatenate two sequences.
 (><) ::
-  (Measured v a) =>
+  Measured v a =>
   StrictFingerTree v a ->
   StrictFingerTree v a ->
   StrictFingerTree v a
@@ -135,7 +135,7 @@ null (SFT ft) = FT.null ft
 
 -- | /O(1)/. Analyse the left end of a sequence.
 viewl ::
-  (Measured v a) =>
+  Measured v a =>
   StrictFingerTree v a ->
   ViewL (StrictFingerTree v) a
 viewl (SFT ft) = case FT.viewl ft of
@@ -144,7 +144,7 @@ viewl (SFT ft) = case FT.viewl ft of
 
 -- | /O(1)/. Analyse the right end of a sequence.
 viewr ::
-  (Measured v a) =>
+  Measured v a =>
   StrictFingerTree v a ->
   ViewR (StrictFingerTree v) a
 viewr (SFT ft) = case FT.viewr ft of
@@ -215,7 +215,7 @@ fromOriginalSearchResult FT.Nowhere = Nowhere
 --
 -- @since 0.1.2.0
 search ::
-  (Measured v a) =>
+  Measured v a =>
   (v -> v -> Bool) ->
   StrictFingerTree v a ->
   SearchResult v a
@@ -231,7 +231,7 @@ search p (SFT ft) = fromOriginalSearchResult (FT.search p ft)
 -- For predictable results, one should ensure that there is only one such
 -- point, i.e. that the predicate is /monotonic/.
 split ::
-  (Measured v a) =>
+  Measured v a =>
   (v -> Bool) ->
   StrictFingerTree v a ->
   (StrictFingerTree v a, StrictFingerTree v a)
@@ -245,7 +245,7 @@ split p (SFT ft) = (SFT left, SFT right)
 --
 -- *  @'takeUntil' p t = 'fst' ('split' p t)@
 takeUntil ::
-  (Measured v a) =>
+  Measured v a =>
   (v -> Bool) ->
   StrictFingerTree v a ->
   StrictFingerTree v a
@@ -257,7 +257,7 @@ takeUntil p (SFT ft) = SFT (FT.takeUntil p ft)
 --
 -- * @'dropUntil' p t = 'snd' ('split' p t)@
 dropUntil ::
-  (Measured v a) =>
+  Measured v a =>
   (v -> Bool) ->
   StrictFingerTree v a ->
   StrictFingerTree v a
@@ -268,7 +268,7 @@ dropUntil p (SFT ft) = SFT (FT.dropUntil p ft)
 -------------------------------------------------------------------------------}
 
 -- | /O(n)/. The reverse of a sequence.
-reverse :: (Measured v a) => StrictFingerTree v a -> StrictFingerTree v a
+reverse :: Measured v a => StrictFingerTree v a -> StrictFingerTree v a
 reverse (SFT ft) = SFT (FT.reverse ft)
 
 {-------------------------------------------------------------------------------

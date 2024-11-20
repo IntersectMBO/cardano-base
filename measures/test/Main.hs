@@ -1,7 +1,7 @@
-module Main
-  ( main
-  , tests
-  )
+module Main (
+  main,
+  tests,
+)
 where
 
 import Test.Tasty
@@ -12,6 +12,8 @@ main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "measures package"
+tests =
+  testGroup
+    "measures package"
     [ Test.Data.Measure.tests
     ]

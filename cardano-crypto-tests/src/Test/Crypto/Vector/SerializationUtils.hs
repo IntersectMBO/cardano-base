@@ -1,23 +1,23 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Test.Crypto.Vector.SerializationUtils
-  ( unHex,
-    unsafeUnHex,
-    SignatureResult,
-    HexStringInCBOR (..),
-    sKeyParser,
-    vKeyParser,
-    sigParser,
-    dropBytes,
-    hexByteStringLength,
-  )
+module Test.Crypto.Vector.SerializationUtils (
+  unHex,
+  unsafeUnHex,
+  SignatureResult,
+  HexStringInCBOR (..),
+  sKeyParser,
+  vKeyParser,
+  sigParser,
+  dropBytes,
+  hexByteStringLength,
+)
 where
 
 import Cardano.Binary (FromCBOR, serialize', unsafeDeserialize')
-import Cardano.Crypto.DSIGN
-  ( DSIGNAlgorithm (SigDSIGN, SignKeyDSIGN, VerKeyDSIGN),
-  )
+import Cardano.Crypto.DSIGN (
+  DSIGNAlgorithm (SigDSIGN, SignKeyDSIGN, VerKeyDSIGN),
+ )
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as BS16
@@ -37,7 +37,7 @@ instance IsString HexStringInCBOR where
 instance Show HexStringInCBOR where
   show (HexCBOR bs) = BS8.unpack $ BS16.encode bs
 
---Drop from actual bytestring without cbor then recalculate
+-- Drop from actual bytestring without cbor then recalculate
 dropBytes :: Int -> HexStringInCBOR -> HexStringInCBOR
 dropBytes n (HexCBOR bs) = HexCBOR $ serialize' $ BS.drop n (unsafeDeserialize' bs)
 
@@ -54,11 +54,11 @@ unsafeUnHex hexBs = case unHex hexBs of
 
 type SignatureResult = (Either String ())
 
-sKeyParser :: forall d. (FromCBOR (SignKeyDSIGN d)) => HexStringInCBOR -> SignKeyDSIGN d
+sKeyParser :: forall d. FromCBOR (SignKeyDSIGN d) => HexStringInCBOR -> SignKeyDSIGN d
 sKeyParser (HexCBOR bs) = unsafeDeserialize' bs
 
-vKeyParser :: forall d. (FromCBOR (VerKeyDSIGN d)) => HexStringInCBOR -> VerKeyDSIGN d
+vKeyParser :: forall d. FromCBOR (VerKeyDSIGN d) => HexStringInCBOR -> VerKeyDSIGN d
 vKeyParser (HexCBOR bs) = unsafeDeserialize' bs
 
-sigParser :: forall d. (FromCBOR (SigDSIGN d)) => HexStringInCBOR -> SigDSIGN d
+sigParser :: forall d. FromCBOR (SigDSIGN d) => HexStringInCBOR -> SigDSIGN d
 sigParser (HexCBOR bs) = unsafeDeserialize' bs

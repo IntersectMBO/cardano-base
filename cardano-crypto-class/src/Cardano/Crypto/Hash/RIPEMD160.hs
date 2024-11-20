@@ -3,14 +3,14 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the RIPEMD-160 hashing algorithm.
-module Cardano.Crypto.Hash.RIPEMD160
-  ( RIPEMD160
-  )
-  where
+module Cardano.Crypto.Hash.RIPEMD160 (
+  RIPEMD160,
+)
+where
 
 import Cardano.Crypto.Hash.Class
-import qualified "crypton" Crypto.Hash as H
 import qualified Data.ByteArray as BA
+import qualified "crypton" Crypto.Hash as H
 
 data RIPEMD160
 

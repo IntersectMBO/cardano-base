@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 
+{- FOURMOLU_DISABLE -}
 module Main (main) where
 
 import qualified Test.Crypto.DSIGN

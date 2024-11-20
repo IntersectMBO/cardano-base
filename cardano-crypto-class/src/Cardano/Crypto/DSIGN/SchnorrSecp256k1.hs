@@ -1,12 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 -- According to the documentation for unsafePerformIO:
 --
 -- > Make sure that the either you switch off let-floating
@@ -23,80 +23,82 @@ module Cardano.Crypto.DSIGN.SchnorrSecp256k1 (
   SchnorrSecp256k1DSIGN,
   VerKeyDSIGN,
   SignKeyDSIGN,
-  SigDSIGN
-  ) where
+  SigDSIGN,
+) where
 
-import GHC.TypeNats (natVal)
-import Foreign.ForeignPtr (withForeignPtr)
-import Data.Proxy (Proxy (Proxy))
-import Data.ByteString (useAsCStringLen)
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
-import Data.Primitive.Ptr (copyPtr)
-import Cardano.Crypto.Seed (getBytesFromSeedT)
-import Cardano.Crypto.SECP256K1.Constants (
-  SECP256K1_SCHNORR_PRIVKEY_BYTES,
-  SECP256K1_SCHNORR_SIGNATURE_BYTES,
-  SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL,
-  SECP256K1_SCHNORR_PUBKEY_BYTES,
-  )
-import Cardano.Crypto.SECP256K1.C (
-  secpKeyPairCreate,
-  secpXOnlyPubkeySerialize,
-  secpKeyPairXOnlyPub,
-  secpXOnlyPubkeyParse,
-  secpSchnorrSigVerify,
-  secpSchnorrSigSignCustom,
-  secpCtxPtr,
-  )
-import Cardano.Foreign (allocaSized)
-import Control.Monad (when)
-import System.IO.Unsafe (unsafeDupablePerformIO)
-import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (toCBOR, encodedSizeExpr))
-import Foreign.Ptr (castPtr, nullPtr)
-import NoThunks.Class (NoThunks)
+import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (encodedSizeExpr, toCBOR))
 import Cardano.Crypto.DSIGN.Class (
-  DSIGNAlgorithm (VerKeyDSIGN,
-                  SignKeyDSIGN,
-                  SigDSIGN,
-                  SeedSizeDSIGN,
-                  SizeSigDSIGN,
-                  SizeSignKeyDSIGN,
-                  SizeVerKeyDSIGN,
-                  algorithmNameDSIGN,
-                  deriveVerKeyDSIGN,
-                  signDSIGN,
-                  verifyDSIGN,
-                  genKeyDSIGN,
-                  rawSerialiseSigDSIGN,
-                  Signable,
-                  rawSerialiseVerKeyDSIGN,
-                  rawSerialiseSignKeyDSIGN,
-                  rawDeserialiseVerKeyDSIGN,
-                  rawDeserialiseSignKeyDSIGN,
-                  rawDeserialiseSigDSIGN),
-  encodeVerKeyDSIGN,
-  encodedVerKeyDSIGNSizeExpr,
-  decodeVerKeyDSIGN,
-  encodeSignKeyDSIGN,
-  encodedSignKeyDSIGNSizeExpr,
-  decodeSignKeyDSIGN,
-  encodeSigDSIGN,
-  encodedSigDSIGNSizeExpr,
+  DSIGNAlgorithm (
+    SeedSizeDSIGN,
+    SigDSIGN,
+    SignKeyDSIGN,
+    Signable,
+    SizeSigDSIGN,
+    SizeSignKeyDSIGN,
+    SizeVerKeyDSIGN,
+    VerKeyDSIGN,
+    algorithmNameDSIGN,
+    deriveVerKeyDSIGN,
+    genKeyDSIGN,
+    rawDeserialiseSigDSIGN,
+    rawDeserialiseSignKeyDSIGN,
+    rawDeserialiseVerKeyDSIGN,
+    rawSerialiseSigDSIGN,
+    rawSerialiseSignKeyDSIGN,
+    rawSerialiseVerKeyDSIGN,
+    signDSIGN,
+    verifyDSIGN
+  ),
   decodeSigDSIGN,
-  seedSizeDSIGN
-  )
-import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
+  decodeSignKeyDSIGN,
+  decodeVerKeyDSIGN,
+  encodeSigDSIGN,
+  encodeSignKeyDSIGN,
+  encodeVerKeyDSIGN,
+  encodedSigDSIGNSizeExpr,
+  encodedSignKeyDSIGNSizeExpr,
+  encodedVerKeyDSIGNSizeExpr,
+  seedSizeDSIGN,
+ )
 import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
-  psbUseAsSizedPtr,
-  psbCreateSizedResult,
   psbCreate,
   psbCreateSized,
-  psbToByteString,
+  psbCreateSizedResult,
   psbFromByteStringCheck,
-  )
+  psbToByteString,
+  psbUseAsSizedPtr,
+ )
+import Cardano.Crypto.SECP256K1.C (
+  secpCtxPtr,
+  secpKeyPairCreate,
+  secpKeyPairXOnlyPub,
+  secpSchnorrSigSignCustom,
+  secpSchnorrSigVerify,
+  secpXOnlyPubkeyParse,
+  secpXOnlyPubkeySerialize,
+ )
+import Cardano.Crypto.SECP256K1.Constants (
+  SECP256K1_SCHNORR_PRIVKEY_BYTES,
+  SECP256K1_SCHNORR_PUBKEY_BYTES,
+  SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL,
+  SECP256K1_SCHNORR_SIGNATURE_BYTES,
+ )
+import Cardano.Crypto.Seed (getBytesFromSeedT)
+import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
+import Cardano.Foreign (allocaSized)
+import Control.DeepSeq (NFData)
+import Control.Monad (when)
+import Data.ByteString (useAsCStringLen)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
+import Data.Primitive.Ptr (copyPtr)
+import Data.Proxy (Proxy (Proxy))
+import Foreign.ForeignPtr (withForeignPtr)
+import Foreign.Ptr (castPtr, nullPtr)
+import GHC.Generics (Generic)
+import GHC.TypeNats (natVal)
+import NoThunks.Class (NoThunks)
+import System.IO.Unsafe (unsafeDupablePerformIO)
 
 data SchnorrSecp256k1DSIGN
 
@@ -106,18 +108,18 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   type SizeSignKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
   type SizeVerKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PUBKEY_BYTES
   type Signable SchnorrSecp256k1DSIGN = SignableRepresentation
-  newtype VerKeyDSIGN SchnorrSecp256k1DSIGN =
-    VerKeySchnorrSecp256k1 (PinnedSizedBytes SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL)
+  newtype VerKeyDSIGN SchnorrSecp256k1DSIGN
+    = VerKeySchnorrSecp256k1 (PinnedSizedBytes SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL)
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
-  newtype SignKeyDSIGN SchnorrSecp256k1DSIGN =
-    SignKeySchnorrSecp256k1 (PinnedSizedBytes (SizeSignKeyDSIGN SchnorrSecp256k1DSIGN))
+  newtype SignKeyDSIGN SchnorrSecp256k1DSIGN
+    = SignKeySchnorrSecp256k1 (PinnedSizedBytes (SizeSignKeyDSIGN SchnorrSecp256k1DSIGN))
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
-  newtype SigDSIGN SchnorrSecp256k1DSIGN =
-    SigSchnorrSecp256k1 (PinnedSizedBytes (SizeSigDSIGN SchnorrSecp256k1DSIGN))
+  newtype SigDSIGN SchnorrSecp256k1DSIGN
+    = SigSchnorrSecp256k1 (PinnedSizedBytes (SizeSigDSIGN SchnorrSecp256k1DSIGN))
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
@@ -128,12 +130,14 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
       allocaSized $ \kpp ->
         withForeignPtr secpCtxPtr $ \ctx -> do
           res <- secpKeyPairCreate ctx kpp skp
-          when (res /= 1)
-               (error "deriveVerKeyDSIGN: Failed to create keypair for SchnorrSecp256k1DSIGN")
+          when
+            (res /= 1)
+            (error "deriveVerKeyDSIGN: Failed to create keypair for SchnorrSecp256k1DSIGN")
           xonlyPSB <- psbCreateSized $ \xonlyp -> do
-                        res' <- secpKeyPairXOnlyPub ctx xonlyp nullPtr kpp
-                        when (res' /= 1)
-                             (error "deriveVerKeyDSIGN: could not extract xonly pubkey for SchnorrSecp256k1DSIGN")
+            res' <- secpKeyPairXOnlyPub ctx xonlyp nullPtr kpp
+            when
+              (res' /= 1)
+              (error "deriveVerKeyDSIGN: could not extract xonly pubkey for SchnorrSecp256k1DSIGN")
           pure . VerKeySchnorrSecp256k1 $ xonlyPSB
   {-# NOINLINE signDSIGN #-}
   signDSIGN () msg (SignKeySchnorrSecp256k1 skpsb) =
@@ -144,12 +148,14 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
           res <- secpKeyPairCreate ctx kpp skp
           when (res /= 1) (error "signDSIGN: Failed to create keypair for SchnorrSecp256k1DSIGN")
           sigPSB <- psbCreateSized $ \sigp -> useAsCStringLen bs $ \(msgp, msgLen) -> do
-            res' <- secpSchnorrSigSignCustom ctx
-                                             sigp
-                                             (castPtr msgp)
-                                             (fromIntegral msgLen)
-                                             kpp
-                                             nullPtr
+            res' <-
+              secpSchnorrSigSignCustom
+                ctx
+                sigp
+                (castPtr msgp)
+                (fromIntegral msgLen)
+                kpp
+                nullPtr
             when (res' /= 1) (error "signDSIGN: Failed to sign SchnorrSecp256k1DSIGN message")
           pure . SigSchnorrSecp256k1 $ sigPSB
   {-# NOINLINE verifyDSIGN #-}
@@ -159,21 +165,25 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
         let bs = getSignableRepresentation msg
         res <- useAsCStringLen bs $ \(msgp, msgLen) ->
           withForeignPtr secpCtxPtr $ \ctx ->
-            pure $ secpSchnorrSigVerify ctx
-                                        sigp
-                                        (castPtr msgp)
-                                        (fromIntegral msgLen)
-                                        pkp
-        pure $ if res == 0
-          then Left "SigDSIGN SchnorrSecp256k1DSIGN failed to verify."
-          else pure ()
+            pure $
+              secpSchnorrSigVerify
+                ctx
+                sigp
+                (castPtr msgp)
+                (fromIntegral msgLen)
+                pkp
+        pure $
+          if res == 0
+            then Left "SigDSIGN SchnorrSecp256k1DSIGN failed to verify."
+            else pure ()
   {-# NOINLINE genKeyDSIGN #-}
-  genKeyDSIGN seed = SignKeySchnorrSecp256k1 $
-    let (bs, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @SchnorrSecp256k1DSIGN)) seed
-    in unsafeDupablePerformIO $
-         psbCreate $ \skp ->
-           useAsCStringLen bs $ \(bsp, sz) ->
-             copyPtr skp (castPtr bsp) sz
+  genKeyDSIGN seed =
+    SignKeySchnorrSecp256k1 $
+      let (bs, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @SchnorrSecp256k1DSIGN)) seed
+       in unsafeDupablePerformIO $
+            psbCreate $ \skp ->
+              useAsCStringLen bs $ \(bsp, sz) ->
+                copyPtr skp (castPtr bsp) sz
   rawSerialiseSigDSIGN (SigSchnorrSecp256k1 sigPSB) = psbToByteString sigPSB
   {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
   rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) =
@@ -181,23 +191,24 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
       res <- psbCreateSized $ \bsPtr ->
         withForeignPtr secpCtxPtr $ \ctx -> do
           res' <- secpXOnlyPubkeySerialize ctx bsPtr pkbPtr
-          when (res' /= 1)
-               (error "rawSerialiseVerKeyDSIGN: Failed to serialise VerKeyDSIGN SchnorrSecp256k1DSIGN")
+          when
+            (res' /= 1)
+            (error "rawSerialiseVerKeyDSIGN: Failed to serialise VerKeyDSIGN SchnorrSecp256k1DSIGN")
       pure . psbToByteString $ res
   rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs =
     unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, len) ->
       if len /= (fromIntegral . natVal $ Proxy @(SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
-      then pure Nothing
-      else do
-        let dataPtr = castPtr ptr
-        (vkPsb, res) <- psbCreateSizedResult $ \outPtr ->
-          withForeignPtr secpCtxPtr $ \ctx ->
-            secpXOnlyPubkeyParse ctx outPtr dataPtr
-        pure $ case res of
-          1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
-          _ -> Nothing
+        then pure Nothing
+        else do
+          let dataPtr = castPtr ptr
+          (vkPsb, res) <- psbCreateSizedResult $ \outPtr ->
+            withForeignPtr secpCtxPtr $ \ctx ->
+              secpXOnlyPubkeyParse ctx outPtr dataPtr
+          pure $ case res of
+            1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
+            _ -> Nothing
   rawDeserialiseSignKeyDSIGN bs =
     SignKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
   rawDeserialiseSigDSIGN bs =

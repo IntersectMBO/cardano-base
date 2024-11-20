@@ -2,8 +2,8 @@
 
 module Test.Cardano.Slotting.TreeDiff where
 
-import Cardano.Slotting.Slot
 import Cardano.Slotting.Block
+import Cardano.Slotting.Slot
 import Data.TreeDiff
 
 instance ToExpr x => ToExpr (WithOrigin x)

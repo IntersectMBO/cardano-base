@@ -1,7 +1,6 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE LambdaCase #-}
-
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Cardano.Binary.TreeDiff where
@@ -9,11 +8,11 @@ module Test.Cardano.Binary.TreeDiff where
 import qualified Cardano.Binary as Plain
 import qualified Codec.CBOR.Read as CBOR
 import qualified Codec.CBOR.Term as CBOR
+import Data.Bifunctor (bimap)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as BSL
-import Data.Bifunctor (bimap)
 import Data.TreeDiff
 import Formatting (build, formatToString)
 import qualified Formatting.Buildable as B (Buildable (..))

@@ -1,5 +1,5 @@
-import Test.Tasty
 import Test.Cardano.Slotting.EpochInfo (epochInfoTests)
+import Test.Tasty
 
 main :: IO ()
 main = defaultMain tests

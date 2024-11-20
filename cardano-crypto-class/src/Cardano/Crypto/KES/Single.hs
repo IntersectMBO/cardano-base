@@ -29,162 +29,165 @@
 -- 'DSIGNMAlgorithm' into an instance of 'KESAlgorithm' with a single period.
 --
 -- See "Cardano.Crypto.KES.Sum" for the composition case.
---
 module Cardano.Crypto.KES.Single (
-    SingleKES
-  , VerKeyKES (..)
-  , SignKeyKES (..)
-  , SigKES (..)
-  ) where
+  SingleKES,
+  VerKeyKES (..),
+  SignKeyKES (..),
+  SigKES (..),
+) where
 
-import Data.Proxy (Proxy(..))
+import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
-import Control.Exception (assert)
 import Control.DeepSeq (NFData)
+import Control.Exception (assert)
 import Control.Monad ((<$!>))
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
-import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.DSIGN.Class as DSIGN
-import Cardano.Crypto.KES.Class
 import Cardano.Crypto.DirectSerialise
+import Cardano.Crypto.Hash.Class
+import Cardano.Crypto.KES.Class
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
 -- single time period.
---
 data SingleKES d
 
 deriving instance NFData (VerKeyDSIGN d) => NFData (VerKeyKES (SingleKES d))
 deriving instance NFData (SigDSIGN d) => NFData (SigKES (SingleKES d))
 
-deriving via (SignKeyDSIGNM d) instance NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (SingleKES d))
+deriving via
+  (SignKeyDSIGNM d)
+  instance
+    NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (SingleKES d))
 
-instance (DSIGNMAlgorithm d) => KESAlgorithm (SingleKES d) where
-    type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
+instance DSIGNMAlgorithm d => KESAlgorithm (SingleKES d) where
+  type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
 
-    --
-    -- Key and signature types
-    --
+  --
+  -- Key and signature types
+  --
 
-    newtype VerKeyKES (SingleKES d) = VerKeySingleKES (VerKeyDSIGN d)
-        deriving Generic
+  newtype VerKeyKES (SingleKES d) = VerKeySingleKES (VerKeyDSIGN d)
+    deriving (Generic)
 
-    newtype SigKES (SingleKES d) = SigSingleKES (SigDSIGN d)
-        deriving Generic
+  newtype SigKES (SingleKES d) = SigSingleKES (SigDSIGN d)
+    deriving (Generic)
 
-    newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
+  newtype SignKeyKES (SingleKES d) = SignKeySingleKES (SignKeyDSIGNM d)
 
+  type ContextKES (SingleKES d) = ContextDSIGN d
+  type Signable (SingleKES d) = DSIGN.Signable d
 
-    type ContextKES (SingleKES d) = ContextDSIGN d
-    type Signable   (SingleKES d) = DSIGN.Signable     d
+  --
+  -- Metadata and basic key operations
+  --
 
+  algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
-    --
-    -- Metadata and basic key operations
-    --
+  totalPeriodsKES _ = 1
 
-    algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
+  verifyKES ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
+    assert (t == 0) $
+      verifyDSIGN ctxt vk a sig
 
-    totalPeriodsKES  _ = 1
+  --
+  -- raw serialise/deserialise
+  --
 
-    verifyKES ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
-        assert (t == 0) $
-        verifyDSIGN ctxt vk a sig
+  type SizeVerKeyKES (SingleKES d) = SizeVerKeyDSIGN d
+  type SizeSignKeyKES (SingleKES d) = SizeSignKeyDSIGN d
+  type SizeSigKES (SingleKES d) = SizeSigDSIGN d
 
-    --
-    -- raw serialise/deserialise
-    --
+  hashVerKeyKES (VerKeySingleKES vk) =
+    castHash (hashVerKeyDSIGN vk)
 
-    type SizeVerKeyKES (SingleKES d) = SizeVerKeyDSIGN d
-    type SizeSignKeyKES (SingleKES d) = SizeSignKeyDSIGN d
-    type SizeSigKES (SingleKES d) = SizeSigDSIGN d
+  rawSerialiseVerKeyKES (VerKeySingleKES vk) = rawSerialiseVerKeyDSIGN vk
+  rawSerialiseSigKES (SigSingleKES sig) = rawSerialiseSigDSIGN sig
 
-    hashVerKeyKES (VerKeySingleKES vk) =
-        castHash (hashVerKeyDSIGN vk)
+  rawDeserialiseVerKeyKES = fmap VerKeySingleKES . rawDeserialiseVerKeyDSIGN
+  {-# INLINE rawDeserialiseVerKeyKES #-}
+  rawDeserialiseSigKES = fmap SigSingleKES . rawDeserialiseSigDSIGN
+  {-# INLINE rawDeserialiseSigKES #-}
 
-    rawSerialiseVerKeyKES  (VerKeySingleKES  vk) = rawSerialiseVerKeyDSIGN vk
-    rawSerialiseSigKES     (SigSingleKES    sig) = rawSerialiseSigDSIGN sig
+  deriveVerKeyKES (SignKeySingleKES v) =
+    VerKeySingleKES <$!> deriveVerKeyDSIGNM v
 
-    rawDeserialiseVerKeyKES  = fmap VerKeySingleKES  . rawDeserialiseVerKeyDSIGN
-    {-# INLINE rawDeserialiseVerKeyKES #-}
-    rawDeserialiseSigKES     = fmap SigSingleKES     . rawDeserialiseSigDSIGN
-    {-# INLINE rawDeserialiseSigKES #-}
+  --
+  -- Core algorithm operations
+  --
 
+  signKES ctxt t a (SignKeySingleKES sk) =
+    assert (t == 0) $!
+      SigSingleKES <$!> signDSIGNM ctxt a sk
 
-    deriveVerKeyKES (SignKeySingleKES v) =
-      VerKeySingleKES <$!> deriveVerKeyDSIGNM v
+  updateKESWith _allocator _ctx (SignKeySingleKES _sk) _to = return Nothing
 
-    --
-    -- Core algorithm operations
-    --
+  --
+  -- Key generation
+  --
 
-    signKES ctxt t a (SignKeySingleKES sk) =
-        assert (t == 0) $!
-        SigSingleKES <$!> signDSIGNM ctxt a sk
+  genKeyKESWith allocator seed =
+    SignKeySingleKES <$!> genKeyDSIGNMWith allocator seed
 
-    updateKESWith _allocator _ctx (SignKeySingleKES _sk) _to = return Nothing
+  --
+  -- forgetting
+  --
+  forgetSignKeyKESWith allocator (SignKeySingleKES v) =
+    forgetSignKeyDSIGNMWith allocator v
 
-    --
-    -- Key generation
-    --
+instance
+  ( KESAlgorithm (SingleKES d)
+  , UnsoundDSIGNMAlgorithm d
+  ) =>
+  UnsoundPureKESAlgorithm (SingleKES d)
+  where
+  newtype UnsoundPureSignKeyKES (SingleKES d) = UnsoundPureSignKeySingleKES (SignKeyDSIGN d)
+    deriving (Generic)
 
-    genKeyKESWith allocator seed =
-      SignKeySingleKES <$!> genKeyDSIGNMWith allocator seed
+  unsoundPureSignKES ctxt t a (UnsoundPureSignKeySingleKES sk) =
+    assert (t == 0) $!
+      SigSingleKES $!
+        signDSIGN ctxt a sk
 
-    --
-    -- forgetting
-    --
-    forgetSignKeyKESWith allocator (SignKeySingleKES v) =
-      forgetSignKeyDSIGNMWith allocator v
+  unsoundPureUpdateKES _ctx _sk _to = Nothing
 
-instance ( KESAlgorithm (SingleKES d)
-         , UnsoundDSIGNMAlgorithm d
-         )
-         => UnsoundPureKESAlgorithm (SingleKES d) where
-    newtype UnsoundPureSignKeyKES (SingleKES d) = UnsoundPureSignKeySingleKES (SignKeyDSIGN d)
-      deriving (Generic)
+  --
+  -- Key generation
+  --
 
-    unsoundPureSignKES ctxt t a (UnsoundPureSignKeySingleKES sk) =
-        assert (t == 0) $!
-        SigSingleKES $! signDSIGN ctxt a sk
+  unsoundPureGenKeyKES seed =
+    UnsoundPureSignKeySingleKES $! genKeyDSIGN seed
 
-    unsoundPureUpdateKES _ctx _sk _to = Nothing
+  unsoundPureDeriveVerKeyKES (UnsoundPureSignKeySingleKES v) =
+    VerKeySingleKES $! deriveVerKeyDSIGN v
 
-    --
-    -- Key generation
-    --
+  unsoundPureSignKeyKESToSoundSignKeyKES =
+    unsoundPureSignKeyKESToSoundSignKeyKESViaSer
 
-    unsoundPureGenKeyKES seed =
-      UnsoundPureSignKeySingleKES $! genKeyDSIGN seed
+  rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySingleKES sk) =
+    rawSerialiseSignKeyDSIGN sk
+  rawDeserialiseUnsoundPureSignKeyKES b =
+    UnsoundPureSignKeySingleKES <$> rawDeserialiseSignKeyDSIGN b
 
-    unsoundPureDeriveVerKeyKES (UnsoundPureSignKeySingleKES v) =
-      VerKeySingleKES $! deriveVerKeyDSIGN v
+instance
+  (KESAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d) =>
+  UnsoundKESAlgorithm (SingleKES d)
+  where
+  rawSerialiseSignKeyKES (SignKeySingleKES sk) =
+    rawSerialiseSignKeyDSIGNM sk
 
-    unsoundPureSignKeyKESToSoundSignKeyKES =
-      unsoundPureSignKeyKESToSoundSignKeyKESViaSer
-
-    rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySingleKES sk) =
-      rawSerialiseSignKeyDSIGN sk
-    rawDeserialiseUnsoundPureSignKeyKES b =
-      UnsoundPureSignKeySingleKES <$> rawDeserialiseSignKeyDSIGN b
-
-instance (KESAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d)
-         => UnsoundKESAlgorithm (SingleKES d) where
-    rawSerialiseSignKeyKES (SignKeySingleKES sk) =
-      rawSerialiseSignKeyDSIGNM sk
-
-    rawDeserialiseSignKeyKESWith allocator bs =
-      fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
+  rawDeserialiseSignKeyKESWith allocator bs =
+    fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
 --
 -- VerKey instances
 --
 
 deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SingleKES d))
-deriving instance DSIGNAlgorithm d => Eq   (VerKeyKES (SingleKES d))
+deriving instance DSIGNAlgorithm d => Eq (VerKeyKES (SingleKES d))
 
 instance DSIGNMAlgorithm d => ToCBOR (VerKeyKES (SingleKES d)) where
   toCBOR = encodeVerKeyKES
@@ -194,8 +197,7 @@ instance DSIGNMAlgorithm d => FromCBOR (VerKeyKES (SingleKES d)) where
   fromCBOR = decodeVerKeyKES
   {-# INLINE fromCBOR #-}
 
-instance DSIGNMAlgorithm d => NoThunks (VerKeyKES  (SingleKES d))
-
+instance DSIGNMAlgorithm d => NoThunks (VerKeyKES (SingleKES d))
 
 --
 -- SignKey instances
@@ -208,7 +210,7 @@ deriving via (SignKeyDSIGNM d) instance DSIGNMAlgorithm d => NoThunks (SignKeyKE
 --
 
 deriving instance DSIGNAlgorithm d => Show (SigKES (SingleKES d))
-deriving instance DSIGNAlgorithm d => Eq   (SigKES (SingleKES d))
+deriving instance DSIGNAlgorithm d => Eq (SigKES (SingleKES d))
 
 instance DSIGNAlgorithm d => NoThunks (SigKES (SingleKES d))
 
@@ -224,29 +226,29 @@ instance DSIGNMAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
 --
 
 deriving instance DSIGNAlgorithm d => Show (UnsoundPureSignKeyKES (SingleKES d))
-deriving instance Eq (SignKeyDSIGN d) => Eq   (UnsoundPureSignKeyKES (SingleKES d))
+deriving instance Eq (SignKeyDSIGN d) => Eq (UnsoundPureSignKeyKES (SingleKES d))
 
-instance (UnsoundDSIGNMAlgorithm d) => ToCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
+instance UnsoundDSIGNMAlgorithm d => ToCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
   toCBOR = encodeUnsoundPureSignKeyKES
   encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (SingleKES d)))
 
-instance (UnsoundDSIGNMAlgorithm d) => FromCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
+instance UnsoundDSIGNMAlgorithm d => FromCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
   fromCBOR = decodeUnsoundPureSignKeyKES
 
-instance DSIGNAlgorithm d => NoThunks (UnsoundPureSignKeyKES  (SingleKES d))
+instance DSIGNAlgorithm d => NoThunks (UnsoundPureSignKeyKES (SingleKES d))
 
 --
 -- Direct ser/deser
 --
 
-instance (DirectSerialise (SignKeyDSIGNM d)) => DirectSerialise (SignKeyKES (SingleKES d)) where
+instance DirectSerialise (SignKeyDSIGNM d) => DirectSerialise (SignKeyKES (SingleKES d)) where
   directSerialise push (SignKeySingleKES sk) = directSerialise push sk
 
-instance (DirectDeserialise (SignKeyDSIGNM d)) => DirectDeserialise (SignKeyKES (SingleKES d)) where
+instance DirectDeserialise (SignKeyDSIGNM d) => DirectDeserialise (SignKeyKES (SingleKES d)) where
   directDeserialise pull = SignKeySingleKES <$!> directDeserialise pull
 
-instance (DirectSerialise (VerKeyDSIGN d)) => DirectSerialise (VerKeyKES (SingleKES d)) where
+instance DirectSerialise (VerKeyDSIGN d) => DirectSerialise (VerKeyKES (SingleKES d)) where
   directSerialise push (VerKeySingleKES sk) = directSerialise push sk
 
-instance (DirectDeserialise (VerKeyDSIGN d)) => DirectDeserialise (VerKeyKES (SingleKES d)) where
+instance DirectDeserialise (VerKeyDSIGN d) => DirectDeserialise (VerKeyKES (SingleKES d)) where
   directDeserialise pull = VerKeySingleKES <$!> directDeserialise pull

@@ -3,14 +3,14 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the SHA3_256 hashing algorithm.
-module Cardano.Crypto.Hash.SHA3_256
-  ( SHA3_256
-  )
+module Cardano.Crypto.Hash.SHA3_256 (
+  SHA3_256,
+)
 where
 
 import Cardano.Crypto.Hash.Class
-import qualified "crypton" Crypto.Hash as H
 import qualified Data.ByteArray as BA
+import qualified "crypton" Crypto.Hash as H
 
 data SHA3_256
 

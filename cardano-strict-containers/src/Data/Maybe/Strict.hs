@@ -3,29 +3,29 @@
 {-# LANGUAGE DeriveTraversable #-}
 
 -- | Strict version of the 'Maybe' type.
-module Data.Maybe.Strict
-  ( StrictMaybe (SNothing, SJust),
+module Data.Maybe.Strict (
+  StrictMaybe (SNothing, SJust),
 
-    -- * Conversion: StrictMaybe <--> Maybe
-    strictMaybeToMaybe,
-    maybeToStrictMaybe,
+  -- * Conversion: StrictMaybe <--> Maybe
+  strictMaybeToMaybe,
+  maybeToStrictMaybe,
 
-    -- * Accessing the underlying value
-    fromSMaybe,
-    isSNothing,
-    isSJust,
-    strictMaybe,
-  )
+  -- * Accessing the underlying value
+  fromSMaybe,
+  isSNothing,
+  isSJust,
+  strictMaybe,
+)
 where
 
-import Cardano.Binary
-  ( FromCBOR (fromCBOR),
-    ToCBOR (toCBOR),
-    decodeBreakOr,
-    decodeListLenOrIndef,
-    encodeListLen,
-  )
-import Control.Applicative (Alternative(..))
+import Cardano.Binary (
+  FromCBOR (fromCBOR),
+  ToCBOR (toCBOR),
+  decodeBreakOr,
+  decodeListLenOrIndef,
+  encodeListLen,
+ )
+import Control.Applicative (Alternative (..))
 import Control.DeepSeq (NFData)
 import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Default.Class (Default (..))
@@ -36,15 +36,15 @@ data StrictMaybe a
   = SNothing
   | SJust !a
   deriving
-    ( Eq,
-      Ord,
-      Show,
-      Generic,
-      Functor,
-      Foldable,
-      Traversable,
-      NoThunks,
-      NFData
+    ( Eq
+    , Ord
+    , Show
+    , Generic
+    , Functor
+    , Foldable
+    , Traversable
+    , NoThunks
+    , NFData
     )
 
 instance Applicative StrictMaybe where
@@ -109,7 +109,6 @@ fromSMaybe :: a -> StrictMaybe a -> a
 fromSMaybe d SNothing = d
 fromSMaybe _ (SJust x) = x
 
-
 -- | Same as `Data.Maybe.isNothing`
 isSNothing :: StrictMaybe a -> Bool
 isSNothing SNothing = True
@@ -124,11 +123,8 @@ strictMaybe :: a -> (b -> a) -> StrictMaybe b -> a
 strictMaybe x _ SNothing = x
 strictMaybe _ f (SJust y) = f y
 
-
 instance Default (StrictMaybe t) where
   def = SNothing
-
-
 
 instance Semigroup a => Semigroup (StrictMaybe a) where
   SNothing <> x = x
@@ -141,4 +137,4 @@ instance Semigroup a => Monoid (StrictMaybe a) where
 instance Alternative StrictMaybe where
   empty = SNothing
   SNothing <|> r = r
-  l        <|> _ = l
+  l <|> _ = l

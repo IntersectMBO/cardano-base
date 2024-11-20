@@ -1,8 +1,8 @@
 -- | Helper functions for enforcing strictness.
-module Data.Unit.Strict
-  ( StrictUnit (),
-    forceElemsToWHNF,
-  )
+module Data.Unit.Strict (
+  StrictUnit (),
+  forceElemsToWHNF,
+)
 where
 
 -- | Force all of the elements of a 'Foldable' to weak head normal form.

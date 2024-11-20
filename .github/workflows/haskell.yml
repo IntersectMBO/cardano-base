@@ -191,3 +191,27 @@ jobs:
       uses: input-output-hk/actions/cache@latest
       with:
         ghc_version: ${{ matrix.ghc == '8.10.7' && 'ghc810' || matrix.ghc == '9.6.6' && 'ghc96' }}
+
+  fourmolu:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install fourmolu
+      run: |
+        FOURMOLU_VERSION="0.16.2.0"
+        mkdir -p "$HOME/.local/bin"
+        curl -sL "https://github.com/fourmolu/fourmolu/releases/download/v${FOURMOLU_VERSION}/fourmolu-${FOURMOLU_VERSION}-linux-x86_64" -o "$HOME/.local/bin/fourmolu"
+        chmod a+x "$HOME/.local/bin/fourmolu"
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Run fourmolu
+      run: ./scripts/fourmolize.sh

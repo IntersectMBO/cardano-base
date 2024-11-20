@@ -6,29 +6,29 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Test.Crypto.Vector.Secp256k1DSIGN
-  ( tests,
-  )
+module Test.Crypto.Vector.Secp256k1DSIGN (
+  tests,
+)
 where
 
 import Cardano.Binary (DecoderError (DecoderErrorDeserialiseFailure), FromCBOR, decodeFull')
-import Cardano.Crypto.DSIGN
-  ( DSIGNAlgorithm
-      ( ContextDSIGN,
-        SigDSIGN,
-        SignKeyDSIGN,
-        Signable,
-        VerKeyDSIGN,
-        deriveVerKeyDSIGN,
-        signDSIGN,
-        verifyDSIGN
-      ),
-    EcdsaSecp256k1DSIGN,
-    MessageHash,
-    SchnorrSecp256k1DSIGN,
-    hashAndPack,
-    toMessageHash,
-  )
+import Cardano.Crypto.DSIGN (
+  DSIGNAlgorithm (
+    ContextDSIGN,
+    SigDSIGN,
+    SignKeyDSIGN,
+    Signable,
+    VerKeyDSIGN,
+    deriveVerKeyDSIGN,
+    signDSIGN,
+    verifyDSIGN
+  ),
+  EcdsaSecp256k1DSIGN,
+  MessageHash,
+  SchnorrSecp256k1DSIGN,
+  hashAndPack,
+  toMessageHash,
+ )
 import Cardano.Crypto.Hash.SHA3_256 (SHA3_256)
 import Codec.CBOR.Read (DeserialiseFailure (..))
 import Control.Monad (forM_)
@@ -36,32 +36,36 @@ import Data.ByteString (ByteString)
 import Data.Either (isLeft, isRight)
 import Data.Maybe (isNothing)
 import Data.Proxy (Proxy (..))
-import Test.Crypto.Vector.SerializationUtils as Utils (HexStringInCBOR (..), dropBytes, hexByteStringLength)
-import Test.Crypto.Vector.StringConstants
-  ( cannotDecodeVerificationKeyError,
-    invalidEcdsaSigLengthError,
-    invalidEcdsaVerKeyLengthError,
-    invalidSchnorrSigLengthError,
-    invalidSchnorrVerKeyLengthError,
-    unexpectedDecodingError,
-  )
-import Test.Crypto.Vector.Vectors
-  ( defaultMessage,
-    defaultSKey,
-    ecdsaMismatchMessageAndSignature,
-    ecdsaNegSigTestVectors,
-    ecdsaVerKeyAndSigVerifyTestVectors,
-    ecdsaWrongLengthSigTestVectorsRaw,
-    schnorrMismatchMessageAndSignature,
-    schnorrVerKeyAndSigVerifyTestVectors,
-    schnorrWrongLengthSigTestVectorsRaw,
-    signAndVerifyTestVectors,
-    verKeyNotOnCurveTestVectorRaw,
-    wrongEcdsaVerKeyTestVector,
-    wrongLengthMessageHashTestVectors,
-    wrongLengthVerKeyTestVectorsRaw,
-    wrongSchnorrVerKeyTestVector,
-  )
+import Test.Crypto.Vector.SerializationUtils as Utils (
+  HexStringInCBOR (..),
+  dropBytes,
+  hexByteStringLength,
+ )
+import Test.Crypto.Vector.StringConstants (
+  cannotDecodeVerificationKeyError,
+  invalidEcdsaSigLengthError,
+  invalidEcdsaVerKeyLengthError,
+  invalidSchnorrSigLengthError,
+  invalidSchnorrVerKeyLengthError,
+  unexpectedDecodingError,
+ )
+import Test.Crypto.Vector.Vectors (
+  defaultMessage,
+  defaultSKey,
+  ecdsaMismatchMessageAndSignature,
+  ecdsaNegSigTestVectors,
+  ecdsaVerKeyAndSigVerifyTestVectors,
+  ecdsaWrongLengthSigTestVectorsRaw,
+  schnorrMismatchMessageAndSignature,
+  schnorrVerKeyAndSigVerifyTestVectors,
+  schnorrWrongLengthSigTestVectorsRaw,
+  signAndVerifyTestVectors,
+  verKeyNotOnCurveTestVectorRaw,
+  wrongEcdsaVerKeyTestVector,
+  wrongLengthMessageHashTestVectors,
+  wrongLengthVerKeyTestVectorsRaw,
+  wrongSchnorrVerKeyTestVector,
+ )
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
 
@@ -78,35 +82,47 @@ tests =
     [ -- Note : Proxies are here repetead due to specific test vectors need to be used with specific proxy
       testGroup
         "EcdsaSecp256k1"
-        [ signAndVerifyTest ecdsaProxy,
-          verifyOnlyTest ecdsaVerKeyAndSigVerifyTestVectors,
-          wrongMessageHashLengthTest,
-          mismatchSignKeyVerKeyTest wrongEcdsaVerKeyTestVector,
-          mismatchMessageSignatureTest ecdsaMismatchMessageAndSignature,
-          verKeyNotOnCurveParserTest ecdsaProxy verKeyNotOnCurveTestVectorRaw,
-          invalidLengthVerKeyParserTest ecdsaProxy wrongLengthVerKeyTestVectorsRaw invalidEcdsaVerKeyLengthError,
-          invalidLengthSignatureParserTest ecdsaProxy ecdsaWrongLengthSigTestVectorsRaw invalidEcdsaSigLengthError,
-          negativeSignatureTest ecdsaNegSigTestVectors
-        ],
-      testGroup
+        [ signAndVerifyTest ecdsaProxy
+        , verifyOnlyTest ecdsaVerKeyAndSigVerifyTestVectors
+        , wrongMessageHashLengthTest
+        , mismatchSignKeyVerKeyTest wrongEcdsaVerKeyTestVector
+        , mismatchMessageSignatureTest ecdsaMismatchMessageAndSignature
+        , verKeyNotOnCurveParserTest ecdsaProxy verKeyNotOnCurveTestVectorRaw
+        , invalidLengthVerKeyParserTest
+            ecdsaProxy
+            wrongLengthVerKeyTestVectorsRaw
+            invalidEcdsaVerKeyLengthError
+        , invalidLengthSignatureParserTest
+            ecdsaProxy
+            ecdsaWrongLengthSigTestVectorsRaw
+            invalidEcdsaSigLengthError
+        , negativeSignatureTest ecdsaNegSigTestVectors
+        ]
+    , testGroup
         "SchnorrSecp256k1"
-        [ signAndVerifyTest schnorrProxy,
-          verifyOnlyTest schnorrVerKeyAndSigVerifyTestVectors,
-          mismatchSignKeyVerKeyTest wrongSchnorrVerKeyTestVector,
-          mismatchMessageSignatureTest schnorrMismatchMessageAndSignature,
-          -- Note: First byte is dropped for schnorr as it doesn't require Y-cordinate information and assumed to be even and our vectors contains Y-information.
-          verKeyNotOnCurveParserTest schnorrProxy (Utils.dropBytes 1 verKeyNotOnCurveTestVectorRaw),
-          invalidLengthVerKeyParserTest schnorrProxy (map (Utils.dropBytes 1) wrongLengthVerKeyTestVectorsRaw) invalidSchnorrVerKeyLengthError,
-          invalidLengthSignatureParserTest schnorrProxy schnorrWrongLengthSigTestVectorsRaw invalidSchnorrSigLengthError
+        [ signAndVerifyTest schnorrProxy
+        , verifyOnlyTest schnorrVerKeyAndSigVerifyTestVectors
+        , mismatchSignKeyVerKeyTest wrongSchnorrVerKeyTestVector
+        , mismatchMessageSignatureTest schnorrMismatchMessageAndSignature
+        , -- Note: First byte is dropped for schnorr as it doesn't require Y-cordinate information and assumed to be even and our vectors contains Y-information.
+          verKeyNotOnCurveParserTest schnorrProxy (Utils.dropBytes 1 verKeyNotOnCurveTestVectorRaw)
+        , invalidLengthVerKeyParserTest
+            schnorrProxy
+            (map (Utils.dropBytes 1) wrongLengthVerKeyTestVectorsRaw)
+            invalidSchnorrVerKeyLengthError
+        , invalidLengthSignatureParserTest
+            schnorrProxy
+            schnorrWrongLengthSigTestVectorsRaw
+            invalidSchnorrSigLengthError
         ]
     ]
 
 negativeSignatureTest ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
   ) =>
   (VerKeyDSIGN v, ByteString, SigDSIGN v) ->
   TestTree
@@ -119,8 +135,7 @@ type InvalidLengthErrorFunction = Integer -> String
 
 invalidLengthSignatureParserTest ::
   forall v.
-  ( FromCBOR (SigDSIGN v)
-  ) =>
+  FromCBOR (SigDSIGN v) =>
   Proxy v ->
   [HexStringInCBOR] ->
   InvalidLengthErrorFunction ->
@@ -129,13 +144,15 @@ invalidLengthSignatureParserTest _ invalidLengthSigs errorF =
   testCase "Parsing should fail when using invalid length signatures." $
     forM_ invalidLengthSigs $ \invalidSig -> do
       let (DeserialiseFailure _ actualError) = invalidSigParserTest (Proxy @v) invalidSig
-      assertEqual "Expected invalid length signature error.." (errorF $ Utils.hexByteStringLength invalidSig) actualError
+      assertEqual
+        "Expected invalid length signature error.."
+        (errorF $ Utils.hexByteStringLength invalidSig)
+        actualError
 
 -- Try to parse the raw string into signature key and return the deserialize error
 invalidSigParserTest ::
   forall v.
-  ( FromCBOR (SigDSIGN v)
-  ) =>
+  FromCBOR (SigDSIGN v) =>
   Proxy v ->
   HexStringInCBOR ->
   DeserialiseFailure
@@ -149,8 +166,7 @@ invalidSigParserTest _ rawSig = do
 -- Signature parser using decodeFull
 fullSigParser ::
   forall v.
-  ( FromCBOR (SigDSIGN v)
-  ) =>
+  FromCBOR (SigDSIGN v) =>
   Proxy v ->
   HexStringInCBOR ->
   Either DecoderError (SigDSIGN v)
@@ -159,8 +175,7 @@ fullSigParser _ (HexCBOR hs) = decodeFull' hs
 -- Try to parse invalid length raw verification key
 invalidLengthVerKeyParserTest ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
-  ) =>
+  FromCBOR (VerKeyDSIGN v) =>
   Proxy v ->
   [HexStringInCBOR] ->
   InvalidLengthErrorFunction ->
@@ -169,13 +184,15 @@ invalidLengthVerKeyParserTest _ invalidLengthVKeys errorF =
   testCase "Parsing should fail when using invalid length verification keys." $
     forM_ invalidLengthVKeys $ \invalidVKey -> do
       let (DeserialiseFailure _ actualError) = invalidVerKeyParserTest (Proxy @v) invalidVKey
-      assertEqual "Expected invalid length verification key error." (errorF $ Utils.hexByteStringLength invalidVKey) actualError
+      assertEqual
+        "Expected invalid length verification key error."
+        (errorF $ Utils.hexByteStringLength invalidVKey)
+        actualError
 
 -- Try to parse raw verification key string and expect decode key error.
 verKeyNotOnCurveParserTest ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
-  ) =>
+  FromCBOR (VerKeyDSIGN v) =>
   Proxy v ->
   HexStringInCBOR ->
   TestTree
@@ -186,8 +203,7 @@ verKeyNotOnCurveParserTest _ rawVKey = testCase "Parsing should fail when trying
 -- Try to parse the raw string into verification key and return the deserialize error
 invalidVerKeyParserTest ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
-  ) =>
+  FromCBOR (VerKeyDSIGN v) =>
   Proxy v ->
   HexStringInCBOR ->
   DeserialiseFailure
@@ -201,8 +217,7 @@ invalidVerKeyParserTest _ rawVKey = do
 -- Vkey parser using decodeFull
 fullVerKeyParser ::
   forall v.
-  ( FromCBOR (VerKeyDSIGN v)
-  ) =>
+  FromCBOR (VerKeyDSIGN v) =>
   Proxy v ->
   HexStringInCBOR ->
   Either DecoderError (VerKeyDSIGN v)
@@ -211,16 +226,17 @@ fullVerKeyParser _ (HexCBOR hs) = decodeFull' hs
 -- Use mismatch messages and signature vectors to test how verification behaves on wrong message or wrong signature
 mismatchMessageSignatureTest ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
   ) =>
   [(ByteString, VerKeyDSIGN v, SigDSIGN v)] ->
   TestTree
 mismatchMessageSignatureTest mismatchMessageSignatureVectors =
-  testCase "Verification should not be successful when using mismatch message, signature and vice versa." $
-    forM_
+  testCase
+    "Verification should not be successful when using mismatch message, signature and vice versa."
+    $ forM_
       mismatchMessageSignatureVectors
       ( \(msg, vKey, sig) -> do
           let result = verifyDSIGN () vKey (toSignable (Proxy @v) msg) sig
@@ -230,11 +246,11 @@ mismatchMessageSignatureTest mismatchMessageSignatureVectors =
 -- Use mismatch verification key for the signature generated by another signing key
 mismatchSignKeyVerKeyTest ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a,
-    FromCBOR (SignKeyDSIGN v)
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
+  , FromCBOR (SignKeyDSIGN v)
   ) =>
   VerKeyDSIGN v ->
   TestTree
@@ -252,10 +268,10 @@ wrongMessageHashLengthTest = testCase "toMessageHash should return Nothing when 
 -- Test for vKey, message and signature test vectors without using sign key
 verifyOnlyTest ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
   ) =>
   (VerKeyDSIGN v, ByteString, SigDSIGN v) ->
   TestTree
@@ -264,11 +280,11 @@ verifyOnlyTest (vKey, msg, sig) = testCase "Verification only should be successf
 -- Sign using given sKey and verify it
 signAndVerifyTest ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a,
-    FromCBOR (SignKeyDSIGN v)
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
+  , FromCBOR (SignKeyDSIGN v)
   ) =>
   Proxy v ->
   TestTree
@@ -280,10 +296,10 @@ signAndVerifyTest _ =
 -- Used for testing whole sign and verification flow
 signAndVerify ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
   ) =>
   Proxy v ->
   SignKeyDSIGN v ->
@@ -298,10 +314,10 @@ signAndVerify _ sKey msg = do
 -- Used for testing whole sign and verification flow
 signAndVerifyWithVkey ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
   ) =>
   Proxy v ->
   SignKeyDSIGN v ->
@@ -315,10 +331,10 @@ signAndVerifyWithVkey _ sKey vKey msg =
 -- Use alreday given signature, message and vkey to verify the signature
 verifyOnly ::
   forall v a.
-  ( DSIGNAlgorithm v,
-    ContextDSIGN v ~ (),
-    Signable v a,
-    ToSignable v a
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ ()
+  , Signable v a
+  , ToSignable v a
   ) =>
   Proxy v ->
   VerKeyDSIGN v ->

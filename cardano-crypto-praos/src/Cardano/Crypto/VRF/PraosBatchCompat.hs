@@ -2,74 +2,72 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- | Verifiable Random Function (VRF) implemented as FFI wrappers around the
 -- implementation in https://github.com/input-output-hk/libsodium
-module Cardano.Crypto.VRF.PraosBatchCompat
-  (
+module Cardano.Crypto.VRF.PraosBatchCompat (
   -- * VRFAlgorithm API
-    PraosBatchCompatVRF
+  PraosBatchCompatVRF,
 
   -- * Low-level size specifiers
+
   --
   -- Sizes of various value types involved in the VRF calculations. Users of
   -- this module will not need these, we are only exporting them for unit
   -- testing purposes.
-  , crypto_vrf_ietfdraft13_bytes_batchcompat
-  , crypto_vrf_ietfdraft13_publickeybytes
-  , crypto_vrf_ietfdraft13_secretkeybytes
-  , crypto_vrf_ietfdraft13_seedbytes
-  , crypto_vrf_ietfdraft13_outputbytes
-
-  , io_crypto_vrf_ietfdraft13_publickeybytes
-  , io_crypto_vrf_ietfdraft13_secretkeybytes
+  crypto_vrf_ietfdraft13_bytes_batchcompat,
+  crypto_vrf_ietfdraft13_publickeybytes,
+  crypto_vrf_ietfdraft13_secretkeybytes,
+  crypto_vrf_ietfdraft13_seedbytes,
+  crypto_vrf_ietfdraft13_outputbytes,
+  io_crypto_vrf_ietfdraft13_publickeybytes,
+  io_crypto_vrf_ietfdraft13_secretkeybytes,
 
   -- * Key sizes
-  , certSizeVRF
-  , signKeySizeVRF
-  , verKeySizeVRF
-  , vrfKeySizeVRF
+  certSizeVRF,
+  signKeySizeVRF,
+  verKeySizeVRF,
+  vrfKeySizeVRF,
 
   -- * Seed and key generation
-  , Seed
-  , genSeed
-  , keypairFromSeed
+  Seed,
+  genSeed,
+  keypairFromSeed,
 
   -- * Conversions
-  , unsafeRawSeed
-  , outputBytes
-  , proofBytes
-  , skBytes
-  , vkBytes
-  , skToVerKey
-  , skToSeed
+  unsafeRawSeed,
+  outputBytes,
+  proofBytes,
+  skBytes,
+  vkBytes,
+  skToVerKey,
+  skToSeed,
 
   -- * Core VRF operations
-  , prove
-  , verify
-
-  , SignKeyVRF (..)
-  , VerKeyVRF (..)
-  , CertVRF (..)
-  )
+  prove,
+  verify,
+  SignKeyVRF (..),
+  VerKeyVRF (..),
+  CertVRF (..),
+)
 where
 
-import Cardano.Binary
-  ( FromCBOR (..)
-  , ToCBOR (..)
-  )
+import Cardano.Binary (
+  FromCBOR (..),
+  ToCBOR (..),
+ )
 
-import Cardano.Crypto.VRF.Class
-import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.RandomBytes (randombytes_buf)
-import Cardano.Crypto.Util (SignableRepresentation(..))
+import Cardano.Crypto.Seed (getBytesFromSeedT)
+import Cardano.Crypto.Util (SignableRepresentation (..))
+import Cardano.Crypto.VRF.Class
 
 import Control.DeepSeq (NFData (..))
 import Control.Monad (void)
@@ -124,51 +122,57 @@ type OutputPtr = Ptr OutputValue
 -- finalizers that automatically free the memory for us.
 
 -- | A random seed, used to derive a key pair.
-newtype Seed = Seed { unSeed :: ForeignPtr SeedValue }
-  deriving NoThunks via OnlyCheckWhnf Seed
+newtype Seed = Seed {unSeed :: ForeignPtr SeedValue}
+  deriving (NoThunks) via OnlyCheckWhnf Seed
 
 -- | Signing key. In this implementation, the signing key is actually a 64-byte
 -- value that contains both the 32-byte signing key and the corresponding
 -- 32-byte verification key.
-newtype SignKey = SignKey { unSignKey :: ForeignPtr SignKeyValue }
+newtype SignKey = SignKey {unSignKey :: ForeignPtr SignKeyValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf SignKey
+  deriving (NoThunks) via OnlyCheckWhnf SignKey
 
 instance NFData SignKey where
   rnf a = seq a ()
 
 -- | Verification key.
-newtype VerKey = VerKey { unVerKey :: ForeignPtr VerKeyValue }
+newtype VerKey = VerKey {unVerKey :: ForeignPtr VerKeyValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf VerKey
+  deriving (NoThunks) via OnlyCheckWhnf VerKey
 
 instance NFData VerKey where
   rnf a = seq a ()
 
 -- | A proof, as constructed by the 'prove' function.
-newtype Proof = Proof { unProof :: ForeignPtr ProofValue }
+newtype Proof = Proof {unProof :: ForeignPtr ProofValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf Proof
+  deriving (NoThunks) via OnlyCheckWhnf Proof
 
 instance NFData Proof where
   rnf a = seq a ()
 
 -- | Hashed output of a proof verification, as returned by the 'verify'
 -- function.
-newtype Output = Output { unOutput :: ForeignPtr OutputValue }
+newtype Output = Output {unOutput :: ForeignPtr OutputValue}
   deriving (Generic)
-  deriving NoThunks via OnlyCheckWhnf Output
+  deriving (NoThunks) via OnlyCheckWhnf Output
 
 -- Raw low-level FFI bindings.
 --
-foreign import ccall "crypto_vrf_ietfdraft13_bytes_batchcompat" crypto_vrf_ietfdraft13_bytes_batchcompat :: CSize
-foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes" crypto_vrf_ietfdraft13_publickeybytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes" crypto_vrf_ietfdraft13_secretkeybytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_bytes_batchcompat"
+  crypto_vrf_ietfdraft13_bytes_batchcompat :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes"
+  crypto_vrf_ietfdraft13_publickeybytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes"
+  crypto_vrf_ietfdraft13_secretkeybytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_seedbytes" crypto_vrf_ietfdraft13_seedbytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft13_outputbytes" crypto_vrf_ietfdraft13_outputbytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_outputbytes"
+  crypto_vrf_ietfdraft13_outputbytes :: CSize
 
-foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes" io_crypto_vrf_ietfdraft13_publickeybytes :: IO CSize
-foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes" io_crypto_vrf_ietfdraft13_secretkeybytes :: IO CSize
+foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes"
+  io_crypto_vrf_ietfdraft13_publickeybytes :: IO CSize
+foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes"
+  io_crypto_vrf_ietfdraft13_secretkeybytes :: IO CSize
 
 foreign import ccall "crypto_vrf_seed_keypair"
   crypto_vrf_ietfdraft13_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
@@ -177,9 +181,11 @@ foreign import ccall "crypto_vrf_sk_to_pk"
 foreign import ccall "crypto_vrf_sk_to_seed"
   crypto_vrf_ietfdraft13_sk_to_seed :: SeedPtr -> SignKeyPtr -> IO CInt
 foreign import ccall "crypto_vrf_ietfdraft13_prove_batchcompat"
-  crypto_vrf_ietfdraft13_prove_batchcompat :: ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
+  crypto_vrf_ietfdraft13_prove_batchcompat ::
+    ProofPtr -> SignKeyPtr -> Ptr CChar -> CULLong -> IO CInt
 foreign import ccall "crypto_vrf_ietfdraft13_verify_batchcompat"
-  crypto_vrf_ietfdraft13_verify_batchcompat :: OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
+  crypto_vrf_ietfdraft13_verify_batchcompat ::
+    OutputPtr -> VerKeyPtr -> ProofPtr -> Ptr CChar -> CULLong -> IO CInt
 
 foreign import ccall "crypto_vrf_ietfdraft13_proof_to_hash_batchcompat"
   crypto_vrf_ietfdraft13_proof_to_hash_batchcompat :: OutputPtr -> ProofPtr -> IO CInt
@@ -232,14 +238,17 @@ genSeed = do
 copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
 copyFromByteString ptr bs lenExpected =
   BS.useAsCStringLen bs $ \(cstr, lenActual) ->
-    if lenActual >= lenExpected then
-      copyBytes (castPtr ptr) cstr lenExpected
-    else
-      error $ "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
+    if lenActual >= lenExpected
+      then
+        copyBytes (castPtr ptr) cstr lenExpected
+      else
+        error $
+          "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
 
 seedFromBytes :: ByteString -> Seed
-seedFromBytes bs | BS.length bs < fromIntegral crypto_vrf_ietfdraft13_seedbytes =
-  error "Not enough bytes for seed"
+seedFromBytes bs
+  | BS.length bs < fromIntegral crypto_vrf_ietfdraft13_seedbytes =
+      error "Not enough bytes for seed"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
@@ -290,7 +299,6 @@ instance ToCBOR Proof where
 instance FromCBOR Proof where
   fromCBOR = proofFromBytes <$> fromCBOR
 
-
 instance Show SignKey where
   show = show . skBytes
 
@@ -304,7 +312,6 @@ instance ToCBOR SignKey where
 
 instance FromCBOR SignKey where
   fromCBOR = skFromBytes <$> fromCBOR
-
 
 instance Show VerKey where
   show = show . vkBytes
@@ -337,21 +344,28 @@ mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 
 proofFromBytes :: ByteString -> Proof
 proofFromBytes bs
-  | BS.length bs /= certSizeVRF
-  = error "Invalid proof length"
-  | otherwise
-  = unsafePerformIO $ do
-      proof <- mkProof
-      withForeignPtr (unProof proof) $ \ptr ->
-        copyFromByteString ptr bs certSizeVRF
-      return proof
+  | BS.length bs /= certSizeVRF =
+      error "Invalid proof length"
+  | otherwise =
+      unsafePerformIO $ do
+        proof <- mkProof
+        withForeignPtr (unProof proof) $ \ptr ->
+          copyFromByteString ptr bs certSizeVRF
+        return proof
 
 skFromBytes :: ByteString -> SignKey
 skFromBytes bs = unsafePerformIO $ do
   if bsLen /= signKeySizeVRF
     then do
       ioSize <- ioSignKeySizeVRF
-      error ("Invalid sk length " <> show @Int bsLen <> ", expecting " <> show @Int signKeySizeVRF <> " or " <> show @Int ioSize)
+      error
+        ( "Invalid sk length "
+            <> show @Int bsLen
+            <> ", expecting "
+            <> show @Int signKeySizeVRF
+            <> " or "
+            <> show @Int ioSize
+        )
     else do
       sk <- mkSignKey
       withForeignPtr (unSignKey sk) $ \ptr ->
@@ -365,7 +379,14 @@ vkFromBytes bs = unsafePerformIO $ do
   if BS.length bs /= verKeySizeVRF
     then do
       ioSize <- ioVerKeySizeVRF
-      error ("Invalid pk length " <> show @Int bsLen <> ", expecting " <> show @Int verKeySizeVRF <> " or " <> show @Int ioSize)
+      error
+        ( "Invalid pk length "
+            <> show @Int bsLen
+            <> ", expecting "
+            <> show @Int verKeySizeVRF
+            <> " or "
+            <> show @Int ioSize
+        )
     else do
       pk <- mkVerKey
       withForeignPtr (unVerKey pk) $ \ptr ->
@@ -377,7 +398,9 @@ vkFromBytes bs = unsafePerformIO $ do
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
 mkOutput :: IO Output
-mkOutput = fmap Output $ newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft13_outputbytes)
+mkOutput =
+  fmap Output $
+    newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft13_outputbytes)
 
 -- | Derive a key pair (Sign + Verify) from a seed.
 keypairFromSeed :: Seed -> (VerKey, SignKey)
@@ -454,21 +477,21 @@ data PraosBatchCompatVRF
 
 instance VRFAlgorithm PraosBatchCompatVRF where
   newtype VerKeyVRF PraosBatchCompatVRF = VerKeyPraosBatchCompatVRF VerKey
-    deriving stock   (Show, Eq, Generic)
+    deriving stock (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "VerKeyVRF PraosBatchCompatVRF" VerKey
+    deriving (NoThunks) via OnlyCheckWhnfNamed "VerKeyVRF PraosBatchCompatVRF" VerKey
     deriving newtype (NFData)
 
   newtype SignKeyVRF PraosBatchCompatVRF = SignKeyPraosBatchCompatVRF SignKey
-    deriving stock   (Show, Eq, Generic)
+    deriving stock (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "SignKeyVRF PraosBatchCompatVRF" SignKey
+    deriving (NoThunks) via OnlyCheckWhnfNamed "SignKeyVRF PraosBatchCompatVRF" SignKey
     deriving newtype (NFData)
 
   newtype CertVRF PraosBatchCompatVRF = CertPraosBatchCompatVRF Proof
-    deriving stock   (Show, Eq, Generic)
+    deriving stock (Show, Eq, Generic)
     deriving newtype (ToCBOR, FromCBOR)
-    deriving NoThunks via OnlyCheckWhnfNamed "CertKeyVRF PraosBatchCompatVRF" Proof
+    deriving (NoThunks) via OnlyCheckWhnfNamed "CertKeyVRF PraosBatchCompatVRF" Proof
     deriving newtype (NFData)
 
   type Signable PraosBatchCompatVRF = SignableRepresentation
@@ -481,8 +504,9 @@ instance VRFAlgorithm PraosBatchCompatVRF where
     let msgBS = getSignableRepresentation msg
         proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
         output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
-    in output `seq` proof `seq`
-           (OutputVRF (outputBytes output), CertPraosBatchCompatVRF proof)
+     in output `seq`
+          proof `seq`
+            (OutputVRF (outputBytes output), CertPraosBatchCompatVRF proof)
 
   verifyVRF = \_ (VerKeyPraosBatchCompatVRF pk) msg (CertPraosBatchCompatVRF proof) ->
     (OutputVRF . outputBytes) <$> verify pk proof (getSignableRepresentation msg)
@@ -491,9 +515,10 @@ instance VRFAlgorithm PraosBatchCompatVRF where
   seedSizeVRF _ = fromIntegral crypto_vrf_ietfdraft13_seedbytes
 
   genKeyPairVRF = \cryptoseed ->
-    let seed = seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_ietfdraft13_seedbytes) $ cryptoseed
+    let seed =
+          seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_ietfdraft13_seedbytes) $ cryptoseed
         (pk, sk) = keypairFromSeed seed
-    in sk `seq` pk `seq` (SignKeyPraosBatchCompatVRF sk, VerKeyPraosBatchCompatVRF pk)
+     in sk `seq` pk `seq` (SignKeyPraosBatchCompatVRF sk, VerKeyPraosBatchCompatVRF pk)
 
   rawSerialiseVerKeyVRF (VerKeyPraosBatchCompatVRF pk) = vkBytes pk
   rawSerialiseSignKeyVRF (SignKeyPraosBatchCompatVRF sk) = skBytes sk
@@ -508,7 +533,7 @@ instance VRFAlgorithm PraosBatchCompatVRF where
 
 assertLength :: Int -> ByteString -> Maybe ByteString
 assertLength l bs
-  | BS.length bs == l
-  = Just bs
-  | otherwise
-  = Nothing
+  | BS.length bs == l =
+      Just bs
+  | otherwise =
+      Nothing

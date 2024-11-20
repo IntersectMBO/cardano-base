@@ -1,56 +1,59 @@
-{-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE MagicHash                  #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE UnboxedTuples              #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskellQuotes      #-}
-module Cardano.Crypto.PinnedSizedBytes
-  (
-    PinnedSizedBytes,
-    -- * Initialization
-    psbZero,
-    -- * Conversions
-    psbFromBytes,
-    psbToBytes,
-    psbFromByteString,
-    psbFromByteStringCheck,
-    psbToByteString,
-    -- * C usage
-    psbUseAsCPtr,
-    psbUseAsCPtrLen,
-    psbUseAsSizedPtr,
-    psbCreate,
-    psbCreateLen,
-    psbCreateSized,
-    psbCreateResult,
-    psbCreateResultLen,
-    psbCreateSizedResult,
-    ptrPsbToSizedPtr,
-  ) where
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UnboxedTuples #-}
 
-import Data.Kind (Type)
+module Cardano.Crypto.PinnedSizedBytes (
+  PinnedSizedBytes,
+
+  -- * Initialization
+  psbZero,
+
+  -- * Conversions
+  psbFromBytes,
+  psbToBytes,
+  psbFromByteString,
+  psbFromByteStringCheck,
+  psbToByteString,
+
+  -- * C usage
+  psbUseAsCPtr,
+  psbUseAsCPtrLen,
+  psbUseAsSizedPtr,
+  psbCreate,
+  psbCreateLen,
+  psbCreateSized,
+  psbCreateResult,
+  psbCreateResultLen,
+  psbCreateSizedResult,
+  ptrPsbToSizedPtr,
+) where
+
 import Control.DeepSeq (NFData)
+import Control.Monad.Class.MonadST (MonadST, stToIO)
+import Control.Monad.Primitive (primitive_, touch)
 import Control.Monad.ST (runST)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
-import Control.Monad.Class.MonadST (MonadST, stToIO)
-import Control.Monad.Primitive  (primitive_, touch)
-import Data.Primitive.ByteArray
-          ( ByteArray (..)
-          , MutableByteArray (..)
-          , copyByteArrayToAddr
-          , newPinnedByteArray
-          , unsafeFreezeByteArray
-          , foldrByteArray
-          , byteArrayContents
-          , writeByteArray
-          , mutableByteArrayContents
-          )
+import Data.Kind (Type)
+import Data.Primitive.ByteArray (
+  ByteArray (..),
+  MutableByteArray (..),
+  byteArrayContents,
+  copyByteArrayToAddr,
+  foldrByteArray,
+  mutableByteArrayContents,
+  newPinnedByteArray,
+  unsafeFreezeByteArray,
+  writeByteArray,
+ )
 import Data.Proxy (Proxy (..))
 import Data.String (IsString (..))
 import Data.Word (Word8)
@@ -58,21 +61,21 @@ import Foreign.C.Types (CSize)
 import Foreign.Ptr (FunPtr, castPtr)
 import Foreign.Storable (Storable (..))
 import GHC.TypeLits (KnownNat, Nat, natVal)
+import Language.Haskell.TH.Syntax (Q, TExp (..))
+import Language.Haskell.TH.Syntax.Compat (Code (..), examineSplice)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
-import Language.Haskell.TH.Syntax (Q, TExp(..))
-import Language.Haskell.TH.Syntax.Compat (Code(..), examineSplice)
 import Numeric (showHex)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import GHC.Exts (Int (..), copyAddrToByteArray#)
 import GHC.Ptr (Ptr (..))
 
-import qualified Data.Primitive as Prim
 import qualified Data.ByteString as BS
+import qualified Data.Primitive as Prim
 
-import Cardano.Foreign
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 import Cardano.Crypto.Util (decodeHexString)
+import Cardano.Foreign
 
 {- HLINT ignore "Reduce duplication" -}
 
@@ -91,36 +94,35 @@ import Cardano.Crypto.Util (decodeHexString)
 -- 'ForeignPtr' + offset (and size).
 --
 -- I'm sorry for adding more types for bytes. :(
---
 newtype PinnedSizedBytes (n :: Nat) = PSB ByteArray
-  deriving NoThunks via OnlyCheckWhnfNamed "PinnedSizedBytes" (PinnedSizedBytes n)
-  deriving NFData
+  deriving (NoThunks) via OnlyCheckWhnfNamed "PinnedSizedBytes" (PinnedSizedBytes n)
+  deriving (NFData)
 
 instance Show (PinnedSizedBytes n) where
-    showsPrec _ (PSB ba)
-        = showChar '"'
-        . foldrByteArray (\w acc -> show8 w . acc) id ba
-        . showChar '"'
-      where
-        show8 :: Word8 -> ShowS
-        show8 w | w < 16    = showChar '0' . showHex w
-                | otherwise = showHex w
+  showsPrec _ (PSB ba) =
+    showChar '"'
+      . foldrByteArray (\w acc -> show8 w . acc) id ba
+      . showChar '"'
+    where
+      show8 :: Word8 -> ShowS
+      show8 w
+        | w < 16 = showChar '0' . showHex w
+        | otherwise = showHex w
 
 -- | The comparison is done in constant time for a given size @n@.
 instance KnownNat n => Eq (PinnedSizedBytes n) where
-    x == y = compare x y == EQ
+  x == y = compare x y == EQ
 
 instance KnownNat n => Ord (PinnedSizedBytes n) where
-    compare x y =
-        runST $
-            psbUseAsCPtr x $ \xPtr ->
-                psbUseAsCPtr y $ \yPtr -> do
-                    res <- unsafeIOToST $ c_sodium_compare xPtr yPtr size
-                    return (compare res 0)
-      where
-        size :: CSize
-        size = fromInteger (natVal (Proxy :: Proxy n))
-
+  compare x y =
+    runST $
+      psbUseAsCPtr x $ \xPtr ->
+        psbUseAsCPtr y $ \yPtr -> do
+          res <- unsafeIOToST $ c_sodium_compare xPtr yPtr size
+          return (compare res 0)
+    where
+      size :: CSize
+      size = fromInteger (natVal (Proxy :: Proxy n))
 
 -- | This instance is meant to be used with @TemplateHaskell@
 --
@@ -146,11 +148,11 @@ instance KnownNat n => Ord (PinnedSizedBytes n) where
 --       In the expression: $$("nogood") :: PinnedSizedBytes 5
 --       In an equation for ‘bsb’: bsb = $$("nogood") :: PinnedSizedBytes 5
 instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
-    fromString hexStr = do
-      let n = fromInteger $ natVal (Proxy :: Proxy n)
-      case decodeHexString hexStr n of
-        Left err -> fail $ "<PinnedSizedBytes>: " ++ err
-        Right _  -> examineSplice [|| either error psbFromByteString (decodeHexString hexStr n) ||]
+  fromString hexStr = do
+    let n = fromInteger $ natVal (Proxy :: Proxy n)
+    case decodeHexString hexStr n of
+      Left err -> fail $ "<PinnedSizedBytes>: " ++ err
+      Right _ -> examineSplice [||either error psbFromByteString (decodeHexString hexStr n)||]
 
 instance KnownNat n => IsString (Code Q (PinnedSizedBytes n)) where
   fromString = Code . fromString
@@ -172,7 +174,6 @@ psbToByteString = BS.pack . psbToBytes
 --
 -- >>> psbToBytes . (id @(PinnedSizedBytes 4)) . psbFromBytes $ [1,2,3,4,5,6]
 -- [3,4,5,6]
---
 {-# DEPRECATED psbFromBytes "This is not referentially transparent" #-}
 psbFromBytes :: forall n. KnownNat n => [Word8] -> PinnedSizedBytes n
 psbFromBytes ws0 = PSB (pinnedByteArrayFromListN size ws)
@@ -181,10 +182,11 @@ psbFromBytes ws0 = PSB (pinnedByteArrayFromListN size ws)
     size = fromInteger (natVal (Proxy :: Proxy n))
 
     ws :: [Word8]
-    ws = reverse
-        $ take size
-        $ (++ repeat 0)
-        $ reverse ws0
+    ws =
+      reverse $
+        take size $
+          (++ repeat 0) $
+            reverse ws0
 
 -- | Convert a ByteString into PinnedSizedBytes. Input should contain the exact
 -- number of bytes as expected by type level @n@ size, otherwise error.
@@ -196,37 +198,38 @@ psbFromByteString bs =
 
 psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
 psbFromByteStringCheck bs
-    | BS.length bs == size = Just $ unsafeDupablePerformIO $
+  | BS.length bs == size = Just $
+      unsafeDupablePerformIO $
         BS.useAsCStringLen bs $ \(Ptr addr#, _) -> do
-            marr@(MutableByteArray marr#) <- newPinnedByteArray size
-            primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
-            arr <- unsafeFreezeByteArray marr
-            return (PSB arr)
-    | otherwise            = Nothing
+          marr@(MutableByteArray marr#) <- newPinnedByteArray size
+          primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
+          arr <- unsafeFreezeByteArray marr
+          return (PSB arr)
+  | otherwise = Nothing
   where
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
 
 {-# DEPRECATED psbZero "This is not referentially transparent" #-}
-psbZero :: KnownNat n =>  PinnedSizedBytes n
+psbZero :: KnownNat n => PinnedSizedBytes n
 psbZero = psbFromBytes []
 
 instance KnownNat n => Storable (PinnedSizedBytes n) where
-    sizeOf _          = fromInteger (natVal (Proxy :: Proxy n))
-    alignment _       = alignment (undefined :: FunPtr (Int -> Int))
+  sizeOf _ = fromInteger (natVal (Proxy :: Proxy n))
+  alignment _ = alignment (undefined :: FunPtr (Int -> Int))
 
-    peek (Ptr addr#) = do
-        let size :: Int
-            size = fromInteger (natVal (Proxy :: Proxy n))
-        marr@(MutableByteArray marr#) <- newPinnedByteArray size
-        primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
-        arr <- unsafeFreezeByteArray marr
-        return (PSB arr)
+  peek (Ptr addr#) = do
+    let size :: Int
+        size = fromInteger (natVal (Proxy :: Proxy n))
+    marr@(MutableByteArray marr#) <- newPinnedByteArray size
+    primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
+    arr <- unsafeFreezeByteArray marr
+    return (PSB arr)
 
-    poke p (PSB arr) = do
-        let size :: Int
-            size = fromInteger (natVal (Proxy :: Proxy n))
-        copyByteArrayToAddr (castPtr p) arr 0 size
+  poke p (PSB arr) = do
+    let size :: Int
+        size = fromInteger (natVal (Proxy :: Proxy n))
+    copyByteArrayToAddr (castPtr p) arr 0 size
 
 -- | Use a 'PinnedSizedBytes' in a setting where its size is \'forgotten\'
 -- temporarily.
@@ -237,8 +240,8 @@ instance KnownNat n => Storable (PinnedSizedBytes n) where
 -- type @r@.
 {-# INLINE psbUseAsCPtr #-}
 psbUseAsCPtr ::
-  forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
-  (MonadST m) =>
+  forall (n :: Nat) (r :: Type) (m :: Type -> Type).
+  MonadST m =>
   PinnedSizedBytes n ->
   (Ptr Word8 -> m r) ->
   m r
@@ -260,7 +263,7 @@ psbUseAsCPtr (PSB ba) = runAndTouch ba
 -- 'psbUseAsCPtr'.
 {-# INLINE psbUseAsCPtrLen #-}
 psbUseAsCPtrLen ::
-  forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
+  forall (n :: Nat) (r :: Type) (m :: Type -> Type).
   (KnownNat n, MonadST m) =>
   PinnedSizedBytes n ->
   (Ptr Word8 -> CSize -> m r) ->
@@ -273,22 +276,22 @@ psbUseAsCPtrLen (PSB ba) f = do
 --
 -- The same caveats apply to this use of this function as to the use of
 -- 'psbUseAsCPtr'.
-{-# INLINE psbUseAsSizedPtr  #-}
+{-# INLINE psbUseAsSizedPtr #-}
 psbUseAsSizedPtr ::
-  forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
-  (MonadST m) =>
+  forall (n :: Nat) (r :: Type) (m :: Type -> Type).
+  MonadST m =>
   PinnedSizedBytes n ->
   (SizedPtr n -> m r) ->
   m r
 psbUseAsSizedPtr (PSB ba) k = do
-    r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
-    r <$ stToIO (touch ba)
+  r <- k (SizedPtr $ castPtr $ byteArrayContents ba)
+  r <$ stToIO (touch ba)
 
 -- | As 'psbCreateResult', but presumes that no useful value is produced: that
 -- is, the function argument is run only for its side effects.
-{-# INLINE psbCreate  #-}
+{-# INLINE psbCreate #-}
 psbCreate ::
-  forall (n :: Nat) (m :: Type -> Type) .
+  forall (n :: Nat) (m :: Type -> Type).
   (KnownNat n, MonadST m) =>
   (Ptr Word8 -> m ()) ->
   m (PinnedSizedBytes n)
@@ -296,9 +299,9 @@ psbCreate f = fst <$> psbCreateResult f
 
 -- | As 'psbCreateResultLen', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
-{-# INLINE psbCreateLen  #-}
+{-# INLINE psbCreateLen #-}
 psbCreateLen ::
-  forall (n :: Nat) (m :: Type -> Type) .
+  forall (n :: Nat) (m :: Type -> Type).
   (KnownNat n, MonadST m) =>
   (Ptr Word8 -> CSize -> m ()) ->
   m (PinnedSizedBytes n)
@@ -319,9 +322,9 @@ psbCreateLen f = fst <$> psbCreateResultLen f
 -- which can lead to segfaults or out-of-bounds reads.
 --
 -- This poses both correctness /and/ security risks, so please don't do it.
-{-# INLINE psbCreateResult  #-}
+{-# INLINE psbCreateResult #-}
 psbCreateResult ::
-  forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
+  forall (n :: Nat) (r :: Type) (m :: Type -> Type).
   (KnownNat n, MonadST m) =>
   (Ptr Word8 -> m r) ->
   m (PinnedSizedBytes n, r)
@@ -339,7 +342,7 @@ psbCreateResult f = psbCreateResultLen (\p _ -> f p)
 --
 -- The same caveats apply to this function as to 'psbCreateResult': the 'Ptr'
 -- given to the function argument /must not/ be returned as @r@.
-{-# INLINE psbCreateResultLen  #-}
+{-# INLINE psbCreateResultLen #-}
 psbCreateResultLen ::
   forall (n :: Nat) (r :: Type) (m :: Type -> Type).
   (KnownNat n, MonadST m) =>
@@ -354,9 +357,9 @@ psbCreateResultLen f = do
 
 -- | As 'psbCreateSizedResult', but presumes that no useful value is produced:
 -- that is, the function argument is run only for its side effects.
-{-# INLINE psbCreateSized  #-}
+{-# INLINE psbCreateSized #-}
 psbCreateSized ::
-  forall (n :: Nat) (m :: Type -> Type) .
+  forall (n :: Nat) (m :: Type -> Type).
   (KnownNat n, MonadST m) =>
   (SizedPtr n -> m ()) ->
   m (PinnedSizedBytes n)
@@ -365,9 +368,9 @@ psbCreateSized k = psbCreate (k . SizedPtr . castPtr)
 -- | As 'psbCreateResult', but gives a 'SizedPtr' to the function argument. The
 -- same caveats apply to this function as to 'psbCreateResult': the 'SizedPtr'
 -- given to the function argument /must not/ be resulted as @r@.
-{-# INLINE psbCreateSizedResult  #-}
+{-# INLINE psbCreateSizedResult #-}
 psbCreateSizedResult ::
-  forall (n :: Nat) (r :: Type) (m :: Type -> Type) .
+  forall (n :: Nat) (r :: Type) (m :: Type -> Type).
   (KnownNat n, MonadST m) =>
   (SizedPtr n -> m r) ->
   m (PinnedSizedBytes n, r)
@@ -385,31 +388,33 @@ ptrPsbToSizedPtr = SizedPtr . castPtr
 --   then this throws an exception.
 pinnedByteArrayFromListN :: forall a. Prim.Prim a => Int -> [a] -> ByteArray
 pinnedByteArrayFromListN 0 _ =
-    die "pinnedByteArrayFromListN" "list length zero #1"
+  die "pinnedByteArrayFromListN" "list length zero #1"
 pinnedByteArrayFromListN n ys = runST $ do
-    let headYs = case ys of
-                  [] -> die "pinnedByteArrayFromListN" "list length zero #2"
-                  (y:_) -> y
-    marr <- newPinnedByteArray (n * Prim.sizeOf headYs)
-    let go !ix [] = if ix == n
+  let headYs = case ys of
+        [] -> die "pinnedByteArrayFromListN" "list length zero #2"
+        (y : _) -> y
+  marr <- newPinnedByteArray (n * Prim.sizeOf headYs)
+  let go !ix [] =
+        if ix == n
           then return ()
           else die "pinnedByteArrayFromListN" "list length less than specified size"
-        go !ix (x : xs) = if ix < n
+      go !ix (x : xs) =
+        if ix < n
           then do
             writeByteArray marr ix x
             go (ix + 1) xs
           else die "pinnedByteArrayFromListN" "list length greater than specified size"
-    go 0 ys
-    unsafeFreezeByteArray marr
+  go 0 ys
+  unsafeFreezeByteArray marr
 
 die :: String -> String -> a
 die fun problem = error $ "PinnedSizedBytes." ++ fun ++ ": " ++ problem
 
 -- Wrapper that combines applying a function, then touching
-{-# INLINE runAndTouch  #-}
+{-# INLINE runAndTouch #-}
 runAndTouch ::
-  forall (a :: Type) (m :: Type -> Type) .
-  (MonadST m) =>
+  forall (a :: Type) (m :: Type -> Type).
+  MonadST m =>
   ByteArray ->
   (Ptr Word8 -> m a) ->
   m a

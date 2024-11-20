@@ -2,8 +2,8 @@
 
 -- | Initialization for the library's functionality
 module Cardano.Crypto.Init (
-  cryptoInit
-  ) where
+  cryptoInit,
+) where
 
 import Cardano.Crypto.Libsodium.Init (sodiumInit)
 #if defined(SECP256K1_ENABLED)

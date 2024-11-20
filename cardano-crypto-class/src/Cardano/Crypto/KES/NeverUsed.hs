@@ -1,22 +1,22 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Cardano.Crypto.KES.NeverUsed
-  ( NeverKES
-  , VerKeyKES (..)
-  , SignKeyKES (..)
-  , SigKES (..)
-  )
+{-# LANGUAGE TypeFamilies #-}
+
+module Cardano.Crypto.KES.NeverUsed (
+  NeverKES,
+  VerKeyKES (..),
+  SignKeyKES (..),
+  SigKES (..),
+)
 where
 
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
 import Cardano.Crypto.KES.Class
-
 
 -- | KES never used
 --
@@ -27,14 +27,14 @@ data NeverKES
 instance KESAlgorithm NeverKES where
   type SeedSizeKES NeverKES = 0
 
-  data VerKeyKES  NeverKES = NeverUsedVerKeyKES
-      deriving (Show, Eq, Generic, NoThunks)
+  data VerKeyKES NeverKES = NeverUsedVerKeyKES
+    deriving (Show, Eq, Generic, NoThunks)
 
-  data SigKES     NeverKES = NeverUsedSigKES
-      deriving (Show, Eq, Generic, NoThunks)
+  data SigKES NeverKES = NeverUsedSigKES
+    deriving (Show, Eq, Generic, NoThunks)
 
   data SignKeyKES NeverKES = NeverUsedSignKeyKES
-      deriving (Show, Eq, Generic, NoThunks)
+    deriving (Show, Eq, Generic, NoThunks)
 
   algorithmNameKES _ = "never"
 
@@ -42,25 +42,24 @@ instance KESAlgorithm NeverKES where
 
   totalPeriodsKES _ = 0
 
-  type SizeVerKeyKES  NeverKES = 0
+  type SizeVerKeyKES NeverKES = 0
   type SizeSignKeyKES NeverKES = 0
-  type SizeSigKES     NeverKES = 0
+  type SizeSigKES NeverKES = 0
 
-  rawSerialiseVerKeyKES  _ = mempty
-  rawSerialiseSigKES     _ = mempty
+  rawSerialiseVerKeyKES _ = mempty
+  rawSerialiseSigKES _ = mempty
 
-  rawDeserialiseVerKeyKES  _ = Just NeverUsedVerKeyKES
-  rawDeserialiseSigKES     _ = Just NeverUsedSigKES
+  rawDeserialiseVerKeyKES _ = Just NeverUsedVerKeyKES
+  rawDeserialiseSigKES _ = Just NeverUsedSigKES
 
   deriveVerKeyKES _ = return NeverUsedVerKeyKES
 
-  signKES   = error "KES not available"
+  signKES = error "KES not available"
   updateKESWith _ = error "KES not available"
 
   genKeyKESWith _ _ = return NeverUsedSignKeyKES
 
   forgetSignKeyKESWith _ = const $ return ()
-
 
 instance UnsoundKESAlgorithm NeverKES where
   rawSerialiseSignKeyKES _ = return mempty
@@ -68,7 +67,7 @@ instance UnsoundKESAlgorithm NeverKES where
 
 instance UnsoundPureKESAlgorithm NeverKES where
   data UnsoundPureSignKeyKES NeverKES = NeverUsedUnsoundPureSignKeyKES
-      deriving (Show, Eq, Generic, NoThunks)
+    deriving (Show, Eq, Generic, NoThunks)
 
   unsoundPureSignKES = error "KES not available"
   unsoundPureGenKeyKES _ = NeverUsedUnsoundPureSignKeyKES

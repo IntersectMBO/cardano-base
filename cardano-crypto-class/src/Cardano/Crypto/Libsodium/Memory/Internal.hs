@@ -6,6 +6,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+
 module Cardano.Crypto.Libsodium.Memory.Internal (
   -- * High-level memory management
   MLockedForeignPtr (..),
@@ -16,7 +17,6 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   -- * MLocked allocations
   mlockedMalloc,
   MLockedAllocator (..),
-
   mlockedAlloca,
   mlockedAllocaSized,
   mlockedAllocForeignPtr,
@@ -43,21 +43,22 @@ module Cardano.Crypto.Libsodium.Memory.Internal (
   packByteStringCStringLen,
 
   -- * Helper
-  unsafeIOToMonadST
+  unsafeIOToMonadST,
 ) where
 
 import Control.DeepSeq (NFData (..), rwhnf)
 import Control.Exception (Exception, mask_)
-import Control.Monad (when, void)
+import Control.Monad (void, when)
 import Control.Monad.Class.MonadST (MonadST, stToIO)
 import Control.Monad.Class.MonadThrow (MonadThrow (bracket))
-import Control.Monad.ST (RealWorld, ST)
 import Control.Monad.Primitive (touch)
+import Control.Monad.ST (RealWorld, ST)
 import Control.Monad.ST.Unsafe (unsafeIOToST)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
+import Data.Kind
 import Data.Typeable
 import Debug.Trace (traceShowM)
 import Foreign.C.Error (errnoToIOError, getErrno)
@@ -65,24 +66,23 @@ import Foreign.C.String (CStringLen)
 import Foreign.C.Types (CSize (..))
 import qualified Foreign.Concurrent as Foreign
 import qualified Foreign.ForeignPtr as Foreign hiding (newForeignPtr)
-import qualified Foreign.ForeignPtr.Unsafe as Foreign
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
+import qualified Foreign.ForeignPtr.Unsafe as Foreign
 import Foreign.Marshal.Utils (fillBytes)
-import Foreign.Ptr (Ptr, nullPtr, castPtr)
-import Foreign.Storable (Storable (peek), sizeOf, alignment)
+import Foreign.Ptr (Ptr, castPtr, nullPtr)
+import Foreign.Storable (Storable (peek), alignment, sizeOf)
 import GHC.IO.Exception (ioException)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
-import Data.Kind
 
 import Cardano.Crypto.Libsodium.C
-import Cardano.Foreign (c_memset, c_memcpy, SizedPtr (..))
-import Cardano.Memory.Pool (initPool, grabNextBlock, Pool)
+import Cardano.Foreign (SizedPtr (..), c_memcpy, c_memset)
+import Cardano.Memory.Pool (Pool, grabNextBlock, initPool)
 
 -- | Foreign pointer to securely allocated memory.
-newtype MLockedForeignPtr a = SFP { _unwrapMLockedForeignPtr :: Foreign.ForeignPtr a }
-  deriving NoThunks via OnlyCheckWhnfNamed "MLockedForeignPtr" (MLockedForeignPtr a)
+newtype MLockedForeignPtr a = SFP {_unwrapMLockedForeignPtr :: Foreign.ForeignPtr a}
+  deriving (NoThunks) via OnlyCheckWhnfNamed "MLockedForeignPtr" (MLockedForeignPtr a)
 
 instance NFData (MLockedForeignPtr a) where
   rnf = rwhnf . _unwrapMLockedForeignPtr
@@ -97,11 +97,10 @@ finalizeMLockedForeignPtr (SFP fptr) =
   unsafeIOToMonadST $ Foreign.finalizeForeignPtr fptr
 
 {-# WARNING traceMLockedForeignPtr "Do not use traceMLockedForeignPtr in production" #-}
-
 traceMLockedForeignPtr :: (Storable a, Show a, MonadST m) => MLockedForeignPtr a -> m ()
 traceMLockedForeignPtr fptr = withMLockedForeignPtr fptr $ \ptr -> do
-    a <- unsafeIOToMonadST (peek ptr)
-    traceShowM a
+  a <- unsafeIOToMonadST (peek ptr)
+  traceShowM a
 
 unsafeIOToMonadST :: MonadST m => IO a -> m a
 unsafeIOToMonadST = stToIO . unsafeIOToST
@@ -110,12 +109,12 @@ makeMLockedPool :: forall n s. KnownNat n => ST s (Pool n s)
 makeMLockedPool = do
   initPool
     (max 1 . fromIntegral $ 4096 `div` natVal (Proxy @n) `div` 64)
-    (\size -> unsafeIOToST $ mask_ $ do
-      ptr <- sodiumMalloc (fromIntegral size)
-      Foreign.newForeignPtr ptr (sodiumFree ptr (fromIntegral size))
+    ( \size -> unsafeIOToST $ mask_ $ do
+        ptr <- sodiumMalloc (fromIntegral size)
+        Foreign.newForeignPtr ptr (sodiumFree ptr (fromIntegral size))
     )
-    (\ptr -> do
-      eraseMem (Proxy @n) ptr
+    ( \ptr -> do
+        eraseMem (Proxy @n) ptr
     )
 
 eraseMem :: forall n a. KnownNat n => Proxy n -> Ptr a -> IO ()
@@ -141,46 +140,47 @@ mlockedPool512 :: Pool 512 RealWorld
 mlockedPool512 = unsafePerformIO $ stToIO makeMLockedPool
 {-# NOINLINE mlockedPool512 #-}
 
-data AllocatorException =
-  AllocatorNoTracer
+data AllocatorException
+  = AllocatorNoTracer
   | AllocatorNoGenerator
-  deriving Show
+  deriving (Show)
 
 instance Exception AllocatorException
 
 mlockedMalloc :: MonadST m => MLockedAllocator m
 mlockedMalloc =
-  MLockedAllocator { mlAllocate = unsafeIOToMonadST . mlockedMallocIO }
+  MLockedAllocator {mlAllocate = unsafeIOToMonadST . mlockedMallocIO}
 
 mlockedMallocIO :: CSize -> IO (MLockedForeignPtr a)
-mlockedMallocIO size = SFP <$> do
-  if
-    | size <= 32 -> do
-        fmap coerce $ stToIO $ grabNextBlock mlockedPool32
-    | size <= 64 -> do
-        fmap coerce $ stToIO $ grabNextBlock mlockedPool64
-    | size <= 128 -> do
-        fmap coerce $ stToIO $ grabNextBlock mlockedPool128
-    | size <= 256 -> do
-        fmap coerce $ stToIO $ grabNextBlock mlockedPool256
-    | size <= 512 -> do
-        fmap coerce $ stToIO $ grabNextBlock mlockedPool512
-    | otherwise -> do
-        mask_ $ do
-          ptr <- sodiumMalloc size
-          Foreign.newForeignPtr ptr $ do
-            sodiumFree ptr size
+mlockedMallocIO size =
+  SFP <$> do
+    if
+      | size <= 32 -> do
+          fmap coerce $ stToIO $ grabNextBlock mlockedPool32
+      | size <= 64 -> do
+          fmap coerce $ stToIO $ grabNextBlock mlockedPool64
+      | size <= 128 -> do
+          fmap coerce $ stToIO $ grabNextBlock mlockedPool128
+      | size <= 256 -> do
+          fmap coerce $ stToIO $ grabNextBlock mlockedPool256
+      | size <= 512 -> do
+          fmap coerce $ stToIO $ grabNextBlock mlockedPool512
+      | otherwise -> do
+          mask_ $ do
+            ptr <- sodiumMalloc size
+            Foreign.newForeignPtr ptr $ do
+              sodiumFree ptr size
 
 sodiumMalloc :: CSize -> IO (Ptr a)
 sodiumMalloc size = do
   ptr <- c_sodium_malloc size
   when (ptr == nullPtr) $ do
-      errno <- getErrno
-      ioException $ errnoToIOError "c_sodium_malloc" errno Nothing Nothing
+    errno <- getErrno
+    ioException $ errnoToIOError "c_sodium_malloc" errno Nothing Nothing
   res <- c_sodium_mlock ptr size
   when (res /= 0) $ do
-      errno <- getErrno
-      ioException $ errnoToIOError "c_sodium_mlock" errno Nothing Nothing
+    errno <- getErrno
+    ioException $ errnoToIOError "c_sodium_mlock" errno Nothing Nothing
   return ptr
 
 sodiumFree :: Ptr a -> CSize -> IO ()
@@ -200,16 +200,16 @@ copyMem dst src size = unsafeIOToMonadST . void $ c_memcpy (castPtr dst) (castPt
 -- | A 'ForeignPtr' type, generalized to 'MonadST'. The type is tagged with
 -- the correct Monad @m@ in order to ensure that foreign pointers created in
 -- one ST context can only be used within the same ST context.
-newtype ForeignPtr (m :: Type -> Type) a = ForeignPtr { unsafeRawForeignPtr :: Foreign.ForeignPtr a }
+newtype ForeignPtr (m :: Type -> Type) a = ForeignPtr {unsafeRawForeignPtr :: Foreign.ForeignPtr a}
 
-mallocForeignPtrBytes :: (MonadST m) => Int -> m (ForeignPtr m a)
+mallocForeignPtrBytes :: MonadST m => Int -> m (ForeignPtr m a)
 mallocForeignPtrBytes size =
   ForeignPtr <$> unsafeIOToMonadST (Foreign.mallocForeignPtrBytes size)
 
 -- | 'Foreign.withForeignPtr', generalized to 'MonadST'.
 -- Caveat: if the monadic action passed to 'withForeignPtr' does not terminate
 -- (e.g., 'forever'), the 'ForeignPtr' finalizer may run prematurely.
-withForeignPtr :: (MonadST m) => ForeignPtr m a -> (Ptr a -> m b) -> m b
+withForeignPtr :: MonadST m => ForeignPtr m a -> (Ptr a -> m b) -> m b
 withForeignPtr (ForeignPtr fptr) f = do
   result <- f $ Foreign.unsafeForeignPtrToPtr fptr
   stToIO $ touch fptr
@@ -234,20 +234,23 @@ packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
 packByteStringCStringLen =
   unsafeIOToMonadST . BS.packCStringLen
 
-newtype MLockedAllocator m =
-  MLockedAllocator
-    { mlAllocate :: forall a. CSize -> m (MLockedForeignPtr a)
-    }
+newtype MLockedAllocator m
+  = MLockedAllocator
+  { mlAllocate :: forall a. CSize -> m (MLockedForeignPtr a)
+  }
 
-mlockedAllocaSized :: forall m n b. (MonadST m, MonadThrow m, KnownNat n) => (SizedPtr n -> m b) -> m b
+mlockedAllocaSized ::
+  forall m n b. (MonadST m, MonadThrow m, KnownNat n) => (SizedPtr n -> m b) -> m b
 mlockedAllocaSized = mlockedAllocaSizedWith mlockedMalloc
 
 mlockedAllocaSizedWith ::
-     forall m n b. (MonadST m, MonadThrow m, KnownNat n)
-  => MLockedAllocator m
-  -> (SizedPtr n -> m b)
-  -> m b
-mlockedAllocaSizedWith allocator k = mlockedAllocaWith allocator size (k . SizedPtr) where
+  forall m n b.
+  (MonadST m, MonadThrow m, KnownNat n) =>
+  MLockedAllocator m ->
+  (SizedPtr n -> m b) ->
+  m b
+mlockedAllocaSizedWith allocator k = mlockedAllocaWith allocator size (k . SizedPtr)
+  where
     size :: CSize
     size = fromInteger (natVal (Proxy @n))
 
@@ -262,18 +265,19 @@ mlockedAllocForeignPtrBytesWith allocator size align = do
   where
     size' :: CSize
     size'
-        | m == 0    = size
-        | otherwise = (q + 1) * align
+      | m == 0 = size
+      | otherwise = (q + 1) * align
       where
-        (q,m) = size `quotRem` align
+        (q, m) = size `quotRem` align
 
-mlockedAllocForeignPtr :: forall a m . (MonadST m, Storable a) => m (MLockedForeignPtr a)
+mlockedAllocForeignPtr :: forall a m. (MonadST m, Storable a) => m (MLockedForeignPtr a)
 mlockedAllocForeignPtr = mlockedAllocForeignPtrWith mlockedMalloc
 
 mlockedAllocForeignPtrWith ::
-     forall a m. Storable a
-  => MLockedAllocator m
-  -> m (MLockedForeignPtr a)
+  forall a m.
+  Storable a =>
+  MLockedAllocator m ->
+  m (MLockedForeignPtr a)
 mlockedAllocForeignPtrWith allocator =
   mlockedAllocForeignPtrBytesWith allocator size align
   where
@@ -290,11 +294,12 @@ mlockedAlloca :: forall a b m. (MonadST m, MonadThrow m) => CSize -> (Ptr a -> m
 mlockedAlloca = mlockedAllocaWith mlockedMalloc
 
 mlockedAllocaWith ::
-     forall a b m. (MonadThrow m, MonadST m)
-  => MLockedAllocator m
-  -> CSize
-  -> (Ptr a -> m b)
-  -> m b
+  forall a b m.
+  (MonadThrow m, MonadST m) =>
+  MLockedAllocator m ->
+  CSize ->
+  (Ptr a -> m b) ->
+  m b
 mlockedAllocaWith allocator size =
   bracket alloc finalizeMLockedForeignPtr . flip withMLockedForeignPtr
   where

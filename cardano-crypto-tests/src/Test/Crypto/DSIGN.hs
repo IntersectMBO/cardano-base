@@ -1,13 +1,14 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NumericUnderscores #-}
 
+{- FOURMOLU_DISABLE -}
 module Test.Crypto.DSIGN
   ( tests
   )

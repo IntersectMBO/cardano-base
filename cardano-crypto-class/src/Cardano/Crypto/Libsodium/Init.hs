@@ -13,9 +13,7 @@ import Cardano.Crypto.Libsodium.C
 -- <https://libsodium.gitbook.io/doc/usage>
 sodiumInit :: IO ()
 sodiumInit = do
-    res <- c_sodium_init
-    -- sodium_init() returns 0 on success, -1 on failure, and 1 if the library
-    -- had already been initialized.
-    unless (res == 0 || res == 1) $ fail "sodium_init failed"
-
-
+  res <- c_sodium_init
+  -- sodium_init() returns 0 on success, -1 on failure, and 1 if the library
+  -- had already been initialized.
+  unless (res == 0 || res == 1) $ fail "sodium_init failed"
