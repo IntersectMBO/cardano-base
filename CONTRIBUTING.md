@@ -25,6 +25,25 @@ infrastructure:
 We use trunk based developement. Normal development will branch off of master and be
 merged back to master.
 
+### Recommended `git` configuration
+
+Once you cloned the repository, it is recommended to run the following
+from the repository's root:
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+This way `git blame` will ignore the commits specified in the `.git-blame-ignore-revs`
+file. This can come in handy if you want to exclude large commits
+with only formatting changes.
+You can ignore the above however, if you tend to look at `git blame`
+through GitHub. In that case, you don't have to do anything,
+as GitHub will pick up `.git-blame-ignore-revs` automatically and ignore
+the specified commits.
+
+If you want to add further revisions to the `ignore-revs` file,
+just prepend the full commit hash that you want `git blame` to ignore
+and add the commit's title and date as a comment for clarity.
+
 ### Releasing and versioning
 
 Packages from `cardano-base` are released to

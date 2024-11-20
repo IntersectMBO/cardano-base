@@ -14,4 +14,5 @@ to the issue. -->
       [versioning process](https://github.com/intersectmbo/cardano-base/blob/master/RELEASING.md#versioning-process).
 - [ ] The version bounds in `.cabal` files for all affected packages are updated.
       **_If you change the bounds in a cabal file, that package itself must have a version increase._** (See [RELEASING.md](https://github.com/intersectmbo/cardano-base/blob/master/RELEASING.md#versioning-process))
+- [ ] Commits that only contain large amounts of formatting changes were added to `.git-blame-ignore-revs`
 - [ ] Self-reviewed the diff
