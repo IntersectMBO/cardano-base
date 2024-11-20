@@ -24,14 +24,18 @@ module Cardano.Crypto.PackedBytes
 import Codec.Serialise (Serialise(..))
 import Codec.Serialise.Decoding (decodeBytes)
 import Codec.Serialise.Encoding (encodeBytes)
-import Control.DeepSeq
+import Control.DeepSeq (NFData(..))
 import Control.Monad (guard)
-import Control.Monad.Primitive
+import Control.Monad.Primitive (primitive_)
+import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
+import Control.Monad.State.Strict (MonadState(state))
 import Data.Bits
 import Data.ByteString
 import Data.ByteString.Internal as BS (accursedUnutterablePerformIO,
                                        fromForeignPtr, toForeignPtr)
 import Data.ByteString.Short.Internal as SBS
+import Data.MemPack (guardAdvanceUnpack, st_, MemPack(..), Pack(Pack))
+import Data.MemPack.Buffer (Buffer(buffer), byteArrayToShortByteString, pinnedByteArrayToForeignPtr)
 import Data.Primitive.ByteArray
 import Data.Primitive.PrimArray (PrimArray(..), imapPrimArray, indexPrimArray)
 import Data.Typeable
@@ -39,7 +43,6 @@ import Foreign.ForeignPtr
 import Foreign.Ptr (castPtr)
 import Foreign.Storable (peekByteOff)
 import GHC.Exts
-import GHC.ForeignPtr (ForeignPtr(ForeignPtr), ForeignPtrContents(PlainPtr))
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr (unsafeWithForeignPtr)
 #endif
@@ -92,9 +95,46 @@ instance NFData (PackedBytes n) where
   rnf PackedBytes32 {} = ()
   rnf PackedBytes#  {} = ()
 
-instance Serialise (PackedBytes n) where
+instance KnownNat n => MemPack (PackedBytes n) where
+  packedByteCount = fromInteger @Int . natVal
+  {-# INLINE packedByteCount #-}
+  packM pb = do
+    let !len@(I# len#) = packedByteCount pb
+    i@(I# i#) <- state $ \i -> (i, i + len)
+    mba@(MutableByteArray mba#) <- ask
+    Pack $ \_ -> lift $ case pb of
+      PackedBytes8 w -> writeWord64BE mba i w
+      PackedBytes28 w0 w1 w2 w3 -> do
+        writeWord64BE mba i        w0
+        writeWord64BE mba (i + 8)  w1
+        writeWord64BE mba (i + 16) w2
+        writeWord32BE mba (i + 24) w3
+      PackedBytes32 w0 w1 w2 w3 -> do
+        writeWord64BE mba i        w0
+        writeWord64BE mba (i + 8)  w1
+        writeWord64BE mba (i + 16) w2
+        writeWord64BE mba (i + 24) w3
+      PackedBytes# ba# ->
+        st_ (copyByteArray# ba# 0# mba# i# len#)
+  {-# INLINE packM #-}
+  unpackM = do
+    let !len = fromInteger @Int $ natVal' (proxy# :: Proxy# n)
+    curPos@(I# curPos#) <- guardAdvanceUnpack len
+    buf <- ask
+    pure $! buffer buf
+      (\ba# -> packBytes (SBS.SBS ba#) curPos)
+      -- Usage of `accursedUnutterablePerformIO` is safe below because there are no memory
+      -- allocations happening that depend on the IO monad that we are excaping here. All
+      -- IO actions are morally pure reads using pointers into the immutable
+      -- memory. Furthermore, in the place where ByteArray is allocated in
+      -- `packPinnedPtrN`, mutation and freezing are encapsulated with `runST` and is not
+      -- related to the `IO` we are escaping.
+      (\addr# -> accursedUnutterablePerformIO $ packPinnedPtr (Ptr (addr# `plusAddr#` curPos#)))
+  {-# INLINE unpackM #-}
+
+instance KnownNat n => Serialise (PackedBytes n) where
   encode = encodeBytes . unpackPinnedBytes
-  decode = packPinnedBytesN <$> decodeBytes
+  decode = packPinnedBytes <$> decodeBytes
 
 xorPackedBytes :: PackedBytes n -> PackedBytes n -> PackedBytes n
 xorPackedBytes (PackedBytes8 x) (PackedBytes8 y) = PackedBytes8 (x `xor` y)
@@ -219,54 +259,58 @@ packBytesMaybe bs offset = do
   guard (offset >= 0)
   guard (size <= bufferSize - offset)
   Just $ packBytes bs offset
+{-# INLINE packBytesMaybe #-}
 
 
-packPinnedBytes8 :: ByteString -> PackedBytes 8
-packPinnedBytes8 bs = unsafeWithByteStringPtr bs (fmap PackedBytes8 . (`peekWord64BE` 0))
-{-# INLINE packPinnedBytes8 #-}
+packPinnedPtr8 :: Ptr a -> IO (PackedBytes 8)
+packPinnedPtr8 = fmap PackedBytes8 . (`peekWord64BE` 0)
+{-# INLINE packPinnedPtr8 #-}
 
-packPinnedBytes28 :: ByteString -> PackedBytes 28
-packPinnedBytes28 bs =
-  unsafeWithByteStringPtr bs $ \ptr ->
-    PackedBytes28
-      <$> peekWord64BE ptr 0
-      <*> peekWord64BE ptr 8
-      <*> peekWord64BE ptr 16
-      <*> peekWord32BE ptr 24
-{-# INLINE packPinnedBytes28 #-}
+packPinnedPtr28 :: Ptr a -> IO (PackedBytes 28)
+packPinnedPtr28 ptr =
+  PackedBytes28
+    <$> peekWord64BE ptr 0
+    <*> peekWord64BE ptr 8
+    <*> peekWord64BE ptr 16
+    <*> peekWord32BE ptr 24
+{-# INLINE packPinnedPtr28 #-}
 
-packPinnedBytes32 :: ByteString -> PackedBytes 32
-packPinnedBytes32 bs =
-  unsafeWithByteStringPtr bs $ \ptr -> PackedBytes32 <$> peekWord64BE ptr 0
-                                                   <*> peekWord64BE ptr 8
-                                                   <*> peekWord64BE ptr 16
-                                                   <*> peekWord64BE ptr 24
-{-# INLINE packPinnedBytes32 #-}
+packPinnedPtr32 :: Ptr a -> IO (PackedBytes 32)
+packPinnedPtr32 ptr =
+  PackedBytes32 <$> peekWord64BE ptr 0
+                <*> peekWord64BE ptr 8
+                <*> peekWord64BE ptr 16
+                <*> peekWord64BE ptr 24
+{-# INLINE packPinnedPtr32 #-}
 
-packPinnedBytesN :: ByteString -> PackedBytes n
-packPinnedBytesN bs =
-  case toShort bs of
-    SBS ba# -> PackedBytes# ba#
-{-# INLINE packPinnedBytesN #-}
+packPinnedPtrN :: forall n a. KnownNat n => Ptr a -> IO (PackedBytes n)
+packPinnedPtrN (Ptr addr#) = pure $! PackedBytes# ba#
+  where
+    !(ByteArray ba#) = withMutableByteArray len $ \(MutableByteArray mba#) ->
+           st_ (copyAddrToByteArray# addr# mba# 0# len#)
+    !len@(I# len#) = fromInteger (natVal' (proxy# :: Proxy# n))
+{-# INLINE packPinnedPtrN #-}
 
-
-packPinnedBytes :: forall n . KnownNat n => ByteString -> PackedBytes n
-packPinnedBytes bs =
+packPinnedPtr :: forall n a. KnownNat n => Ptr a -> IO (PackedBytes n)
+packPinnedPtr bs =
   let px = Proxy :: Proxy n
    in case sameNat px (Proxy :: Proxy 8) of
-        Just Refl -> packPinnedBytes8 bs
+        Just Refl -> packPinnedPtr8 bs
         Nothing -> case sameNat px (Proxy :: Proxy 28) of
-          Just Refl -> packPinnedBytes28 bs
+          Just Refl -> packPinnedPtr28 bs
           Nothing -> case sameNat px (Proxy :: Proxy 32) of
-            Just Refl -> packPinnedBytes32 bs
-            Nothing   -> packPinnedBytesN bs
-{-# INLINE[1] packPinnedBytes #-}
-
+            Just Refl -> packPinnedPtr32 bs
+            Nothing   -> packPinnedPtrN bs
+{-# INLINE[1] packPinnedPtr #-}
 {-# RULES
-"packPinnedBytes8"  packPinnedBytes = packPinnedBytes8
-"packPinnedBytes28" packPinnedBytes = packPinnedBytes28
-"packPinnedBytes32" packPinnedBytes = packPinnedBytes32
+"packPinnedPtr8"  packPinnedPtr = packPinnedPtr8
+"packPinnedPtr28" packPinnedPtr = packPinnedPtr28
+"packPinnedPtr32" packPinnedPtr = packPinnedPtr32
   #-}
+
+packPinnedBytes :: forall n . KnownNat n => ByteString -> PackedBytes n
+packPinnedBytes bs = unsafeWithByteStringPtr bs packPinnedPtr
+{-# INLINE packPinnedBytes #-}
 
 
 --- Primitive architecture agnostic helpers
@@ -358,21 +402,12 @@ writeWord32BE (MutableByteArray mba#) (I# i#) w =
 #endif
 {-# INLINE writeWord32BE #-}
 
-byteArrayToShortByteString :: ByteArray -> ShortByteString
-byteArrayToShortByteString (ByteArray ba#) = SBS ba#
-{-# INLINE byteArrayToShortByteString #-}
-
 byteArrayToByteString :: ByteArray -> ByteString
-byteArrayToByteString ba
+byteArrayToByteString ba@(ByteArray ba#)
   | isByteArrayPinned ba =
-    BS.fromForeignPtr (pinnedByteArrayToForeignPtr ba) 0 (sizeofByteArray ba)
+    BS.fromForeignPtr (pinnedByteArrayToForeignPtr ba#) 0 (sizeofByteArray ba)
   | otherwise = SBS.fromShort (byteArrayToShortByteString ba)
 {-# INLINE byteArrayToByteString #-}
-
-pinnedByteArrayToForeignPtr :: ByteArray -> ForeignPtr a
-pinnedByteArrayToForeignPtr (ByteArray ba#) =
-  ForeignPtr (byteArrayContents# ba#) (PlainPtr (unsafeCoerce# ba#))
-{-# INLINE pinnedByteArrayToForeignPtr #-}
 
 -- Usage of `accursedUnutterablePerformIO` here is safe because we only use it
 -- for indexing into an immutable `ByteString`, which is analogous to

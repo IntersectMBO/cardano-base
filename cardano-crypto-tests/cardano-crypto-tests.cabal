@@ -75,6 +75,7 @@ library
                       , deepseq
                       , formatting
                       , io-classes >= 1.4.0
+                      , mempack
                       , mtl
                       , nothunks
                       , pretty-show
