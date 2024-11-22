@@ -177,8 +177,8 @@ import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import Foreign.Storable (peek)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad (forM_)
-import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
+-- import Control.Monad (forM_)
+-- import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 
 ---- Phantom Types
 
@@ -299,13 +299,12 @@ withNewAffine' = fmap snd . withNewAffine
 -- Helper: Converts a list of affine points to a contiguous memory block
 withAffineList :: forall curve a. BLS curve => [Affine curve] -> (AffinePtrList curve -> IO a) -> IO a
 withAffineList affines go = do
-    let totalSize = sizeAffine (Proxy @curve) * length affines
-    finalPtr <- mallocForeignPtrBytes totalSize
-    withForeignPtr finalPtr $ \destPtr -> do
-        let copyElement offset (Affine srcPtr) = withForeignPtr srcPtr $ \src ->
-                copyBytes (destPtr `plusPtr` offset) src (sizeAffine (Proxy @curve))
-        forM_ (zip [0, sizeAffine (Proxy @curve) ..] affines) $ uncurry copyElement
-    go (AffinePtrList (castPtr $ unsafeForeignPtrToPtr finalPtr))
+  let numAffines = length affines
+  let sizeAffine' = sizeAffine (Proxy @curve)
+  allocaBytes (numAffines * sizeAffine') $ \ptr -> do
+    -- Copy each affine point to the memory block
+    mapM_ (\(i, a) -> withAffine a $ \(AffinePtr aPtr) -> copyBytes (ptr `plusPtr` (i * sizeAffine')) (castPtr aPtr) sizeAffine') (zip [0..] affines)
+    go (AffinePtrList ptr)
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
@@ -459,13 +458,11 @@ withNewScalar' = fmap snd . withNewScalar
 -- Helper: Converts a list of scalars to a contiguous memory block
 withScalarList :: [Scalar] -> (ScalarPtrList -> IO a) -> IO a
 withScalarList scalars go = do
-    let totalSize = sizeScalar * length scalars
-    finalPtr <- mallocForeignPtrBytes totalSize
-    withForeignPtr finalPtr $ \destPtr -> do
-        let copyElement offset (Scalar srcPtr) = withForeignPtr srcPtr $ \src ->
-                copyBytes (destPtr `plusPtr` offset) src sizeScalar
-        forM_ (zip [0, sizeScalar ..] scalars) $ uncurry copyElement
-    go (ScalarPtrList (castPtr $ unsafeForeignPtrToPtr finalPtr))
+  let numScalars = length scalars
+  allocaBytes (numScalars * sizeScalar) $ \ptr -> do
+    -- Copy each scalar to the memory block
+    mapM_ (\(i, s) -> withScalar s $ \(ScalarPtr sPtr) -> copyBytes (ptr `plusPtr` (i * sizeScalar)) (castPtr sPtr) sizeScalar) (zip [0..] scalars)
+    go (ScalarPtrList ptr)
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do
