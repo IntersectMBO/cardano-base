@@ -177,8 +177,6 @@ import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import Foreign.Storable (peek)
 import System.IO.Unsafe (unsafePerformIO)
--- import Control.Monad (forM_)
--- import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 
 ---- Phantom Types
 
@@ -924,6 +922,8 @@ scalarCanonical scalar =
 
 -- | Multi-scalar multiplication using the Pippenger algorithm.
 -- The number of points must be equal or smaller than the number of scalars.
+-- For reference, see the usage of the rust bindings: https://github.com/perturbing/blst/blob/master/bindings/rust/src/pippenger.rs#L143C1-L161C11
+-- Note that we only implement the single thread version of the algorithm.
 blsMSM :: forall curve. BLS curve => [Point curve] -> [Scalar] -> Either BLSTError (Point curve)
 blsMSM ps ss
   | null ps || null ss = Left BLST_UNKNOWN_ERROR
@@ -951,7 +951,7 @@ blsMSM ps ss
                 affineListPtr
                 (fromIntegral numPoints)
                 scalarListPtr
-                (fromIntegral numPoints)
+                255
                 (ScratchPtr scratchPtr)
 
               -- Return the result as Right
