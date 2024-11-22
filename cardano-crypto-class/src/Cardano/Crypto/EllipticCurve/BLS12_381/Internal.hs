@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
@@ -129,6 +130,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsMult,
   blsCneg,
   blsNeg,
+  blsMSM,
   blsCompress,
   blsSerialize,
   blsUncompress,
@@ -175,6 +177,8 @@ import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import Foreign.Storable (peek)
 import System.IO.Unsafe (unsafePerformIO)
+import Control.Monad (forM_)
+import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 
 ---- Phantom Types
 
@@ -189,9 +193,13 @@ type Point1Ptr = PointPtr Curve1
 type Point2Ptr = PointPtr Curve2
 
 newtype AffinePtr curve = AffinePtr (Ptr Void)
+newtype AffinePtrList curve = AffinePtrList (Ptr Void)
 
 type Affine1Ptr = AffinePtr Curve1
 type Affine2Ptr = AffinePtr Curve2
+
+type Affine1PtrList = AffinePtrList Curve1
+type Affine2PtrList = AffinePtrList Curve2
 
 newtype PTPtr = PTPtr (Ptr Void)
 
@@ -288,6 +296,17 @@ withNewAffine_ = fmap fst . withNewAffine
 withNewAffine' :: BLS curve => (AffinePtr curve -> IO a) -> IO (Affine curve)
 withNewAffine' = fmap snd . withNewAffine
 
+-- Helper: Converts a list of affine points to a contiguous memory block
+withAffineList :: forall curve a. BLS curve => [Affine curve] -> (AffinePtrList curve -> IO a) -> IO a
+withAffineList affines go = do
+    let totalSize = sizeAffine (Proxy @curve) * length affines
+    finalPtr <- mallocForeignPtrBytes totalSize
+    withForeignPtr finalPtr $ \destPtr -> do
+        let copyElement offset (Affine srcPtr) = withForeignPtr srcPtr $ \src ->
+                copyBytes (destPtr `plusPtr` offset) src (sizeAffine (Proxy @curve))
+        forM_ (zip [0, sizeAffine (Proxy @curve) ..] affines) $ uncurry copyElement
+    go (AffinePtrList (castPtr $ unsafeForeignPtrToPtr finalPtr))
+
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
 
@@ -317,6 +336,9 @@ class BLS curve where
   c_blst_mult :: PointPtr curve -> PointPtr curve -> ScalarPtr -> CSize -> IO ()
   c_blst_cneg :: PointPtr curve -> Bool -> IO ()
 
+  c_blst_scratch_sizeof :: Proxy curve -> CSize -> CSize
+  c_blst_mult_pippenger :: PointPtr curve -> AffinePtrList curve -> CSize -> ScalarPtrList -> CSize -> ScratchPtr -> IO ()
+
   c_blst_hash ::
     PointPtr curve -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
   c_blst_compress :: Ptr CChar -> PointPtr curve -> IO ()
@@ -345,6 +367,9 @@ instance BLS Curve1 where
   c_blst_mult = c_blst_p1_mult
   c_blst_cneg = c_blst_p1_cneg
 
+  c_blst_scratch_sizeof _ = c_blst_p1s_mult_pippenger_scratch_sizeof
+  c_blst_mult_pippenger = c_blst_p1s_mult_pippenger
+
   c_blst_hash = c_blst_hash_to_g1
   c_blst_compress = c_blst_p1_compress
   c_blst_serialize = c_blst_p1_serialize
@@ -372,6 +397,9 @@ instance BLS Curve2 where
   c_blst_add_or_double = c_blst_p2_add_or_double
   c_blst_mult = c_blst_p2_mult
   c_blst_cneg = c_blst_p2_cneg
+
+  c_blst_scratch_sizeof _ = c_blst_p2s_mult_pippenger_scratch_sizeof
+  c_blst_mult_pippenger = c_blst_p2s_mult_pippenger
 
   c_blst_hash = c_blst_hash_to_g2
   c_blst_compress = c_blst_p2_compress
@@ -427,6 +455,17 @@ withNewScalar_ = fmap fst . withNewScalar
 
 withNewScalar' :: (ScalarPtr -> IO a) -> IO Scalar
 withNewScalar' = fmap snd . withNewScalar
+
+-- Helper: Converts a list of scalars to a contiguous memory block
+withScalarList :: [Scalar] -> (ScalarPtrList -> IO a) -> IO a
+withScalarList scalars go = do
+    let totalSize = sizeScalar * length scalars
+    finalPtr <- mallocForeignPtrBytes totalSize
+    withForeignPtr finalPtr $ \destPtr -> do
+        let copyElement offset (Scalar srcPtr) = withForeignPtr srcPtr $ \src ->
+                copyBytes (destPtr `plusPtr` offset) src sizeScalar
+        forM_ (zip [0, sizeScalar ..] scalars) $ uncurry copyElement
+    go (ScalarPtrList (castPtr $ unsafeForeignPtrToPtr finalPtr))
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do
@@ -512,7 +551,9 @@ scalarFromInteger n = do
 ---- Unsafe types
 
 newtype ScalarPtr = ScalarPtr (Ptr Void)
+newtype ScalarPtrList = ScalarPtrList (Ptr Void)
 newtype FrPtr = FrPtr (Ptr Void)
+newtype ScratchPtr = ScratchPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
 
@@ -555,6 +596,9 @@ foreign import ccall "blst_p1_generator" c_blst_p1_generator :: Point1Ptr
 foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: Point1Ptr -> Point1Ptr -> IO Bool
 foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: Point1Ptr -> IO Bool
 
+foreign import ccall "blst_p1s_mult_pippenger_scratch_sizeof" c_blst_p1s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p1s_mult_pippenger" c_blst_p1s_mult_pippenger :: Point1Ptr -> Affine1PtrList -> CSize -> ScalarPtrList -> CSize -> ScratchPtr -> IO ()
+
 ---- Raw Point2 functions
 
 foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
@@ -581,6 +625,9 @@ foreign import ccall "blst_p2_generator" c_blst_p2_generator :: Point2Ptr
 
 foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: Point2Ptr -> Point2Ptr -> IO Bool
 foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: Point2Ptr -> IO Bool
+
+foreign import ccall "blst_p2s_mult_pippenger_scratch_sizeof" c_blst_p2s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p2s_mult_pippenger" c_blst_p2s_mult_pippenger :: Point2Ptr -> Affine2PtrList -> CSize -> ScalarPtrList -> CSize -> ScratchPtr -> IO ()
 
 ---- Affine operations
 
@@ -824,7 +871,8 @@ blsZero =
           error $ "Unexpected failure deserialising point at infinity on BLS12_381.G1: " ++ show err
         Right infinity ->
           infinity -- The zero point on this curve is chosen to be the point at infinity.
-          ---- Scalar / Fr operations
+
+---- Scalar / Fr operations
 
 scalarFromFr :: Fr -> IO Scalar
 scalarFromFr fr =
@@ -874,6 +922,45 @@ scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar =
   unsafePerformIO $
     withScalar scalar c_blst_scalar_fr_check
+
+---- MSM operations
+
+-- | Multi-scalar multiplication using the Pippenger algorithm.
+-- The number of points must be equal or smaller than the number of scalars.
+blsMSM :: forall curve. BLS curve => [Point curve] -> [Scalar] -> Either BLSTError (Point curve)
+blsMSM ps ss
+  | null ps || null ss = Left BLST_UNKNOWN_ERROR
+  | length ps /= length ss = Left BLST_UNKNOWN_ERROR
+  | otherwise = unsafePerformIO $ do
+      -- Convert points to affine representations
+      let affinePoints = map toAffine ps
+
+      -- Allocate memory for affine points and scalars
+      withAffineList affinePoints $ \affineListPtr ->
+        withScalarList ss $ \scalarListPtr -> do
+
+          -- Calculate required scratch size
+          let numPoints = length ps
+          let scratchSize = c_blst_scratch_sizeof (Proxy @curve) (fromIntegral numPoints)
+
+          -- Allocate scratch space
+          allocaBytes (fromIntegral scratchSize) $ \scratchPtr -> do
+
+            -- Allocate memory for the result point
+            withNewPoint' $ \resultPtr -> do
+              -- Perform the MSM
+              c_blst_mult_pippenger
+                resultPtr
+                affineListPtr
+                (fromIntegral numPoints)
+                scalarListPtr
+                (fromIntegral numPoints)
+                (ScratchPtr scratchPtr)
+
+              -- Return the result as Right
+              return $ unsafePointFromPointPtr resultPtr
+        >>= \case
+          p -> return $ Right p
 
 ---- PT operations
 
