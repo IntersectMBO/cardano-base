@@ -10,9 +10,9 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2024-10-10T00:52:24Z
+index-state: 2024-12-03T06:33:00Z
 -- The CHaP index-state
-index-state: cardano-haskell-packages 2024-10-10T04:22:19Z
+index-state: cardano-haskell-packages 2024-11-27T20:49:28Z
 
 packages:
   base-deriving-via
@@ -42,3 +42,69 @@ program-options
 package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
+
+allow-newer:
+  , aeson:time
+  , aeson:ghc-prim
+  , aeson:template-haskell
+  , assoc:base
+  , async:base
+  , attoparsec:ghc-prim
+  , bifunctors:template-haskell
+  , binary-orphans:base
+  , boring:base
+  , cborg:base
+  , cborg:ghc-prim
+  , data-fix:base
+  , free:template-haskell
+  , generically:base
+  , hashable:base
+  , hedgehog:template-haskell
+  , hsc2hs:base
+  , io-classes:base
+  , io-classes:time
+  , indexed-traversable:base
+  , indexed-traversable-instances:base
+  , integer-conversion:base
+  , integer-logarithms:base
+  , integer-logarithms:ghc-prim
+  , lifted-async:base
+  , microstache:base
+  , OneTuple:base
+  , parallel:base
+  , primitive:base
+  , quickcheck-instances:base
+  , recursion-schemes:template-haskell 
+  , scientific:base
+  , scientific:template-haskell
+  , semialign:base
+  , serialise:base
+  , serialise:ghc-prim
+  , splitmix:base
+  , text-iso8601:time
+  , text-short:base
+  , text-short:ghc-prim
+  , text-short:template-haskell
+  , these:base
+  , th-abstraction:template-haskell
+  , th-compat:template-haskell
+  , time:base
+  , time-compat:base
+  , time-compat:time
+  , tree-diff:base
+  , tree-diff:time
+  , unordered-containers:template-haskell
+  , uuid-types:template-haskell
+  , vector:base
+  , vector-stream:base
+  , vector-th-unbox:base
+  , vector-th-unbox:template-haskell
+
+source-repository-package
+  type: git
+  location: https://github.com/IntersectMBO/cardano-prelude
+  tag: 96df9210a3e8a1852b3e5998c8286507fb5ac923
+  --sha256: 0yi06z2ipk7hz6ahgbqrynacqj29653fnrvyvsag14vkpw1wnlbi
+  subdir:
+    cardano-prelude
+    cardano-prelude-test

@@ -96,6 +96,10 @@ library
                      Test.Crypto.Vector.StringConstants
                      Test.Crypto.Vector.Vectors
 
+  -- This should be removed when ghc-9.12 becomes the oldest compiler we support.
+  if impl(ghc >= 9.12)
+    ghc-options:     -Wno-deriving-typeable
+
 test-suite test-crypto
   import:               base, project-config
   type:                 exitcode-stdio-1.0
