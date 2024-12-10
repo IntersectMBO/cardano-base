@@ -75,10 +75,10 @@ import GHC.IO.Exception (ioException)
 import GHC.TypeLits (KnownNat, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
+import System.Memory.Pool (Pool, grabNextBlock, initPool)
 
 import Cardano.Crypto.Libsodium.C
 import Cardano.Foreign (SizedPtr (..), c_memcpy, c_memset)
-import Cardano.Memory.Pool (Pool, grabNextBlock, initPool)
 
 -- | Foreign pointer to securely allocated memory.
 newtype MLockedForeignPtr a = SFP {_unwrapMLockedForeignPtr :: Foreign.ForeignPtr a}
