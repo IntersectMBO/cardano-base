@@ -2,7 +2,7 @@
 
 ## 2.2.0.0
 
-*
+* Memlocking functionality
 
 ## 2.1.2.0
 
