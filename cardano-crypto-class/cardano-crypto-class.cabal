@@ -98,7 +98,6 @@ library
     , base16-bytestring  >=1
     , bytestring
     , cardano-binary >= 1.6
-    , cardano-mempool
     , cardano-strict-containers
     , crypton
     , deepseq
@@ -106,6 +105,7 @@ library
     , io-classes >= 1.4.1
     , memory
     , mempack
+    , memory-pool
     , mtl
     , nothunks
     , primitive >= 0.8
