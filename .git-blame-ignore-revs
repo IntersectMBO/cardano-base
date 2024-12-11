@@ -1,8 +1,0 @@
-### NOTE
-# Run `git config blame.ignoreRevsFile .git-blame-ignore-revs`
-# from the repository's root to tell `git blame` to ignore
-# the commits below.
-
-# `fourmolize`
-# CommitDate: Wed Nov 20 18:01:24 2024 +0100
-db87b19be6ff702d3bf37cef259de456c48b7ffe
