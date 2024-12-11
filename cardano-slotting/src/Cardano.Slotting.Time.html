@@ -1,0 +1,530 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Slotting.Time</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-7"></span><span>  </span><span class="annot"><span class="hs-comment">-- * System time</span></span><span>
+</span><span id="line-8"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier">SystemStart</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Relative time</span></span><span>
+</span><span id="line-11"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier">RelativeTime</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#addRelativeTime"><span class="hs-identifier">addRelativeTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#diffRelativeTime"><span class="hs-identifier">diffRelativeTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#fromRelativeTime"><span class="hs-identifier">fromRelativeTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#multRelativeTime"><span class="hs-identifier">multRelativeTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#toRelativeTime"><span class="hs-identifier">toRelativeTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Nominal diff time</span></span><span>
+</span><span id="line-19"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#multNominalDiffTime"><span class="hs-identifier">multNominalDiffTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Slot length</span></span><span>
+</span><span id="line-22"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#getSlotLength"><span class="hs-identifier">getSlotLength</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#mkSlotLength"><span class="hs-identifier">mkSlotLength</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Conversions</span></span><span>
+</span><span id="line-26"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthFromMillisec"><span class="hs-identifier">slotLengthFromMillisec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthFromSec"><span class="hs-identifier">slotLengthFromSec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthToMillisec"><span class="hs-identifier">slotLengthToMillisec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthToSec"><span class="hs-identifier">slotLengthToSec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** opaque</span></span><span>
+</span><span id="line-32"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier">SlotLength</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">Cardano.Binary</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier">Codec.Serialise</span></a></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Control.Exception</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">assert</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Data.Fixed</span></a></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier">Data.Time</span></a></span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-41"></span><span>  </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier">NominalDiffTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-42"></span><span>  </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier">UTCTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-43"></span><span>  </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier">addUTCTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-44"></span><span>  </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier">diffUTCTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-45"></span><span>  </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier">nominalDiffTimeToSeconds</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-46"></span><span>  </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier">secondsToNominalDiffTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-47"></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier">NoThunks.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier">InspectHeap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier">NoThunks</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier">Quiet</span></a></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-comment">{-------------------------------------------------------------------------------
+  System start
+-------------------------------------------------------------------------------}</span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- | System start</span><span>
+</span><span id="line-57"></span><span class="hs-comment">--</span><span>
+</span><span id="line-58"></span><span class="hs-comment">-- Slots are counted from the system start.</span><span>
+</span><span id="line-59"></span><span id="local-6989586621679113605"><span id="local-6989586621679113606"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="SystemStart"><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-var">SystemStart</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SystemStart"><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-var">SystemStart</span></a></span></span><span> </span><span class="hs-special">{</span><span id="getSystemStart"><span class="annot"><span class="annottext">SystemStart -&gt; UTCTime
+</span><a href="Cardano.Slotting.Time.html#getSystemStart"><span class="hs-identifier hs-var hs-var">getSystemStart</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">UTCTime</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113596"><span id="local-6989586621679113601"><span class="annot"><span class="annottext">SystemStart -&gt; SystemStart -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SystemStart -&gt; SystemStart -&gt; Bool
+$c/= :: SystemStart -&gt; SystemStart -&gt; Bool
+== :: SystemStart -&gt; SystemStart -&gt; Bool
+$c== :: SystemStart -&gt; SystemStart -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep SystemStart x -&gt; SystemStart
+forall x. SystemStart -&gt; Rep SystemStart x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SystemStart x -&gt; SystemStart
+$cfrom :: forall x. SystemStart -&gt; Rep SystemStart x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113575"><span id="local-6989586621679113580"><span id="local-6989586621679113586"><span class="annot"><span class="annottext">Context -&gt; SystemStart -&gt; IO (Maybe ThunkInfo)
+Proxy SystemStart -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy SystemStart -&gt; String
+$cshowTypeOf :: Proxy SystemStart -&gt; String
+wNoThunks :: Context -&gt; SystemStart -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SystemStart -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SystemStart -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SystemStart -&gt; IO (Maybe ThunkInfo)
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier hs-type">InspectHeap</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-type">SystemStart</span></a></span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113555"><span id="local-6989586621679113561"><span id="local-6989586621679113568"><span class="annot"><span class="annottext">Int -&gt; SystemStart -&gt; ShowS
+[SystemStart] -&gt; ShowS
+SystemStart -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SystemStart] -&gt; ShowS
+$cshowList :: [SystemStart] -&gt; ShowS
+show :: SystemStart -&gt; String
+$cshow :: SystemStart -&gt; String
+showsPrec :: Int -&gt; SystemStart -&gt; ShowS
+$cshowsPrec :: Int -&gt; SystemStart -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-type">SystemStart</span></a></span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113499"><span id="local-6989586621679113503"><span id="local-6989586621679113507"><span id="local-6989586621679113512"><span class="annot"><span class="annottext">[SystemStart] -&gt; Encoding
+SystemStart -&gt; Encoding
+forall s. Decoder s [SystemStart]
+forall s. Decoder s SystemStart
+forall a.
+(a -&gt; Encoding)
+-&gt; (forall s. Decoder s a)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (forall s. Decoder s [a])
+-&gt; Serialise a
+decodeList :: forall s. Decoder s [SystemStart]
+$cdecodeList :: forall s. Decoder s [SystemStart]
+encodeList :: [SystemStart] -&gt; Encoding
+$cencodeList :: [SystemStart] -&gt; Encoding
+decode :: forall s. Decoder s SystemStart
+$cdecode :: forall s. Decoder s SystemStart
+encode :: SystemStart -&gt; Encoding
+$cencode :: SystemStart -&gt; Encoding
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Serialise</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113478"><span id="local-6989586621679113484"><span id="local-6989586621679113491"><span class="annot"><span class="annottext">Typeable SystemStart
+SystemStart -&gt; Encoding
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [SystemStart] -&gt; Size
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy SystemStart -&gt; Size
+forall a.
+Typeable a
+-&gt; (a -&gt; Encoding)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy a -&gt; Size)
+-&gt; ((forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy [a] -&gt; Size)
+-&gt; ToCBOR a
+encodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [SystemStart] -&gt; Size
+$cencodedListSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy [SystemStart] -&gt; Size
+encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy SystemStart -&gt; Size
+$cencodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy SystemStart -&gt; Size
+toCBOR :: SystemStart -&gt; Encoding
+$ctoCBOR :: SystemStart -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToCBOR</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679113465"><span id="local-6989586621679113470"><span class="annot"><span class="annottext">Typeable SystemStart
+Proxy SystemStart -&gt; Text
+forall s. Decoder s SystemStart
+forall a.
+Typeable a
+-&gt; (forall s. Decoder s a) -&gt; (Proxy a -&gt; Text) -&gt; FromCBOR a
+label :: Proxy SystemStart -&gt; Text
+$clabel :: Proxy SystemStart -&gt; Text
+fromCBOR :: forall s. Decoder s SystemStart
+$cfromCBOR :: forall s. Decoder s SystemStart
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromCBOR</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679113442"><span id="local-6989586621679113446"><span id="local-6989586621679113450"><span id="local-6989586621679113454"><span id="local-6989586621679113459"><span class="annot"><span class="annottext">[SystemStart] -&gt; Encoding
+[SystemStart] -&gt; Value
+SystemStart -&gt; Bool
+SystemStart -&gt; Encoding
+SystemStart -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (a -&gt; Bool)
+-&gt; ToJSON a
+omitField :: SystemStart -&gt; Bool
+$comitField :: SystemStart -&gt; Bool
+toEncodingList :: [SystemStart] -&gt; Encoding
+$ctoEncodingList :: [SystemStart] -&gt; Encoding
+toJSONList :: [SystemStart] -&gt; Value
+$ctoJSONList :: [SystemStart] -&gt; Value
+toEncoding :: SystemStart -&gt; Encoding
+$ctoEncoding :: SystemStart -&gt; Encoding
+toJSON :: SystemStart -&gt; Value
+$ctoJSON :: SystemStart -&gt; Value
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679113427"><span id="local-6989586621679113431"><span id="local-6989586621679113436"><span class="annot"><span class="annottext">Maybe SystemStart
+Value -&gt; Parser [SystemStart]
+Value -&gt; Parser SystemStart
+forall a.
+(Value -&gt; Parser a)
+-&gt; (Value -&gt; Parser [a]) -&gt; Maybe a -&gt; FromJSON a
+omittedField :: Maybe SystemStart
+$comittedField :: Maybe SystemStart
+parseJSONList :: Value -&gt; Parser [SystemStart]
+$cparseJSONList :: Value -&gt; Parser [SystemStart]
+parseJSON :: Value -&gt; Parser SystemStart
+$cparseJSON :: Value -&gt; Parser SystemStart
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-comment">{-------------------------------------------------------------------------------
+  Relative time
+-------------------------------------------------------------------------------}</span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- | 'RelativeTime' is time relative to the 'SystemStart'</span><span>
+</span><span id="line-71"></span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- Precision is in picoseconds</span><span>
+</span><span id="line-73"></span><span id="local-6989586621679113421"><span id="local-6989586621679113422"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="RelativeTime"><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-var">RelativeTime</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="RelativeTime"><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-var">RelativeTime</span></a></span></span><span> </span><span class="hs-special">{</span><span id="getRelativeTime"><span class="annot"><span class="annottext">RelativeTime -&gt; NominalDiffTime
+</span><a href="Cardano.Slotting.Time.html#getRelativeTime"><span class="hs-identifier hs-var hs-var">getRelativeTime</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113413"><span id="local-6989586621679113417"><span class="annot"><span class="annottext">RelativeTime -&gt; RelativeTime -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: RelativeTime -&gt; RelativeTime -&gt; Bool
+$c/= :: RelativeTime -&gt; RelativeTime -&gt; Bool
+== :: RelativeTime -&gt; RelativeTime -&gt; Bool
+$c== :: RelativeTime -&gt; RelativeTime -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679113391"><span id="local-6989586621679113393"><span id="local-6989586621679113396"><span id="local-6989586621679113399"><span id="local-6989586621679113402"><span id="local-6989586621679113405"><span id="local-6989586621679113409"><span class="annot"><span class="annottext">Eq RelativeTime
+RelativeTime -&gt; RelativeTime -&gt; Bool
+RelativeTime -&gt; RelativeTime -&gt; Ordering
+RelativeTime -&gt; RelativeTime -&gt; RelativeTime
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: RelativeTime -&gt; RelativeTime -&gt; RelativeTime
+$cmin :: RelativeTime -&gt; RelativeTime -&gt; RelativeTime
+max :: RelativeTime -&gt; RelativeTime -&gt; RelativeTime
+$cmax :: RelativeTime -&gt; RelativeTime -&gt; RelativeTime
+&gt;= :: RelativeTime -&gt; RelativeTime -&gt; Bool
+$c&gt;= :: RelativeTime -&gt; RelativeTime -&gt; Bool
+&gt; :: RelativeTime -&gt; RelativeTime -&gt; Bool
+$c&gt; :: RelativeTime -&gt; RelativeTime -&gt; Bool
+&lt;= :: RelativeTime -&gt; RelativeTime -&gt; Bool
+$c&lt;= :: RelativeTime -&gt; RelativeTime -&gt; Bool
+&lt; :: RelativeTime -&gt; RelativeTime -&gt; Bool
+$c&lt; :: RelativeTime -&gt; RelativeTime -&gt; Bool
+compare :: RelativeTime -&gt; RelativeTime -&gt; Ordering
+$ccompare :: RelativeTime -&gt; RelativeTime -&gt; Ordering
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep RelativeTime x -&gt; RelativeTime
+forall x. RelativeTime -&gt; Rep RelativeTime x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep RelativeTime x -&gt; RelativeTime
+$cfrom :: forall x. RelativeTime -&gt; Rep RelativeTime x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113376"><span id="local-6989586621679113380"><span id="local-6989586621679113385"><span class="annot"><span class="annottext">Context -&gt; RelativeTime -&gt; IO (Maybe ThunkInfo)
+Proxy RelativeTime -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy RelativeTime -&gt; String
+$cshowTypeOf :: Proxy RelativeTime -&gt; String
+wNoThunks :: Context -&gt; RelativeTime -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; RelativeTime -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; RelativeTime -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; RelativeTime -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679113376"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113359"><span id="local-6989586621679113365"><span id="local-6989586621679113371"><span class="annot"><span class="annottext">Int -&gt; RelativeTime -&gt; ShowS
+[RelativeTime] -&gt; ShowS
+RelativeTime -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [RelativeTime] -&gt; ShowS
+$cshowList :: [RelativeTime] -&gt; ShowS
+show :: RelativeTime -&gt; String
+$cshow :: RelativeTime -&gt; String
+showsPrec :: Int -&gt; RelativeTime -&gt; ShowS
+$cshowsPrec :: Int -&gt; RelativeTime -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113307"><span id="local-6989586621679113311"><span id="local-6989586621679113315"><span id="local-6989586621679113319"><span id="local-6989586621679113324"><span class="annot"><span class="annottext">[RelativeTime] -&gt; Encoding
+[RelativeTime] -&gt; Value
+RelativeTime -&gt; Bool
+RelativeTime -&gt; Encoding
+RelativeTime -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (a -&gt; Bool)
+-&gt; ToJSON a
+omitField :: RelativeTime -&gt; Bool
+$comitField :: RelativeTime -&gt; Bool
+toEncodingList :: [RelativeTime] -&gt; Encoding
+$ctoEncodingList :: [RelativeTime] -&gt; Encoding
+toJSONList :: [RelativeTime] -&gt; Value
+$ctoJSONList :: [RelativeTime] -&gt; Value
+toEncoding :: RelativeTime -&gt; Encoding
+$ctoEncoding :: RelativeTime -&gt; Encoding
+toJSON :: RelativeTime -&gt; Value
+$ctoJSON :: RelativeTime -&gt; Value
+</span><a href="#local-6989586621679113307"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679113293"><span id="local-6989586621679113297"><span id="local-6989586621679113302"><span class="annot"><span class="annottext">Maybe RelativeTime
+Value -&gt; Parser [RelativeTime]
+Value -&gt; Parser RelativeTime
+forall a.
+(Value -&gt; Parser a)
+-&gt; (Value -&gt; Parser [a]) -&gt; Maybe a -&gt; FromJSON a
+omittedField :: Maybe RelativeTime
+$comittedField :: Maybe RelativeTime
+parseJSONList :: Value -&gt; Parser [RelativeTime]
+$cparseJSONList :: Value -&gt; Parser [RelativeTime]
+parseJSON :: Value -&gt; Parser RelativeTime
+$cparseJSON :: Value -&gt; Parser RelativeTime
+</span><a href="#local-6989586621679113293"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679113283"><span id="local-6989586621679113285"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-80"></span><span>  </span><span id="local-6989586621679113279"><span class="annot"><span class="annottext">toCBOR :: RelativeTime -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; Pico
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-var">nominalDiffTimeToSeconds</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">RelativeTime -&gt; NominalDiffTime
+</span><a href="Cardano.Slotting.Time.html#getRelativeTime"><span class="hs-identifier hs-var">getRelativeTime</span></a></span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679113272"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-83"></span><span>  </span><span id="local-6989586621679113266"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s RelativeTime
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; RelativeTime
+</span><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-var">RelativeTime</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; NominalDiffTime
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-var">secondsToNominalDiffTime</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a s. FromCBOR a =&gt; Decoder s a
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">fromCBOR</span></a></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679113258"><span id="local-6989586621679113260"><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-type">Serialise</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-86"></span><span>  </span><span id="local-6989586621679113256"><span class="annot"><span class="annottext">encode :: RelativeTime -&gt; Encoding
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">encode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span>
+</span><span id="line-87"></span><span>  </span><span id="local-6989586621679113253"><span class="annot"><span class="annottext">decode :: forall s. Decoder s RelativeTime
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">decode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a s. FromCBOR a =&gt; Decoder s a
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">fromCBOR</span></a></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span class="annot"><a href="Cardano.Slotting.Time.html#addRelativeTime"><span class="hs-identifier hs-type">addRelativeTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span>
+</span><span id="line-90"></span><span id="addRelativeTime"><span class="annot"><span class="annottext">addRelativeTime :: NominalDiffTime -&gt; RelativeTime -&gt; RelativeTime
+</span><a href="Cardano.Slotting.Time.html#addRelativeTime"><span class="hs-identifier hs-var hs-var">addRelativeTime</span></a></span></span><span> </span><span id="local-6989586621679113251"><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113251"><span class="hs-identifier hs-var">delta</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span id="local-6989586621679113250"><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113250"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; RelativeTime
+</span><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-var">RelativeTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113250"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113251"><span class="hs-identifier hs-var">delta</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="annot"><a href="Cardano.Slotting.Time.html#diffRelativeTime"><span class="hs-identifier hs-type">diffRelativeTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span>
+</span><span id="line-93"></span><span id="diffRelativeTime"><span class="annot"><span class="annottext">diffRelativeTime :: RelativeTime -&gt; RelativeTime -&gt; NominalDiffTime
+</span><a href="Cardano.Slotting.Time.html#diffRelativeTime"><span class="hs-identifier hs-var hs-var">diffRelativeTime</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span id="local-6989586621679113248"><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113248"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span id="local-6989586621679113247"><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113247"><span class="hs-identifier hs-var">t'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113248"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113247"><span class="hs-identifier hs-var">t'</span></a></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="annot"><a href="Cardano.Slotting.Time.html#toRelativeTime"><span class="hs-identifier hs-type">toRelativeTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-type">SystemStart</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">UTCTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span>
+</span><span id="line-96"></span><span id="toRelativeTime"><span class="annot"><span class="annottext">toRelativeTime :: SystemStart -&gt; UTCTime -&gt; RelativeTime
+</span><a href="Cardano.Slotting.Time.html#toRelativeTime"><span class="hs-identifier hs-var hs-var">toRelativeTime</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-type">SystemStart</span></a></span><span> </span><span id="local-6989586621679113246"><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113246"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679113245"><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113245"><span class="hs-identifier hs-var">t'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-97"></span><span>  </span><span class="annot"><span class="annottext">forall a. (?callStack::CallStack) =&gt; Bool -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var">assert</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113245"><span class="hs-identifier hs-var">t'</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113246"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-98"></span><span>    </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; RelativeTime
+</span><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-var">RelativeTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UTCTime -&gt; UTCTime -&gt; NominalDiffTime
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-var">diffUTCTime</span></a></span><span> </span><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113245"><span class="hs-identifier hs-var">t'</span></a></span><span> </span><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113246"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="annot"><a href="Cardano.Slotting.Time.html#fromRelativeTime"><span class="hs-identifier hs-type">fromRelativeTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-type">SystemStart</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">UTCTime</span></a></span><span>
+</span><span id="line-101"></span><span id="fromRelativeTime"><span class="annot"><span class="annottext">fromRelativeTime :: SystemStart -&gt; RelativeTime -&gt; UTCTime
+</span><a href="Cardano.Slotting.Time.html#fromRelativeTime"><span class="hs-identifier hs-var hs-var">fromRelativeTime</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Time.html#SystemStart"><span class="hs-identifier hs-type">SystemStart</span></a></span><span> </span><span id="local-6989586621679113244"><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113244"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span id="local-6989586621679113243"><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113243"><span class="hs-identifier hs-var">t'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; UTCTime -&gt; UTCTime
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-var">addUTCTime</span></a></span><span> </span><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113243"><span class="hs-identifier hs-var">t'</span></a></span><span> </span><span class="annot"><span class="annottext">UTCTime
+</span><a href="#local-6989586621679113244"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span id="local-6989586621679113700"><span class="annot"><a href="Cardano.Slotting.Time.html#multRelativeTime"><span class="hs-identifier hs-type">multRelativeTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Integral</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679113700"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679113700"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span></span><span>
+</span><span id="line-104"></span><span id="multRelativeTime"><span class="annot"><span class="annottext">multRelativeTime :: forall f. Integral f =&gt; RelativeTime -&gt; f -&gt; RelativeTime
+</span><a href="Cardano.Slotting.Time.html#multRelativeTime"><span class="hs-identifier hs-var hs-var">multRelativeTime</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-type">RelativeTime</span></a></span><span> </span><span id="local-6989586621679113240"><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113240"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-105"></span><span>  </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; RelativeTime
+</span><a href="Cardano.Slotting.Time.html#RelativeTime"><span class="hs-identifier hs-var">RelativeTime</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall f. Integral f =&gt; NominalDiffTime -&gt; f -&gt; NominalDiffTime
+</span><a href="Cardano.Slotting.Time.html#multNominalDiffTime"><span class="hs-identifier hs-var">multNominalDiffTime</span></a></span><span> </span><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113240"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-106"></span><span>
+</span><span id="line-107"></span><span id="local-6989586621679113698"><span class="annot"><a href="Cardano.Slotting.Time.html#multNominalDiffTime"><span class="hs-identifier hs-type">multNominalDiffTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Integral</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679113698"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679113698"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span></span><span>
+</span><span id="line-108"></span><span id="multNominalDiffTime"><span class="annot"><span class="annottext">multNominalDiffTime :: forall f. Integral f =&gt; NominalDiffTime -&gt; f -&gt; NominalDiffTime
+</span><a href="Cardano.Slotting.Time.html#multNominalDiffTime"><span class="hs-identifier hs-var hs-var">multNominalDiffTime</span></a></span></span><span> </span><span id="local-6989586621679113235"><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113235"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621679113234"><span class="annot"><span class="annottext">f
+</span><a href="#local-6989586621679113234"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-109"></span><span>  </span><span class="annot"><span class="annottext">Pico -&gt; NominalDiffTime
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-var">secondsToNominalDiffTime</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-110"></span><span>    </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; Pico
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-var">nominalDiffTimeToSeconds</span></a></span><span> </span><span class="annot"><span class="annottext">NominalDiffTime
+</span><a href="#local-6989586621679113235"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">f
+</span><a href="#local-6989586621679113234"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">{-------------------------------------------------------------------------------
+  SlotLength
+-------------------------------------------------------------------------------}</span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- | Slot length</span><span>
+</span><span id="line-117"></span><span class="hs-comment">--</span><span>
+</span><span id="line-118"></span><span class="hs-comment">-- Precision is in milliseconds</span><span>
+</span><span id="line-119"></span><span id="local-6989586621679113231"><span id="local-6989586621679113232"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="SlotLength"><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-var">SlotLength</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SlotLength"><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-var">SlotLength</span></a></span></span><span> </span><span class="hs-special">{</span><span id="getSlotLength"><span class="annot"><span class="annottext">SlotLength -&gt; NominalDiffTime
+</span><a href="Cardano.Slotting.Time.html#getSlotLength"><span class="hs-identifier hs-var hs-var">getSlotLength</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-120"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113224"><span id="local-6989586621679113228"><span class="annot"><span class="annottext">SlotLength -&gt; SlotLength -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SlotLength -&gt; SlotLength -&gt; Bool
+$c/= :: SlotLength -&gt; SlotLength -&gt; Bool
+== :: SlotLength -&gt; SlotLength -&gt; Bool
+$c== :: SlotLength -&gt; SlotLength -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep SlotLength x -&gt; SlotLength
+forall x. SlotLength -&gt; Rep SlotLength x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SlotLength x -&gt; SlotLength
+$cfrom :: forall x. SlotLength -&gt; Rep SlotLength x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679113208"><span id="local-6989586621679113212"><span id="local-6989586621679113216"><span class="annot"><span class="annottext">Context -&gt; SlotLength -&gt; IO (Maybe ThunkInfo)
+Proxy SlotLength -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy SlotLength -&gt; String
+$cshowTypeOf :: Proxy SlotLength -&gt; String
+wNoThunks :: Context -&gt; SlotLength -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SlotLength -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SlotLength -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SlotLength -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679113208"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679113191"><span id="local-6989586621679113197"><span id="local-6989586621679113203"><span class="annot"><span class="annottext">Int -&gt; SlotLength -&gt; ShowS
+[SlotLength] -&gt; ShowS
+SlotLength -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SlotLength] -&gt; ShowS
+$cshowList :: [SlotLength] -&gt; ShowS
+show :: SlotLength -&gt; String
+$cshow :: SlotLength -&gt; String
+showsPrec :: Int -&gt; SlotLength -&gt; ShowS
+$cshowsPrec :: Int -&gt; SlotLength -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679113152"><span id="local-6989586621679113154"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-124"></span><span>  </span><span id="local-6989586621679113149"><span class="annot"><span class="annottext">toCBOR :: SlotLength -&gt; Encoding
+</span><a href="#local-6989586621679113149"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">SlotLength -&gt; Integer
+</span><a href="Cardano.Slotting.Time.html#slotLengthToMillisec"><span class="hs-identifier hs-var">slotLengthToMillisec</span></a></span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679113144"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-127"></span><span>  </span><span id="local-6989586621679113140"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s SlotLength
+</span><a href="#local-6989586621679113140"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; SlotLength
+</span><a href="Cardano.Slotting.Time.html#slotLengthFromMillisec"><span class="hs-identifier hs-var">slotLengthFromMillisec</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a s. FromCBOR a =&gt; Decoder s a
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">fromCBOR</span></a></span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679113134"><span id="local-6989586621679113136"><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-type">Serialise</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-130"></span><span>  </span><span id="local-6989586621679113132"><span class="annot"><span class="annottext">encode :: SlotLength -&gt; Encoding
+</span><a href="#local-6989586621679113132"><span class="hs-identifier hs-var hs-var hs-var hs-var">encode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span>
+</span><span id="line-131"></span><span>  </span><span id="local-6989586621679113130"><span class="annot"><span class="annottext">decode :: forall s. Decoder s SlotLength
+</span><a href="#local-6989586621679113130"><span class="hs-identifier hs-var hs-var hs-var hs-var">decode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a s. FromCBOR a =&gt; Decoder s a
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">fromCBOR</span></a></span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- | Constructor for 'SlotLength'</span><span>
+</span><span id="line-134"></span><span class="annot"><a href="Cardano.Slotting.Time.html#mkSlotLength"><span class="hs-identifier hs-type">mkSlotLength</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span><span>
+</span><span id="line-135"></span><span id="mkSlotLength"><span class="annot"><span class="annottext">mkSlotLength :: NominalDiffTime -&gt; SlotLength
+</span><a href="Cardano.Slotting.Time.html#mkSlotLength"><span class="hs-identifier hs-var hs-var">mkSlotLength</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; SlotLength
+</span><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-var">SlotLength</span></a></span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthFromSec"><span class="hs-identifier hs-type">slotLengthFromSec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span><span>
+</span><span id="line-138"></span><span id="slotLengthFromSec"><span class="annot"><span class="annottext">slotLengthFromSec :: Integer -&gt; SlotLength
+</span><a href="Cardano.Slotting.Time.html#slotLengthFromSec"><span class="hs-identifier hs-var hs-var">slotLengthFromSec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; SlotLength
+</span><a href="Cardano.Slotting.Time.html#slotLengthFromMillisec"><span class="hs-identifier hs-var">slotLengthFromMillisec</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1000</span></span><span class="hs-special">)</span><span>
+</span><span id="line-139"></span><span>
+</span><span id="line-140"></span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthToSec"><span class="hs-identifier hs-type">slotLengthToSec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-141"></span><span id="slotLengthToSec"><span class="annot"><span class="annottext">slotLengthToSec :: SlotLength -&gt; Integer
+</span><a href="Cardano.Slotting.Time.html#slotLengthToSec"><span class="hs-identifier hs-var hs-var">slotLengthToSec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">`div`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1000</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">SlotLength -&gt; Integer
+</span><a href="Cardano.Slotting.Time.html#slotLengthToMillisec"><span class="hs-identifier hs-var">slotLengthToMillisec</span></a></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthFromMillisec"><span class="hs-identifier hs-type">slotLengthFromMillisec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span><span>
+</span><span id="line-144"></span><span id="slotLengthFromMillisec"><span class="annot"><span class="annottext">slotLengthFromMillisec :: Integer -&gt; SlotLength
+</span><a href="Cardano.Slotting.Time.html#slotLengthFromMillisec"><span class="hs-identifier hs-var hs-var">slotLengthFromMillisec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; SlotLength
+</span><a href="Cardano.Slotting.Time.html#mkSlotLength"><span class="hs-identifier hs-var">mkSlotLength</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; NominalDiffTime
+</span><a href="#local-6989586621679113128"><span class="hs-identifier hs-var">conv</span></a></span><span>
+</span><span id="line-145"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-146"></span><span>    </span><span class="hs-comment">-- Explicit type annotation here means that /if/ we change the precision,</span><span>
+</span><span id="line-147"></span><span>    </span><span class="hs-comment">-- we are forced to reconsider this code.</span><span>
+</span><span id="line-148"></span><span>    </span><span class="annot"><a href="#local-6989586621679113128"><span class="hs-identifier hs-type">conv</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span>
+</span><span id="line-149"></span><span>    </span><span id="local-6989586621679113128"><span class="annot"><span class="annottext">conv :: Integer -&gt; NominalDiffTime
+</span><a href="#local-6989586621679113128"><span class="hs-identifier hs-var hs-var">conv</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-150"></span><span>      </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. (Real a, Fractional b) =&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">realToFrac</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Pico</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-151"></span><span>        </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Fractional a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">/</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><span class="hs-number">1000</span></span><span class="hs-special">)</span><span>
+</span><span id="line-152"></span><span>        </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Pico</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span class="annot"><a href="Cardano.Slotting.Time.html#slotLengthToMillisec"><span class="hs-identifier hs-type">slotLengthToMillisec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Slotting.Time.html#SlotLength"><span class="hs-identifier hs-type">SlotLength</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-155"></span><span id="slotLengthToMillisec"><span class="annot"><span class="annottext">slotLengthToMillisec :: SlotLength -&gt; Integer
+</span><a href="Cardano.Slotting.Time.html#slotLengthToMillisec"><span class="hs-identifier hs-var hs-var">slotLengthToMillisec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NominalDiffTime -&gt; Integer
+</span><a href="#local-6989586621679113126"><span class="hs-identifier hs-var">conv</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">SlotLength -&gt; NominalDiffTime
+</span><a href="Cardano.Slotting.Time.html#getSlotLength"><span class="hs-identifier hs-var">getSlotLength</span></a></span><span>
+</span><span id="line-156"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-comment">-- Explicit type annotation here means that /if/ we change the precision,</span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-comment">-- we are forced to reconsider this code.</span><span>
+</span><span id="line-159"></span><span>    </span><span class="annot"><a href="#local-6989586621679113126"><span class="hs-identifier hs-type">conv</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-160"></span><span>    </span><span id="local-6989586621679113126"><span class="annot"><span class="annottext">conv :: NominalDiffTime -&gt; Integer
+</span><a href="#local-6989586621679113126"><span class="hs-identifier hs-var hs-var">conv</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-161"></span><span>      </span><span class="annot"><span class="annottext">forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">truncate</span></a></span><span>
+</span><span id="line-162"></span><span>        </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><span class="hs-number">1000</span></span><span class="hs-special">)</span><span>
+</span><span id="line-163"></span><span>        </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. (Real a, Fractional b) =&gt; a -&gt; b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">realToFrac</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/time-1.11.1.1/src"><span class="hs-identifier hs-type">NominalDiffTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Pico</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-164"></span></pre></body></html>

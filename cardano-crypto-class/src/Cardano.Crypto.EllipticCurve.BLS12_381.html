@@ -1,0 +1,47 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-3"></span><span>
+</span><span id="line-4"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Crypto.EllipticCurve.BLS12_381</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-5"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Types</span></span><span>
+</span><span id="line-6"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#Point"><span class="hs-identifier">Point</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-7"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#Point1"><span class="hs-identifier">Point1</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-8"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#Point2"><span class="hs-identifier">Point2</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#PT"><span class="hs-identifier">PT</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#Curve1"><span class="hs-identifier">Curve1</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#Curve2"><span class="hs-identifier">Curve2</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#BLSTError"><span class="hs-identifier">BLSTError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span>  </span><span class="annot"><span class="hs-comment">-- * BLS Class</span></span><span>
+</span><span id="line-15"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#BLS"><span class="hs-identifier">BLS</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Point / Group operations</span></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span>  </span><span class="hs-comment">-- | These work on both curves, and take phantom parameters of type 'Curve1'</span><span>
+</span><span id="line-20"></span><span>  </span><span class="hs-comment">-- or 'Curve2' to select one of the two provided elliptic curves.</span><span>
+</span><span id="line-21"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsInGroup"><span class="hs-identifier">blsInGroup</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsAddOrDouble"><span class="hs-identifier">blsAddOrDouble</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsMult"><span class="hs-identifier">blsMult</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsCneg"><span class="hs-identifier">blsCneg</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsNeg"><span class="hs-identifier">blsNeg</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsCompress"><span class="hs-identifier">blsCompress</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsSerialize"><span class="hs-identifier">blsSerialize</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsUncompress"><span class="hs-identifier">blsUncompress</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsDeserialize"><span class="hs-identifier">blsDeserialize</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsHash"><span class="hs-identifier">blsHash</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsGenerator"><span class="hs-identifier">blsGenerator</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#blsIsInf"><span class="hs-identifier">blsIsInf</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span>  </span><span class="annot"><span class="hs-comment">-- * PT operations</span></span><span>
+</span><span id="line-35"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#ptMult"><span class="hs-identifier">ptMult</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-36"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#ptFinalVerify"><span class="hs-identifier">ptFinalVerify</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Pairings</span></span><span>
+</span><span id="line-39"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#millerLoop"><span class="hs-identifier">millerLoop</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span>  </span><span class="annot"><span class="hs-comment">-- * The period (modulo) of scalars</span></span><span>
+</span><span id="line-42"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html#scalarPeriod"><span class="hs-identifier">scalarPeriod</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-43"></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.EllipticCurve.BLS12_381.Internal.html"><span class="hs-identifier">Cardano.Crypto.EllipticCurve.BLS12_381.Internal</span></a></span><span>
+</span><span id="line-47"></span></pre></body></html>

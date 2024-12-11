@@ -1,0 +1,231 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Slotting.Block</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-6"></span><span>  </span><span class="annot"><a href="Cardano.Slotting.Block.html#BlockNo"><span class="hs-identifier">BlockNo</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-7"></span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">Cardano.Binary</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier">Codec.Serialise</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier">Serialise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Data.Word</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Word64</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier">NoThunks.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier">NoThunks</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier">Quiet</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier">Quiet</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- | The 0-based index of the block in the blockchain.</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- BlockNo is &lt;= SlotNo and is only equal at slot N if there is a block</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- for every slot where N &lt;= SlotNo.</span><span>
+</span><span id="line-22"></span><span id="local-6989586621679111608"><span id="local-6989586621679111609"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="BlockNo"><span class="annot"><a href="Cardano.Slotting.Block.html#BlockNo"><span class="hs-identifier hs-var">BlockNo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="BlockNo"><span class="annot"><a href="Cardano.Slotting.Block.html#BlockNo"><span class="hs-identifier hs-var">BlockNo</span></a></span></span><span> </span><span class="hs-special">{</span><span id="unBlockNo"><span class="annot"><span class="annottext">BlockNo -&gt; Word64
+</span><a href="Cardano.Slotting.Block.html#unBlockNo"><span class="hs-identifier hs-var hs-var">unBlockNo</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-type">Word64</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111600"><span id="local-6989586621679111604"><span class="annot"><span class="annottext">BlockNo -&gt; BlockNo -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: BlockNo -&gt; BlockNo -&gt; Bool
+$c/= :: BlockNo -&gt; BlockNo -&gt; Bool
+== :: BlockNo -&gt; BlockNo -&gt; Bool
+$c== :: BlockNo -&gt; BlockNo -&gt; Bool
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111577"><span id="local-6989586621679111579"><span id="local-6989586621679111582"><span id="local-6989586621679111585"><span id="local-6989586621679111588"><span id="local-6989586621679111591"><span id="local-6989586621679111595"><span class="annot"><span class="annottext">Eq BlockNo
+BlockNo -&gt; BlockNo -&gt; Bool
+BlockNo -&gt; BlockNo -&gt; Ordering
+BlockNo -&gt; BlockNo -&gt; BlockNo
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: BlockNo -&gt; BlockNo -&gt; BlockNo
+$cmin :: BlockNo -&gt; BlockNo -&gt; BlockNo
+max :: BlockNo -&gt; BlockNo -&gt; BlockNo
+$cmax :: BlockNo -&gt; BlockNo -&gt; BlockNo
+&gt;= :: BlockNo -&gt; BlockNo -&gt; Bool
+$c&gt;= :: BlockNo -&gt; BlockNo -&gt; Bool
+&gt; :: BlockNo -&gt; BlockNo -&gt; Bool
+$c&gt; :: BlockNo -&gt; BlockNo -&gt; Bool
+&lt;= :: BlockNo -&gt; BlockNo -&gt; Bool
+$c&lt;= :: BlockNo -&gt; BlockNo -&gt; Bool
+&lt; :: BlockNo -&gt; BlockNo -&gt; Bool
+$c&lt; :: BlockNo -&gt; BlockNo -&gt; Bool
+compare :: BlockNo -&gt; BlockNo -&gt; Ordering
+$ccompare :: BlockNo -&gt; BlockNo -&gt; Ordering
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep BlockNo x -&gt; BlockNo
+forall x. BlockNo -&gt; Rep BlockNo x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep BlockNo x -&gt; BlockNo
+$cfrom :: forall x. BlockNo -&gt; Rep BlockNo x
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111557"><span id="local-6989586621679111563"><span id="local-6989586621679111570"><span class="annot"><span class="annottext">Int -&gt; BlockNo -&gt; ShowS
+[BlockNo] -&gt; ShowS
+BlockNo -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [BlockNo] -&gt; ShowS
+$cshowList :: [BlockNo] -&gt; ShowS
+show :: BlockNo -&gt; String
+$cshow :: BlockNo -&gt; String
+showsPrec :: Int -&gt; BlockNo -&gt; ShowS
+$cshowsPrec :: Int -&gt; BlockNo -&gt; ShowS
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/quiet-0.2-5ab684dfea28647dd21af2c1d5ea48eacda334f57d4e2ecf958b0f4bd26fe87e/share/doc/html/src"><span class="hs-identifier hs-type">Quiet</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Block.html#BlockNo"><span class="hs-identifier hs-type">BlockNo</span></a></span><span>
+</span><span id="line-25"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679111485"><span id="local-6989586621679111489"><span id="local-6989586621679111493"><span id="local-6989586621679111497"><span id="local-6989586621679111501"><span id="local-6989586621679111505"><span id="local-6989586621679111509"><span id="local-6989586621679111514"><span class="annot"><span class="annottext">Int -&gt; BlockNo
+BlockNo -&gt; Int
+BlockNo -&gt; [BlockNo]
+BlockNo -&gt; BlockNo
+BlockNo -&gt; BlockNo -&gt; [BlockNo]
+BlockNo -&gt; BlockNo -&gt; BlockNo -&gt; [BlockNo]
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+enumFromThenTo :: BlockNo -&gt; BlockNo -&gt; BlockNo -&gt; [BlockNo]
+$cenumFromThenTo :: BlockNo -&gt; BlockNo -&gt; BlockNo -&gt; [BlockNo]
+enumFromTo :: BlockNo -&gt; BlockNo -&gt; [BlockNo]
+$cenumFromTo :: BlockNo -&gt; BlockNo -&gt; [BlockNo]
+enumFromThen :: BlockNo -&gt; BlockNo -&gt; [BlockNo]
+$cenumFromThen :: BlockNo -&gt; BlockNo -&gt; [BlockNo]
+enumFrom :: BlockNo -&gt; [BlockNo]
+$cenumFrom :: BlockNo -&gt; [BlockNo]
+fromEnum :: BlockNo -&gt; Int
+$cfromEnum :: BlockNo -&gt; Int
+toEnum :: Int -&gt; BlockNo
+$ctoEnum :: Int -&gt; BlockNo
+pred :: BlockNo -&gt; BlockNo
+$cpred :: BlockNo -&gt; BlockNo
+succ :: BlockNo -&gt; BlockNo
+$csucc :: BlockNo -&gt; BlockNo
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></a></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111474"><span id="local-6989586621679111479"><span class="annot"><span class="annottext">BlockNo
+forall a. a -&gt; a -&gt; Bounded a
+maxBound :: BlockNo
+$cmaxBound :: BlockNo
+minBound :: BlockNo
+$cminBound :: BlockNo
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111443"><span id="local-6989586621679111447"><span id="local-6989586621679111451"><span id="local-6989586621679111455"><span id="local-6989586621679111459"><span id="local-6989586621679111463"><span id="local-6989586621679111468"><span class="annot"><span class="annottext">Integer -&gt; BlockNo
+BlockNo -&gt; BlockNo
+BlockNo -&gt; BlockNo -&gt; BlockNo
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Integer -&gt; a)
+-&gt; Num a
+fromInteger :: Integer -&gt; BlockNo
+$cfromInteger :: Integer -&gt; BlockNo
+signum :: BlockNo -&gt; BlockNo
+$csignum :: BlockNo -&gt; BlockNo
+abs :: BlockNo -&gt; BlockNo
+$cabs :: BlockNo -&gt; BlockNo
+negate :: BlockNo -&gt; BlockNo
+$cnegate :: BlockNo -&gt; BlockNo
+* :: BlockNo -&gt; BlockNo -&gt; BlockNo
+$c* :: BlockNo -&gt; BlockNo -&gt; BlockNo
+- :: BlockNo -&gt; BlockNo -&gt; BlockNo
+$c- :: BlockNo -&gt; BlockNo -&gt; BlockNo
++ :: BlockNo -&gt; BlockNo -&gt; BlockNo
+$c+ :: BlockNo -&gt; BlockNo -&gt; BlockNo
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Num</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111424"><span id="local-6989586621679111428"><span id="local-6989586621679111432"><span id="local-6989586621679111437"><span class="annot"><span class="annottext">[BlockNo] -&gt; Encoding
+BlockNo -&gt; Encoding
+forall s. Decoder s [BlockNo]
+forall s. Decoder s BlockNo
+forall a.
+(a -&gt; Encoding)
+-&gt; (forall s. Decoder s a)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (forall s. Decoder s [a])
+-&gt; Serialise a
+decodeList :: forall s. Decoder s [BlockNo]
+$cdecodeList :: forall s. Decoder s [BlockNo]
+encodeList :: [BlockNo] -&gt; Encoding
+$cencodeList :: [BlockNo] -&gt; Encoding
+decode :: forall s. Decoder s BlockNo
+$cdecode :: forall s. Decoder s BlockNo
+encode :: BlockNo -&gt; Encoding
+$cencode :: BlockNo -&gt; Encoding
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Serialise</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111409"><span id="local-6989586621679111413"><span id="local-6989586621679111418"><span class="annot"><span class="annottext">Context -&gt; BlockNo -&gt; IO (Maybe ThunkInfo)
+Proxy BlockNo -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy BlockNo -&gt; String
+$cshowTypeOf :: Proxy BlockNo -&gt; String
+wNoThunks :: Context -&gt; BlockNo -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; BlockNo -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; BlockNo -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; BlockNo -&gt; IO (Maybe ThunkInfo)
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/nothunks-0.3.0.0-acafbc2d1ef6c63ee4fdb9cc6790a2b23ad40b0a77ef90ac5dbc8368080ce374/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111403"><span class="annot"><span class="annottext">BlockNo -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: BlockNo -&gt; ()
+$crnf :: BlockNo -&gt; ()
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111379"><span id="local-6989586621679111383"><span id="local-6989586621679111387"><span id="local-6989586621679111391"><span id="local-6989586621679111396"><span class="annot"><span class="annottext">[BlockNo] -&gt; Encoding
+[BlockNo] -&gt; Value
+BlockNo -&gt; Bool
+BlockNo -&gt; Encoding
+BlockNo -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; (a -&gt; Bool)
+-&gt; ToJSON a
+omitField :: BlockNo -&gt; Bool
+$comitField :: BlockNo -&gt; Bool
+toEncodingList :: [BlockNo] -&gt; Encoding
+$ctoEncodingList :: [BlockNo] -&gt; Encoding
+toJSONList :: [BlockNo] -&gt; Value
+$ctoJSONList :: [BlockNo] -&gt; Value
+toEncoding :: BlockNo -&gt; Encoding
+$ctoEncoding :: BlockNo -&gt; Encoding
+toJSON :: BlockNo -&gt; Value
+$ctoJSON :: BlockNo -&gt; Value
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679111364"><span id="local-6989586621679111368"><span id="local-6989586621679111373"><span class="annot"><span class="annottext">Maybe BlockNo
+Value -&gt; Parser [BlockNo]
+Value -&gt; Parser BlockNo
+forall a.
+(Value -&gt; Parser a)
+-&gt; (Value -&gt; Parser [a]) -&gt; Maybe a -&gt; FromJSON a
+omittedField :: Maybe BlockNo
+$comittedField :: Maybe BlockNo
+parseJSONList :: Value -&gt; Parser [BlockNo]
+$cparseJSONList :: Value -&gt; Parser [BlockNo]
+parseJSON :: Value -&gt; Parser BlockNo
+$cparseJSON :: Value -&gt; Parser BlockNo
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/aeson-2.2.3.0-3a93381eba7301bf617a7a3c0ed5adc025fc0caafb9c1e031a30ef9821b33da2/share/doc/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111354"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Block.html#BlockNo"><span class="hs-identifier hs-type">BlockNo</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-28"></span><span>  </span><span id="local-6989586621679111351"><span class="annot"><span class="annottext">toCBOR :: BlockNo -&gt; Encoding
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Serialise a =&gt; a -&gt; Encoding
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span>
+</span><span id="line-29"></span><span>  </span><span id="local-6989586621679111344"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy BlockNo -&gt; Size
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span id="local-6989586621679111342"><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><a href="#local-6989586621679111342"><span class="hs-identifier hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a.
+ToCBOR a =&gt;
+(forall t. ToCBOR t =&gt; Proxy t -&gt; Size) -&gt; Proxy a -&gt; Size
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var">encodedSizeExpr</span></a></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><a href="#local-6989586621679111342"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///usr/local/.ghcup/ghc/9.2.8/share/doc/ghc-9.2.8/html/libraries/base-4.16.4.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">BlockNo -&gt; Word64
+</span><a href="Cardano.Slotting.Block.html#unBlockNo"><span class="hs-identifier hs-var">unBlockNo</span></a></span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111334"><span class="annot"><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Slotting.Block.html#BlockNo"><span class="hs-identifier hs-type">BlockNo</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-32"></span><span>  </span><span id="local-6989586621679111331"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s BlockNo
+</span><a href="../file:///home/runner/work/cardano-base/cardano-base/dist-newstyle/build/x86_64-linux/ghc-9.2.8/cardano-binary-1.7.1.0/doc/html/cardano-binary/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a s. Serialise a =&gt; Decoder s a
+</span><a href="../file:///home/runner/.local/state/cabal/store/ghc-9.2.8/serialise-0.2.6.1-c9046e07837a6c1791318f3ac7f0497a40906a2c6358d22526788c33c56793dd/share/doc/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-33"></span></pre></body></html>
