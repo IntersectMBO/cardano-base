@@ -10,9 +10,8 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2024-12-10T00:00:00Z
--- The CHaP index-state
-index-state: cardano-haskell-packages 2024-10-10T04:22:19Z
+index-state: 2025-01-14T23:25:37Z
+index-state: cardano-haskell-packages 2025-01-13T22:30:16Z
 packages:
   base-deriving-via
   cardano-binary
@@ -39,3 +38,23 @@ program-options
 package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
+
+if impl(ghc >=9.12)
+  allow-newer:
+    -- Stuck on `cabal-3.14` issues and maintainer difficulties
+    -- https://github.com/haskell/aeson/issues/1124
+    -- Stuck on `cabal-3.14` and unresponsive maintainers
+    -- https://github.com/well-typed/cborg/pull/339
+    -- Fix blocked by aeson
+    -- https://github.com/haskellari/microstache/issues/43
+    -- Difficult maintainer
+    -- https://github.com/haskellari/tree-diff/issues/97
+    , aeson:ghc-prim
+    , aeson:template-haskell
+    , cborg:base
+    , cborg:ghc-prim
+    , serialise:base
+    , serialise:ghc-prim
+    , microstache:base
+    , tree-diff:base
+    , tree-diff:time
