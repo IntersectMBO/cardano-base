@@ -25,7 +25,7 @@ import Codec.Serialise (Serialise(..))
 import Codec.Serialise.Decoding (decodeBytes)
 import Codec.Serialise.Encoding (encodeBytes)
 import Control.DeepSeq
-import Control.Monad (guard)
+import qualified Control.Monad as Monad (guard)
 import Control.Monad.Primitive
 import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
 import Control.Monad.State.Strict (MonadState(state))
@@ -250,8 +250,8 @@ packBytesMaybe :: forall n . KnownNat n => ShortByteString -> Int -> Maybe (Pack
 packBytesMaybe bs offset = do
   let bufferSize = SBS.length bs
       size = fromInteger (natVal' (proxy# @n))
-  guard (offset >= 0)
-  guard (size <= bufferSize - offset)
+  Monad.guard (offset >= 0)
+  Monad.guard (size <= bufferSize - offset)
   Just $ packBytes bs offset
 
 
