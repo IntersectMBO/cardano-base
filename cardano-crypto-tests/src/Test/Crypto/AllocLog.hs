@@ -6,7 +6,6 @@
 module Test.Crypto.AllocLog where
 
 import Control.Tracer
-import Data.Typeable
 import Foreign.Concurrent
 import Foreign.Ptr
 
@@ -23,7 +22,7 @@ data AllocEvent
   = AllocEv !WordPtr
   | FreeEv !WordPtr
   | MarkerEv !String
-  deriving (Eq, Show, Typeable)
+  deriving (Eq, Show)
 
 mkLoggingAllocator ::
   Tracer IO AllocEvent -> MLockedAllocator IO -> MLockedAllocator IO
