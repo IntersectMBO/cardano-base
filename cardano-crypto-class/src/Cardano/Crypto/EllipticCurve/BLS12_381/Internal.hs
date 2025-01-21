@@ -303,8 +303,7 @@ withAffineVector :: NonEmpty.NonEmpty (Affine curve) -> (AffinePtrVector curve -
 withAffineVector affines go = do
   let numAffines = NonEmpty.length affines
   let sizeReference = sizeOf (undefined :: Ptr ())
-  p <- mallocForeignPtrBytes (numAffines * sizeReference)
-  withForeignPtr p $ \ptr -> do
+  allocaBytes (numAffines * sizeReference) $ \ptr -> do
     let copyPtrAtIx ix affine =
           withAffine affine $ \(AffinePtr aPtr) -> do
           poke (ptr `advancePtr` ix) aPtr
@@ -464,8 +463,7 @@ withScalarVector :: NonEmpty.NonEmpty Scalar -> (ScalarPtrVector -> IO a) -> IO 
 withScalarVector scalars go = do
   let numScalars = NonEmpty.length scalars
   let sizeReference = sizeOf (undefined :: Ptr ())
-  p <- mallocForeignPtrBytes (numScalars * sizeReference)
-  withForeignPtr p $ \ptr -> do
+  allocaBytes (numScalars * sizeReference) $ \ptr -> do
     let copyPtrAtIx ix scalar =
           withScalar scalar $ \(ScalarPtr sPtr) -> do
           poke (ptr `advancePtr` ix) sPtr
@@ -938,10 +936,10 @@ scalarCanonical scalar =
 blsMSM :: forall curve. BLS curve => NonEmpty.NonEmpty (Point curve, Integer) -> Point curve
 blsMSM psAndSs =
   unsafePerformIO $ do
-    let (points, scalarsAsInt) = unzip $ NonEmpty.toList psAndSs
+    let (points, scalarsAsInt) = NonEmpty.unzip psAndSs
         numPoints = length points
-        nonEmptyAffinePoints = NonEmpty.fromList $ fmap toAffine points
-        nonEmptyScalars = NonEmpty.fromList $ map (unsafePerformIO . scalarFromInteger) scalarsAsInt
+        nonEmptyAffinePoints = fmap toAffine points
+    nonEmptyScalars <- mapM scalarFromInteger scalarsAsInt
 
     withAffineVector nonEmptyAffinePoints $ \affineVectorPtr -> do
         withScalarVector nonEmptyScalars $ \scalarVectorPtr -> do
