@@ -311,7 +311,6 @@ withAffineVector affines go = do
     zipWithM_ copyPtrAtIx [0..] (NonEmpty.toList affines)
     go (AffinePtrVector (castPtr ptr))
 
-
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
 
@@ -932,13 +931,17 @@ scalarCanonical scalar =
 ---- MSM operations
 
 -- | Multi-scalar multiplication using the Pippenger algorithm.
-blsMSM :: forall curve. BLS curve => NonEmpty.NonEmpty (Point curve, Scalar) -> Point curve
+-- The scalar will be brought into the range of modular arithmetic
+-- by means of a modulo operation over the 'scalarPeriod'. 
+-- Negative number will also be brought to the range 
+-- [0, 'scalarPeriod' - 1] via modular reduction.
+blsMSM :: forall curve. BLS curve => NonEmpty.NonEmpty (Point curve, Integer) -> Point curve
 blsMSM psAndSs =
   unsafePerformIO $ do
-    let (points, scalars) = unzip $ NonEmpty.toList psAndSs
+    let (points, scalarsAsInt) = unzip $ NonEmpty.toList psAndSs
         numPoints = length points
         nonEmptyAffinePoints = NonEmpty.fromList $ fmap toAffine points
-        nonEmptyScalars = NonEmpty.fromList scalars
+        nonEmptyScalars = NonEmpty.fromList $ map (unsafePerformIO . scalarFromInteger) scalarsAsInt
 
     withAffineVector nonEmptyAffinePoints $ \affineVectorPtr -> do
         withScalarVector nonEmptyScalars $ \scalarVectorPtr -> do

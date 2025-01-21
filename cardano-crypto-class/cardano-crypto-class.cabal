@@ -148,11 +148,3 @@ library
 
 --   if (os(linux) || os(osx))
 --     build-depends: unix
-
-executable run-msm
-  import:         base, project-config
-  hs-source-dirs: exe
-  main-is:        Main.hs
-  build-depends:
-    , base
-    , cardano-crypto-class
