@@ -38,6 +38,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (testProperty)
 import qualified Data.List.NonEmpty as NonEmpty
+import Test.QuickCheck (NonEmptyList(..))
 
 tests :: TestTree
 tests =
