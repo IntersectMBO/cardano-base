@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-tests`
 
+## 2.2.0.1
+
+*
+
 ## 2.2.0.0
 
 * Memlocking functionality
