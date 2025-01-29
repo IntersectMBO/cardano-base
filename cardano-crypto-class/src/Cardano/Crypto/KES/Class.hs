@@ -288,7 +288,12 @@ updateKES = updateKESWith mlockedMalloc
 -- code.
 -- This API is only provided for testing purposes; it must not be used to
 -- generate or use real KES keys.
-class KESAlgorithm v => UnsoundPureKESAlgorithm v where
+class
+  ( KESAlgorithm v
+  , NoThunks (UnsoundPureSignKeyKES v)
+  ) =>
+  UnsoundPureKESAlgorithm v
+  where
   data UnsoundPureSignKeyKES v :: Type
 
   unsoundPureSignKES ::
