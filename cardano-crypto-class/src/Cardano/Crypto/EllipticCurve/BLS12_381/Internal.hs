@@ -179,7 +179,6 @@ import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import Foreign.Storable (peek)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.List.NonEmpty as NonEmpty
-import Control.Monad (zipWithM_)
 import Foreign.Marshal (advancePtr)
 import Foreign ( poke, sizeOf )
 
@@ -302,13 +301,18 @@ withNewAffine' = fmap snd . withNewAffine
 withAffineVector :: NonEmpty.NonEmpty (Affine curve) -> (AffinePtrVector curve -> IO a) -> IO a
 withAffineVector affines go = do
   let numAffines = NonEmpty.length affines
-  let sizeReference = sizeOf (undefined :: Ptr ())
-  allocaBytes (numAffines * sizeReference) $ \ptr -> do
-    let copyPtrAtIx ix affine =
+      sizeReference = sizeOf (undefined :: Ptr ())
+  allocaBytes (numAffines * sizeReference) $ \ptr ->
+    -- The accumulate function ensures that each `withAffine` call is properly nested.
+    -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early. 
+    -- By nesting `withAffine` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
+    let accumulate [] = go (AffinePtrVector (castPtr ptr))
+        accumulate ((ix, affine):rest) =
           withAffine affine $ \(AffinePtr aPtr) -> do
-          poke (ptr `advancePtr` ix) aPtr
-    zipWithM_ copyPtrAtIx [0..] (NonEmpty.toList affines)
-    go (AffinePtrVector (castPtr ptr))
+            poke (ptr `advancePtr` ix) aPtr
+            accumulate rest
+    in accumulate (zip [0..] (NonEmpty.toList affines))
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
@@ -462,13 +466,18 @@ withNewScalar' = fmap snd . withNewScalar
 withScalarVector :: NonEmpty.NonEmpty Scalar -> (ScalarPtrVector -> IO a) -> IO a
 withScalarVector scalars go = do
   let numScalars = NonEmpty.length scalars
-  let sizeReference = sizeOf (undefined :: Ptr ())
-  allocaBytes (numScalars * sizeReference) $ \ptr -> do
-    let copyPtrAtIx ix scalar =
+      sizeReference = sizeOf (undefined :: Ptr ())
+  allocaBytes (numScalars * sizeReference) $ \ptr ->
+    -- The accumulate function ensures that each `withScalar` call is properly nested.
+    -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early. 
+    -- By nesting `withScalar` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
+    let accumulate [] = go (ScalarPtrVector (castPtr ptr))
+        accumulate ((ix, scalar):rest) =
           withScalar scalar $ \(ScalarPtr sPtr) -> do
-          poke (ptr `advancePtr` ix) sPtr
-    zipWithM_ copyPtrAtIx [0..] (NonEmpty.toList scalars)
-    go (ScalarPtrVector (castPtr ptr))
+            poke (ptr `advancePtr` ix) sPtr
+            accumulate rest
+    in accumulate (zip [0..] (NonEmpty.toList scalars))
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do

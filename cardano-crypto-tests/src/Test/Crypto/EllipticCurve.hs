@@ -47,10 +47,7 @@ tests =
     [ testGroup
         "BLS12_381"
         [ testUtil "Utility"
-          -- this test break te testBLSCurve tests for some reason :/
-          -- cabal run cardano-crypto-tests:test:test-crypto -- --quickcheck-replay="(SMGen 5126899516769672812 8257425892914665049,56)" 
-          -- for example will fail if below test is included, but succeed if excluded
-        -- , testScalar "Scalar"
+        , testScalar "Scalar"
         , testBLSCurve "Curve 1" (Proxy @BLS.Curve1)
         , testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
         , testPT "PT"
