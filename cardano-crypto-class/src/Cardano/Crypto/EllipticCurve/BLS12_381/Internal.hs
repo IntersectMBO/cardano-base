@@ -7,6 +7,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+#if MIN_VERSION_base(4,20,0)
+{-# OPTIONS_GHC -Wno-x-data-list-nonempty-unzip #-}
+#endif
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
@@ -171,7 +174,7 @@ import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
 import qualified Data.List.NonEmpty as NonEmpty
 
-#if MIN_VERSION_base(4,18,0)
+#if MIN_VERSION_base(4,22,0)
 import qualified Data.Functor (unzip)
 #endif
 
@@ -958,7 +961,7 @@ scalarCanonical scalar =
 blsMSM :: forall curve. BLS curve => NonEmpty.NonEmpty (Point curve, Integer) -> Point curve
 blsMSM psAndSs =
   unsafePerformIO $ do
-#if MIN_VERSION_base(4,18,0)
+#if MIN_VERSION_base(4,22,0)
     let (points, scalarsAsInt) = Data.Functor.unzip psAndSs
 #else
     let (points, scalarsAsInt) = NonEmpty.unzip psAndSs
