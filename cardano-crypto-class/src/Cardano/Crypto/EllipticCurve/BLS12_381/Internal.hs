@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
@@ -169,6 +170,11 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
 import qualified Data.List.NonEmpty as NonEmpty
+
+#if MIN_VERSION_base(4,18,0)
+import qualified Data.Functor (unzip)
+#endif
+
 import Data.Proxy (Proxy (..))
 import Data.Void
 import Foreign (poke, sizeOf)
@@ -952,8 +958,12 @@ scalarCanonical scalar =
 blsMSM :: forall curve. BLS curve => NonEmpty.NonEmpty (Point curve, Integer) -> Point curve
 blsMSM psAndSs =
   unsafePerformIO $ do
+#if MIN_VERSION_base(4,18,0)
+    let (points, scalarsAsInt) = Data.Functor.unzip psAndSs
+#else
     let (points, scalarsAsInt) = NonEmpty.unzip psAndSs
-        numPoints = length points
+#endif
+    let numPoints = length points
         nonEmptyAffinePoints = fmap toAffine points
     nonEmptyScalars <- mapM scalarFromInteger scalarsAsInt
 
