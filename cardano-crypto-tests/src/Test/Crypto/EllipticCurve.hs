@@ -1,9 +1,9 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module Test.Crypto.EllipticCurve
@@ -21,11 +21,13 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Foldable as F (foldl')
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Proxy (Proxy (..))
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
   Arbitrary (..),
+  NonEmptyList (..),
   Property,
   choose,
   chooseAny,
@@ -37,8 +39,6 @@ import Test.QuickCheck (
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (testProperty)
-import qualified Data.List.NonEmpty as NonEmpty
-import Test.QuickCheck (NonEmptyList(..))
 
 tests :: TestTree
 tests =
@@ -138,7 +138,8 @@ testBLSCurve name _ =
         BLS.blsMult a (b + c) === BLS.blsAddOrDouble (BLS.blsMult a b) (BLS.blsMult a c)
     , testProperty "MSM matches naive approach" $ \(NonEmpty (psAndSs :: [(BLS.Point curve, BigInteger)])) ->
         let pairs = NonEmpty.fromList [(p, i) | (p, BigInteger i) <- psAndSs]
-        in BLS.blsMSM pairs === foldr (\(p, s) acc -> BLS.blsAddOrDouble acc (BLS.blsMult p s)) (BLS.blsZero @curve) pairs
+         in BLS.blsMSM pairs
+              === foldr (\(p, s) acc -> BLS.blsAddOrDouble acc (BLS.blsMult p s)) (BLS.blsZero @curve) pairs
     , testProperty "scalar mult distributive right" $ \(a :: BLS.Point curve) (b :: BLS.Point curve) (BigInteger c) ->
         BLS.blsMult (BLS.blsAddOrDouble a b) c === BLS.blsAddOrDouble (BLS.blsMult a c) (BLS.blsMult b c)
     , testProperty "mult by zero is inf" $ \(a :: BLS.Point curve) ->

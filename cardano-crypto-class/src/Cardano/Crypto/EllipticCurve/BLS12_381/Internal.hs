@@ -168,19 +168,19 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Proxy (Proxy (..))
 import Data.Void
+import Foreign (poke, sizeOf)
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.ForeignPtr
+import Foreign.Marshal (advancePtr)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import Foreign.Storable (peek)
 import System.IO.Unsafe (unsafePerformIO)
-import qualified Data.List.NonEmpty as NonEmpty
-import Foreign.Marshal (advancePtr)
-import Foreign ( poke, sizeOf )
 
 ---- Phantom Types
 
@@ -305,14 +305,14 @@ withAffineVector affines go = do
   allocaBytes (numAffines * sizeReference) $ \ptr ->
     -- The accumulate function ensures that each `withAffine` call is properly nested.
     -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
-    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early. 
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
     -- By nesting `withAffine` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
     let accumulate [] = go (AffinePtrVector (castPtr ptr))
-        accumulate ((ix, affine):rest) =
+        accumulate ((ix, affine) : rest) =
           withAffine affine $ \(AffinePtr aPtr) -> do
             poke (ptr `advancePtr` ix) aPtr
             accumulate rest
-    in accumulate (zip [0..] (NonEmpty.toList affines))
+     in accumulate (zip [0 ..] (NonEmpty.toList affines))
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
@@ -344,7 +344,8 @@ class BLS curve where
   c_blst_cneg :: PointPtr curve -> Bool -> IO ()
 
   c_blst_scratch_sizeof :: Proxy curve -> CSize -> CSize
-  c_blst_mult_pippenger :: PointPtr curve -> AffinePtrVector curve -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
+  c_blst_mult_pippenger ::
+    PointPtr curve -> AffinePtrVector curve -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
 
   c_blst_hash ::
     PointPtr curve -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
@@ -470,14 +471,14 @@ withScalarVector scalars go = do
   allocaBytes (numScalars * sizeReference) $ \ptr ->
     -- The accumulate function ensures that each `withScalar` call is properly nested.
     -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
-    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early. 
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
     -- By nesting `withScalar` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
     let accumulate [] = go (ScalarPtrVector (castPtr ptr))
-        accumulate ((ix, scalar):rest) =
+        accumulate ((ix, scalar) : rest) =
           withScalar scalar $ \(ScalarPtr sPtr) -> do
             poke (ptr `advancePtr` ix) sPtr
             accumulate rest
-    in accumulate (zip [0..] (NonEmpty.toList scalars))
+     in accumulate (zip [0 ..] (NonEmpty.toList scalars))
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do
@@ -608,8 +609,11 @@ foreign import ccall "blst_p1_generator" c_blst_p1_generator :: Point1Ptr
 foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: Point1Ptr -> Point1Ptr -> IO Bool
 foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: Point1Ptr -> IO Bool
 
-foreign import ccall "blst_p1s_mult_pippenger_scratch_sizeof" c_blst_p1s_mult_pippenger_scratch_sizeof :: CSize -> CSize
-foreign import ccall "blst_p1s_mult_pippenger" c_blst_p1s_mult_pippenger :: Point1Ptr -> Affine1PtrVector -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
+foreign import ccall "blst_p1s_mult_pippenger_scratch_sizeof"
+  c_blst_p1s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p1s_mult_pippenger"
+  c_blst_p1s_mult_pippenger ::
+    Point1Ptr -> Affine1PtrVector -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
 
 ---- Raw Point2 functions
 
@@ -638,8 +642,11 @@ foreign import ccall "blst_p2_generator" c_blst_p2_generator :: Point2Ptr
 foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: Point2Ptr -> Point2Ptr -> IO Bool
 foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: Point2Ptr -> IO Bool
 
-foreign import ccall "blst_p2s_mult_pippenger_scratch_sizeof" c_blst_p2s_mult_pippenger_scratch_sizeof :: CSize -> CSize
-foreign import ccall "blst_p2s_mult_pippenger" c_blst_p2s_mult_pippenger :: Point2Ptr -> Affine2PtrVector -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
+foreign import ccall "blst_p2s_mult_pippenger_scratch_sizeof"
+  c_blst_p2s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p2s_mult_pippenger"
+  c_blst_p2s_mult_pippenger ::
+    Point2Ptr -> Affine2PtrVector -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
 
 ---- Affine operations
 
@@ -939,8 +946,8 @@ scalarCanonical scalar =
 
 -- | Multi-scalar multiplication using the Pippenger algorithm.
 -- The scalar will be brought into the range of modular arithmetic
--- by means of a modulo operation over the 'scalarPeriod'. 
--- Negative number will also be brought to the range 
+-- by means of a modulo operation over the 'scalarPeriod'.
+-- Negative number will also be brought to the range
 -- [0, 'scalarPeriod' - 1] via modular reduction.
 blsMSM :: forall curve. BLS curve => NonEmpty.NonEmpty (Point curve, Integer) -> Point curve
 blsMSM psAndSs =
@@ -951,21 +958,21 @@ blsMSM psAndSs =
     nonEmptyScalars <- mapM scalarFromInteger scalarsAsInt
 
     withAffineVector nonEmptyAffinePoints $ \affineVectorPtr -> do
-        withScalarVector nonEmptyScalars $ \scalarVectorPtr -> do
-          let numPoints' :: CSize
-              numPoints' = fromIntegral numPoints
-              scratchSize :: Int
-              scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
+      withScalarVector nonEmptyScalars $ \scalarVectorPtr -> do
+        let numPoints' :: CSize
+            numPoints' = fromIntegral numPoints
+            scratchSize :: Int
+            scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
 
-          allocaBytes scratchSize $ \scratchPtr -> do
-            withNewPoint' $ \resultPtr -> do
-              c_blst_mult_pippenger
-                resultPtr
-                affineVectorPtr
-                (fromIntegral numPoints)
-                scalarVectorPtr
-                255
-                (ScratchPtr scratchPtr)
+        allocaBytes scratchSize $ \scratchPtr -> do
+          withNewPoint' $ \resultPtr -> do
+            c_blst_mult_pippenger
+              resultPtr
+              affineVectorPtr
+              (fromIntegral numPoints)
+              scalarVectorPtr
+              255
+              (ScratchPtr scratchPtr)
 
 ---- PT operations
 
