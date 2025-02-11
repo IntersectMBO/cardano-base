@@ -991,9 +991,9 @@ blsMSM psAndSs =
             c_blst_mult_pippenger
               resultPtr
               affineVectorPtr
-              (fromIntegral numPoints)
+              numPoints'
               scalarVectorPtr
-              255
+              255 -- 255 bits is the size of the scalar field (bound by the scalarPeriod below)
               (ScratchPtr scratchPtr)
 
 ---- PT operations
