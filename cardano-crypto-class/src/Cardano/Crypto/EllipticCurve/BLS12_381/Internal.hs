@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
@@ -7,9 +6,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-#if MIN_VERSION_base(4,20,0)
-{-# OPTIONS_GHC -Wno-x-data-list-nonempty-unzip #-}
-#endif
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
@@ -172,11 +168,6 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
-import qualified Data.List.NonEmpty as NonEmpty
-
-#if MIN_VERSION_base(4,22,0)
-import qualified Data.Functor (unzip)
-#endif
 
 import Data.Proxy (Proxy (..))
 import Data.Void
@@ -307,9 +298,9 @@ withNewAffine_ = fmap fst . withNewAffine
 withNewAffine' :: BLS curve => (AffinePtr curve -> IO a) -> IO (Affine curve)
 withNewAffine' = fmap snd . withNewAffine
 
-withAffineVector :: NonEmpty.NonEmpty (Affine curve) -> (AffinePtrVector curve -> IO a) -> IO a
+withAffineVector :: [Affine curve] -> (AffinePtrVector curve -> IO a) -> IO a
 withAffineVector affines go = do
-  let numAffines = NonEmpty.length affines
+  let numAffines = length affines
       sizeReference = sizeOf (undefined :: Ptr ())
   allocaBytes (numAffines * sizeReference) $ \ptr ->
     -- The accumulate function ensures that each `withAffine` call is properly nested.
@@ -321,7 +312,7 @@ withAffineVector affines go = do
           withAffine affine $ \(AffinePtr aPtr) -> do
             poke (ptr `advancePtr` ix) aPtr
             accumulate rest
-     in accumulate (zip [0 ..] (NonEmpty.toList affines))
+     in accumulate (zip [0 ..] affines)
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
@@ -473,9 +464,9 @@ withNewScalar_ = fmap fst . withNewScalar
 withNewScalar' :: (ScalarPtr -> IO a) -> IO Scalar
 withNewScalar' = fmap snd . withNewScalar
 
-withScalarVector :: NonEmpty.NonEmpty Scalar -> (ScalarPtrVector -> IO a) -> IO a
+withScalarVector :: [Scalar] -> (ScalarPtrVector -> IO a) -> IO a
 withScalarVector scalars go = do
-  let numScalars = NonEmpty.length scalars
+  let numScalars = length scalars
       sizeReference = sizeOf (undefined :: Ptr ())
   allocaBytes (numScalars * sizeReference) $ \ptr ->
     -- The accumulate function ensures that each `withScalar` call is properly nested.
@@ -487,7 +478,7 @@ withScalarVector scalars go = do
           withScalar scalar $ \(ScalarPtr sPtr) -> do
             poke (ptr `advancePtr` ix) sPtr
             accumulate rest
-     in accumulate (zip [0 ..] (NonEmpty.toList scalars))
+     in accumulate (zip [0 ..] scalars)
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do
@@ -953,48 +944,38 @@ scalarCanonical scalar =
 
 ---- MSM operations
 
--- | A small convenience helper for unzipping a 'NonEmpty' list of @(p, i)@ pairs
--- into two 'NonEmpty' lists. We dispatch to 'Data.Functor.unzip' when base >= 4.22,
--- and to 'NonEmpty.unzip' otherwise. Having this in one place under CPP avoids
--- duplicating large code blocks (and also keeps Fourmolu happy).
-unzipPointsAndScalars ::
-  NonEmpty.NonEmpty (p, i) ->
-  (NonEmpty.NonEmpty p, NonEmpty.NonEmpty i)
-#if MIN_VERSION_base(4,22,0)
-unzipPointsAndScalars = Data.Functor.unzip
-#else
-unzipPointsAndScalars = NonEmpty.unzip
-#endif
-
 -- | Multi-scalar multiplication using the Pippenger algorithm.
 -- The scalars will be brought into the range of modular arithmetic
 -- by means of a modulo operation over the 'scalarPeriod'.
 -- Negative numbers will also be brought to the range
 -- [0, 'scalarPeriod' - 1] via modular reduction.
-blsMSM :: forall curve. BLS curve => NonEmpty.NonEmpty (Point curve, Integer) -> Point curve
-blsMSM psAndSs =
-  unsafePerformIO $ do
-    let (points, scalarsAsInt) = unzipPointsAndScalars psAndSs
-        numPoints = length points
-        nonEmptyAffinePoints = fmap toAffine points
-    nonEmptyScalars <- mapM scalarFromInteger scalarsAsInt
+blsMSM :: forall curve. BLS curve => [(Point curve, Integer)] -> Point curve
+blsMSM psAndSs = unsafePerformIO $ do
+  let filteredPoints = filter (not . blsIsInf . fst) psAndSs
+  case filteredPoints of
+    [] -> return blsZero
+    _ -> do
+      let (points, scalarsAsInt) = unzip filteredPoints
+          numPoints = length points
+          affinePoints = fmap toAffine points
+      scalars <- mapM scalarFromInteger scalarsAsInt
 
-    withAffineVector nonEmptyAffinePoints $ \affineVectorPtr -> do
-      withScalarVector nonEmptyScalars $ \scalarVectorPtr -> do
-        let numPoints' :: CSize
-            numPoints' = fromIntegral numPoints
-            scratchSize :: Int
-            scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
+      withAffineVector affinePoints $ \affineVectorPtr -> do
+        withScalarVector scalars $ \scalarVectorPtr -> do
+          let numPoints' :: CSize
+              numPoints' = fromIntegral numPoints
+              scratchSize :: Int
+              scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
 
-        allocaBytes scratchSize $ \scratchPtr -> do
-          withNewPoint' $ \resultPtr -> do
-            c_blst_mult_pippenger
-              resultPtr
-              affineVectorPtr
-              numPoints'
-              scalarVectorPtr
-              255 -- 255 bits is the size of the scalar field (bound by the scalarPeriod below)
-              (ScratchPtr scratchPtr)
+          allocaBytes scratchSize $ \scratchPtr -> do
+            withNewPoint' $ \resultPtr -> do
+              c_blst_mult_pippenger
+                resultPtr
+                affineVectorPtr
+                numPoints'
+                scalarVectorPtr
+                255 -- 255 bits is the size of the scalar field (bound by the scalarPeriod below)
+                (ScratchPtr scratchPtr)
 
 ---- PT operations
 
