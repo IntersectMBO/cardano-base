@@ -34,7 +34,7 @@ import Test.QuickCheck (
  )
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
-import Test.Tasty.QuickCheck (testProperty)
+import Test.Tasty.QuickCheck (frequency, testProperty)
 
 tests :: TestTree
 tests =
@@ -457,10 +457,14 @@ prop_fourPairings a1 a2 a3 b = BLS.ptFinalVerify tt t4
     t4 = BLS.millerLoop (BLS.blsAddOrDouble (BLS.blsAddOrDouble a1 a2) a3) b
     tt = BLS.ptMult (BLS.ptMult t1 t2) t3
 
-prop_randomFailsFinalVerify :: BLS.Point1 -> BLS.Point1 -> BLS.Point2 -> BLS.Point2 -> Property
-prop_randomFailsFinalVerify a b c d =
-  a /= b && c /= d ==>
-    BLS.ptFinalVerify (BLS.millerLoop a c) (BLS.millerLoop b d) === False
+prop_randomFailsFinalVerify :: BigInteger -> BigInteger -> BigInteger -> BigInteger -> Property
+prop_randomFailsFinalVerify (BigInteger a) (BigInteger b) (BigInteger c) (BigInteger d) =
+  (a * c `mod` BLS.scalarPeriod) /= (b * d `mod` BLS.scalarPeriod) ==>
+    let a' = BLS.blsMult (BLS.blsGenerator @BLS.Curve1) a
+        b' = BLS.blsMult (BLS.blsGenerator @BLS.Curve1) b
+        c' = BLS.blsMult (BLS.blsGenerator @BLS.Curve2) c
+        d' = BLS.blsMult (BLS.blsGenerator @BLS.Curve2) d
+     in BLS.ptFinalVerify (BLS.millerLoop a' c') (BLS.millerLoop b' d') === False
 
 newtype BigInteger = BigInteger Integer
   deriving (Eq, Show)
@@ -468,10 +472,17 @@ instance Arbitrary BigInteger where
   arbitrary = BigInteger <$> oneof [arbitrary, chooseAny, choose (-2 ^ (128 :: Int), 2 ^ (128 :: Int))]
 
 instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
-  arbitrary = do
-    str <- arbitrary
-    let bs = BS.pack str
-    return $ BLS.blsHash bs Nothing Nothing
+  arbitrary =
+    frequency
+      [ (1, pure BLS.blsZero)
+      ,
+        ( 9
+        , do
+            str <- arbitrary
+            let bs = BS.pack str
+            pure (BLS.blsHash bs Nothing Nothing)
+        )
+      ]
 
 instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
