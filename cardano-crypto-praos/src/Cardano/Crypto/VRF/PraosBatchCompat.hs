@@ -40,6 +40,7 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   Seed,
   genSeed,
   keypairFromSeed,
+  seedFromBytes,
 
   -- * Conversions
   unsafeRawSeed,
