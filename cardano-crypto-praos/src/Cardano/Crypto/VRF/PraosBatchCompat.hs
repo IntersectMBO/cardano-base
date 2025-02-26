@@ -45,9 +45,13 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   -- * Conversions
   unsafeRawSeed,
   outputBytes,
+  outputFromBytes,
   proofBytes,
+  proofFromBytes,
   skBytes,
+  skFromBytes,
   vkBytes,
+  vkFromBytes,
   skToVerKey,
   skToSeed,
 
@@ -57,6 +61,8 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   SignKeyVRF (..),
   VerKeyVRF (..),
   CertVRF (..),
+  Proof (..),
+  Output (..),
 )
 where
 
@@ -166,7 +172,8 @@ foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes"
   crypto_vrf_ietfdraft13_publickeybytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes"
   crypto_vrf_ietfdraft13_secretkeybytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft13_seedbytes" crypto_vrf_ietfdraft13_seedbytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_seedbytes"
+  crypto_vrf_ietfdraft13_seedbytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_outputbytes"
   crypto_vrf_ietfdraft13_outputbytes :: CSize
 
@@ -174,6 +181,8 @@ foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes"
   io_crypto_vrf_ietfdraft13_publickeybytes :: IO CSize
 foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes"
   io_crypto_vrf_ietfdraft13_secretkeybytes :: IO CSize
+foreign import ccall "crypto_vrf_ietfdraft13_outputbytes"
+  io_crypto_vrf_ietfdraft13_outputbytes :: IO CSize
 
 foreign import ccall "crypto_vrf_seed_keypair"
   crypto_vrf_ietfdraft13_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
@@ -210,6 +219,9 @@ ioSignKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_secretkeybytes
 
 ioVerKeySizeVRF :: IO Int
 ioVerKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_publickeybytes
+
+ioOutputSizeVRF :: IO Int
+ioOutputSizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_outputbytes
 
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
@@ -402,6 +414,27 @@ mkOutput :: IO Output
 mkOutput =
   fmap Output $
     newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft13_outputbytes)
+
+outputFromBytes :: ByteString -> Output
+outputFromBytes bs = unsafePerformIO $ do
+  if BS.length bs /= vrfKeySizeVRF
+    then do
+      ioSize <- ioOutputSizeVRF
+      error
+        ( "Invalid output length "
+            <> show @Int bsLen
+            <> ", expecting "
+            <> show @Int vrfKeySizeVRF
+            <> " or "
+            <> show @Int ioSize
+        )
+    else do
+      output <- mkOutput
+      withForeignPtr (unOutput output) $ \ptr ->
+        copyFromByteString ptr bs vrfKeySizeVRF
+      return output
+  where
+    bsLen = BS.length bs
 
 -- | Derive a key pair (Sign + Verify) from a seed.
 keypairFromSeed :: Seed -> (VerKey, SignKey)

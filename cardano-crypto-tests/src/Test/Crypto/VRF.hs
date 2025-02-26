@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -19,8 +21,13 @@ import Cardano.Crypto.VRF.PraosBatchCompat
 import qualified Cardano.Crypto.VRF.PraosBatchCompat as Ver13
 
 import qualified Data.ByteString as BS
+import qualified Data.Char as Char
+import Data.Maybe (isJust)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64, Word8)
+import System.Directory (getCurrentDirectory)
+import qualified Text.ParserCombinators.ReadP as Parse
+import qualified Text.Read as Read
 
 import Test.Crypto.Util
 import Test.QuickCheck (
@@ -33,8 +40,9 @@ import Test.QuickCheck (
   (==>),
  )
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (testCase, (@?=))
+import Test.Tasty.HUnit (Assertion, assertBool, testCase)
 import Test.Tasty.QuickCheck (testProperty, vectorOf)
+
 
 {- HLINT IGNORE "Use <$>" -}
 --
@@ -63,55 +71,63 @@ tests =
         ]
     , testGroup
         "test vectors"
-        [ testCase "producing golden test vectors" $
-            Golden
-            { name = algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
-            , certSize = Ver13.certSizeVRF
-            , signKeySize = Ver13.signKeySizeVRF
-            , verKeySize = Ver13.verKeySizeVRF
-            , vrfKeySize = Ver13.vrfKeySizeVRF
-            , seedLen = seedSizeVRF (Proxy :: Proxy PraosBatchCompatVRF)
-            , seed = BS.replicate 32 0
-            , signingKey = Ver13.skBytes $ snd $ Ver13.keypairFromSeed $
-                Ver13.seedFromBytes $
-                BS.replicate 32 0
-            , verifyingKey = Ver13.vkBytes $ fst $ Ver13.keypairFromSeed $
-                Ver13.seedFromBytes $
-                BS.replicate 32 0
-            , message = unsafeFromRight $ decodeHexString "00" 1
-            , proof = Ver13.proofBytes $
-                unsafeFromJust $
-                Ver13.prove
-                (snd $ Ver13.keypairFromSeed $ Ver13.seedFromBytes $ BS.replicate 32 0)
-                (unsafeFromRight $ decodeHexString "00" 1)
-            , hash = Ver13.outputBytes $
-                unsafeFromJust $
-                Ver13.verify
-                (fst $ Ver13.keypairFromSeed $ Ver13.seedFromBytes $ BS.replicate 32 0)
-                (unsafeFromJust $ Ver13.prove (snd $ Ver13.keypairFromSeed $ Ver13.seedFromBytes $ BS.replicate 32 0) (unsafeFromRight $ decodeHexString "00" 1))
-                (unsafeFromRight $ decodeHexString "00" 1)
-            }
-            @?= Golden
-            { name = "PraosBatchCompatVRF"
-            , certSize = 128
-            , signKeySize = 64
-            , verKeySize = 32
-            , vrfKeySize = 64
-            , seedLen = 32
-            , seed = unsafeFromRight $
-                decodeHexString "0000000000000000000000000000000000000000000000000000000000000000" 32
-            , signingKey = unsafeFromRight $
-                decodeHexString "00000000000000000000000000000000000000000000000000000000000000003b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29" 64
-            , verifyingKey = unsafeFromRight $
-                decodeHexString "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29" 32
-            , message = unsafeFromRight $ decodeHexString "00" 1
-            , proof = unsafeFromRight $
-                decodeHexString "93d70c5ed59ccb21ca9991be561756939ff9753bf85764d2a7b937d6fbf9183443cd118bee8a0f61e8bdc5403c03d6c94ead31956e98bfd6a5e02d3be5900d17a540852d586f0891caed3e3b0e0871d6a741fb0edcdb586f7f10252f79c35176474ece4936e0190b5167832c10712884ad12acdfff2e434aacb165e1f789660f" 128
-            , hash = unsafeFromRight $
-                decodeHexString "9a4d34f87003412e413ca42feba3b6158bdf11db41c2bbde98961c5865400cfdee07149b928b376db365c5d68459378b0981f1cb0510f1e0c194c4a17603d44d" 64
-            }
+        [ testCase "producing golden test vectors" $ checkTestVector "vrf_ver13_1"
         ]
     ]
+
+checkTestVector :: FilePath -> Assertion
+checkTestVector file = do
+    dir <- getCurrentDirectory
+    str <- readFile $ dir <> "/test_vectors/" <> file
+    let testVectorE = Read.readMaybe @VRFTestVector str
+    assertBool ("parsing test vector: " <> file <> " not successful") $ isJust testVectorE
+{--
+    Golden
+    { name = algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
+    , certSize = Ver13.certSizeVRF
+    , signKeySize = Ver13.signKeySizeVRF
+    , verKeySize = Ver13.verKeySizeVRF
+    , vrfKeySize = Ver13.vrfKeySizeVRF
+    , seedLen = seedSizeVRF (Proxy :: Proxy PraosBatchCompatVRF)
+    , seed = BS.replicate 32 0
+    , signingKey = Ver13.skBytes $ snd $ Ver13.keypairFromSeed $
+        Ver13.seedFromBytes $
+        BS.replicate 32 0
+    , verifyingKey = Ver13.vkBytes $ fst $ Ver13.keypairFromSeed $
+        Ver13.seedFromBytes $
+        BS.replicate 32 0
+    , message = unsafeFromRight $ decodeHexString "00" 1
+    , proof = Ver13.proofBytes $
+        unsafeFromJust $
+        Ver13.prove
+        (snd $ Ver13.keypairFromSeed $ Ver13.seedFromBytes $ BS.replicate 32 0)
+        (unsafeFromRight $ decodeHexString "00" 1)
+    , hash = Ver13.outputBytes $
+        unsafeFromJust $
+        Ver13.verify
+        (fst $ Ver13.keypairFromSeed $ Ver13.seedFromBytes $ BS.replicate 32 0)
+        (unsafeFromJust $ Ver13.prove (snd $ Ver13.keypairFromSeed $ Ver13.seedFromBytes $ BS.replicate 32 0) (unsafeFromRight $ decodeHexString "00" 1))
+        (unsafeFromRight $ decodeHexString "00" 1)
+    }
+    @?= Golden
+    { name = "PraosBatchCompatVRF"
+    , certSize = 128
+    , signKeySize = 64
+    , verKeySize = 32
+    , vrfKeySize = 64
+    , seedLen = 32
+    , seed = unsafeFromRight $
+        decodeHexString "0000000000000000000000000000000000000000000000000000000000000000" 32
+    , signingKey = unsafeFromRight $
+        decodeHexString "00000000000000000000000000000000000000000000000000000000000000003b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29" 64
+    , verifyingKey = unsafeFromRight $
+        decodeHexString "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29" 32
+    , message = unsafeFromRight $ decodeHexString "00" 1
+    , proof = unsafeFromRight $
+        decodeHexString "93d70c5ed59ccb21ca9991be561756939ff9753bf85764d2a7b937d6fbf9183443cd118bee8a0f61e8bdc5403c03d6c94ead31956e98bfd6a5e02d3be5900d17a540852d586f0891caed3e3b0e0871d6a741fb0edcdb586f7f10252f79c35176474ece4936e0190b5167832c10712884ad12acdfff2e434aacb165e1f789660f" 128
+    , hash = unsafeFromRight $
+        decodeHexString "9a4d34f87003412e413ca42feba3b6158bdf11db41c2bbde98961c5865400cfdee07149b928b376db365c5d68459378b0981f1cb0510f1e0c194c4a17603d44d" 64
+    }
 
 unsafeFromJust :: Maybe a -> a
 unsafeFromJust (Just r) = r
@@ -135,6 +151,72 @@ data Golden = Golden
     , proof        :: BS.ByteString
     , hash         :: BS.ByteString
     } deriving (Show, Eq)
+
+--}
+data VRFTestVector = VRFTestVector
+    { name         :: String
+    , version      :: String
+    , ciphersuite  :: String
+    , signingKey   :: Ver13.SignKeyVRF PraosBatchCompatVRF
+    , verifyingKey :: Ver13.VerKeyVRF PraosBatchCompatVRF
+    , message      :: BS.ByteString
+    , proof        :: Ver13.Proof
+    , hash         :: Ver13.Output
+    }
+
+data HexStringWithLength = HexStringWithLength
+    { payload :: String
+    , expectedLength :: Int
+    } deriving (Show, Eq)
+
+parserHex :: Maybe Int -> Parse.ReadP BS.ByteString
+parserHex lenM = do
+    str <- parseString
+    case lenM of
+        Just len -> handleDecode str len
+        Nothing -> handleDecode str ((length str) `div` 2)
+  where
+    handleDecode str size = case decodeHexString str size of
+        Right bs -> pure bs
+        Left err -> error err
+
+parseKey :: String -> Parse.ReadP String
+parseKey key = do
+    key' <- Parse.string key
+    Parse.skipSpaces
+    _ <- Parse.string ":"
+    Parse.skipSpaces
+    pure key'
+
+parseEOL :: Parse.ReadP ()
+parseEOL = Parse.choice
+    [ Parse.char '\n' >> return ()
+    , Parse.eof
+    ]
+
+parseContent :: String -> Parse.ReadP a -> Parse.ReadP a
+parseContent key parser =
+    Parse.between (parseKey key) parseEOL parser
+
+parseString :: Parse.ReadP String
+parseString = Parse.munch1 (\c -> Char.isAlphaNum c || c == '-')
+
+parserVRFTestVector :: Parse.ReadP VRFTestVector
+parserVRFTestVector = do
+    name <- parseContent "vrf" parseString
+    version <- parseContent "ver" parseString
+    ciphersuite <- parseContent "ciphersuite" parseString
+    sk <- parseContent "sk" $ parserHex (Just 32)
+    vk <- parseContent "pk" $ parserHex (Just 32)
+    let signingKey = Ver13.SignKeyPraosBatchCompatVRF . Ver13.skFromBytes $ sk <> vk
+    let verifyingKey = Ver13.VerKeyPraosBatchCompatVRF $ Ver13.vkFromBytes vk
+    message <- parseContent "alpha" $ parserHex Nothing
+    proof <- Ver13.proofFromBytes <$> parseContent "pi" (parserHex (Just 128))
+    hash <- Ver13.outputFromBytes <$> parseContent "beta" (parserHex (Just 64))
+    pure VRFTestVector{..}
+
+instance Read VRFTestVector where
+  readsPrec _ = Parse.readP_to_S parserVRFTestVector
 
 testVRFAlgorithm ::
   forall proxy v.
