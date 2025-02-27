@@ -80,6 +80,12 @@ tests =
         , testCase "generated golden test vector: vrf_ver03_generated_4" $
             checkVer03TestVector "vrf_ver03_generated_4"
 
+        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+        --, testCase "generated golden test vector: vrf_ver03_standard_10" $
+            --  checkVer03TestVector "vrf_ver03_standard_10"
+        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+        , testCase "generated golden test vector: vrf_ver03_standard_11" $
+            checkVer03TestVector "vrf_ver03_standard_11"
         ]
     , testGroup
         "test vectors for PraosBatchCompat"
