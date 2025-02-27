@@ -75,6 +75,8 @@ tests =
             checkVer03TestVector "vrf_ver03_generated_1"
         , testCase "generated golden test vector: vrf_ver03_generated_2" $
             checkVer03TestVector "vrf_ver03_generated_2"
+        , testCase "generated golden test vector: vrf_ver03_generated_3" $
+            checkVer03TestVector "vrf_ver03_generated_3"
         ]
     , testGroup
         "test vectors for PraosBatchCompat"
