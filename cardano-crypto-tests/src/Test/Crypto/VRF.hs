@@ -74,6 +74,9 @@ tests =
         , testCase "generated golden test vector: vrf_ver13_generated_2" $ checkTestVector "vrf_ver13_generated_2"
         , testCase "generated golden test vector: vrf_ver13_generated_3" $ checkTestVector "vrf_ver13_generated_3"
         , testCase "generated golden test vector: vrf_ver13_generated_4" $ checkTestVector "vrf_ver13_generated_4"
+
+        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 11
+        , testCase "generated golden test vector: vrf_ver13_standard_11" $ checkTestVector "vrf_ver13_standard_11"
         ]
     ]
 
