@@ -43,7 +43,6 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase, (@?=))
 import Test.Tasty.QuickCheck (testProperty, vectorOf)
 
-
 {- HLINT IGNORE "Use <$>" -}
 --
 -- The list of all tests
@@ -71,7 +70,8 @@ tests =
         ]
     , testGroup
         "test vectors"
-        [ testCase "producing golden test vectors" $ checkTestVector "vrf_ver13_1"
+        [ testCase "generated golden test vector: vrf_ver13_1" $ checkTestVector "vrf_ver13_1"
+        , testCase "generated golden test vector: vrf_ver13_2" $ checkTestVector "vrf_ver13_2"
         ]
     ]
 
