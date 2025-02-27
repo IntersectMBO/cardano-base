@@ -72,8 +72,8 @@ tests =
         "test vectors for PraosBatchCompat"
         [ testCase "generated golden test vector: vrf_ver13_generated_1" $ checkTestVector "vrf_ver13_generated_1"
         , testCase "generated golden test vector: vrf_ver13_generated_2" $ checkTestVector "vrf_ver13_generated_2"
-        -- the below does not work for : bytesEq (Ver13.verify verKey proof message) hash
-        -- testCase "generated golden test vector: vrf_ver13_generated_3" $ checkTestVector "vrf_ver13_generated_3"
+        , testCase "generated golden test vector: vrf_ver13_generated_3" $ checkTestVector "vrf_ver13_generated_3"
+        , testCase "generated golden test vector: vrf_ver13_generated_4" $ checkTestVector "vrf_ver13_generated_4"
         ]
     ]
 
