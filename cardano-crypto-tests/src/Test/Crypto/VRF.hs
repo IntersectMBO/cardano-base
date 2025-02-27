@@ -86,6 +86,9 @@ tests =
         -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
         , testCase "generated golden test vector: vrf_ver03_standard_11" $
             checkVer03TestVector "vrf_ver03_standard_11"
+        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+        , testCase "generated golden test vector: vrf_ver03_standard_12" $
+            checkVer03TestVector "vrf_ver03_standard_12"
         ]
     , testGroup
         "test vectors for PraosBatchCompat"
