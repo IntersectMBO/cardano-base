@@ -30,6 +30,8 @@ module Cardano.Crypto.VRF.Praos (
 
   -- * Conversions
   outputBytes,
+  outputFromBytes,
+  outputFromProof,
   proofBytes,
   skBytes,
   vkBytes,
@@ -375,6 +377,24 @@ vkFromBytes bs = do
 -- not be initialized.
 mkOutput :: IO Output
 mkOutput = fmap Output $ newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_outputbytes)
+
+outputFromBytes :: ByteString -> Output
+outputFromBytes bs = unsafePerformIO $ do
+  if BS.length bs /= vrfKeySizeVRF
+    then do
+      error
+        ( "Invalid output length "
+            <> show @Int bsLen
+            <> ", expecting "
+            <> show @Int vrfKeySizeVRF
+        )
+    else do
+      output <- mkOutput
+      withForeignPtr (unOutput output) $ \ptr ->
+        copyFromByteString ptr bs vrfKeySizeVRF
+      return output
+  where
+    bsLen = BS.length bs
 
 -- | Derive a key pair (Sign + Verify) from a seed.
 keypairFromSeed :: Seed -> (VerKey, SignKey)
