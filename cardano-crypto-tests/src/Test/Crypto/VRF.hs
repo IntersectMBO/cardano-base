@@ -77,6 +77,8 @@ tests =
 
         -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 11
         , testCase "generated golden test vector: vrf_ver13_standard_11" $ checkTestVector "vrf_ver13_standard_11"
+        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 12
+        , testCase "generated golden test vector: vrf_ver13_standard_12" $ checkTestVector "vrf_ver13_standard_12"
         ]
     ]
 
@@ -161,9 +163,9 @@ parserVRFTestVector = do
     version <- parseContent "ver" parseString
     ciphersuite <- parseContent "ciphersuite" parseString
     sk <- parseContent "sk" $ parserHex (Just 32)
-    vk <- parseContent "vk" $ parserHex (Just 32)
-    let signingKey = Ver13.SignKeyPraosBatchCompatVRF . Ver13.skFromBytes $ sk <> vk
-    let verifyingKey = Ver13.VerKeyPraosBatchCompatVRF $ Ver13.vkFromBytes vk
+    pk <- parseContent "pk" $ parserHex (Just 32)
+    let signingKey = Ver13.SignKeyPraosBatchCompatVRF . Ver13.skFromBytes $ sk <> pk
+    let verifyingKey = Ver13.VerKeyPraosBatchCompatVRF $ Ver13.vkFromBytes pk
     message <- parseContent "alpha" $ parserHex Nothing
     proof <- Ver13.proofFromBytes <$> parseContent "pi" (parserHex (Just 128))
     hash <- Ver13.outputFromBytes <$> parseContent "beta" (parserHex (Just 64))
