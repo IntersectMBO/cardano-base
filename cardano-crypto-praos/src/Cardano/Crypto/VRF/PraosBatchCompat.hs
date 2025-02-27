@@ -46,6 +46,7 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   unsafeRawSeed,
   outputBytes,
   outputFromBytes,
+  outputFromProof,
   proofBytes,
   proofFromBytes,
   skBytes,
