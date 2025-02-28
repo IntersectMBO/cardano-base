@@ -17,7 +17,7 @@ where
 import Cardano.Crypto.Util
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
-import qualified Cardano.Crypto.VRF.Praos  as Ver03
+import qualified Cardano.Crypto.VRF.Praos as Ver03
 import Cardano.Crypto.VRF.PraosBatchCompat
 import qualified Cardano.Crypto.VRF.PraosBatchCompat as Ver13
 
@@ -79,15 +79,14 @@ tests =
             checkVer03TestVector "vrf_ver03_generated_3"
         , testCase "generated golden test vector: vrf_ver03_generated_4" $
             checkVer03TestVector "vrf_ver03_generated_4"
-
-        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
-        --, testCase "generated golden test vector: vrf_ver03_standard_10" $
-            --  checkVer03TestVector "vrf_ver03_standard_10"
-        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
-        , testCase "generated golden test vector: vrf_ver03_standard_11" $
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+          -- , testCase "generated golden test vector: vrf_ver03_standard_10" $
+          --  checkVer03TestVector "vrf_ver03_standard_10"
+          -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+          testCase "generated golden test vector: vrf_ver03_standard_11" $
             checkVer03TestVector "vrf_ver03_standard_11"
-        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
-        , testCase "generated golden test vector: vrf_ver03_standard_12" $
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+          testCase "generated golden test vector: vrf_ver03_standard_12" $
             checkVer03TestVector "vrf_ver03_standard_12"
         ]
     , testGroup
@@ -100,140 +99,143 @@ tests =
             checkVer13TestVector "vrf_ver13_generated_3"
         , testCase "generated golden test vector: vrf_ver13_generated_4" $
             checkVer13TestVector "vrf_ver13_generated_4"
-
-        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 10
-        --, testCase "generated golden test vector: vrf_ver13_standard_10" $
-            --  checkTestVector "vrf_ver13_standard_10"
-        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 11
-        , testCase "generated golden test vector: vrf_ver13_standard_11" $
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 10
+          -- , testCase "generated golden test vector: vrf_ver13_standard_10" $
+          --  checkTestVector "vrf_ver13_standard_10"
+          -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 11
+          testCase "generated golden test vector: vrf_ver13_standard_11" $
             checkVer13TestVector "vrf_ver13_standard_11"
-        -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 12
-        , testCase "generated golden test vector: vrf_ver13_standard_12" $
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 12
+          testCase "generated golden test vector: vrf_ver13_standard_12" $
             checkVer13TestVector "vrf_ver13_standard_12"
         ]
     ]
 
 checkVer03TestVector :: FilePath -> Assertion
 checkVer03TestVector file = do
-    dir <- getCurrentDirectory
-    str <- readFile $ dir <> "/test_vectors/" <> file
-    let testVectorE = Read.readMaybe @VRFTestVector str
-    assertBool ("parsing test vector: " <> file <> " not successful") $ isJust testVectorE
-    let VRFTestVector{..} = fromJust testVectorE
-    signKey <- Ver03.skFromBytes signingKey
-    verKey <- Ver03.vkFromBytes verifyingKey
-    let bytesEq left right = case left of
-            Just left' ->
-                Ver03.outputBytes left' @?= Ver03.outputBytes right
-            Nothing ->
-                assertBool ("left side in byteEq gave Nothing") False
+  dir <- getCurrentDirectory
+  str <- readFile $ dir <> "/test_vectors/" <> file
+  let testVectorE = Read.readMaybe @VRFTestVector str
+  assertBool ("parsing test vector: " <> file <> " not successful") $ isJust testVectorE
+  let VRFTestVector {..} = fromJust testVectorE
+  signKey <- Ver03.skFromBytes signingKey
+  verKey <- Ver03.vkFromBytes verifyingKey
+  let bytesEq left right = case left of
+        Just left' ->
+          Ver03.outputBytes left' @?= Ver03.outputBytes right
+        Nothing ->
+          assertBool ("left side in byteEq gave Nothing") False
 
-    name @?= algorithmNameVRF (Proxy :: Proxy PraosVRF)
-    version @?= "ietfdraft03"
-    ciphersuite @?= "ECVRF-ED25519-SHA512-Elligator2"
-    proof' <- Ver03.proofFromBytes proof
-    let hash' = Ver03.outputFromBytes hash
-    -- prove signKey msg -> proof
-    Ver03.prove signKey message @?= Just proof'
-    -- signKey -> verKey
-    Ver03.skToVerKey signKey @?= verKey
-    -- proof -> hashed msg
-    bytesEq (Ver03.outputFromProof proof') hash'
-    -- verify verKey proof msg -> hashed msg
-    bytesEq (Ver03.verify verKey proof' message) hash'
+  name @?= algorithmNameVRF (Proxy :: Proxy PraosVRF)
+  version @?= "ietfdraft03"
+  ciphersuite @?= "ECVRF-ED25519-SHA512-Elligator2"
+  proof' <- Ver03.proofFromBytes proof
+  let hash' = Ver03.outputFromBytes hash
+  -- prove signKey msg -> proof
+  Ver03.prove signKey message @?= Just proof'
+  -- signKey -> verKey
+  Ver03.skToVerKey signKey @?= verKey
+  -- proof -> hashed msg
+  bytesEq (Ver03.outputFromProof proof') hash'
+  -- verify verKey proof msg -> hashed msg
+  bytesEq (Ver03.verify verKey proof' message) hash'
 
 checkVer13TestVector :: FilePath -> Assertion
 checkVer13TestVector file = do
-    dir <- getCurrentDirectory
-    str <- readFile $ dir <> "/test_vectors/" <> file
-    let testVectorE = Read.readMaybe @VRFTestVector str
-    assertBool ("parsing test vector: " <> file <> " not successful") $ isJust testVectorE
-    let VRFTestVector{..} = fromJust testVectorE
-    let signKey = Ver13.skFromBytes signingKey
-    let verKey = Ver13.vkFromBytes verifyingKey
-    let bytesEq left right = case left of
-            Just left' ->
-                Ver13.outputBytes left' @?= Ver13.outputBytes right
-            Nothing ->
-                assertBool ("left side in byteEq gave Nothing") False
+  dir <- getCurrentDirectory
+  str <- readFile $ dir <> "/test_vectors/" <> file
+  let testVectorE = Read.readMaybe @VRFTestVector str
+  assertBool ("parsing test vector: " <> file <> " not successful") $ isJust testVectorE
+  let VRFTestVector {..} = fromJust testVectorE
+  let signKey = Ver13.skFromBytes signingKey
+  let verKey = Ver13.vkFromBytes verifyingKey
+  let bytesEq left right = case left of
+        Just left' ->
+          Ver13.outputBytes left' @?= Ver13.outputBytes right
+        Nothing ->
+          assertBool ("left side in byteEq gave Nothing") False
 
-    name @?= algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
-    version @?= "ietfdraft13"
-    ciphersuite @?= "ECVRF-ED25519-SHA512-Elligator2"
-    -- prove signKey msg -> proof
-    let proof' = Ver13.proofFromBytes proof
-    let hash' = Ver13.outputFromBytes hash
-    Ver13.prove signKey message @?= Just proof'
-    -- signKey -> verKey
-    Ver13.skToVerKey signKey @?= verKey
-    -- proof -> hashed msg
-    bytesEq (Ver13.outputFromProof proof') hash'
-    -- verify verKey proof msg -> hashed msg
-    bytesEq (Ver13.verify verKey proof' message) hash'
+  name @?= algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
+  version @?= "ietfdraft13"
+  ciphersuite @?= "ECVRF-ED25519-SHA512-Elligator2"
+  -- prove signKey msg -> proof
+  let proof' = Ver13.proofFromBytes proof
+  let hash' = Ver13.outputFromBytes hash
+  Ver13.prove signKey message @?= Just proof'
+  -- signKey -> verKey
+  Ver13.skToVerKey signKey @?= verKey
+  -- proof -> hashed msg
+  bytesEq (Ver13.outputFromProof proof') hash'
+  -- verify verKey proof msg -> hashed msg
+  bytesEq (Ver13.verify verKey proof' message) hash'
 
 data VRFTestVector = VRFTestVector
-    { name         :: String
-    , version      :: String
-    , ciphersuite  :: String
-    , signingKey   :: BS.ByteString
-    , verifyingKey :: BS.ByteString
-    , message      :: BS.ByteString
-    , proof        :: BS.ByteString
-    , hash         :: BS.ByteString
-    }
+  { name :: String
+  , version :: String
+  , ciphersuite :: String
+  , signingKey :: BS.ByteString
+  , verifyingKey :: BS.ByteString
+  , message :: BS.ByteString
+  , proof :: BS.ByteString
+  , hash :: BS.ByteString
+  }
 
 data HexStringWithLength = HexStringWithLength
-    { payload :: String
-    , expectedLength :: Int
-    } deriving (Show, Eq)
+  { payload :: String
+  , expectedLength :: Int
+  }
+  deriving (Show, Eq)
 
 parserHex :: Maybe Int -> Parse.ReadP BS.ByteString
 parserHex lenM = do
-    str <- parseString
-    case lenM of
-        Just len -> handleDecode str len
-        Nothing -> handleDecode str ((length str) `div` 2)
+  str <- parseString
+  case lenM of
+    Just len -> handleDecode str len
+    Nothing -> handleDecode str ((length str) `div` 2)
   where
     handleDecode str size = case decodeHexString str size of
-        Right bs -> pure bs
-        Left err -> error err
+      Right bs -> pure bs
+      Left err -> error err
 
 parseKey :: String -> Parse.ReadP String
 parseKey key = do
-    key' <- Parse.string key
-    Parse.skipSpaces
-    _ <- Parse.string ":"
-    Parse.skipSpaces
-    pure key'
+  key' <- Parse.string key
+  Parse.skipSpaces
+  _ <- Parse.string ":"
+  Parse.skipSpaces
+  pure key'
 
 parseEOL :: Parse.ReadP ()
-parseEOL = Parse.choice
+parseEOL =
+  Parse.choice
     [ Parse.char '\n' >> return ()
     , Parse.eof
     ]
 
 parseContent :: String -> Parse.ReadP a -> Parse.ReadP a
 parseContent key parser =
-    Parse.between (parseKey key) parseEOL parser
+  Parse.between (parseKey key) parseEOL parser
 
 parseString :: Parse.ReadP String
 parseString = Parse.munch1 (\c -> Char.isAlphaNum c || c == '-')
 
 parserVRFTestVector :: Parse.ReadP VRFTestVector
 parserVRFTestVector = do
-    name <- parseContent "vrf" parseString
-    version <- parseContent "ver" parseString
-    ciphersuite <- parseContent "ciphersuite" parseString
-    sk <- parseContent "sk" $ parserHex (Just 32)
-    verifyingKey <- parseContent "pk" $ parserHex (Just 32)
-    let signingKey = sk <> verifyingKey
-    message <- parseContent "alpha" $ parserHex Nothing
-    proof <- if name == "PraosVRF" then
-                 parseContent "pi" (parserHex (Just 80))
-             else
-                 parseContent "pi" (parserHex (Just 128))
-    hash <- parseContent "beta" (parserHex (Just 64))
-    pure VRFTestVector{..}
+  name <- parseContent "vrf" parseString
+  version <- parseContent "ver" parseString
+  ciphersuite <- parseContent "ciphersuite" parseString
+  sk <- parseContent "sk" $ parserHex (Just 32)
+  verifyingKey <- parseContent "pk" $ parserHex (Just 32)
+  let signingKey = sk <> verifyingKey
+  message <- parseContent "alpha" $ parserHex Nothing
+  proof <-
+    if name == "PraosVRF"
+      then
+        parseContent "pi" (parserHex (Just 80))
+      else
+        parseContent "pi" (parserHex (Just 128))
+  hash <- parseContent "beta" (parserHex (Just 64))
+  pure VRFTestVector {..}
 
 instance Read VRFTestVector where
   readsPrec _ = Parse.readP_to_S parserVRFTestVector
