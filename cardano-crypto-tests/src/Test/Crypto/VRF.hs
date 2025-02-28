@@ -80,9 +80,9 @@ tests =
         , testCase "generated golden test vector: vrf_ver03_generated_4" $
             checkVer03TestVector "vrf_ver03_generated_4"
         , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
-          -- , testCase "generated golden test vector: vrf_ver03_standard_10" $
-          --  checkVer03TestVector "vrf_ver03_standard_10"
-          -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+          testCase "generated golden test vector: vrf_ver03_standard_10" $
+            checkVer03TestVector "vrf_ver03_standard_10"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
           testCase "generated golden test vector: vrf_ver03_standard_11" $
             checkVer03TestVector "vrf_ver03_standard_11"
         , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
@@ -100,12 +100,15 @@ tests =
         , testCase "generated golden test vector: vrf_ver13_generated_4" $
             checkVer13TestVector "vrf_ver13_generated_4"
         , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 10
-          -- , testCase "generated golden test vector: vrf_ver13_standard_10" $
-          --  checkTestVector "vrf_ver13_standard_10"
-          -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 11
+          -- pi = 7d9c633ffeee27349264cf5c667579fc583b4bda63ab71d001f89c10003ab46f14adf9a3cd8b8412d9038531e865c341cafa73589b023d14311c331a9ad15ff2fb37831e00f0acaa6d73bc9997b06501
+          testCase "generated golden test vector: vrf_ver13_standard_10" $
+            checkVer13TestVector "vrf_ver13_standard_10"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 11
+          -- pi = 47b327393ff2dd81336f8a2ef10339112401253b3c714eeda879f12c509072ef055b48372bb82efbdce8e10c8cb9a2f9d60e93908f93df1623ad78a86a028d6bc064dbfc75a6a57379ef855dc6733801
           testCase "generated golden test vector: vrf_ver13_standard_11" $
             checkVer13TestVector "vrf_ver13_standard_11"
         , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 12
+          -- pi = 926e895d308f5e328e7aa159c06eddbe56d06846abf5d98c2512235eaa57fdce35b46edfc655bc828d44ad09d1150f31374e7ef73027e14760d42e77341fe05467bb286cc2c9d7fde29120a0b2320d04
           testCase "generated golden test vector: vrf_ver13_standard_12" $
             checkVer13TestVector "vrf_ver13_standard_12"
         ]
@@ -189,9 +192,12 @@ data HexStringWithLength = HexStringWithLength
 parserHex :: Maybe Int -> Parse.ReadP BS.ByteString
 parserHex lenM = do
   str <- parseString
-  case lenM of
-    Just len -> handleDecode str len
-    Nothing -> handleDecode str ((length str) `div` 2)
+  if str == "empty"
+    then
+      pure BS.empty
+    else case lenM of
+      Just len -> handleDecode str len
+      Nothing -> handleDecode str ((length str) `div` 2)
   where
     handleDecode str size = case decodeHexString str size of
       Right bs -> pure bs
@@ -227,7 +233,7 @@ parserVRFTestVector = do
   sk <- parseContent "sk" $ parserHex (Just 32)
   verifyingKey <- parseContent "pk" $ parserHex (Just 32)
   let signingKey = sk <> verifyingKey
-  message <- parseContent "alpha" $ parserHex Nothing
+  message <- parseContent "alpha" (parserHex Nothing)
   proof <-
     if name == "PraosVRF"
       then
