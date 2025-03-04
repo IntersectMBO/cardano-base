@@ -136,7 +136,7 @@ checkVer03TestVector file = do
   testVectorVersion @?= "ietfdraft03"
   testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
   proof' <- Ver03.proofFromBytes testVectorProof
-  let hash' = Ver03.outputFromBytes testVectorHash
+  hash' <- Ver03.outputFromBytes testVectorHash
   -- prove signKey msg -> proof
   Ver03.prove signKey testVectorMessage @?= Just proof'
   -- signKey -> verKey
@@ -163,7 +163,7 @@ checkVer13TestVector file = do
   testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
   -- prove signKey msg -> proof
   let proof' = Ver13.proofFromBytes testVectorProof
-  let hash' = Ver13.outputFromBytes testVectorHash
+  hash' <- Ver13.outputFromBytes testVectorHash
   Ver13.prove signKey testVectorMessage @?= Just proof'
   -- signKey -> verKey
   Ver13.skToVerKey signKey @?= verKey

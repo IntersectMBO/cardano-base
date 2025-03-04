@@ -378,21 +378,21 @@ vkFromBytes bs = do
 mkOutput :: IO Output
 mkOutput = fmap Output $ newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_outputbytes)
 
-outputFromBytes :: ByteString -> Output
-outputFromBytes bs = unsafePerformIO $ do
-  if BS.length bs /= vrfKeySizeVRF
-    then do
-      error
+outputFromBytes :: MonadFail m => ByteString -> m Output
+outputFromBytes bs = do
+  if bsLen /= fromIntegral @CSize @Int crypto_vrf_outputbytes
+    then
+      fail
         ( "Invalid output length "
-            <> show @Int bsLen
+            <> show bsLen
             <> ", expecting "
-            <> show @Int vrfKeySizeVRF
+            <> show crypto_vrf_outputbytes
         )
-    else do
+    else pure $! unsafePerformIO $ do
       output <- mkOutput
       withForeignPtr (unOutput output) $ \ptr ->
-        copyFromByteString ptr bs vrfKeySizeVRF
-      return output
+        copyFromByteString ptr bs bsLen
+      pure output
   where
     bsLen = BS.length bs
 

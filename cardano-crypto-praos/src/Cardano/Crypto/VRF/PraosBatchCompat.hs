@@ -182,8 +182,6 @@ foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes"
   io_crypto_vrf_ietfdraft13_publickeybytes :: IO CSize
 foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes"
   io_crypto_vrf_ietfdraft13_secretkeybytes :: IO CSize
-foreign import ccall "crypto_vrf_ietfdraft13_outputbytes"
-  io_crypto_vrf_ietfdraft13_outputbytes :: IO CSize
 
 foreign import ccall "crypto_vrf_seed_keypair"
   crypto_vrf_ietfdraft13_keypair_from_seed :: VerKeyPtr -> SignKeyPtr -> SeedPtr -> IO CInt
@@ -220,9 +218,6 @@ ioSignKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_secretkeybytes
 
 ioVerKeySizeVRF :: IO Int
 ioVerKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_publickeybytes
-
-ioOutputSizeVRF :: IO Int
-ioOutputSizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_outputbytes
 
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
@@ -416,24 +411,21 @@ mkOutput =
   fmap Output $
     newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft13_outputbytes)
 
-outputFromBytes :: ByteString -> Output
-outputFromBytes bs = unsafePerformIO $ do
-  if BS.length bs /= vrfKeySizeVRF
-    then do
-      ioSize <- ioOutputSizeVRF
-      error
+outputFromBytes :: MonadFail m => ByteString -> m Output
+outputFromBytes bs = do
+  if bsLen /= fromIntegral @CSize @Int crypto_vrf_ietfdraft13_outputbytes
+    then
+      fail
         ( "Invalid output length "
-            <> show @Int bsLen
+            <> show bsLen
             <> ", expecting "
-            <> show @Int vrfKeySizeVRF
-            <> " or "
-            <> show @Int ioSize
+            <> show crypto_vrf_ietfdraft13_outputbytes
         )
-    else do
+    else pure $! unsafePerformIO $ do
       output <- mkOutput
       withForeignPtr (unOutput output) $ \ptr ->
-        copyFromByteString ptr bs vrfKeySizeVRF
-      return output
+        copyFromByteString ptr bs bsLen
+      pure output
   where
     bsLen = BS.length bs
 
