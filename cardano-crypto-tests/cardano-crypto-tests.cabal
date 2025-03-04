@@ -83,7 +83,6 @@ library
     criterion,
     crypton,
     deepseq,
-    directory,
     formatting,
     io-classes >=1.4.0,
     mempack,

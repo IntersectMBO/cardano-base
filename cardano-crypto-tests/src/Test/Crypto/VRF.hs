@@ -26,10 +26,10 @@ import qualified Data.Char as Char
 import Data.Maybe (fromJust, isJust)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64, Word8)
-import System.Directory (getCurrentDirectory)
 import qualified Text.ParserCombinators.ReadP as Parse
 import qualified Text.Read as Read
 
+import Paths_cardano_crypto_tests (getDataFileName)
 import Test.Crypto.Util
 import Test.QuickCheck (
   Arbitrary (..),
@@ -116,8 +116,8 @@ tests =
 
 checkVer03TestVector :: FilePath -> Assertion
 checkVer03TestVector file = do
-  dir <- getCurrentDirectory
-  str <- readFile $ dir <> "/test_vectors/" <> file
+  filename <- getDataFileName $ "test_vectors/" <> file
+  str <- readFile filename
   let testVectorE = Read.readMaybe @VRFTestVector str
   assertBool ("parsing test vector: " <> file <> " not successful") $ isJust testVectorE
   let VRFTestVector {..} = fromJust testVectorE
@@ -145,8 +145,8 @@ checkVer03TestVector file = do
 
 checkVer13TestVector :: FilePath -> Assertion
 checkVer13TestVector file = do
-  dir <- getCurrentDirectory
-  str <- readFile $ dir <> "/test_vectors/" <> file
+  filename <- getDataFileName $ "test_vectors/" <> file
+  str <- readFile filename
   let testVectorE = Read.readMaybe @VRFTestVector str
   assertBool ("parsing test vector: " <> file <> " not successful") $ isJust testVectorE
   let VRFTestVector {..} = fromJust testVectorE
