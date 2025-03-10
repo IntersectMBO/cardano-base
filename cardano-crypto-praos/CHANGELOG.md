@@ -2,7 +2,7 @@
 
 ## 2.2.0.1
 
-*
+* Add and expose `outputFromBytes` for both `Praos` and `PraosBatchCompat` modules
 
 ## 2.2.0.0
 

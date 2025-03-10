@@ -23,6 +23,20 @@ data-files:
   bls12-381-test-vectors/test_vectors/h2c_large_dst
   bls12-381-test-vectors/test_vectors/pairing_test_vectors
   bls12-381-test-vectors/test_vectors/serde_test_vectors
+  test_vectors/vrf_ver03_generated_1
+  test_vectors/vrf_ver03_generated_2
+  test_vectors/vrf_ver03_generated_3
+  test_vectors/vrf_ver03_generated_4
+  test_vectors/vrf_ver03_standard_10
+  test_vectors/vrf_ver03_standard_11
+  test_vectors/vrf_ver03_standard_12
+  test_vectors/vrf_ver13_generated_1
+  test_vectors/vrf_ver13_generated_2
+  test_vectors/vrf_ver13_generated_3
+  test_vectors/vrf_ver13_generated_4
+  test_vectors/vrf_ver13_standard_10
+  test_vectors/vrf_ver13_standard_11
+  test_vectors/vrf_ver13_standard_12
 
 flag secp256k1-support
   description:
@@ -49,13 +63,13 @@ common project-config
 library
   import: base, project-config
   hs-source-dirs: src
+  other-modules: Paths_cardano_crypto_tests
   exposed-modules:
     Bench.Crypto.BenchData
     Bench.Crypto.DSIGN
     Bench.Crypto.HASH
     Bench.Crypto.KES
     Bench.Crypto.VRF
-    Paths_cardano_crypto_tests
     Test.Crypto.AllocLog
     Test.Crypto.DSIGN
     Test.Crypto.EllipticCurve
@@ -106,6 +120,7 @@ test-suite test-crypto
   import: base, project-config
   type: exitcode-stdio-1.0
   hs-source-dirs: test
+  other-modules: Paths_cardano_crypto_tests
   main-is: Main.hs
   build-depends:
     base,

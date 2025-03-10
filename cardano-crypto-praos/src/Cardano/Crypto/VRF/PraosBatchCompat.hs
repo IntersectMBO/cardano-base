@@ -40,13 +40,19 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   Seed,
   genSeed,
   keypairFromSeed,
+  seedFromBytes,
 
   -- * Conversions
   unsafeRawSeed,
   outputBytes,
+  outputFromBytes,
+  outputFromProof,
   proofBytes,
+  proofFromBytes,
   skBytes,
+  skFromBytes,
   vkBytes,
+  vkFromBytes,
   skToVerKey,
   skToSeed,
 
@@ -56,6 +62,8 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   SignKeyVRF (..),
   VerKeyVRF (..),
   CertVRF (..),
+  Proof (..),
+  Output (..),
 )
 where
 
@@ -165,7 +173,8 @@ foreign import ccall "crypto_vrf_ietfdraft13_publickeybytes"
   crypto_vrf_ietfdraft13_publickeybytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_secretkeybytes"
   crypto_vrf_ietfdraft13_secretkeybytes :: CSize
-foreign import ccall "crypto_vrf_ietfdraft13_seedbytes" crypto_vrf_ietfdraft13_seedbytes :: CSize
+foreign import ccall "crypto_vrf_ietfdraft13_seedbytes"
+  crypto_vrf_ietfdraft13_seedbytes :: CSize
 foreign import ccall "crypto_vrf_ietfdraft13_outputbytes"
   crypto_vrf_ietfdraft13_outputbytes :: CSize
 
@@ -401,6 +410,24 @@ mkOutput :: IO Output
 mkOutput =
   fmap Output $
     newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft13_outputbytes)
+
+outputFromBytes :: MonadFail m => ByteString -> m Output
+outputFromBytes bs = do
+  if bsLen /= fromIntegral @CSize @Int crypto_vrf_ietfdraft13_outputbytes
+    then
+      fail
+        ( "Invalid output length "
+            <> show bsLen
+            <> ", expecting "
+            <> show crypto_vrf_ietfdraft13_outputbytes
+        )
+    else pure $! unsafePerformIO $ do
+      output <- mkOutput
+      withForeignPtr (unOutput output) $ \ptr ->
+        copyFromByteString ptr bs bsLen
+      pure output
+  where
+    bsLen = BS.length bs
 
 -- | Derive a key pair (Sign + Verify) from a seed.
 keypairFromSeed :: Seed -> (VerKey, SignKey)
