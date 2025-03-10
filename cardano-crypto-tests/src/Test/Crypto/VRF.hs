@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -15,12 +17,18 @@ where
 import Cardano.Crypto.Util
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
+import qualified Cardano.Crypto.VRF.Praos as Ver03
 import Cardano.Crypto.VRF.PraosBatchCompat
+import qualified Cardano.Crypto.VRF.PraosBatchCompat as Ver13
 
 import qualified Data.ByteString as BS
+import qualified Data.Char as Char
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64, Word8)
+import qualified Text.ParserCombinators.ReadP as Parse
+import qualified Text.Read as Read
 
+import Paths_cardano_crypto_tests (getDataFileName)
 import Test.Crypto.Util
 import Test.QuickCheck (
   Arbitrary (..),
@@ -32,6 +40,7 @@ import Test.QuickCheck (
   (==>),
  )
 import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.HUnit (Assertion, HasCallStack, assertBool, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck (testProperty, vectorOf)
 
 {- HLINT IGNORE "Use <$>" -}
@@ -59,7 +68,183 @@ tests =
         , testProperty "compatibleVerKeyConversion" prop_verKeyValidConversion
         , testProperty "compatibleSignKeyConversion" prop_signKeyValidConversion
         ]
+    , testGroup
+        "test vectors for Praos"
+        [ testCase "generated golden test vector: vrf_ver03_generated_1" $
+            checkVer03TestVector "vrf_ver03_generated_1"
+        , testCase "generated golden test vector: vrf_ver03_generated_2" $
+            checkVer03TestVector "vrf_ver03_generated_2"
+        , testCase "generated golden test vector: vrf_ver03_generated_3" $
+            checkVer03TestVector "vrf_ver03_generated_3"
+        , testCase "generated golden test vector: vrf_ver03_generated_4" $
+            checkVer03TestVector "vrf_ver03_generated_4"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+          testCase "generated golden test vector: vrf_ver03_standard_10" $
+            checkVer03TestVector "vrf_ver03_standard_10"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+          testCase "generated golden test vector: vrf_ver03_standard_11" $
+            checkVer03TestVector "vrf_ver03_standard_11"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/03/ - Section A.4.
+          testCase "generated golden test vector: vrf_ver03_standard_12" $
+            checkVer03TestVector "vrf_ver03_standard_12"
+        ]
+    , testGroup
+        "test vectors for PraosBatchCompat"
+        [ testCase "generated golden test vector: vrf_ver13_generated_1" $
+            checkVer13TestVector "vrf_ver13_generated_1"
+        , testCase "generated golden test vector: vrf_ver13_generated_2" $
+            checkVer13TestVector "vrf_ver13_generated_2"
+        , testCase "generated golden test vector: vrf_ver13_generated_3" $
+            checkVer13TestVector "vrf_ver13_generated_3"
+        , testCase "generated golden test vector: vrf_ver13_generated_4" $
+            checkVer13TestVector "vrf_ver13_generated_4"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 10
+          -- pi = 7d9c633ffeee27349264cf5c667579fc583b4bda63ab71d001f89c10003ab46f14adf9a3cd8b8412d9038531e865c341cafa73589b023d14311c331a9ad15ff2fb37831e00f0acaa6d73bc9997b06501
+          testCase "generated golden test vector: vrf_ver13_standard_10" $
+            checkVer13TestVector "vrf_ver13_standard_10"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 11
+          -- pi = 47b327393ff2dd81336f8a2ef10339112401253b3c714eeda879f12c509072ef055b48372bb82efbdce8e10c8cb9a2f9d60e93908f93df1623ad78a86a028d6bc064dbfc75a6a57379ef855dc6733801
+          testCase "generated golden test vector: vrf_ver13_standard_11" $
+            checkVer13TestVector "vrf_ver13_standard_11"
+        , -- https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/13/ - example 12
+          -- pi = 926e895d308f5e328e7aa159c06eddbe56d06846abf5d98c2512235eaa57fdce35b46edfc655bc828d44ad09d1150f31374e7ef73027e14760d42e77341fe05467bb286cc2c9d7fde29120a0b2320d04
+          testCase "generated golden test vector: vrf_ver13_standard_12" $
+            checkVer13TestVector "vrf_ver13_standard_12"
+        ]
     ]
+
+bytesEq :: HasCallStack => (a -> BS.ByteString) -> Maybe a -> a -> Assertion
+bytesEq outputToBytes suppliedM expected = case suppliedM of
+  Just supplied ->
+    outputToBytes supplied @?= outputToBytes expected
+  Nothing ->
+    assertBool ("suppliedM in byteEq gave Nothing") False
+
+checkVer03TestVector :: FilePath -> Assertion
+checkVer03TestVector file = do
+  filename <- getDataFileName $ "test_vectors/" <> file
+  str <- readFile filename
+  let testVectorE = Read.readMaybe @VRFTestVector str
+  VRFTestVector {..} <-
+    maybe
+      (assertFailure $ "parsing test vector: " <> file <> " not successful")
+      pure
+      testVectorE
+  signKey <- Ver03.skFromBytes testVectorSigningKey
+  verKey <- Ver03.vkFromBytes testVectorVerifyingKey
+  testVectorName @?= algorithmNameVRF (Proxy :: Proxy PraosVRF)
+  testVectorVersion @?= "ietfdraft03"
+  testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
+  proof' <- Ver03.proofFromBytes testVectorProof
+  hash' <- Ver03.outputFromBytes testVectorHash
+  -- prove signKey msg -> proof
+  Ver03.prove signKey testVectorMessage @?= Just proof'
+  -- signKey -> verKey
+  Ver03.skToVerKey signKey @?= verKey
+  -- proof -> hashed msg
+  bytesEq Ver03.outputBytes (Ver03.outputFromProof proof') hash'
+  -- verify verKey proof msg -> hashed msg
+  bytesEq Ver03.outputBytes (Ver03.verify verKey proof' testVectorMessage) hash'
+
+checkVer13TestVector :: FilePath -> Assertion
+checkVer13TestVector file = do
+  filename <- getDataFileName $ "test_vectors/" <> file
+  str <- readFile filename
+  let testVectorE = Read.readMaybe @VRFTestVector str
+  VRFTestVector {..} <-
+    maybe
+      (assertFailure $ "parsing test vector: " <> file <> " not successful")
+      pure
+      testVectorE
+  let signKey = Ver13.skFromBytes testVectorSigningKey
+  let verKey = Ver13.vkFromBytes testVectorVerifyingKey
+  testVectorName @?= algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
+  testVectorVersion @?= "ietfdraft13"
+  testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
+  -- prove signKey msg -> proof
+  let proof' = Ver13.proofFromBytes testVectorProof
+  hash' <- Ver13.outputFromBytes testVectorHash
+  Ver13.prove signKey testVectorMessage @?= Just proof'
+  -- signKey -> verKey
+  Ver13.skToVerKey signKey @?= verKey
+  -- proof -> hashed msg
+  bytesEq Ver13.outputBytes (Ver13.outputFromProof proof') hash'
+  -- verify verKey proof msg -> hashed msg
+  bytesEq Ver13.outputBytes (Ver13.verify verKey proof' testVectorMessage) hash'
+
+data VRFTestVector = VRFTestVector
+  { testVectorName :: String
+  , testVectorVersion :: String
+  , testVectorCipherSuite :: String
+  , testVectorSigningKey :: BS.ByteString
+  , testVectorVerifyingKey :: BS.ByteString
+  , testVectorMessage :: BS.ByteString
+  , testVectorProof :: BS.ByteString
+  , testVectorHash :: BS.ByteString
+  }
+
+data HexStringWithLength = HexStringWithLength
+  { hswlPayload :: String
+  , hswExpectedLength :: Int
+  }
+  deriving (Show, Eq)
+
+parserHex :: Maybe Int -> Parse.ReadP BS.ByteString
+parserHex lenM = do
+  str <- parseString
+  if str == "empty"
+    then
+      pure BS.empty
+    else case lenM of
+      Just len -> handleDecode str len
+      Nothing -> handleDecode str (length str `div` 2)
+  where
+    handleDecode str size = case decodeHexString str size of
+      Right bs -> pure bs
+      Left err -> error err
+
+parseKey :: String -> Parse.ReadP String
+parseKey key = do
+  key' <- Parse.string key
+  Parse.skipSpaces
+  _ <- Parse.string ":"
+  Parse.skipSpaces
+  pure key'
+
+parseEOL :: Parse.ReadP ()
+parseEOL =
+  Parse.choice
+    [ Parse.char '\n' >> return ()
+    , Parse.eof
+    ]
+
+parseContent :: String -> Parse.ReadP a -> Parse.ReadP a
+parseContent key parser =
+  Parse.between (parseKey key) parseEOL parser
+
+parseString :: Parse.ReadP String
+parseString = Parse.munch1 (\c -> Char.isAlphaNum c || c == '-')
+
+parserVRFTestVector :: Parse.ReadP VRFTestVector
+parserVRFTestVector = do
+  testVectorName <- parseContent "vrf" parseString
+  testVectorVersion <- parseContent "ver" parseString
+  testVectorCipherSuite <- parseContent "ciphersuite" parseString
+  sk <- parseContent "sk" $ parserHex (Just 32)
+  testVectorVerifyingKey <- parseContent "pk" $ parserHex (Just 32)
+  let testVectorSigningKey = sk <> testVectorVerifyingKey
+  testVectorMessage <- parseContent "alpha" (parserHex Nothing)
+  testVectorProof <-
+    if testVectorName == "PraosVRF"
+      then
+        parseContent "pi" (parserHex (Just 80))
+      else
+        parseContent "pi" (parserHex (Just 128))
+  testVectorHash <- parseContent "beta" (parserHex (Just 64))
+  pure VRFTestVector {..}
+
+instance Read VRFTestVector where
+  readsPrec _ = Parse.readP_to_S parserVRFTestVector
 
 testVRFAlgorithm ::
   forall proxy v.
