@@ -10,8 +10,8 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2025-01-19T19:57:14Z
-index-state: cardano-haskell-packages 2025-01-13T22:30:16Z
+index-state: 2025-03-06T20:53:09Z
+index-state: cardano-haskell-packages 2025-03-04T15:51:45Z
 packages:
   base-deriving-via
   cardano-binary
@@ -42,10 +42,5 @@ package bitvec
 if impl(ghc >=9.12)
   allow-newer:
     -- treediff: Difficult maintainer https://github.com/haskellari/tree-diff/issues/97
-    -- cborg/serialise: Stuck on `cabal-3.14` and unresponsive maintainers https://github.com/well-typed/cborg/pull/339
-    , cborg:base
-    , cborg:ghc-prim
-    , serialise:base
-    , serialise:ghc-prim
     , tree-diff:base
     , tree-diff:time
