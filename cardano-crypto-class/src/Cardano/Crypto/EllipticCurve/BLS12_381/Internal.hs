@@ -54,6 +54,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_add_or_double,
     c_blst_mult,
     c_blst_cneg,
+    c_blst_scratch_sizeof,
+    c_blst_mult_pippenger,
     c_blst_hash,
     c_blst_compress,
     c_blst_serialize,
@@ -129,6 +131,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsMult,
   blsCneg,
   blsNeg,
+  blsMSM,
   blsCompress,
   blsSerialize,
   blsUncompress,
@@ -165,11 +168,14 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
+
 import Data.Proxy (Proxy (..))
 import Data.Void
+import Foreign (poke, sizeOf)
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.ForeignPtr
+import Foreign.Marshal (advancePtr)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
@@ -189,9 +195,13 @@ type Point1Ptr = PointPtr Curve1
 type Point2Ptr = PointPtr Curve2
 
 newtype AffinePtr curve = AffinePtr (Ptr Void)
+newtype AffinePtrVector curve = AffinePtrVector (Ptr Void)
 
 type Affine1Ptr = AffinePtr Curve1
 type Affine2Ptr = AffinePtr Curve2
+
+type Affine1PtrVector = AffinePtrVector Curve1
+type Affine2PtrVector = AffinePtrVector Curve2
 
 newtype PTPtr = PTPtr (Ptr Void)
 
@@ -288,6 +298,22 @@ withNewAffine_ = fmap fst . withNewAffine
 withNewAffine' :: BLS curve => (AffinePtr curve -> IO a) -> IO (Affine curve)
 withNewAffine' = fmap snd . withNewAffine
 
+withAffineVector :: [Affine curve] -> (AffinePtrVector curve -> IO a) -> IO a
+withAffineVector affines go = do
+  let numAffines = length affines
+      sizeReference = sizeOf (undefined :: Ptr ())
+  allocaBytes (numAffines * sizeReference) $ \ptr ->
+    -- The accumulate function ensures that each `withAffine` call is properly nested.
+    -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
+    -- By nesting `withAffine` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
+    let accumulate [] = go (AffinePtrVector (castPtr ptr))
+        accumulate ((ix, affine) : rest) =
+          withAffine affine $ \(AffinePtr aPtr) -> do
+            poke (ptr `advancePtr` ix) aPtr
+            accumulate rest
+     in accumulate (zip [0 ..] affines)
+
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
 
@@ -317,6 +343,10 @@ class BLS curve where
   c_blst_mult :: PointPtr curve -> PointPtr curve -> ScalarPtr -> CSize -> IO ()
   c_blst_cneg :: PointPtr curve -> Bool -> IO ()
 
+  c_blst_scratch_sizeof :: Proxy curve -> CSize -> CSize
+  c_blst_mult_pippenger ::
+    PointPtr curve -> AffinePtrVector curve -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
+
   c_blst_hash ::
     PointPtr curve -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
   c_blst_compress :: Ptr CChar -> PointPtr curve -> IO ()
@@ -345,6 +375,9 @@ instance BLS Curve1 where
   c_blst_mult = c_blst_p1_mult
   c_blst_cneg = c_blst_p1_cneg
 
+  c_blst_scratch_sizeof _ = c_blst_p1s_mult_pippenger_scratch_sizeof
+  c_blst_mult_pippenger = c_blst_p1s_mult_pippenger
+
   c_blst_hash = c_blst_hash_to_g1
   c_blst_compress = c_blst_p1_compress
   c_blst_serialize = c_blst_p1_serialize
@@ -372,6 +405,9 @@ instance BLS Curve2 where
   c_blst_add_or_double = c_blst_p2_add_or_double
   c_blst_mult = c_blst_p2_mult
   c_blst_cneg = c_blst_p2_cneg
+
+  c_blst_scratch_sizeof _ = c_blst_p2s_mult_pippenger_scratch_sizeof
+  c_blst_mult_pippenger = c_blst_p2s_mult_pippenger
 
   c_blst_hash = c_blst_hash_to_g2
   c_blst_compress = c_blst_p2_compress
@@ -427,6 +463,22 @@ withNewScalar_ = fmap fst . withNewScalar
 
 withNewScalar' :: (ScalarPtr -> IO a) -> IO Scalar
 withNewScalar' = fmap snd . withNewScalar
+
+withScalarVector :: [Scalar] -> (ScalarPtrVector -> IO a) -> IO a
+withScalarVector scalars go = do
+  let numScalars = length scalars
+      sizeReference = sizeOf (undefined :: Ptr ())
+  allocaBytes (numScalars * sizeReference) $ \ptr ->
+    -- The accumulate function ensures that each `withScalar` call is properly nested.
+    -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
+    -- By nesting `withScalar` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
+    let accumulate [] = go (ScalarPtrVector (castPtr ptr))
+        accumulate ((ix, scalar) : rest) =
+          withScalar scalar $ \(ScalarPtr sPtr) -> do
+            poke (ptr `advancePtr` ix) sPtr
+            accumulate rest
+     in accumulate (zip [0 ..] scalars)
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do
@@ -512,7 +564,9 @@ scalarFromInteger n = do
 ---- Unsafe types
 
 newtype ScalarPtr = ScalarPtr (Ptr Void)
+newtype ScalarPtrVector = ScalarPtrVector (Ptr Void)
 newtype FrPtr = FrPtr (Ptr Void)
+newtype ScratchPtr = ScratchPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
 
@@ -555,6 +609,12 @@ foreign import ccall "blst_p1_generator" c_blst_p1_generator :: Point1Ptr
 foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: Point1Ptr -> Point1Ptr -> IO Bool
 foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: Point1Ptr -> IO Bool
 
+foreign import ccall "blst_p1s_mult_pippenger_scratch_sizeof"
+  c_blst_p1s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p1s_mult_pippenger"
+  c_blst_p1s_mult_pippenger ::
+    Point1Ptr -> Affine1PtrVector -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
+
 ---- Raw Point2 functions
 
 foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
@@ -581,6 +641,12 @@ foreign import ccall "blst_p2_generator" c_blst_p2_generator :: Point2Ptr
 
 foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: Point2Ptr -> Point2Ptr -> IO Bool
 foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: Point2Ptr -> IO Bool
+
+foreign import ccall "blst_p2s_mult_pippenger_scratch_sizeof"
+  c_blst_p2s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p2s_mult_pippenger"
+  c_blst_p2s_mult_pippenger ::
+    Point2Ptr -> Affine2PtrVector -> CSize -> ScalarPtrVector -> CSize -> ScratchPtr -> IO ()
 
 ---- Affine operations
 
@@ -824,7 +890,8 @@ blsZero =
           error $ "Unexpected failure deserialising point at infinity on BLS12_381.G1: " ++ show err
         Right infinity ->
           infinity -- The zero point on this curve is chosen to be the point at infinity.
-          ---- Scalar / Fr operations
+
+---- Scalar / Fr operations
 
 scalarFromFr :: Fr -> IO Scalar
 scalarFromFr fr =
@@ -874,6 +941,41 @@ scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar =
   unsafePerformIO $
     withScalar scalar c_blst_scalar_fr_check
+
+---- MSM operations
+
+-- | Multi-scalar multiplication using the Pippenger algorithm.
+-- The scalars will be brought into the range of modular arithmetic
+-- by means of a modulo operation over the 'scalarPeriod'.
+-- Negative numbers will also be brought to the range
+-- [0, 'scalarPeriod' - 1] via modular reduction.
+blsMSM :: forall curve. BLS curve => [(Point curve, Integer)] -> Point curve
+blsMSM psAndSs = unsafePerformIO $ do
+  let filteredPoints = filter (not . blsIsInf . fst) psAndSs
+  case filteredPoints of
+    [] -> return blsZero
+    _ -> do
+      let (points, scalarsAsInt) = unzip filteredPoints
+          numPoints = length points
+          affinePoints = fmap toAffine points
+      scalars <- mapM scalarFromInteger scalarsAsInt
+
+      withAffineVector affinePoints $ \affineVectorPtr -> do
+        withScalarVector scalars $ \scalarVectorPtr -> do
+          let numPoints' :: CSize
+              numPoints' = fromIntegral numPoints
+              scratchSize :: Int
+              scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
+
+          allocaBytes scratchSize $ \scratchPtr -> do
+            withNewPoint' $ \resultPtr -> do
+              c_blst_mult_pippenger
+                resultPtr
+                affineVectorPtr
+                numPoints'
+                scalarVectorPtr
+                255 -- 255 bits is the size of the scalar field (bound by the scalarPeriod below)
+                (ScratchPtr scratchPtr)
 
 ---- PT operations
 
