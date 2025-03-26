@@ -1,5 +1,9 @@
 # Changelog for `cardano-strict-containers`
 
+# 0.1.4.1
+
+*
+
 # 0.1.4.0
 
 * GHC-8.10 compatibility
