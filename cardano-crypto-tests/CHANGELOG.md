@@ -1,7 +1,8 @@
 # Changelog for `cardano-crypto-tests`
 
-## 2.2.0.1
+## 2.2.1.0
 
+* Add test for `SHA512` and `SHA3_512` algorithms.
 * Add tests using standard test vectors and generated ones for Praos and PraosBatchCompat
 
 ## 2.2.0.0
