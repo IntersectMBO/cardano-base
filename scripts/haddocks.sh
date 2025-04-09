@@ -31,14 +31,14 @@ CABAL_OPTS=(
 HADDOCK_OPTS=(
   --haddock-html
   --haddock-hyperlink-source
-  --haddock-option "--use-unicode"
+  --haddock-option="--use-unicode"
   --haddock-option="--base-url=.."
   --haddock-quickjump
 )
 
 # Rebuild documentation if requested
 if (( "${#REGENERATE[@]}" > 0 )); then
-  cabal build   "${CABAL_OPTS[@]}" "${REGENERATE[@]}"
+  cabal build   "${CABAL_OPTS[@]}" "${REGENERATE[@]}" "${HADDOCK_OPTS[@]}"
   cabal haddock "${CABAL_OPTS[@]}" "${REGENERATE[@]}" "${HADDOCK_OPTS[@]}"
 fi
 
@@ -94,15 +94,17 @@ done
 ./scripts/mkprolog.sh "${OUTPUT_DIR}" scripts/prolog
 
 # Generate top level index using interface files
-haddock \
-  -o "${OUTPUT_DIR}" \
-  --title "cardano-base" \
-  --package-name "Cardano Base" \
-  --gen-index \
-  --gen-contents \
-  --quickjump \
-  --prolog ./scripts/prolog \
+FINAL_OPTS=(
+  -o "${OUTPUT_DIR}"
+  --title "cardano-base"
+  --package-name "Cardano Base"
+  --gen-index
+  --gen-contents
+  --quickjump
+  --prolog ./scripts/prolog
   "${interface_options[@]}"
+)
+cabal haddock "${CABAL_OPTS[@]}" "${REGENERATE[@]}" "${HADDOCK_OPTS[@]}" "${FINAL_OPTS[@]/#/--haddock-option=}"
 
 # Assemble a toplevel `doc-index.json` from package level ones.
 for file in "$OUTPUT_DIR"/*/doc-index.json; do
