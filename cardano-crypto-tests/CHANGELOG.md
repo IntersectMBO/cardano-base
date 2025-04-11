@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-tests`
 
+## 2.2.1.1
+
+*
+
 ## 2.2.1.0
 
 * Add test for `SHA512` and `SHA3_512` algorithms.
