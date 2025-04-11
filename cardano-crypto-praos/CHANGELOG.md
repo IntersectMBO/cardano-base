@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-praos`
 
+## 2.2.1.1
+
+*
+
 ## 2.2.1.0
 
 * Add `outputFromBytes` to `Cardano.Crypto.VRF.Praos` module
