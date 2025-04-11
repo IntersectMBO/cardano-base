@@ -90,7 +90,7 @@ library
     bytestring >=0.10.12.0,
     cardano-binary,
     cardano-crypto-class ^>=2.2.2,
-    cardano-crypto-praos,
+    cardano-crypto-praos >=2.2.1,
     cborg,
     containers,
     contra-tracer ==0.1.0.1,
