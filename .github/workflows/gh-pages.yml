@@ -19,7 +19,7 @@ jobs:
       id: setup-haskell
       with:
         ghc-version: "9.2.8"
-        cabal-version: latest
+        cabal-version: "3.12"
 
     - name: Install system dependencies
       uses: input-output-hk/actions/base@latest
@@ -39,7 +39,21 @@ jobs:
     - name: Build haddocks
       run: scripts/haddocks.sh haddocks all
 
+    # Save generated output as an artifact
+    - name: Archive haddocks directory
+      run: tar -czf haddocks.tgz haddocks
+    - name: Upload haddocks artifact
+      # upload-artifact is pinned to avoid a bug in download-artifact
+      # See https://github.com/actions/download-artifact/issues/328
+      uses: actions/upload-artifact@v4.2.0
+      with:
+        name: haddocks
+        path: haddocks.tgz
+        overwrite: true
+        retention-days: 1
+
     - name: Add files
+      if: github.event_name == 'push' && github.ref_name == 'master'
       run: |
         git config --local user.name ${{ github.actor }}
         git config --local user.email "${{ github.actor }}@users.noreply.github.com"
@@ -75,6 +89,7 @@ jobs:
         git commit -qm "Updated from ${GITHUB_SHA} via ${GITHUB_EVENT_NAME}"
 
     - name: Push to gh-pages
+      if: github.event_name == 'push' && github.ref_name == 'master'
       uses: ad-m/github-push-action@v0.8.0
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
