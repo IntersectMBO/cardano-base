@@ -13,7 +13,6 @@ Once all the pending issues/pull-requests are integrated:
 ./scripts/add-from-github.sh "https://github.com/intersectmbo/cardano-base" <COMMIT_HASH> \
   base-deriving-via \
   cardano-binary \
-  test/cardano-binary-test \
   cardano-crypto-class \
   cardano-crypto-praos \
   cardano-crypto-tests \
@@ -33,6 +32,6 @@ Once all the pending issues/pull-requests are integrated:
 
 ### CHaP PRs
 
-To know the exact versions and packages released, check these pull-requests on [CHaP](https://github.com/IntersectMBO/cardano-haskell-packages). 
+To know the exact versions and packages released, check these pull-requests on [CHaP](https://github.com/IntersectMBO/cardano-haskell-packages).
 
 - [Link](#)
