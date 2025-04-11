@@ -40,7 +40,6 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   Seed,
   genSeed,
   keypairFromSeed,
-  seedFromBytes,
 
   -- * Conversions
   unsafeRawSeed,
@@ -62,8 +61,8 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   SignKeyVRF (..),
   VerKeyVRF (..),
   CertVRF (..),
-  Proof (..),
-  Output (..),
+  Proof,
+  Output,
 )
 where
 
@@ -256,8 +255,8 @@ copyFromByteString ptr bs lenExpected =
 
 seedFromBytes :: ByteString -> Seed
 seedFromBytes bs
-  | BS.length bs < fromIntegral crypto_vrf_ietfdraft13_seedbytes =
-      error "Not enough bytes for seed"
+  | BS.length bs /= fromIntegral crypto_vrf_ietfdraft13_seedbytes =
+      error $ "Expected " ++ show crypto_vrf_ietfdraft13_seedbytes ++ " bytes"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->

@@ -1,8 +1,11 @@
 # Changelog for `cardano-crypto-praos`
 
-## 2.2.0.1
+## 2.2.1.0
 
-* Add and expose `outputFromBytes` for both `Praos` and `PraosBatchCompat` modules
+* Add `outputFromBytes` to `Cardano.Crypto.VRF.Praos` module
+* Expose `outputFromProof` from `Cardano.Crypto.VRF.Praos` module
+* Add `outputFromBytes` to `Cardano.Crypto.VRF.PraosBatchCompat` module
+* Expose `Proof`, `Output`, `proofFromBytes`, `skFromBytes`, `vkFromBytes` and `outputFromProof` from `Cardano.Crypto.VRF.PraosBatchCompat` module
 
 ## 2.2.0.0
 

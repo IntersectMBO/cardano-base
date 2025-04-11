@@ -239,6 +239,9 @@ copyFromByteString ptr bs lenExpected =
             <> show lenActual
 
 seedFromBytes :: ByteString -> Seed
+seedFromBytes bs
+  | BS.length bs /= fromIntegral crypto_vrf_seedbytes =
+      error $ "Expected " ++ show crypto_vrf_seedbytes ++ " bytes"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
