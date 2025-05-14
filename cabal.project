@@ -10,8 +10,8 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2025-03-06T20:53:09Z
-index-state: cardano-haskell-packages 2025-03-04T15:51:45Z
+index-state: 2025-05-14T16:20:57Z
+index-state: cardano-haskell-packages 2025-05-14T07:44:24Z
 packages:
   base-deriving-via
   cardano-binary
