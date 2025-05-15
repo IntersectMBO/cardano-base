@@ -193,10 +193,10 @@ data Curve2
 
 ---- Unsafe PointPtr types
 
--- A pointer to a (projective) point one of the two elliptical curves
+-- | A pointer to a (projective) point one of the two elliptical curves
 newtype PointPtr curve = PointPtr (Ptr Void)
 
--- A pointer to a null-terminated array of pointers to points
+-- | A pointer to a null-terminated array of pointers to points
 newtype PointArrayPtr curve = PointArrayPtr (Ptr Void)
 
 type Point1Ptr = PointPtr Curve1
@@ -205,13 +205,13 @@ type Point2Ptr = PointPtr Curve2
 type Point1ArrayPtr = PointArrayPtr Curve1
 type Point2ArrayPtr = PointArrayPtr Curve2
 
--- A pointer to an affine point on one of the two elliptical curves
+-- | A pointer to an affine point on one of the two elliptical curves
 newtype AffinePtr curve = AffinePtr (Ptr Void)
 
--- A pointer to a contiguous array of affine points
+-- | A pointer to a contiguous array of affine points
 newtype AffineBlockPtr curve = AffineBlockPtr (Ptr Void)
 
--- A pointer to a null-terminated array of pointers to affine points
+-- | A pointer to a null-terminated array of pointers to affine points
 newtype AffineArrayPtr curve = AffineArrayPtr (Ptr Void)
 
 type Affine1Ptr = AffinePtr Curve1
@@ -1002,27 +1002,27 @@ scalarCanonical scalar =
 -- [0, 'scalarPeriod' - 1] via modular reduction.
 blsMSM :: forall curve. BLS curve => Int -> [Integer] -> [Point curve] -> Point curve
 blsMSM threshold ss ps = unsafePerformIO $ do
-  zeroScalar <- scalarFromInteger 0
+  -- zeroScalar <- scalarFromInteger 0
   filteredPoints <-
     foldM
       ( \acc (s, pt) -> do
           scalar <- scalarFromInteger s
-          -- here we filter out pairs that will not contribute to the result
+          -- Here we filter out pairs that will not contribute to the result.
           -- This is also for safety, as the c_blst_to_affines C call
-          -- will fail if the input cointaints the point at infinity.
+          -- will fail if the input contains the point at infinity.
           -- We also filter out the zero scalar, as on windows builds,
           -- the blst_mult_pippenger C call will fail for this case.
-          if not (blsIsInf pt) && scalar /= zeroScalar
-            then return ((scalar, pt) : acc)
-            else return acc
+          if blsIsInf pt -- || scalar == zeroScalar
+            then return acc
+            else return ((scalar, pt) : acc)
       )
       []
       (zip ss ps)
   case filteredPoints of
     [] -> return blsZero
-    -- -- If there is only one point, we refert to blsMult function
-    -- -- The blst_mult_pippenger C call will also not work for
-    -- -- this case on windows builds.
+    -- If there is only one point, we refert to blsMult function
+    -- The blst_mult_pippenger C call will also not work for
+    -- this case on windows builds.
     [(scalar, pt)] -> do
       i <- scalarToInteger scalar
       return (blsMult pt i)
