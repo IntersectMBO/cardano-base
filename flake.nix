@@ -119,7 +119,7 @@
             #   inherit compiler-nix-name;
             # });
             # we also want cross compilation to windows.
-            crossPlatforms = p: lib.optional (system == "x86_64-linux") p.mingwW64;
+            crossPlatforms = p: lib.optional (system == "x86_64-linux") p.ucrt64;
           };
 
           # package customizations as needed. Where cabal.project is not
@@ -157,6 +157,9 @@
               packages.Win32.components.library.build-tools = lib.mkForce [];
               packages.terminal-size.components.library.build-tools = lib.mkForce [];
               packages.network.components.library.build-tools = lib.mkForce [];
+            })
+            ({pkgs, ...}: lib.mkIf pkgs.stdenv.hostPlatform.isWindows {
+              packages.basement.configureFlags = [ "--hsc2hs-options=--cflag=-Wno-int-conversion" ];
             })
           ];
         });
