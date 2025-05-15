@@ -114,11 +114,12 @@
           };
           flake = {
             # on linux, build/test other supported compilers
-            variants = lib.genAttrs ["ghc8107"] (compiler-nix-name: {
-              inherit compiler-nix-name;
-            });
+            # TODO uncomment this to enable GHC 9.12 testing
+            # variants = lib.genAttrs ["ghc912"] (compiler-nix-name: {
+            #   inherit compiler-nix-name;
+            # });
             # we also want cross compilation to windows.
-            crossPlatforms = p: lib.optional (system == "x86_64-linux" && config.compiler-nix-name != "ghc8107") p.mingwW64;
+            crossPlatforms = p: lib.optional (system == "x86_64-linux") p.mingwW64;
           };
 
           # package customizations as needed. Where cabal.project is not
