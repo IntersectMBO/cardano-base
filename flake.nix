@@ -158,6 +158,9 @@
               packages.terminal-size.components.library.build-tools = lib.mkForce [];
               packages.network.components.library.build-tools = lib.mkForce [];
             })
+            ({pkgs, ...}: lib.mkIf pkgs.stdenv.hostPlatform.isWindows {
+              packages.basement.configureFlags = [ "--hsc2hs-options=--cflag=-Wno-int-conversion" ];
+            })
           ];
         });
         # ... and construct a flake from the cabal project
