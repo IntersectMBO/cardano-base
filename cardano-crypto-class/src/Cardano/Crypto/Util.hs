@@ -52,14 +52,8 @@ import qualified GHC.Natural as GHC
 
 import Crypto.Random (MonadRandom (..))
 
-#if __GLASGOW_HASKELL__ >= 900
--- Use the GHC version here because this is compiler dependent, and only indirectly lib dependent.
 import           GHC.Num.Integer (integerFromAddr)
 import           GHC.IO (unsafeDupablePerformIO)
-#else
-import qualified GHC.Integer.GMP.Internals as GMP
-import           GHC.IO (unsafeDupablePerformIO)
-#endif
 
 class Empty a
 instance Empty a
@@ -141,12 +135,7 @@ bytesToInteger (BS.PS fp (GHC.I# off#) (GHC.I# len#)) =
           importIntegerFromAddr addrOff# (GHC.int2Word# len#) 1#
   where
     importIntegerFromAddr :: Addr# -> Word# -> Int# -> IO Integer
-#if __GLASGOW_HASKELL__ >= 900
--- Use the GHC version here because this is compiler dependent, and only indirectly lib dependent.
     importIntegerFromAddr addr sz = integerFromAddr sz addr
-#else
-    importIntegerFromAddr = GMP.importIntegerFromAddr
-#endif
 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size =
