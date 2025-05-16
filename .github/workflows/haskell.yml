@@ -62,22 +62,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ["8.10.7", "9.2.8", "9.6.6", "9.8.2", "9.10.1", "9.12.1"]
+        ghc: ["9.6.7", "9.8.4", "9.10.2", "9.12.2"]
         os: [ubuntu-latest, macos-13, macos-latest, windows-latest]
         # GHC versions older than ghc-9.2 are not supported on macos-latest
         exclude:
-          - os: macos-latest
-            ghc: "8.10.7"
           - os: macos-13
-            ghc: "9.2.8"
+            ghc: "9.6.7"
           - os: macos-13
-            ghc: "9.6.6"
+            ghc: "9.8.4"
           - os: macos-13
-            ghc: "9.8.2"
+            ghc: "9.10.2"
           - os: macos-13
-            ghc: "9.10.1"
-          - os: macos-13
-            ghc: "9.12.1"
+            ghc: "9.12.2"
 
     env:
       # Modify this value to "invalidate" the cabal cache.
@@ -89,7 +85,7 @@ jobs:
       id: setup-haskell
       with:
         ghc-version: ${{ matrix.ghc }}
-        cabal-version: 3.12.1.0
+        cabal-version: 3.14.1.0
 
     - name: Install system dependencies
       uses: input-output-hk/actions/base@latest
@@ -189,10 +185,10 @@ jobs:
     #     limit-access-to-actor: true
 
     - name: Cache HLS artifacts (used to speed up GitHub Codespaces bootstrapping)
-      if: runner.os == 'Linux' && (matrix.ghc == '8.10.7' || matrix.ghc == '9.6.6')
+      if: runner.os == 'Linux' && matrix.ghc == '9.6.7'
       uses: input-output-hk/actions/cache@latest
       with:
-        ghc_version: ${{ matrix.ghc == '8.10.7' && 'ghc810' || matrix.ghc == '9.6.6' && 'ghc96' }}
+        ghc_version: ${{ matrix.ghc == '9.6.7' && 'ghc96' }}
 
   fourmolu:
     runs-on: ubuntu-latest
@@ -209,7 +205,7 @@ jobs:
 
     - name: Install fourmolu
       run: |
-        FOURMOLU_VERSION="0.16.2.0"
+        FOURMOLU_VERSION="0.17.0.0"
         mkdir -p "$HOME/.local/bin"
         curl -sL "https://github.com/fourmolu/fourmolu/releases/download/v${FOURMOLU_VERSION}/fourmolu-${FOURMOLU_VERSION}-linux-x86_64" -o "$HOME/.local/bin/fourmolu"
         chmod a+x "$HOME/.local/bin/fourmolu"
