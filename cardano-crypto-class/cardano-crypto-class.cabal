@@ -1,6 +1,6 @@
 cabal-version: 2.2
 name: cardano-crypto-class
-version: 2.2.2.0
+version: 2.2.2.1
 synopsis:
   Type classes abstracting over cryptography primitives for Cardano
 
@@ -30,7 +30,7 @@ flag secp256k1-support
   manual: True
 
 common base
-  build-depends: base >=4.14 && <5
+  build-depends: base >=4.18 && <5
 
 common project-config
   default-language: Haskell2010
