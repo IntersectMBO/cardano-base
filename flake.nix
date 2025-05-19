@@ -3,16 +3,10 @@
 
   inputs = {
     haskellNix.url = "github:input-output-hk/haskell.nix";
-    # allow us to independently update hackageNix
-    haskellNix.inputs.hackage.follows = "hackageNix";
+    
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     iohkNix.url = "github:input-output-hk/iohk-nix";
     flake-utils.url = "github:hamishmack/flake-utils/hkm/nested-hydraJobs";
-
-    hackageNix = {
-      url = "github:input-output-hk/hackage.nix";
-      flake = false;
-    };
 
     CHaP = {
       url = "github:intersectmbo/cardano-haskell-packages?ref=repo";
@@ -55,8 +49,8 @@
         inherit (nixpkgs) lib;
 
         # see flake `variants` below for alternative compilers
-        defaultCompiler = "ghc966";
-        fourmoluVersion = "0.16.2.0";
+        defaultCompiler = "ghc967";
+        fourmoluVersion = "0.17.0.0";
         # We use cabalProject' to ensure we don't build the plan for
         # all systems.
         cabalProject = nixpkgs.haskell-nix.cabalProject' ({config, ...}: {
@@ -91,8 +85,7 @@
             # tools we want in our shell, from hackage
             tools =
               {
-                cabal = "3.12.1.0";
-                ghcid = "0.8.9";
+                cabal = "3.14.1.0";
               }
               // lib.optionalAttrs (config.compiler-nix-name == defaultCompiler) {
                 # tools that work only with default compiler
@@ -187,9 +180,9 @@
 
           devShells = let
             mkDevShells = p: {
-              # `nix develop .#profiling` (or `.#ghc966.profiling): a shell with profiling enabled
+              # `nix develop .#profiling` (or `.#ghc967.profiling): a shell with profiling enabled
               profiling = (p.appendModule {modules = [{enableLibraryProfiling = true;}];}).shell;
-              # `nix develop .#pre-commit` (or `.#ghc966.pre-commit): a shell with pre-commit enabled
+              # `nix develop .#pre-commit` (or `.#ghc967.pre-commit): a shell with pre-commit enabled
               pre-commit = let
                 pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
                   src = ./.;
@@ -207,7 +200,7 @@
             };
           in
             mkDevShells cabalProject
-            # Additional shells for every GHC version supported by haskell.nix, eg. `nix develop .#ghc8107`
+            # Additional shells for every GHC version supported by haskell.nix, eg. `nix develop .#ghc9122`
             // lib.mapAttrs (compiler-nix-name: _: let
               p = cabalProject.appendModule {inherit compiler-nix-name;};
             in
