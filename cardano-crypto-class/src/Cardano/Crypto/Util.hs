@@ -52,8 +52,8 @@ import qualified GHC.Natural as GHC
 
 import Crypto.Random (MonadRandom (..))
 
-import           GHC.Num.Integer (integerFromAddr)
-import           GHC.IO (unsafeDupablePerformIO)
+import GHC.IO (unsafeDupablePerformIO)
+import GHC.Num.Integer (integerFromAddr)
 
 class Empty a
 instance Empty a
