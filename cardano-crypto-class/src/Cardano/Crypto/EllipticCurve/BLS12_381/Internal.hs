@@ -167,20 +167,19 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 )
 where
 
+import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
-
-import Control.Monad (foldM, forM_)
+import Data.Foldable (foldrM)
 import Data.Proxy (Proxy (..))
 import Data.Void
 import Foreign (Storable (..), poke, sizeOf)
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.ForeignPtr
-import Foreign.Marshal (advancePtr)
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
@@ -328,14 +327,14 @@ withPointArray points go = do
     -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
     -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
     -- By nesting `withPoint` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
-    let accumulate [] = do
-          poke (ptr `advancePtr` numPoints) nullPtr
+    let accumulate curPtr [] = do
+          poke curPtr nullPtr
           go numPoints (PointArrayPtr (castPtr ptr))
-        accumulate ((ix, point) : rest) =
+        accumulate curPtr (point : rest) =
           withPoint point $ \(PointPtr pPtr) -> do
-            poke (ptr `advancePtr` ix) pPtr
-            accumulate rest
-     in accumulate (zip [0 ..] points)
+            poke curPtr pPtr
+            accumulate (curPtr `plusPtr` sizeReference) rest
+     in accumulate ptr points
 
 -- | Given a block of affine points and a count, produce a pointer array
 withAffineBlockArrayPtr ::
@@ -513,15 +512,14 @@ withScalarArray scalars go = do
     -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
     -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
     -- By nesting `withScalar` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
-    let accumulate [] = do
-          -- Add a null terminator to the end of the array
-          poke (ptr `advancePtr` numScalars) nullPtr
+    let accumulate curPtr [] = do
+          poke curPtr nullPtr
           go numScalars (ScalarArrayPtr (castPtr ptr))
-        accumulate ((ix, scalar) : rest) =
-          withScalar scalar $ \(ScalarPtr sPtr) -> do
-            poke (ptr `advancePtr` ix) sPtr
-            accumulate rest
-     in accumulate (zip [0 ..] scalars)
+        accumulate curPtr (scalar : rest) =
+          withScalar scalar $ \(ScalarPtr pPtr) -> do
+            poke curPtr pPtr
+            accumulate (curPtr `plusPtr` sizeReference) rest
+     in accumulate ptr scalars
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do
@@ -998,35 +996,38 @@ scalarCanonical scalar =
 -- by means of a modulo operation over the 'scalarPeriod'.
 -- Negative numbers will also be brought to the range
 -- [0, 'scalarPeriod' - 1] via modular reduction.
-blsMSM :: forall curve. BLS curve => Int -> [Integer] -> [Point curve] -> Point curve
-blsMSM threshold ss ps = unsafePerformIO $ do
+blsMSM :: forall curve. BLS curve => Int -> [(Integer, Point curve)] -> Point curve
+blsMSM threshold ssAndps = unsafePerformIO $ do
   zeroScalar <- scalarFromInteger 0
   filteredPoints <-
-    foldM
-      ( \acc (s, pt) -> do
-          scalar <- scalarFromInteger s
+    foldrM
+      ( \(s, pt) acc -> do
           -- Here we filter out pairs that will not contribute to the result.
           -- This is also for safety, as the c_blst_to_affines C call
           -- will fail if the input contains the point at infinity.
           -- see https://github.com/supranational/blst/blob/165ec77634495175aefd045a48d3469af6950ea4/src/multi_scalar.c#L11C32-L11C37
-          -- We also filter out the zero scalar, as for any point pt
-          -- we have:
-          --
-          --    pt ^ 0 = id
-          --
-          -- Which yields no contribution to summation, and
-          -- thus we can skip the point and scalar pair. This filter
-          -- saves us an extra input to the more expensive exponential
-          -- operation.
-          if blsIsInf pt || scalar == zeroScalar
-            then return acc
-            else return ((scalar, pt) : acc)
+          if blsIsInf pt
+            then pure acc
+            else do
+              scalar <- scalarFromInteger s
+              -- We also filter out the zero scalar, as for any point pt
+              -- we have:
+              --
+              --    pt ^ 0 = id
+              --
+              -- Which yields no contribution to summation, and
+              -- thus we can skip the point and scalar pair. This filter
+              -- saves us an extra input to the more expensive exponential
+              -- operation.
+              if scalar == zeroScalar
+                then return acc
+                else return ((scalar, pt) : acc)
       )
       []
-      (zip ss ps)
+      ssAndps
   case filteredPoints of
     [] -> return blsZero
-    -- If there is only one point, we refert to blsMult function
+    -- If there is only one point, we revert to blsMult function
     -- The blst_mult_pippenger C call will also not work for
     -- this case on windows builds.
     [(scalar, pt)] -> do
