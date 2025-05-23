@@ -34,7 +34,3 @@ library
     text,
     time,
     vector
-
-  if impl(ghc <9.0.0)
-    build-depends:
-      integer-gmp

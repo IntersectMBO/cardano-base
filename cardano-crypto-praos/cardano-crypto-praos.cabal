@@ -1,6 +1,6 @@
 cabal-version: 2.2
 name: cardano-crypto-praos
-version: 2.2.1.0
+version: 2.2.1.1
 synopsis: Crypto primitives from libsodium
 description: VRF (and KES, tba) primitives from libsodium.
 license: Apache-2.0
@@ -45,7 +45,7 @@ flag external-libsodium-vrf
   manual: True
 
 common base
-  build-depends: base >=4.14 && <5
+  build-depends: base >=4.18 && <5
 
 common project-config
   default-language: Haskell2010
