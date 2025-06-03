@@ -1,5 +1,10 @@
 # Changelog for `cardano-crypto-tests`
 
+## 2.2.2.0
+
+* Add test for `blsMSM`
+* fix bls property test for final verify to depent on group algebra
+
 ## 2.2.1.1
 
 *

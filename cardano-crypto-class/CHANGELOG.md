@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.2.3.0
+
+* Add `blsMSM` to the BLS12_381 interface
+
 ## 2.2.2.1
 
 *
