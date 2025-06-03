@@ -105,6 +105,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   withNewAffine,
   withNewAffine_,
   withNewAffine',
+  withPointArray,
+  withAffineBlockArrayPtr,
   sizePT,
   withPT,
   withNewPT,
@@ -115,6 +117,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   withNewScalar,
   withNewScalar_,
   withNewScalar',
+  withScalarArray,
   cloneScalar,
   sizeFr,
   withFr,
@@ -166,6 +169,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 )
 where
 
+import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -173,13 +177,13 @@ import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
 import Data.Proxy (Proxy (..))
 import Data.Void
+import Foreign (Storable (..), poke, sizeOf)
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
-import Foreign.Storable (peek)
 import System.IO.Unsafe (unsafePerformIO)
 
 ---- Phantom Types
@@ -218,7 +222,6 @@ type Affine2BlockPtr = AffineBlockPtr Curve2
 
 type Affine1ArrayPtr = AffineArrayPtr Curve1
 type Affine2ArrayPtr = AffineArrayPtr Curve2
-
 
 newtype PTPtr = PTPtr (Ptr Void)
 
@@ -314,6 +317,38 @@ withNewAffine_ = fmap fst . withNewAffine
 
 withNewAffine' :: BLS curve => (AffinePtr curve -> IO a) -> IO (Affine curve)
 withNewAffine' = fmap snd . withNewAffine
+
+withPointArray :: [Point curve] -> (Int -> PointArrayPtr curve -> IO a) -> IO a
+withPointArray points go = do
+  let numPoints = length points
+      sizeReference = sizeOf (nullPtr :: Ptr ())
+  -- Allocate space for the points and a null terminator
+  allocaBytes ((numPoints + 1) * sizeReference) $ \ptr ->
+    -- The accumulate function ensures that each `withPoint` call is properly nested.
+    -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
+    -- By nesting `withPoint` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
+    let accumulate curPtr [] = do
+          poke curPtr nullPtr
+          go numPoints (PointArrayPtr (castPtr ptr))
+        accumulate curPtr (point : rest) =
+          withPoint point $ \(PointPtr pPtr) -> do
+            poke curPtr pPtr
+            accumulate (curPtr `plusPtr` sizeReference) rest
+     in accumulate ptr points
+
+-- | Given a block of affine points and a count, produce a pointer array
+withAffineBlockArrayPtr ::
+  forall curve a.
+  BLS curve =>
+  Ptr Void -> Int -> (AffineArrayPtr curve -> IO a) -> IO a
+withAffineBlockArrayPtr affinesBlockPtr numPoints go = do
+  allocaBytes (numPoints * sizeOf (nullPtr :: Ptr ())) $ \affineVectorPtr -> do
+    let ptrArray = castPtr affineVectorPtr :: Ptr (Ptr ())
+    forM_ [0 .. numPoints - 1] $ \i -> do
+      let ptr = affinesBlockPtr `plusPtr` (i * sizeAffine (Proxy @curve))
+      pokeElemOff ptrArray i ptr
+    go (AffineArrayPtr affineVectorPtr)
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
@@ -467,6 +502,25 @@ withNewScalar_ = fmap fst . withNewScalar
 
 withNewScalar' :: (ScalarPtr -> IO a) -> IO Scalar
 withNewScalar' = fmap snd . withNewScalar
+
+withScalarArray :: [Scalar] -> (Int -> ScalarArrayPtr -> IO a) -> IO a
+withScalarArray scalars go = do
+  let numScalars = length scalars
+      sizeReference = sizeOf (undefined :: Ptr ())
+  -- Allocate space for the scalars and a null terminator
+  allocaBytes ((numScalars + 1) * sizeReference) $ \ptr ->
+    -- The accumulate function ensures that each `withScalar` call is properly nested.
+    -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
+    -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
+    -- By nesting `withScalar` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
+    let accumulate curPtr [] = do
+          poke curPtr nullPtr
+          go numScalars (ScalarArrayPtr (castPtr ptr))
+        accumulate curPtr (scalar : rest) =
+          withScalar scalar $ \(ScalarPtr pPtr) -> do
+            poke curPtr pPtr
+            accumulate (curPtr `plusPtr` sizeReference) rest
+     in accumulate ptr scalars
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar a) = do
