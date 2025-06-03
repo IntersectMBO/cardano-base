@@ -138,6 +138,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsMult,
   blsCneg,
   blsNeg,
+  blsMSM,
   blsCompress,
   blsSerialize,
   blsUncompress,
@@ -175,6 +176,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
+import Data.Foldable (foldrM)
 import Data.Proxy (Proxy (..))
 import Data.Void
 import Foreign (Storable (..), poke, sizeOf)
@@ -988,6 +990,82 @@ scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar =
   unsafePerformIO $
     withScalar scalar c_blst_scalar_fr_check
+
+---- MSM operations
+
+-- | Multi-scalar multiplication using the Pippenger algorithm.
+-- The scalars will be brought into the range of modular arithmetic
+-- by means of a modulo operation over the 'scalarPeriod'.
+-- Negative numbers will also be brought to the range
+-- [0, 'scalarPeriod' - 1] via modular reduction.
+blsMSM :: forall curve. BLS curve => Int -> [(Integer, Point curve)] -> Point curve
+blsMSM threshold ssAndps = unsafePerformIO $ do
+  zeroScalar <- scalarFromInteger 0
+  filteredPoints <-
+    foldrM
+      ( \(s, pt) acc -> do
+          -- Here we filter out pairs that will not contribute to the result.
+          -- This is also for safety, as the c_blst_to_affines C call
+          -- will fail if the input contains the point at infinity.
+          -- see https://github.com/supranational/blst/blob/165ec77634495175aefd045a48d3469af6950ea4/src/multi_scalar.c#L11C32-L11C37
+          if blsIsInf pt
+            then pure acc
+            else do
+              scalar <- scalarFromInteger s
+              -- We also filter out the zero scalar, as for any point pt
+              -- we have:
+              --
+              --    pt ^ 0 = id
+              --
+              -- Which yields no contribution to summation, and
+              -- thus we can skip the point and scalar pair. This filter
+              -- saves us an extra input to the more expensive exponential
+              -- operation.
+              if scalar == zeroScalar
+                then return acc
+                else return ((scalar, pt) : acc)
+      )
+      []
+      ssAndps
+  case filteredPoints of
+    [] -> return blsZero
+    -- If there is only one point, we revert to blsMult function
+    -- The blst_mult_pippenger C call will also not work for
+    -- this case on windows builds.
+    [(scalar, pt)] -> do
+      i <- scalarToInteger scalar
+      return (blsMult pt i)
+    _ | length filteredPoints <= threshold -> do
+      return $
+        foldr
+          (\(scalar, pt) acc -> blsAddOrDouble acc (blsMult pt (unsafePerformIO $ scalarToInteger scalar)))
+          blsZero
+          filteredPoints
+    _ -> do
+      let (scalars, points) = unzip filteredPoints
+
+      withNewPoint' @curve $ \resultPtr -> do
+        withPointArray points $ \numPoints pointArrayPtr -> do
+          withScalarArray scalars $ \_ scalarArrayPtr -> do
+            let numPoints' :: CSize
+                numPoints' = fromIntegral numPoints
+                scratchSize :: Int
+                scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
+                -- Multiply by 8, because blst_mult_pippenger takes number of *bits*, but
+                -- sizeScalar is in *bytes*
+                nbits :: CSize
+                nbits = fromIntegral @Int @CSize $ sizeScalar * 8
+            allocaBytes (numPoints * sizeAffine (Proxy @curve)) $ \affinesBlockPtr -> do
+              c_blst_to_affines (AffineBlockPtr affinesBlockPtr) pointArrayPtr numPoints'
+              withAffineBlockArrayPtr affinesBlockPtr numPoints $ \affineArrayPtr -> do
+                allocaBytes scratchSize $ \scratchPtr -> do
+                  c_blst_mult_pippenger
+                    resultPtr
+                    affineArrayPtr
+                    numPoints'
+                    scalarArrayPtr
+                    nbits
+                    (ScratchPtr scratchPtr)
 
 ---- PT operations
 
