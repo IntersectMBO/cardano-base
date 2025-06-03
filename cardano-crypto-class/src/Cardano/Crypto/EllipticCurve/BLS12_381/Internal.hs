@@ -9,9 +9,12 @@
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
-  ScalarPtr,
+  ScalarPtr (..),
   PointPtr (..),
-  AffinePtr,
+  AffinePtr (..),
+  PointArrayPtr (..),
+  AffineArrayPtr (..),
+  AffineBlockPtr (..),
   Point1Ptr,
   Point2Ptr,
   Affine1Ptr,
@@ -54,6 +57,9 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_add_or_double,
     c_blst_mult,
     c_blst_cneg,
+    c_blst_scratch_sizeof,
+    c_blst_to_affines,
+    c_blst_mult_pippenger,
     c_blst_hash,
     c_blst_compress,
     c_blst_serialize,
@@ -183,15 +189,36 @@ data Curve2
 
 ---- Unsafe PointPtr types
 
+-- | A pointer to a (projective) point one of the two elliptical curves
 newtype PointPtr curve = PointPtr (Ptr Void)
+
+-- | A pointer to a null-terminated array of pointers to points
+newtype PointArrayPtr curve = PointArrayPtr (Ptr Void)
 
 type Point1Ptr = PointPtr Curve1
 type Point2Ptr = PointPtr Curve2
 
+type Point1ArrayPtr = PointArrayPtr Curve1
+type Point2ArrayPtr = PointArrayPtr Curve2
+
+-- | A pointer to an affine point on one of the two elliptical curves
 newtype AffinePtr curve = AffinePtr (Ptr Void)
+
+-- | A pointer to a contiguous array of affine points
+newtype AffineBlockPtr curve = AffineBlockPtr (Ptr Void)
+
+-- | A pointer to a null-terminated array of pointers to affine points
+newtype AffineArrayPtr curve = AffineArrayPtr (Ptr Void)
 
 type Affine1Ptr = AffinePtr Curve1
 type Affine2Ptr = AffinePtr Curve2
+
+type Affine1BlockPtr = AffineBlockPtr Curve1
+type Affine2BlockPtr = AffineBlockPtr Curve2
+
+type Affine1ArrayPtr = AffineArrayPtr Curve1
+type Affine2ArrayPtr = AffineArrayPtr Curve2
+
 
 newtype PTPtr = PTPtr (Ptr Void)
 
@@ -317,6 +344,11 @@ class BLS curve where
   c_blst_mult :: PointPtr curve -> PointPtr curve -> ScalarPtr -> CSize -> IO ()
   c_blst_cneg :: PointPtr curve -> Bool -> IO ()
 
+  c_blst_scratch_sizeof :: Proxy curve -> CSize -> CSize
+  c_blst_to_affines :: AffineBlockPtr curve -> PointArrayPtr curve -> CSize -> IO ()
+  c_blst_mult_pippenger ::
+    PointPtr curve -> AffineArrayPtr curve -> CSize -> ScalarArrayPtr -> CSize -> ScratchPtr -> IO ()
+
   c_blst_hash ::
     PointPtr curve -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
   c_blst_compress :: Ptr CChar -> PointPtr curve -> IO ()
@@ -345,6 +377,10 @@ instance BLS Curve1 where
   c_blst_mult = c_blst_p1_mult
   c_blst_cneg = c_blst_p1_cneg
 
+  c_blst_scratch_sizeof _ = c_blst_p1s_mult_pippenger_scratch_sizeof
+  c_blst_to_affines = c_blst_p1s_to_affine
+  c_blst_mult_pippenger = c_blst_p1s_mult_pippenger
+
   c_blst_hash = c_blst_hash_to_g1
   c_blst_compress = c_blst_p1_compress
   c_blst_serialize = c_blst_p1_serialize
@@ -372,6 +408,10 @@ instance BLS Curve2 where
   c_blst_add_or_double = c_blst_p2_add_or_double
   c_blst_mult = c_blst_p2_mult
   c_blst_cneg = c_blst_p2_cneg
+
+  c_blst_scratch_sizeof _ = c_blst_p2s_mult_pippenger_scratch_sizeof
+  c_blst_to_affines = c_blst_p2s_to_affine
+  c_blst_mult_pippenger = c_blst_p2s_mult_pippenger
 
   c_blst_hash = c_blst_hash_to_g2
   c_blst_compress = c_blst_p2_compress
@@ -512,7 +552,11 @@ scalarFromInteger n = do
 ---- Unsafe types
 
 newtype ScalarPtr = ScalarPtr (Ptr Void)
+
+-- A pointer to a null-terminated array of pointers to scalars
+newtype ScalarArrayPtr = ScalarArrayPtr (Ptr Void)
 newtype FrPtr = FrPtr (Ptr Void)
+newtype ScratchPtr = ScratchPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
 
@@ -555,6 +599,14 @@ foreign import ccall "blst_p1_generator" c_blst_p1_generator :: Point1Ptr
 foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: Point1Ptr -> Point1Ptr -> IO Bool
 foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: Point1Ptr -> IO Bool
 
+foreign import ccall "blst_p1s_mult_pippenger_scratch_sizeof"
+  c_blst_p1s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p1s_to_affine"
+  c_blst_p1s_to_affine :: Affine1BlockPtr -> Point1ArrayPtr -> CSize -> IO ()
+foreign import ccall "blst_p1s_mult_pippenger"
+  c_blst_p1s_mult_pippenger ::
+    Point1Ptr -> Affine1ArrayPtr -> CSize -> ScalarArrayPtr -> CSize -> ScratchPtr -> IO ()
+
 ---- Raw Point2 functions
 
 foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
@@ -581,6 +633,14 @@ foreign import ccall "blst_p2_generator" c_blst_p2_generator :: Point2Ptr
 
 foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: Point2Ptr -> Point2Ptr -> IO Bool
 foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: Point2Ptr -> IO Bool
+
+foreign import ccall "blst_p2s_mult_pippenger_scratch_sizeof"
+  c_blst_p2s_mult_pippenger_scratch_sizeof :: CSize -> CSize
+foreign import ccall "blst_p2s_to_affine"
+  c_blst_p2s_to_affine :: Affine2BlockPtr -> Point2ArrayPtr -> CSize -> IO ()
+foreign import ccall "blst_p2s_mult_pippenger"
+  c_blst_p2s_mult_pippenger ::
+    Point2Ptr -> Affine2ArrayPtr -> CSize -> ScalarArrayPtr -> CSize -> ScratchPtr -> IO ()
 
 ---- Affine operations
 
