@@ -27,6 +27,7 @@ import Test.QuickCheck (
   Property,
   choose,
   chooseAny,
+  classify,
   oneof,
   suchThatMap,
   (===),
@@ -134,6 +135,12 @@ testBLSCurve name _ =
         BLS.blsMult a (b + c) === BLS.blsAddOrDouble (BLS.blsMult a b) (BLS.blsMult a c)
     , testProperty "scalar mult distributive right" $ \(a :: BLS.Point curve) (b :: BLS.Point curve) (BigInteger c) ->
         BLS.blsMult (BLS.blsAddOrDouble a b) c === BLS.blsAddOrDouble (BLS.blsMult a c) (BLS.blsMult b c)
+    , testProperty "MSM matches naive approach" $ \(ssAndPs :: [(BigInteger, BLS.Point curve)]) ->
+        let pairs = [(i, p) | (BigInteger i, p) <- ssAndPs]
+            threshold = 10
+         in classify (length pairs <= threshold) "Below threshold" $
+              BLS.blsMSM threshold pairs
+                === foldr (\(s, p) acc -> BLS.blsAddOrDouble acc (BLS.blsMult p s)) (BLS.blsZero @curve) pairs
     , testProperty "mult by zero is inf" $ \(a :: BLS.Point curve) ->
         BLS.blsIsInf (BLS.blsMult a 0)
     , testProperty "mult by -1 is equal to neg" $ \(a :: BLS.Point curve) ->
