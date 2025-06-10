@@ -10,8 +10,8 @@ repository cardano-haskell-packages
     d4a35cd3121aa00d18544bb0ac01c3e1691d618f462c46129271bccf39f7e8ee
 
 -- The hackage index-state
-index-state: 2025-05-14T16:20:57Z
-index-state: cardano-haskell-packages 2025-05-14T07:44:24Z
+index-state: 2025-06-10T06:34:13Z
+index-state: cardano-haskell-packages 2025-06-07T03:18:32Z
 packages:
   base-deriving-via
   cardano-binary
@@ -38,9 +38,3 @@ program-options
 package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
-
-if impl(ghc >=9.12)
-  allow-newer:
-    -- treediff: Difficult maintainer https://github.com/haskellari/tree-diff/issues/97
-    , tree-diff:base
-    , tree-diff:time
