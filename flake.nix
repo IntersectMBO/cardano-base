@@ -3,10 +3,17 @@
 
   inputs = {
     haskellNix.url = "github:input-output-hk/haskell.nix";
+    # allow us to independently update hackageNix
+    haskellNix.inputs.hackage.follows = "hackageNix";
 
     nixpkgs.follows = "haskellNix/nixpkgs-unstable";
     iohkNix.url = "github:input-output-hk/iohk-nix";
     flake-utils.url = "github:hamishmack/flake-utils/hkm/nested-hydraJobs";
+
+    hackageNix = {
+      url = "github:input-output-hk/hackage.nix";
+      flake = false;
+    };
 
     CHaP = {
       url = "github:intersectmbo/cardano-haskell-packages?ref=repo";
