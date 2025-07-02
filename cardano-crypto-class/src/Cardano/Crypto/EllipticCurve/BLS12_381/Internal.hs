@@ -998,8 +998,8 @@ scalarCanonical scalar =
 -- by means of a modulo operation over the 'scalarPeriod'.
 -- Negative numbers will also be brought to the range
 -- [0, 'scalarPeriod' - 1] via modular reduction.
-blsMSM :: forall curve. BLS curve => Int -> [(Integer, Point curve)] -> Point curve
-blsMSM threshold ssAndps = unsafePerformIO $ do
+blsMSM :: forall curve. BLS curve => [(Integer, Point curve)] -> Point curve
+blsMSM ssAndps = unsafePerformIO $ do
   zeroScalar <- scalarFromInteger 0
   filteredPoints <-
     foldrM
@@ -1035,12 +1035,6 @@ blsMSM threshold ssAndps = unsafePerformIO $ do
     [(scalar, pt)] -> do
       i <- scalarToInteger scalar
       return (blsMult pt i)
-    _ | length filteredPoints <= threshold -> do
-      return $
-        foldr
-          (\(scalar, pt) acc -> blsAddOrDouble acc (blsMult pt (unsafePerformIO $ scalarToInteger scalar)))
-          blsZero
-          filteredPoints
     _ -> do
       let (scalars, points) = unzip filteredPoints
 
