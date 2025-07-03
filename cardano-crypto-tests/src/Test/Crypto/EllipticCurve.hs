@@ -27,7 +27,6 @@ import Test.QuickCheck (
   Property,
   choose,
   chooseAny,
-  classify,
   oneof,
   suchThatMap,
   (===),
