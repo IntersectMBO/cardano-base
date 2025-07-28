@@ -62,6 +62,7 @@ module Data.Sequence.Strict (
   zipWith,
   unzip,
   unzipWith,
+  filter,
 )
 where
 
@@ -79,6 +80,7 @@ import qualified GHC.Exts as GHC (IsList (..))
 import NoThunks.Class (NoThunks (..), noThunksInValues)
 import Prelude hiding (
   drop,
+  filter,
   length,
   lookup,
   null,
@@ -372,6 +374,15 @@ findIndicesL p (StrictSeq xs) = Seq.findIndicesL p xs
 -- descending order.
 findIndicesR :: (a -> Bool) -> StrictSeq a -> [Int]
 findIndicesR p (StrictSeq xs) = Seq.findIndicesR p xs
+
+{-------------------------------------------------------------------------------
+  Filtering
+-------------------------------------------------------------------------------}
+
+-- | @'filter' p xs@ returns a sequence of those elements of @xs@ which satisfy
+-- the predicate @p@.
+filter :: (a -> Bool) -> StrictSeq a -> StrictSeq a
+filter p (StrictSeq xs) = StrictSeq $ Seq.filter p xs
 
 {-------------------------------------------------------------------------------
   Zips and Unzips

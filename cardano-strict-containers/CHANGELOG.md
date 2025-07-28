@@ -1,8 +1,8 @@
 # Changelog for `cardano-strict-containers`
 
-# 0.1.4.1
+# 0.1.5.0
 
-*
+* Added `filter` function to `Data.Sequence.Strict`
 
 # 0.1.4.0
 
