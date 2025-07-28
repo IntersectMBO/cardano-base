@@ -128,7 +128,7 @@
             ({pkgs, ...}: {
               # Packages that are not always in the plan need to be listed so that haskell.nix does not
               # complain about overrides on packages that do not exist.
-              package-keys = ["katip" "ekg" "slotting" "lens" "nonempty-vector"];
+              package-keys = ["katip" "ekg" "slotting" "lens" "nonempty-vector" "Win32"];
 
               # Packages we wish to ignore version bounds of.
               # This is similar to jailbreakCabal, however it
