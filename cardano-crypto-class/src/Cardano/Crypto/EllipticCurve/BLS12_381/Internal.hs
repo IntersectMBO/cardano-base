@@ -1054,7 +1054,7 @@ blsMSM ssAndps = unsafePerformIO $ do
                     affineArrayPtr
                     numPoints'
                     scalarArrayPtr
-                    (fromIntegral @Int @CSize 255)
+                    (255 :: CSize)
                     (ScratchPtr scratchPtr)
 
 ---- PT operations
