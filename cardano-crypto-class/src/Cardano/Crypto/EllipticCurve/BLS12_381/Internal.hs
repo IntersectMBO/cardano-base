@@ -998,8 +998,8 @@ scalarCanonical scalar =
 -- by means of a modulo operation over the 'scalarPeriod'.
 -- Negative numbers will also be brought to the range
 -- [0, 'scalarPeriod' - 1] via modular reduction.
-blsMSM :: forall curve. BLS curve => Int -> [(Integer, Point curve)] -> Point curve
-blsMSM threshold ssAndps = unsafePerformIO $ do
+blsMSM :: forall curve. BLS curve => [(Integer, Point curve)] -> Point curve
+blsMSM ssAndps = unsafePerformIO $ do
   zeroScalar <- scalarFromInteger 0
   filteredPoints <-
     foldrM
@@ -1035,12 +1035,6 @@ blsMSM threshold ssAndps = unsafePerformIO $ do
     [(scalar, pt)] -> do
       i <- scalarToInteger scalar
       return (blsMult pt i)
-    _ | length filteredPoints <= threshold -> do
-      return $
-        foldr
-          (\(scalar, pt) acc -> blsAddOrDouble acc (blsMult pt (unsafePerformIO $ scalarToInteger scalar)))
-          blsZero
-          filteredPoints
     _ -> do
       let (scalars, points) = unzip filteredPoints
 
@@ -1051,10 +1045,6 @@ blsMSM threshold ssAndps = unsafePerformIO $ do
                 numPoints' = fromIntegral numPoints
                 scratchSize :: Int
                 scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
-                -- Multiply by 8, because blst_mult_pippenger takes number of *bits*, but
-                -- sizeScalar is in *bytes*
-                nbits :: CSize
-                nbits = fromIntegral @Int @CSize $ sizeScalar * 8
             allocaBytes (numPoints * sizeAffine (Proxy @curve)) $ \affinesBlockPtr -> do
               c_blst_to_affines (AffineBlockPtr affinesBlockPtr) pointArrayPtr numPoints'
               withAffineBlockArrayPtr affinesBlockPtr numPoints $ \affineArrayPtr -> do
@@ -1064,7 +1054,7 @@ blsMSM threshold ssAndps = unsafePerformIO $ do
                     affineArrayPtr
                     numPoints'
                     scalarArrayPtr
-                    nbits
+                    (255 :: CSize)
                     (ScratchPtr scratchPtr)
 
 ---- PT operations
