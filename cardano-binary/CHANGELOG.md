@@ -1,5 +1,13 @@
 # Changelog for `cardano-binary`
 
+## 1.7.1.2
+
+*
+
+## 1.7.1.1
+
+* Drop GHC <= 9.4 support
+
 ## 1.7.1.0
 
 * New `Test.Cardano.Binary.TreeDiff` module extracted from
