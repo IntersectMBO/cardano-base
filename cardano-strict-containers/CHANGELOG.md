@@ -2,6 +2,7 @@
 
 # 0.1.5.0
 
+* Add `Eq1`, `Ord1`, `Read1` and `Show1` instances for `StrictMaybe`
 * Added `filter` function to `Data.Sequence.Strict`
 
 # 0.1.4.0
