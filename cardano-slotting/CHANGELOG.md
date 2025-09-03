@@ -1,8 +1,12 @@
 # Changelog for `cardano-slotting`
 
-## 0.2.0.1
+## 0.2.0.2
 
 *
+
+## 0.2.0.1
+
+* Drop GHC <= 9.4 support
 
 ## 0.2.0.0
 

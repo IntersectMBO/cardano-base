@@ -1,8 +1,12 @@
 # Changelog for `cardano-crypto-praos`
 
-## 2.2.1.1
+## 2.2.1.2
 
 *
+
+## 2.2.1.1
+
+* Drop GHC <= 9.4 support
 
 ## 2.2.1.0
 
