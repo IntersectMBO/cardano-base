@@ -28,6 +28,14 @@ packages:
   measures
   orphans-deriving-via
 
+constraints:
+  -- this is needed to make it compatible with non-gmp
+  -- ghc 9.0+ builds (e.g. with ghc-bignum). Prior to
+  -- 1.1.4.0, it unconditonally incuded the Data.Bit.Gmp
+  -- module, which in turn blew up when loading bitvec
+  -- during TH into a compiler without libgmp.
+  bitvec >= 1.1.4.0
+
 -- Ensures colourized output from test runners
 test-show-details: direct
 tests: true
