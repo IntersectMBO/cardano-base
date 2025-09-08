@@ -98,6 +98,8 @@ library
     Cardano.Crypto.VRF.NeverUsed
     Cardano.Crypto.VRF.Simple
     Cardano.Foreign
+    Cardano.ForeignChecks
+    Cardano.ForeignChecks.TH
 
   other-modules:
     Cardano.Crypto.PackedBytes
@@ -119,6 +121,7 @@ library
     mtl,
     nothunks,
     primitive >=0.8,
+    process,
     serialise,
     template-haskell,
     text,
