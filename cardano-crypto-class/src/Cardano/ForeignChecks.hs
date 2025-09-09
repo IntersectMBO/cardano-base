@@ -7,8 +7,8 @@ import Cardano.ForeignChecks.TH (
   ensureExactVersionOrCommit,
  )
 
--- libsodium == 1.0.18
-$(ensureExactVersion "libsodium" (1, 0, 18))
+-- libsodium == 1.0.20
+$(ensureExactVersion "libsodium" (1, 0, 20))
 
 -- libblst == 0.3.14 OR libblst == "commit hash"
 -- see: https://github.com/input-output-hk/iohk-nix/blob/64ca6f4c0c6db283e2ec457c775bce75173fb319/overlays/crypto/libblst.nix#L44
