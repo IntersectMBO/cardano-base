@@ -419,7 +419,7 @@ class BLS curve where
   sizeAffine_ :: Proxy curve -> CSize
 
   c_blst_sk_to_pk :: PointPtr curve -> ScalarPtr -> IO ()
-  c_blst_sign :: PointPtr (Dual curve) -> PointPtr (Dual curve) -> ScalarPtr -> IO ()
+  c_blst_sign :: Proxy curve -> PointPtr (Dual curve) -> PointPtr (Dual curve) -> ScalarPtr -> IO ()
 
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
@@ -454,7 +454,7 @@ instance BLS Curve1 where
   sizeAffine_ _ = c_size_blst_affine1
 
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g1
-  c_blst_sign = c_blst_sign_pk_in_g1
+  c_blst_sign _ = c_blst_sign_pk_in_g1
 
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
@@ -489,7 +489,7 @@ instance BLS Curve2 where
   sizeAffine_ _ = c_size_blst_affine2
 
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
-  c_blst_sign = c_blst_sign_pk_in_g2
+  c_blst_sign _ = c_blst_sign_pk_in_g2
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
@@ -747,7 +747,7 @@ foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr ->
 foreign import ccall "blst_miller_loop"
   c_blst_miller_loop :: PTPtr -> Affine2Ptr -> Affine1Ptr -> IO ()
 
----- BLS signaturs Secret-key operatons
+---- BLS signatures Secret-key operations
 
 foreign import ccall "blst_keygen"
   c_blst_keygen :: ScalarPtr -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
