@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
@@ -71,11 +72,16 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_affine_in_g,
     c_blst_generator,
     c_blst_p_is_equal,
-    c_blst_p_is_inf
+    c_blst_p_is_inf,
+    c_blst_sk_to_pk,
+    c_blst_sign
   ),
 
   -- * Pairing check
   c_blst_miller_loop,
+
+  -- * Keygen
+  c_blst_keygen,
 
   -- * FP12 functions
 
@@ -192,6 +198,11 @@ import System.IO.Unsafe (unsafePerformIO)
 
 data Curve1
 data Curve2
+
+-- | A type family mapping a curve to its dual curve (its an involution).
+type family Dual curve where
+  Dual Curve1 = Curve2
+  Dual Curve2 = Curve1
 
 ---- Unsafe PointPtr types
 
@@ -407,6 +418,9 @@ class BLS curve where
   compressedSizePoint_ :: Proxy curve -> CSize
   sizeAffine_ :: Proxy curve -> CSize
 
+  c_blst_sk_to_pk :: PointPtr curve -> ScalarPtr -> IO ()
+  c_blst_sign :: PointPtr (Dual curve) -> PointPtr (Dual curve) -> ScalarPtr -> IO ()
+
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
 
@@ -439,6 +453,9 @@ instance BLS Curve1 where
   serializedSizePoint_ _ = 96
   sizeAffine_ _ = c_size_blst_affine1
 
+  c_blst_sk_to_pk = c_blst_sk_to_pk_in_g1
+  c_blst_sign = c_blst_sign_pk_in_g1
+
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
 
@@ -470,6 +487,9 @@ instance BLS Curve2 where
   compressedSizePoint_ _ = 96
   serializedSizePoint_ _ = 192
   sizeAffine_ _ = c_size_blst_affine2
+
+  c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
+  c_blst_sign = c_blst_sign_pk_in_g2
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
@@ -726,6 +746,23 @@ foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr ->
 
 foreign import ccall "blst_miller_loop"
   c_blst_miller_loop :: PTPtr -> Affine2Ptr -> Affine1Ptr -> IO ()
+
+---- BLS signaturs Secret-key operatons
+
+foreign import ccall "blst_keygen" 
+  c_blst_keygen :: ScalarPtr -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
+
+foreign import ccall "blst_sk_to_pk_in_g1"
+  c_blst_sk_to_pk_in_g1 :: Point1Ptr -> ScalarPtr -> IO ()
+
+foreign import ccall "blst_sign_pk_in_g1"
+  c_blst_sign_pk_in_g1 :: Point2Ptr -> Point2Ptr -> ScalarPtr -> IO ()
+
+foreign import ccall "blst_sk_to_pk_in_g2"
+  c_blst_sk_to_pk_in_g2 :: Point2Ptr -> ScalarPtr -> IO ()
+
+foreign import ccall "blst_sign_pk_in_g2"
+  c_blst_sign_pk_in_g2 :: Point1Ptr -> Point1Ptr -> ScalarPtr -> IO ()
 
 ---- Raw BLST error constants
 
