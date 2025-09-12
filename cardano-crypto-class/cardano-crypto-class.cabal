@@ -130,7 +130,7 @@ library
     build-depends:
       integer-gmp
   pkgconfig-depends:
-    libblst,
+    libblst >=1.3.16,
     libsodium,
 
   c-sources: cbits/blst_util.c
