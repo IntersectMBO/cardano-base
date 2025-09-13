@@ -45,6 +45,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Point2,
   PT,
   Scalar (..),
+  SecretKey (..), -- TODO: remove constructor export, added for testing
   Fr (..),
   unsafePointFromPointPtr,
 
@@ -71,11 +72,16 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_affine_in_g,
     c_blst_generator,
     c_blst_p_is_equal,
-    c_blst_p_is_inf
+    c_blst_p_is_inf,
+    c_blst_sk_to_pk,
+    c_blst_sign
   ),
 
   -- * Pairing check
   c_blst_miller_loop,
+
+  -- * Keygen
+  c_blst_keygen,
 
   -- * FP12 functions
 
@@ -167,6 +173,11 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 
   -- * Pairings
   millerLoop,
+
+  -- * Secret key operations
+  blsKeyGen,
+  blsSkToPk,
+  blsSign,
 )
 where
 
@@ -192,6 +203,11 @@ import System.IO.Unsafe (unsafePerformIO)
 
 data Curve1
 data Curve2
+
+-- | A type family mapping a curve to its dual curve (its an involution).
+type family Dual curve where
+  Dual Curve1 = Curve2
+  Dual Curve2 = Curve1
 
 ---- Unsafe PointPtr types
 
@@ -407,6 +423,9 @@ class BLS curve where
   compressedSizePoint_ :: Proxy curve -> CSize
   sizeAffine_ :: Proxy curve -> CSize
 
+  c_blst_sk_to_pk :: PointPtr curve -> ScalarPtr -> IO ()
+  c_blst_sign :: Proxy curve -> PointPtr (Dual curve) -> PointPtr (Dual curve) -> ScalarPtr -> IO ()
+
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
 
@@ -438,6 +457,9 @@ instance BLS Curve1 where
   compressedSizePoint_ _ = 48
   serializedSizePoint_ _ = 96
   sizeAffine_ _ = c_size_blst_affine1
+
+  c_blst_sk_to_pk = c_blst_sk_to_pk_in_g1
+  c_blst_sign _ = c_blst_sign_pk_in_g1
 
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
@@ -471,6 +493,9 @@ instance BLS Curve2 where
   serializedSizePoint_ _ = 192
   sizeAffine_ _ = c_size_blst_affine2
 
+  c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
+  c_blst_sign _ = c_blst_sign_pk_in_g2
+
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
     withAffine a $ \aptr ->
@@ -483,6 +508,8 @@ sizeScalar :: Int
 sizeScalar = fromIntegral c_size_blst_scalar
 
 newtype Scalar = Scalar (ForeignPtr Void)
+
+newtype SecretKey = SecretKey {unSecretKey :: Scalar} deriving (Eq)
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
@@ -726,6 +753,23 @@ foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr ->
 
 foreign import ccall "blst_miller_loop"
   c_blst_miller_loop :: PTPtr -> Affine2Ptr -> Affine1Ptr -> IO ()
+
+---- BLS signatures Secret-key operations
+
+foreign import ccall "blst_keygen"
+  c_blst_keygen :: ScalarPtr -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
+
+foreign import ccall "blst_sk_to_pk_in_g1"
+  c_blst_sk_to_pk_in_g1 :: Point1Ptr -> ScalarPtr -> IO ()
+
+foreign import ccall "blst_sign_pk_in_g1"
+  c_blst_sign_pk_in_g1 :: Point2Ptr -> Point2Ptr -> ScalarPtr -> IO ()
+
+foreign import ccall "blst_sk_to_pk_in_g2"
+  c_blst_sk_to_pk_in_g2 :: Point2Ptr -> ScalarPtr -> IO ()
+
+foreign import ccall "blst_sign_pk_in_g2"
+  c_blst_sign_pk_in_g2 :: Point1Ptr -> Point1Ptr -> ScalarPtr -> IO ()
 
 ---- Raw BLST error constants
 
@@ -1090,6 +1134,62 @@ millerLoop p1 p2 =
       withAffine (toAffine p2) $ \ap2 ->
         withNewPT' $ \ppt ->
           c_blst_miller_loop ppt ap2 ap1
+
+---- BLS signatures Secret-key operations
+
+-- Following the rust bindings as per this reference:
+-- https://github.com/supranational/blst/blob/f48500c1fdbefa7c0bf9800bccd65d28236799c1/bindings/rust/src/lib.rs#L559
+
+-- | Generate a secret key from the given input keying material (ikm)
+-- and optional info. The ikm must be at least 32 bytes long.
+blsKeyGen :: ByteString -> Maybe ByteString -> Either BLSTError SecretKey
+blsKeyGen ikm info = unsafePerformIO $ do
+  withMaybeCStringLen info $ \(infoPtr, infoLen) ->
+    BSU.unsafeUseAsCStringLen ikm $ \(ikmPtr, ikmLen) ->
+      if ikmLen < 32
+        then return $ Left BLST_BAD_ENCODING
+        else do
+          sk <- withNewScalar' $ \skPtr ->
+            c_blst_keygen skPtr ikmPtr (fromIntegral ikmLen) infoPtr (fromIntegral infoLen)
+          return $ Right (SecretKey sk)
+
+-- | Derive the public key from a secret key.
+-- Note that given the choice of Curve1 or Curve2, the public key
+-- will be a point on the corresponding curve.
+blsSkToPk :: BLS curve => SecretKey -> Point curve
+blsSkToPk (SecretKey sk) = unsafePerformIO $
+  withNewPoint' $ \pkPtr ->
+    withScalar sk $ \skPtr ->
+      c_blst_sk_to_pk pkPtr skPtr
+
+-- | Sign a message with the given secret key.
+-- Note that given the choice of Curve1 or Curve2, the signature
+-- will be a point on the dual of the corresponding curve.
+blsSign ::
+  forall curve.
+  (BLS curve, BLS (Dual curve)) =>
+  Proxy curve ->
+  SecretKey -> -- secret key
+  ByteString -> -- message
+  Maybe ByteString -> -- domain separation tag
+  Maybe ByteString -> -- augmentation
+  Point (Dual curve) -- signature
+blsSign _ (SecretKey sk) msg dst aug = unsafePerformIO $
+  BSU.unsafeUseAsCStringLen msg $ \(msgPtr, msgLen) ->
+    withMaybeCStringLen dst $ \(dstPtr, dstLen) ->
+      withMaybeCStringLen aug $ \(augPtr, augLen) ->
+        withNewPoint' @(Dual curve) $ \sigPtr -> do
+          withNewPoint_ @(Dual curve) $ \hPtr -> do
+            c_blst_hash @(Dual curve)
+              hPtr
+              msgPtr
+              (fromIntegral msgLen)
+              dstPtr
+              (fromIntegral dstLen)
+              augPtr
+              (fromIntegral augLen)
+            withScalar sk $ \skPtr ->
+              c_blst_sign (Proxy @curve) sigPtr hPtr skPtr
 
 ---- Utility
 
