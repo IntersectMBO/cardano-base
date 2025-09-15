@@ -46,6 +46,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   PT,
   Scalar (..),
   SecretKey (..), -- TODO: remove constructor export, added for testing
+  PublicKey (..),
+  Signature (..),
   Fr (..),
   unsafePointFromPointPtr,
 
@@ -173,11 +175,13 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 
   -- * Pairings
   millerLoop,
+  finalVerifyWithOrder,
 
-  -- * Secret key operations
+  -- * BLS signature operations
   blsKeyGen,
   blsSkToPk,
   blsSign,
+  blsSignatureVerify,
 )
 where
 
@@ -509,7 +513,9 @@ sizeScalar = fromIntegral c_size_blst_scalar
 
 newtype Scalar = Scalar (ForeignPtr Void)
 
-newtype SecretKey = SecretKey {unSecretKey :: Scalar} deriving (Eq)
+newtype SecretKey = SecretKey {unSecretKey :: Scalar}
+newtype PublicKey curve = PublicKey {unPublicKey :: Point curve}
+newtype Signature curve = Signature {unSignature :: Point (Dual curve)}
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
@@ -1135,13 +1141,28 @@ millerLoop p1 p2 =
         withNewPT' $ \ppt ->
           c_blst_miller_loop ppt ap2 ap1
 
----- BLS signatures Secret-key operations
+class (BLS curve, BLS (Dual curve)) => FinalVerifyOrder curve where
+  finalVerifyWithOrder ::
+    Point curve -> Point (Dual curve) -> Point curve -> Point (Dual curve) -> Bool
+
+instance FinalVerifyOrder Curve1 where
+  finalVerifyWithOrder g1a g2a g1b g2b =
+    ptFinalVerify (millerLoop g1a g2a) (millerLoop g1b g2b)
+
+instance FinalVerifyOrder Curve2 where
+  finalVerifyWithOrder g2a g1a g2b g1b =
+    ptFinalVerify (millerLoop g1a g2a) (millerLoop g1b g2b)
+
+---- BLS signatures operations
 
 -- Following the rust bindings as per this reference:
 -- https://github.com/supranational/blst/blob/f48500c1fdbefa7c0bf9800bccd65d28236799c1/bindings/rust/src/lib.rs#L559
 
 -- | Generate a secret key from the given input keying material (ikm)
--- and optional info. The ikm must be at least 32 bytes long.
+-- and optional extra info. The ikm must be at least 32 bytes long.
+-- See https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html#name-keygen
+-- on this length requirement. Note that the blst library itself does not
+-- enforce this length requirement.
 blsKeyGen :: ByteString -> Maybe ByteString -> Either BLSTError SecretKey
 blsKeyGen ikm info = unsafePerformIO $ do
   withMaybeCStringLen info $ \(infoPtr, infoLen) ->
@@ -1156,8 +1177,8 @@ blsKeyGen ikm info = unsafePerformIO $ do
 -- | Derive the public key from a secret key.
 -- Note that given the choice of Curve1 or Curve2, the public key
 -- will be a point on the corresponding curve.
-blsSkToPk :: BLS curve => SecretKey -> Point curve
-blsSkToPk (SecretKey sk) = unsafePerformIO $
+blsSkToPk :: BLS curve => SecretKey -> PublicKey curve
+blsSkToPk (SecretKey sk) = PublicKey . unsafePerformIO $
   withNewPoint' $ \pkPtr ->
     withScalar sk $ \skPtr ->
       c_blst_sk_to_pk pkPtr skPtr
@@ -1173,8 +1194,8 @@ blsSign ::
   ByteString -> -- message
   Maybe ByteString -> -- domain separation tag
   Maybe ByteString -> -- augmentation
-  Point (Dual curve) -- signature
-blsSign _ (SecretKey sk) msg dst aug = unsafePerformIO $
+  Signature curve -- signature
+blsSign _ (SecretKey sk) msg dst aug = Signature . unsafePerformIO $
   BSU.unsafeUseAsCStringLen msg $ \(msgPtr, msgLen) ->
     withMaybeCStringLen dst $ \(dstPtr, dstLen) ->
       withMaybeCStringLen aug $ \(augPtr, augLen) ->
@@ -1191,7 +1212,20 @@ blsSign _ (SecretKey sk) msg dst aug = unsafePerformIO $
             withScalar sk $ \skPtr ->
               c_blst_sign (Proxy @curve) sigPtr hPtr skPtr
 
----- Utility
+-- | Verify a BLS signature via the naive way.
+blsSignatureVerify ::
+  forall curve.
+  FinalVerifyOrder curve =>
+  PublicKey curve -> -- pk on curve
+  ByteString -> -- msg
+  Signature curve -> -- sig on dual curve
+  Maybe ByteString -> -- dst
+  Maybe ByteString -> -- aug
+  Bool
+blsSignatureVerify (PublicKey pk) msg (Signature sig) dst aug =
+  -- here we check that e(g1, sig) == e(pk, H(msg)) or equivalently
+  -- e(sig, g2) == e(H(msg),pk) depending on the curve choice for pk/sig.
+  finalVerifyWithOrder @curve blsGenerator sig pk (blsHash msg dst aug)
 
 withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)
