@@ -93,7 +93,7 @@ library
     cardano-crypto-praos >=2.2.1,
     cborg,
     containers,
-    contra-tracer ==0.1.0.2,
+    contra-tracer ==0.1.0.1 || ==0.1.0.2,
     criterion,
     crypton,
     deepseq,
