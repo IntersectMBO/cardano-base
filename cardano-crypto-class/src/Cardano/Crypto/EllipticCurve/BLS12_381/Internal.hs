@@ -49,6 +49,10 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   SecretKey (..),
   PublicKey (..),
   Signature (..),
+  Dual,
+  FinalVerifyOrder,
+  PairingSide,
+  ProofOfPossession (..),
   Fr (..),
   unsafePointFromPointPtr,
 
@@ -79,9 +83,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_sk_to_pk,
     c_blst_sign
   ),
-  Dual,
-  FinalVerifyOrder,
-  ProofOfPossession (..),
 
   -- * Pairing check
   c_blst_miller_loop,
@@ -179,7 +180,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 
   -- * Pairings
   millerLoop,
-  finalVerifyWithOrder,
+  finalVerifyPairs,
 
   -- * BLS signature operations
   blsKeyGen,
@@ -1172,17 +1173,21 @@ millerLoop p1 p2 =
         withNewPT' $ \ppt ->
           c_blst_miller_loop ppt ap2 ap1
 
+-- A single side of e(·,·): the point on `curve` and the point on its `Dual`.
+type PairingSide curve = (Point curve, Point (Dual curve))
+
 class (BLS curve, BLS (Dual curve)) => FinalVerifyOrder curve where
-  finalVerifyWithOrder ::
-    Point curve -> Point (Dual curve) -> Point curve -> Point (Dual curve) -> Bool
+  millerSide :: PairingSide curve -> PT
+  finalVerifyPairs :: PairingSide curve -> PairingSide curve -> Bool
+  finalVerifyPairs lhs rhs = ptFinalVerify (millerSide lhs) (millerSide rhs)
 
 instance FinalVerifyOrder Curve1 where
-  finalVerifyWithOrder g1a g2a g1b g2b =
-    ptFinalVerify (millerLoop g1a g2a) (millerLoop g1b g2b)
+  -- Curve1: miller loop expects (g1, g2)
+  millerSide (g1, g2) = millerLoop g1 g2
 
 instance FinalVerifyOrder Curve2 where
-  finalVerifyWithOrder g2a g1a g2b g1b =
-    ptFinalVerify (millerLoop g1a g2a) (millerLoop g1b g2b)
+  -- Curve2: miller loop expects (g1, g2) but our Pair is (g2, g1)
+  millerSide (g2, g1) = millerLoop g1 g2
 
 ---- BLS signatures operations
 
@@ -1256,7 +1261,7 @@ blsSignatureVerify ::
 blsSignatureVerify (PublicKey pk) msg (Signature sig) dst aug =
   -- here we check that e(g1, sig) == e(pk, H(msg)) or equivalently
   -- e(sig, g2) == e(H(msg),pk) depending on the curve choice for pk/sig.
-  finalVerifyWithOrder @curve blsGenerator sig pk (blsHash msg dst aug)
+  finalVerifyPairs @curve (blsGenerator, sig) (pk, blsHash msg dst aug)
 
 blsProofOfPossessionProve ::
   forall curve.
@@ -1283,8 +1288,8 @@ blsProofOfPossessionVerify ::
   Maybe ByteString -> -- augmentation (per message augmentation)
   Bool
 blsProofOfPossessionVerify (PublicKey pk) (ProofOfPossession mu1 mu2) dst aug =
-  finalVerifyWithOrder @curve blsGenerator mu1 pk (blsHash ("PoP" <> blsCompress pk) dst aug)
-    && finalVerifyWithOrder @curve pk blsGenerator blsGenerator mu2
+  finalVerifyPairs @curve (blsGenerator, mu1) (pk, blsHash ("PoP" <> blsCompress pk) dst aug)
+    && finalVerifyPairs @curve (pk, blsGenerator) (blsGenerator, mu2)
 
 withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)
