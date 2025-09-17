@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -80,6 +81,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   ),
   Dual,
   FinalVerifyOrder,
+  ProofOfPossession (..),
 
   -- * Pairing check
   c_blst_miller_loop,
@@ -184,6 +186,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsSkToPk,
   blsSign,
   blsSignatureVerify,
+  blsProofOfPossessionProve,
+  blsProofOfPossessionVerify,
 )
 where
 
@@ -515,9 +519,34 @@ sizeScalar = fromIntegral c_size_blst_scalar
 
 newtype Scalar = Scalar (ForeignPtr Void)
 
+{-
+- The BLS signature scheme as specified in the IETF draft
+- https://www.ietf.org/archive/id/draft-irtf-cfrg-bls-signature-05.html
+-
+- Note that the specification defines two variants, 'minimal-signature-size'
+- and 'minimal-pubkey-size'. The former uses G1 for signatures and G2 for
+- public keys, while the latter does the opposite.
+-
+- Below we implement both variants, using the phantom types 'Curve1' and
+- 'Curve2' to distinguish them. The user-facing API is so that
+-
+- * Curve1 as 'curve' corresponds to "minimal-pubkey-size", i.e. public keys
+-   are points in G1, signatures are points in G2 and POPs are points in G2.
+- * Curve2 as 'curve' corresponds to "minimal-signature-size", i.e. public keys
+-   are points in G2, signatures are points in G1 and POPs are points in G1.
+-
+- TODO: Add note on switching these around / reusing secret keys for both variants
+-}
+
+-- TODO: Asses is wrapping Scalar is enough to ensure security
+-- against accidental leakage of secret keys.
 newtype SecretKey = SecretKey {unSecretKey :: Scalar}
 newtype PublicKey curve = PublicKey {unPublicKey :: Point curve}
 newtype Signature curve = Signature {unSignature :: Point (Dual curve)}
+data ProofOfPossession curve = ProofOfPossession
+  { unMu1 :: Point (Dual curve)
+  , unMu2 :: Point (Dual curve)
+  }
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
@@ -1194,8 +1223,8 @@ blsSign ::
   Proxy curve ->
   SecretKey -> -- secret key
   ByteString -> -- message
-  Maybe ByteString -> -- domain separation tag
-  Maybe ByteString -> -- augmentation
+  Maybe ByteString -> -- domain separation tag (for protocol separation)
+  Maybe ByteString -> -- augmentation (per message augmentation)
   Signature curve -- signature
 blsSign _ (SecretKey sk) msg dst aug = Signature . unsafePerformIO $
   BSU.unsafeUseAsCStringLen msg $ \(msgPtr, msgLen) ->
@@ -1221,13 +1250,41 @@ blsSignatureVerify ::
   PublicKey curve -> -- pk on curve
   ByteString -> -- msg
   Signature curve -> -- sig on dual curve
-  Maybe ByteString -> -- dst
-  Maybe ByteString -> -- aug
+  Maybe ByteString -> -- domain separation tag (for protocol separation)
+  Maybe ByteString -> -- augmentation (per message augmentation)
   Bool
 blsSignatureVerify (PublicKey pk) msg (Signature sig) dst aug =
   -- here we check that e(g1, sig) == e(pk, H(msg)) or equivalently
   -- e(sig, g2) == e(H(msg),pk) depending on the curve choice for pk/sig.
   finalVerifyWithOrder @curve blsGenerator sig pk (blsHash msg dst aug)
+
+blsProofOfPossessionProve ::
+  forall curve.
+  (BLS curve, BLS (Dual curve)) =>
+  SecretKey -> -- secret key
+  Maybe ByteString -> -- domain separation tag (for protocol separation)
+  Maybe ByteString -> -- augmentation (per message augmentation)
+  ProofOfPossession curve -- proof of possession
+blsProofOfPossessionProve (SecretKey sk) dst aug = ProofOfPossession mu1 mu2
+  where
+    skAsInteger = unsafePerformIO $ scalarToInteger sk
+    PublicKey pk = blsSkToPk @curve (SecretKey sk)
+    mu1 :: Point (Dual curve)
+    mu1 = blsMult (blsHash ("PoP" <> blsCompress pk) dst aug) skAsInteger
+    mu2 :: Point (Dual curve)
+    mu2 = blsMult blsGenerator skAsInteger
+
+blsProofOfPossessionVerify ::
+  forall curve.
+  FinalVerifyOrder curve =>
+  PublicKey curve -> -- pk on curve
+  ProofOfPossession curve -> -- proof of possession
+  Maybe ByteString -> -- domain separation tag (for protocol separation)
+  Maybe ByteString -> -- augmentation (per message augmentation)
+  Bool
+blsProofOfPossessionVerify (PublicKey pk) (ProofOfPossession mu1 mu2) dst aug =
+  finalVerifyWithOrder @curve blsGenerator mu1 pk (blsHash ("PoP" <> blsCompress pk) dst aug)
+    && finalVerifyWithOrder @curve pk blsGenerator blsGenerator mu2
 
 withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)
