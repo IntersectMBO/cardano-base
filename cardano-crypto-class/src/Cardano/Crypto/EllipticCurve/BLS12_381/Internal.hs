@@ -46,7 +46,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Point2,
   PT,
   Scalar (..),
-  SecretKey (..), -- TODO: remove constructor export, added for testing
+  SecretKey (..),
   PublicKey (..),
   Signature (..),
   Fr (..),
@@ -79,6 +79,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_sk_to_pk,
     c_blst_sign
   ),
+  Dual,
+  FinalVerifyOrder,
 
   -- * Pairing check
   c_blst_miller_loop,
