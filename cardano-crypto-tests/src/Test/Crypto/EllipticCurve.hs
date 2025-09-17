@@ -1,7 +1,9 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Crypto.EllipticCurve
@@ -9,11 +11,12 @@ where
 
 import Paths_cardano_crypto_tests
 
-import Test.Crypto.Util (eitherShowError)
+import Test.Crypto.Util (Message (..), eitherShowError)
 
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Cardano.Crypto.Hash (SHA256, digest)
+import Cardano.Crypto.Seed
 import Data.Bits (shiftL)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
@@ -29,6 +32,7 @@ import Test.QuickCheck (
   chooseAny,
   oneof,
   suchThatMap,
+  vectorOf,
   (===),
   (==>),
  )
@@ -49,6 +53,8 @@ tests =
         , testPT "PT"
         , testPairing "Pairing"
         , testVectors "Vectors"
+        , testBlsSignature "BLS Signature Curve 1" (Proxy @BLS.Curve1)
+        , testBlsSignature "BLS Signature Curve 2" (Proxy @BLS.Curve2)
         ]
     ]
 
@@ -408,6 +414,59 @@ testVectorLargeDst name =
       hashedMsg
       expected_output
 
+testBlsSignature ::
+  forall curve.
+  BLS.FinalVerifyOrder curve => String -> Proxy curve -> TestTree
+testBlsSignature name curve =
+  testGroup
+    name
+    [ testProperty
+        "generate key"
+        ( \(seed :: Seed, info :: Message) ->
+            let sk = BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info))
+             in case sk of
+                  Left _ -> True
+                  Right sk' ->
+                    let pk = BLS.blsSkToPk sk'
+                     in BLS.unPublicKey pk
+                          == BLS.blsMult (BLS.blsGenerator @curve) (unsafePerformIO (BLS.scalarToInteger (BLS.unSecretKey sk')))
+        )
+    , testProperty
+        "sign/verify"
+        ( \(seed :: Seed, info :: Message, msg :: Message, dst :: Message, aug :: Message) ->
+            let sk = BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info))
+             in case sk of
+                  Left _ -> False
+                  Right sk' ->
+                    let pk = BLS.blsSkToPk sk'
+                        sig = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes aug))
+                     in BLS.blsSignatureVerify pk (messageBytes msg) sig (Just (messageBytes dst)) (Just (messageBytes aug))
+        )
+    , testProperty
+        "Random signature fails"
+        ( \( seed :: Seed
+             , info :: Message
+             , randomSig :: BLS.Signature curve
+             , msg :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              let sk = BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info))
+               in case sk of
+                    Left _ -> True
+                    Right sk' ->
+                      let pk = BLS.blsSkToPk sk'
+                       in not
+                            ( BLS.blsSignatureVerify
+                                pk
+                                (messageBytes msg)
+                                randomSig
+                                (Just (messageBytes dst))
+                                (Just (messageBytes aug))
+                            )
+        )
+    ]
+
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =
   f a (f b c) === f (f a b) c
@@ -484,6 +543,12 @@ instance BLS.BLS curve => Arbitrary (BLS.Point curve) where
         )
       ]
 
+instance BLS.BLS (BLS.Dual curve) => Arbitrary (BLS.Signature curve) where
+  arbitrary = BLS.Signature <$> arbitrary
+
+instance BLS.BLS (BLS.Dual curve) => Show (BLS.Signature curve) where
+  show (BLS.Signature p) = show (BLS.blsSerialize p)
+
 instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
 
@@ -500,6 +565,12 @@ instance Arbitrary BLS.Scalar where
                         Left _ -> Nothing
                         Right v -> Just v
                     )
+
+instance Arbitrary Seed where
+  arbitrary = do
+    n <- choose (32, 128)
+    bytes <- vectorOf n (choose (0, 255))
+    pure (mkSeedFromBytes (BS.pack bytes))
 
 instance Show BLS.Scalar where
   show = show . BLS.scalarToBS
