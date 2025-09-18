@@ -55,6 +55,8 @@ tests =
         , testVectors "Vectors"
         , testBlsSignature "BLS Signature Curve 1" (Proxy @BLS.Curve1)
         , testBlsSignature "BLS Signature Curve 2" (Proxy @BLS.Curve2)
+        , testBlsPoP "BLS PoP Curve 1" (Proxy @BLS.Curve1)
+        , testBlsPoP "BLS PoP Curve 2" (Proxy @BLS.Curve2)
         ]
     ]
 
@@ -467,6 +469,206 @@ testBlsSignature name curve =
         )
     ]
 
+testBlsPoP ::
+  forall curve.
+  BLS.FinalVerifyOrder curve =>
+  String -> Proxy curve -> TestTree
+testBlsPoP name _ =
+  testGroup
+    name
+    [ testProperty
+        "prove/verify"
+        ( \(seed :: Seed, info :: Message, dst :: Message, aug :: Message) ->
+            case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+              Left _ -> False
+              Right sk' ->
+                let pk = BLS.blsSkToPk @curve sk'
+                    pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
+                 in BLS.blsProofOfPossessionVerify @curve pk pop (Just (messageBytes dst)) (Just (messageBytes aug))
+        )
+    , testProperty
+        "wrong public key fails"
+        ( \( seedA :: Seed
+             , infoA :: Message
+             , seedB :: Seed
+             , infoB :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case ( BLS.blsKeyGen (getSeedBytes seedA) (Just (messageBytes infoA))
+                   , BLS.blsKeyGen (getSeedBytes seedB) (Just (messageBytes infoB))
+                   ) of
+                (Right skA, Right skB) ->
+                  let pkB = BLS.blsSkToPk @curve skB
+                      popA = BLS.blsProofOfPossessionProve @curve skA (Just (messageBytes dst)) (Just (messageBytes aug))
+                   in not
+                        (BLS.blsProofOfPossessionVerify @curve pkB popA (Just (messageBytes dst)) (Just (messageBytes aug)))
+                _ -> False
+        )
+    , testProperty
+        "Wrong DST fails"
+        ( \( seed :: Seed
+             , info :: Message
+             , dstA :: Message
+             , dstB :: Message
+             , aug :: Message
+             ) ->
+              dstA /= dstB ==>
+                case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                  Left _ -> False
+                  Right sk' ->
+                    let pk = BLS.blsSkToPk @curve sk'
+                        pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dstA)) (Just (messageBytes aug))
+                     in not
+                          ( BLS.blsProofOfPossessionVerify @curve
+                              pk
+                              pop
+                              (Just (messageBytes dstB))
+                              (Just (messageBytes aug))
+                          )
+        )
+    , testProperty
+        "Wrong Aug fails"
+        ( \( seed :: Seed
+             , info :: Message
+             , dst :: Message
+             , augA :: Message
+             , augB :: Message
+             ) ->
+              augA /= augB ==>
+                case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                  Left _ -> False
+                  Right sk' ->
+                    let pk = BLS.blsSkToPk @curve sk'
+                        pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes augA))
+                     in not
+                          ( BLS.blsProofOfPossessionVerify @curve
+                              pk
+                              pop
+                              (Just (messageBytes dst))
+                              (Just (messageBytes augB))
+                          )
+        )
+    , testProperty
+        "changing both DST and Aug still fails"
+        ( \( seed :: Seed
+             , info :: Message
+             , dstA :: Message
+             , dstB :: Message
+             , augA :: Message
+             , augB :: Message
+             ) ->
+              (dstA /= dstB || augA /= augB) ==>
+                case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                  Left _ -> False
+                  Right sk' ->
+                    let pk = BLS.blsSkToPk @curve sk'
+                        pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dstA)) (Just (messageBytes augA))
+                     in not
+                          ( BLS.blsProofOfPossessionVerify @curve
+                              pk
+                              pop
+                              (Just (messageBytes dstB))
+                              (Just (messageBytes augB))
+                          )
+        )
+    , testProperty
+        "random PoP fails"
+        ( \( seed :: Seed
+             , info :: Message
+             , randomPoP :: BLS.ProofOfPossession curve
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                Left _ -> False
+                Right sk' ->
+                  let pk = BLS.blsSkToPk @curve sk'
+                   in not
+                        ( BLS.blsProofOfPossessionVerify @curve
+                            pk
+                            randomPoP
+                            (Just (messageBytes dst))
+                            (Just (messageBytes aug))
+                        )
+        )
+    , testProperty
+        "prove builds expected (mu1, mu2)"
+        ( \(seed :: Seed, info :: Message, dst :: Message, aug :: Message) ->
+            case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+              Left _ -> True
+              Right sk' ->
+                let pk = BLS.blsSkToPk @curve sk'
+                    BLS.ProofOfPossession mu1 mu2 =
+                      BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
+                    skI = unsafePerformIO (BLS.scalarToInteger (BLS.unSecretKey sk'))
+                    expectedMu2 = BLS.blsMult (BLS.blsGenerator @(BLS.Dual curve)) skI
+                    expectedMu1 =
+                      BLS.blsMult
+                        ( BLS.blsHash
+                            ("PoP" <> BLS.blsCompress (BLS.unPublicKey pk))
+                            (Just (messageBytes dst))
+                            (Just (messageBytes aug))
+                        )
+                        skI
+                 in mu1 == expectedMu1 && mu2 == expectedMu2
+        )
+    , testProperty
+        "PoP is deterministic"
+        ( \(seed :: Seed, info :: Message, dst :: Message, aug :: Message) ->
+            case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+              Left _ -> True
+              Right sk' ->
+                let BLS.ProofOfPossession mu1 mu2 = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
+                    BLS.ProofOfPossession mu1' mu2' = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
+                 in mu1 == mu1' && mu2 == mu2'
+        )
+    , testProperty
+        "DST/Aug: Nothing == Just \"\""
+        ( \(seed :: Seed, info :: Message) ->
+            case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+              Left _ -> True
+              Right sk' ->
+                let BLS.ProofOfPossession mu1 mu2 = BLS.blsProofOfPossessionProve @curve sk' Nothing Nothing
+                    BLS.ProofOfPossession mu1' mu2' = BLS.blsProofOfPossessionProve @curve sk' (Just "") (Just "")
+                 in mu1 == mu1' && mu2 == mu2'
+        )
+    , testProperty
+        "Swapping (mu1, mu2) fails"
+        ( \(seed :: Seed, info :: Message, dst :: Message, aug :: Message) ->
+            case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+              Left _ -> True
+              Right sk' ->
+                let pk = BLS.blsSkToPk @curve sk'
+                    BLS.ProofOfPossession mu1 mu2 =
+                      BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
+                    swapped = BLS.ProofOfPossession mu2 mu1
+                 in not
+                      (BLS.blsProofOfPossessionVerify @curve pk swapped (Just (messageBytes dst)) (Just (messageBytes aug)))
+        )
+    , testProperty
+        "infinity in PoP fails with valid PoP parts"
+        ( \(seed :: Seed, info :: Message, dst :: Message, aug :: Message) ->
+            case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+              Left _ -> True
+              Right sk' ->
+                let pk = BLS.blsSkToPk @curve sk'
+                    BLS.ProofOfPossession mu1 mu2 =
+                      BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
+                    popInf1 = BLS.ProofOfPossession BLS.blsZero mu2
+                    popInf2 = BLS.ProofOfPossession mu1 BLS.blsZero
+                 in not
+                      (BLS.blsProofOfPossessionVerify @curve pk popInf1 (Just (messageBytes dst)) (Just (messageBytes aug)))
+                      && not
+                        (BLS.blsProofOfPossessionVerify @curve pk popInf2 (Just (messageBytes dst)) (Just (messageBytes aug)))
+                      && BLS.blsProofOfPossessionVerify @curve
+                        pk
+                        (BLS.ProofOfPossession mu1 mu2)
+                        (Just (messageBytes dst))
+                        (Just (messageBytes aug))
+        )
+    ]
+
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =
   f a (f b c) === f (f a b) c
@@ -548,6 +750,13 @@ instance BLS.BLS (BLS.Dual curve) => Arbitrary (BLS.Signature curve) where
 
 instance BLS.BLS (BLS.Dual curve) => Show (BLS.Signature curve) where
   show (BLS.Signature p) = show (BLS.blsSerialize p)
+
+instance BLS.BLS (BLS.Dual curve) => Arbitrary (BLS.ProofOfPossession curve) where
+  arbitrary = BLS.ProofOfPossession <$> arbitrary <*> arbitrary
+
+instance BLS.BLS (BLS.Dual curve) => Show (BLS.ProofOfPossession curve) where
+  show (BLS.ProofOfPossession mu1 mu2) =
+    "(PoP mu1=" <> show (BLS.blsSerialize mu1) <> ", mu2=" <> show (BLS.blsSerialize mu2) <> ")"
 
 instance BLS.BLS curve => Arbitrary (BLS.Affine curve) where
   arbitrary = BLS.toAffine <$> arbitrary
