@@ -1,8 +1,8 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.2.3.1
+## 2.2.4.0
 
-*
+* Update to `mempack-0.2`.
 
 ## 2.2.3.0
 
@@ -62,4 +62,3 @@
 ## 2.0.0.1
 
 * Initial release
-
