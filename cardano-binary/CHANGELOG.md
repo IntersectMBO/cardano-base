@@ -1,8 +1,15 @@
 # Changelog for `cardano-binary`
 
-## 1.7.1.2
+## 1.7.2.0
 
 *
+
+### `testlib`
+
+* Expose modules:
+ - `Test.Cardano.Binary.Helpers`
+ - `Test.Cardano.Binary.Helpers.GoldenRoundTrip`
+* Remove the need for `cardano-binary-test` package.
 
 ## 1.7.1.1
 

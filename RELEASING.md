@@ -254,7 +254,6 @@ Here are test suite packages that are still subject to the versioning and releas
 but do not require changelog updates:
 
 * `cardano-crypto-tests`
-* `cardano-binary-test`
 
 It is mostly used internally and is planned to be deprecated and removed in some distant
 future in favor of a public sublibrary `testlib` for each relevant package.
