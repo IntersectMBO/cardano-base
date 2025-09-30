@@ -2,7 +2,7 @@
 
 ## 2.2.3.1
 
-*
+* Add package bound on pkg-config lib blst in #544
 
 ## 2.2.3.0
 
