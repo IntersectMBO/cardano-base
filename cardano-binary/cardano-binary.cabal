@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-binary
-version: 1.7.1.1
+version: 1.7.2.0
 synopsis: Binary serialization for Cardano
 description: This package includes the binary serialization format for Cardano
 license: Apache-2.0
@@ -60,32 +60,15 @@ library testlib
   import: base, project-config
   visibility: public
   hs-source-dirs: testlib
-  exposed-modules: Test.Cardano.Binary.TreeDiff
-  build-depends:
-    base,
-    base16-bytestring,
-    bytestring,
-    cardano-binary,
-    cborg,
-    formatting,
-    tree-diff,
-
-test-suite test
-  import: base, project-config
-  hs-source-dirs: test
-  main-is: test.hs
-  type: exitcode-stdio-1.0
-  other-modules:
-    Test.Cardano.Binary.Failure
+  exposed-modules:
     Test.Cardano.Binary.Helpers
     Test.Cardano.Binary.Helpers.GoldenRoundTrip
-    Test.Cardano.Binary.RoundTrip
-    Test.Cardano.Binary.Serialization
-    Test.Cardano.Binary.SizeBounds
+    Test.Cardano.Binary.TreeDiff
 
   build-depends:
     QuickCheck,
     base,
+    base16-bytestring,
     bytestring,
     cardano-binary,
     cardano-prelude-test,
@@ -96,6 +79,28 @@ test-suite test
     hspec,
     pretty-show,
     quickcheck-instances,
+    text,
+    tree-diff,
+
+test-suite test
+  import: base, project-config
+  hs-source-dirs: test
+  main-is: test.hs
+  type: exitcode-stdio-1.0
+  other-modules:
+    Test.Cardano.Binary.Failure
+    Test.Cardano.Binary.RoundTrip
+    Test.Cardano.Binary.Serialization
+    Test.Cardano.Binary.SizeBounds
+
+  build-depends:
+    base,
+    bytestring,
+    cardano-binary:{cardano-binary, testlib},
+    cardano-prelude-test,
+    cborg,
+    containers,
+    hedgehog,
     tagged,
     text,
     time,

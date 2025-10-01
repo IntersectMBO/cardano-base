@@ -18,7 +18,6 @@ packages:
   base-deriving-via
   cardano-base
   cardano-binary
-  cardano-binary/test
   cardano-crypto-class
   cardano-crypto-praos
   cardano-crypto-tests
