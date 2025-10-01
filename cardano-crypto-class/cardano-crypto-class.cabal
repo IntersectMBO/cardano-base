@@ -99,9 +99,7 @@ library
     Cardano.Crypto.VRF.Simple
     Cardano.Foreign
 
-  other-modules:
-    Cardano.Crypto.PackedBytes
-
+  other-modules: Cardano.Crypto.PackedBytes
   build-depends:
     aeson,
     base,
@@ -115,7 +113,7 @@ library
     io-classes >=1.4.1,
     memory,
     memory-pool,
-    mempack,
+    mempack >=0.1.2 && <0.2,
     mtl,
     nothunks,
     primitive >=0.8,
@@ -127,8 +125,7 @@ library
     vector,
 
   if impl(ghc <9.0.0)
-    build-depends:
-      integer-gmp
+    build-depends: integer-gmp
   pkgconfig-depends:
     libblst >=0.3.14,
     libsodium,
