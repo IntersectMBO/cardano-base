@@ -123,7 +123,11 @@ instance KnownNat n => MemPack (PackedBytes n) where
     curPos@(I# curPos#) <- guardAdvanceUnpack len
     buf <- ask
     pure $! buffer buf
+#if MIN_VERSION_mempack(0,2,0)
+      (\ba# off# -> packBytes (SBS.SBS ba#) (curPos + I# off#))
+#else
       (\ba# -> packBytes (SBS.SBS ba#) curPos)
+#endif
       -- Usage of `accursedUnutterablePerformIO` is safe below because there are no memory
       -- allocations happening that depend on the IO monad that we are excaping here. All
       -- IO actions are morally pure reads using pointers into the immutable
