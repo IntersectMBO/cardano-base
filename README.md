@@ -16,7 +16,7 @@ package repository](https://github.com/intersectmbo/cardano-haskell-packages)
 
 ## Building
 
-### With `nix`
+### Quick Start with `nix` (Recommended)
 
 With nix it is as easy as:
 
@@ -28,20 +28,25 @@ $ cabal build all
 
 ### Without `nix`
 
-Crypotgraphic depencencies needed for building Haskell packages:
+**IMPORTANT**: This project requires custom versions of cryptographic libraries with VRF support.
 
-* [`libsodium`](https://github.com/jedisct1/libsodium)
-* [`libsecp256k1`](https://github.com/bitcoin-core/secp256k1)
-* [`libblst`](https://github.com/supranational/blst)
+See **[INSTALL.md](INSTALL.md)** for detailed installation instructions including:
+- Pre-built binaries for macOS, Linux, and Windows
+- Building from source
+- Environment setup
+- Troubleshooting
 
-We provide packaged versions for common Operating Systems for all of the above
-dependencies: [Download](https://github.com/input-output-hk/iohk-nix/releases/latest)
+Quick overview of required dependencies:
+* **libsodium-vrf** - Custom fork with VRF batch verification ([source](https://github.com/input-output-hk/libsodium/tree/iquerejeta/vrf_batchverify))
+* **libsecp256k1** - With Schnorr signature support
+* **libblst** - BLS12-381 implementation
+
+Pre-built binaries available at: https://github.com/input-output-hk/iohk-nix/releases/latest
 
 
 ## GHC
 
-Default version of GHC used in `nix` is `9.2.7`, but we do support other GHC versions
-`8.10.7` and `9.6.1`.
+Default version of GHC used in `nix` is `9.6.7`. The project is tested with GHC versions `9.6.7`, `9.8.4`, `9.10.2`, and `9.12.2`.
 
 
 ### Testing
