@@ -94,7 +94,9 @@ testScalar name =
 testBLSCurve ::
   forall curve.
   BLS.BLS curve =>
-  String -> Proxy curve -> TestTree
+  String ->
+  Proxy curve ->
+  TestTree
 testBLSCurve name _ =
   testGroup
     name
@@ -426,7 +428,8 @@ prop_repeatedAddition a p = BLS.blsMult p (fromIntegral a) === repeatedAdd a p
 testAddNegYieldsInf ::
   forall curve.
   BLS.BLS curve =>
-  BLS.Point curve -> Bool
+  BLS.Point curve ->
+  Bool
 testAddNegYieldsInf p =
   BLS.blsIsInf (BLS.blsAddOrDouble p (BLS.blsNeg p))
 
