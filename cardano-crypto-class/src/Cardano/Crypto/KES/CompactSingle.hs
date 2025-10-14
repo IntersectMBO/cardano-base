@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -284,7 +285,13 @@ slice offset size =
 
 deriving instance DSIGNAlgorithm d => Show (UnsoundPureSignKeyKES (CompactSingleKES d))
 deriving instance
-  (DSIGNAlgorithm d, Eq (SignKeyDSIGN d)) => Eq (UnsoundPureSignKeyKES (CompactSingleKES d))
+  (
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  DSIGNAlgorithm d,
+#endif
+  Eq (SignKeyDSIGN d)) => Eq (UnsoundPureSignKeyKES (CompactSingleKES d))
 
 instance
   (UnsoundDSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) =>

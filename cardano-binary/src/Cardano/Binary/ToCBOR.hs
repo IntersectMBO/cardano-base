@@ -757,7 +757,13 @@ encodeMapSkel size foldrWithKey =
     (\k v b -> toCBOR k <> toCBOR v <> b)
 {-# INLINE encodeMapSkel #-}
 
-instance (Ord k, ToCBOR k, ToCBOR v) => ToCBOR (M.Map k v) where
+instance (
+#if __GLASGOW_HASKELL__ < 914
+  -- This constraints is REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  Ord k,
+#endif
+  ToCBOR k, ToCBOR v) => ToCBOR (M.Map k v) where
   toCBOR = encodeMapSkel M.size M.foldrWithKey
 
 encodeSetSkel ::
@@ -788,7 +794,13 @@ setTag = 258
 encodeSetTag :: E.Encoding
 encodeSetTag = E.encodeTag setTag
 
-instance (Ord a, ToCBOR a) => ToCBOR (S.Set a) where
+instance (
+#if __GLASGOW_HASKELL__ < 914
+  -- This constraints is REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  Ord a,
+#endif
+  ToCBOR a) => ToCBOR (S.Set a) where
   toCBOR = encodeSetSkel S.size S.foldr
 
 -- | Generic encoder for vectors. Its intended use is to allow easy
