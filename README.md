@@ -8,8 +8,8 @@ A collection of miscellaneous packages used by Cardano that cover:
 
 Each sub-project has its own README.
 
-Haddock for all packages from master branch can be found here:
-[https://cardano-base.cardano.intersectmbo.org](https://cardano-base.cardano.intersectmbo.org/)
+Haddocks for all packages from the `master` branch can be found at
+[base.cardano.intersectmbo.org](https://base.cardano.intersectmbo.org/)
 
 All releases for packages found in this repository are recorded in [Cardano Haskell
 package repository](https://github.com/intersectmbo/cardano-haskell-packages)
