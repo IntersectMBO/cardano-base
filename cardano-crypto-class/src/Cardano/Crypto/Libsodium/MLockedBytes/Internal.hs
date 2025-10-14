@@ -184,13 +184,16 @@ mlsbCopyWith allocator src = mlsbUseAsCPtr src $ \ptrSrc -> do
 mlsbFromByteString ::
   forall n m.
   (KnownNat n, MonadST m) =>
-  BS.ByteString -> m (MLockedSizedBytes n)
+  BS.ByteString ->
+  m (MLockedSizedBytes n)
 mlsbFromByteString = mlsbFromByteStringWith mlockedMalloc
 
 mlsbFromByteStringWith ::
   forall n m.
   (KnownNat n, MonadST m) =>
-  MLockedAllocator m -> BS.ByteString -> m (MLockedSizedBytes n)
+  MLockedAllocator m ->
+  BS.ByteString ->
+  m (MLockedSizedBytes n)
 mlsbFromByteStringWith allocator bs = do
   dst <- mlsbNewWith allocator
   withMLSB dst $ \ptr -> stToIO . unsafeIOToST $ do

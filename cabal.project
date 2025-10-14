@@ -40,3 +40,120 @@ program-options
 package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
+
+if impl(ghc >=9.14)
+  constraints:
+    , nothunks ^>= 0.2
+    , os-string >= 2.0.8
+    , QuickCheck < 2.17.0.0
+
+-- cabal-allow-newer
+if impl(ghc >=9.14)
+  allow-newer:
+    , OneTuple:base
+    , aeson:base
+    , aeson:bytestring
+    , aeson:containers
+    , aeson:data-fix
+    , aeson:deepseq
+    , aeson:ghc-prim
+    , aeson:hashable
+    , aeson:scientific
+    , aeson:tagged
+    , aeson:template-haskell
+    , aeson:these
+    , aeson:time
+    , aeson:time-compat
+    , aeson:witherable
+    , assoc:base
+    , async:base
+    , base:ghc-internal
+    , base:ghc-prim
+    , bifunctors:template-haskell
+    , binary:containers
+    , binary-orphans:base
+    , boring:base
+    , bytestring:base
+    , bytestring:deepseq
+    , bytestring:template-haskell
+    , canonical-json:containers
+    , cardano-binary:cborg
+    , cardano-prelude-test:canonical-json
+    , cborg:base
+    , data-fix:base
+    , directory:base
+    , exceptions:mtl
+    , filepath:template-haskell
+    , free:base
+    , free:exceptions
+    , free:mtl
+    , free:template-haskell
+    , generically:base
+    , ghc-heap:base
+    , ghc-heap:containers
+    , ghc-heap:ghc-internal
+    , ghc-heap:ghc-prim
+    , hashable:base
+    , hashable:containers
+    , hashable:ghc-bignum
+    , hedgehog:async
+    , hedgehog:bytestring
+    , hedgehog:template-haskell
+    , hedgehog:time
+    , hsc2hs:base
+    , indexed-traversable:base
+    , indexed-traversable:containers
+    , indexed-traversable-instances:base
+    , integer-conversion:base
+    , integer-logarithms:base
+    , integer-logarithms:ghc-bignum
+    , io-classes:base
+    , microstache:aeson
+    , microstache:base
+    , nothunks:base
+    , nothunks:containers
+    , nothunks:time
+    , nothunks:wherefrom-compat
+    , parallel:base
+    , parsec:base
+    , parsec:bytestring
+    , primitive:base
+    , process:base
+    , quickcheck-instances:base
+    , quickcheck-instances:bytestring
+    , quickcheck-instances:containers
+    , recursion-schemes:free
+    , recursion-schemes:template-haskell
+    , scientific:base
+    , scientific:containers
+    , scientific:template-haskell
+    , semialign:base
+    , semialign:containers
+    , semigroupoids:bifunctors
+    , serialise:base
+    , serialise:bytestring
+    , splitmix:base
+    , statistics:parallel
+    , tagged:template-haskell
+    , template-haskell:base
+    , text:binary
+    , text:template-haskell
+    , text-iso8601:time
+    , text-short:base
+    , text-short:template-haskell
+    , th-abstraction:template-haskell
+    , th-compat:template-haskell
+    , these:base
+    , time-compat:base
+    , time-compat:time
+    , tree-diff:base
+    , tree-diff:containers
+    , tree-diff:parsec
+    , tree-diff:time
+    , unix:base
+    , unordered-containers:template-haskell
+    , uuid-types:template-haskell
+    , vector-th-unbox:base
+    , vector-th-unbox:template-haskell
+    , wherefrom-compat:base
+    , witherable:containers
