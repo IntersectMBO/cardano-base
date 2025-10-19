@@ -300,8 +300,7 @@ decodeCertVRF = do
         actual = BS.length bs
 {-# INLINEABLE decodeCertVRF #-}
 
-data CertifiedVRF v a
-  = CertifiedVRF
+data CertifiedVRF v a = CertifiedVRF
   { certifiedOutput :: !(OutputVRF v)
   , certifiedProof :: !(CertVRF v)
   }
