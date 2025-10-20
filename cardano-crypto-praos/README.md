@@ -4,7 +4,7 @@
 
 `cardano-crypto-praos` provides cryptographic primitives specifically designed for the Praos consensus protocol. It implements high-performance Verifiable Random Functions (VRF) through optimized FFI bindings to a specialized fork of libsodium, enabling the random leader election process that powers Cardano's proof-of-stake consensus.
 
-## Core Functionality
+## Core Functionality 
 
 ### Verifiable Random Functions (VRF)
 VRFs are cryptographic functions that provide publicly verifiable randomness, essential for:
