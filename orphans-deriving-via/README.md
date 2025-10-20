@@ -12,16 +12,16 @@ This package solves the issue of needing these instances while keeping them sepa
 
 Provides automatic derivation of `NFData` (deep evaluation) instances via `Generic`:
 
-```haskell 
+```haskell
 instance (Generic a, GNFData (Rep a)) => NFData (InstantiatedAt Generic a)
 ```
 
-### NoThunks Instance  
+### NoThunks Instance
 
 Provides automatic derivation of `NoThunks` (thunk detection) instances via `Generic`:
 
-```haskell 
-instance (Generic a, GShowTypeOf (Rep a), GWNoThunks '[] (Rep a)) => 
+```haskell
+instance (Generic a, GShowTypeOf (Rep a), GWNoThunks '[] (Rep a)) =>
   NoThunks (InstantiatedAt Generic a)
 ```
 
@@ -29,7 +29,7 @@ instance (Generic a, GShowTypeOf (Rep a), GWNoThunks '[] (Rep a)) =>
 
 ### Basic NFData Derivation
 
-```haskell 
+```haskell
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -41,7 +41,7 @@ import GHC.Generics
 -- Automatically derive NFData for deep evaluation
 data MyData = MyData
   { field1 :: String
-  , field2 :: [Int] 
+  , field2 :: [Int]
   , field3 :: Maybe (String, Int)
   } deriving (Generic, Show)
     deriving NFData via InstantiatedAt Generic MyData
@@ -53,7 +53,7 @@ deeplyEvaluated = example `deepseq` "Data is fully evaluated"
 
 ### NoThunks Derivation for Memory Safety
 
-```haskell 
+```haskell
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -87,7 +87,7 @@ checkBlockData block = do
 
 ### Combined NFData and NoThunks
 
-```haskell 
+```haskell
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -123,7 +123,7 @@ processState state = do
 
 ### Working with Recursive Data Structures
 
-```haskell 
+```haskell
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -141,7 +141,7 @@ data Tree a = Leaf a | Node (Tree a) a (Tree a)
 
 -- Usage
 binaryTree :: Tree Int
-binaryTree = Node 
+binaryTree = Node
   (Node (Leaf 1) 2 (Leaf 3))
   4
   (Node (Leaf 5) 6 (Leaf 7))
@@ -154,7 +154,7 @@ verifyTree tree = do
   case result of
     Nothing -> putStrLn "✓ Tree contains no thunks"
     Just ctx -> putStrLn $ "⚠️  Tree has thunk: " ++ show ctx
-  
+
   -- Force full evaluation
   let !evaluated = tree `deepseq` tree
   putStrLn "✓ Tree fully evaluated"
@@ -162,7 +162,7 @@ verifyTree tree = do
 
 ### Cardano-Specific Examples
 
-```haskell 
+```haskell
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -198,7 +198,7 @@ processUTxO utxo = do
   -- Verify no thunks before expensive operations
   noThunksResult <- noThunks ["processUTxO"] utxo
   case noThunksResult of
-    Just thunkContext -> 
+    Just thunkContext ->
       error $ "UTxO contains thunks: " ++ show thunkContext
     Nothing -> do
       -- Process and ensure full evaluation
@@ -213,7 +213,7 @@ updateUTxO = id  -- Placeholder for actual processing
 
 ### Custom Type Hierarchies
 
-```haskell 
+```haskell
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -229,7 +229,7 @@ newtype Hash = Hash ByteString
   deriving (Generic, Show, Eq, Ord)
   deriving (NFData, NoThunks) via InstantiatedAt Generic Hash
 
-newtype Signature = Signature ByteString  
+newtype Signature = Signature ByteString
   deriving (Generic, Show, Eq)
   deriving (NFData, NoThunks) via InstantiatedAt Generic Signature
 
@@ -248,7 +248,7 @@ type SignedBlock = SignedData Block
 
 ### Performance-Critical Paths
 
-```haskell 
+```haskell
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -262,7 +262,7 @@ import NoThunks.Class
 -- High-frequency data with automatic optimization
 data BlockHeader = BlockHeader
   { headerPrevHash :: Hash
-  , headerMerkleRoot :: Hash  
+  , headerMerkleRoot :: Hash
   , headerTimestamp :: UTCTime
   , headerNonce :: Word64
   } deriving (Generic, Show, Eq)
@@ -281,7 +281,7 @@ processBatch headers = do
       case result of
         Just ctx -> error $ "Header has thunk: " ++ show ctx
         Nothing -> return ()
-    
+
     processHeader = id  -- Placeholder for processing logic
     force = (`deepseq` h) where h = undefined
 ```
@@ -292,7 +292,7 @@ processBatch headers = do
 
 The package implements its own generic NFData class:
 
-```haskell 
+```haskell
 class GNFData rep where
   grnf :: rep x -> ()
 ```
@@ -317,7 +317,7 @@ The `NoThunks` instance reuses the existing generic machinery from the `nothunks
 - **Sum Type Efficiency**: Only the active constructor is evaluated
 - **Lazy Recursion**: Recursive structures are handled properly
 
-### NoThunks Performance  
+### NoThunks Performance
 - **Compile-Time Optimizations**: Type information used for efficient checks
 - **Context Tracking**: Provides detailed information about thunk locations
 - **Early Termination**: Stops at first thunk found
@@ -331,7 +331,7 @@ The `NoThunks` instance reuses the existing generic machinery from the `nothunks
 
 ### When to Use NFData
 1. **Before Expensive Operations**: Ensure all inputs are evaluated
-2. **Inter-Thread Communication**: Avoid passing thunks between threads  
+2. **Inter-Thread Communication**: Avoid passing thunks between threads
 3. **Serialization Boundaries**: Evaluate before serialization
 4. **Memory Management**: Force evaluation to reduce heap size
 

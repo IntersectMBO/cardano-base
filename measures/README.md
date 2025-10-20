@@ -7,7 +7,7 @@ The `measures` package provides abstractions for working with multidimensional m
 ## Core Concepts
 
 The package revolves around the `Measure` type class, which represents quantities that can be:
-- **Combined** using `plus` (addition)  
+- **Combined** using `plus` (addition)
 - **Compared** using partial ordering (`min`, `max`)
 - **Zeroed** with a `zero` identity element
 
@@ -18,7 +18,7 @@ Think of measurements like `(Age, Height)`, `(MemoryUsage, CPUTime)`, or `(ByteS
 ```haskell
 class Measure a where
   zero :: a                    -- Identity element (e.g., (0, 0))
-  plus :: a -> a -> a          -- Combine measurements  
+  plus :: a -> a -> a          -- Combine measurements
   min :: a -> a -> a           -- Component-wise minimum
   max :: a -> a -> a           -- Component-wise maximum
 ```
@@ -37,7 +37,7 @@ type ResourceUsage = (Int, Int)  -- (Memory, CPU)
 memory_cpu :: ResourceUsage
 memory_cpu = (100, 50)  -- 100MB memory, 50% CPU
 
--- Combine measurements  
+-- Combine measurements
 total = plus (100, 50) (200, 30)  -- (300, 80)
 
 -- Check capacity constraints
@@ -50,7 +50,7 @@ canFit = memory_cpu <= capacity  -- True (component-wise comparison)
 ```haskell
 -- Partial ordering: <= means ALL components are <=
 usage1 = (100, 50)
-usage2 = (80, 60)  
+usage2 = (80, 60)
 capacity = (200, 100)
 
 -- Check if usage1 fits in capacity
@@ -68,7 +68,7 @@ The real power comes from capacity-aware list operations:
 -- splitAt: Split list when accumulated measure hits limit
 splitAt :: Measure a => (e -> a) -> a -> [e] -> ([e], [e])
 
--- Example: Split transactions by total (size, count) limits  
+-- Example: Split transactions by total (size, count) limits
 data Transaction = Tx { size :: Int, priority :: Int }
 
 measureTx :: Transaction -> (Int, Int)  -- (size, count)
@@ -89,7 +89,7 @@ blockLimit = (400, 3)  -- Max 400 bytes, 3 transactions
 -- take: Get prefix that fits within limits
 take :: Measure a => (e -> a) -> a -> [e] -> [e]
 
--- drop: Skip prefix that fits, return remainder  
+-- drop: Skip prefix that fits, return remainder
 drop :: Measure a => (e -> a) -> a -> [e] -> [e]
 
 -- Example: Memory-constrained batch processing
@@ -117,20 +117,20 @@ putStrLn $ "Deferred " ++ show (length remaining) ++ " jobs"
 -- Define custom multi-dimensional resource
 data NetworkResource = NetworkResource
   { bandwidth :: Int     -- MB/s
-  , connections :: Int   -- active connections  
+  , connections :: Int   -- active connections
   , latency :: Int       -- milliseconds
   } deriving (Eq, Show)
 
 -- Manual Measure instance (tuples get this automatically)
 instance Measure NetworkResource where
   zero = NetworkResource 0 0 0
-  
+
   plus (NetworkResource b1 c1 l1) (NetworkResource b2 c2 l2) =
     NetworkResource (b1 + b2) (c1 + c2) (max l1 l2)  -- max latency
-    
+
   min (NetworkResource b1 c1 l1) (NetworkResource b2 c2 l2) =
     NetworkResource (min b1 b2) (min c1 c2) (min l1 l2)
-    
+
   max (NetworkResource b1 c1 l1) (NetworkResource b2 c2 l2) =
     NetworkResource (max b1 b2) (max c1 c2) (max l1 l2)
 ```
@@ -144,11 +144,11 @@ type TxLimits = (Int, Int, Int)  -- (bytes, gas, count)
 
 data CardanoTx = CardanoTx
   { txBytes :: Int
-  , txGas :: Int  
+  , txGas :: Int
   } deriving (Show)
 
 -- Measure function for transactions
-measureTx :: CardanoTx -> TxLimits  
+measureTx :: CardanoTx -> TxLimits
 measureTx tx = (txBytes tx, txGas tx, 1)
 
 -- Block limits
@@ -198,7 +198,7 @@ limitedRequests reqs limit = take measureRequest limit reqs
 ## Performance Considerations
 
 - **Lazy Evaluation**: `take` is non-strict and works well with infinite lists
-- **Strict Accumulation**: Internal counters use `BangPatterns` for efficiency  
+- **Strict Accumulation**: Internal counters use `BangPatterns` for efficiency
 - **Early Termination**: Operations stop as soon as limits are exceeded
 - **Memory Efficient**: Minimal allocation for capacity checking
 
@@ -206,7 +206,7 @@ limitedRequests reqs limit = take measureRequest limit reqs
 
 This package is commonly used with:
 - **Resource management** in long-running services
-- **Transaction batching** in blockchain applications  
+- **Transaction batching** in blockchain applications
 - **Memory-constrained** processing
 - **Rate limiting** and throttling systems
 

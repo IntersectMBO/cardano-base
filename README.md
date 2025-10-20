@@ -13,7 +13,7 @@ A collection of foundational packages used by Cardano that provide core abstract
 `cardano-base` provides the foundational libraries that all other Cardano components depend on. If you're building applications that interact with Cardano, you'll likely need these packages for:
 
 - **Cryptographic operations**: Creating and verifying signatures, hashing data
-- **Data serialization**: Encoding/decoding transaction and block data  
+- **Data serialization**: Encoding/decoding transaction and block data
 - **Time calculations**: Working with slots, epochs, and blockchain time
 - **Memory management**: Secure handling of cryptographic material
 
@@ -23,7 +23,7 @@ A collection of foundational packages used by Cardano that provide core abstract
 cardano-node, cardano-cli, cardano-db-sync, etc.
                     ↓ depend on
             cardano-base packages
-                    ↓ depend on  
+                    ↓ depend on
    System crypto libraries (libsodium-vrf, libsecp256k1, libblst)
 ```
 
@@ -41,11 +41,11 @@ cardano-node, cardano-cli, cardano-db-sync, etc.
 
 #### For New Developers
 1. **Installation**: See [INSTALL.md](INSTALL.md) for detailed setup instructions
-2. **Start with Examples**: 
+2. **Start with Examples**:
    - Try [`cardano-crypto-class` examples](cardano-crypto-class/README.md#basic-usage) for hashing and signatures
    - Practice [`cardano-binary` examples](cardano-binary/README.md#key-types-and-usage) for CBOR serialization
    - Explore [`cardano-slotting` examples](cardano-slotting/README.md#key-types-and-usage) for time calculations
-3. **API Documentation**: Browse the [Haddock documentation](http://base.cardano.intersectmbo.org/) 
+3. **API Documentation**: Browse the [Haddock documentation](http://base.cardano.intersectmbo.org/)
 
 #### For Experienced Developers
 - **Quick Reference**: See package-specific READMEs for API patterns and integration examples
@@ -55,7 +55,7 @@ cardano-node, cardano-cli, cardano-db-sync, etc.
 ### Common Use Cases
 
 - **Transaction Validation**: Use `cardano-crypto-class` for signature verification
-- **Block Parsing**: Use `cardano-binary` for CBOR decoding 
+- **Block Parsing**: Use `cardano-binary` for CBOR decoding
 - **Time Calculations**: Use `cardano-slotting` for slot/epoch conversions
 - **Key Generation**: Use `cardano-crypto-praos` for cryptographic key operations
 
@@ -67,9 +67,7 @@ Understanding how packages relate to each other:
 cardano-crypto-class ← Core crypto abstractions (hashing, signing, VRF)
         ↑
         └── cardano-crypto-praos ← Praos-specific implementations
-        
 cardano-binary ← CBOR serialization (independent)
-        
 cardano-slotting ← Time/slot calculations
         ├─ depends on: cardano-binary (for serialization)
         └─ used by: consensus layer packages
@@ -149,7 +147,7 @@ $ TASTY_PATTERN="blake2b_256" cabal test cardano-crypto-tests
 We welcome contributions to cardano-base! Whether you're:
 
 - **Fixing bugs** in cryptographic implementations
-- **Adding new features** to serialization libraries  
+- **Adding new features** to serialization libraries
 - **Improving documentation** and examples
 - **Optimizing performance** for critical paths
 - **Writing tests** for edge cases
@@ -182,6 +180,6 @@ This project is licensed under the Apache 2.0 License - see individual package d
 
 ---
 
-**Built with ❤️ by the Cardano community**  
+**Built with ❤️ by the Cardano community**
 *Providing the cryptographic foundation for the next generation of blockchain applications*
 

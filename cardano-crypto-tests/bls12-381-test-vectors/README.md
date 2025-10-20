@@ -103,7 +103,7 @@ To validate these test vectors, one needs to proceed as follows:
 ```
 let hashed_msg = HashToG1Curve(aug || msg, dst);
 
-assert!(pairing(sig, G2Generator) ==  pairing(hashed_msg, pk)) 
+assert!(pairing(sig, G2Generator) ==  pairing(hashed_msg, pk))
 ```
 
 ### 5- Hash to curve with large DST
@@ -113,13 +113,13 @@ DST following the instructions of the standard draft (see [section 5.3.3](https:
 
 We create test vectors to ensure that hashing to a curve by first hashing a large DST with SHA256, and then
 hashing to the curve works as expected. The test vectors of this file are stored in `h2c_large_dst` with the
-following order: 
+following order:
 
 - 'msg'
 - 'large_dst'
 - Compressed G1 'output'
 
-To validate these test vectors, one needs to proceed as follows: 
+To validate these test vectors, one needs to proceed as follows:
 
 ```
 let hashed_dst = Sha256(b"H2C-OVERSIZE-DST-" | large_dst);
@@ -128,5 +128,5 @@ let hashed_output = HashToG1Curve(msg, hashed_dst);
 
 let expected_output = G1FromCompressed(output);
 
-assert!(expected_oputput == hashed_output); 
+assert!(expected_oputput == hashed_output);
 ```

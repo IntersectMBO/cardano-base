@@ -124,13 +124,13 @@ import Data.Sequence.Strict
 buildSequence :: [a] -> StrictSeq a
 buildSequence = foldl (|>) empty
 
--- Efficient right-to-left building  
+-- Efficient right-to-left building
 buildSequenceR :: [a] -> StrictSeq a
 buildSequenceR = foldr (<|) empty
 
 -- Batch operations
 processItems :: [ExpensiveItem] -> StrictSeq ProcessedItem
-processItems items = 
+processItems items =
   fromList (map processExpensive items)  -- All processing happens at fromList
 ```
 
@@ -142,8 +142,8 @@ sumLazy :: [Int] -> Int
 sumLazy = foldl (+) 0  -- Can build thunk chains
 
 -- Use strict containers for intermediate results:
-sumStrict :: [Int] -> Int  
-sumStrict xs = 
+sumStrict :: [Int] -> Int
+sumStrict xs =
   let strictSeq = fromList xs  -- Forces evaluation
       result = foldl (+) 0 strictSeq
   in result
@@ -159,7 +159,7 @@ import Data.Unit.Strict
 data StrictPair a b = StrictPair !a !b
 
 makeStrictPair :: a -> b -> StrictPair a b
-makeStrictPair x y = 
+makeStrictPair x y =
   let forced = forceElemsToWHNF [x, y]  -- Forces both to WHNF
   in forced `seq` StrictPair x y
 
@@ -188,7 +188,7 @@ instance FromCBOR NetworkMessage
 
 -- Deserialization automatically forces strictness
 processMessage :: ByteString -> Either String NetworkMessage
-processMessage bytes = 
+processMessage bytes =
   case decodeFull bytes of
     Right msg -> Right msg  -- msg.msgPayload is strict
     Left err -> Left (show err)
@@ -293,19 +293,19 @@ processOld obj = fromMaybe "default" (field1 obj)
 -- After
 import Data.Maybe.Strict
 
-data NewType = NewType  
+data NewType = NewType
   { field1 :: StrictMaybe String
   , field2 :: StrictMaybe Int
   }
 
-processNew :: NewType -> String  
+processNew :: NewType -> String
 processNew obj = fromSMaybe "default" (field1 obj)
 
 -- Migration utility
 migrateType :: OldType -> NewType
 migrateType old = NewType
   { field1 = maybeToStrictMaybe (field1 old)
-  , field2 = maybeToStrictMaybe (field2 old)  
+  , field2 = maybeToStrictMaybe (field2 old)
   }
 ```
 
@@ -319,7 +319,7 @@ processItems = map processItem
 -- After
 import Data.Sequence.Strict
 
-processItems :: StrictSeq Item -> StrictSeq ProcessedItem  
+processItems :: StrictSeq Item -> StrictSeq ProcessedItem
 processItems = fmap processItem  -- More efficient, guaranteed strict
 
 -- Migration
@@ -338,7 +338,7 @@ testStrictness :: IO ()
 testStrictness = do
   let lazyValue = error "This will explode!"
   let strictMaybe = SJust lazyValue  -- Should explode immediately
-  
+
   -- This should not reach the print statement
   print "If you see this, strictness failed!"
 
@@ -347,7 +347,7 @@ testNoThunkAccumulation :: IO ()
 testNoThunkAccumulation = do
   let bigList = [1..1000000]
   let strictSeq = fromList bigList  -- Should evaluate immediately
-  
+
   -- Memory usage should be predictable here
   print $ length strictSeq
 ```

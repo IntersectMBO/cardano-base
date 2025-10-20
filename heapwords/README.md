@@ -58,15 +58,15 @@ analyzeContainers = do
   let smallMap = Map.fromList [(i, i*2) | i <- [1..100]]
   let largeSet = Set.fromList [1..10000]
   let textData = replicate 1000 "Sample text"
-  
+
   putStrLn $ "Small map (100 entries): " ++ show (heapWords smallMap) ++ " words"
-  putStrLn $ "Large set (10k entries): " ++ show (heapWords largeSet) ++ " words"  
+  putStrLn $ "Large set (10k entries): " ++ show (heapWords largeSet) ++ " words"
   putStrLn $ "Text list (1000 items): " ++ show (heapWords textData) ++ " words"
-  
+
   -- Memory efficiency comparison
   let mapMB = heapSizeMb (heapWords smallMap)
   let setMB = heapSizeMb (heapWords largeSet)
-  
+
   putStrLn $ "Map uses " ++ show mapMB ++ " MB"
   putStrLn $ "Set uses " ++ show setMB ++ " MB"
 ```
@@ -87,7 +87,7 @@ data Transaction = Transaction
 -- HeapWords instance is automatically derived for most standard types
 -- but you can also measure manually:
 measureTransaction :: Transaction -> Int
-measureTransaction tx = 
+measureTransaction tx =
   heapWords (txId tx) +
   heapWords (txInputs tx) +
   heapWords (txOutputs tx) +
@@ -97,13 +97,13 @@ measureTransaction tx =
 -- Example usage
 sampleTx = Transaction
   { txId = "abc123"
-  , txInputs = ["input1", "input2"]  
+  , txInputs = ["input1", "input2"]
   , txOutputs = [("output1", 100), ("output2", 200)]
   , txFee = 10
   }
 
 txSize = measureTransaction sampleTx
-putStrLn $ "Transaction size: " ++ show txSize ++ " words (" ++ 
+putStrLn $ "Transaction size: " ++ show txSize ++ " words (" ++
            show (txSize * wordSize) ++ " bytes)"
 ```
 
@@ -120,10 +120,10 @@ compareImplementations = do
   let list = [1..1000] :: [Int]
   let vector = V.fromList [1..1000]
   let unboxedVector = V.U.fromList [1..1000]
-  
+
   putStrLn "Memory usage comparison:"
   putStrLn $ "List: " ++ show (heapSizeMb (heapWords list)) ++ " MB"
-  putStrLn $ "Boxed Vector: " ++ show (heapSizeMb (heapWords vector)) ++ " MB"  
+  putStrLn $ "Boxed Vector: " ++ show (heapSizeMb (heapWords vector)) ++ " MB"
   putStrLn $ "Unboxed Vector: " ++ show (heapSizeMb (heapWords unboxedVector)) ++ " MB"
 ```
 
@@ -143,18 +143,18 @@ monitorMemoryUsage :: BlockchainState -> IO ()
 monitorMemoryUsage state = do
   let totalWords = heapWords state
   let totalMB = heapSizeMb totalWords
-  
+
   putStrLn $ "Blockchain state uses " ++ show totalMB ++ " MB"
-  
+
   -- Component breakdown
   let ledgerMB = heapSizeMb (heapWords (ledger state))
   let mempoolMB = heapSizeMb (heapWords (mempool state))
   let blocksMB = heapSizeMb (heapWords (recentBlocks state))
-  
+
   putStrLn $ "  Ledger: " ++ show ledgerMB ++ " MB"
   putStrLn $ "  Mempool: " ++ show mempoolMB ++ " MB"
   putStrLn $ "  Recent blocks: " ++ show blocksMB ++ " MB"
-  
+
   -- Memory pressure warning
   when (totalMB > 1000) $
     putStrLn "⚠️  Warning: Memory usage exceeds 1GB"
@@ -169,7 +169,7 @@ import Cardano.HeapWords
 processWithMemoryLimit :: Int -> [a] -> IO [a]
 processWithMemoryLimit maxMB items = do
   let maxWords = maxMB * 1024 * 1024 `div` wordSize
-  
+
   let processChunk acc remaining currentSize
         | currentSize >= maxWords = return (reverse acc)
         | null remaining = return (reverse acc)
@@ -177,11 +177,11 @@ processWithMemoryLimit maxMB items = do
             let item = head remaining
             let itemSize = heapWords item
             let newSize = currentSize + itemSize
-            
+
             if newSize <= maxWords
               then processChunk (item : acc) (tail remaining) newSize
               else return (reverse acc)
-  
+
   processChunk [] items 0
 ```
 

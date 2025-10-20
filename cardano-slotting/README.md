@@ -188,7 +188,7 @@ simpleEpochInfo epochSize slotLength = EpochInfo
   { epochInfoSize_ = \_ -> pure epochSize
   , epochInfoFirst_ = \(EpochNo e) -> pure $ SlotNo (e * unEpochSize epochSize)
   , epochInfoEpoch_ = \(SlotNo s) -> pure $ EpochNo (s `div` unEpochSize epochSize)
-  , epochInfoSlotToRelativeTime_ = \(SlotNo s) -> 
+  , epochInfoSlotToRelativeTime_ = \(SlotNo s) ->
       pure $ RelativeTime (fromIntegral s * getSlotLength slotLength)
   , epochInfoSlotLength_ = \_ -> pure slotLength
   }
@@ -198,7 +198,7 @@ simpleEpochInfo epochSize slotLength = EpochInfo
 ```haskell
 -- Transform EpochInfo between monads
 identityEI :: EpochInfo Identity
-identityEI = -- ... 
+identityEI = -- ...
 
 ioEI :: EpochInfo IO
 ioEI = generalizeEpochInfo identityEI

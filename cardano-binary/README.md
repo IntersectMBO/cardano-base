@@ -17,14 +17,14 @@ import Data.Word (Word32)
 import GHC.Generics (Generic)
 
 -- Define a simple data type
-data Person = Person 
+data Person = Person
   { name :: Text
-  , age  :: Word32 
+  , age  :: Word32
   } deriving (Generic, Show)
 
 -- Implement serialization instances
 instance ToCBOR Person where
-  toCBOR (Person n a) = 
+  toCBOR (Person n a) =
     encodeListLen 2 <> toCBOR n <> toCBOR a
 
 instance FromCBOR Person where
@@ -38,7 +38,7 @@ example = do
   let person = Person "Alice" 30
   let encoded = serialize person
   let decoded = deserialize encoded
-  
+
   putStrLn $ "Encoded size: " ++ show (LBS.length encoded) ++ " bytes"
   case decoded of
     Right p -> putStrLn $ "Decoded: " ++ show p
@@ -78,7 +78,7 @@ class Typeable a => ToCBOR a where
 - `encodedSizeExpr` - Static size bounds computation
 - `serialize` - High-level serialization to ByteString
 
-### FromCBOR Class - Deserialization  
+### FromCBOR Class - Deserialization
 
 The `FromCBOR` type class defines how to decode CBOR back to Haskell values:
 
@@ -100,7 +100,7 @@ Comprehensive error types for robust deserialization:
 ```haskell
 data DecoderError
   = DecoderErrorSizeMismatch Text Int Int    -- Expected vs actual size
-  | DecoderErrorCustom Text Text            -- Custom validation errors  
+  | DecoderErrorCustom Text Text            -- Custom validation errors
   | DecoderErrorUnknownTag Text Word8       -- Unknown CBOR tags
   | DecoderErrorLeftover Text BS.ByteString -- Unexpected remaining data
   -- ... and more
@@ -114,7 +114,7 @@ data DecoderError
 data Point = Point Int Int deriving (Generic, Show)
 
 instance ToCBOR Point where
-  toCBOR (Point x y) = 
+  toCBOR (Point x y) =
     encodeListLen 2 <> toCBOR x <> toCBOR y
 
 instance FromCBOR Point where
@@ -130,9 +130,9 @@ data Shape = Circle Double | Rectangle Double Double
   deriving (Show)
 
 instance ToCBOR Shape where
-  toCBOR (Circle r) = 
+  toCBOR (Circle r) =
     encodeListLen 2 <> toCBOR (0 :: Word8) <> toCBOR r
-  toCBOR (Rectangle w h) = 
+  toCBOR (Rectangle w h) =
     encodeListLen 3 <> toCBOR (1 :: Word8) <> toCBOR w <> toCBOR h
 
 instance FromCBOR Shape where
@@ -148,17 +148,17 @@ instance FromCBOR Shape where
 ### 3. Optional Fields
 
 ```haskell
-data User = User 
+data User = User
   { userId :: Word32
-  , userName :: Text  
+  , userName :: Text
   , userEmail :: Maybe Text
   } deriving (Show)
 
 instance ToCBOR User where
-  toCBOR (User uid name email) = 
-    encodeListLen 3 <> 
-    toCBOR uid <> 
-    toCBOR name <> 
+  toCBOR (User uid name email) =
+    encodeListLen 3 <>
+    toCBOR uid <>
+    toCBOR name <>
     encodeMaybe toCBOR email  -- Built-in Maybe encoding
 
 instance FromCBOR User where
@@ -174,7 +174,7 @@ Always test your ToCBOR/FromCBOR instances for correctness:
 ```haskell
 -- Round-trip property
 prop_roundTrip :: (ToCBOR a, FromCBOR a, Eq a) => a -> Bool
-prop_roundTrip x = 
+prop_roundTrip x =
   case deserialize (serialize x) of
     Right y -> x == y
     Left _ -> False
@@ -183,7 +183,7 @@ prop_roundTrip x =
 ## 🔍 Key Modules
 
 - **`Cardano.Binary`** - Main module, re-exports everything
-- **`Cardano.Binary.ToCBOR`** - Serialization type class and utilities  
+- **`Cardano.Binary.ToCBOR`** - Serialization type class and utilities
 - **`Cardano.Binary.FromCBOR`** - Deserialization type class and error types
 - **`Cardano.Binary.Serialize`** - High-level serialize/deserialize functions
 
@@ -202,8 +202,8 @@ import Cardano.Crypto.Hash
 import Cardano.Binary
 
 -- Hashes have built-in ToCBOR/FromCBOR instances
-hashRoundTrip :: Hash Blake2b_256 ByteString -> Bool  
-hashRoundTrip h = 
+hashRoundTrip :: Hash Blake2b_256 ByteString -> Bool
+hashRoundTrip h =
   case deserialize (serialize h) of
     Right h' -> h == h'
     Left _ -> False

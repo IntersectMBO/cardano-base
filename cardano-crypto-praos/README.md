@@ -4,7 +4,7 @@
 
 `cardano-crypto-praos` provides cryptographic primitives specifically designed for the Praos consensus protocol. It implements high-performance Verifiable Random Functions (VRF) through optimized FFI bindings to a specialized fork of libsodium, enabling the random leader election process that powers Cardano's proof-of-stake consensus.
 
-## Core Functionality 
+## Core Functionality
 
 ### Verifiable Random Functions (VRF)
 VRFs are cryptographic functions that provide publicly verifiable randomness, essential for:
@@ -41,11 +41,11 @@ let (vrfOutput, vrfProof) = prove signKey message
 
 -- Verify the proof
 case verify verKey message vrfProof of
-  Just output | output == vrfOutput -> 
+  Just output | output == vrfOutput ->
     putStrLn "VRF proof verified successfully!"
-  Just output -> 
+  Just output ->
     putStrLn $ "Output mismatch: " ++ show (output, vrfOutput)
-  Nothing -> 
+  Nothing ->
     putStrLn "VRF proof verification failed"
 ```
 
@@ -107,11 +107,11 @@ putStrLn $ "Generated " ++ show (BS.length randomData) ++ " random bytes"
 import Cardano.Crypto.VRF.Class
 
 -- Use generic VRF operations
-exampleVRF :: (VRFAlgorithm alg, Signable alg a) => 
+exampleVRF :: (VRFAlgorithm alg, Signable alg a) =>
               SignKeyVRF alg -> a -> (OutputVRF alg, CertVRF alg)
 exampleVRF sk msg = evalVRF () msg sk
 
--- Verify using generic interface  
+-- Verify using generic interface
 verifyVRF :: (VRFAlgorithm alg, Signable alg a) =>
              VerKeyVRF alg -> a -> CertVRF alg -> Maybe (OutputVRF alg)
 verifyVRF vk msg cert = verifyVRF () vk msg cert
@@ -132,11 +132,11 @@ batchVerify :: [VerKey] -> [BS.ByteString] -> [Proof] -> IO [Maybe Output]
 batchVerify verKeys messages proofs = do
   -- Convert to batch-compatible format
   let batchKeys = map vkToBatchCompat verKeys
-  
+
   -- Verify in batch (implementation details in C)
-  results <- mapM (\(vk, msg, proof) -> 
+  results <- mapM (\(vk, msg, proof) ->
     return $ verify vk msg proof) (zip3 verKeys messages proofs)
-    
+
   return results
 ```
 
@@ -147,7 +147,7 @@ batchVerify verKeys messages proofs = do
 import Cardano.Crypto.Seed
 
 createDeterministicKey :: BS.ByteString -> (VerKey, SignKey)
-createDeterministicKey entropy = 
+createDeterministicKey entropy =
   let seed = mkSeedFromBytes entropy  -- Ensure exactly 32 bytes
       (vk, sk) = keypairFromSeed seed
   in (vk, sk)
@@ -165,10 +165,10 @@ let (testVK, testSK) = createDeterministicKey hash256
 keyInfo :: IO ()
 keyInfo = do
   putStrLn $ "VRF verification key size: " ++ show verKeySizeVRF ++ " bytes"
-  putStrLn $ "VRF signing key size: " ++ show signKeySizeVRF ++ " bytes" 
+  putStrLn $ "VRF signing key size: " ++ show signKeySizeVRF ++ " bytes"
   putStrLn $ "VRF proof size: " ++ show certSizeVRF ++ " bytes"
   putStrLn $ "VRF output size: " ++ show (outputBytes someOutput) ++ " bytes"
-  
+
 -- Typical sizes:
 -- Verification key: 32 bytes
 -- Signing key: 64 bytes (includes verification key)
@@ -186,19 +186,19 @@ checkSlotLeadership :: SignKey -> Word64 -> Rational -> IO Bool
 checkSlotLeadership vrfKey slotNum relativeStake = do
   -- Create slot-specific message
   let slotMsg = "slot-" ++ show slotNum
-  
+
   -- Generate VRF proof
   let (vrfOutput, _proof) = prove vrfKey (BS.pack $ map (fromIntegral . fromEnum) slotMsg)
-  
+
   -- Convert VRF output to probability
   let vrfBytes = outputBytes vrfOutput
   let vrfValue = bytesToProbability vrfBytes  -- Custom function
-  
+
   -- Check if VRF value indicates leadership
   return $ vrfValue < relativeStake
 
 bytesToProbability :: BS.ByteString -> Rational
-bytesToProbability bs = 
+bytesToProbability bs =
   let value = foldl' (\acc b -> acc * 256 + fromIntegral b) 0 (BS.unpack bs)
   in value % (2 ^ (8 * BS.length bs))
 ```
@@ -208,7 +208,7 @@ bytesToProbability bs =
 ```haskell
 -- Epoch nonce calculation using VRF outputs
 evolveNonce :: [Output] -> BS.ByteString -> BS.ByteString
-evolveNonce vrfOutputs previousNonce = 
+evolveNonce vrfOutputs previousNonce =
   let allOutputs = previousNonce : map outputBytes vrfOutputs
       combined = BS.concat allOutputs
   in hash combined  -- Using appropriate hash function
@@ -240,7 +240,7 @@ safeVRFOperation sk msg = do
 ⚠️ **Critical Security Notes**:
 
 1. **Signing Key Protection**: Never expose signing keys in logs or memory dumps
-2. **Random Seed Quality**: Use cryptographically secure randomness for key generation  
+2. **Random Seed Quality**: Use cryptographically secure randomness for key generation
 3. **Side-Channel Attacks**: The C implementation includes protections, but be aware in constrained environments
 4. **Proof Validation**: Always verify VRF proofs before trusting their outputs
 5. **Key Lifecycle**: Implement proper key rotation and destruction procedures
@@ -281,7 +281,7 @@ nix-shell --run "cabal build cardano-crypto-praos"
 ### cardano-crypto-class
 Provides the `VRFAlgorithm` type class that `PraosVRF` implements.
 
-### cardano-binary  
+### cardano-binary
 VRF keys and proofs support CBOR serialization for blockchain storage.
 
 ### cardano-crypto-tests
@@ -294,15 +294,15 @@ All VRF operations should be thoroughly tested:
 ```haskell
 -- Property: VRF proof verifies correctly
 prop_vrfProofVerifies :: SignKey -> BS.ByteString -> Bool
-prop_vrfProofVerifies sk msg = 
+prop_vrfProofVerifies sk msg =
   let vk = skToVerKey sk
       (output, proof) = prove sk msg
   in verify vk msg proof == Just output
 
--- Property: Different messages produce different outputs  
+-- Property: Different messages produce different outputs
 prop_vrfUniqueness :: SignKey -> BS.ByteString -> BS.ByteString -> Bool
-prop_vrfUniqueness sk msg1 msg2 = 
-  msg1 /= msg2 ==> 
+prop_vrfUniqueness sk msg1 msg2 =
+  msg1 /= msg2 ==>
     let (out1, _) = prove sk msg1
         (out2, _) = prove sk msg2
     in out1 /= out2
@@ -311,6 +311,6 @@ prop_vrfUniqueness sk msg1 msg2 =
 ## See Also
 
 - [`cardano-crypto-class`](../cardano-crypto-class/README.md) - Cryptographic type classes and KES
-- [`cardano-binary`](../cardano-binary/README.md) - CBOR serialization for blockchain data  
+- [`cardano-binary`](../cardano-binary/README.md) - CBOR serialization for blockchain data
 - [Praos Paper](https://eprint.iacr.org/2017/573.pdf) - The consensus protocol specification
 - [VRF Specification](https://tools.ietf.org/html/draft-irtf-cfrg-vrf-03) - IETF VRF standard

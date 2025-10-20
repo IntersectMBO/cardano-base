@@ -82,7 +82,7 @@ let verified = verifyVRF () vrfPub inputData vrfProof
 ### Type Classes
 
 - **`DSIGNAlgorithm`** - Digital signature algorithms
-- **`HashAlgorithm`** - Cryptographic hash functions  
+- **`HashAlgorithm`** - Cryptographic hash functions
 - **`KESAlgorithm`** - Key-evolving signature schemes
 - **`VRFAlgorithm`** - Verifiable random functions
 
@@ -117,7 +117,7 @@ build-depends:
 import qualified Data.ByteString as BS
 
 -- Work with any hash algorithm (using working function)
-hashAnyData :: HashAlgorithm h => BS.ByteString -> Hash h BS.ByteString  
+hashAnyData :: HashAlgorithm h => BS.ByteString -> Hash h BS.ByteString
 hashAnyData = hash
 
 -- Work with any signature scheme (corrected parameter order)
@@ -162,7 +162,7 @@ let decodedHash = fromCBOR encodedHash :: Either DecoderError (Hash Blake2b_256 
 
 - **Memory Management**: Use `MLockedBytes` for sensitive cryptographic material
 - **Entropy**: Always use proper entropy sources for key generation
-- **Side Channels**: Be aware of timing attacks in custom implementations  
+- **Side Channels**: Be aware of timing attacks in custom implementations
 - **Key Lifecycle**: Properly zeroize keys when no longer needed
 
 ## 🔗 Related Packages

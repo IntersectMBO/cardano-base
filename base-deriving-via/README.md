@@ -62,8 +62,8 @@ data Config = Config
 
 -- Usage
 config1 = Config "app" (Sum 10) [True, False]
-config2 = Config "tool" (Sum 20) [False, True]  
-merged = config1 <> config2  
+config2 = Config "tool" (Sum 20) [False, True]
+merged = config1 <> config2
 -- Result: Config "apptool" (Sum 30) [True, False, False, True]
 ```
 
@@ -80,7 +80,7 @@ import Data.Monoid (First(..), Last(..))
 -- User preferences with optional fields
 data UserPrefs = UserPrefs
   { prefTheme :: First String      -- Keep first non-Nothing
-  , prefLanguage :: Last String    -- Keep last non-Nothing  
+  , prefLanguage :: Last String    -- Keep last non-Nothing
   , prefHistory :: [String]        -- Concatenate lists
   } deriving (Generic, Show)
     deriving (Semigroup, Monoid)
@@ -112,7 +112,7 @@ data Inner = Inner (Sum Int) String
     via InstantiatedAt Generic Inner
 
 data Outer = Outer Inner [Bool] (Product Int)
-  deriving (Generic, Show)  
+  deriving (Generic, Show)
   deriving (Semigroup, Monoid)
     via InstantiatedAt Generic Outer
 
@@ -152,7 +152,7 @@ data Sorted a = Sorted [a]
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-import Data.DerivingVia  
+import Data.DerivingVia
 import GHC.Generics
 
 -- Blockchain-related example
@@ -166,7 +166,7 @@ data BlockHeader = BlockHeader
 
 -- Combine headers (useful for merging partial information)
 header1 = BlockHeader (Sum 100) (First $ Just "hash1") (Max someTime1)
-header2 = BlockHeader (Sum 0) (First Nothing) (Max someTime2) 
+header2 = BlockHeader (Sum 0) (First Nothing) (Max someTime2)
 merged = header1 <> header2  -- Gets hash from header1, latest time
 ```
 
@@ -239,7 +239,7 @@ data BadType = A Int | B String
 This package is particularly useful in Cardano development for:
 
 - **Configuration Merging**: Combining partial configurations
-- **State Accumulation**: Merging blockchain state updates  
+- **State Accumulation**: Merging blockchain state updates
 - **Preference Handling**: Combining user and default settings
 - **Data Aggregation**: Combining metrics and statistics
 - **Event Processing**: Merging event data from multiple sources
