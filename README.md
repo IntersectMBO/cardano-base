@@ -77,8 +77,9 @@ cardano-slotting ← Time/slot calculations
 
 
 
-Haddock for all packages from master branch can be found here:
-[http://base.cardano.intersectmbo.org](http://base.cardano.intersectmbo.org/)
+
+Haddocks for all packages from the `master` branch can be found at
+[base.cardano.intersectmbo.org](https://base.cardano.intersectmbo.org/)
 
 All releases for packages found in this repository are recorded in [Cardano Haskell
 package repository](https://github.com/intersectmbo/cardano-haskell-packages)
