@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -6,7 +7,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
@@ -749,7 +749,7 @@ foreign import ccall "blst_miller_loop"
 
 ---- BLS signaturs Secret-key operatons
 
-foreign import ccall "blst_keygen" 
+foreign import ccall "blst_keygen"
   c_blst_keygen :: ScalarPtr -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
 
 foreign import ccall "blst_sk_to_pk_in_g1"
