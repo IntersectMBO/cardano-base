@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
@@ -549,6 +550,10 @@ data ProofOfPossession curve = ProofOfPossession
   { unMu1 :: Point (Dual curve)
   , unMu2 :: Point (Dual curve)
   }
+
+instance (BLS curve, BLS (Dual curve)) => Eq (ProofOfPossession curve) where
+  (ProofOfPossession mu1a mu2a) == (ProofOfPossession mu1b mu2b) =
+    mu1a == mu1b && mu2a == mu2b
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
