@@ -27,10 +27,13 @@ import System.IO.Unsafe (unsafePerformIO)
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
   Arbitrary (..),
+  Gen,
   Property,
   choose,
   chooseAny,
+  forAll,
   oneof,
+  suchThat,
   suchThatMap,
   vectorOf,
   (===),
@@ -53,6 +56,7 @@ tests =
         , testPT "PT"
         , testPairing "Pairing"
         , testVectors "Vectors"
+        , testBlsKeyGenIKM "BLS KeyGen / IKM"
         , testBlsSignature "BLS Signature Curve 1" (Proxy @BLS.Curve1)
         , testBlsSignature "BLS Signature Curve 2" (Proxy @BLS.Curve2)
         , testBlsPoP "BLS PoP Curve 1" (Proxy @BLS.Curve1)
@@ -200,6 +204,14 @@ testPairing name =
 loadHexFile :: String -> IO [BS.ByteString]
 loadHexFile filename = do
   mapM (either error pure . Base16.decode . BS8.filter (/= '\r')) . BS8.lines =<< BS.readFile filename
+
+-- Generators to avoid discards in negative tests
+-- Produce two Messages with different underlying bytes
+genDistinctMessages :: Gen (Message, Message)
+genDistinctMessages = do
+  a <- arbitrary
+  b <- arbitrary `suchThat` (\x -> messageBytes x /= messageBytes a)
+  pure (a, b)
 
 testVectors :: String -> TestTree
 testVectors name =
@@ -416,6 +428,34 @@ testVectorLargeDst name =
       hashedMsg
       expected_output
 
+testBlsKeyGenIKM :: String -> TestTree
+testBlsKeyGenIKM name =
+  testGroup
+    name
+    [ testCase "Same (IKM, info) -> same sk" $ do
+        -- fixed IKM + info
+        let ikm = BS.replicate 32 0x11
+            info = "keygen-info"
+        let sk1 = BLS.blsKeyGen ikm (Just info)
+            sk2 = BLS.blsKeyGen ikm (Just info)
+        case (sk1, sk2) of
+          (Right s1, Right s2) -> do
+            i1 <- BLS.scalarToInteger (BLS.unSecretKey s1)
+            i2 <- BLS.scalarToInteger (BLS.unSecretKey s2)
+            assertBool "Secret keys differ but should be identical" (i1 == i2)
+          _ -> assertBool "KeyGen failed unexpectedly" False
+    , testProperty
+        "Deterministic pk derivation (sk -> pk)"
+        ( \(seed :: Seed, info :: Message) ->
+            case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+              Left _ -> True
+              Right sk' ->
+                let pk1 = BLS.blsSkToPk @BLS.Curve1 sk'
+                    pk2 = BLS.blsSkToPk @BLS.Curve1 sk'
+                 in BLS.unPublicKey pk1 == BLS.unPublicKey pk2
+        )
+    ]
+
 testBlsSignature ::
   forall curve.
   BLS.FinalVerifyOrder curve => String -> Proxy curve -> TestTree
@@ -445,6 +485,49 @@ testBlsSignature name curve =
                      in BLS.blsSignatureVerify pk (messageBytes msg) sig (Just (messageBytes dst)) (Just (messageBytes aug))
         )
     , testProperty
+        "Deterministic signature (same inputs)"
+        ( \( seed :: Seed
+             , info :: Message
+             , msg :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                Left _ -> True
+                Right sk' ->
+                  let sig1 = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes aug))
+                      sig2 = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes aug))
+                      BLS.Signature p1 = sig1
+                      BLS.Signature p2 = sig2
+                   in BLS.blsSerialize p1 == BLS.blsSerialize p2
+        )
+    , testProperty
+        "Encoding invariants: compressed lengths (pk,sig)"
+        ( \( seed :: Seed
+             , info :: Message
+             , msg :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                Left _ -> True
+                Right sk' ->
+                  let pk = BLS.blsSkToPk @curve sk'
+                      sig = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes aug))
+                      -- compressed lengths for actual pk/sig
+                      pkLen = BS.length (BLS.blsCompress (BLS.unPublicKey pk))
+                      sigLen = case sig of BLS.Signature p -> BS.length (BLS.blsCompress p)
+                      -- expected lengths by curve variant, derived from generators
+                      expPkLen = BS.length (BLS.blsCompress (BLS.blsGenerator @curve))
+                      expSigLen = BS.length (BLS.blsCompress (BLS.blsGenerator @(BLS.Dual curve)))
+                      pair = (pkLen, sigLen)
+                      expPair = (expPkLen, expSigLen)
+                   in -- 1) match the curve's expected (pk,sig) layout
+                      pair == expPair
+                        -- 2) and specifically enforce the only valid byte-length pairs on BLS12-381
+                        && (pair == (48, 96) || pair == (96, 48))
+        )
+    , testProperty
         "Random signature fails"
         ( \( seed :: Seed
              , info :: Message
@@ -466,6 +549,125 @@ testBlsSignature name curve =
                                 (Just (messageBytes dst))
                                 (Just (messageBytes aug))
                             )
+        )
+    , testProperty
+        "Wrong DST fails"
+        ( \( seed :: Seed
+             , info :: Message
+             , msg :: Message
+             , aug :: Message
+             ) ->
+              forAll genDistinctMessages $ \(dstA, dstB) ->
+                case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                  Left _ -> False
+                  Right sk' ->
+                    let pk = BLS.blsSkToPk @curve sk'
+                        sig = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dstA)) (Just (messageBytes aug))
+                     in not
+                          ( BLS.blsSignatureVerify
+                              pk
+                              (messageBytes msg)
+                              sig
+                              (Just (messageBytes dstB))
+                              (Just (messageBytes aug))
+                          )
+        )
+    , testProperty
+        "Wrong AUG fails"
+        ( \( seed :: Seed
+             , info :: Message
+             , msg :: Message
+             , dst :: Message
+             ) ->
+              forAll genDistinctMessages $ \(augA, augB) ->
+                case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                  Left _ -> False
+                  Right sk' ->
+                    let pk = BLS.blsSkToPk @curve sk'
+                        sig = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes augA))
+                     in not
+                          ( BLS.blsSignatureVerify
+                              pk
+                              (messageBytes msg)
+                              sig
+                              (Just (messageBytes dst))
+                              (Just (messageBytes augB))
+                          )
+        )
+    , testProperty
+        "Wrong public key fails"
+        ( \( seedA :: Seed
+             , infoA :: Message
+             , seedB :: Seed
+             , infoB :: Message
+             , msg :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case ( BLS.blsKeyGen (getSeedBytes seedA) (Just (messageBytes infoA))
+                   , BLS.blsKeyGen (getSeedBytes seedB) (Just (messageBytes infoB))
+                   ) of
+                (Right skA, Right skB) ->
+                  let pkB = BLS.blsSkToPk @curve skB
+                      sigA = BLS.blsSign curve skA (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes aug))
+                   in not
+                        ( BLS.blsSignatureVerify
+                            pkB
+                            (messageBytes msg)
+                            sigA
+                            (Just (messageBytes dst))
+                            (Just (messageBytes aug))
+                        )
+                _ -> False
+        )
+    , testProperty
+        "Reject infinity signature"
+        ( \( seed :: Seed
+             , info :: Message
+             , msg :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                Left _ -> True
+                Right sk' ->
+                  let pk = BLS.blsSkToPk @curve sk'
+                      -- Signature at infinity (on Dual curve)
+                      sigInf = BLS.Signature (BLS.blsZero @(BLS.Dual curve))
+                   in not
+                        ( BLS.blsSignatureVerify
+                            pk
+                            (messageBytes msg)
+                            sigInf
+                            (Just (messageBytes dst))
+                            (Just (messageBytes aug))
+                        )
+        )
+    , testProperty
+        "Reject infinity public key"
+        ( \( seed :: Seed
+             , info :: Message
+             , msg :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                Left _ -> True
+                Right sk' ->
+                  let
+                    -- Valid signature under a real key
+                    sig = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes aug))
+                    -- PublicKey at infinity (on this curve)
+                    pkInf = BLS.PublicKey (BLS.blsZero @curve)
+                   in
+                    not
+                      ( BLS.blsSignatureVerify
+                          pkInf
+                          (messageBytes msg)
+                          sig
+                          (Just (messageBytes dst))
+                          (Just (messageBytes aug))
+                      )
         )
     ]
 
@@ -506,14 +708,36 @@ testBlsPoP name _ =
                 _ -> False
         )
     , testProperty
+        "Reject infinity public key"
+        ( \( seed :: Seed
+             , info :: Message
+             , dst :: Message
+             , aug :: Message
+             ) ->
+              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                Left _ -> True
+                Right sk' ->
+                  let
+                    -- Construct valid PoP under real key
+                    pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
+                    -- Replace pk with infinity point
+                    pkInf = BLS.PublicKey (BLS.blsZero @curve)
+                   in
+                    not
+                      ( BLS.blsProofOfPossessionVerify @curve
+                          pkInf
+                          pop
+                          (Just (messageBytes dst))
+                          (Just (messageBytes aug))
+                      )
+        )
+    , testProperty
         "Wrong DST fails"
         ( \( seed :: Seed
              , info :: Message
-             , dstA :: Message
-             , dstB :: Message
              , aug :: Message
              ) ->
-              dstA /= dstB ==>
+              forAll genDistinctMessages $ \(dstA, dstB) ->
                 case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
                   Left _ -> False
                   Right sk' ->
@@ -532,10 +756,8 @@ testBlsPoP name _ =
         ( \( seed :: Seed
              , info :: Message
              , dst :: Message
-             , augA :: Message
-             , augB :: Message
              ) ->
-              augA /= augB ==>
+              forAll genDistinctMessages $ \(augA, augB) ->
                 case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
                   Left _ -> False
                   Right sk' ->
@@ -553,24 +775,21 @@ testBlsPoP name _ =
         "changing both DST and Aug still fails"
         ( \( seed :: Seed
              , info :: Message
-             , dstA :: Message
-             , dstB :: Message
-             , augA :: Message
-             , augB :: Message
              ) ->
-              (dstA /= dstB || augA /= augB) ==>
-                case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
-                  Left _ -> False
-                  Right sk' ->
-                    let pk = BLS.blsSkToPk @curve sk'
-                        pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dstA)) (Just (messageBytes augA))
-                     in not
-                          ( BLS.blsProofOfPossessionVerify @curve
-                              pk
-                              pop
-                              (Just (messageBytes dstB))
-                              (Just (messageBytes augB))
-                          )
+              forAll genDistinctMessages $ \(dstA, dstB) ->
+                forAll genDistinctMessages $ \(augA, augB) ->
+                  case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
+                    Left _ -> False
+                    Right sk' ->
+                      let pk = BLS.blsSkToPk @curve sk'
+                          pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dstA)) (Just (messageBytes augA))
+                       in not
+                            ( BLS.blsProofOfPossessionVerify @curve
+                                pk
+                                pop
+                                (Just (messageBytes dstB))
+                                (Just (messageBytes augB))
+                            )
         )
     , testProperty
         "random PoP fails"
