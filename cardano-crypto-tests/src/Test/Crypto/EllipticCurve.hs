@@ -56,6 +56,7 @@ tests =
         , testPT "PT"
         , testPairing "Pairing"
         , testVectors "Vectors"
+        , testBlsSerDeHelpers "Serialization helpers"
         , testBlsKeyGenIKM "BLS KeyGen / IKM"
         , testBlsSignature "BLS Signature Curve 1" (Proxy @BLS.Curve1)
         , testBlsSignature "BLS Signature Curve 2" (Proxy @BLS.Curve2)
@@ -427,6 +428,154 @@ testVectorLargeDst name =
       "expected hash output"
       hashedMsg
       expected_output
+
+-- Low-level serialization helpers round-trips & guards (Internal.hs)
+-- This validates secret/public key & signature byte encodings before DSIGN wiring.
+
+testBlsSerDeHelpers :: String -> TestTree
+testBlsSerDeHelpers name =
+  testGroup
+    name
+    [ -- Secret keys -----------------------------------------------------------
+      testProperty "SecretKey bytes round-trip" $
+        forAll genSecretKey $
+          propRoundTripBytes BLS.secretKeyToBS BLS.secretKeyFromBS
+    , testProperty "SecretKey rejects bad length" $
+        forAll genSecretKey $ \sk ->
+          let bs = BLS.secretKeyToBS sk
+              res =
+                ( BLS.secretKeyFromBS (shorten bs)
+                , BLS.secretKeyFromBS (lengthen bs)
+                )
+           in case res of
+                (a, b) -> isBadScalar a && isBadScalar b
+    , -- Public keys -----------------------------------------------------------
+      testProperty "PublicKey compressed round-trip (Curve1)" $
+        forAll genSecretKey $ \sk ->
+          let pk = BLS.blsSkToPk @BLS.Curve1 sk
+              bs = BLS.publicKeyToCompressedBS pk
+           in (fmap (BLS.publicKeyToCompressedBS) (BLS.publicKeyFromCompressedBS @BLS.Curve1 bs)) === Right bs
+    , testProperty "PublicKey compressed round-trip (Curve2)" $
+        forAll genSecretKey $ \sk ->
+          let pk = BLS.blsSkToPk @BLS.Curve2 sk
+              bs = BLS.publicKeyToCompressedBS pk
+           in (fmap (BLS.publicKeyToCompressedBS) (BLS.publicKeyFromCompressedBS @BLS.Curve2 bs)) === Right bs
+    , testProperty "PublicKey uncompressed round-trip (Curve1)" $
+        forAll genSecretKey $ \sk ->
+          let pk = BLS.blsSkToPk @BLS.Curve1 sk
+              bs = BLS.publicKeyToUncompressedBS pk
+           in (fmap (BLS.publicKeyToUncompressedBS) (BLS.publicKeyFromUncompressedBS @BLS.Curve1 bs)) === Right bs
+    , testProperty "PublicKey uncompressed round-trip (Curve2)" $
+        forAll genSecretKey $ \sk ->
+          let pk = BLS.blsSkToPk @BLS.Curve2 sk
+              bs = BLS.publicKeyToUncompressedBS pk
+           in (fmap (BLS.publicKeyToUncompressedBS) (BLS.publicKeyFromUncompressedBS @BLS.Curve2 bs)) === Right bs
+    , testCase "PublicKey rejects infinity (Curve1) [compressed & uncompressed]" $ do
+        let cbs = BLS.blsCompress (BLS.blsZero @BLS.Curve1)
+            ubs = BLS.blsSerialize (BLS.blsZero @BLS.Curve1)
+        assertBool
+          "expected BLST_PK_IS_INFINITY"
+          ( bothInfinity
+              ( BLS.publicKeyFromCompressedBS @BLS.Curve1 cbs
+              , BLS.publicKeyFromUncompressedBS @BLS.Curve1 ubs
+              )
+          )
+    , testCase "PublicKey rejects infinity (Curve2) [compressed & uncompressed]" $ do
+        let cbs = BLS.blsCompress (BLS.blsZero @BLS.Curve2)
+            ubs = BLS.blsSerialize (BLS.blsZero @BLS.Curve2)
+        assertBool
+          "expected BLST_PK_IS_INFINITY"
+          ( bothInfinity
+              ( BLS.publicKeyFromCompressedBS @BLS.Curve2 cbs
+              , BLS.publicKeyFromUncompressedBS @BLS.Curve2 ubs
+              )
+          )
+    , testProperty "PublicKey length corruption is rejected (Curve1 compressed)" $
+        forAll genSecretKey $ \sk ->
+          let pk = BLS.blsSkToPk @BLS.Curve1 sk
+              bs = BLS.publicKeyToCompressedBS pk
+              res =
+                ( BLS.publicKeyFromCompressedBS @BLS.Curve1 (shorten bs)
+                , BLS.publicKeyFromCompressedBS @BLS.Curve1 (lengthen bs)
+                )
+           in bothBadEncoding res
+    , -- Signatures ------------------------------------------------------------
+      testProperty "Signature compressed round-trip (Curve1 sigs live on Curve2)" $
+        forAll genSecretKey $ \sk ->
+          let sig = BLS.blsSign @BLS.Curve1 Proxy sk "hello" Nothing Nothing
+              bs = BLS.signatureToCompressedBS @BLS.Curve1 sig
+           in (fmap (BLS.signatureToCompressedBS @BLS.Curve1) (BLS.signatureFromCompressedBS @BLS.Curve1 bs))
+                === Right bs
+    , testProperty "Signature uncompressed round-trip (Curve2 sigs live on Curve1)" $
+        forAll genSecretKey $ \sk ->
+          let sig = BLS.blsSign @BLS.Curve2 Proxy sk "world" Nothing Nothing
+              bs = BLS.signatureToUncompressedBS @BLS.Curve2 sig
+           in (fmap (BLS.signatureToUncompressedBS @BLS.Curve2) (BLS.signatureFromUncompressedBS @BLS.Curve2 bs))
+                === Right bs
+    , testCase "Signature rejects infinity (Curve1) [compressed & uncompressed]" $ do
+        let cbs = BLS.blsCompress (BLS.blsZero @(BLS.Dual BLS.Curve1))
+            ubs = BLS.blsSerialize (BLS.blsZero @(BLS.Dual BLS.Curve1))
+        assertBool
+          "expected BLST_PK_IS_INFINITY"
+          ( bothInfinity
+              ( BLS.signatureFromCompressedBS @BLS.Curve1 cbs
+              , BLS.signatureFromUncompressedBS @BLS.Curve1 ubs
+              )
+          )
+    , testProperty "Signature length corruption is rejected (Curve2 compressed)" $
+        forAll genSecretKey $ \sk ->
+          let sig = BLS.blsSign @BLS.Curve2 Proxy sk "!" Nothing Nothing
+              bs = BLS.signatureToCompressedBS @BLS.Curve2 sig
+              res =
+                ( BLS.signatureFromCompressedBS @BLS.Curve2 (shorten bs)
+                , BLS.signatureFromCompressedBS @BLS.Curve2 (lengthen bs)
+                )
+           in bothBadEncoding res
+    ]
+
+-- Generators and small helpers used above ------------------------------------
+
+genIKM32 :: Gen BS.ByteString
+genIKM32 = BS.pack <$> vectorOf 32 arbitrary
+
+-- Deterministic SK via blsKeyGen(IKM, Nothing) for tests
+-- (Retries are extremely unlikely to be needed.)
+genSecretKey :: Gen BLS.SecretKey
+genSecretKey = do
+  ikm <- genIKM32
+  case BLS.blsKeyGen ikm Nothing of
+    Right sk -> pure sk
+    Left _ -> genSecretKey
+
+shorten :: BS.ByteString -> BS.ByteString
+shorten bs
+  | BS.null bs = bs
+  | otherwise = BS.init bs
+
+lengthen :: BS.ByteString -> BS.ByteString
+lengthen bs = bs <> BS.singleton 0x00
+
+bothInfinity :: (Either BLS.BLSTError a, Either BLS.BLSTError b) -> Bool
+bothInfinity (Left BLS.BLST_PK_IS_INFINITY, Left BLS.BLST_PK_IS_INFINITY) = True
+bothInfinity _ = False
+
+bothBadEncoding :: (Either BLS.BLSTError a, Either BLS.BLSTError b) -> Bool
+bothBadEncoding (Left BLS.BLST_BAD_ENCODING, Left BLS.BLST_BAD_ENCODING) = True
+bothBadEncoding _ = False
+
+-- Property helper: round-trip via bytes (to keep tests concise)
+propRoundTripBytes ::
+  (Eq e, Show e) =>
+  (a -> BS.ByteString) ->
+  (BS.ByteString -> Either e a) ->
+  a ->
+  Property
+propRoundTripBytes toBS fromBS x =
+  Right (toBS x) === fmap toBS (fromBS (toBS x))
+
+isBadScalar :: Either BLS.BLSTError a -> Bool
+isBadScalar (Left BLS.BLST_BAD_SCALAR) = True
+isBadScalar _ = False
 
 testBlsKeyGenIKM :: String -> TestTree
 testBlsKeyGenIKM name =
@@ -970,6 +1119,10 @@ instance BLS.BLS (BLS.Dual curve) => Arbitrary (BLS.Signature curve) where
 instance BLS.BLS (BLS.Dual curve) => Show (BLS.Signature curve) where
   show (BLS.Signature p) = show (BLS.blsSerialize p)
 
+-- Show instance for PublicKey to improve counterexample readability
+instance BLS.BLS curve => Show (BLS.PublicKey curve) where
+  show (BLS.PublicKey p) = show (BLS.blsSerialize p)
+
 instance BLS.BLS (BLS.Dual curve) => Arbitrary (BLS.ProofOfPossession curve) where
   arbitrary = BLS.ProofOfPossession <$> arbitrary <*> arbitrary
 
@@ -1002,6 +1155,10 @@ instance Arbitrary Seed where
 
 instance Show BLS.Scalar where
   show = show . BLS.scalarToBS
+
+-- Show instance needed by QuickCheck for `forAll genSecretKey` counterexamples
+instance Show BLS.SecretKey where
+  show = show . BLS.scalarToBS . BLS.unSecretKey
 
 instance BLS.BLS curve => Show (BLS.Point curve) where
   show = show . BLS.blsSerialize

@@ -180,6 +180,18 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   scalarToInteger,
   scalarCanonical,
 
+  -- * Byte encoders/decoders (internal; used later by DSIGN)
+  secretKeyToBS,
+  secretKeyFromBS,
+  publicKeyToCompressedBS,
+  publicKeyFromCompressedBS,
+  publicKeyToUncompressedBS,
+  publicKeyFromUncompressedBS,
+  signatureToCompressedBS,
+  signatureFromCompressedBS,
+  signatureToUncompressedBS,
+  signatureFromUncompressedBS,
+
   -- * Pairings
   millerLoop,
   finalVerifyPairs,
@@ -1078,6 +1090,84 @@ scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar =
   unsafePerformIO $
     withScalar scalar c_blst_scalar_fr_check
+
+---- Serialization helpers for SecretKey / PublicKey / Signature
+--
+-- These helpers provide canonical byte encodings that we will plug into the
+-- DSIGN rawSerialise*/rawDeserialise* later. They deliberately:
+--   * use compressed encodings for curve points (48 bytes for G1, 96 for G2),
+--   * enforce exact input lengths via the underlying bls(De)serialize calls,
+--   * reject the point at infinity explicitly (mapped to BLST_PK_IS_INFINITY).
+-- All functions are pure and total via Either BLSTError.
+
+-- SecretKey (wraps Scalar) ---------------------------------------------------
+
+-- | Canonical big-endian 32-byte encoding of the secret scalar.
+secretKeyToBS :: SecretKey -> ByteString
+secretKeyToBS (SecretKey s) = scalarToBS s
+
+-- | Parse a secret key from a 32-byte big-endian scalar.
+-- Returns BLST_BAD_SCALAR on bad length or non-canonical input.
+secretKeyFromBS :: ByteString -> Either BLSTError SecretKey
+secretKeyFromBS bs = SecretKey <$> scalarFromBS bs
+
+-- | Helper to reject the point at infinity uniformly across decoders.
+-- It maps successful decodes to an explicit infinity check and
+-- returns BLST_PK_IS_INFINITY when the decoded point is the identity.
+-- Note: BLST exposes a single 'pk_is_infinity' code; we reuse it for
+-- signatures too. Downstream treats it generically as "point is infinity".
+rejectInfinity :: BLS curve => Either BLSTError (Point curve) -> Either BLSTError (Point curve)
+rejectInfinity = (>>= \p -> if blsIsInf p then Left BLST_PK_IS_INFINITY else Right p)
+
+-- PublicKey ------------------------------------------------------------------
+
+-- | Compressed (canonical) encoding of a public key point.
+-- For Curve1 (minimal-pk-size): 48 bytes (G1). For Curve2: 96 bytes (G2).
+publicKeyToCompressedBS :: BLS curve => PublicKey curve -> ByteString
+publicKeyToCompressedBS (PublicKey pk) = blsCompress pk
+
+-- | Uncompressed (serialized) encoding of a public key point.
+publicKeyToUncompressedBS :: BLS curve => PublicKey curve -> ByteString
+publicKeyToUncompressedBS (PublicKey pk) = blsSerialize pk
+
+-- | Decode a public key from its compressed encoding, rejecting infinity.
+publicKeyFromCompressedBS ::
+  forall curve. BLS curve => ByteString -> Either BLSTError (PublicKey curve)
+publicKeyFromCompressedBS bs =
+  PublicKey <$> rejectInfinity @curve (blsUncompress @curve bs)
+
+-- | Decode a public key from its uncompressed encoding, rejecting infinity.
+publicKeyFromUncompressedBS ::
+  forall curve. BLS curve => ByteString -> Either BLSTError (PublicKey curve)
+publicKeyFromUncompressedBS bs =
+  PublicKey <$> rejectInfinity @curve (blsDeserialize @curve bs)
+
+-- Signature ------------------------------------------------------------------
+
+-- | Compressed (canonical) encoding of a signature point.
+-- Note: signatures live on the Dual curve of the public key.
+signatureToCompressedBS :: forall curve. BLS (Dual curve) => Signature curve -> ByteString
+signatureToCompressedBS (Signature sig) = blsCompress @(Dual curve) sig
+
+-- | Uncompressed (serialized) encoding of a signature point.
+signatureToUncompressedBS :: forall curve. BLS (Dual curve) => Signature curve -> ByteString
+signatureToUncompressedBS (Signature sig) = blsSerialize @(Dual curve) sig
+
+-- Note: BLST does not expose a signature-specific infinity error; we reuse
+-- BLST_PK_IS_INFINITY for signatures as well. This is intentional and treated
+-- downstream as a generic "point is infinity" condition.
+
+-- | Decode a signature from its compressed encoding, rejecting infinity.
+signatureFromCompressedBS ::
+  forall curve. BLS (Dual curve) => ByteString -> Either BLSTError (Signature curve)
+signatureFromCompressedBS bs =
+  Signature <$> rejectInfinity @(Dual curve) (blsUncompress @(Dual curve) bs)
+
+-- | Decode a signature from its uncompressed encoding, rejecting infinity.
+signatureFromUncompressedBS ::
+  forall curve. BLS (Dual curve) => ByteString -> Either BLSTError (Signature curve)
+signatureFromUncompressedBS bs =
+  Signature <$> rejectInfinity @(Dual curve) (blsDeserialize @(Dual curve) bs)
 
 ---- MSM operations
 
