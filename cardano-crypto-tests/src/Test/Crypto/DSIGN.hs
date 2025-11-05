@@ -94,6 +94,7 @@ import Cardano.Crypto.DSIGN (
   getSeedDSIGNM,
   forgetSignKeyDSIGNM
   )
+import Cardano.Crypto.DSIGN.BLS12381MinPk (BLS12381MinPkDSIGN)
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
@@ -199,6 +200,7 @@ tests lock =
       [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
       , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
       , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
+      , testDSIGNAlgorithm (defaultSigGen @BLS12381MinPkDSIGN) (arbitrary @Message) "BLS12381MinPkDSIGN"
 #ifdef SECP256K1_ENABLED
       , testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
       , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
