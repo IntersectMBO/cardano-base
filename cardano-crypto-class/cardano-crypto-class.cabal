@@ -49,6 +49,7 @@ library
   exposed-modules:
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.BLS12381MinPk
+    Cardano.Crypto.DSIGN.BLS12381MinSig
     Cardano.Crypto.DSIGN.Class
     Cardano.Crypto.DSIGN.Ed25519
     Cardano.Crypto.DSIGN.Ed448
