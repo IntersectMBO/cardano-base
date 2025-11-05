@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
+-- | BLS12-381 digital signatures (minimal public key size variant).
 module Cardano.Crypto.DSIGN.BLS12381MinPk (
   BLS12381MinPkDSIGN,
 ) where

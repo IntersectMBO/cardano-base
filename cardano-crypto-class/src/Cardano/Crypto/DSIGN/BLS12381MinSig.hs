@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
+-- | BLS12-381 digital signatures (minimal signature size variant).
 module Cardano.Crypto.DSIGN.BLS12381MinSig
   ( BLS12381MinSigDSIGN
   ) where
@@ -130,4 +131,3 @@ instance Show (SignKeyDSIGN BLS12381MinSigDSIGN) where
 instance Show (SigDSIGN BLS12381MinSigDSIGN) where
   show (SigBLSMinSig sig) =
     "SigBLSMinSig " <> show (BLS.signatureToCompressedBS @BLS.Curve2 sig)
-

@@ -3,6 +3,8 @@
 This package defines type classes and mock instances for the following cryptographic primitives:
 
   - A digital signature scheme
+  
+  - An aggregatable signature scheme
 
   - A cryptographic hashing function
 

@@ -3,6 +3,8 @@
 This package defines tests the implementations of the following cryptographic primitives:
 
   - A digital signature scheme
+  
+  - An aggregatable signature scheme
 
   - A cryptographic hashing function
 
