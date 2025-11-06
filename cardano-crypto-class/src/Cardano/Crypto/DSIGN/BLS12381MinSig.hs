@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -18,6 +19,8 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Seed (getSeedBytes)
 import Cardano.Crypto.Util (SignableRepresentation, getSignableRepresentation)
+import Data.ByteString (ByteString)
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -28,6 +31,9 @@ import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 -- public keys on G2 (96B), signatures on G1 (48B), secret key 32B.
 data BLS12381MinSigDSIGN
 
+defaultDst :: ByteString
+defaultDst = "BLS_DST_CARDANO_BASE_V1"
+
 instance DSIGNAlgorithm BLS12381MinSigDSIGN where
   type SeedSizeDSIGN BLS12381MinSigDSIGN = 32
   type SizeVerKeyDSIGN BLS12381MinSigDSIGN = 96 -- G2 compressed
@@ -35,6 +41,7 @@ instance DSIGNAlgorithm BLS12381MinSigDSIGN where
   type SizeSigDSIGN BLS12381MinSigDSIGN = 48 -- G1 compressed
 
   type Signable BLS12381MinSigDSIGN = SignableRepresentation
+  type ContextDSIGN BLS12381MinSigDSIGN = (Maybe ByteString, Maybe ByteString)
 
   newtype VerKeyDSIGN BLS12381MinSigDSIGN = VerKeyBLSMinSig (BLS.PublicKey BLS.Curve2)
     deriving stock (Generic)
@@ -75,13 +82,17 @@ instance DSIGNAlgorithm BLS12381MinSigDSIGN where
 
   deriveVerKeyDSIGN (SignKeyBLSMinSig sk) = VerKeyBLSMinSig (BLS.blsSkToPk @BLS.Curve2 sk)
 
-  signDSIGN () a (SignKeyBLSMinSig sk) =
+  signDSIGN (mdst, maug) a (SignKeyBLSMinSig sk) =
     let msg = getSignableRepresentation a
-     in SigBLSMinSig (BLS.blsSign @BLS.Curve2 Proxy sk msg Nothing Nothing)
+        effDst = Just (fromMaybe defaultDst mdst)
+        effAug = Just (fromMaybe mempty maug)
+     in SigBLSMinSig (BLS.blsSign @BLS.Curve2 Proxy sk msg effDst effAug)
 
-  verifyDSIGN () (VerKeyBLSMinSig vk) a (SigBLSMinSig sig) =
+  verifyDSIGN (mdst, maug) (VerKeyBLSMinSig vk) a (SigBLSMinSig sig) =
     let msg = getSignableRepresentation a
-     in if BLS.blsSignatureVerify @BLS.Curve2 vk msg sig Nothing Nothing
+        effDst = Just (fromMaybe defaultDst mdst)
+        effAug = Just (fromMaybe mempty maug)
+     in if BLS.blsSignatureVerify @BLS.Curve2 vk msg sig effDst effAug
           then Right ()
           else Left "verifyDSIGN (BLS minsig): verification failed"
 

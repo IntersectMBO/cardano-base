@@ -29,11 +29,14 @@ import Test.QuickCheck (
   forAllShrinkShow,
   ioProperty,
   counterexample,
+  conjoin,
   )
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
 
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import Cardano.Crypto.Libsodium
 
 import Text.Show.Pretty (ppShow)
@@ -100,25 +103,25 @@ import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
 import Test.Crypto.Util (
-  Message,
-  prop_raw_serialise,
-  prop_raw_deserialise,
-  prop_size_serialise,
-  prop_cbor_with,
+  Lock,
+  Message (..),
+  arbitrarySeedOfSize,
+  directDeserialiseFromBS,
+  directSerialiseToBS,
+  genBadInputFor,
+  hexBS,
   prop_cbor,
-  prop_cbor_size,
   prop_cbor_direct_vs_class,
+  prop_cbor_size,
+  prop_cbor_with,
   prop_no_thunks,
   prop_no_thunks_IO,
-  arbitrarySeedOfSize,
-  genBadInputFor,
+  prop_raw_deserialise,
+  prop_raw_serialise,
+  prop_size_serialise,
   shrinkBadInputFor,
   showBadInputFor,
-  Lock,
   withLock,
-  directSerialiseToBS,
-  directDeserialiseFromBS,
-  hexBS,
   )
 import Cardano.Crypto.Libsodium.MLockedSeed
 
@@ -133,9 +136,6 @@ import Cardano.Crypto.DSIGN (
   toMessageHash,
   hashAndPack,
   )
-import Test.Crypto.Util (
-  Message (messageBytes),
-  )
 import Cardano.Crypto.SECP256K1.Constants (SECP256K1_ECDSA_MESSAGE_BYTES)
 import GHC.TypeLits (natVal)
 import Cardano.Crypto.Hash (SHA3_256, HashAlgorithm (SizeHash), Blake2b_256, SHA256, Keccak256)
@@ -149,6 +149,12 @@ ed25519SigGen = defaultSigGen
 
 ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
+
+blsMinPkSigGen :: Gen (SigDSIGN BLS12381MinPkDSIGN)
+blsMinPkSigGen = defaultSigGenWithCtx (Nothing, Nothing)
+
+blsMinSigSigGen :: Gen (SigDSIGN BLS12381MinSigDSIGN)
+blsMinSigSigGen = defaultSigGenWithCtx (Nothing, Nothing)
 
 #ifdef SECP256K1_ENABLED
 ecdsaSigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
@@ -174,12 +180,114 @@ defaultSignKeyGen :: forall (a :: Type).
 defaultSignKeyGen =
   genKeyDSIGN <$> arbitrarySeedOfSize (seedSizeDSIGN (Proxy :: Proxy a))
 
-defaultSigGen :: forall (a :: Type) .
+defaultSigGenWithCtx ::
+  forall (a :: Type) .
+  (DSIGNAlgorithm a, Signable a Message) =>
+  ContextDSIGN a ->
+  Gen (SigDSIGN a)
+defaultSigGenWithCtx ctx = do
+  msg :: Message <- arbitrary
+  signDSIGN ctx msg <$> defaultSignKeyGen
+
+defaultSigGen ::
+  forall (a :: Type) .
   (DSIGNAlgorithm a, ContextDSIGN a ~ (), Signable a Message) =>
   Gen (SigDSIGN a)
-defaultSigGen = do
-  msg :: Message <- arbitrary
-  signDSIGN () msg <$> defaultSignKeyGen
+defaultSigGen = defaultSigGenWithCtx @a ()
+
+defaultBlsDst :: ByteString
+defaultBlsDst = BS8.pack "BLS_DST_CARDANO_BASE_V1"
+
+badBlsDst :: ByteString
+badBlsDst = BS8.pack "BLS_DST_CARDANO_BASE_V1_X"
+
+blsAugVote :: ByteString
+blsAugVote = BS8.pack "role=vote"
+
+blsAugCert :: ByteString
+blsAugCert = BS8.pack "role=cert"
+
+blsTestMessage :: Message
+blsTestMessage = Message (BS8.pack "dst-aug-test-message")
+
+blsDstAugTests :: TestTree
+blsDstAugTests =
+  testGroup
+    "DST/AUG behaviour"
+    [ blsDstAugGroup "BLS12381MinPkDSIGN" (Proxy @BLS12381MinPkDSIGN)
+    , blsDstAugGroup "BLS12381MinSigDSIGN" (Proxy @BLS12381MinSigDSIGN)
+    ]
+
+blsDstAugGroup ::
+  forall v.
+  ( DSIGNAlgorithm v
+  , Signable v Message
+  , ContextDSIGN v ~ (Maybe ByteString, Maybe ByteString)
+  ) =>
+  String ->
+  Proxy v ->
+  TestTree
+blsDstAugGroup label _ =
+  testGroup
+    label
+    [ testProperty "dst default equivalence" $
+        forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+          let msg = blsTestMessage
+              sigDefault = signDSIGN ctxDefault msg sk
+              sigExplicit = signDSIGN ctxExplicitDst msg sk
+              vk = deriveVerKeyDSIGN sk
+           in conjoin
+                [ counterexample "default context should verify"
+                    (verifyDSIGN ctxDefault vk msg sigDefault === Right ())
+                , counterexample "explicit default DST should verify"
+                    (verifyDSIGN ctxExplicitDst vk msg sigExplicit === Right ())
+                , counterexample "signatures should match when DST defaults"
+                    (sigDefault === sigExplicit)
+                ]
+    , testProperty "aug empty equivalence" $
+        forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+          let msg = blsTestMessage
+              sigNothing = signDSIGN ctxExplicitDst msg sk
+              sigEmpty = signDSIGN ctxExplicitEmptyAug msg sk
+              vk = deriveVerKeyDSIGN sk
+           in conjoin
+                [ counterexample "aug Nothing should verify"
+                    (verifyDSIGN ctxExplicitDst vk msg sigNothing === Right ())
+                , counterexample "aug empty string should verify"
+                    (verifyDSIGN ctxExplicitEmptyAug vk msg sigEmpty === Right ())
+                , counterexample "signatures should match when AUG defaults"
+                    (sigNothing === sigEmpty)
+                ]
+    , testProperty "verify fails on wrong dst" $
+        forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+          let msg = blsTestMessage
+              sig = signDSIGN ctxExplicitEmptyAug msg sk
+              vk = deriveVerKeyDSIGN sk
+           in conjoin
+                [ counterexample "control context should verify"
+                    (verifyDSIGN ctxExplicitEmptyAug vk msg sig === Right ())
+                , counterexample "verification should fail with wrong DST"
+                    (verifyDSIGN ctxWrongDst vk msg sig =/= Right ())
+                ]
+    , testProperty "verify fails on wrong aug" $
+        forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+          let msg = blsTestMessage
+              sig = signDSIGN ctxVote msg sk
+              vk = deriveVerKeyDSIGN sk
+           in conjoin
+                [ counterexample "control context should verify"
+                    (verifyDSIGN ctxVote vk msg sig === Right ())
+                , counterexample "verification should fail with wrong AUG"
+                    (verifyDSIGN ctxCert vk msg sig =/= Right ())
+                ]
+    ]
+  where
+    ctxDefault = (Nothing, Nothing)
+    ctxExplicitDst = (Just defaultBlsDst, Nothing)
+    ctxExplicitEmptyAug = (Just defaultBlsDst, Just BS.empty)
+    ctxWrongDst = (Just badBlsDst, Just BS.empty)
+    ctxVote = (Just defaultBlsDst, Just blsAugVote)
+    ctxCert = (Just defaultBlsDst, Just blsAugCert)
 
 #ifdef SECP256K1_ENABLED
 -- Used for adjusting no of quick check tests
@@ -198,14 +306,14 @@ tests :: Lock -> TestTree
 tests lock =
   testGroup "Crypto.DSIGN"
     [ testGroup "Pure"
-      [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
-      , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
-      , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
-      , testDSIGNAlgorithm (defaultSigGen @BLS12381MinPkDSIGN) (arbitrary @Message) "BLS12381MinPkDSIGN"
-      , testDSIGNAlgorithm (defaultSigGen @BLS12381MinSigDSIGN) (arbitrary @Message) "BLS12381MinSigDSIGN"
+      [ testDSIGNAlgorithm () mockSigGen (arbitrary @Message) "MockDSIGN"
+      , testDSIGNAlgorithm () ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
+      , testDSIGNAlgorithm () ed448SigGen (arbitrary @Message) "Ed448DSIGN"
+      , testDSIGNAlgorithm (Nothing, Nothing) blsMinPkSigGen (arbitrary @Message) "BLS12381MinPkDSIGN"
+      , testDSIGNAlgorithm (Nothing, Nothing) blsMinSigSigGen (arbitrary @Message) "BLS12381MinSigDSIGN"
 #ifdef SECP256K1_ENABLED
-      , testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
-      , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
+      , testDSIGNAlgorithm () ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
+      , testDSIGNAlgorithm () schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
       -- Specific tests related only to ecdsa
       , testEcdsaInvalidMessageHash "EcdsaSecp256k1InvalidMessageHash"
       , testEcdsaWithHashAlgorithm (Proxy @SHA3_256) "EcdsaSecp256k1WithSHA3_256"
@@ -214,6 +322,7 @@ tests lock =
       , testEcdsaWithHashAlgorithm (Proxy @Keccak256) "EcdsaSecp256k1WithKeccak256"
 #endif
       ]
+    , blsDstAugTests
     , testGroup "MLocked"
       [ testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
       ]
@@ -222,7 +331,6 @@ tests lock =
 testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,
    Signable v a,
-   ContextDSIGN v ~ (),
    Show a,
    Eq (SignKeyDSIGN v),
    Eq a,
@@ -232,11 +340,12 @@ testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
    FromCBOR (SignKeyDSIGN v),
    ToCBOR (SigDSIGN v),
    FromCBOR (SigDSIGN v)) =>
+  ContextDSIGN v ->
   Gen (SigDSIGN v) ->
   Gen a ->
   String ->
   TestTree
-testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name $ [
+testDSIGNAlgorithm ctx genSig genMsg name = adjustOption testEnough . testGroup name $ [
   testGroup "serialization" [
     testGroup "raw" [
       testProperty "VerKey serialization" .
@@ -320,13 +429,13 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
     testGroup "verify" [
       testProperty "signing and verifying with matching keys" .
         forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @v) ppShow $
-        prop_dsign_verify,
+        prop_dsign_verify ctx,
       testProperty "verifying with wrong key" .
         forAllShow genWrongKey ppShow $
-        prop_dsign_verify_wrong_key,
+        prop_dsign_verify_wrong_key ctx,
       testProperty "verifying wrong message" .
         forAllShow genWrongMsg ppShow $
-        prop_dsign_verify_wrong_msg
+        prop_dsign_verify_wrong_msg ctx
     ],
     testGroup "NoThunks" [
       testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_no_thunks,
@@ -612,33 +721,29 @@ prop_dsignm_seed_roundtrip p seedPSB = ioProperty . withMLockedSeedFromPSB seedP
 
 -- If we sign a message with the key, we can verify the signature with the
 -- corresponding verification key.
-prop_dsign_verify
-  :: forall (v :: Type) (a :: Type) .
-     ( DSIGNAlgorithm v
-     , ContextDSIGN v ~ ()
-     , Signable v a
-     )
-  => (a, SignKeyDSIGN v)
-  -> Property
-prop_dsign_verify (msg, sk) =
-  let signed = signDSIGN () msg sk
+prop_dsign_verify ::
+  forall (v :: Type) (a :: Type) .
+  (DSIGNAlgorithm v, Signable v a) =>
+  ContextDSIGN v ->
+  (a, SignKeyDSIGN v) ->
+  Property
+prop_dsign_verify ctx (msg, sk) =
+  let signed = signDSIGN ctx msg sk
       vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN () vk msg signed === Right ()
+    in verifyDSIGN ctx vk msg signed === Right ()
 
 -- If we sign a message with one key, and try to verify with another, then
 -- verification fails.
-prop_dsign_verify_wrong_key
-  :: forall (v :: Type) (a :: Type) .
-     ( DSIGNAlgorithm v
-     , ContextDSIGN v ~ ()
-     , Signable v a
-     )
-  => (a, SignKeyDSIGN v, SignKeyDSIGN v)
-  -> Property
-prop_dsign_verify_wrong_key (msg, sk, sk') =
-  let signed = signDSIGN () msg sk
+prop_dsign_verify_wrong_key ::
+  forall (v :: Type) (a :: Type) .
+  (DSIGNAlgorithm v, Signable v a) =>
+  ContextDSIGN v ->
+  (a, SignKeyDSIGN v, SignKeyDSIGN v) ->
+  Property
+prop_dsign_verify_wrong_key ctx (msg, sk, sk') =
+  let signed = signDSIGN ctx msg sk
       vk' = deriveVerKeyDSIGN sk'
-    in verifyDSIGN () vk' msg signed =/= Right ()
+    in verifyDSIGN ctx vk' msg signed =/= Right ()
 
 prop_dsignm_verify_pos
   :: forall v. (DSIGNMAlgorithm v, ContextDSIGN v ~ (), Signable v Message)
@@ -674,15 +779,16 @@ prop_dsignm_verify_neg_key lock _ msg seedPSB seedPSB' =
 
 -- If we sign a message with a key, but then try to verify with a different
 -- message, then verification fails.
-prop_dsign_verify_wrong_msg
-  :: forall (v :: Type) (a :: Type) .
-  (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
-  => (a, a, SignKeyDSIGN v)
-  -> Property
-prop_dsign_verify_wrong_msg (msg, msg', sk) =
-  let signed = signDSIGN () msg sk
+prop_dsign_verify_wrong_msg ::
+  forall (v :: Type) (a :: Type) .
+  (DSIGNAlgorithm v, Signable v a) =>
+  ContextDSIGN v ->
+  (a, a, SignKeyDSIGN v) ->
+  Property
+prop_dsign_verify_wrong_msg ctx (msg, msg', sk) =
+  let signed = signDSIGN ctx msg sk
       vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN () vk msg' signed =/= Right ()
+    in verifyDSIGN ctx vk msg' signed =/= Right ()
 
 data ExpectedLengths (v :: Type) =
   ExpectedLengths {
@@ -720,7 +826,7 @@ testEcdsaWithHashAlgorithm ::
 testEcdsaWithHashAlgorithm _ name = adjustOption defaultTestEnough . testGroup name $ [
     testProperty "Ecdsa sign and verify" .
     forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @EcdsaSecp256k1DSIGN) ppShow $
-      prop_dsign_verify
+      prop_dsign_verify ()
   ]
   where
     genMsg :: Gen MessageHash

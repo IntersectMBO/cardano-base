@@ -29,17 +29,17 @@ import Test.QuickCheck (
   Arbitrary (..),
   Gen,
   Property,
-  counterexample,
   choose,
   chooseAny,
+  counterexample,
   forAll,
   oneof,
+  property,
   suchThat,
   suchThatMap,
   vectorOf,
   (===),
   (==>),
-  property,
  )
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, assertEqual, testCase)

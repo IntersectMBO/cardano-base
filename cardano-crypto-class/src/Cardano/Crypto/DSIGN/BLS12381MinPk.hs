@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -23,12 +24,18 @@ import GHC.Generics (Generic)
 
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
+import Data.ByteString (ByteString)
+import Data.Maybe (fromMaybe)
+
 -- Our internal BLS implementation
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 
 -- | Algorithm marker for BLS12-381 Minimal-PK-size:
 -- public keys on G1 (48B), signatures on G2 (96B), secret key 32B.
 data BLS12381MinPkDSIGN
+
+defaultDst :: ByteString
+defaultDst = "BLS_DST_CARDANO_BASE_V1"
 
 instance DSIGNAlgorithm BLS12381MinPkDSIGN where
   -- DSIGN associated sizes (in bytes)
@@ -39,6 +46,7 @@ instance DSIGNAlgorithm BLS12381MinPkDSIGN where
 
   -- What messages are signable by this DSIGN
   type Signable BLS12381MinPkDSIGN = SignableRepresentation
+  type ContextDSIGN BLS12381MinPkDSIGN = (Maybe ByteString, Maybe ByteString)
 
   -- Concrete DSIGN key/sig representations
   newtype VerKeyDSIGN BLS12381MinPkDSIGN = VerKeyBLSMinPk (BLS.PublicKey BLS.Curve1)
@@ -82,13 +90,17 @@ instance DSIGNAlgorithm BLS12381MinPkDSIGN where
 
   deriveVerKeyDSIGN (SignKeyBLSMinPk sk) = VerKeyBLSMinPk (BLS.blsSkToPk @BLS.Curve1 sk)
 
-  signDSIGN () a (SignKeyBLSMinPk sk) =
+  signDSIGN (mdst, maug) a (SignKeyBLSMinPk sk) =
     let msg = getSignableRepresentation a
-     in SigBLSMinPk (BLS.blsSign @BLS.Curve1 Proxy sk msg Nothing Nothing)
+        effDst = Just (fromMaybe defaultDst mdst)
+        effAug = Just (fromMaybe mempty maug)
+     in SigBLSMinPk (BLS.blsSign @BLS.Curve1 Proxy sk msg effDst effAug)
 
-  verifyDSIGN () (VerKeyBLSMinPk vk) a (SigBLSMinPk sig) =
+  verifyDSIGN (mdst, maug) (VerKeyBLSMinPk vk) a (SigBLSMinPk sig) =
     let msg = getSignableRepresentation a
-     in if BLS.blsSignatureVerify @BLS.Curve1 vk msg sig Nothing Nothing
+        effDst = Just (fromMaybe defaultDst mdst)
+        effAug = Just (fromMaybe mempty maug)
+     in if BLS.blsSignatureVerify @BLS.Curve1 vk msg sig effDst effAug
           then Right ()
           else Left "verifyDSIGN (BLS minpk): verification failed"
 
