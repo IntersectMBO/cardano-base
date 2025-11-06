@@ -10,9 +10,9 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- | BLS12-381 digital signatures (minimal signature size variant).
-module Cardano.Crypto.DSIGN.BLS12381MinSig
-  ( BLS12381MinSigDSIGN
-  ) where
+module Cardano.Crypto.DSIGN.BLS12381MinSig (
+  BLS12381MinSigDSIGN,
+) where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.DSIGN.Class
@@ -38,19 +38,22 @@ instance DSIGNAlgorithm BLS12381MinSigDSIGN where
 
   newtype VerKeyDSIGN BLS12381MinSigDSIGN = VerKeyBLSMinSig (BLS.PublicKey BLS.Curve2)
     deriving stock (Generic)
-    deriving (NoThunks)
+    deriving
+      (NoThunks)
       via OnlyCheckWhnfNamed
             "VerKeyDSIGN BLS12381MinSigDSIGN"
             (VerKeyDSIGN BLS12381MinSigDSIGN)
   newtype SignKeyDSIGN BLS12381MinSigDSIGN = SignKeyBLSMinSig BLS.SecretKey
     deriving stock (Generic)
-    deriving (NoThunks)
+    deriving
+      (NoThunks)
       via OnlyCheckWhnfNamed
             "SignKeyDSIGN BLS12381MinSigDSIGN"
             (SignKeyDSIGN BLS12381MinSigDSIGN)
   newtype SigDSIGN BLS12381MinSigDSIGN = SigBLSMinSig (BLS.Signature BLS.Curve2)
     deriving stock (Generic)
-    deriving (NoThunks)
+    deriving
+      (NoThunks)
       via OnlyCheckWhnfNamed
             "SigDSIGN BLS12381MinSigDSIGN"
             (SigDSIGN BLS12381MinSigDSIGN)
