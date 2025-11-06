@@ -29,6 +29,7 @@ import Test.QuickCheck (
   Arbitrary (..),
   Gen,
   Property,
+  counterexample,
   choose,
   chooseAny,
   forAll,
@@ -38,6 +39,7 @@ import Test.QuickCheck (
   vectorOf,
   (===),
   (==>),
+  property,
  )
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
@@ -490,6 +492,16 @@ testBlsSerDeHelpers name =
               , BLS.publicKeyFromUncompressedBS @BLS.Curve2 ubs
               )
           )
+    , testProperty "PublicKey cross-group bytes rejected (Curve1 expects G1)" $
+        forAll genSecretKey $ \sk ->
+          let bs = BLS.publicKeyToCompressedBS (BLS.blsSkToPk @BLS.Curve2 sk)
+              res = BLS.publicKeyFromCompressedBS @BLS.Curve1 bs
+           in expectError res BLS.BLST_BAD_ENCODING
+    , testProperty "PublicKey cross-group bytes rejected (Curve2 expects G2)" $
+        forAll genSecretKey $ \sk ->
+          let bs = BLS.publicKeyToCompressedBS (BLS.blsSkToPk @BLS.Curve1 sk)
+              res = BLS.publicKeyFromCompressedBS @BLS.Curve2 bs
+           in expectError res BLS.BLST_BAD_ENCODING
     , testProperty "PublicKey length corruption is rejected (Curve1 compressed)" $
         forAll genSecretKey $ \sk ->
           let pk = BLS.blsSkToPk @BLS.Curve1 sk
@@ -522,6 +534,28 @@ testBlsSerDeHelpers name =
               , BLS.signatureFromUncompressedBS @BLS.Curve1 ubs
               )
           )
+    , testCase "Signature rejects infinity (Curve2) [compressed & uncompressed]" $ do
+        let cbs = BLS.blsCompress (BLS.blsZero @(BLS.Dual BLS.Curve2))
+            ubs = BLS.blsSerialize (BLS.blsZero @(BLS.Dual BLS.Curve2))
+        assertBool
+          "expected BLST_PK_IS_INFINITY"
+          ( bothInfinity
+              ( BLS.signatureFromCompressedBS @BLS.Curve2 cbs
+              , BLS.signatureFromUncompressedBS @BLS.Curve2 ubs
+              )
+          )
+    , testProperty "Signature cross-group bytes rejected (Curve1 expects G2)" $
+        forAll genSecretKey $ \sk ->
+          let sig = BLS.blsSign @BLS.Curve2 Proxy sk "x" Nothing Nothing
+              bs = BLS.signatureToCompressedBS @BLS.Curve2 sig
+              res = BLS.signatureFromCompressedBS @BLS.Curve1 bs
+           in expectError res BLS.BLST_BAD_ENCODING
+    , testProperty "Signature cross-group bytes rejected (Curve2 expects G1)" $
+        forAll genSecretKey $ \sk ->
+          let sig = BLS.blsSign @BLS.Curve1 Proxy sk "y" Nothing Nothing
+              bs = BLS.signatureToCompressedBS @BLS.Curve1 sig
+              res = BLS.signatureFromCompressedBS @BLS.Curve2 bs
+           in expectError res BLS.BLST_BAD_ENCODING
     , testProperty "Signature length corruption is rejected (Curve2 compressed)" $
         forAll genSecretKey $ \sk ->
           let sig = BLS.blsSign @BLS.Curve2 Proxy sk "!" Nothing Nothing
@@ -562,6 +596,15 @@ bothInfinity _ = False
 bothBadEncoding :: (Either BLS.BLSTError a, Either BLS.BLSTError b) -> Bool
 bothBadEncoding (Left BLS.BLST_BAD_ENCODING, Left BLS.BLST_BAD_ENCODING) = True
 bothBadEncoding _ = False
+
+expectError :: Either BLS.BLSTError a -> BLS.BLSTError -> Property
+expectError result expected =
+  case result of
+    Left err | err == expected -> property True
+    Left err ->
+      counterexample ("expected " ++ show expected ++ ", got " ++ show err) (property False)
+    Right _ ->
+      counterexample ("expected " ++ show expected ++ ", got successful decode") (property False)
 
 -- Property helper: round-trip via bytes (to keep tests concise)
 propRoundTripBytes ::
