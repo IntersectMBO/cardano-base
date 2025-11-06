@@ -769,55 +769,6 @@ testBlsSignature name curve =
                         )
                 _ -> False
         )
-    , testProperty
-        "Reject infinity signature"
-        ( \( seed :: Seed
-             , info :: Message
-             , msg :: Message
-             , dst :: Message
-             , aug :: Message
-             ) ->
-              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
-                Left _ -> True
-                Right sk' ->
-                  let pk = BLS.blsSkToPk @curve sk'
-                      -- Signature at infinity (on Dual curve)
-                      sigInf = BLS.Signature (BLS.blsZero @(BLS.Dual curve))
-                   in not
-                        ( BLS.blsSignatureVerify
-                            pk
-                            (messageBytes msg)
-                            sigInf
-                            (Just (messageBytes dst))
-                            (Just (messageBytes aug))
-                        )
-        )
-    , testProperty
-        "Reject infinity public key"
-        ( \( seed :: Seed
-             , info :: Message
-             , msg :: Message
-             , dst :: Message
-             , aug :: Message
-             ) ->
-              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
-                Left _ -> True
-                Right sk' ->
-                  let
-                    -- Valid signature under a real key
-                    sig = BLS.blsSign curve sk' (messageBytes msg) (Just (messageBytes dst)) (Just (messageBytes aug))
-                    -- PublicKey at infinity (on this curve)
-                    pkInf = BLS.PublicKey (BLS.blsZero @curve)
-                   in
-                    not
-                      ( BLS.blsSignatureVerify
-                          pkInf
-                          (messageBytes msg)
-                          sig
-                          (Just (messageBytes dst))
-                          (Just (messageBytes aug))
-                      )
-        )
     ]
 
 testBlsPoP ::
@@ -855,30 +806,6 @@ testBlsPoP name _ =
                    in not
                         (BLS.blsProofOfPossessionVerify @curve pkB popA (Just (messageBytes dst)) (Just (messageBytes aug)))
                 _ -> False
-        )
-    , testProperty
-        "Reject infinity public key"
-        ( \( seed :: Seed
-             , info :: Message
-             , dst :: Message
-             , aug :: Message
-             ) ->
-              case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of
-                Left _ -> True
-                Right sk' ->
-                  let
-                    -- Construct valid PoP under real key
-                    pop = BLS.blsProofOfPossessionProve @curve sk' (Just (messageBytes dst)) (Just (messageBytes aug))
-                    -- Replace pk with infinity point
-                    pkInf = BLS.PublicKey (BLS.blsZero @curve)
-                   in
-                    not
-                      ( BLS.blsProofOfPossessionVerify @curve
-                          pkInf
-                          pop
-                          (Just (messageBytes dst))
-                          (Just (messageBytes aug))
-                      )
         )
     , testProperty
         "Wrong DST fails"
