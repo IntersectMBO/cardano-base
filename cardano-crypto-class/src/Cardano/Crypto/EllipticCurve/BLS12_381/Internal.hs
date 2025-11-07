@@ -627,6 +627,7 @@ instance BLS (Dual curve) => BLSCompressed (Signature curve) where
 
 instance BLS (Dual curve) => BLSCompressed (ProofOfPossession curve) where
   compressedLength _ = 2 * compressedSizePoint (Proxy @(Dual curve))
+
   -- Layout: mu1 || mu2, each encoded as the canonical compressed point of the dual curve
   toCompressedBytes (ProofOfPossession mu1 mu2) =
     signatureToCompressedBS @curve (Signature mu1)
@@ -660,6 +661,7 @@ instance BLS (Dual curve) => BLSUncompressed (Signature curve) where
 
 instance BLS (Dual curve) => BLSUncompressed (ProofOfPossession curve) where
   uncompressedLength _ = 2 * serializedSizePoint (Proxy @(Dual curve))
+
   -- Layout mirrors the compressed case but uses canonical uncompressed encodings
   toUncompressedBytes (ProofOfPossession mu1 mu2) =
     signatureToUncompressedBS @curve (Signature mu1)
