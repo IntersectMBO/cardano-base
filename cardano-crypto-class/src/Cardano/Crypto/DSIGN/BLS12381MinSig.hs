@@ -67,18 +67,24 @@ instance DSIGNAlgorithm BLS12381MinSigDSIGN where
 
   algorithmNameDSIGN _ = "bls12-381-minsig"
 
-  rawSerialiseVerKeyDSIGN (VerKeyBLSMinSig pk) = BLS.publicKeyToCompressedBS pk
-  rawSerialiseSignKeyDSIGN (SignKeyBLSMinSig sk) = BLS.secretKeyToBS sk
-  rawSerialiseSigDSIGN (SigBLSMinSig sig) = BLS.signatureToCompressedBS @BLS.Curve2 sig
+  rawSerialiseVerKeyDSIGN (VerKeyBLSMinSig pk) = BLS.toCompressedBytes pk
+  rawSerialiseSignKeyDSIGN (SignKeyBLSMinSig sk) = BLS.toCompressedBytes sk
+  rawSerialiseSigDSIGN (SigBLSMinSig sig) = BLS.toCompressedBytes sig
 
   rawDeserialiseVerKeyDSIGN bs =
-    VerKeyBLSMinSig <$> either (const Nothing) Just (BLS.publicKeyFromCompressedBS @BLS.Curve2 bs)
+    case BLS.fromCompressedBytes @(BLS.PublicKey BLS.Curve2) bs of
+      Right pk -> Just (VerKeyBLSMinSig pk)
+      Left _ -> Nothing
 
   rawDeserialiseSignKeyDSIGN bs =
-    SignKeyBLSMinSig <$> either (const Nothing) Just (BLS.secretKeyFromBS bs)
+    case BLS.fromCompressedBytes @BLS.SecretKey bs of
+      Right sk -> Just (SignKeyBLSMinSig sk)
+      Left _ -> Nothing
 
   rawDeserialiseSigDSIGN bs =
-    SigBLSMinSig <$> either (const Nothing) Just (BLS.signatureFromCompressedBS @BLS.Curve2 bs)
+    case BLS.fromCompressedBytes @(BLS.Signature BLS.Curve2) bs of
+      Right sig -> Just (SigBLSMinSig sig)
+      Left _ -> Nothing
 
   deriveVerKeyDSIGN (SignKeyBLSMinSig sk) = VerKeyBLSMinSig (BLS.blsSkToPk @BLS.Curve2 sk)
 

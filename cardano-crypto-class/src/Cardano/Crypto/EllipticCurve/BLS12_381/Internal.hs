@@ -43,6 +43,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Affine1,
   Affine2,
   BLSTError (..),
+  BLSDeserializeError (..),
   Point (..),
   Point1,
   Point2,
@@ -191,6 +192,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   signatureFromCompressedBS,
   signatureToUncompressedBS,
   signatureFromUncompressedBS,
+  BLSCompressed (..),
+  BLSUncompressed (..),
 
   -- * Pairings
   millerLoop,
@@ -207,6 +210,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 where
 
 import Control.Monad (forM_)
+import Data.Bifunctor (first)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -567,6 +571,72 @@ instance (BLS curve, BLS (Dual curve)) => Eq (ProofOfPossession curve) where
   (ProofOfPossession mu1a mu2a) == (ProofOfPossession mu1b mu2b) =
     mu1a == mu1b && mu2a == mu2b
 
+class BLSCompressed a where
+  compressedLength :: proxy a -> Int
+  toCompressedBytes :: a -> ByteString
+  fromCompressedBytes :: ByteString -> Either BLSDeserializeError a
+
+class BLSUncompressed a where
+  uncompressedLength :: proxy a -> Int
+  toUncompressedBytes :: a -> ByteString
+  fromUncompressedBytes :: ByteString -> Either BLSDeserializeError a
+
+mapBLSTError :: BLSTError -> BLSDeserializeError
+mapBLSTError BLST_BAD_ENCODING = BLSDeserializeBadEncoding
+mapBLSTError BLST_PK_IS_INFINITY = BLSDeserializeIdentityPoint
+mapBLSTError BLST_POINT_NOT_IN_GROUP = BLSDeserializeWrongSubgroup
+mapBLSTError BLST_BAD_SCALAR = BLSDeserializeBadEncoding
+mapBLSTError _ = BLSDeserializeBadEncoding
+
+instance BLSCompressed SecretKey where
+  compressedLength _ = sizeScalar
+  toCompressedBytes = secretKeyToBS
+  fromCompressedBytes bs
+    | len /= sizeScalar = Left $ BLSDeserializeWrongLength sizeScalar len
+    | otherwise = first mapBLSTError (secretKeyFromBS bs)
+    where
+      len = BS.length bs
+
+instance BLS curve => BLSCompressed (PublicKey curve) where
+  compressedLength _ = compressedSizePoint (Proxy @curve)
+  toCompressedBytes = publicKeyToCompressedBS
+  fromCompressedBytes bs
+    | len /= expected = Left $ BLSDeserializeWrongLength expected len
+    | otherwise = first mapBLSTError (publicKeyFromCompressedBS @curve bs)
+    where
+      len = BS.length bs
+      expected = compressedLength (Proxy @(PublicKey curve))
+
+instance BLS (Dual curve) => BLSCompressed (Signature curve) where
+  compressedLength _ = compressedSizePoint (Proxy @(Dual curve))
+  toCompressedBytes = signatureToCompressedBS @curve
+  fromCompressedBytes bs
+    | len /= expected = Left $ BLSDeserializeWrongLength expected len
+    | otherwise = first mapBLSTError (signatureFromCompressedBS @curve bs)
+    where
+      len = BS.length bs
+      expected = compressedLength (Proxy @(Signature curve))
+
+instance BLS curve => BLSUncompressed (PublicKey curve) where
+  uncompressedLength _ = serializedSizePoint (Proxy @curve)
+  toUncompressedBytes = publicKeyToUncompressedBS
+  fromUncompressedBytes bs
+    | len /= expected = Left $ BLSDeserializeWrongLength expected len
+    | otherwise = first mapBLSTError (publicKeyFromUncompressedBS @curve bs)
+    where
+      len = BS.length bs
+      expected = uncompressedLength (Proxy @(PublicKey curve))
+
+instance BLS (Dual curve) => BLSUncompressed (Signature curve) where
+  uncompressedLength _ = serializedSizePoint (Proxy @(Dual curve))
+  toUncompressedBytes = signatureToUncompressedBS @curve
+  fromUncompressedBytes bs
+    | len /= expected = Left $ BLSDeserializeWrongLength expected len
+    | otherwise = first mapBLSTError (signatureFromUncompressedBS @curve bs)
+    where
+      len = BS.length bs
+      expected = uncompressedLength (Proxy @(Signature curve))
+
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
   s <- scalarFromInteger i
@@ -855,6 +925,13 @@ data BLSTError
   | BLST_BAD_SCALAR
   | BLST_UNKNOWN_ERROR
   deriving (Show, Eq, Ord, Enum, Bounded)
+
+data BLSDeserializeError
+  = BLSDeserializeBadEncoding
+  | BLSDeserializeIdentityPoint
+  | BLSDeserializeWrongSubgroup
+  | BLSDeserializeWrongLength !Int !Int
+  deriving (Eq, Show)
 
 mkBLSTError :: CInt -> BLSTError
 mkBLSTError e
