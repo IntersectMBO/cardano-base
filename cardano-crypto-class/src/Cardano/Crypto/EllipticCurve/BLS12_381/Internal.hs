@@ -571,6 +571,14 @@ instance (BLS curve, BLS (Dual curve)) => Eq (ProofOfPossession curve) where
   (ProofOfPossession mu1a mu2a) == (ProofOfPossession mu1b mu2b) =
     mu1a == mu1b && mu2a == mu2b
 
+splitFixed :: Int -> ByteString -> Either BLSDeserializeError (ByteString, ByteString)
+splitFixed partLen bs
+  | actual /= expected = Left $ BLSDeserializeWrongLength expected actual
+  | otherwise = Right (BS.take partLen bs, BS.drop partLen bs)
+  where
+    actual = BS.length bs
+    expected = 2 * partLen
+
 class BLSCompressed a where
   compressedLength :: proxy a -> Int
   toCompressedBytes :: a -> ByteString
@@ -617,6 +625,19 @@ instance BLS (Dual curve) => BLSCompressed (Signature curve) where
       len = BS.length bs
       expected = compressedLength (Proxy @(Signature curve))
 
+instance BLS (Dual curve) => BLSCompressed (ProofOfPossession curve) where
+  compressedLength _ = 2 * compressedSizePoint (Proxy @(Dual curve))
+  -- Layout: mu1 || mu2, each encoded as the canonical compressed point of the dual curve
+  toCompressedBytes (ProofOfPossession mu1 mu2) =
+    signatureToCompressedBS @curve (Signature mu1)
+      <> signatureToCompressedBS @curve (Signature mu2)
+  fromCompressedBytes bs = do
+    let partLen = compressedSizePoint (Proxy @(Dual curve))
+    (chunk1, chunk2) <- splitFixed partLen bs
+    Signature mu1 <- first mapBLSTError (signatureFromCompressedBS @curve chunk1)
+    Signature mu2 <- first mapBLSTError (signatureFromCompressedBS @curve chunk2)
+    pure (ProofOfPossession mu1 mu2)
+
 instance BLS curve => BLSUncompressed (PublicKey curve) where
   uncompressedLength _ = serializedSizePoint (Proxy @curve)
   toUncompressedBytes = publicKeyToUncompressedBS
@@ -636,6 +657,19 @@ instance BLS (Dual curve) => BLSUncompressed (Signature curve) where
     where
       len = BS.length bs
       expected = uncompressedLength (Proxy @(Signature curve))
+
+instance BLS (Dual curve) => BLSUncompressed (ProofOfPossession curve) where
+  uncompressedLength _ = 2 * serializedSizePoint (Proxy @(Dual curve))
+  -- Layout mirrors the compressed case but uses canonical uncompressed encodings
+  toUncompressedBytes (ProofOfPossession mu1 mu2) =
+    signatureToUncompressedBS @curve (Signature mu1)
+      <> signatureToUncompressedBS @curve (Signature mu2)
+  fromUncompressedBytes bs = do
+    let partLen = serializedSizePoint (Proxy @(Dual curve))
+    (chunk1, chunk2) <- splitFixed partLen bs
+    Signature mu1 <- first mapBLSTError (signatureFromUncompressedBS @curve chunk1)
+    Signature mu2 <- first mapBLSTError (signatureFromUncompressedBS @curve chunk2)
+    pure (ProofOfPossession mu1 mu2)
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do

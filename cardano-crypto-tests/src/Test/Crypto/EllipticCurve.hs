@@ -32,6 +32,7 @@ import Test.QuickCheck (
   choose,
   chooseAny,
   counterexample,
+  (.&&.),
   forAll,
   oneof,
   property,
@@ -42,7 +43,7 @@ import Test.QuickCheck (
   (==>),
  )
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
+import Test.Tasty.HUnit (assertBool, assertEqual, assertFailure, testCase)
 import Test.Tasty.QuickCheck (frequency, testProperty)
 
 tests :: TestTree
@@ -448,12 +449,12 @@ testBlsSerDeHelpers name =
                 )
            in case res of
                 (a, b) -> isBadScalar a && isBadScalar b
-    , -- Public keys -----------------------------------------------------------
-      testProperty "SecretKey class round-trip" $
+    , testProperty "SecretKey class round-trip" $
         forAll genSecretKey $ \sk ->
           fmap BLS.toCompressedBytes (BLS.fromCompressedBytes @BLS.SecretKey (BLS.toCompressedBytes sk))
             === Right (BLS.toCompressedBytes sk)
-    , testProperty "PublicKey class round-trip (Curve1)" $
+    , -- Public keys -----------------------------------------------------------
+      testProperty "PublicKey class round-trip (Curve1)" $
         forAll genSecretKey $ \sk ->
           let pk = BLS.blsSkToPk @BLS.Curve1 sk
            in fmap
@@ -467,6 +468,48 @@ testBlsSerDeHelpers name =
                 BLS.toCompressedBytes
                 (BLS.fromCompressedBytes @(BLS.PublicKey BLS.Curve2) (BLS.toCompressedBytes pk))
                 === Right (BLS.toCompressedBytes pk)
+    , testProperty "PublicKey uncompressed class round-trip (Curve1)" $
+        forAll genSecretKey $ \sk ->
+          let pk = BLS.blsSkToPk @BLS.Curve1 sk
+           in fmap
+                BLS.toUncompressedBytes
+                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve1) (BLS.toUncompressedBytes pk))
+                === Right (BLS.toUncompressedBytes pk)
+    , testProperty "PublicKey uncompressed class round-trip (Curve2)" $
+        forAll genSecretKey $ \sk ->
+          let pk = BLS.blsSkToPk @BLS.Curve2 sk
+           in fmap
+                BLS.toUncompressedBytes
+                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve2) (BLS.toUncompressedBytes pk))
+                === Right (BLS.toUncompressedBytes pk)
+    , testProperty "PublicKey class cross-group bytes rejected (Curve1 expects G1)" $
+        forAll genSecretKey $ \sk ->
+          let bs = BLS.toCompressedBytes (BLS.blsSkToPk @BLS.Curve2 sk)
+              expected = BLS.compressedLength (Proxy @(BLS.PublicKey BLS.Curve1))
+           in expectSerdeError
+                (BLS.fromCompressedBytes @(BLS.PublicKey BLS.Curve1) bs)
+                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
+    , testProperty "PublicKey class cross-group bytes rejected (Curve2 expects G2)" $
+        forAll genSecretKey $ \sk ->
+          let bs = BLS.toCompressedBytes (BLS.blsSkToPk @BLS.Curve1 sk)
+              expected = BLS.compressedLength (Proxy @(BLS.PublicKey BLS.Curve2))
+           in expectSerdeError
+                (BLS.fromCompressedBytes @(BLS.PublicKey BLS.Curve2) bs)
+                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
+    , testProperty "PublicKey uncompressed class cross-group bytes rejected (Curve1 expects G1)" $
+        forAll genSecretKey $ \sk ->
+          let bs = BLS.toUncompressedBytes (BLS.blsSkToPk @BLS.Curve2 sk)
+              expected = BLS.uncompressedLength (Proxy @(BLS.PublicKey BLS.Curve1))
+           in expectSerdeError
+                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve1) bs)
+                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
+    , testProperty "PublicKey uncompressed class cross-group bytes rejected (Curve2 expects G2)" $
+        forAll genSecretKey $ \sk ->
+          let bs = BLS.toUncompressedBytes (BLS.blsSkToPk @BLS.Curve1 sk)
+              expected = BLS.uncompressedLength (Proxy @(BLS.PublicKey BLS.Curve2))
+           in expectSerdeError
+                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve2) bs)
+                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
     , testCase "PublicKey rejects infinity (Curve1) [compressed & uncompressed]" $ do
         let cbs = BLS.blsCompress (BLS.blsZero @BLS.Curve1)
             ubs = BLS.blsSerialize (BLS.blsZero @BLS.Curve1)
@@ -508,6 +551,29 @@ testBlsSerDeHelpers name =
               , BLS.signatureFromUncompressedBS @BLS.Curve2 ubs
               )
           )
+    , -- Class-level infinity rejection ensures network inputs cannot produce identity points
+      testCase "Signature class rejects infinity (Curve1)" $ do
+        let sigInf :: BLS.Signature BLS.Curve1
+            sigInf = BLS.Signature (BLS.blsZero @(BLS.Dual BLS.Curve1))
+            compressed = BLS.toCompressedBytes sigInf
+            uncompressed = BLS.toUncompressedBytes sigInf
+        case BLS.fromCompressedBytes @(BLS.Signature BLS.Curve1) compressed of
+          Left err -> assertEqual "compressed" BLS.BLSDeserializeIdentityPoint err
+          Right _ -> assertFailure "expected compressed infinity rejection"
+        case BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve1) uncompressed of
+          Left err -> assertEqual "uncompressed" BLS.BLSDeserializeIdentityPoint err
+          Right _ -> assertFailure "expected uncompressed infinity rejection"
+    , testCase "Signature class rejects infinity (Curve2)" $ do
+        let sigInf :: BLS.Signature BLS.Curve2
+            sigInf = BLS.Signature (BLS.blsZero @(BLS.Dual BLS.Curve2))
+            compressed = BLS.toCompressedBytes sigInf
+            uncompressed = BLS.toUncompressedBytes sigInf
+        case BLS.fromCompressedBytes @(BLS.Signature BLS.Curve2) compressed of
+          Left err -> assertEqual "compressed" BLS.BLSDeserializeIdentityPoint err
+          Right _ -> assertFailure "expected compressed infinity rejection"
+        case BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve2) uncompressed of
+          Left err -> assertEqual "uncompressed" BLS.BLSDeserializeIdentityPoint err
+          Right _ -> assertFailure "expected uncompressed infinity rejection"
     , testProperty "Signature class round-trip (Curve1 sigs on G2)" $
         forAll genSecretKey $ \sk ->
           let sig = BLS.blsSign @BLS.Curve1 Proxy sk "hello" Nothing Nothing
@@ -522,48 +588,20 @@ testBlsSerDeHelpers name =
                 BLS.toCompressedBytes
                 (BLS.fromCompressedBytes @(BLS.Signature BLS.Curve2) (BLS.toCompressedBytes sig))
                 === Right (BLS.toCompressedBytes sig)
-    , testProperty "PublicKey class cross-group bytes rejected (Curve1 expects G1)" $
+    , testProperty "Signature uncompressed class round-trip (Curve1 sigs on G2)" $
         forAll genSecretKey $ \sk ->
-          let bs = BLS.toCompressedBytes (BLS.blsSkToPk @BLS.Curve2 sk)
-              expected = BLS.compressedLength (Proxy @(BLS.PublicKey BLS.Curve1))
-           in expectSerdeError
-                (BLS.fromCompressedBytes @(BLS.PublicKey BLS.Curve1) bs)
-                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
-    , testProperty "PublicKey class cross-group bytes rejected (Curve2 expects G2)" $
-        forAll genSecretKey $ \sk ->
-          let bs = BLS.toCompressedBytes (BLS.blsSkToPk @BLS.Curve1 sk)
-              expected = BLS.compressedLength (Proxy @(BLS.PublicKey BLS.Curve2))
-           in expectSerdeError
-                (BLS.fromCompressedBytes @(BLS.PublicKey BLS.Curve2) bs)
-                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
-    , testProperty "PublicKey uncompressed class round-trip (Curve1)" $
-        forAll genSecretKey $ \sk ->
-          let pk = BLS.blsSkToPk @BLS.Curve1 sk
+          let sig = BLS.blsSign @BLS.Curve1 Proxy sk "hello" Nothing Nothing
            in fmap
                 BLS.toUncompressedBytes
-                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve1) (BLS.toUncompressedBytes pk))
-                === Right (BLS.toUncompressedBytes pk)
-    , testProperty "PublicKey uncompressed class round-trip (Curve2)" $
+                (BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve1) (BLS.toUncompressedBytes sig))
+                === Right (BLS.toUncompressedBytes sig)
+    , testProperty "Signature uncompressed class round-trip (Curve2 sigs on G1)" $
         forAll genSecretKey $ \sk ->
-          let pk = BLS.blsSkToPk @BLS.Curve2 sk
+          let sig = BLS.blsSign @BLS.Curve2 Proxy sk "world" Nothing Nothing
            in fmap
                 BLS.toUncompressedBytes
-                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve2) (BLS.toUncompressedBytes pk))
-                === Right (BLS.toUncompressedBytes pk)
-    , testProperty "PublicKey uncompressed class cross-group bytes rejected (Curve1 expects G1)" $
-        forAll genSecretKey $ \sk ->
-          let bs = BLS.toUncompressedBytes (BLS.blsSkToPk @BLS.Curve2 sk)
-              expected = BLS.uncompressedLength (Proxy @(BLS.PublicKey BLS.Curve1))
-           in expectSerdeError
-                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve1) bs)
-                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
-    , testProperty "PublicKey uncompressed class cross-group bytes rejected (Curve2 expects G2)" $
-        forAll genSecretKey $ \sk ->
-          let bs = BLS.toUncompressedBytes (BLS.blsSkToPk @BLS.Curve1 sk)
-              expected = BLS.uncompressedLength (Proxy @(BLS.PublicKey BLS.Curve2))
-           in expectSerdeError
-                (BLS.fromUncompressedBytes @(BLS.PublicKey BLS.Curve2) bs)
-                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
+                (BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve2) (BLS.toUncompressedBytes sig))
+                === Right (BLS.toUncompressedBytes sig)
     , testProperty "Signature class cross-group bytes rejected (Curve1 expects G2)" $
         forAll genSecretKey $ \sk ->
           let sig = BLS.blsSign @BLS.Curve2 Proxy sk "x" Nothing Nothing
@@ -580,20 +618,6 @@ testBlsSerDeHelpers name =
            in expectSerdeError
                 (BLS.fromCompressedBytes @(BLS.Signature BLS.Curve2) bs)
                 (BLS.BLSDeserializeWrongLength expected (BS.length bs))
-    , testProperty "Signature uncompressed class round-trip (Curve1 sigs on G2)" $
-        forAll genSecretKey $ \sk ->
-          let sig = BLS.blsSign @BLS.Curve1 Proxy sk "hello" Nothing Nothing
-           in fmap
-                BLS.toUncompressedBytes
-                (BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve1) (BLS.toUncompressedBytes sig))
-                === Right (BLS.toUncompressedBytes sig)
-    , testProperty "Signature uncompressed class round-trip (Curve2 sigs on G1)" $
-        forAll genSecretKey $ \sk ->
-          let sig = BLS.blsSign @BLS.Curve2 Proxy sk "world" Nothing Nothing
-           in fmap
-                BLS.toUncompressedBytes
-                (BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve2) (BLS.toUncompressedBytes sig))
-                === Right (BLS.toUncompressedBytes sig)
     , testProperty "Signature uncompressed class cross-group bytes rejected (Curve1 expects G2)" $
         forAll genSecretKey $ \sk ->
           let sig = BLS.blsSign @BLS.Curve2 Proxy sk "x" Nothing Nothing
@@ -619,6 +643,96 @@ testBlsSerDeHelpers name =
                 , BLS.signatureFromCompressedBS @BLS.Curve2 (lengthen bs)
                 )
            in bothBadEncoding res
+    , testProperty "Signature length corruption is rejected (Curve2 uncompressed)" $
+        forAll genSecretKey $ \sk ->
+          let sig = BLS.blsSign @BLS.Curve2 Proxy sk "?" Nothing Nothing
+              bs = BLS.toUncompressedBytes sig
+              expected = BLS.uncompressedLength (Proxy @(BLS.Signature BLS.Curve2))
+              shortRes = BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve2) (shorten bs)
+              longRes = BLS.fromUncompressedBytes @(BLS.Signature BLS.Curve2) (lengthen bs)
+           in expectSerdeError shortRes (BLS.BLSDeserializeWrongLength expected (BS.length (shorten bs)))
+                .&&. expectSerdeError longRes (BLS.BLSDeserializeWrongLength expected (BS.length (lengthen bs)))
+    , -- Proofs of possession --------------------------------------------------
+      testProperty "PoP class round-trip (Curve1)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve1 sk Nothing Nothing
+           in fmap
+                BLS.toCompressedBytes
+                (BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve1) (BLS.toCompressedBytes pop))
+                === Right (BLS.toCompressedBytes pop)
+    , testProperty "PoP class round-trip (Curve2)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve2 sk Nothing Nothing
+           in fmap
+                BLS.toCompressedBytes
+                (BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve2) (BLS.toCompressedBytes pop))
+                === Right (BLS.toCompressedBytes pop)
+    , testProperty "PoP uncompressed class round-trip (Curve1)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve1 sk Nothing Nothing
+           in fmap
+                BLS.toUncompressedBytes
+                (BLS.fromUncompressedBytes @(BLS.ProofOfPossession BLS.Curve1) (BLS.toUncompressedBytes pop))
+                === Right (BLS.toUncompressedBytes pop)
+    , testProperty "PoP uncompressed class round-trip (Curve2)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve2 sk Nothing Nothing
+           in fmap
+                BLS.toUncompressedBytes
+                (BLS.fromUncompressedBytes @(BLS.ProofOfPossession BLS.Curve2) (BLS.toUncompressedBytes pop))
+                === Right (BLS.toUncompressedBytes pop)
+    , testProperty "PoP class cross-group bytes rejected (Curve1 expects G2 parts)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve2 sk Nothing Nothing
+              bs = BLS.toCompressedBytes pop
+              expected = BLS.compressedLength (Proxy @(BLS.ProofOfPossession BLS.Curve1))
+           in expectSerdeError
+                (BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve1) bs)
+                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
+    , testProperty "PoP class cross-group bytes rejected (Curve2 expects G1 parts)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve1 sk Nothing Nothing
+              bs = BLS.toCompressedBytes pop
+              expected = BLS.compressedLength (Proxy @(BLS.ProofOfPossession BLS.Curve2))
+           in expectSerdeError
+                (BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve2) bs)
+                (BLS.BLSDeserializeWrongLength expected (BS.length bs))
+    , testProperty "PoP compressed rejects infinity (Curve1)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve1 sk Nothing Nothing
+              good = BLS.signatureToCompressedBS @BLS.Curve1 (BLS.Signature (BLS.unMu2 pop))
+              inf = BLS.signatureToCompressedBS @BLS.Curve1 (BLS.Signature (BLS.blsZero @(BLS.Dual BLS.Curve1)))
+              bs = inf <> good
+           in expectSerdeError
+                (BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve1) bs)
+                BLS.BLSDeserializeIdentityPoint
+    , testProperty "PoP compressed rejects infinity (Curve2)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve2 sk Nothing Nothing
+              good = BLS.signatureToCompressedBS @BLS.Curve2 (BLS.Signature (BLS.unMu2 pop))
+              inf = BLS.signatureToCompressedBS @BLS.Curve2 (BLS.Signature (BLS.blsZero @(BLS.Dual BLS.Curve2)))
+              bs = inf <> good
+           in expectSerdeError
+                (BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve2) bs)
+                BLS.BLSDeserializeIdentityPoint
+    , testProperty "PoP class length corruption (Curve1 compressed)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve1 sk Nothing Nothing
+              bs = BLS.toCompressedBytes pop
+              expected = BLS.compressedLength (Proxy @(BLS.ProofOfPossession BLS.Curve1))
+              shortRes = BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve1) (shorten bs)
+              longRes = BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve1) (lengthen bs)
+           in expectSerdeError shortRes (BLS.BLSDeserializeWrongLength expected (BS.length (shorten bs)))
+                .&&. expectSerdeError longRes (BLS.BLSDeserializeWrongLength expected (BS.length (lengthen bs)))
+    , testProperty "PoP class length corruption (Curve1 uncompressed)" $
+        forAll genSecretKey $ \sk ->
+          let pop = BLS.blsProofOfPossessionProve @BLS.Curve1 sk Nothing Nothing
+              bs = BLS.toUncompressedBytes pop
+              expected = BLS.uncompressedLength (Proxy @(BLS.ProofOfPossession BLS.Curve1))
+              shortRes = BLS.fromUncompressedBytes @(BLS.ProofOfPossession BLS.Curve1) (shorten bs)
+              longRes = BLS.fromUncompressedBytes @(BLS.ProofOfPossession BLS.Curve1) (lengthen bs)
+           in expectSerdeError shortRes (BLS.BLSDeserializeWrongLength expected (BS.length (shorten bs)))
+                .&&. expectSerdeError longRes (BLS.BLSDeserializeWrongLength expected (BS.length (lengthen bs)))
     ]
 
 -- Generators and small helpers used above ------------------------------------
