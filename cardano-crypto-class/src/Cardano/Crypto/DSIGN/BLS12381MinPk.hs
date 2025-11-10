@@ -5,6 +5,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -13,10 +14,13 @@
 -- | BLS12-381 digital signatures (minimal public key size variant).
 module Cardano.Crypto.DSIGN.BLS12381MinPk (
   BLS12381MinPkDSIGN,
+  PoPBLSMinPk,
+  pattern PoPBLSMinPk,
 ) where
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.DSIGN.ProofOfPossession
 import Cardano.Crypto.Seed (getSeedBytes)
 import Cardano.Crypto.Util (SignableRepresentation, getSignableRepresentation)
 import Data.Proxy (Proxy (..))
@@ -36,6 +40,14 @@ data BLS12381MinPkDSIGN
 
 defaultDst :: ByteString
 defaultDst = "BLS_DST_CARDANO_BASE_V1"
+
+type PoPBLSMinPk = PoPDSIGNData BLS12381MinPkDSIGN
+
+pattern PoPBLSMinPk :: BLS.ProofOfPossession BLS.Curve1 -> PoPBLSMinPk
+pattern PoPBLSMinPk pop <- PoPBLSMinPkInternal pop
+  where
+    PoPBLSMinPk pop = PoPBLSMinPkInternal pop
+{-# COMPLETE PoPBLSMinPk #-}
 
 instance DSIGNAlgorithm BLS12381MinPkDSIGN where
   -- DSIGN associated sizes (in bytes)
@@ -164,3 +176,39 @@ instance Show (SigDSIGN BLS12381MinPkDSIGN) where
     "SigBLSMinPk " <> show (BLS.signatureToCompressedBS @BLS.Curve1 sg)
 
 -- NoThunks: handled via the deriving clauses above (we only check WHNF for these FFI-backed values).
+
+instance PoPDSIGN BLS12381MinPkDSIGN where
+  newtype PoPDSIGNData BLS12381MinPkDSIGN = PoPBLSMinPkInternal (BLS.ProofOfPossession BLS.Curve1)
+    deriving stock (Generic)
+    deriving
+      (NoThunks)
+      via OnlyCheckWhnfNamed
+            "PoPDSIGN BLS12381MinPkDSIGN"
+            (PoPDSIGNData BLS12381MinPkDSIGN)
+
+  provePoPDSIGN (mdst, maug) (SignKeyBLSMinPk sk) =
+    let effDst = Just (fromMaybe defaultDst mdst)
+        effAug = Just (fromMaybe mempty maug)
+     in PoPBLSMinPkInternal (BLS.blsProofOfPossessionProve @BLS.Curve1 sk effDst effAug)
+
+  verifyPoPDSIGN (mdst, maug) (VerKeyBLSMinPk vk) (PoPBLSMinPkInternal pop) =
+    let effDst = Just (fromMaybe defaultDst mdst)
+        effAug = Just (fromMaybe mempty maug)
+     in if BLS.blsProofOfPossessionVerify @BLS.Curve1 vk pop effDst effAug
+          then Right ()
+          else Left "verifyPoPDSIGN (BLS minpk): verification failed"
+
+  rawSerialisePoPDSIGN (PoPBLSMinPkInternal pop) = BLS.toCompressedBytes pop
+
+  rawDeserialisePoPDSIGN bs =
+    case BLS.fromCompressedBytes @(BLS.ProofOfPossession BLS.Curve1) bs of
+      Right pop -> Just (PoPBLSMinPkInternal pop)
+      Left _ -> Nothing
+
+instance Eq (PoPDSIGNData BLS12381MinPkDSIGN) where
+  PoPBLSMinPkInternal a == PoPBLSMinPkInternal b =
+    BLS.toCompressedBytes a == BLS.toCompressedBytes b
+
+instance Show (PoPDSIGNData BLS12381MinPkDSIGN) where
+  show (PoPBLSMinPkInternal pop) =
+    "PoPBLSMinPk " <> show (BLS.toCompressedBytes pop)

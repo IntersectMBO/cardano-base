@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -25,6 +26,8 @@ import Test.QuickCheck (
   Gen,
   Property,
   Testable,
+  property,
+  suchThat,
   forAllShow,
   forAllShrinkShow,
   ioProperty,
@@ -37,6 +40,7 @@ import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
+import Data.Bits (xor)
 import Cardano.Crypto.Libsodium
 
 import Text.Show.Pretty (ppShow)
@@ -68,9 +72,9 @@ import Cardano.Crypto.DSIGN (
     rawDeserialiseVerKeyDSIGN,
     rawSerialiseSignKeyDSIGN,
     rawDeserialiseSignKeyDSIGN,
-    rawSerialiseSigDSIGN,
-    rawDeserialiseSigDSIGN
-    ),
+  rawSerialiseSigDSIGN,
+  rawDeserialiseSigDSIGN
+  ),
   sizeVerKeyDSIGN,
   sizeSignKeyDSIGN,
   sizeSigDSIGN,
@@ -91,17 +95,26 @@ import Cardano.Crypto.DSIGN (
   rawSerialiseSignKeyDSIGNM,
   rawDeserialiseSignKeyDSIGNM,
   signDSIGNM,
-  deriveVerKeyDSIGN,
   genKeyDSIGNM,
 
   getSeedDSIGNM,
-  forgetSignKeyDSIGNM
+  forgetSignKeyDSIGNM,
+
+  PoPDSIGN (
+    PoPDSIGNData,
+    provePoPDSIGN,
+    verifyPoPDSIGN,
+    rawSerialisePoPDSIGN,
+    rawDeserialisePoPDSIGN
+    )
   )
-import Cardano.Crypto.DSIGN.BLS12381MinPk (BLS12381MinPkDSIGN)
-import Cardano.Crypto.DSIGN.BLS12381MinSig (BLS12381MinSigDSIGN)
+import Cardano.Crypto.DSIGN.BLS12381MinPk (BLS12381MinPkDSIGN, pattern PoPBLSMinPk)
+import Cardano.Crypto.DSIGN.BLS12381MinSig (BLS12381MinSigDSIGN, pattern PoPBLSMinSig)
+import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
+import NoThunks.Class (NoThunks)
 import Test.Crypto.Util (
   Lock,
   Message (..),
@@ -289,6 +302,169 @@ blsDstAugGroup label _ =
     ctxVote = (Just defaultBlsDst, Just blsAugVote)
     ctxCert = (Just defaultBlsDst, Just blsAugCert)
 
+class PoPCompressedBytes v where
+  popCompressedBytes :: PoPDSIGNData v -> ByteString
+
+instance PoPCompressedBytes BLS12381MinPkDSIGN where
+  popCompressedBytes pop =
+    case pop of
+      PoPBLSMinPk blsPop -> BLS.toCompressedBytes blsPop
+
+instance PoPCompressedBytes BLS12381MinSigDSIGN where
+  popCompressedBytes pop =
+    case pop of
+      PoPBLSMinSig blsPop -> BLS.toCompressedBytes blsPop
+
+mutateBytes :: ByteString -> ByteString
+mutateBytes bs =
+  case BS.uncons bs of
+    Nothing -> bs
+    Just (h, t) -> BS.cons (h `xor` 0x01) t
+
+testPoPDSIGN ::
+  forall v.
+  ( PoPDSIGN v
+  , Eq (SignKeyDSIGN v)
+  , Eq (PoPDSIGNData v)
+  , Show (PoPDSIGNData v)
+  , NoThunks (PoPDSIGNData v)
+  , ContextDSIGN v ~ (Maybe ByteString, Maybe ByteString)
+  , PoPCompressedBytes v
+  ) =>
+  String ->
+  Proxy v ->
+  TestTree
+testPoPDSIGN label _ =
+  testGroup
+    ("PoP " <> label)
+    [ testProperty "prove/verify context equivalence" propContextEquivalence
+    , testProperty "verification fails on wrong dst" propWrongDst
+    , testProperty "verification fails on wrong aug" propWrongAug
+    , testProperty "verification fails with mismatched verification key" propWrongKey
+    , testProperty "verification fails for tampered PoP bytes" propTampered
+    , testProperty "verification fails for random PoP bytes" propRandomPoP
+    , testProperty "raw serialisation round-trip" propRawRoundTrip
+    , testProperty "raw deserialisation rejects truncated bytes" propRejectShort
+    , testProperty "raw deserialisation rejects extended bytes" propRejectLong
+    , testProperty "raw bytes match BLS compressed form" propMatchesBls
+    , testProperty "PoP is NoThunks" propPoPNoThunks
+    ]
+  where
+    ctxDefault = (Nothing, Nothing)
+    ctxExplicitDst = (Just defaultBlsDst, Nothing)
+    ctxExplicitEmptyAug = (Just defaultBlsDst, Just BS.empty)
+    ctxOnlyAug = (Nothing, Just BS.empty)
+    ctxWrongDst = (Just badBlsDst, Just BS.empty)
+    ctxVote = (Just defaultBlsDst, Just blsAugVote)
+    ctxCert = (Just defaultBlsDst, Just blsAugCert)
+
+    propContextEquivalence =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let vk = deriveVerKeyDSIGN sk
+            pop = provePoPDSIGN ctxDefault sk
+            contexts =
+              [ ("Nothing/Nothing", ctxDefault)
+              , ("explicit dst default", ctxExplicitDst)
+              , ("explicit dst with empty aug", ctxExplicitEmptyAug)
+              , ("Nothing dst with empty aug", ctxOnlyAug)
+              ]
+         in conjoin
+              [ counterexample ("context: " <> labelCtx)
+                  (verifyPoPDSIGN ctx vk pop === Right ())
+              | (labelCtx, ctx) <- contexts
+              ]
+
+    propWrongDst =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let vk = deriveVerKeyDSIGN sk
+            pop = provePoPDSIGN ctxExplicitEmptyAug sk
+         in conjoin
+              [ counterexample "control context should verify"
+                  (verifyPoPDSIGN ctxExplicitEmptyAug vk pop === Right ())
+              , counterexample "wrong dst should fail"
+                  (verifyPoPDSIGN ctxWrongDst vk pop =/= Right ())
+              ]
+
+    propWrongAug =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let vk = deriveVerKeyDSIGN sk
+            pop = provePoPDSIGN ctxVote sk
+         in conjoin
+              [ counterexample "control context should verify"
+                  (verifyPoPDSIGN ctxVote vk pop === Right ())
+              , counterexample "wrong aug should fail"
+                  (verifyPoPDSIGN ctxCert vk pop =/= Right ())
+              ]
+
+    propWrongKey =
+      forAllShow genDistinctSignKeys ppShow $ \(skGood, skOther) ->
+        let vkOther = deriveVerKeyDSIGN skOther
+            pop = provePoPDSIGN ctxDefault skGood
+         in counterexample "verification with different key should fail" $
+              verifyPoPDSIGN ctxDefault vkOther pop =/= Right ()
+
+    propTampered =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let vk = deriveVerKeyDSIGN sk
+            pop = provePoPDSIGN ctxDefault sk
+            tamperedBs = mutateBytes (rawSerialisePoPDSIGN pop)
+         in counterexample "tampered bytes should not verify" $
+              case rawDeserialisePoPDSIGN @v tamperedBs of
+                Nothing -> property True
+                Just tamperedPop ->
+                  verifyPoPDSIGN ctxDefault vk tamperedPop =/= Right ()
+
+    propRandomPoP =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let vk = deriveVerKeyDSIGN sk
+            pop = provePoPDSIGN ctxDefault sk
+            len = BS.length (rawSerialisePoPDSIGN pop)
+         in forAllShow (randomPoPBytesOf len) hexBS $ \randomBs ->
+              case rawDeserialisePoPDSIGN @v randomBs of
+                Nothing -> property True
+                Just randomPop ->
+                  verifyPoPDSIGN ctxDefault vk randomPop =/= Right ()
+
+    propRawRoundTrip =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let pop = provePoPDSIGN ctxDefault sk
+            bs = rawSerialisePoPDSIGN pop
+         in counterexample "round-trip failed" $
+              rawDeserialisePoPDSIGN @v bs === Just pop
+
+    propRejectShort =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let pop = provePoPDSIGN ctxDefault sk
+            bs = rawSerialisePoPDSIGN pop
+            shortBs = BS.drop 1 bs
+         in counterexample "short bytes should fail" $
+              rawDeserialisePoPDSIGN @v shortBs === Nothing
+
+    propRejectLong =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let pop = provePoPDSIGN ctxDefault sk
+            bs = rawSerialisePoPDSIGN pop
+            longBs = bs <> BS.singleton 0
+         in counterexample "extended bytes should fail" $
+              rawDeserialisePoPDSIGN @v longBs === Nothing
+
+    propMatchesBls =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        let pop = provePoPDSIGN ctxDefault sk
+         in rawSerialisePoPDSIGN pop === popCompressedBytes pop
+
+    propPoPNoThunks =
+      forAllShow (defaultSignKeyGen @v) ppShow $ \sk ->
+        prop_no_thunks (provePoPDSIGN ctxDefault sk)
+
+    genDistinctSignKeys = do
+      skA <- defaultSignKeyGen @v
+      skB <- suchThat (defaultSignKeyGen @v) (/= skA)
+      pure (skA, skB)
+
+    randomPoPBytesOf n =
+      BS.pack <$> Gen.vectorOf n arbitrary
+
 #ifdef SECP256K1_ENABLED
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
@@ -311,6 +487,9 @@ tests lock =
       , testDSIGNAlgorithm () ed448SigGen (arbitrary @Message) "Ed448DSIGN"
       , testDSIGNAlgorithm (Nothing, Nothing) blsMinPkSigGen (arbitrary @Message) "BLS12381MinPkDSIGN"
       , testDSIGNAlgorithm (Nothing, Nothing) blsMinSigSigGen (arbitrary @Message) "BLS12381MinSigDSIGN"
+      -- Specific tests related only to BLS
+      , testPoPDSIGN "BLS12381MinPkDSIGN" (Proxy @BLS12381MinPkDSIGN)
+      , testPoPDSIGN "BLS12381MinSigDSIGN" (Proxy @BLS12381MinSigDSIGN)
 #ifdef SECP256K1_ENABLED
       , testDSIGNAlgorithm () ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
       , testDSIGNAlgorithm () schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"

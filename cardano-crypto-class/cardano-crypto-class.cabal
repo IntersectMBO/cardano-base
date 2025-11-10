@@ -55,6 +55,7 @@ library
     Cardano.Crypto.DSIGN.Ed448
     Cardano.Crypto.DSIGN.Mock
     Cardano.Crypto.DSIGN.NeverUsed
+    Cardano.Crypto.DSIGN.ProofOfPossession
     Cardano.Crypto.DirectSerialise
     Cardano.Crypto.EllipticCurve.BLS12_381
     Cardano.Crypto.EllipticCurve.BLS12_381.Internal
