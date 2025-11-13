@@ -206,6 +206,12 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsSignatureVerify,
   blsProofOfPossessionProve,
   blsProofOfPossessionVerify,
+
+  -- * Aggregation helpers
+  blsAggregatePublicKeys,
+  blsAggregateSignatures,
+  blsAggregateVerifyFast,
+  blsAggregateVerifyDistinct,
 )
 where
 
@@ -217,6 +223,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
 import Data.Foldable (foldrM)
+import Data.List (foldl')
 import Data.Proxy (Proxy (..))
 import Data.Void
 import Foreign (Storable (..), poke, sizeOf)
@@ -1472,6 +1479,8 @@ blsSignatureVerify (PublicKey pk) msg (Signature sig) dst aug =
   -- e(sig, g2) == e(H(msg),pk) depending on the curve choice for pk/sig.
   finalVerifyPairs @curve (blsGenerator, sig) (pk, blsHash msg dst aug)
 
+---- Proof of possession operations
+
 blsProofOfPossessionProve ::
   forall curve.
   (BLS curve, BLS (Dual curve)) =>
@@ -1500,6 +1509,87 @@ blsProofOfPossessionVerify (PublicKey pk) (ProofOfPossession mu1 mu2) dst aug =
   finalVerifyPairs @curve (blsGenerator, mu1) (pk, blsHash ("PoP" <> blsCompress pk) dst aug)
     && finalVerifyPairs @curve (pk, blsGenerator) (blsGenerator, mu2)
 
+---- Aggregation helpers
+
+-- | Aggregate a non-empty list of public keys by group addition.
+-- Returns 'Left BLST_BAD_ENCODING' on empty input.
+blsAggregatePublicKeys ::
+  forall curve. BLS curve => [PublicKey curve] -> Either BLSTError (PublicKey curve)
+blsAggregatePublicKeys [] = Left BLST_BAD_ENCODING
+blsAggregatePublicKeys (PublicKey pk0 : rest) =
+  Right . PublicKey $
+    foldl' combine pk0 rest
+  where
+    combine :: Point curve -> PublicKey curve -> Point curve
+    combine acc (PublicKey pk) = blsAddOrDouble acc pk
+
+-- | Aggregate a non-empty list of signatures by group addition.
+-- Returns 'Left BLST_BAD_ENCODING' on empty input.
+blsAggregateSignatures ::
+  forall curve.
+  BLS (Dual curve) =>
+  [Signature curve] ->
+  Either BLSTError (Signature curve)
+blsAggregateSignatures [] = Left BLST_BAD_ENCODING
+blsAggregateSignatures (Signature sig0 : rest) =
+  Right . Signature $
+    foldl' combine sig0 rest
+  where
+    combine :: Point (Dual curve) -> Signature curve -> Point (Dual curve)
+    combine acc (Signature sig) = blsAddOrDouble acc sig
+
+-- | Verify an aggregated signature for signers of the same message by
+-- aggregating the public keys and delegating to 'blsSignatureVerify'.
+blsAggregateVerifyFast ::
+  forall curve.
+  FinalVerifyOrder curve =>
+  [PublicKey curve] ->
+  ByteString ->
+  Signature curve ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Either BLSTError Bool
+blsAggregateVerifyFast [] _ _ _ _ = Left BLST_BAD_ENCODING
+blsAggregateVerifyFast pks msg sig dst aug = do
+  aggregatedPk <- blsAggregatePublicKeys @curve pks
+  pure $ blsSignatureVerify aggregatedPk msg sig dst aug
+
+-- | Verify an aggregated signature for distinct messages by computing the
+-- multi-message pairing equation explicitly: we build the product of pairings
+-- via 'millerSide' and 'ptMult' and finalize once with 'ptFinalVerify'.
+blsAggregateVerifyDistinct ::
+  forall curve.
+  FinalVerifyOrder curve =>
+  [(PublicKey curve, ByteString)] ->
+  Signature curve ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Either BLSTError Bool
+blsAggregateVerifyDistinct [] _ _ _ = Left BLST_BAD_ENCODING
+blsAggregateVerifyDistinct pairs sig dst aug =
+  Right $
+    verifyDistinct pairs sig dst aug
+  where
+    verifyDistinct ::
+      [(PublicKey curve, ByteString)] ->
+      Signature curve ->
+      Maybe ByteString ->
+      Maybe ByteString ->
+      Bool
+    verifyDistinct ((PublicKey pk0, msg0) : rest) (Signature sigPoint) dst' aug' =
+      let lhs = millerSide @curve (blsGenerator, sigPoint)
+          rhs0 = millerSide @curve (pk0, blsHash msg0 dst' aug')
+          rhs =
+            foldl'
+              ( \acc (PublicKey pk', msg') ->
+                  ptMult acc (millerSide @curve (pk', blsHash msg' dst' aug'))
+              )
+              rhs0
+              rest
+       in ptFinalVerify lhs rhs
+    verifyDistinct [] _ _ _ = False -- unreachable due to outer guard
+
+---- Miscellaneous utilities
 withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)
 withMaybeCStringLen (Just bs) go = BSU.unsafeUseAsCStringLen bs go
