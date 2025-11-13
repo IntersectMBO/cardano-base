@@ -71,6 +71,7 @@ library
     Bench.Crypto.KES
     Bench.Crypto.VRF
     Test.Crypto.AllocLog
+    Test.Crypto.BLSCoreVerify
     Test.Crypto.DSIGN
     Test.Crypto.EllipticCurve
     Test.Crypto.EqST
@@ -82,6 +83,7 @@ library
     Test.Crypto.Util
     Test.Crypto.VRF
     Test.Crypto.Vector.SerializationUtils
+    Bench.Crypto.BLS
 
   build-depends:
     QuickCheck,
@@ -135,6 +137,19 @@ test-suite test-crypto
     -threaded
     -rtsopts
     -with-rtsopts=-N
+
+test-suite test-bls-core
+  import: base, project-config
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: BLSCoreVerifyMain.hs
+  other-modules: Paths_cardano_crypto_tests
+  build-depends:
+    base,
+    cardano-crypto-tests,
+    tasty
+  ghc-options:
+    -threaded
 
 benchmark bench-crypto
   import: base, project-config

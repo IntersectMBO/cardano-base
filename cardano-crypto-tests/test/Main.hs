@@ -4,6 +4,7 @@
 module Main (main) where
 
 import qualified Test.Crypto.DSIGN
+import qualified Test.Crypto.BLSCoreVerify
 import qualified Test.Crypto.Hash
 import qualified Test.Crypto.KES
 import qualified Test.Crypto.VRF
@@ -36,6 +37,7 @@ tests mlockLock =
   adjustOption (\(QuickCheckTests i) -> QuickCheckTests $ max i 1000) .
     testGroup "cardano-crypto-class" $
       [ Test.Crypto.DSIGN.tests mlockLock
+      , Test.Crypto.BLSCoreVerify.tests
       , Test.Crypto.Hash.tests mlockLock
       , Test.Crypto.KES.tests mlockLock
       , Test.Crypto.VRF.tests

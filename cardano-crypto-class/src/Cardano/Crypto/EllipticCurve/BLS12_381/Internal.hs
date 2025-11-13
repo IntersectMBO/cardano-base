@@ -54,6 +54,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Signature (..),
   Dual,
   FinalVerifyOrder,
+  CoreVerifyOrder,
   PairingSide,
   ProofOfPossession (..),
   Fr (..),
@@ -204,6 +205,9 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsSkToPk,
   blsSign,
   blsSignatureVerify,
+  blsSignatureVerifyCore,
+  blsSignatureVerifyPairingAffine,
+  blsSignatureVerifyCoreAffine,
   blsProofOfPossessionProve,
   blsProofOfPossessionVerify,
 )
@@ -933,6 +937,32 @@ foreign import ccall "blst_sk_to_pk_in_g2"
 foreign import ccall "blst_sign_pk_in_g2"
   c_blst_sign_pk_in_g2 :: Point1Ptr -> Point1Ptr -> ScalarPtr -> IO ()
 
+foreign import ccall "blst_core_verify_pk_in_g1"
+  c_blst_core_verify_pk_in_g1 ::
+    Affine1Ptr ->
+    Affine2Ptr ->
+    Bool ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    IO CInt
+
+foreign import ccall "blst_core_verify_pk_in_g2"
+  c_blst_core_verify_pk_in_g2 ::
+    Affine2Ptr ->
+    Affine1Ptr ->
+    Bool ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    IO CInt
+
 ---- Raw BLST error constants
 
 foreign import ccall "blst_success" c_blst_success :: CInt
@@ -1398,6 +1428,35 @@ instance FinalVerifyOrder Curve2 where
   -- Curve2: miller loop expects (g1, g2) but our Pair is (g2, g1)
   millerSide (g2, g1) = millerLoop g1 g2
 
+-- | Curve-specific selection of the appropriate BLST core verifier.
+-- We always pass 'True' for @hash_or_encode@, meaning the message is hashed to
+-- the curve (the ciphersuite's hash_to_curve path) just like 'blsHash'.
+class FinalVerifyOrder curve => CoreVerifyOrder curve where
+  coreVerify ::
+    Affine curve ->
+    Affine (Dual curve) ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    IO CInt
+
+instance CoreVerifyOrder Curve1 where
+  coreVerify pk sig msgPtr msgLen dstPtr dstLen augPtr augLen =
+    withAffine pk $ \pkPtr ->
+      withAffine sig $ \sigPtr ->
+        c_blst_core_verify_pk_in_g1 pkPtr sigPtr True msgPtr msgLen dstPtr dstLen augPtr augLen
+  {-# INLINE coreVerify #-}
+
+instance CoreVerifyOrder Curve2 where
+  coreVerify pk sig msgPtr msgLen dstPtr dstLen augPtr augLen =
+    withAffine pk $ \pkPtr ->
+      withAffine sig $ \sigPtr ->
+        c_blst_core_verify_pk_in_g2 pkPtr sigPtr True msgPtr msgLen dstPtr dstLen augPtr augLen
+  {-# INLINE coreVerify #-}
+
 ---- BLS signatures operations
 
 -- Following the rust bindings as per this reference:
@@ -1457,20 +1516,89 @@ blsSign _ (SecretKey sk) msg dst aug = Signature . unsafePerformIO $
             withScalar sk $ \skPtr ->
               c_blst_sign (Proxy @curve) sigPtr hPtr skPtr
 
--- | Verify a BLS signature via the naive way.
 blsSignatureVerify ::
   forall curve.
   FinalVerifyOrder curve =>
-  PublicKey curve -> -- pk on curve
-  ByteString -> -- msg
-  Signature curve -> -- sig on dual curve
-  Maybe ByteString -> -- domain separation tag (for protocol separation)
-  Maybe ByteString -> -- augmentation (per message augmentation)
+  PublicKey curve -> -- ^ Verification key on the curve for this variant.
+  ByteString -> -- ^ Message bytes that were signed (after 'Signable' conversion upstream).
+  Signature curve -> -- ^ Signature point on the dual curve (G1/G2 swapped as per variant).
+  Maybe ByteString -> -- ^ Optional domain-separation tag; 'Nothing' defaults to the Cardano DST.
+  Maybe ByteString -> -- ^ Optional per-message augmentation; 'Nothing' is treated as the empty string.
   Bool
 blsSignatureVerify (PublicKey pk) msg (Signature sig) dst aug =
+  blsSignatureVerifyPairingAffine
+    (toAffine pk)
+    (toAffine sig)
+    msg
+    dst
+    aug
+
+-- | Benchmark helper that assumes affine inputs (no internal conversion).
+blsSignatureVerifyPairingAffine ::
+  forall curve.
+  FinalVerifyOrder curve =>
+  Affine curve ->
+  Affine (Dual curve) ->
+  ByteString ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Bool
+blsSignatureVerifyPairingAffine pkAffine sigAffine msg dst aug =
   -- here we check that e(g1, sig) == e(pk, H(msg)) or equivalently
   -- e(sig, g2) == e(H(msg),pk) depending on the curve choice for pk/sig.
-  finalVerifyPairs @curve (blsGenerator, sig) (pk, blsHash msg dst aug)
+  finalVerifyPairs @curve
+    (blsGenerator, fromAffine sigAffine)
+    (fromAffine pkAffine, blsHash msg dst aug)
+
+-- | Verify via the one-shot BLST core verifier.
+--
+-- This function does not alter the context; the caller (DSIGN layer) is
+-- responsible for applying defaults so we can compare against the pairing
+-- implementation byte-for-byte.
+blsSignatureVerifyCore ::
+  forall curve.
+  CoreVerifyOrder curve =>
+  PublicKey curve -> -- ^ Verification key on the curve for this variant.
+  ByteString -> -- ^ Message bytes to verify.
+  Signature curve -> -- ^ Signature point on the dual curve (G1/G2 swapped as per variant).
+  Maybe ByteString -> -- ^ Optional domain-separation tag; 'Nothing' defaults to the Cardano DST.
+  Maybe ByteString -> -- ^ Optional per-message augmentation; 'Nothing' is treated as the empty string.
+  Bool
+blsSignatureVerifyCore (PublicKey pk) msg (Signature sig) dst aug =
+  blsSignatureVerifyCoreAffine
+    (toAffine pk)
+    (toAffine sig)
+    msg
+    dst
+    aug
+
+-- | Benchmark helper that assumes affine inputs (no internal conversion).
+blsSignatureVerifyCoreAffine ::
+  forall curve.
+  CoreVerifyOrder curve =>
+  Affine curve ->
+  Affine (Dual curve) ->
+  ByteString ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Bool
+blsSignatureVerifyCoreAffine pkAffine sigAffine msg dst aug =
+  unsafePerformIO $
+    BSU.unsafeUseAsCStringLen msg $ \(msgPtr, msgLen) ->
+      withMaybeCStringLen dst $ \(dstPtr, dstLen) ->
+        withMaybeCStringLen aug $ \(augPtr, augLen) -> do
+          res <-
+            coreVerify @curve
+              pkAffine
+              sigAffine
+              msgPtr
+              (fromIntegral msgLen)
+              dstPtr
+              (fromIntegral dstLen)
+              augPtr
+              (fromIntegral augLen)
+          pure (res == c_blst_success)
+{-# INLINE blsSignatureVerifyCore #-}
 
 blsProofOfPossessionProve ::
   forall curve.
