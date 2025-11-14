@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -17,14 +18,20 @@ module Cardano.Crypto.DSIGN.BLS12381MinPk (
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.DSIGN.Class
+import Cardano.Crypto.PinnedSizedBytes (
+  PinnedSizedBytes,
+  psbFromByteStringCheck,
+  psbToByteString,
+ )
 import Cardano.Crypto.Seed (getSeedBytes)
 import Cardano.Crypto.Util (SignableRepresentation, getSignableRepresentation)
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
-
+import GHC.TypeLits (KnownNat, Nat)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import Data.Maybe (fromMaybe)
 
 -- Our internal BLS implementation
@@ -36,6 +43,10 @@ data BLS12381MinPkDSIGN
 
 defaultDst :: ByteString
 defaultDst = "BLS_DST_CARDANO_BASE_V1"
+
+type BlsSecretKeyBytes = 32 :: Nat
+type BlsMinPkVerKeyBytes = 48 :: Nat
+type BlsMinPkSigBytes = 96 :: Nat
 
 instance DSIGNAlgorithm BLS12381MinPkDSIGN where
   -- DSIGN associated sizes (in bytes)
@@ -49,65 +60,83 @@ instance DSIGNAlgorithm BLS12381MinPkDSIGN where
   type ContextDSIGN BLS12381MinPkDSIGN = (Maybe ByteString, Maybe ByteString)
 
   -- Concrete DSIGN key/sig representations
-  newtype VerKeyDSIGN BLS12381MinPkDSIGN = VerKeyBLSMinPk (BLS.PublicKey BLS.Curve1)
+  newtype VerKeyDSIGN BLS12381MinPkDSIGN
+    = VerKeyBLSMinPk (PinnedSizedBytes BlsMinPkVerKeyBytes)
     deriving stock (Generic)
+    deriving newtype (Eq, Show)
     deriving
       (NoThunks)
       via OnlyCheckWhnfNamed
             "VerKeyDSIGN BLS12381MinPkDSIGN"
             (VerKeyDSIGN BLS12381MinPkDSIGN)
-  newtype SignKeyDSIGN BLS12381MinPkDSIGN = SignKeyBLSMinPk BLS.SecretKey
+  newtype SignKeyDSIGN BLS12381MinPkDSIGN
+    = SignKeyBLSMinPk (PinnedSizedBytes BlsSecretKeyBytes)
     deriving stock (Generic)
+    deriving newtype (Eq, Show)
     deriving
       (NoThunks)
       via OnlyCheckWhnfNamed
             "SignKeyDSIGN BLS12381MinPkDSIGN"
             (SignKeyDSIGN BLS12381MinPkDSIGN)
-  newtype SigDSIGN BLS12381MinPkDSIGN = SigBLSMinPk (BLS.Signature BLS.Curve1)
+  newtype SigDSIGN BLS12381MinPkDSIGN
+    = SigBLSMinPk (PinnedSizedBytes BlsMinPkSigBytes)
     deriving stock (Generic)
+    deriving newtype (Eq, Show)
     deriving
       (NoThunks)
       via OnlyCheckWhnfNamed
             "SigDSIGN BLS12381MinPkDSIGN"
             (SigDSIGN BLS12381MinPkDSIGN)
 
-  -- Note: BLS.Signature Curve1 lives on Dual Curve1 == Curve2 (G2), as intended.
   algorithmNameDSIGN _ = "bls12-381-minpk"
 
-  -- Raw serialization (canonical encodings, exact sizes)
-  rawSerialiseVerKeyDSIGN (VerKeyBLSMinPk pk) = BLS.publicKeyToCompressedBS pk
-  rawSerialiseSignKeyDSIGN (SignKeyBLSMinPk sk) = BLS.secretKeyToBS sk
-  rawSerialiseSigDSIGN (SigBLSMinPk sg) = BLS.signatureToCompressedBS @BLS.Curve1 sg
+  rawSerialiseVerKeyDSIGN (VerKeyBLSMinPk vk) = psbToByteString vk
+  rawSerialiseSignKeyDSIGN (SignKeyBLSMinPk sk) = psbToByteString sk
+  rawSerialiseSigDSIGN (SigBLSMinPk sig) = psbToByteString sig
 
-  rawDeserialiseVerKeyDSIGN bs =
-    VerKeyBLSMinPk <$> either (const Nothing) Just (BLS.publicKeyFromCompressedBS @BLS.Curve1 bs)
+  rawDeserialiseVerKeyDSIGN bs = do
+    _ <- either (const Nothing) Just (BLS.publicKeyFromCompressedBS @BLS.Curve1 bs)
+    VerKeyBLSMinPk <$> psbFromByteStringCheck bs
 
   rawDeserialiseSignKeyDSIGN bs =
-    SignKeyBLSMinPk <$> either (const Nothing) Just (BLS.secretKeyFromBS bs)
+    SignKeyBLSMinPk <$> psbFromByteStringCheck bs
 
-  rawDeserialiseSigDSIGN bs =
-    SigBLSMinPk <$> either (const Nothing) Just (BLS.signatureFromCompressedBS @BLS.Curve1 bs)
+  rawDeserialiseSigDSIGN bs = do
+    _ <- either (const Nothing) Just (BLS.signatureFromCompressedBS @BLS.Curve1 bs)
+    SigBLSMinPk <$> psbFromByteStringCheck bs
 
-  deriveVerKeyDSIGN (SignKeyBLSMinPk sk) = VerKeyBLSMinPk (BLS.blsSkToPk @BLS.Curve1 sk)
+  deriveVerKeyDSIGN sk =
+    let blsSk = expectSecretKey "deriveVerKeyDSIGN" sk
+        vk = BLS.blsSkToPk @BLS.Curve1 blsSk
+     in VerKeyBLSMinPk (bytesToPinned "deriveVerKeyDSIGN" (BLS.publicKeyToCompressedBS vk))
 
-  signDSIGN (mdst, maug) a (SignKeyBLSMinPk sk) =
+  signDSIGN (mdst, maug) a skBytes =
     let msg = getSignableRepresentation a
         effDst = Just (fromMaybe defaultDst mdst)
         effAug = Just (fromMaybe mempty maug)
-     in SigBLSMinPk (BLS.blsSign @BLS.Curve1 Proxy sk msg effDst effAug)
+        blsSk = expectSecretKey "signDSIGN" skBytes
+        sig = BLS.blsSign @BLS.Curve1 Proxy blsSk msg effDst effAug
+     in SigBLSMinPk (bytesToPinned "signDSIGN" (BLS.signatureToCompressedBS @BLS.Curve1 sig))
 
-  verifyDSIGN (mdst, maug) (VerKeyBLSMinPk vk) a (SigBLSMinPk sig) =
+  verifyDSIGN (mdst, maug) vkBytes a sigBytes =
     let msg = getSignableRepresentation a
         effDst = Just (fromMaybe defaultDst mdst)
         effAug = Just (fromMaybe mempty maug)
-     in if BLS.blsSignatureVerify @BLS.Curve1 vk msg sig effDst effAug
-          then Right ()
-          else Left "verifyDSIGN (BLS minpk): verification failed"
+     in case ( decodeVerKeyBytes vkBytes
+             , decodeSignatureBytes sigBytes
+             ) of
+          (Right vk, Right sig) ->
+            if BLS.blsSignatureVerify @BLS.Curve1 vk msg sig effDst effAug
+              then Right ()
+              else Left "verifyDSIGN (BLS minpk): verification failed"
+          (Left _, _) -> Left "verifyDSIGN (BLS minpk): invalid verification key"
+          (_, Left _) -> Left "verifyDSIGN (BLS minpk): invalid signature"
 
   genKeyDSIGN seed =
     case BLS.blsKeyGen (getSeedBytes seed) Nothing of
       Left _ -> error "genKeyDSIGN (BLS minpk): invalid seed (needs >=32 bytes)"
-      Right sk -> SignKeyBLSMinPk sk
+      Right sk ->
+        SignKeyBLSMinPk (bytesToPinned "genKeyDSIGN" (BLS.secretKeyToBS sk))
 
 -- CBOR instances (delegating to the shared helpers; includes size checks)
 instance ToCBOR (VerKeyDSIGN BLS12381MinPkDSIGN) where
@@ -131,30 +160,36 @@ instance ToCBOR (SigDSIGN BLS12381MinPkDSIGN) where
 instance FromCBOR (SigDSIGN BLS12381MinPkDSIGN) where
   fromCBOR = decodeSigDSIGN
 
--- Eq via canonical encodings
-instance Eq (VerKeyDSIGN BLS12381MinPkDSIGN) where
-  VerKeyBLSMinPk a == VerKeyBLSMinPk b =
-    BLS.publicKeyToCompressedBS a == BLS.publicKeyToCompressedBS b
+expectSecretKey ::
+  String ->
+  SignKeyDSIGN BLS12381MinPkDSIGN ->
+  BLS.SecretKey
+expectSecretKey ctx (SignKeyBLSMinPk psb) =
+  case BLS.secretKeyFromBS (psbToByteString psb) of
+    Right sk -> sk
+    Left err ->
+      error $
+        ctx <> ": invalid secret key encoding (" <> show err <> ")"
 
-instance Eq (SignKeyDSIGN BLS12381MinPkDSIGN) where
-  SignKeyBLSMinPk a == SignKeyBLSMinPk b =
-    BLS.secretKeyToBS a == BLS.secretKeyToBS b
+decodeVerKeyBytes ::
+  VerKeyDSIGN BLS12381MinPkDSIGN ->
+  Either BLS.BLSTError (BLS.PublicKey BLS.Curve1)
+decodeVerKeyBytes (VerKeyBLSMinPk psb) =
+  BLS.publicKeyFromCompressedBS @BLS.Curve1 (psbToByteString psb)
 
-instance Eq (SigDSIGN BLS12381MinPkDSIGN) where
-  SigBLSMinPk a == SigBLSMinPk b =
-    BLS.signatureToCompressedBS @BLS.Curve1 a == BLS.signatureToCompressedBS @BLS.Curve1 b
+decodeSignatureBytes ::
+  SigDSIGN BLS12381MinPkDSIGN ->
+  Either BLS.BLSTError (BLS.Signature BLS.Curve1)
+decodeSignatureBytes (SigBLSMinPk psb) =
+  BLS.signatureFromCompressedBS @BLS.Curve1 (psbToByteString psb)
 
--- Show via canonical encodings (ByteString's Show instance)
-instance Show (VerKeyDSIGN BLS12381MinPkDSIGN) where
-  show (VerKeyBLSMinPk vk) =
-    "VerKeyBLSMinPk " <> show (BLS.publicKeyToCompressedBS vk)
-
-instance Show (SignKeyDSIGN BLS12381MinPkDSIGN) where
-  show (SignKeyBLSMinPk sk) =
-    "SignKeyBLSMinPk " <> show (BLS.secretKeyToBS sk)
-
-instance Show (SigDSIGN BLS12381MinPkDSIGN) where
-  show (SigBLSMinPk sg) =
-    "SigBLSMinPk " <> show (BLS.signatureToCompressedBS @BLS.Curve1 sg)
-
--- NoThunks: handled via the deriving clauses above (we only check WHNF for these FFI-backed values).
+bytesToPinned ::
+  forall n.
+  KnownNat n =>
+  String ->
+  ByteString ->
+  PinnedSizedBytes n
+bytesToPinned ctx bs =
+  fromMaybe
+    (error (ctx <> ": unexpected byte length " <> show (BS.length bs)))
+    (psbFromByteStringCheck bs)
