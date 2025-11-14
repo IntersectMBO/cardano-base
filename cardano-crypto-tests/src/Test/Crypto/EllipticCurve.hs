@@ -13,6 +13,9 @@ import Paths_cardano_crypto_tests
 
 import Test.Crypto.Util (Message (..), eitherShowError)
 
+import qualified Codec.CBOR.Read as CBOR
+
+import Cardano.Binary (serialize')
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Cardano.Crypto.Hash (SHA256, digest)
@@ -21,6 +24,7 @@ import Data.Bits (shiftL)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Foldable as F (foldl')
 import Data.Proxy (Proxy (..))
 import System.IO.Unsafe (unsafePerformIO)
@@ -33,6 +37,7 @@ import Test.QuickCheck (
   chooseAny,
   counterexample,
   forAll,
+  generate,
   oneof,
   property,
   suchThat,
@@ -42,7 +47,7 @@ import Test.QuickCheck (
   (==>),
  )
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
+import Test.Tasty.HUnit (assertBool, assertEqual, assertFailure, testCase)
 import Test.Tasty.QuickCheck (frequency, testProperty)
 
 tests :: TestTree
@@ -58,7 +63,7 @@ tests =
         , testPT "PT"
         , testPairing "Pairing"
         , testVectors "Vectors"
-        , testBlsSerDeHelpers "Serialization helpers"
+        , testBlsSerializationHelpers "Serialization helpers"
         , testBlsKeyGenIKM "BLS KeyGen / IKM"
         , testBlsSignature "BLS Signature Curve 1" (Proxy @BLS.Curve1)
         , testBlsSignature "BLS Signature Curve 2" (Proxy @BLS.Curve2)
@@ -431,18 +436,18 @@ testVectorLargeDst name =
       hashedMsg
       expected_output
 
--- Low-level serialization helpers round-trips & guards (Internal.hs)
+-- Low-level serialization helpers: ensure canonical encodings behave as expected.
 -- This validates secret/public key & signature byte encodings before DSIGN wiring.
 
-testBlsSerDeHelpers :: String -> TestTree
-testBlsSerDeHelpers name =
+testBlsSerializationHelpers :: String -> TestTree
+testBlsSerializationHelpers name =
   testGroup
     name
     [ -- Secret keys -----------------------------------------------------------
-      testProperty "SecretKey bytes round-trip" $
+      testProperty "SecretKey canonical raw serialization" $
         forAll genSecretKey $
-          propRoundTripBytes BLS.secretKeyToBS BLS.secretKeyFromBS
-    , testProperty "SecretKey rejects bad length" $
+          propSerializationCanonical BLS.secretKeyToBS BLS.secretKeyFromBS
+    , testProperty "SecretKey serialization rejects bad length" $
         forAll genSecretKey $ \sk ->
           let bs = BLS.secretKeyToBS sk
               res =
@@ -452,22 +457,22 @@ testBlsSerDeHelpers name =
            in case res of
                 (a, b) -> isBadScalar a && isBadScalar b
     , -- Public keys -----------------------------------------------------------
-      testProperty "PublicKey compressed round-trip (Curve1)" $
+      testProperty "PublicKey compressed canonical serialization (Curve1)" $
         forAll genSecretKey $ \sk ->
           let pk = BLS.blsSkToPk @BLS.Curve1 sk
               bs = BLS.publicKeyToCompressedBS pk
            in (fmap (BLS.publicKeyToCompressedBS) (BLS.publicKeyFromCompressedBS @BLS.Curve1 bs)) === Right bs
-    , testProperty "PublicKey compressed round-trip (Curve2)" $
+    , testProperty "PublicKey compressed canonical serialization (Curve2)" $
         forAll genSecretKey $ \sk ->
           let pk = BLS.blsSkToPk @BLS.Curve2 sk
               bs = BLS.publicKeyToCompressedBS pk
            in (fmap (BLS.publicKeyToCompressedBS) (BLS.publicKeyFromCompressedBS @BLS.Curve2 bs)) === Right bs
-    , testProperty "PublicKey uncompressed round-trip (Curve1)" $
+    , testProperty "PublicKey uncompressed canonical serialization (Curve1)" $
         forAll genSecretKey $ \sk ->
           let pk = BLS.blsSkToPk @BLS.Curve1 sk
               bs = BLS.publicKeyToUncompressedBS pk
            in (fmap (BLS.publicKeyToUncompressedBS) (BLS.publicKeyFromUncompressedBS @BLS.Curve1 bs)) === Right bs
-    , testProperty "PublicKey uncompressed round-trip (Curve2)" $
+    , testProperty "PublicKey uncompressed canonical serialization (Curve2)" $
         forAll genSecretKey $ \sk ->
           let pk = BLS.blsSkToPk @BLS.Curve2 sk
               bs = BLS.publicKeyToUncompressedBS pk
@@ -502,7 +507,7 @@ testBlsSerDeHelpers name =
           let bs = BLS.publicKeyToCompressedBS (BLS.blsSkToPk @BLS.Curve1 sk)
               res = BLS.publicKeyFromCompressedBS @BLS.Curve2 bs
            in expectError res BLS.BLST_BAD_ENCODING
-    , testProperty "PublicKey length corruption is rejected (Curve1 compressed)" $
+    , testProperty "PublicKey length corruption is rejected (Curve1 compressed serialization)" $
         forAll genSecretKey $ \sk ->
           let pk = BLS.blsSkToPk @BLS.Curve1 sk
               bs = BLS.publicKeyToCompressedBS pk
@@ -512,13 +517,13 @@ testBlsSerDeHelpers name =
                 )
            in bothBadEncoding res
     , -- Signatures ------------------------------------------------------------
-      testProperty "Signature compressed round-trip (Curve1 sigs live on Curve2)" $
+      testProperty "Signature compressed canonical serialization (Curve1 sigs live on Curve2)" $
         forAll genSecretKey $ \sk ->
           let sig = BLS.blsSign @BLS.Curve1 Proxy sk "hello" Nothing Nothing
               bs = BLS.signatureToCompressedBS @BLS.Curve1 sig
            in (fmap (BLS.signatureToCompressedBS @BLS.Curve1) (BLS.signatureFromCompressedBS @BLS.Curve1 bs))
                 === Right bs
-    , testProperty "Signature uncompressed round-trip (Curve2 sigs live on Curve1)" $
+    , testProperty "Signature uncompressed canonical serialization (Curve2 sigs live on Curve1)" $
         forAll genSecretKey $ \sk ->
           let sig = BLS.blsSign @BLS.Curve2 Proxy sk "world" Nothing Nothing
               bs = BLS.signatureToUncompressedBS @BLS.Curve2 sig
@@ -556,7 +561,7 @@ testBlsSerDeHelpers name =
               bs = BLS.signatureToCompressedBS @BLS.Curve1 sig
               res = BLS.signatureFromCompressedBS @BLS.Curve2 bs
            in expectError res BLS.BLST_BAD_ENCODING
-    , testProperty "Signature length corruption is rejected (Curve2 compressed)" $
+    , testProperty "Signature length corruption is rejected (Curve2 compressed serialization)" $
         forAll genSecretKey $ \sk ->
           let sig = BLS.blsSign @BLS.Curve2 Proxy sk "!" Nothing Nothing
               bs = BLS.signatureToCompressedBS @BLS.Curve2 sig
@@ -580,6 +585,81 @@ genSecretKey = do
   case BLS.blsKeyGen ikm Nothing of
     Right sk -> pure sk
     Left _ -> genSecretKey
+
+propPopCborSerialization ::
+  forall curve.
+  BLS.FinalVerifyOrder curve =>
+  Proxy curve ->
+  Property
+propPopCborSerialization _ =
+  forAll genSecretKey $ \sk ->
+    let pop = BLS.blsProofOfPossessionProve @curve sk Nothing Nothing
+        encoded = encodePopBytes @curve pop
+     in case decodePopBytes @curve encoded of
+          Right decoded -> decoded === pop
+          Left err ->
+            counterexample
+              ("ProofOfPossession CBOR decode failed: " <> show err)
+              False
+
+popCborRejectWrongLength ::
+  forall curve.
+  BLS.FinalVerifyOrder curve =>
+  Proxy curve ->
+  IO ()
+popCborRejectWrongLength _ = do
+  sk <- sampleSecretKeyIO
+  let pop = BLS.blsProofOfPossessionProve @curve sk Nothing Nothing
+      encoded = encodePopBytes @curve pop
+      tampered =
+        case BS.uncons encoded of
+          Nothing -> encoded
+          Just (tag, rest) ->
+            let newTag =
+                  case tag of
+                    0x82 -> 0x81
+                    _ -> tag
+             in BS.cons newTag rest
+  case decodePopBytes @curve tampered of
+    Left _ -> pure ()
+    Right _ ->
+      assertFailure "ProofOfPossession CBOR decoding should fail for wrong list length"
+
+popCborRejectCorruptedBytes ::
+  forall curve.
+  BLS.FinalVerifyOrder curve =>
+  Proxy curve ->
+  IO ()
+popCborRejectCorruptedBytes _ = do
+  sk <- sampleSecretKeyIO
+  let pop = BLS.blsProofOfPossessionProve @curve sk Nothing Nothing
+      encoded = encodePopBytes @curve pop
+      tampered = shorten encoded
+  case decodePopBytes @curve tampered of
+    Left _ -> pure ()
+    Right _ ->
+      assertFailure "ProofOfPossession CBOR decoding should fail for truncated data"
+
+encodePopBytes ::
+  forall curve.
+  BLS.FinalVerifyOrder curve =>
+  BLS.ProofOfPossession curve ->
+  BS.ByteString
+encodePopBytes =
+  serialize' . BLS.encodeProofOfPossession @curve
+
+decodePopBytes ::
+  forall curve.
+  BLS.FinalVerifyOrder curve =>
+  BS.ByteString ->
+  Either CBOR.DeserialiseFailure (BLS.ProofOfPossession curve)
+decodePopBytes =
+  fmap snd
+    . CBOR.deserialiseFromBytes (BLS.decodeProofOfPossession @curve)
+    . BSL.fromStrict
+
+sampleSecretKeyIO :: IO BLS.SecretKey
+sampleSecretKeyIO = generate genSecretKey
 
 shorten :: BS.ByteString -> BS.ByteString
 shorten bs
@@ -606,14 +686,14 @@ expectError result expected =
     Right _ ->
       counterexample ("expected " ++ show expected ++ ", got successful decode") (property False)
 
--- Property helper: round-trip via bytes (to keep tests concise)
-propRoundTripBytes ::
+-- Property helper: canonical serialization via bytes (to keep tests concise)
+propSerializationCanonical ::
   (Eq e, Show e) =>
   (a -> BS.ByteString) ->
   (BS.ByteString -> Either e a) ->
   a ->
   Property
-propRoundTripBytes toBS fromBS x =
+propSerializationCanonical toBS fromBS x =
   Right (toBS x) === fmap toBS (fromBS (toBS x))
 
 isBadScalar :: Either BLS.BLSTError a -> Bool
@@ -822,6 +902,13 @@ testBlsPoP name _ =
   testGroup
     name
     [ testProperty
+        "CBOR serialization"
+        (propPopCborSerialization (Proxy @curve))
+    , testCase "CBOR rejects wrong list length" $
+        popCborRejectWrongLength (Proxy @curve)
+    , testCase "CBOR rejects corrupted bytes" $
+        popCborRejectCorruptedBytes (Proxy @curve)
+    , testProperty
         "prove/verify"
         ( \(seed :: Seed, info :: Message, dst :: Message, aug :: Message) ->
             case BLS.blsKeyGen (getSeedBytes seed) (Just (messageBytes info)) of

@@ -55,6 +55,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   FinalVerifyOrder,
   PairingSide,
   ProofOfPossession (..),
+  encodeProofOfPossession,
+  decodeProofOfPossession,
   Fr (..),
   unsafePointFromPointPtr,
 
@@ -206,6 +208,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 )
 where
 
+import Cardano.Binary (Decoder, Encoding, decodeBytes, encodeBytes, encodeListLen, enforceSize)
 import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
@@ -562,6 +565,48 @@ data ProofOfPossession curve = ProofOfPossession
   { unMu1 :: Point (Dual curve)
   , unMu2 :: Point (Dual curve)
   }
+
+encodeProofOfPossession ::
+  forall curve.
+  BLS (Dual curve) =>
+  ProofOfPossession curve ->
+  Encoding
+encodeProofOfPossession (ProofOfPossession mu1 mu2) =
+  encodeListLen 2
+    <> encodeBytes (blsCompress @(Dual curve) mu1)
+    <> encodeBytes (blsCompress @(Dual curve) mu2)
+
+decodeProofOfPossession ::
+  forall curve s.
+  BLS (Dual curve) =>
+  Decoder s (ProofOfPossession curve)
+decodeProofOfPossession = do
+  enforceSize "ProofOfPossession" 2
+  mu1Bytes <- decodeBytes
+  mu2Bytes <- decodeBytes
+  mu1 <- decodePoint "mu1" mu1Bytes
+  mu2 <- decodePoint "mu2" mu2Bytes
+  pure (ProofOfPossession mu1 mu2)
+  where
+    decodePoint ::
+      String ->
+      ByteString ->
+      Decoder s (Point (Dual curve))
+    decodePoint label bytes =
+      case blsUncompress @(Dual curve) bytes of
+        Right point
+          | blsIsInf point ->
+              fail $
+                "decodeProofOfPossession: "
+                  <> label
+                  <> " is infinity"
+          | otherwise -> pure point
+        Left err ->
+          fail $
+            "decodeProofOfPossession: "
+              <> label
+              <> " failed with "
+              <> show err
 
 instance (BLS curve, BLS (Dual curve)) => Eq (ProofOfPossession curve) where
   (ProofOfPossession mu1a mu2a) == (ProofOfPossession mu1b mu2b) =
