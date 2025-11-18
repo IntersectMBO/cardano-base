@@ -3,10 +3,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -26,7 +26,6 @@ module Cardano.Crypto.DSIGN.BLS12381MinSig (
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..), decodeBytes, encodeBytes, withWordSize)
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (..),
-  failSizeCheck,
   decodeSigDSIGN,
   decodeSignKeyDSIGN,
   decodeVerKeyDSIGN,
@@ -36,6 +35,7 @@ import Cardano.Crypto.DSIGN.Class (
   encodedSigDSIGNSizeExpr,
   encodedSignKeyDSIGNSizeExpr,
   encodedVerKeyDSIGNSizeExpr,
+  failSizeCheck,
  )
 import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
