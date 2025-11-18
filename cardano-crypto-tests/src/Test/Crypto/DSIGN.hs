@@ -25,6 +25,7 @@ import Test.QuickCheck (
   Gen,
   Property,
   Testable,
+  forAll,
   forAllShow,
   forAllShrinkShow,
   ioProperty,
@@ -81,7 +82,6 @@ import Cardano.Crypto.DSIGN (
   encodeSigDSIGN,
   decodeSigDSIGN,
   signDSIGN,
-  deriveVerKeyDSIGN,
   verifyDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
@@ -97,8 +97,10 @@ import Cardano.Crypto.DSIGN (
   getSeedDSIGNM,
   forgetSignKeyDSIGNM
   )
-import Cardano.Crypto.DSIGN.BLS12381MinPk (BLS12381MinPkDSIGN)
+import Cardano.Crypto.DSIGN.BLS12381MinPk (BLS12381MinPkDSIGN, PopDSIGN)
+import qualified Cardano.Crypto.DSIGN.BLS12381MinPk as BLSMinPk
 import Cardano.Crypto.DSIGN.BLS12381MinSig (BLS12381MinSigDSIGN)
+import qualified Cardano.Crypto.DSIGN.BLS12381MinSig as BLSMinSig
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
@@ -156,6 +158,14 @@ blsMinPkSigGen = defaultSigGenWithCtx (Nothing, Nothing)
 blsMinSigSigGen :: Gen (SigDSIGN BLS12381MinSigDSIGN)
 blsMinSigSigGen = defaultSigGenWithCtx (Nothing, Nothing)
 
+blsPopGen :: Gen PopDSIGN
+blsPopGen = do
+  sk <- defaultSignKeyGen @BLS12381MinPkDSIGN
+  let vk = deriveVerKeyDSIGN sk
+      pin = rawSerialiseVerKeyDSIGN vk
+      ctx = (Nothing, Nothing)
+  pure (BLSMinPk.derivePopDSIGN ctx sk pin)
+
 #ifdef SECP256K1_ENABLED
 ecdsaSigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
 ecdsaSigGen = do
@@ -210,12 +220,90 @@ blsAugCert = BS8.pack "role=cert"
 blsTestMessage :: Message
 blsTestMessage = Message (BS8.pack "dst-aug-test-message")
 
-blsDstAugTests :: TestTree
-blsDstAugTests =
-  testGroup
+-- Used for adjusting number of QuickCheck tests so crypto cases get enough coverage
+testEnough :: QuickCheckTests -> QuickCheckTests
+testEnough = max 10_000
+
+testBlsDstAug :: TestTree
+testBlsDstAug =
+  adjustOption testEnough . testGroup
     "DST/AUG behaviour"
-    [ blsDstAugGroup "BLS12381MinPkDSIGN" (Proxy @BLS12381MinPkDSIGN)
-    , blsDstAugGroup "BLS12381MinSigDSIGN" (Proxy @BLS12381MinSigDSIGN)
+    $ [ blsDstAugGroup "BLS12381MinPkDSIGN" (Proxy @BLS12381MinPkDSIGN)
+      , blsDstAugGroup "BLS12381MinSigDSIGN" (Proxy @BLS12381MinSigDSIGN)
+      ]
+
+testBlsPop :: TestTree
+testBlsPop =
+  adjustOption testEnough . testGroup
+    "BLS Proof of Possession"
+    $ [ blsPopSuite
+          @BLS12381MinPkDSIGN
+          "MinPk PoP"
+          BLSMinPk.derivePopDSIGN
+          BLSMinPk.verifyPopDSIGN
+      , blsPopSuite
+          @BLS12381MinSigDSIGN
+          "MinSig PoP"
+          BLSMinSig.derivePopDSIGN
+          BLSMinSig.verifyPopDSIGN
+      ]
+
+testBlsPopCbor :: TestTree
+testBlsPopCbor =
+  adjustOption testEnough . testGroup
+    "BLS PoP CBOR"
+    $ [ testProperty "CBOR roundtrip" .
+          forAllShow blsPopGen ppShow $
+            prop_cbor @PopDSIGN
+      , testProperty "ToCBOR size" .
+          forAllShow blsPopGen ppShow $
+            prop_cbor_size @PopDSIGN
+      ]
+
+testBlsPopRaw :: TestTree
+testBlsPopRaw =
+  adjustOption testEnough . testGroup
+    "BLS PoP raw"
+    $ [ testProperty "raw serialise/deserialise" .
+          forAllShow blsPopGen ppShow $
+            prop_raw_serialise
+              BLSMinPk.rawSerialisePopBLS
+              BLSMinPk.rawDeserialisePopBLS
+      , testProperty "raw deserialization (wrong length)" .
+          forAllShrinkShow
+            (genBadInputFor BLSMinPk.popByteLength)
+            (shrinkBadInputFor @PopDSIGN)
+            showBadInputFor $
+            prop_raw_deserialise BLSMinPk.rawDeserialisePopBLS
+      ]
+
+blsPopSuite ::
+  forall v pop.
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ (Maybe ByteString, Maybe ByteString)
+  ) =>
+  String ->
+  (ContextDSIGN v -> SignKeyDSIGN v -> ByteString -> pop) ->
+  (ContextDSIGN v -> VerKeyDSIGN v -> ByteString -> pop -> Bool) ->
+  TestTree
+blsPopSuite label derivePop verifyPop =
+  testGroup
+    label
+    [ testProperty "happy path" $
+        forAll (defaultSignKeyGen @v) $ \sk ->
+          let vk = deriveVerKeyDSIGN sk
+              pin = rawSerialiseVerKeyDSIGN vk
+              ctx = (Nothing, Nothing)
+              pop = derivePop ctx sk pin
+           in verifyPop ctx vk pin pop === True
+    , testProperty "rejects wrong pin bytes" $
+        forAll (defaultSignKeyGen @v) $ \sk ->
+          let vk = deriveVerKeyDSIGN sk
+              pin = rawSerialiseVerKeyDSIGN vk
+              badPin = BS.snoc pin 0x00
+              ctx = (Nothing, Nothing)
+              pop = derivePop ctx sk pin
+           in verifyPop ctx vk badPin pop === False
     ]
 
 blsDstAugGroup ::
@@ -293,7 +381,7 @@ blsDstAugGroup label _ =
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
 defaultTestEnough :: QuickCheckTests -> QuickCheckTests
-defaultTestEnough = max 10_000
+defaultTestEnough = testEnough
 #endif
 
 {- HLINT ignore "Use <$>" -}
@@ -311,6 +399,11 @@ tests lock =
       , testDSIGNAlgorithm () ed448SigGen (arbitrary @Message) "Ed448DSIGN"
       , testDSIGNAlgorithm (Nothing, Nothing) blsMinPkSigGen (arbitrary @Message) "BLS12381MinPkDSIGN"
       , testDSIGNAlgorithm (Nothing, Nothing) blsMinSigSigGen (arbitrary @Message) "BLS12381MinSigDSIGN"
+      -- Specific tests related only to BLS12-381
+      , testBlsDstAug
+      , testBlsPop
+      , testBlsPopCbor
+      , testBlsPopRaw
 #ifdef SECP256K1_ENABLED
       , testDSIGNAlgorithm () ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
       , testDSIGNAlgorithm () schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
@@ -322,7 +415,6 @@ tests lock =
       , testEcdsaWithHashAlgorithm (Proxy @Keccak256) "EcdsaSecp256k1WithKeccak256"
 #endif
       ]
-    , blsDstAugTests
     , testGroup "MLocked"
       [ testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
       ]
@@ -462,8 +554,6 @@ testDSIGNAlgorithm ctx genSig genMsg name = adjustOption testEnough . testGroup 
       msg2 <- Gen.suchThat genMsg (/= msg1)
       sk <- defaultSignKeyGen
       pure (msg1, msg2, sk)
-    testEnough :: QuickCheckTests -> QuickCheckTests
-    testEnough = max 10_000
 
 testDSIGNMAlgorithm
   :: forall v. ( -- change back to DSIGNMAlgorithm when unsound API is phased out
