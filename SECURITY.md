@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Cardano open source project cardano-base is committed to ensuring the security of its software and the privacy of its users. We value the contributions of the security community in helping us identify and address vulnerabilities in our code. This Security Vulnerability Disclosure Policy outlines how security vulnerabilities should be reported and how we will respond to and remediate such reports.
+The Cardano open source project (cardano-base) is committed to ensuring the security of its software and the privacy of its users. We value the contributions of the security community in helping us identify and address vulnerabilities in our code. This Security Vulnerability Disclosure Policy outlines how security vulnerabilities should be reported and how we will respond to and remediate such reports.
 
 ## Security Vulnerability Handling Process
 
@@ -14,22 +14,22 @@ Please include as many details as needed to clearly qualify the issue:
 
 - A description of the vulnerability and its potential impact.
 - Steps to reproduce the vulnerability.
-- The version of `cardano-base` package where the vulnerability exists.
+- The version of the `cardano-base` package where the vulnerability exists.
 - Any relevant proof-of-concept or exploit code (if applicable).
 
 ### Processing Vulnerability
 
 1. **Acknowledgment**: The team acknowledges the receipt of your report within 3 business days by commenting on the issue reporting it or replying to email.
 
-2. **Validation**: The team investigates the issue and either _reject_ or _validate_ the reported vulnerability.
+2. **Validation**: The team investigates the issue and either _rejects_ or _validates_ the reported vulnerability.
 
    a. **Rejection**: If the team rejects the report, detailed explanations will be provided by email or commenting on the relevant issue and the latter will be made public and closed as `Won't fix`.
 
-   b. **Acceptance**: If the team accepts the report, a CVE identifier will be requested through GitHub and a [private fork](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/collaborating-in-a-temporary-private-fork-to-resolve-a-repository-security-vulnerability) opened to work on a fix to the issue.
+   b. **Acceptance**: If the team accepts the report, a CVE identifier will be requested through GitHub and a [private fork](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/collaborating-in-a-temporary-private-fork-to-resolve-a-repository-security-vulnerability) will be opened to work on a fix to the issue.
 
 3. **Resolution**: The team works to resolve the vulnerability in a timely manner. The timeline for resolution will depend on the complexity and severity of the vulnerability, but we will strive to address critical vulnerabilities as quickly as possible.
 
-4. **Collaboration**: While working on a fix, the team maintains open and transparent communication with the reporter throughout the process, providing updates on the status of the vulnerability and any steps taken to remediate it. In particular this means that the reporter will be asked to review any proposed fix and to advise on the timing for public disclosure.
+4. **Collaboration**: While working on a fix, the team maintains open and transparent communication with the reporter throughout the process, providing updates on the status of the vulnerability and any steps taken to remediate it. In particular, this means that the reporter will be asked to review any proposed fix and to advise on the timing for public disclosure.
 
 5. **Fixing Issue**: The team agrees on the fix, the announcement, and the release schedule with the reporter. If the reporter is not responsive in a reasonable time frame this should not block the team from moving to the next steps particularly in the face of a high impact or high severity issue.
 
@@ -37,11 +37,11 @@ Please include as many details as needed to clearly qualify the issue:
 
    b. **Fix**: When a fix is available and approved, it should be merged and made available as quickly as possible:
 
-   - All commits to the private repository are squashed into a single commit whose description _should not_ make any reference it relates to a security vulnerability
+   - All commits to the private repository are squashed into a single commit whose description _should not_ make any reference that it relates to a security vulnerability
    - A new Pull Request is created with this single commit
    - This PR's review and merging is expedited as all the work has already been done
 
-6. **Release**: The team creates and publishes a release that includes the fix
+6. **Release**: The team creates and publishes a release that includes the fix.
 
 7. **Announcement**: Concomitant to the release announcement, the team announces the security vulnerability by making the GitHub issue public. This is the first point that any information regarding the vulnerability is made public.
 
