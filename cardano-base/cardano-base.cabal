@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-base
-version: 0.1.0.0
+version: 0.1.1.0
 synopsis: Various utilities for Cardano
 description: Various utilities for Cardano.
 category:
@@ -31,7 +31,10 @@ common project-config
 library
   import: project-config
   hs-source-dirs: src
-  exposed-modules: Cardano.Base.FeatureFlags
+  exposed-modules:
+    Cardano.Base.FeatureFlags
+    Cardano.Base.Proxy
+
   build-depends:
     aeson,
     nothunks,

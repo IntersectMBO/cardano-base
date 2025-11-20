@@ -31,6 +31,8 @@ result
 # Local development
 stack-local.yaml
 .nvimrc
+.direnv
+.envrc
 
 # Visual Studio Code
 /.vscode
