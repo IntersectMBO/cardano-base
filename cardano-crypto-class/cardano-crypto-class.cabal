@@ -1,6 +1,6 @@
 cabal-version: 2.2
 name: cardano-crypto-class
-version: 2.2.0.0
+version: 2.2.0.1
 synopsis:
   Type classes abstracting over cryptography primitives for Cardano
 
@@ -113,7 +113,7 @@ library
     io-classes >=1.4.1,
     memory,
     memory-pool,
-    mempack,
+    mempack ^>=0.1,
     mtl,
     nothunks,
     primitive >=0.8,
