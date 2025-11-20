@@ -143,6 +143,11 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   withNewFr',
   cloneFr,
 
+  -- * PSB sizes
+  PointBytes,
+  AffineBytes,
+  PTBytes,
+
   -- * Utility
   integerAsCStrL,
   cstrToInteger,
@@ -227,10 +232,26 @@ import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import System.IO.Unsafe (unsafePerformIO)
 
+import Cardano.Crypto.PinnedSizedBytes (
+  PinnedSizedBytes,
+  psbCreate,
+  psbCreateResult,
+  psbUseAsCPtr,
+ )
+import GHC.TypeLits (KnownNat, Nat)
+
 ---- Phantom Types
 
 data Curve1
 data Curve2
+
+type family PointBytes curve :: Nat where
+  PointBytes Curve1 = 144
+  PointBytes Curve2 = 288
+
+type family AffineBytes curve :: Nat where
+  AffineBytes Curve1 = 96
+  AffineBytes Curve2 = 192
 
 -- | A type family mapping a curve to its dual curve (its an involution).
 type family Dual curve where
@@ -271,9 +292,15 @@ type Affine2ArrayPtr = AffineArrayPtr Curve2
 
 newtype PTPtr = PTPtr (Ptr Void)
 
-unsafePointFromPointPtr :: PointPtr curve -> Point curve
+unsafePointFromPointPtr ::
+  forall curve.
+  BLS curve =>
+  PointPtr curve ->
+  Point curve
 unsafePointFromPointPtr (PointPtr ptr) =
-  Point . unsafePerformIO $ newForeignPtr_ ptr
+  Point . unsafePerformIO $
+    psbCreate @(PointBytes curve) $ \dst ->
+      copyBytes dst (castPtr ptr) (sizePoint (Proxy @curve))
 
 eqAffinePtr :: forall curve. BLS curve => AffinePtr curve -> AffinePtr curve -> IO Bool
 eqAffinePtr (AffinePtr a) (AffinePtr b) =
@@ -286,7 +313,7 @@ instance BLS curve => Eq (AffinePtr curve) where
 
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
-newtype Point curve = Point (ForeignPtr Void)
+newtype Point curve = Point (PinnedSizedBytes (PointBytes curve))
 
 -- Making sure different 'Point's are not 'Coercible', which would ruin the
 -- intended type safety:
@@ -295,7 +322,7 @@ type role Point nominal
 type Point1 = Point Curve1
 type Point2 = Point Curve2
 
-newtype Affine curve = Affine (ForeignPtr Void)
+newtype Affine curve = Affine (PinnedSizedBytes (AffineBytes curve))
 
 -- Making sure different 'Affine's are not 'Coercible', which would ruin the
 -- intended type safety:
@@ -307,7 +334,7 @@ type Affine2 = Affine Curve2
 -- | Target element without the final exponantiation. By defining target elements
 -- | as such, we save up the final exponantiation when computing a pairing, and only
 -- | compute it when necessary (e.g. comparison with another point or serialisation)
-newtype PT = PT (ForeignPtr Void)
+newtype PT = PT (PinnedSizedBytes PTBytes)
 
 -- | Sizes of various representations of elliptic curve points.
 -- | Size of a curve point in memory
@@ -327,13 +354,16 @@ sizeAffine :: forall curve. BLS curve => Proxy curve -> Int
 sizeAffine = fromIntegral . sizeAffine_
 
 withPoint :: forall a curve. Point curve -> (PointPtr curve -> IO a) -> IO a
-withPoint (Point p) go = withForeignPtr p (go . PointPtr)
+withPoint (Point psb) go =
+  psbUseAsCPtr psb $ \ptr ->
+    go (PointPtr (castPtr ptr))
 
 withNewPoint :: forall curve a. BLS curve => (PointPtr curve -> IO a) -> IO (a, Point curve)
 withNewPoint go = do
-  p <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
-  x <- withForeignPtr p (go . PointPtr)
-  return (x, Point p)
+  (psb, res) <-
+    psbCreateResult @(PointBytes curve) $ \ptr ->
+      go (PointPtr (castPtr ptr))
+  pure (res, Point psb)
 
 withNewPoint_ :: BLS curve => (PointPtr curve -> IO a) -> IO a
 withNewPoint_ = fmap fst . withNewPoint
@@ -342,21 +372,25 @@ withNewPoint' :: BLS curve => (PointPtr curve -> IO a) -> IO (Point curve)
 withNewPoint' = fmap snd . withNewPoint
 
 clonePoint :: forall curve. BLS curve => Point curve -> IO (Point curve)
-clonePoint (Point a) = do
-  b <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap (sizePoint (Proxy @curve))
-  return (Point b)
+clonePoint (Point src) = do
+  Point
+    <$> psbCreate @(PointBytes curve)
+      ( \dst ->
+          psbUseAsCPtr src $ \srcPtr ->
+            copyBytes dst srcPtr (sizePoint (Proxy @curve))
+      )
 
 withAffine :: forall a curve. Affine curve -> (AffinePtr curve -> IO a) -> IO a
-withAffine (Affine p) go = withForeignPtr p (go . AffinePtr)
+withAffine (Affine psb) go =
+  psbUseAsCPtr psb $ \ptr ->
+    go (AffinePtr (castPtr ptr))
 
 withNewAffine :: forall curve a. BLS curve => (AffinePtr curve -> IO a) -> IO (a, Affine curve)
 withNewAffine go = do
-  p <- mallocForeignPtrBytes (sizeAffine (Proxy @curve))
-  x <- withForeignPtr p (go . AffinePtr)
-  return (x, Affine p)
+  (psb, res) <-
+    psbCreateResult @(AffineBytes curve) $ \ptr ->
+      go (AffinePtr (castPtr ptr))
+  pure (res, Affine psb)
 
 withNewAffine_ :: BLS curve => (AffinePtr curve -> IO a) -> IO a
 withNewAffine_ = fmap fst . withNewAffine
@@ -364,7 +398,13 @@ withNewAffine_ = fmap fst . withNewAffine
 withNewAffine' :: BLS curve => (AffinePtr curve -> IO a) -> IO (Affine curve)
 withNewAffine' = fmap snd . withNewAffine
 
-withPointArray :: [Point curve] -> (Int -> PointArrayPtr curve -> IO a) -> IO a
+-- | Build a temporary null-terminated array of pointers to the given points.
+-- The pointers reference the underlying PSB storage, so the array is only
+-- valid for the duration of the continuation supplied to this helper.
+withPointArray ::
+  [Point curve] ->
+  (Int -> PointArrayPtr curve -> IO a) ->
+  IO a
 withPointArray points go = do
   let numPoints = length points
       sizeReference = sizeOf (nullPtr :: Ptr ())
@@ -384,6 +424,10 @@ withPointArray points go = do
      in accumulate ptr points
 
 -- | Given a block of affine points and a count, produce a pointer array
+-- | Given a contiguous affine block produced by 'c_blst_to_affines', build a
+-- short-lived array-of-pointers view expected by the MSM routines.  The block
+-- and the resulting pointer array live only for the duration of the supplied
+-- continuation.
 withAffineBlockArrayPtr ::
   forall curve a.
   BLS curve =>
@@ -396,14 +440,19 @@ withAffineBlockArrayPtr affinesBlockPtr numPoints go = do
       pokeElemOff ptrArray i ptr
     go (AffineArrayPtr affineVectorPtr)
 
+type PTBytes = 576 :: Nat
+
 withPT :: PT -> (PTPtr -> IO a) -> IO a
-withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
+withPT (PT psb) go =
+  psbUseAsCPtr psb $ \ptr ->
+    go (PTPtr (castPtr ptr))
 
 withNewPT :: (PTPtr -> IO a) -> IO (a, PT)
 withNewPT go = do
-  p <- mallocForeignPtrBytes sizePT
-  x <- withForeignPtr p (go . PTPtr)
-  return (x, PT p)
+  (psb, res) <-
+    psbCreateResult @PTBytes $ \ptr ->
+      go (PTPtr (castPtr ptr))
+  pure (res, PT psb)
 
 withNewPT_ :: (PTPtr -> IO a) -> IO a
 withNewPT_ = fmap fst . withNewPT
@@ -418,7 +467,12 @@ sizePT = fromIntegral c_size_blst_fp12
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
 -- use higher-level wrappers such as 'blsAddOrDouble', 'blsMult', 'blsCneg', 'blsNeg', etc.
-class BLS curve where
+class
+  ( KnownNat (PointBytes curve)
+  , KnownNat (AffineBytes curve)
+  ) =>
+  BLS curve
+  where
   c_blst_on_curve :: PointPtr curve -> IO Bool
 
   c_blst_add_or_double :: PointPtr curve -> PointPtr curve -> PointPtr curve -> IO ()
@@ -535,7 +589,9 @@ instance BLS curve => Eq (Affine curve) where
 sizeScalar :: Int
 sizeScalar = fromIntegral c_size_blst_scalar
 
-newtype Scalar = Scalar (ForeignPtr Void)
+type ScalarBytes = 32 :: Nat
+
+newtype Scalar = Scalar (PinnedSizedBytes ScalarBytes)
 
 {-
 - The BLS signature scheme as specified in the IETF draft
@@ -618,14 +674,16 @@ withIntScalar i go = do
   withScalar s go
 
 withScalar :: Scalar -> (ScalarPtr -> IO a) -> IO a
-withScalar (Scalar p2) go = do
-  withForeignPtr p2 (go . ScalarPtr)
+withScalar (Scalar psb) go =
+  psbUseAsCPtr psb $ \ptr ->
+    go (ScalarPtr (castPtr ptr))
 
 withNewScalar :: (ScalarPtr -> IO a) -> IO (a, Scalar)
 withNewScalar go = do
-  p2 <- mallocForeignPtrBytes sizeScalar
-  x <- withForeignPtr p2 (go . ScalarPtr)
-  return (x, Scalar p2)
+  (psb, res) <-
+    psbCreateResult @ScalarBytes $ \ptr ->
+      go (ScalarPtr (castPtr ptr))
+  pure (res, Scalar psb)
 
 withNewScalar_ :: (ScalarPtr -> IO a) -> IO a
 withNewScalar_ = fmap fst . withNewScalar
@@ -633,6 +691,9 @@ withNewScalar_ = fmap fst . withNewScalar
 withNewScalar' :: (ScalarPtr -> IO a) -> IO Scalar
 withNewScalar' = fmap snd . withNewScalar
 
+-- | Marshal a list of scalars into a temporary null-terminated pointer array.
+-- Each entry borrows the PSB-backed scalar memory, so the array must not
+-- escape the provided continuation.
 withScalarArray :: [Scalar] -> (Int -> ScalarArrayPtr -> IO a) -> IO a
 withScalarArray scalars go = do
   let numScalars = length scalars
@@ -653,27 +714,32 @@ withScalarArray scalars go = do
      in accumulate ptr scalars
 
 cloneScalar :: Scalar -> IO Scalar
-cloneScalar (Scalar a) = do
-  b <- mallocForeignPtrBytes sizeScalar
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap sizeScalar
-  return (Scalar b)
+cloneScalar (Scalar src) =
+  Scalar
+    <$> psbCreate @ScalarBytes
+      ( \dst ->
+          psbUseAsCPtr src $ \srcPtr ->
+            copyBytes dst srcPtr sizeScalar
+      )
 
 sizeFr :: Int
 sizeFr = fromIntegral c_size_blst_fr
 
-newtype Fr = Fr (ForeignPtr Void)
+type FrBytes = 32 :: Nat
+
+newtype Fr = Fr (PinnedSizedBytes FrBytes)
 
 withFr :: Fr -> (FrPtr -> IO a) -> IO a
-withFr (Fr p2) go = do
-  withForeignPtr p2 (go . FrPtr)
+withFr (Fr psb) go =
+  psbUseAsCPtr psb $ \ptr ->
+    go (FrPtr (castPtr ptr))
 
 withNewFr :: (FrPtr -> IO a) -> IO (a, Fr)
 withNewFr go = do
-  p2 <- mallocForeignPtrBytes sizeFr
-  x <- withForeignPtr p2 (go . FrPtr)
-  return (x, Fr p2)
+  (psb, res) <-
+    psbCreateResult @FrBytes $ \ptr ->
+      go (FrPtr (castPtr ptr))
+  pure (res, Fr psb)
 
 withNewFr_ :: (FrPtr -> IO a) -> IO a
 withNewFr_ = fmap fst . withNewFr
@@ -682,12 +748,13 @@ withNewFr' :: (FrPtr -> IO a) -> IO Fr
 withNewFr' = fmap snd . withNewFr
 
 cloneFr :: Fr -> IO Fr
-cloneFr (Fr a) = do
-  b <- mallocForeignPtrBytes sizeFr
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap sizeFr
-  return (Fr b)
+cloneFr (Fr src) =
+  Fr
+    <$> psbCreate @FrBytes
+      ( \dst ->
+          psbUseAsCPtr src $ \srcPtr ->
+            copyBytes dst srcPtr sizeFr
+      )
 
 scalarToInteger :: Scalar -> IO Integer
 scalarToInteger scalar = withScalar scalar $ \scalarPtr -> do
@@ -1216,6 +1283,11 @@ signatureFromUncompressedBS bs =
 
 ---- MSM operations
 
+-- NOTE: 'blsMSM' operates purely on PSB-backed points/scalars.  The helper
+-- continuations build temporary pointer tables and workspaces whose sizes are
+-- derived from 'sizePoint', 'sizeAffine', 'sizeScalar', and
+-- 'c_blst_scratch_sizeof', so no hard-coded lengths leak into the FFI.
+
 -- | Multi-scalar multiplication using the Pippenger algorithm.
 -- The scalars will be brought into the range of modular arithmetic
 -- by means of a modulo operation over the 'scalarPeriod'.
@@ -1266,8 +1338,12 @@ blsMSM ssAndps = unsafePerformIO $ do
           withScalarArray scalars $ \_ scalarArrayPtr -> do
             let numPoints' :: CSize
                 numPoints' = fromIntegral numPoints
+                -- The blst scratch workspace is sized directly from the
+                -- curve-specific helper, so we never rely on hard-coded sizes.
                 scratchSize :: Int
-                scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
+                scratchSize =
+                  fromIntegral @CSize @Int $
+                    c_blst_scratch_sizeof (Proxy @curve) numPoints'
             allocaBytes (numPoints * sizeAffine (Proxy @curve)) $ \affinesBlockPtr -> do
               c_blst_to_affines (AffineBlockPtr affinesBlockPtr) pointArrayPtr numPoints'
               withAffineBlockArrayPtr affinesBlockPtr numPoints $ \affineArrayPtr -> do

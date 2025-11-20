@@ -27,6 +27,7 @@ import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Foldable as F (foldl')
 import Data.Proxy (Proxy (..))
+import GHC.TypeLits (natVal)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Crypto.Instances ()
 import Test.QuickCheck (
@@ -69,6 +70,12 @@ tests =
         , testBlsSignature "BLS Signature Curve 2" (Proxy @BLS.Curve2)
         , testBlsPoP "BLS PoP Curve 1" (Proxy @BLS.Curve1)
         , testBlsPoP "BLS PoP Curve 2" (Proxy @BLS.Curve2)
+        , testBlsPsbSizeInvariants
+        , testGroup
+            "BLS MSM sanity"
+            [ testBlsMsmSanity "Curve 1" (Proxy @BLS.Curve1)
+            , testBlsMsmSanity "Curve 2" (Proxy @BLS.Curve2)
+            ]
         ]
     ]
 
@@ -1092,6 +1099,52 @@ testBlsPoP name _ =
                         (Just (messageBytes dst))
                         (Just (messageBytes aug))
         )
+    ]
+
+testBlsPsbSizeInvariants :: TestTree
+testBlsPsbSizeInvariants =
+  testGroup
+    "BLS PSB size invariants"
+    [ testProperty "Curve 1 point size" . property $
+        BLS.sizePoint (Proxy @BLS.Curve1)
+          === fromIntegral (natVal (Proxy @(BLS.PointBytes BLS.Curve1)))
+    , testProperty "Curve 2 point size" . property $
+        BLS.sizePoint (Proxy @BLS.Curve2)
+          === fromIntegral (natVal (Proxy @(BLS.PointBytes BLS.Curve2)))
+    , testProperty "Curve 1 affine size" . property $
+        BLS.sizeAffine (Proxy @BLS.Curve1)
+          === fromIntegral (natVal (Proxy @(BLS.AffineBytes BLS.Curve1)))
+    , testProperty "Curve 2 affine size" . property $
+        BLS.sizeAffine (Proxy @BLS.Curve2)
+          === fromIntegral (natVal (Proxy @(BLS.AffineBytes BLS.Curve2)))
+    , testProperty "PT size" . property $
+        BLS.sizePT === fromIntegral (natVal (Proxy @BLS.PTBytes))
+    ]
+
+testBlsMsmSanity ::
+  forall curve.
+  BLS.BLS curve =>
+  String ->
+  Proxy curve ->
+  TestTree
+testBlsMsmSanity label _ =
+  testGroup
+    label
+    [ testProperty "single pair matches scalar multiplication" $
+        \(BigInteger n) (point :: BLS.Point curve) ->
+          let k = n `mod` BLS.scalarPeriod
+           in (k /= 0 && not (BLS.blsIsInf point)) ==>
+                BLS.blsMSM [(k, point)] === BLS.blsMult point k
+    , testProperty "zero scalars / infinity points ignored" $
+        \(pairs :: [(BigInteger, BLS.Point curve)]) ->
+          let allPairs = [(i, p) | (BigInteger i, p) <- pairs]
+              good = filter (\(s, p) -> s /= 0 && not (BLS.blsIsInf p)) allPairs
+              junk =
+                [(0, p) | (_, p) <- allPairs]
+                  ++ [(s, BLS.blsZero @curve) | (s, _) <- allPairs]
+           in BLS.blsMSM (good ++ junk) === BLS.blsMSM good
+    , testProperty "empty input yields infinity" . property $
+        BLS.blsIsInf (BLS.blsMSM ([] :: [(Integer, BLS.Point curve)]))
     ]
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
