@@ -211,7 +211,11 @@ hashFromBytesShort ::
   -- | It must be a buffer of exact length, as given by 'sizeHash'.
   ShortByteString ->
   Maybe (Hash h a)
-hashFromBytesShort bytes = UnsafeHashRep <$> packBytesMaybe bytes 0
+hashFromBytesShort bytes
+  | SBS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h)) =
+      UnsafeHashRep <$> packBytesMaybe bytes 0
+  | otherwise =
+      Nothing
 
 -- | Just like `hashFromBytesShort`, but allows using a region of a 'ShortByteString'.
 hashFromOffsetBytesShort ::
