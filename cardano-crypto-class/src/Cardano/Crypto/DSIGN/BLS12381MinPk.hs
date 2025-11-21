@@ -15,12 +15,20 @@
 -- | BLS12-381 digital signatures (minimal public key size variant).
 module Cardano.Crypto.DSIGN.BLS12381MinPk (
   BLS12381MinPkDSIGN,
+
+  -- * Proof of possession helpers
   PopDSIGN (..),
   derivePopDSIGN,
   verifyPopDSIGN,
   rawSerialisePopBLS,
   rawDeserialisePopBLS,
   popByteLength,
+
+  -- * Aggregation helpers
+  aggregateVerKeysDSIGN,
+  aggregateSignaturesSameMsgDSIGN,
+  verifyAggregateSameMsgDSIGN,
+  verifyAggregateDistinctMsgDSIGN,
 ) where
 
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..), decodeBytes, encodeBytes, withWordSize)
@@ -75,6 +83,8 @@ newtype PopDSIGN
   deriving
     (NoThunks)
     via OnlyCheckWhnfNamed "PopDSIGN" PopDSIGN
+
+-- Proof of possession helpers
 
 rawSerialisePopBLS ::
   PopDSIGN ->
@@ -325,3 +335,63 @@ verifyPopDSIGN (mdst, maug) vkBytes pinBytes (PopDSIGN popPsb) =
         (Right vk, Just popProof) ->
           BLS.blsProofOfPossessionVerify @BLS.Curve1 vk popProof effDst effAug
         _ -> False
+
+-- Aggregation helpers
+
+aggregateVerKeysDSIGN ::
+  [VerKeyDSIGN BLS12381MinPkDSIGN] ->
+  Either BLS.BLSTError (VerKeyDSIGN BLS12381MinPkDSIGN)
+aggregateVerKeysDSIGN vks = do
+  blsVks <- traverse decodeVerKeyBytes vks
+  aggregated <- BLS.blsAggregatePublicKeys @BLS.Curve1 blsVks
+  pure $
+    VerKeyBLSMinPk
+      (bytesToPinned "aggregateVerKeysDSIGN" (BLS.publicKeyToCompressedBS aggregated))
+
+aggregateSignaturesSameMsgDSIGN ::
+  [SigDSIGN BLS12381MinPkDSIGN] ->
+  Either BLS.BLSTError (SigDSIGN BLS12381MinPkDSIGN)
+aggregateSignaturesSameMsgDSIGN sigs = do
+  blsSigs <- traverse decodeSignatureBytes sigs
+  aggregated <- BLS.blsAggregateSignaturesSameMsg @BLS.Curve1 blsSigs
+  pure $
+    SigBLSMinPk
+      (bytesToPinned "aggregateSignaturesSameMsgDSIGN" (BLS.signatureToCompressedBS aggregated))
+
+-- | Verify a same-message aggregate under the supplied DSIGN context. When
+-- the context omits DST/AUG we fallback to 'defaultDst' and the empty
+-- augmentation, matching 'verifyDSIGN'.
+verifyAggregateSameMsgDSIGN ::
+  ContextDSIGN BLS12381MinPkDSIGN ->
+  [VerKeyDSIGN BLS12381MinPkDSIGN] ->
+  ByteString ->
+  SigDSIGN BLS12381MinPkDSIGN ->
+  Either BLS.BLSTError Bool
+verifyAggregateSameMsgDSIGN (mdst, maug) vks msg sigBytes = do
+  blsVks <- traverse decodeVerKeyBytes vks
+  aggregated <- BLS.blsAggregatePublicKeys @BLS.Curve1 blsVks
+  blsSig <- decodeSignatureBytes sigBytes
+  let effDst = Just (fromMaybe defaultDst mdst)
+      effAug = Just (fromMaybe mempty maug)
+  pure (BLS.blsVerifyAggregateSameMsg @BLS.Curve1 aggregated msg blsSig effDst effAug)
+
+-- | Verify a distinct-message aggregate under the supplied DSIGN context. The
+-- supplied DST/AUG must match the values the individual signatures were
+-- produced with; defaults mirror 'verifyDSIGN'.
+verifyAggregateDistinctMsgDSIGN ::
+  ContextDSIGN BLS12381MinPkDSIGN ->
+  [(VerKeyDSIGN BLS12381MinPkDSIGN, ByteString)] ->
+  SigDSIGN BLS12381MinPkDSIGN ->
+  Either BLS.BLSTError Bool
+verifyAggregateDistinctMsgDSIGN (mdst, maug) pairs sigBytes = do
+  blsPairs <-
+    traverse
+      ( \(vk, msg) -> do
+          decoded <- decodeVerKeyBytes vk
+          pure (decoded, msg)
+      )
+      pairs
+  blsSig <- decodeSignatureBytes sigBytes
+  let effDst = Just (fromMaybe defaultDst mdst)
+      effAug = Just (fromMaybe mempty maug)
+  pure (BLS.blsVerifyAggregateDistinctMsg @BLS.Curve1 blsPairs blsSig effDst effAug)

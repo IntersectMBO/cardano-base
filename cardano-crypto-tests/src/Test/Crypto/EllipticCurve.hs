@@ -21,12 +21,15 @@ import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Cardano.Crypto.Hash (SHA256, digest)
 import Cardano.Crypto.Seed
 import Data.Bits (shiftL)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Foldable as F (foldl')
+import Data.List (foldl1')
 import Data.Proxy (Proxy (..))
+import GHC.Stack (HasCallStack)
 import GHC.TypeLits (natVal)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Crypto.Instances ()
@@ -48,7 +51,7 @@ import Test.QuickCheck (
   (==>),
  )
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertBool, assertEqual, assertFailure, testCase)
+import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, assertFailure, testCase)
 import Test.Tasty.QuickCheck (frequency, testProperty)
 
 tests :: TestTree
@@ -75,6 +78,11 @@ tests =
             "BLS MSM sanity"
             [ testBlsMsmSanity "Curve 1" (Proxy @BLS.Curve1)
             , testBlsMsmSanity "Curve 2" (Proxy @BLS.Curve2)
+            ]
+        , testGroup
+            "BLS Aggregation"
+            [ testBlsAggregation "Curve 1" (Proxy @BLS.Curve1)
+            , testBlsAggregation "Curve 2" (Proxy @BLS.Curve2)
             ]
         ]
     ]
@@ -665,8 +673,105 @@ decodePopBytes =
     . CBOR.deserialiseFromBytes (BLS.decodeProofOfPossession @curve)
     . BSL.fromStrict
 
+sampleSecretKeys :: Int -> [BLS.SecretKey]
+sampleSecretKeys n = map mk [1 .. n]
+  where
+    mk idx =
+      case BLS.blsKeyGen (deterministicIkm idx) Nothing of
+        Right sk -> sk
+        Left err -> error ("sampleSecretKeys: " <> show err)
+
 sampleSecretKeyIO :: IO BLS.SecretKey
 sampleSecretKeyIO = generate genSecretKey
+
+deterministicIkm :: Int -> ByteString
+deterministicIkm seed =
+  BS.pack [fromIntegral ((seed + offset) `mod` 256) | offset <- [0 .. 63]]
+expectLeft :: (Show e, Eq e) => Either e a -> e -> Assertion
+expectLeft result expected =
+  case result of
+    Left err | err == expected -> pure ()
+    Left err -> assertFailure ("expected " <> show expected <> ", got " <> show err)
+    Right _ -> assertFailure ("expected " <> show expected <> ", got success")
+
+expectHeadIO :: String -> [a] -> IO a
+expectHeadIO label xs =
+  case xs of
+    y : _ -> pure y
+    [] -> assertFailure label
+
+assertSamePoint ::
+  forall curve.
+  BLS.BLS curve =>
+  String ->
+  BLS.Point curve ->
+  BLS.Point curve ->
+  Assertion
+assertSamePoint label expected actual =
+  assertEqual label (BLS.blsSerialize expected) (BLS.blsSerialize actual)
+
+assertSamePublicKey ::
+  BLS.BLS curve =>
+  String ->
+  BLS.PublicKey curve ->
+  BLS.PublicKey curve ->
+  Assertion
+assertSamePublicKey label expected actual =
+  assertSamePoint label (BLS.unPublicKey expected) (BLS.unPublicKey actual)
+
+assertSameSignature ::
+  BLS.BLS (BLS.Dual curve) =>
+  String ->
+  BLS.Signature curve ->
+  BLS.Signature curve ->
+  Assertion
+assertSameSignature label expected actual =
+  assertSamePoint label (BLS.unSignature expected) (BLS.unSignature actual)
+
+samplePublicKeys ::
+  forall curve.
+  BLS.BLS curve =>
+  Proxy curve ->
+  Int ->
+  [BLS.PublicKey curve]
+samplePublicKeys _ count =
+  let sks = sampleSecretKeys count
+   in map (BLS.blsSkToPk @curve) sks
+
+sampleSignaturesSame ::
+  forall curve.
+  (BLS.BLS curve, BLS.BLS (BLS.Dual curve)) =>
+  Proxy curve ->
+  ByteString ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Int ->
+  [(BLS.SecretKey, BLS.Signature curve)]
+sampleSignaturesSame proxy msg dst aug count =
+  let sks = sampleSecretKeys count
+   in map (\sk -> (sk, BLS.blsSign proxy sk msg dst aug)) sks
+
+sampleSignaturesDistinct ::
+  forall curve.
+  (BLS.BLS curve, BLS.BLS (BLS.Dual curve)) =>
+  Proxy curve ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Int ->
+  [(BLS.PublicKey curve, ByteString, BLS.Signature curve)]
+sampleSignaturesDistinct proxy dst aug count =
+  let sks = sampleSecretKeys count
+      pks = map (BLS.blsSkToPk @curve) sks
+      msgs = map sampleMessage [2000 ..]
+      sigs = zipWith (\sk msg -> BLS.blsSign proxy sk msg dst aug) sks msgs
+   in take count (zip3 pks msgs sigs)
+
+sampleMessage :: Int -> ByteString
+sampleMessage n = BS8.pack ("aggregation-message-" <> show n)
+
+expectRightIO :: HasCallStack => String -> Either BLS.BLSTError a -> IO a
+expectRightIO label =
+  either (\err -> assertFailure (label <> ": " <> show err)) pure
 
 shorten :: BS.ByteString -> BS.ByteString
 shorten bs
@@ -1146,6 +1251,170 @@ testBlsMsmSanity label _ =
     , testProperty "empty input yields infinity" . property $
         BLS.blsIsInf (BLS.blsMSM ([] :: [(Integer, BLS.Point curve)]))
     ]
+
+testBlsAggregation ::
+  forall curve.
+  BLS.FinalVerifyOrder curve =>
+  String ->
+  Proxy curve ->
+  TestTree
+testBlsAggregation name proxy =
+  testGroup
+    name
+    [ testGroup
+        "Public key aggregation"
+        [ testCase "empty list rejected" $
+            BLS.blsAggregatePublicKeys @curve [] `expectLeft` BLS.BLST_BAD_ENCODING
+        , testCase "singleton returns original key" $ do
+            pk <- expectHeadIO "samplePublicKeys produced no keys" (samplePublicKeys proxy 1)
+            result <- expectRightIO "singleton key aggregation" (BLS.blsAggregatePublicKeys @curve [pk])
+            assertSamePublicKey "singleton pk" pk result
+        , -- Aggregation is the same point addition fold as defined in the spec.
+          testCase "matches manual fold" $ do
+            let pks = samplePublicKeys proxy 4
+                manual = foldl1' BLS.blsAddOrDouble (map BLS.unPublicKey pks)
+            result <- expectRightIO "manual pk aggregation" (BLS.blsAggregatePublicKeys @curve pks)
+            assertSamePoint "manual pk fold" manual (BLS.unPublicKey result)
+        , -- Aggregated public key equals the sum of secret keys multiplied by the generator.
+          testCase "matches sum of secret keys" $ do
+            let sks = sampleSecretKeys 5
+                pks = map (BLS.blsSkToPk @curve) sks
+            aggregated <- expectRightIO "pk aggregation" (BLS.blsAggregatePublicKeys @curve pks)
+            skInts <- mapM (BLS.scalarToInteger . BLS.unSecretKey) sks
+            let skSum = F.foldl' (\acc x -> (acc + x) `mod` BLS.scalarPeriod) 0 skInts
+                expected = BLS.blsMult (BLS.blsGenerator @curve) skSum
+            assertSamePoint "sum secret keys" expected (BLS.unPublicKey aggregated)
+        ]
+    , testGroup
+        "Signature aggregation (same message)"
+        [ testCase "empty list rejected" $
+            BLS.blsAggregateSignaturesSameMsg @curve [] `expectLeft` BLS.BLST_BAD_ENCODING
+        , testCase "singleton returns original signature" $ do
+            sigPair <-
+              expectHeadIO
+                "sampleSignaturesSame produced no signatures"
+                (sampleSignaturesSame proxy (sampleMessage 10) sampleDst sampleAug 1)
+            let sig = snd sigPair
+            agg <- expectRightIO "singleton sig aggregation" (BLS.blsAggregateSignaturesSameMsg @curve [sig])
+            assertSameSignature "singleton sig" sig agg
+        , -- Same-message aggregation is just repeated group addition on the dual curve.
+          testCase "matches manual fold" $ do
+            let sigs = map snd (sampleSignaturesSame proxy (sampleMessage 11) sampleDst sampleAug 4)
+                manual = foldl1' BLS.blsAddOrDouble (map BLS.unSignature sigs)
+            agg <- expectRightIO "manual sig aggregation" (BLS.blsAggregateSignaturesSameMsg @curve sigs)
+            assertSamePoint "manual sig fold" manual (BLS.unSignature agg)
+        , -- Same-message aggregated signature verifies against the aggregated public key.
+          testCase "verifies for shared message" $ do
+            let pairs = sampleSignaturesSame proxy (sampleMessage 12) sampleDst sampleAug 4
+                pks = map (BLS.blsSkToPk @curve . fst) pairs
+                sigs = map snd pairs
+            aggPk <- expectRightIO "pk aggregation" (BLS.blsAggregatePublicKeys @curve pks)
+            aggSig <- expectRightIO "sig aggregation" (BLS.blsAggregateSignaturesSameMsg @curve sigs)
+            assertBool
+              "aggregate signature verifies"
+              (BLS.blsVerifyAggregateSameMsg aggPk (sampleMessage 12) aggSig sampleDst sampleAug)
+        , -- Reusing the aggregated signature on a different message must fail.
+          testCase "fails for wrong message" $ do
+            let pairs = sampleSignaturesSame proxy (sampleMessage 13) sampleDst sampleAug 4
+                pks = map (BLS.blsSkToPk @curve . fst) pairs
+                sigs = map snd pairs
+            aggPk <- expectRightIO "pk aggregation" (BLS.blsAggregatePublicKeys @curve pks)
+            aggSig <- expectRightIO "sig aggregation" (BLS.blsAggregateSignaturesSameMsg @curve sigs)
+            assertBool
+              "wrong message rejected"
+              (not (BLS.blsVerifyAggregateSameMsg aggPk (sampleMessage 999) aggSig sampleDst sampleAug))
+        ]
+    , testGroup
+        "Signature aggregation (distinct messages)"
+        [ testCase "empty list rejected" $
+            BLS.blsAggregateSignaturesDistinctMsg @curve [] `expectLeft` BLS.BLST_BAD_ENCODING
+        , testCase "singleton returns original signature" $ do
+            sig <-
+              expectHeadIO
+                "sampleSignaturesDistinct produced no signatures"
+                (map (\(_, _, s) -> s) (sampleSignaturesDistinct proxy sampleDst sampleAug 1))
+            agg <-
+              expectRightIO "singleton distinct aggregation" (BLS.blsAggregateSignaturesDistinctMsg @curve [sig])
+            assertSameSignature "singleton distinct sig" sig agg
+        , -- Distinct-message aggregation also folds the group law over the dual curve.
+          testCase "matches manual fold" $ do
+            let sigs = map (\(_, _, s) -> s) (sampleSignaturesDistinct proxy sampleDst sampleAug 4)
+                manual = foldl1' BLS.blsAddOrDouble (map BLS.unSignature sigs)
+            agg <-
+              expectRightIO "manual distinct aggregation" (BLS.blsAggregateSignaturesDistinctMsg @curve sigs)
+            assertSamePoint "manual distinct fold" manual (BLS.unSignature agg)
+        , -- Aggregated signatures must satisfy the multi-pairing equation.
+          testCase "pairing equation holds" $ do
+            let triples = sampleSignaturesDistinct proxy sampleDst sampleAug 4
+                sigs = map (\(_, _, s) -> s) triples
+                pairs = map (\(pk, msg, _) -> (pk, msg)) triples
+            aggSig <- expectRightIO "distinct aggregation" (BLS.blsAggregateSignaturesDistinctMsg @curve sigs)
+            assertBool
+              "pairing equation"
+              (BLS.blsVerifyAggregateDistinctMsg @curve pairs aggSig sampleDst sampleAug)
+        , -- Reordering (pk, msg) pairs as whole triples must not change the equation.
+          testCase "permutation preserves verification" $ do
+            let triples = sampleSignaturesDistinct proxy sampleDst sampleAug 3
+                sigs = map (\(_, _, s) -> s) triples
+                pairs = map (\(pk, msg, _) -> (pk, msg)) triples
+                permutedPairs =
+                  case pairs of
+                    (a : b : c : rest) -> b : c : a : rest
+                    _ -> pairs
+            aggSig <- expectRightIO "distinct aggregation" (BLS.blsAggregateSignaturesDistinctMsg @curve sigs)
+            assertBool
+              "permutation ok"
+              (BLS.blsVerifyAggregateDistinctMsg @curve permutedPairs aggSig sampleDst sampleAug)
+        , testCase "misaligned pairs fail" $ do
+            let triples = sampleSignaturesDistinct proxy sampleDst sampleAug 3
+                sigs = map (\(_, _, s) -> s) triples
+                msgs = map (\(_, m, _) -> m) triples
+                pks = map (\(pk, _, _) -> pk) triples
+                misaligned =
+                  case pks of
+                    (p1 : p2 : p3 : _) ->
+                      zip [p2, p3, p1] msgs
+                    _ -> zip pks msgs
+            aggSig <- expectRightIO "distinct aggregation" (BLS.blsAggregateSignaturesDistinctMsg @curve sigs)
+            assertBool
+              "misaligned fails"
+              (not (BLS.blsVerifyAggregateDistinctMsg @curve misaligned aggSig sampleDst sampleAug))
+        , -- Swapping in a wrong message for any signer must break the pairing equation.
+          testCase "wrong message fails" $ do
+            let triples = sampleSignaturesDistinct proxy sampleDst sampleAug 3
+                sigs = map (\(_, _, s) -> s) triples
+                pairs = map (\(pk, msg, _) -> (pk, msg)) triples
+                wrongPairs =
+                  case pairs of
+                    [] -> pairs
+                    (pk, _) : rest -> (pk, sampleMessage 9999) : rest
+            aggSig <- expectRightIO "distinct aggregation" (BLS.blsAggregateSignaturesDistinctMsg @curve sigs)
+            assertBool
+              "wrong message fails"
+              (not (BLS.blsVerifyAggregateDistinctMsg @curve wrongPairs aggSig sampleDst sampleAug))
+        , -- Replacing any public key with an unrelated one must also fail verification.
+          testCase "wrong public key fails" $ do
+            let triples = sampleSignaturesDistinct proxy sampleDst sampleAug 3
+                sigs = map (\(_, _, s) -> s) triples
+                pairs = map (\(pk, msg, _) -> (pk, msg)) triples
+            wrongKey <-
+              case pairs of
+                [] -> pure pairs
+                (_pk, msg) : rest -> do
+                  alternate <-
+                    expectHeadIO
+                      "samplePublicKeys produced insufficient keys"
+                      (drop 5 (samplePublicKeys proxy 10))
+                  pure ((alternate, msg) : rest)
+            aggSig <- expectRightIO "distinct aggregation" (BLS.blsAggregateSignaturesDistinctMsg @curve sigs)
+            assertBool
+              "wrong key fails"
+              (not (BLS.blsVerifyAggregateDistinctMsg @curve wrongKey aggSig sampleDst sampleAug))
+        ]
+    ]
+  where
+    sampleDst = Just (BS8.pack "aggregation-dst")
+    sampleAug = Just (BS8.pack "aggregation-aug")
 
 testAssoc :: (Show a, Eq a) => (a -> a -> a) -> a -> a -> a -> Property
 testAssoc f a b c =

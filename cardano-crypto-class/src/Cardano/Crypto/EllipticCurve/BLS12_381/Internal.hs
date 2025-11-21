@@ -210,6 +210,11 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsSignatureVerify,
   blsProofOfPossessionProve,
   blsProofOfPossessionVerify,
+  blsAggregatePublicKeys,
+  blsAggregateSignaturesSameMsg,
+  blsAggregateSignaturesDistinctMsg,
+  blsVerifyAggregateSameMsg,
+  blsVerifyAggregateDistinctMsg,
 )
 where
 
@@ -221,6 +226,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
 import Data.Foldable (foldrM)
+import qualified Data.List as List
 import Data.Proxy (Proxy (..))
 import Data.Void
 import Foreign (Storable (..), poke, sizeOf)
@@ -1507,6 +1513,95 @@ blsProofOfPossessionVerify ::
 blsProofOfPossessionVerify (PublicKey pk) (ProofOfPossession mu1 mu2) dst aug =
   finalVerifyPairs @curve (blsGenerator, mu1) (pk, blsHash ("PoP" <> blsCompress pk) dst aug)
     && finalVerifyPairs @curve (pk, blsGenerator) (blsGenerator, mu2)
+
+---- Aggregation helpers
+
+-- | Aggregate a non-empty list of public keys by group addition.
+-- Returns 'Left BLST_BAD_ENCODING' on empty input.
+blsAggregatePublicKeys ::
+  forall curve. BLS curve => [PublicKey curve] -> Either BLSTError (PublicKey curve)
+blsAggregatePublicKeys [] = Left BLST_BAD_ENCODING
+blsAggregatePublicKeys (PublicKey pk0 : rest) =
+  Right . PublicKey $
+    -- Aggregation is defined as repeated group addition; folding
+    -- 'blsAddOrDouble' implements the BLS spec literally.
+    List.foldl'
+      (\acc (PublicKey pk) -> blsAddOrDouble acc pk)
+      pk0
+      rest
+
+-- | Aggregate a non-empty list of signatures by group addition. Intended for
+-- scenarios where every signer used the same message/ DST / AUG combination.
+-- Returns 'Left BLST_BAD_ENCODING' on empty input.
+blsAggregateSignaturesSameMsg ::
+  forall curve.
+  BLS (Dual curve) =>
+  [Signature curve] ->
+  Either BLSTError (Signature curve)
+blsAggregateSignaturesSameMsg = aggregateSignatures
+
+-- | Aggregate signatures when each signer may have used a distinct message.
+-- Semantics match 'blsAggregateSignaturesSameMsg'; the dedicated export makes
+-- it clear that the caller is in the multi-message case.
+blsAggregateSignaturesDistinctMsg ::
+  forall curve.
+  BLS (Dual curve) =>
+  [Signature curve] ->
+  Either BLSTError (Signature curve)
+blsAggregateSignaturesDistinctMsg = aggregateSignatures
+
+-- | Verify an aggregated signature over a shared message. This is a thin
+-- wrapper around 'blsSignatureVerify' that gives the aggregate path a stable
+-- entry point.
+blsVerifyAggregateSameMsg ::
+  forall curve.
+  FinalVerifyOrder curve =>
+  PublicKey curve ->
+  ByteString ->
+  Signature curve ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Bool
+blsVerifyAggregateSameMsg =
+  blsSignatureVerify
+
+-- | Verify aggregated signatures where each signer may have signed a distinct
+-- message. Implements the standard multi-pairing equation.
+blsVerifyAggregateDistinctMsg ::
+  forall curve.
+  FinalVerifyOrder curve =>
+  [(PublicKey curve, ByteString)] ->
+  Signature curve ->
+  Maybe ByteString ->
+  Maybe ByteString ->
+  Bool
+blsVerifyAggregateDistinctMsg [] _ _ _ = False
+blsVerifyAggregateDistinctMsg ((pk0, msg0) : rest) sig dst aug =
+  let lhs = millerSide (blsGenerator @curve, unSignature sig)
+      rhs0 = millerSide (unPublicKey pk0, blsHash msg0 dst aug)
+      rhs =
+        List.foldl'
+          ( \acc (pk', msg') ->
+              ptMult acc (millerSide (unPublicKey pk', blsHash msg' dst aug))
+          )
+          rhs0
+          rest
+   in ptFinalVerify lhs rhs
+
+aggregateSignatures ::
+  forall curve.
+  BLS (Dual curve) =>
+  [Signature curve] ->
+  Either BLSTError (Signature curve)
+aggregateSignatures [] = Left BLST_BAD_ENCODING
+aggregateSignatures (Signature sig0 : rest) =
+  Right . Signature $
+    -- Same/different-message signature aggregation is repeated group addition
+    -- over the dual-curve points, as prescribed by the BLS definition.
+    List.foldl'
+      (\acc (Signature sig) -> blsAddOrDouble acc sig)
+      sig0
+      rest
 
 withMaybeCStringLen :: Maybe ByteString -> (CStringLen -> IO a) -> IO a
 withMaybeCStringLen Nothing go = go (nullPtr, 0)

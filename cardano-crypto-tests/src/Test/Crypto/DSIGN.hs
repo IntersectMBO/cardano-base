@@ -31,6 +31,7 @@ import Test.QuickCheck (
   ioProperty,
   counterexample,
   conjoin,
+  property,
   )
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
@@ -50,6 +51,7 @@ import qualified GHC.Exts as GHC
 import qualified Test.QuickCheck.Gen as Gen
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
+import Data.Word (Word8)
 import Data.Maybe (fromJust)
 
 import Control.Exception (evaluate, bracket)
@@ -101,6 +103,7 @@ import Cardano.Crypto.DSIGN.BLS12381MinPk (BLS12381MinPkDSIGN, PopDSIGN)
 import qualified Cardano.Crypto.DSIGN.BLS12381MinPk as BLSMinPk
 import Cardano.Crypto.DSIGN.BLS12381MinSig (BLS12381MinSigDSIGN)
 import qualified Cardano.Crypto.DSIGN.BLS12381MinSig as BLSMinSig
+import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
@@ -220,6 +223,18 @@ blsAugCert = BS8.pack "role=cert"
 blsTestMessage :: Message
 blsTestMessage = Message (BS8.pack "dst-aug-test-message")
 
+blsCtxDefault :: (Maybe ByteString, Maybe ByteString)
+blsCtxDefault = (Nothing, Nothing)
+
+blsCtxVote :: (Maybe ByteString, Maybe ByteString)
+blsCtxVote = (Just defaultBlsDst, Just blsAugVote)
+
+blsCtxCert :: (Maybe ByteString, Maybe ByteString)
+blsCtxCert = (Just defaultBlsDst, Just blsAugCert)
+
+blsCtxWrongDst :: (Maybe ByteString, Maybe ByteString)
+blsCtxWrongDst = (Just badBlsDst, Just BS.empty)
+
 -- Used for adjusting number of QuickCheck tests so crypto cases get enough coverage
 testEnough :: QuickCheckTests -> QuickCheckTests
 testEnough = max 10_000
@@ -273,9 +288,223 @@ testBlsPopRaw =
           forAllShrinkShow
             (genBadInputFor BLSMinPk.popByteLength)
             (shrinkBadInputFor @PopDSIGN)
-            showBadInputFor $
+          showBadInputFor $
             prop_raw_deserialise BLSMinPk.rawDeserialisePopBLS
       ]
+
+testBlsAggregation :: TestTree
+testBlsAggregation =
+  adjustOption testEnough . testGroup
+    "BLS Aggregation"
+    $ [ blsAggregationSuite
+          @BLS12381MinPkDSIGN
+          "BLS12381MinPkDSIGN"
+          (Proxy @BLS12381MinPkDSIGN)
+          BLSMinPk.aggregateVerKeysDSIGN
+          BLSMinPk.aggregateSignaturesSameMsgDSIGN
+          BLSMinPk.verifyAggregateSameMsgDSIGN
+          BLSMinPk.verifyAggregateDistinctMsgDSIGN
+      , blsAggregationSuite
+          @BLS12381MinSigDSIGN
+          "BLS12381MinSigDSIGN"
+          (Proxy @BLS12381MinSigDSIGN)
+          BLSMinSig.aggregateVerKeysDSIGN
+          BLSMinSig.aggregateSignaturesSameMsgDSIGN
+          BLSMinSig.verifyAggregateSameMsgDSIGN
+          BLSMinSig.verifyAggregateDistinctMsgDSIGN
+      ]
+
+blsAggregationSuite ::
+  forall v.
+  ( DSIGNAlgorithm v
+  , Signable v Message
+  , ContextDSIGN v ~ (Maybe ByteString, Maybe ByteString)
+  ) =>
+  String ->
+  Proxy v ->
+  ([VerKeyDSIGN v] -> Either BLS.BLSTError (VerKeyDSIGN v)) ->
+  ([SigDSIGN v] -> Either BLS.BLSTError (SigDSIGN v)) ->
+  (ContextDSIGN v -> [VerKeyDSIGN v] -> ByteString -> SigDSIGN v -> Either BLS.BLSTError Bool) ->
+  (ContextDSIGN v -> [(VerKeyDSIGN v, ByteString)] -> SigDSIGN v -> Either BLS.BLSTError Bool) ->
+  TestTree
+blsAggregationSuite label _ aggregateVks aggregateSigs verifySame verifyDistinct =
+  testGroup
+    label
+    [ testGroup "same message"
+        [ testProperty "default context aggregates verify" $
+            forAll (genKeyList keyCount) $ \sks ->
+              forAll (arbitrary @Message) $ \msg ->
+                let ctx = blsCtxDefault
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = fmap (signDSIGN ctx msg) sks
+                    msgBytes = messageBytes msg
+                 in aggregatePair vks sigs $
+                      \(aggVk, aggSig) ->
+                        conjoin
+                          [ counterexample "verifyDSIGN aggregated key" $
+                              verifyDSIGN ctx aggVk msg aggSig === Right ()
+                          , counterexample "verifyAggregateSameMsgDSIGN" $
+                              verifySame ctx vks msgBytes aggSig === Right True
+                          ]
+        , testProperty "custom context aggregates verify" $
+            forAll (genKeyList keyCount) $ \sks ->
+              forAll (arbitrary @Message) $ \msg ->
+                let ctx = blsCtxCert
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = fmap (signDSIGN ctx msg) sks
+                    msgBytes = messageBytes msg
+                 in aggregatePair vks sigs $
+                      \(aggVk, aggSig) ->
+                        conjoin
+                          [ counterexample "verifyDSIGN aggregated key" $
+                              verifyDSIGN ctx aggVk msg aggSig === Right ()
+                          , counterexample "verifyAggregateSameMsgDSIGN" $
+                              verifySame ctx vks msgBytes aggSig === Right True
+                          ]
+        , testProperty "mismatched context fails" $
+            forAll (genKeyList keyCount) $ \sks ->
+              forAll (arbitrary @Message) $ \msg ->
+                let ctxSign = blsCtxVote
+                    ctxVerify = blsCtxDefault
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = fmap (signDSIGN ctxSign msg) sks
+                    msgBytes = messageBytes msg
+                 in aggregatePair vks sigs $
+                      \(_, aggSig) ->
+                        counterexample "aggregate verification should reject mismatched context" $
+                          verifySame ctxVerify vks msgBytes aggSig =/= Right True
+        , testProperty "singleton aggregate behaves like single signer" $
+            forAll (Gen.vectorOf 1 (defaultSignKeyGen @v)) $ \sks ->
+              forAll (arbitrary @Message) $ \msg ->
+                let ctx = blsCtxDefault
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = fmap (signDSIGN ctx msg) sks
+                    msgBytes = messageBytes msg
+                 in aggregatePair vks sigs $
+                      \(aggVk, aggSig) ->
+                        conjoin
+                          [ counterexample "verifyDSIGN singleton" $
+                              verifyDSIGN ctx aggVk msg aggSig === Right ()
+                          , counterexample "verifyAggregateSameMsgDSIGN singleton" $
+                              verifySame ctx vks msgBytes aggSig === Right True
+                          ]
+        ]
+    , testGroup "distinct messages"
+        [ testProperty "distinct aggregates verify" $
+            forAll (genKeyList keyCount) $ \sks ->
+              forAll (genDistinctMessageList keyCount) $ \msgs ->
+                let ctx = blsCtxVote
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = zipWith (signDSIGN ctx) msgs sks
+                    msgBytes = fmap messageBytes msgs
+                    pairs = zip vks msgBytes
+                 in aggregateSigOnly sigs $
+                      \aggSig ->
+                        conjoin
+                          [ counterexample "verifyAggregateDistinctMsgDSIGN" $
+                              verifyDistinct ctx pairs aggSig === Right True
+                          , counterexample "permuted pairs should also verify" $
+                              verifyDistinct ctx (reverse pairs) aggSig === Right True
+                          ]
+        , testProperty "misaligned pairs fail" $
+            forAll (genKeyList keyCount) $ \sks ->
+              forAll (genDistinctMessageList keyCount) $ \msgs ->
+                let ctx = blsCtxVote
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = zipWith (signDSIGN ctx) msgs sks
+                    msgBytes = fmap messageBytes msgs
+                    misalignedPairs = zip (rotateLeft vks) msgBytes
+                 in aggregateSigOnly sigs $
+                      \aggSig ->
+                        counterexample "misaligned pairs must reject" $
+                          verifyDistinct ctx misalignedPairs aggSig =/= Right True
+        , testProperty "context mismatch rejects distinct aggregates" $
+            forAll (genKeyList keyCount) $ \sks ->
+              forAll (genMessageList keyCount) $ \msgs ->
+                let ctxSign = blsCtxCert
+                    ctxVerify = blsCtxWrongDst
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = zipWith (signDSIGN ctxSign) msgs sks
+                    msgBytes = fmap messageBytes msgs
+                    pairs = zip vks msgBytes
+                 in aggregateSigOnly sigs $
+                      \aggSig ->
+                        counterexample "context mismatch must fail" $
+                          verifyDistinct ctxVerify pairs aggSig =/= Right True
+        , testProperty "singleton distinct aggregate acts like single signature" $
+            forAll (Gen.vectorOf 1 (defaultSignKeyGen @v)) $ \sks ->
+              forAll (genMessageList 1) $ \msgs ->
+                let ctx = blsCtxDefault
+                    vks = fmap deriveVerKeyDSIGN sks
+                    sigs = zipWith (signDSIGN ctx) msgs sks
+                    msgBytes = fmap messageBytes msgs
+                    pairs = zip vks msgBytes
+                 in aggregateSigOnly sigs $
+                      \aggSig ->
+                        counterexample "singleton distinct verify" $
+                          verifyDistinct ctx pairs aggSig === Right True
+        ]
+    , testGroup "edge cases"
+        [ testProperty "aggregateVerKeysDSIGN rejects empty input" $
+            case aggregateVks [] of
+              Left _ -> property True
+              Right _ -> counterexample "expected Left for empty keys" False
+        , testProperty "aggregateSignaturesSameMsgDSIGN rejects empty input" $
+            case aggregateSigs [] of
+              Left _ -> property True
+              Right _ -> counterexample "expected Left for empty signatures" False
+        , testProperty "singleton key aggregation preserves encoding" $
+            forAll (defaultVerKeyGen @v) $ \vk ->
+              expectRightProp "aggregateVerKeysDSIGN" (aggregateVks [vk]) $
+                \aggVk ->
+                  rawSerialiseVerKeyDSIGN aggVk === rawSerialiseVerKeyDSIGN vk
+        , testProperty "singleton signature aggregation preserves encoding" $
+            forAll (Gen.vectorOf 1 (defaultSignKeyGen @v)) $ \sks ->
+              forAll (arbitrary @Message) $ \msg ->
+                let ctx = blsCtxDefault
+                    sigs = fmap (signDSIGN ctx msg) sks
+                 in case sigs of
+                      [] ->
+                        counterexample "vectorOf produced empty signature list" False
+                      sig0 : _ ->
+                        expectRightProp "aggregateSignaturesSameMsgDSIGN" (aggregateSigs sigs) $
+                          \aggSig ->
+                            rawSerialiseSigDSIGN aggSig === rawSerialiseSigDSIGN sig0
+        ]
+    ]
+  where
+    keyCount = 3
+    genKeyList n = Gen.vectorOf n (defaultSignKeyGen @v)
+    genMessageList n = Gen.vectorOf n (arbitrary @Message)
+    genDistinctMessageList n = do
+      seedBytes <- arbitrary @[Word8]
+      let seed = BS.pack seedBytes
+      pure (zipWith makeDistinct [0 .. n - 1] (repeat seed))
+      where
+        makeDistinct idx prefix =
+          let suffix = BS.singleton (fromIntegral idx)
+           in Message (prefix <> suffix)
+    rotateLeft [] = []
+    rotateLeft (x : xs) = xs ++ [x]
+    aggregatePair vks sigs k =
+      expectRightProp "aggregateVerKeysDSIGN" (aggregateVks vks) $ \aggVk ->
+        expectRightProp "aggregateSignaturesSameMsgDSIGN" (aggregateSigs sigs) $ \aggSig ->
+          k (aggVk, aggSig)
+    aggregateSigOnly sigs k =
+      expectRightProp "aggregateSignaturesSameMsgDSIGN" (aggregateSigs sigs) k
+
+expectRightProp ::
+  Show e =>
+  String ->
+  Either e a ->
+  (a -> Property) ->
+  Property
+expectRightProp label val cont =
+  case val of
+    Left err ->
+      counterexample (label <> " failed with " <> show err) False
+    Right x ->
+      cont x
 
 blsPopSuite ::
   forall v pop.
@@ -402,6 +631,7 @@ tests lock =
       -- Specific tests related only to BLS12-381
       , testBlsDstAug
       , testBlsPop
+      , testBlsAggregation
       , testBlsPopCbor
       , testBlsPopRaw
 #ifdef SECP256K1_ENABLED

@@ -8,18 +8,26 @@ where
 
 import Cardano.Crypto.DSIGN.BLS12381MinPk as X hiding (
   PopDSIGN,
+  aggregateSignaturesSameMsgDSIGN,
+  aggregateVerKeysDSIGN,
   derivePopDSIGN,
   popByteLength,
   rawDeserialisePopBLS,
   rawSerialisePopBLS,
+  verifyAggregateDistinctMsgDSIGN,
+  verifyAggregateSameMsgDSIGN,
   verifyPopDSIGN,
  )
 import Cardano.Crypto.DSIGN.BLS12381MinSig as X hiding (
   PopDSIGN,
+  aggregateSignaturesSameMsgDSIGN,
+  aggregateVerKeysDSIGN,
   derivePopDSIGN,
   popByteLength,
   rawDeserialisePopBLS,
   rawSerialisePopBLS,
+  verifyAggregateDistinctMsgDSIGN,
+  verifyAggregateSameMsgDSIGN,
   verifyPopDSIGN,
  )
 import Cardano.Crypto.DSIGN.Class as X
