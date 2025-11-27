@@ -30,8 +30,11 @@ module Data.Sequence.Strict (
 
   -- * Scans
   scanl,
+  scanr,
 
   -- * Sublists
+  tails,
+  inits,
 
   -- ** Sequential searches
   takeWhileL,
@@ -40,6 +43,8 @@ module Data.Sequence.Strict (
   dropWhileR,
   spanl,
   spanr,
+  breakl,
+  breakr,
 
   -- * Indexing
   lookup,
@@ -70,6 +75,7 @@ import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Codec.Serialise (Serialise)
 import Control.Arrow ((***))
 import Control.DeepSeq (NFData)
+import Control.Monad ((<$!>))
 import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.Foldable (toList)
 import qualified Data.Foldable as F (foldl')
@@ -85,6 +91,7 @@ import Prelude hiding (
   lookup,
   null,
   scanl,
+  scanr,
   splitAt,
   take,
   unzip,
@@ -235,10 +242,38 @@ length (StrictSeq xs) = Seq.length xs
 --
 -- > scanl f z (fromList [x1, x2, ...]) = fromList [z, z `f` x1, (z `f` x1) `f` x2, ...]
 scanl :: (a -> b -> a) -> a -> StrictSeq b -> StrictSeq a
-scanl f !z0 (StrictSeq xs) = StrictSeq $ forceElemsToWHNF (Seq.scanl f z0 xs)
+scanl f !z0 (StrictSeq xs) = forceToStrict $ Seq.scanl f z0 xs
+
+-- | 'scanr' is the right-to-left dual of 'scanl'.
+scanr :: (a -> b -> b) -> b -> StrictSeq a -> StrictSeq b
+scanr f !z0 (StrictSeq xs) = forceToStrict $ Seq.scanr f z0 xs
 
 {-------------------------------------------------------------------------------
   Sublists
+-------------------------------------------------------------------------------}
+
+-- | \( O(n) \).  Returns a sequence of all suffixes of this sequence,
+-- longest first.  For example,
+--
+-- > tails (fromList "abc") = fromList [fromList "abc", fromList "bc", fromList "c", fromList ""]
+--
+-- Evaluating the \( i \)th suffix takes \( O(\log(\min(i, n-i))) \), but evaluating
+-- every suffix in the sequence takes \( O(n) \) due to sharing.
+tails :: StrictSeq a -> StrictSeq (StrictSeq a)
+tails (StrictSeq xs) = StrictSeq (StrictSeq <$!> Seq.tails xs)
+
+-- | \( O(n) \).  Returns a sequence of all prefixes of this sequence,
+-- shortest first.  For example,
+--
+-- > inits (fromList "abc") = fromList [fromList "", fromList "a", fromList "ab", fromList "abc"]
+--
+-- Evaluating the \( i \)th prefix takes \( O(\log(\min(i, n-i))) \), but evaluating
+-- every prefix in the sequence takes \( O(n) \) due to sharing.
+inits :: StrictSeq a -> StrictSeq (StrictSeq a)
+inits (StrictSeq xs) = StrictSeq (StrictSeq <$!> Seq.inits xs)
+
+{-------------------------------------------------------------------------------
+  Sequential searches
 -------------------------------------------------------------------------------}
 
 -- | \( O(i) \) where \( i \) is the prefix length. 'takeWhileL', applied
@@ -280,6 +315,20 @@ spanl p (StrictSeq xs) = toStrictSeqTuple (Seq.spanl p xs)
 -- satisfy @p@ and the second element is the remainder of the sequence.
 spanr :: (a -> Bool) -> StrictSeq a -> (StrictSeq a, StrictSeq a)
 spanr p (StrictSeq xs) = toStrictSeqTuple (Seq.spanr p xs)
+
+-- | \( O(i) \) where \( i \) is the breakpoint index.  'breakl', applied to a
+-- predicate @p@ and a sequence @xs@, returns a pair whose first element
+-- is the longest prefix (possibly empty) of @xs@ of elements that
+-- /do not satisfy/ @p@ and the second element is the remainder of
+-- the sequence.
+--
+-- @'breakl' p@ is equivalent to @'spanl' (not . p)@.
+breakl :: (a -> Bool) -> StrictSeq a -> (StrictSeq a, StrictSeq a)
+breakl p (StrictSeq xs) = toStrictSeqTuple (Seq.breakl p xs)
+
+-- | @'breakr' p@ is equivalent to @'spanr' (not . p)@.
+breakr :: (a -> Bool) -> StrictSeq a -> (StrictSeq a, StrictSeq a)
+breakr p (StrictSeq xs) = toStrictSeqTuple (Seq.breakr p xs)
 
 {-------------------------------------------------------------------------------
   Indexing
