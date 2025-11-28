@@ -1498,6 +1498,8 @@ blsProofOfPossessionProve (SecretKey sk) dst aug = ProofOfPossession mu1 mu2
     skAsInteger = unsafePerformIO $ scalarToInteger sk
     PublicKey pk = blsSkToPk @curve (SecretKey sk)
     mu1 :: Point (Dual curve)
+    -- \| μ₁ signs the literal bytes @"PoP" <> compressed(pk)@ with the caller
+    -- supplied domain separation tag and augmentation (defaulting to the pin).
     mu1 = blsMult (blsHash ("PoP" <> blsCompress pk) dst aug) skAsInteger
     mu2 :: Point (Dual curve)
     mu2 = blsMult blsGenerator skAsInteger

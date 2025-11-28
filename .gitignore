@@ -39,6 +39,8 @@ stack-local.yaml
 /result-*
 cardano-crypto-class/output
 cardano-crypto-praos/output
+cardano-crypto-tests/bls12-381-test-vectors/target
+cardano-crypto-tests/bls12-381-test-vectors/Cargo.lock
 
 # ghcid
 **/.ghcid

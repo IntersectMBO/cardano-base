@@ -130,3 +130,173 @@ let expected_output = G1FromCompressed(output);
 
 assert!(expected_oputput == hashed_output);
 ```
+
+### 6 – DSIGN Test Vectors (MinPk / MinSig)
+
+This folder also contains a comprehensive suite of *deterministic golden test
+vectors* for the BLS-based DSIGN implementations used in `cardano-crypto-class`.
+These vectors allow cross-checking the Rust implementation (`blst` via
+`bls12_381` crate) against the Haskell DSIGN bindings in `cardano-base`.
+
+All vectors are hex-encoded and are grouped by DSIGN variant:
+
+- `dsign_minpk_*` — DSIGN over MinPk (VK in G1, Sig in G2)
+- `dsign_minsig_*` — DSIGN over MinSig (VK in G2, Sig in G1)
+
+The generator produces vectors for **all major DSIGN operations**, ensuring
+byte-for-byte compatibility between Rust and Haskell.
+
+#### 6.1 – Contents of each DSIGN vector file
+
+Each file contains the following fields in this fixed order:
+
+1. **sk** – 32-byte secret key (IKM-derived, deterministic)  
+2. **vk** – compressed verification key  
+   - MinPk: G1 (48 bytes)  
+   - MinSig: G2 (96 bytes)  
+3. **sig** – compressed signature  
+   - MinPk: G2 (96 bytes)  
+   - MinSig: G1 (48 bytes)  
+4. **pop** – encoded proof-of-possession  
+   - MinPk: `mu1 || mu2` (G2||G2 = 192 bytes)  
+   - MinSig: `mu1 || mu2` (G1||G1 = 96 bytes)
+
+These vectors are used in Haskell tests to validate *serialization,
+deserialization, and correctness of keygen, signing, verification, and PoP*.
+
+---
+
+#### 6.2 – Serialization / Deserialization Vectors
+
+We generate deterministic round-trip serde vectors for all DSIGN artifacts:
+
+- Secret keys  
+- Verification keys  
+- Signatures  
+- Proof-of-possession values  
+
+These vectors confirm that compressed encodings match across both Rust and
+Haskell implementations, and that invalid encodings are rejected correctly.
+
+---
+
+#### 6.3 – Deterministic Key Generation
+
+The following values are produced deterministically for each test case:
+
+- Secret key (from IKM)  
+- Verification key (`sk * Generator`)  
+- Proof of possession (`PoP = Sign(sk, vk)`)  
+
+These vectors allow Haskell tests to assert:
+
+- Same IKM ⇒ same `sk`, `vk`, `pop`  
+- Cross-language determinism (Rust ↔ Haskell)  
+- Correct group placement and byte encoding of keys
+
+---
+
+#### 6.4 – Signature Generation (Sign)
+
+For each message and DSIGN context:
+
+- `sig = Sign(sk, msg, dst, aug)` is computed deterministically  
+- The vectors include both MinPk and MinSig outputs  
+- `dst` and `aug` are handled according to the CFRG BLS specifications
+
+These vectors allow Haskell to verify:
+
+- Deterministic signing  
+- Matching compressed encodings vs. Rust  
+- Proper DST/AUG expansion (following hash-to-curve rules)
+
+---
+
+#### 6.5 – Proof of Possession (PoP)
+
+The generator produces golden PoP values:
+
+- MinPk PoP: signature over `vk` in G2  
+- MinSig PoP: signature over `vk` in G1  
+
+Each PoP is deterministic and stored as the concatenation of two compressed
+group elements (`mu1 || mu2`), validating:
+
+- Correct implementation of PoP construction  
+- Correct subgroup membership  
+- Exact byte-level compatibility with `blst`
+
+---
+
+#### 6.6 – Verification Key Aggregation
+
+We include deterministic vectors for:
+
+- Aggregation of verification keys over G1 (MinPk)  
+- Aggregation over G2 (MinSig)
+
+Each test case provides:
+
+- Individual `vk_i` values  
+- Aggregated `agg_vk = Σ vk_i` (compressed)
+
+These support:
+
+- Deterministic group operations  
+- Correctness of Haskell’s aggregation implementation  
+- Matching compressed encodings vs. Rust
+
+---
+
+#### 6.7 – Signature Aggregation (Same Message)
+
+We generate vectors for aggregation of signatures **on the same message**:
+
+- Multiple secret keys sign the *same* `msg`  
+- The final aggregated signature is:  
+  `agg_sig = Σ sig_i`
+
+Stored values:
+
+- Individual signatures (`sig_i`)  
+- Aggregated signature (`agg_sig`)
+
+The vectors ensure:
+
+- Group-law correctness  
+- Deterministic aggregation across Rust & Haskell  
+- Correct compressed G1/G2 encodings
+
+---
+
+#### 6.8 – Signature Aggregation (Distinct Messages)
+
+We also generate vectors for multi-message aggregation:
+
+- Each signer uses a distinct message `msg_i`  
+- Aggregation is still linear:
+  `agg_sig = Σ sig_i`
+
+These vectors are essential for verifying:
+
+- Distinct-message correctness  
+- Proper hashing to curve with the right DST/AUG  
+- Deterministic multi-message behavior  
+- Exact compressed output consistency
+
+---
+
+#### Summary
+
+These DSIGN test vectors collectively cover:
+
+- Serde (sk, vk, sig, pop)  
+- Deterministic key generation  
+- Signing correctness  
+- Proof-of-possession  
+- Verification key aggregation  
+- Signature aggregation (same and distinct messages)  
+
+They ensure byte-accurate compatibility between Rust’s `blst` implementation and
+the Haskell DSIGN modules in `cardano-base`, and are used as the basis for
+golden-vector tests in the Haskell test suite.

@@ -35,11 +35,14 @@ import Test.QuickCheck (
   )
 import Test.Tasty (TestTree, testGroup, adjustOption)
 import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
+import Test.Tasty.HUnit (testCase, assertFailure, (@?=))
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Base16 as Base16
 import Cardano.Crypto.Libsodium
+import Cardano.Crypto.Seed (mkSeedFromBytes)
 
 import Text.Show.Pretty (ppShow)
 
@@ -49,10 +52,16 @@ import qualified GHC.Exts as GHC
 #endif
 
 import qualified Test.QuickCheck.Gen as Gen
+import Control.Monad (forM, forM_, when, guard)
 import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, mapMaybe)
+import Data.List (stripPrefix, sortOn)
+import Data.Char (isDigit)
+import qualified Data.Map.Strict as Map
+import Paths_cardano_crypto_tests (getDataFileName)
+import Text.Read (readMaybe)
 
 import Control.Exception (evaluate, bracket)
 
@@ -164,9 +173,10 @@ blsMinSigSigGen = defaultSigGenWithCtx (Nothing, Nothing)
 blsPopGen :: Gen PopDSIGN
 blsPopGen = do
   sk <- defaultSignKeyGen @BLS12381MinPkDSIGN
-  let vk = deriveVerKeyDSIGN sk
-      pin = rawSerialiseVerKeyDSIGN vk
-      ctx = (Nothing, Nothing)
+  -- PoP derivation uses an empty augmentation; the vk bytes show up only in the
+  -- message portion of the proof.
+  let pin = BS.empty
+      ctx = blsCtxDefault
   pure (BLSMinPk.derivePopDSIGN ctx sk pin)
 
 #ifdef SECP256K1_ENABLED
@@ -235,6 +245,575 @@ blsCtxCert = (Just defaultBlsDst, Just blsAugCert)
 blsCtxWrongDst :: (Maybe ByteString, Maybe ByteString)
 blsCtxWrongDst = (Just badBlsDst, Just BS.empty)
 
+data DsignSerdeVector = DsignSerdeVector
+  { dsvLabel :: String
+  , dsvSeed :: ByteString
+  , dsvSk :: ByteString
+  , dsvVk :: ByteString
+  , dsvSig :: ByteString
+  , dsvPop :: ByteString
+  }
+
+-- | Deterministic sign/verify vectors with label, key, message and signature.
+data DsignSignVector = DsignSignVector
+  { dsvLabelSV :: String
+  , dsvSkSV :: ByteString
+  , dsvMsgSV :: ByteString
+  , dsvSigSV :: ByteString
+  }
+
+data DsignKeygenVector = DsignKeygenVector
+  { dkvLabel :: String
+  , dkvSeed :: ByteString
+  , dkvSk :: ByteString
+  , dkvVk :: ByteString
+  }
+
+data DsignPopVector = DsignPopVector
+  { dpvLabel :: String
+  , dpvSk :: ByteString
+  , dpvVk :: ByteString
+  , dpvPop :: ByteString
+  }
+
+data DsignVkAggregationVector = DsignVkAggregationVector
+  { dvavLabel :: String
+  , dvavInputs :: [ByteString]
+  , dvavAggVk :: ByteString
+  }
+
+data DsignSigAggregationSigner = DsignSigAggregationSigner
+  { dsasSeed :: ByteString
+  , dsasSk :: ByteString
+  , dsasVk :: ByteString
+  , dsasMsg :: ByteString
+  , dsasSig :: ByteString
+  }
+
+data DsignSigAggregationVector = DsignSigAggregationVector
+  { dsavLabel :: String
+  , dsavSharedMsg :: Maybe ByteString
+  , dsavSigners :: [DsignSigAggregationSigner]
+  , dsavAggSig :: ByteString
+  }
+
+loadSerdeVectors :: String -> IO [DsignSerdeVector]
+loadSerdeVectors relPath = do
+  filename <- getDataFileName relPath
+  bytes <- BS.readFile filename
+  reverse <$> parseLines (BS8.lines bytes) Nothing []
+  where
+    decodeLine field value =
+      case Base16.decode value of
+        Right bs -> pure bs
+        Left err ->
+          fail $
+            "Failed to decode "
+              <> field
+              <> " in "
+              <> relPath
+              <> ": "
+              <> err
+
+    parseLines [] current acc =
+      finalize current acc
+    parseLines (raw : rest) current acc =
+      let line = BS8.unpack (BS8.filter (/= '\r') raw)
+       in if null line
+            then parseLines rest current acc
+            else case stripPrefix "# case:" line of
+              Just lbl ->
+                finalize current acc >>= \acc' ->
+                  parseLines rest (Just (trim lbl, [])) acc'
+              Nothing ->
+                case current of
+                  Nothing ->
+                    fail ("Field without case header in " <> relPath)
+                  Just (lbl, fields) ->
+                    case break (== '=') line of
+                      (name, '=' : val) ->
+                        parseLines
+                          rest
+                          (Just (lbl, (name, BS8.pack val) : fields))
+                          acc
+                      _ ->
+                        fail ("Malformed line in " <> relPath <> ": " <> line)
+
+    finalize Nothing acc = pure acc
+    finalize (Just (lbl, fields)) acc = do
+      seedBytes <- lookupField "seed" fields
+      skBytes <- lookupField "sk" fields
+      vkBytes <- lookupField "vk" fields
+      sigBytes <- lookupField "sig" fields
+      popBytes <- lookupField "pop" fields
+      pure $
+        DsignSerdeVector
+          { dsvLabel = lbl
+          , dsvSeed = seedBytes
+          , dsvSk = skBytes
+          , dsvVk = vkBytes
+          , dsvSig = sigBytes
+          , dsvPop = popBytes
+          }
+          : acc
+
+    lookupField name fields =
+      case lookup name fields of
+        Just val -> decodeLine name val
+        Nothing -> fail ("Missing " <> name <> " in case from " <> relPath)
+
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+loadSignVectors :: String -> IO [DsignSignVector]
+loadSignVectors relPath = do
+  filename <- getDataFileName relPath
+  bytes <- BS.readFile filename
+  reverse <$> parseEntries (BS8.lines bytes) Nothing []
+  where
+    decodeField field value =
+      case Base16.decode value of
+        Right bs -> pure bs
+        Left err ->
+          fail $
+            "Failed to decode "
+              <> field
+              <> " in "
+              <> relPath
+              <> ": "
+              <> err
+
+    parseEntries [] current acc = finalize current acc
+    parseEntries (raw : rest) current acc =
+      let line = BS8.unpack (BS8.filter (/= '\r') raw)
+       in if null line
+            then parseEntries rest current acc
+            else case stripPrefix "# case:" line of
+              Just lbl ->
+                finalize current acc >>= \acc' ->
+                  parseEntries rest (Just (trim lbl, [])) acc'
+              Nothing ->
+                case current of
+                  Nothing -> fail ("Field without case header in " <> relPath)
+                  Just (lbl, fields) ->
+                    case break (== '=') line of
+                      (name, '=' : val) ->
+                        parseEntries
+                          rest
+                          (Just (lbl, (name, BS8.pack val) : fields))
+                          acc
+                      _ ->
+                        fail ("Malformed line in " <> relPath <> ": " <> line)
+
+    finalize Nothing acc = pure acc
+    finalize (Just (lbl, fields)) acc = do
+      skBytes <- decodeField "sk" =<< lookupField "sk" fields
+      msgBytes <- decodeField "msg" =<< lookupField "msg" fields
+      sigBytes <- decodeField "sig" =<< lookupField "sig" fields
+      pure
+        ( DsignSignVector
+            { dsvLabelSV = lbl
+            , dsvSkSV = skBytes
+            , dsvMsgSV = msgBytes
+            , dsvSigSV = sigBytes
+            }
+            : acc
+        )
+
+    lookupField name fields =
+      maybe (fail ("Missing " <> name <> " in " <> relPath)) pure (lookup name fields)
+
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+loadKeygenVectors :: String -> IO [DsignKeygenVector]
+loadKeygenVectors relPath = do
+  filename <- getDataFileName relPath
+  bytes <- BS.readFile filename
+  reverse <$> parseEntries (BS8.lines bytes) Nothing []
+  where
+    decodeField field value =
+      case Base16.decode value of
+        Right bs -> pure bs
+        Left err ->
+          fail $
+            "Failed to decode "
+              <> field
+              <> " in "
+              <> relPath
+              <> ": "
+              <> err
+
+    parseEntries [] current acc = finalize current acc
+    parseEntries (raw : rest) current acc =
+      let line = BS8.unpack (BS8.filter (/= '\r') raw)
+       in if null line
+            then parseEntries rest current acc
+            else case stripPrefix "# case:" line of
+              Just lbl ->
+                finalize current acc >>= \acc' ->
+                  parseEntries rest (Just (trim lbl, [])) acc'
+              Nothing ->
+                case current of
+                  Nothing -> fail ("Field without case header in " <> relPath)
+                  Just (lbl, fields) ->
+                    case break (== '=') line of
+                      (name, '=' : val) ->
+                        parseEntries
+                          rest
+                          (Just (lbl, (name, BS8.pack val) : fields))
+                          acc
+                      _ ->
+                        fail ("Malformed line in " <> relPath <> ": " <> line)
+
+    finalize Nothing acc = pure acc
+    finalize (Just (lbl, fields)) acc = do
+      seedBytes <- decodeField "seed" =<< lookupField "seed" fields
+      skBytes <- decodeField "sk" =<< lookupField "sk" fields
+      vkBytes <- decodeField "vk" =<< lookupField "vk" fields
+      pure
+        ( DsignKeygenVector
+            { dkvLabel = lbl
+            , dkvSeed = seedBytes
+            , dkvSk = skBytes
+            , dkvVk = vkBytes
+            }
+            : acc
+        )
+
+    lookupField name fields =
+      maybe (fail ("Missing " <> name <> " in " <> relPath)) pure (lookup name fields)
+
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+loadPopVectors :: String -> IO [DsignPopVector]
+loadPopVectors relPath = do
+  filename <- getDataFileName relPath
+  bytes <- BS.readFile filename
+  reverse <$> parseEntries (BS8.lines bytes) Nothing []
+  where
+    decodeField field value =
+      case Base16.decode value of
+        Right bs -> pure bs
+        Left err ->
+          fail $
+            "Failed to decode "
+              <> field
+              <> " in "
+              <> relPath
+              <> ": "
+              <> err
+
+    parseEntries [] current acc = finalize current acc
+    parseEntries (raw : rest) current acc =
+      let line = BS8.unpack (BS8.filter (/= '\r') raw)
+       in if null line
+            then parseEntries rest current acc
+            else case stripPrefix "# case:" line of
+              Just lbl ->
+                finalize current acc >>= \acc' ->
+                  parseEntries rest (Just (trim lbl, [])) acc'
+              Nothing ->
+                case current of
+                  Nothing -> fail ("Field without case header in " <> relPath)
+                  Just (lbl, fields) ->
+                    case break (== '=') line of
+                      (name, '=' : val) ->
+                        parseEntries
+                          rest
+                          (Just (lbl, (name, BS8.pack val) : fields))
+                          acc
+                      _ ->
+                        fail ("Malformed line in " <> relPath <> ": " <> line)
+
+    finalize Nothing acc = pure acc
+    finalize (Just (lbl, fields)) acc = do
+      skBytes <- decodeField "sk" =<< lookupField "sk" fields
+      vkBytes <- decodeField "vk" =<< lookupField "vk" fields
+      popBytes <- decodeField "pop" =<< lookupField "pop" fields
+      pure
+        ( DsignPopVector
+            { dpvLabel = lbl
+            , dpvSk = skBytes
+            , dpvVk = vkBytes
+            , dpvPop = popBytes
+            }
+            : acc
+        )
+
+    lookupField name fields =
+      maybe (fail ("Missing " <> name <> " in " <> relPath)) pure (lookup name fields)
+
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+loadVkAggregationVectors :: String -> IO [DsignVkAggregationVector]
+loadVkAggregationVectors relPath = do
+  filename <- getDataFileName relPath
+  bytes <- BS.readFile filename
+  reverse <$> parseEntries (BS8.lines bytes) Nothing []
+  where
+    decodeField field value =
+      case Base16.decode value of
+        Right bs -> pure bs
+        Left err ->
+          fail $
+            "Failed to decode "
+              <> field
+              <> " in "
+              <> relPath
+              <> ": "
+              <> err
+
+    parseEntries [] current acc = finalize current acc
+    parseEntries (raw : rest) current acc =
+      let line = BS8.unpack (BS8.filter (/= '\r') raw)
+       in if null line
+            then parseEntries rest current acc
+            else case stripPrefix "# case:" line of
+              Just lbl ->
+                finalize current acc >>= \acc' ->
+                  parseEntries rest (Just (trim lbl, [])) acc'
+              Nothing ->
+                case current of
+                  Nothing -> fail ("Field without case header in " <> relPath)
+                  Just (lbl, fields) ->
+                    case break (== '=') line of
+                      (name, '=' : val) ->
+                        parseEntries
+                          rest
+                          (Just (lbl, (name, BS8.pack val) : fields))
+                          acc
+                      _ ->
+                        fail ("Malformed line in " <> relPath <> ": " <> line)
+
+    finalize Nothing acc = pure acc
+    finalize (Just (lbl, fields)) acc = do
+      aggVkBytes <- decodeField "agg_vk" =<< lookupField "agg_vk" fields
+      let vkFieldPairs =
+            sortOn fst $
+              mapMaybe
+                ( \(name, value) -> do
+                    suffix <- stripPrefix "vk_" name
+                    idx <- readMaybe suffix
+                    pure (idx, (name, value))
+                )
+                fields
+      when (null vkFieldPairs) $
+        fail ("No vk_i entries found for case " <> lbl <> " in " <> relPath)
+      inputVks <-
+        mapM
+          ( \(idx, (name, value)) -> do
+              let fieldName = name
+                  -- idx used to ensure decode errors reference the numbered field.
+                  _ = idx :: Int
+              decodeField fieldName value
+          )
+          vkFieldPairs
+      pure
+        ( DsignVkAggregationVector
+            { dvavLabel = lbl
+            , dvavInputs = inputVks
+            , dvavAggVk = aggVkBytes
+            }
+            : acc
+        )
+
+    lookupField name fields =
+      maybe (fail ("Missing " <> name <> " in " <> relPath)) pure (lookup name fields)
+
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+loadSigAggregationVectors :: String -> IO [DsignSigAggregationVector]
+loadSigAggregationVectors relPath = do
+  filename <- getDataFileName relPath
+  bytes <- BS.readFile filename
+  reverse <$> parseEntries (BS8.lines bytes) Nothing []
+  where
+    decodeField field value =
+      case Base16.decode value of
+        Right bs -> pure bs
+        Left err ->
+          fail $
+            "Failed to decode "
+              <> field
+              <> " in "
+              <> relPath
+              <> ": "
+              <> err
+
+    parseEntries [] current acc = finalize current acc
+    parseEntries (raw : rest) current acc =
+      let line = BS8.unpack (BS8.filter (/= '\r') raw)
+       in if null line
+            then parseEntries rest current acc
+            else case stripPrefix "# case:" line of
+              Just lbl ->
+                finalize current acc >>= \acc' ->
+                  parseEntries rest (Just (trim lbl, [])) acc'
+              Nothing ->
+                case current of
+                  Nothing -> fail ("Field without case header in " <> relPath)
+                  Just (lbl, fields) ->
+                    case break (== '=') line of
+                      (name, '=' : val) ->
+                        parseEntries
+                          rest
+                          (Just (lbl, (name, BS8.pack val) : fields))
+                          acc
+                      _ ->
+                        fail ("Malformed line in " <> relPath <> ": " <> line)
+
+    finalize Nothing acc = pure acc
+    finalize (Just (lbl, fields)) acc = do
+      aggSigBytes <- decodeField "agg_sig" =<< lookupField "agg_sig" fields
+      sharedMsg <-
+        case lookup "msg" fields of
+          Nothing -> pure Nothing
+          Just rawMsg -> Just <$> decodeField "msg" rawMsg
+      let signerMap =
+            Map.fromListWith (++)
+              [ (idx :: Int, [(fieldName, value)])
+              | (name, value) <- fields
+              , Just (idx, fieldName) <- [parseSignerField name]
+              ]
+      when (Map.null signerMap) $
+        fail ("No signer entries found for case " <> lbl <> " in " <> relPath)
+      let sortedSigners = sortOn fst (Map.toList signerMap)
+      signers <-
+        mapM
+          ( \(idx, signerFields) -> do
+              seedBytes <-
+                decodeField
+                  ("signer_" <> show idx <> "_seed")
+                  =<< lookupSignerField "seed" signerFields
+              skBytes <-
+                decodeField
+                  ("signer_" <> show idx <> "_sk")
+                  =<< lookupSignerField "sk" signerFields
+              vkBytes <-
+                decodeField
+                  ("signer_" <> show idx <> "_vk")
+                  =<< lookupSignerField "vk" signerFields
+              msgBytes <-
+                decodeField
+                  ("signer_" <> show idx <> "_msg")
+                  =<< lookupSignerField "msg" signerFields
+              sigBytes <-
+                decodeField
+                  ("signer_" <> show idx <> "_sig")
+                  =<< lookupSignerField "sig" signerFields
+              pure
+                DsignSigAggregationSigner
+                  { dsasSeed = seedBytes
+                  , dsasSk = skBytes
+                  , dsasVk = vkBytes
+                  , dsasMsg = msgBytes
+                  , dsasSig = sigBytes
+                  }
+          )
+          sortedSigners
+      pure
+        ( DsignSigAggregationVector
+            { dsavLabel = lbl
+            , dsavSharedMsg = sharedMsg
+            , dsavSigners = signers
+            , dsavAggSig = aggSigBytes
+            }
+            : acc
+        )
+
+    lookupField name fields =
+      maybe (fail ("Missing " <> name <> " in " <> relPath)) pure (lookup name fields)
+
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+    parseSignerField name = do
+      rest <- stripPrefix "signer_" name
+      let (idxDigits, suffix) = span isDigit rest
+      guard (not (null idxDigits))
+      guard (all isDigit idxDigits)
+      case suffix of
+        '_' : fieldName
+          | fieldName `elem` ["seed", "sk", "vk", "msg", "sig"] -> do
+              idx <- readMaybe idxDigits
+              pure (idx :: Int, fieldName)
+        _ ->
+          Nothing
+
+    lookupSignerField field fields =
+      maybe (fail ("Missing signer field " <> field <> " in " <> relPath)) pure (lookup field fields)
+
+assertSkRoundTrip ::
+  forall v.
+  String ->
+  (ByteString -> Maybe (SignKeyDSIGN v)) ->
+  (SignKeyDSIGN v -> ByteString) ->
+  ByteString ->
+  IO ()
+assertSkRoundTrip label deser ser bytes = do
+  value <- expectJust ("Failed to decode " <> label) (deser bytes)
+  ser value @?= bytes
+
+assertVkRoundTrip ::
+  forall v.
+  String ->
+  (ByteString -> Maybe (VerKeyDSIGN v)) ->
+  (VerKeyDSIGN v -> ByteString) ->
+  ByteString ->
+  IO ()
+assertVkRoundTrip label deser ser bytes = do
+  value <- expectJust ("Failed to decode " <> label) (deser bytes)
+  ser value @?= bytes
+
+assertSigRoundTrip ::
+  forall v.
+  String ->
+  (ByteString -> Maybe (SigDSIGN v)) ->
+  (SigDSIGN v -> ByteString) ->
+  ByteString ->
+  IO ()
+assertSigRoundTrip label deser ser bytes = do
+  value <- expectJust ("Failed to decode " <> label) (deser bytes)
+  ser value @?= bytes
+
+assertPopRoundTrip ::
+  String ->
+  (ByteString -> Maybe pop) ->
+  (pop -> ByteString) ->
+  ByteString ->
+  IO ()
+assertPopRoundTrip label deser ser bytes = do
+  value <- expectJust ("Failed to decode " <> label) (deser bytes)
+  ser value @?= bytes
+
+assertPopGolden ::
+  forall v pop.
+  ( DSIGNAlgorithm v
+  , ContextDSIGN v ~ (Maybe ByteString, Maybe ByteString)
+  ) =>
+  String ->
+  (ByteString -> Maybe pop) ->
+  (pop -> ByteString) ->
+  (ContextDSIGN v -> SignKeyDSIGN v -> ByteString -> pop) ->
+  DsignPopVector ->
+  IO ()
+assertPopGolden label deser ser derivePop vec = do
+  sk <-
+    expectJust
+      (label <> " failed to decode secret key")
+      (rawDeserialiseSignKeyDSIGN @v (dpvSk vec))
+  vk <-
+    expectJust
+      (label <> " failed to decode verification key")
+      (rawDeserialiseVerKeyDSIGN @v (dpvVk vec))
+  let vkBytes = rawSerialiseVerKeyDSIGN vk
+  vkBytes @?= dpvVk vec
+  popBytes <- expectJust (label <> " failed to decode pop") (deser (dpvPop vec))
+  ser popBytes @?= dpvPop vec
+  let derived = derivePop blsCtxDefault sk BS.empty
+  ser derived @?= dpvPop vec
+
+expectJust :: String -> Maybe a -> IO a
+expectJust msg = maybe (assertFailure msg >> fail msg) pure
+
 -- Used for adjusting number of QuickCheck tests so crypto cases get enough coverage
 testEnough :: QuickCheckTests -> QuickCheckTests
 testEnough = max 10_000
@@ -288,9 +867,409 @@ testBlsPopRaw =
           forAllShrinkShow
             (genBadInputFor BLSMinPk.popByteLength)
             (shrinkBadInputFor @PopDSIGN)
-          showBadInputFor $
+            showBadInputFor $
             prop_raw_deserialise BLSMinPk.rawDeserialisePopBLS
       ]
+
+testBlsPopGolden :: TestTree
+testBlsPopGolden =
+  testGroup
+    "DSIGN PoP golden vectors"
+    [ testCase "MinPk vectors match" $ do
+        vectors <-
+          loadPopVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minpk_pop"
+        forM_ vectors $ \vec -> do
+          let prefix = "MinPk (" <> dpvLabel vec <> ") "
+          assertPopGolden
+            @BLS12381MinPkDSIGN
+            prefix
+            BLSMinPk.rawDeserialisePopBLS
+            BLSMinPk.rawSerialisePopBLS
+            BLSMinPk.derivePopDSIGN
+            vec
+    , testCase "MinSig vectors match" $ do
+        vectors <-
+          loadPopVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minsig_pop"
+        forM_ vectors $ \vec -> do
+          let prefix = "MinSig (" <> dpvLabel vec <> ") "
+          assertPopGolden
+            @BLS12381MinSigDSIGN
+            prefix
+            BLSMinSig.rawDeserialisePopBLS
+            BLSMinSig.rawSerialisePopBLS
+            BLSMinSig.derivePopDSIGN
+            vec
+    ]
+
+testBlsSerde :: TestTree
+testBlsSerde =
+  adjustOption testEnough . testGroup
+    "BLS DSIGN serde golden"
+    $ [ testCase "MinPk vectors round-trip" $ do
+          vectors <-
+            loadSerdeVectors
+              "bls12-381-test-vectors/test_vectors/dsign_minpk_serde"
+          forM_ vectors $ \vec -> do
+            let prefix = "MinPk (" <> dsvLabel vec <> ") "
+            assertSkRoundTrip
+              @BLS12381MinPkDSIGN
+              (prefix <> "secret key")
+              rawDeserialiseSignKeyDSIGN
+              rawSerialiseSignKeyDSIGN
+              (dsvSk vec)
+            assertVkRoundTrip
+              @BLS12381MinPkDSIGN
+              (prefix <> "verification key")
+              rawDeserialiseVerKeyDSIGN
+              rawSerialiseVerKeyDSIGN
+              (dsvVk vec)
+            assertSigRoundTrip
+              @BLS12381MinPkDSIGN
+              (prefix <> "signature")
+              rawDeserialiseSigDSIGN
+              rawSerialiseSigDSIGN
+              (dsvSig vec)
+            assertPopRoundTrip
+              (prefix <> "proof of possession")
+              BLSMinPk.rawDeserialisePopBLS
+              BLSMinPk.rawSerialisePopBLS
+              (dsvPop vec)
+      , testCase "MinSig vectors round-trip" $ do
+          vectors <-
+            loadSerdeVectors
+              "bls12-381-test-vectors/test_vectors/dsign_minsig_serde"
+          forM_ vectors $ \vec -> do
+            let prefix = "MinSig (" <> dsvLabel vec <> ") "
+            assertSkRoundTrip
+              @BLS12381MinSigDSIGN
+              (prefix <> "secret key")
+              rawDeserialiseSignKeyDSIGN
+              rawSerialiseSignKeyDSIGN
+              (dsvSk vec)
+            assertVkRoundTrip
+              @BLS12381MinSigDSIGN
+              (prefix <> "verification key")
+              rawDeserialiseVerKeyDSIGN
+              rawSerialiseVerKeyDSIGN
+              (dsvVk vec)
+            assertSigRoundTrip
+              @BLS12381MinSigDSIGN
+              (prefix <> "signature")
+              rawDeserialiseSigDSIGN
+              rawSerialiseSigDSIGN
+              (dsvSig vec)
+            assertPopRoundTrip
+              (prefix <> "proof of possession")
+              BLSMinSig.rawDeserialisePopBLS
+              BLSMinSig.rawSerialisePopBLS
+              (dsvPop vec)
+      ]
+
+testBlsSignVerify :: TestTree
+testBlsSignVerify =
+  adjustOption testEnough . testGroup
+    "BLS DSIGN sign/verify golden"
+    $ [ testCase "MinPk vectors verify" $ do
+          vectors <-
+            loadSignVectors
+              "bls12-381-test-vectors/test_vectors/dsign_minpk_sign_verify"
+          forM_ vectors $
+            assertSignVector
+              (Proxy @BLS12381MinPkDSIGN)
+              "MinPk"
+      , testCase "MinSig vectors verify" $ do
+          vectors <-
+            loadSignVectors
+              "bls12-381-test-vectors/test_vectors/dsign_minsig_sign_verify"
+          forM_ vectors $
+            assertSignVector
+              (Proxy @BLS12381MinSigDSIGN)
+              "MinSig"
+      ]
+  where
+    assertSignVector ::
+      forall v.
+      ( DSIGNAlgorithm v
+      , ContextDSIGN v ~ (Maybe ByteString, Maybe ByteString)
+      , Signable v Message
+      ) =>
+      Proxy v ->
+      String ->
+      DsignSignVector ->
+      IO ()
+    assertSignVector _ prefix vec = do
+      sk <-
+        expectJust
+          ("Failed to decode " <> prefix <> " (" <> dsvLabelSV vec <> ") secret key")
+          (rawDeserialiseSignKeyDSIGN @v (dsvSkSV vec))
+      sig <-
+        expectJust
+          ("Failed to decode " <> prefix <> " (" <> dsvLabelSV vec <> ") signature")
+          (rawDeserialiseSigDSIGN @v (dsvSigSV vec))
+      let msg = Message (dsvMsgSV vec)
+          ctx :: ContextDSIGN v
+          ctx = blsCtxDefault
+          regenSig = signDSIGN ctx msg sk
+      rawSerialiseSigDSIGN sig @?= dsvSigSV vec
+      rawSerialiseSigDSIGN regenSig @?= dsvSigSV vec
+
+testBlsVkAggregationGolden :: TestTree
+testBlsVkAggregationGolden =
+  testGroup
+    "BLS DSIGN vk aggregation golden"
+    [ testCase "MinPk aggregated vectors match" $ do
+        vectors <-
+          loadVkAggregationVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minpk_vk_aggregation"
+        forM_ vectors $
+          assertVkAggregationVector
+            (Proxy @BLS12381MinPkDSIGN)
+            "MinPk"
+            BLSMinPk.aggregateVerKeysDSIGN
+    , testCase "MinSig aggregated vectors match" $ do
+        vectors <-
+          loadVkAggregationVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minsig_vk_aggregation"
+        forM_ vectors $
+          assertVkAggregationVector
+            (Proxy @BLS12381MinSigDSIGN)
+            "MinSig"
+            BLSMinSig.aggregateVerKeysDSIGN
+    ]
+
+testBlsSigAggregationSameMsgGolden :: TestTree
+testBlsSigAggregationSameMsgGolden =
+  testGroup
+    "BLS DSIGN signature aggregation (same message) golden"
+    [ testCase "MinPk aggregated signatures match" $ do
+        vectors <-
+          loadSigAggregationVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minpk_sig_agg_same_msg"
+        forM_ vectors $
+          assertSigAggregationVector
+            (Proxy @BLS12381MinPkDSIGN)
+            "MinPk"
+            BLSMinPk.aggregateSignaturesSameMsgDSIGN
+    , testCase "MinSig aggregated signatures match" $ do
+        vectors <-
+          loadSigAggregationVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minsig_sig_agg_same_msg"
+        forM_ vectors $
+          assertSigAggregationVector
+            (Proxy @BLS12381MinSigDSIGN)
+            "MinSig"
+            BLSMinSig.aggregateSignaturesSameMsgDSIGN
+    ]
+
+testBlsSigAggregationDistinctMsgGolden :: TestTree
+testBlsSigAggregationDistinctMsgGolden =
+  testGroup
+    "BLS DSIGN signature aggregation (distinct messages) golden"
+    [ testCase "MinPk aggregated signatures match" $ do
+        vectors <-
+          loadSigAggregationVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minpk_sig_agg_distinct_msg"
+        forM_ vectors $
+          assertSigAggregationDistinctVector
+            (Proxy @BLS12381MinPkDSIGN)
+            "MinPk"
+            BLSMinPk.aggregateSignaturesSameMsgDSIGN
+    , testCase "MinSig aggregated signatures match" $ do
+        vectors <-
+          loadSigAggregationVectors
+            "bls12-381-test-vectors/test_vectors/dsign_minsig_sig_agg_distinct_msg"
+        forM_ vectors $
+          assertSigAggregationDistinctVector
+            (Proxy @BLS12381MinSigDSIGN)
+            "MinSig"
+            BLSMinSig.aggregateSignaturesSameMsgDSIGN
+    ]
+
+assertVkAggregationVector ::
+  forall v.
+  DSIGNAlgorithm v =>
+  Proxy v ->
+  String ->
+  ([VerKeyDSIGN v] -> Either BLS.BLSTError (VerKeyDSIGN v)) ->
+  DsignVkAggregationVector ->
+  IO ()
+assertVkAggregationVector _ prefix aggregate vec = do
+  inputs <-
+    mapM
+      ( \(idx, vkBytes) ->
+          expectJust
+            ( "Failed to decode "
+                <> prefix
+                <> " ("
+                <> dvavLabel vec
+                <> ") vk_"
+                <> show idx
+            )
+            (rawDeserialiseVerKeyDSIGN @v vkBytes)
+      )
+      (zip [(1 :: Int) ..] (dvavInputs vec))
+  _expectedAgg <-
+    expectJust
+      ( "Failed to decode "
+          <> prefix
+          <> " ("
+          <> dvavLabel vec
+          <> ") agg_vk"
+      )
+      (rawDeserialiseVerKeyDSIGN @v (dvavAggVk vec))
+  aggregated <-
+    case aggregate inputs of
+      Left err ->
+        assertFailure $
+          prefix
+            <> " ("
+            <> dvavLabel vec
+            <> ") aggregateVerKeysDSIGN failed: "
+            <> show err
+        >> fail "aggregateVerKeysDSIGN failed"
+      Right vk -> pure vk
+  rawSerialiseVerKeyDSIGN aggregated @?= dvavAggVk vec
+
+assertSigAggregationVector ::
+  forall v.
+  DSIGNAlgorithm v =>
+  Proxy v ->
+  String ->
+  ([SigDSIGN v] -> Either BLS.BLSTError (SigDSIGN v)) ->
+  DsignSigAggregationVector ->
+  IO ()
+assertSigAggregationVector _ prefix aggregate vec = do
+  inputs <-
+    mapM
+      ( \(idx, signer) ->
+          expectJust
+            ( "Failed to decode "
+                <> prefix
+                <> " ("
+                <> dsavLabel vec
+                <> ") sig_"
+                <> show idx
+            )
+            (rawDeserialiseSigDSIGN @v (dsasSig signer))
+      )
+      (zip [(1 :: Int) ..] (dsavSigners vec))
+  _expectedAgg <-
+    expectJust
+      ( "Failed to decode "
+          <> prefix
+          <> " ("
+          <> dsavLabel vec
+          <> ") agg_sig"
+      )
+      (rawDeserialiseSigDSIGN @v (dsavAggSig vec))
+  aggregated <-
+    case aggregate inputs of
+      Left err ->
+        assertFailure $
+          prefix
+            <> " ("
+            <> dsavLabel vec
+            <> ") aggregateSignaturesSameMsgDSIGN failed: "
+            <> show err
+        >> fail "aggregateSignaturesSameMsgDSIGN failed"
+      Right sig -> pure sig
+  rawSerialiseSigDSIGN aggregated @?= dsavAggSig vec
+
+assertSigAggregationDistinctVector ::
+  forall v.
+  ( DSIGNAlgorithm v
+  , Signable v Message
+  , ContextDSIGN v ~ (Maybe ByteString, Maybe ByteString)
+  ) =>
+  Proxy v ->
+  String ->
+  ([SigDSIGN v] -> Either BLS.BLSTError (SigDSIGN v)) ->
+  DsignSigAggregationVector ->
+  IO ()
+assertSigAggregationDistinctVector _ prefix aggregate vec = do
+  let ctx :: ContextDSIGN v
+      ctx = blsCtxDefault
+      expectedSeedLength = fromIntegral (seedSizeDSIGN (Proxy @v))
+  signerSigs <-
+    forM (zip [(1 :: Int) ..] (dsavSigners vec)) $ \(idx, signer) -> do
+      when (BS.length (dsasSeed signer) /= expectedSeedLength) $
+        assertFailure $
+          prefix
+            <> " ("
+            <> dsavLabel vec
+            <> ") signer "
+            <> show idx
+            <> " seed length mismatch"
+      let seed = mkSeedFromBytes (dsasSeed signer)
+          sk = genKeyDSIGN @v seed
+          vk = deriveVerKeyDSIGN sk
+          msg = Message (dsasMsg signer)
+          regenSig = signDSIGN ctx msg sk
+      rawSerialiseSignKeyDSIGN sk @?= dsasSk signer
+      rawSerialiseVerKeyDSIGN vk @?= dsasVk signer
+      rawSerialiseSigDSIGN regenSig @?= dsasSig signer
+      pure regenSig
+  aggregated <-
+    case aggregate signerSigs of
+      Left err ->
+        assertFailure $
+          prefix
+            <> " ("
+            <> dsavLabel vec
+            <> ") aggregateSignaturesSameMsgDSIGN failed: "
+            <> show err
+        >> fail "aggregateSignaturesSameMsgDSIGN failed"
+      Right sig -> pure sig
+  rawSerialiseSigDSIGN aggregated @?= dsavAggSig vec
+
+testBlsKeygen :: TestTree
+testBlsKeygen =
+  adjustOption testEnough . testGroup
+    "BLS DSIGN keygen golden"
+    $ [ testCase "MinPk keygen vectors round-trip" $ do
+          vectors <-
+            loadKeygenVectors
+              "bls12-381-test-vectors/test_vectors/dsign_minpk_keygen"
+          forM_ vectors $
+            assertKeygenVector
+              (Proxy @BLS12381MinPkDSIGN)
+              "MinPk"
+      , testCase "MinSig keygen vectors round-trip" $ do
+          vectors <-
+            loadKeygenVectors
+              "bls12-381-test-vectors/test_vectors/dsign_minsig_keygen"
+          forM_ vectors $
+            assertKeygenVector
+              (Proxy @BLS12381MinSigDSIGN)
+              "MinSig"
+      ]
+  where
+    assertKeygenVector ::
+      forall v.
+      DSIGNAlgorithm v =>
+      Proxy v ->
+      String ->
+      DsignKeygenVector ->
+      IO ()
+    assertKeygenVector _ prefix vec = do
+      let seedBytes = dkvSeed vec
+          expectedSeedLength = fromIntegral (seedSizeDSIGN (Proxy @v))
+      when (BS.length seedBytes /= expectedSeedLength) $
+        assertFailure $
+          prefix
+            <> " ("
+            <> dkvLabel vec
+            <> ") seed length mismatch: got "
+            <> show (BS.length seedBytes)
+            <> ", expected "
+            <> show expectedSeedLength
+      let seed = mkSeedFromBytes seedBytes
+          sk = genKeyDSIGN @v seed
+          vk = deriveVerKeyDSIGN sk
+      rawSerialiseSignKeyDSIGN sk @?= dkvSk vec
+      rawSerialiseVerKeyDSIGN vk @?= dkvVk vec
 
 testBlsAggregation :: TestTree
 testBlsAggregation =
@@ -521,16 +1500,27 @@ blsPopSuite label derivePop verifyPop =
     [ testProperty "happy path" $
         forAll (defaultSignKeyGen @v) $ \sk ->
           let vk = deriveVerKeyDSIGN sk
-              pin = rawSerialiseVerKeyDSIGN vk
-              ctx = (Nothing, Nothing)
+              pin = BS.empty
+              ctx = blsCtxDefault
               pop = derivePop ctx sk pin
            in verifyPop ctx vk pin pop === True
+    , testProperty "rejects wrong verification key" $
+        forAll (defaultSignKeyGen @v) $ \sk ->
+          forAll (defaultSignKeyGen @v) $ \skMismatch ->
+            let vk = deriveVerKeyDSIGN sk
+                vkMismatch = deriveVerKeyDSIGN skMismatch
+                vkBytes = rawSerialiseVerKeyDSIGN vk
+                vkMismatchBytes = rawSerialiseVerKeyDSIGN vkMismatch
+                pin = BS.empty
+                ctx = blsCtxDefault
+                pop = derivePop ctx sk pin
+             in vkMismatchBytes /= vkBytes ==> verifyPop ctx vkMismatch pin pop === False
     , testProperty "rejects wrong pin bytes" $
         forAll (defaultSignKeyGen @v) $ \sk ->
           let vk = deriveVerKeyDSIGN sk
-              pin = rawSerialiseVerKeyDSIGN vk
-              badPin = BS.snoc pin 0x00
-              ctx = (Nothing, Nothing)
+              pin = BS.empty
+              badPin = BS.singleton 0x00
+              ctx = blsCtxDefault
               pop = derivePop ctx sk pin
            in verifyPop ctx vk badPin pop === False
     ]
@@ -631,6 +1621,13 @@ tests lock =
       -- Specific tests related only to BLS12-381
       , testBlsDstAug
       , testBlsPop
+      , testBlsPopGolden
+      , testBlsSerde
+      , testBlsKeygen
+      , testBlsSignVerify
+      , testBlsVkAggregationGolden
+      , testBlsSigAggregationSameMsgGolden
+      , testBlsSigAggregationDistinctMsgGolden
       , testBlsAggregation
       , testBlsPopCbor
       , testBlsPopRaw
