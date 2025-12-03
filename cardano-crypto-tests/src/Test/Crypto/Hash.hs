@@ -22,6 +22,7 @@ import Data.String (fromString)
 import GHC.TypeLits
 import Test.Crypto.Util (
   Lock,
+  prop_bad_cbor_bytes,
   prop_cbor,
   prop_cbor_size,
   prop_no_thunks,
@@ -64,8 +65,9 @@ testHashAlgorithm p =
     n
     [ testProperty "hash size" $ prop_hash_correct_sizeHash @h @[Int]
     , testProperty "serialise" $ prop_hash_cbor @h
-    , testProperty "hashFromBytes" $ prop_raw_deserialise (hashFromBytes @h)
-    , testProperty "hashFromBytesShort" $ prop_raw_deserialise (hashFromBytesShort @h . SBS.toShort)
+    , testProperty "fail fromCBOR" $ prop_bad_cbor_bytes @(Hash h ())
+    , testProperty "hashFromBytes" $ prop_raw_deserialise (hashFromBytes @h @())
+    , testProperty "hashFromBytesShort" $ prop_raw_deserialise (hashFromBytesShort @h @() . SBS.toShort)
     , testProperty "ToCBOR size" $ prop_hash_cbor_size @h
     , testProperty "hashFromStringAsHex/hashToStringFromHash" $
         prop_hash_hashFromStringAsHex_hashToStringFromHash @h @Float

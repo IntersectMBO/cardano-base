@@ -7,7 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {- FOURMOLU_DISABLE -}
 module Test.Crypto.DSIGN
   ( tests
@@ -26,7 +26,6 @@ import Test.QuickCheck (
   Property,
   Testable,
   forAllShow,
-  forAllShrinkShow,
   ioProperty,
   counterexample,
   )
@@ -98,10 +97,12 @@ import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
 import Test.Crypto.Util (
+  BadInputFor,
   Message,
   prop_raw_serialise,
   prop_raw_deserialise,
   prop_size_serialise,
+  prop_bad_cbor_bytes,
   prop_cbor_with,
   prop_cbor,
   prop_cbor_size,
@@ -111,7 +112,6 @@ import Test.Crypto.Util (
   arbitrarySeedOfSize,
   genBadInputFor,
   shrinkBadInputFor,
-  showBadInputFor,
   Lock,
   withLock,
   directSerialiseToBS,
@@ -239,29 +239,20 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
         forAllShow (defaultVerKeyGen @v)
                    ppShow $
                    prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN,
-      testProperty "VerKey deserialization (wrong length)" .
-        forAllShrinkShow (genBadInputFor . expectedVKLen $ expected)
-                         (shrinkBadInputFor @(VerKeyDSIGN v))
-                         showBadInputFor $
-                         prop_raw_deserialise rawDeserialiseVerKeyDSIGN,
+      testProperty "VerKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseVerKeyDSIGN @v),
+      testProperty "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(VerKeyDSIGN v),
       testProperty "SignKey serialization" .
         forAllShow (defaultSignKeyGen @v)
                    ppShow $
                    prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN,
-      testProperty "SignKey deserialization (wrong length)" .
-        forAllShrinkShow (genBadInputFor . expectedSKLen $ expected)
-                         (shrinkBadInputFor @(SignKeyDSIGN v))
-                         showBadInputFor $
-                         prop_raw_deserialise rawDeserialiseSignKeyDSIGN,
+      testProperty "SignKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseSignKeyDSIGN @v),
+      testProperty "SignKey fail fromCBOR" $ prop_bad_cbor_bytes @(SignKeyDSIGN v),
       testProperty "Sig serialization" .
         forAllShow genSig
                    ppShow $
                    prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN,
-      testProperty "Sig deserialization (wrong length)" .
-        forAllShrinkShow (genBadInputFor . expectedSigLen $ expected)
-                         (shrinkBadInputFor @(SigDSIGN v))
-                         showBadInputFor $
-                         prop_raw_deserialise rawDeserialiseSigDSIGN
+      testProperty "Sig deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseSigDSIGN @v),
+      testProperty "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(SigDSIGN v)
       ],
     testGroup "size" [
       testProperty "VerKey" .
@@ -335,8 +326,6 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
     ]
   ]
   where
-    expected :: ExpectedLengths v
-    expected = defaultExpected
     genWrongKey :: Gen (a, SignKeyDSIGN v, SignKeyDSIGN v)
     genWrongKey = do
       sk1 <- defaultSignKeyGen
@@ -680,34 +669,17 @@ prop_dsign_verify_wrong_msg (msg, msg', sk) =
       vk = deriveVerKeyDSIGN sk
     in verifyDSIGN () vk msg' signed =/= Right ()
 
-data ExpectedLengths (v :: Type) =
-  ExpectedLengths {
-    expectedVKLen :: Int,
-    expectedSKLen :: Int,
-    expectedSigLen :: Int
-    }
-
-defaultExpected ::
-  forall (v :: Type) .
-  (DSIGNAlgorithm v) =>
-  ExpectedLengths v
-defaultExpected = ExpectedLengths {
-  expectedVKLen = fromIntegral . sizeVerKeyDSIGN $ Proxy @v,
-  expectedSKLen = fromIntegral . sizeSignKeyDSIGN $ Proxy @v,
-  expectedSigLen = fromIntegral . sizeSigDSIGN $ Proxy @v
-  }
-
 #ifdef SECP256K1_ENABLED
+instance Arbitrary (BadInputFor MessageHash) where
+  arbitrary = genBadInputFor (fromIntegral (natVal $ Proxy @SECP256K1_ECDSA_MESSAGE_BYTES))
+  shrink = shrinkBadInputFor
+
 testEcdsaInvalidMessageHash :: String -> TestTree
 testEcdsaInvalidMessageHash name = adjustOption defaultTestEnough . testGroup name $ [
-    testProperty "MessageHash deserialization (wrong length)" .
-      forAllShrinkShow (genBadInputFor expectedMHLen)
-                       (shrinkBadInputFor @MessageHash)
-                       showBadInputFor $ prop_raw_deserialise toMessageHash
+    testProperty "MessageHash deserialization (wrong length)" $
+      prop_raw_deserialise toMessageHash,
+    testProperty "MessageHash fail fromCBOR" $ prop_bad_cbor_bytes @MessageHash
   ]
-  where
-    expectedMHLen :: Int
-    expectedMHLen = fromIntegral $ natVal $ Proxy @SECP256K1_ECDSA_MESSAGE_BYTES
 
 testEcdsaWithHashAlgorithm ::
   forall (h :: Type).

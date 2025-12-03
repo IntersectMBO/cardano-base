@@ -25,6 +25,7 @@ module Test.Crypto.Util (
   prop_raw_deserialise,
   prop_size_serialise,
   prop_cbor_direct_vs_class,
+  prop_bad_cbor_bytes,
 
   -- * NoThunks
   prop_no_thunks,
@@ -80,6 +81,7 @@ import Cardano.Binary (
   FromCBOR (fromCBOR),
   Range (Range),
   ToCBOR (toCBOR),
+  decodeFull,
   decodeFullDecoder,
   encodedSizeExpr,
   hi,
@@ -87,6 +89,12 @@ import Cardano.Binary (
   serialize,
   szGreedy,
   szSimplify,
+ )
+import Cardano.Crypto.DSIGN.Class (
+  DSIGNAlgorithm (SigDSIGN, SignKeyDSIGN, VerKeyDSIGN),
+  sizeSigDSIGN,
+  sizeSignKeyDSIGN,
+  sizeVerKeyDSIGN,
  )
 import Cardano.Crypto.DirectSerialise
 import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, sizeHash)
@@ -286,6 +294,19 @@ prop_raw_deserialise deserialise (BadInputFor (forbiddenLen, bs)) =
       Nothing -> property True
       Just x -> counterexample (ppShow x) False
 
+prop_bad_cbor_bytes ::
+  forall (a :: Type).
+  (Show a, FromCBOR a) =>
+  BadInputFor a ->
+  Property
+prop_bad_cbor_bytes (BadInputFor (forbiddenLen, bs)) =
+  checkCoverage
+    . cover 50.0 (BS.length bs > forbiddenLen) "too long"
+    . cover 50.0 (BS.length bs < forbiddenLen) "too short"
+    $ case decodeFull (serialize bs) of
+      Left _ -> property True
+      Right (x :: a) -> counterexample ("FromCBOR: \n" <> ppShow x) False
+
 -- | The crypto algorithm classes have direct encoding functions, and the key
 -- types are also typically a member of the 'ToCBOR' class. Where a 'ToCBOR'
 -- instance is provided then these should match.
@@ -315,13 +336,13 @@ prop_no_thunks_IO :: NoThunks a => IO a -> IO Property
 prop_no_thunks_IO a =
   a >>= noThunks [] >>= \case
     Nothing -> return $ property True
-    Just msg -> return $! counterexample (show msg) $! (property False)
+    Just msg -> return $! counterexample (show msg) $! property False
 
 prop_no_thunks_IO_from :: NoThunks a => (b -> IO a) -> b -> Property
 prop_no_thunks_IO_from mkX y = ioProperty $ do
   prop_no_thunks_IO (mkX y)
 
-prop_no_thunks_IO_with :: NoThunks a => (Gen (IO a)) -> Property
+prop_no_thunks_IO_with :: NoThunks a => Gen (IO a) -> Property
 prop_no_thunks_IO_with mkX =
   forAllBlind mkX (ioProperty . prop_no_thunks_IO)
 
@@ -332,10 +353,25 @@ prop_no_thunks_IO_with mkX =
 -- Essentially a ByteString carrying around the length it's not allowed to be.
 -- This is annoying, but so's QuickCheck sometimes.
 newtype BadInputFor (a :: Type) = BadInputFor (Int, ByteString)
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show (BadInputFor a) where
+  show = showBadInputFor
 
 instance HashAlgorithm h => Arbitrary (BadInputFor (Hash h a)) where
   arbitrary = genBadInputFor (fromIntegral (sizeHash (Proxy :: Proxy h)))
+  shrink = shrinkBadInputFor
+
+instance DSIGNAlgorithm v => Arbitrary (BadInputFor (VerKeyDSIGN v)) where
+  arbitrary = genBadInputFor (fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy v)))
+  shrink = shrinkBadInputFor
+
+instance DSIGNAlgorithm v => Arbitrary (BadInputFor (SignKeyDSIGN v)) where
+  arbitrary = genBadInputFor (fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v)))
+  shrink = shrinkBadInputFor
+
+instance DSIGNAlgorithm v => Arbitrary (BadInputFor (SigDSIGN v)) where
+  arbitrary = genBadInputFor (fromIntegral (sizeSigDSIGN (Proxy :: Proxy v)))
   shrink = shrinkBadInputFor
 
 -- Coercion around a phantom parameter here is dangerous, as there's an implicit
@@ -377,8 +413,8 @@ showBadInputFor ::
   forall (a :: Type).
   BadInputFor a ->
   String
-showBadInputFor (BadInputFor (_, bs)) =
-  hexBS bs
+showBadInputFor (BadInputFor (len, bs)) =
+  "BadInputFor [Expected length: " <> show len <> ", Bytes: " <> hexBS bs <> "]"
 
 hexBS :: ByteString -> String
 hexBS bs =
