@@ -61,13 +61,14 @@ import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownNat, Nat, natVal)
+import GHC.Stack (HasCallStack)
 
+import Control.Monad.Trans.Fail.String (errorFail)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.ByteString.Short as SBS
 import Data.MemPack (FailT (FailT), MemPack, StateT (StateT), Unpack (Unpack))
 import Data.Word (Word8)
 import Numeric.Natural (Natural)
@@ -149,14 +150,10 @@ instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
 instance HashAlgorithm h => IsString (Code Q (Hash h a)) where
   fromString = Code . fromString
 
-pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
+pattern UnsafeHash :: forall h a. (HashAlgorithm h, HasCallStack) => ShortByteString -> Hash h a
 pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)
   where
-    UnsafeHash bytes =
-      case hashFromBytesShort bytes of
-        Nothing ->
-          error "UnsafeHash: mismatched size of the supplied ShortByteString and the expected digest"
-        Just h -> h
+    UnsafeHash = UnsafeHashRep . errorFail . packShortByteString
 {-# COMPLETE UnsafeHash #-}
 
 --
@@ -213,11 +210,12 @@ hashFromBytesShort ::
   Maybe (Hash h a)
 hashFromBytesShort bytes
   | SBS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h)) =
-      UnsafeHashRep <$> packBytesMaybe bytes 0
+      UnsafeHashRep <$> packShortByteString bytes
   | otherwise =
       Nothing
 
--- | Just like `hashFromBytesShort`, but allows using a region of a 'ShortByteString'.
+-- | Just like `hashFromBytesShort`, but allows using a region in a middle of a
+-- 'ShortByteString'. Will return `Nothing` if there is not enough data or offset is negative.
 hashFromOffsetBytesShort ::
   forall h a.
   HashAlgorithm h =>
@@ -226,7 +224,7 @@ hashFromOffsetBytesShort ::
   -- | Offset in number of bytes
   Int ->
   Maybe (Hash h a)
-hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packBytesMaybe bytes offset
+hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packShortByteStringWithOffset bytes offset
 
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
 hashToBytesShort :: Hash h a -> ShortByteString
@@ -343,17 +341,8 @@ instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
 instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
   fromCBOR = do
     sbs <- fromCBOR
-    case hashFromBytesShort sbs of
-      Just x -> return x
-      Nothing ->
-        fail $
-          "hash bytes wrong size, expected "
-            ++ show expected
-            ++ " but got "
-            ++ show actual
-        where
-          expected = sizeHash (Proxy :: Proxy h)
-          actual = SBS.length sbs
+    UnsafeHashRep <$> packShortByteString sbs
+  {-# INLINE fromCBOR #-}
 
 --
 -- Deprecated

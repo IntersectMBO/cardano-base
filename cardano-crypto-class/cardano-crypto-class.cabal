@@ -103,8 +103,8 @@ library
     Cardano.Crypto.PackedBytes
 
   build-depends:
+    FailT,
     aeson,
-    base,
     base16-bytestring >=1,
     bytestring,
     cardano-binary >=1.6,

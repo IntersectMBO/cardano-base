@@ -16,6 +16,8 @@ module Cardano.Crypto.PackedBytes
   ( PackedBytes(..)
   , packBytes
   , packBytesMaybe
+  , packShortByteString
+  , packShortByteStringWithOffset
   , packPinnedBytes
   , unpackBytes
   , unpackPinnedBytes
@@ -26,7 +28,7 @@ import Codec.Serialise (Serialise(..))
 import Codec.Serialise.Decoding (decodeBytes)
 import Codec.Serialise.Encoding (encodeBytes)
 import Control.DeepSeq (NFData(..))
-import Control.Monad (guard)
+import Control.Monad (unless, when)
 import Control.Monad.Primitive (primitive_)
 import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
 import Control.Monad.State.Strict (MonadState(state))
@@ -258,13 +260,52 @@ packBytes sbs@(SBS ba#) offset =
 -- | Construct `PackedBytes` from a `ShortByteString` and a non-negative offset
 -- in number of bytes from the beginning. This function is safe.
 packBytesMaybe :: forall n . KnownNat n => ShortByteString -> Int -> Maybe (PackedBytes n)
-packBytesMaybe bs offset = do
+packBytesMaybe = packShortByteStringWithOffset
+{-# INLINE packBytesMaybe #-}
+{-# DEPRECATED packBytesMaybe "In favor of `packShortByteStringWithOffset`" #-}
+
+-- | Construct `PackedBytes` from a `ShortByteString`. This function is safe and will fail
+--  if the buffer size does not match expected size of packed bytes exactly.
+--
+-- @since 2.2.4.0
+packShortByteString :: forall n m. (KnownNat n, MonadFail m) => ShortByteString -> m (PackedBytes n)
+packShortByteString bs = do
   let bufferSize = SBS.length bs
       size = fromInteger (natVal' (proxy# @n))
-  guard (offset >= 0)
-  guard (size <= bufferSize - offset)
-  Just $ packBytes bs offset
-{-# INLINE packBytesMaybe #-}
+  unless (size == bufferSize) $ do
+    fail $ "Number of bytes mismatch. Expected " <> show size <> " number of bytes, but got " <> show bufferSize
+  pure $ packBytes bs 0
+{-# INLINE packShortByteString #-}
+
+-- | Construct `PackedBytes` from a `ShortByteString` and a non-negative offset in number of bytes
+-- from the beginning. This function is safe, but it only checks whether there are enough
+-- bytes. I.e. it doesn't enforce full buffer consumption. If you need to check that
+-- buffer has no other data except what is being packed, then use `packShortByteString` instead
+--
+-- @since 2.2.4.0
+packShortByteStringWithOffset ::
+  forall n m. (KnownNat n, MonadFail m) =>
+  ShortByteString ->
+  -- ^ Buffer to read data from
+  Int ->
+  -- ^ Non-negative offset into the buffer, where packing will start from.
+  m (PackedBytes n)
+packShortByteStringWithOffset bs offset = do
+  let bufferSize = SBS.length bs
+      size = fromInteger (natVal' (proxy# @n))
+  when (offset < 0) $ do
+    fail $ "Expected non-negative offset, but got: " <> show offset
+  when (size > bufferSize - offset) $ do
+    fail $ mconcat [ "Not enough data. Expected to read "
+                   , show size
+                   , " number of bytes, but supplied buffer has only "
+                   , show bufferSize
+                   , ", which is not enough when reading from "
+                   , show offset
+                   , " offset."
+                   ]
+  pure $ packBytes bs offset
+{-# INLINE packShortByteStringWithOffset #-}
 
 
 packPinnedPtr8 :: Ptr a -> IO (PackedBytes 8)
