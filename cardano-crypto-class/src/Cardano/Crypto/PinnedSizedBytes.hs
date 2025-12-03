@@ -37,6 +37,7 @@ module Cardano.Crypto.PinnedSizedBytes (
   ptrPsbToSizedPtr,
 ) where
 
+import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
 import Control.DeepSeq (NFData)
 import Control.Monad.Class.MonadST (MonadST, stToIO)
 import Control.Monad.Primitive (primitive_, touch)
@@ -123,6 +124,29 @@ instance KnownNat n => Ord (PinnedSizedBytes n) where
     where
       size :: CSize
       size = fromInteger (natVal (Proxy :: Proxy n))
+
+instance KnownNat n => ToCBOR (PinnedSizedBytes n) where
+  toCBOR = toCBOR . psbToByteString
+  {-# INLINE toCBOR #-}
+
+  encodedSizeExpr _size proxy =
+    encodedSizeExpr (const pinnedBytesSize) (psbToByteString <$> proxy)
+    where
+      pinnedBytesSize :: Size
+      pinnedBytesSize = fromInteger (natVal (Proxy @n))
+
+instance KnownNat n => FromCBOR (PinnedSizedBytes n) where
+  fromCBOR = do
+    bs <- fromCBOR
+    case psbFromByteStringCheck bs of
+      Nothing ->
+        fail $
+          "Size mismatch. Expected: " <> show size <> " number of bytes, but got: " <> show (BS.length bs)
+      Just psb -> pure psb
+    where
+      size :: Int
+      size = fromInteger (natVal (Proxy :: Proxy n))
+  {-# INLINE fromCBOR #-}
 
 -- | This instance is meant to be used with @TemplateHaskell@
 --
