@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
@@ -88,6 +89,7 @@ import Cardano.Binary (
   szSimplify,
  )
 import Cardano.Crypto.DirectSerialise
+import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, sizeHash)
 import Cardano.Crypto.Libsodium.Memory (
   allocaBytes,
   packByteStringCStringLen,
@@ -331,6 +333,10 @@ prop_no_thunks_IO_with mkX =
 -- This is annoying, but so's QuickCheck sometimes.
 newtype BadInputFor (a :: Type) = BadInputFor (Int, ByteString)
   deriving (Eq, Show)
+
+instance HashAlgorithm h => Arbitrary (BadInputFor (Hash h a)) where
+  arbitrary = genBadInputFor (fromIntegral (sizeHash (Proxy :: Proxy h)))
+  shrink = shrinkBadInputFor
 
 -- Coercion around a phantom parameter here is dangerous, as there's an implicit
 -- relation between it and the forbidden length. We ensure this is impossible.
