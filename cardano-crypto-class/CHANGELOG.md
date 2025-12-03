@@ -1,5 +1,10 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.2.4.0
+
+* Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
+* Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
+
 ## 2.2.3.2
 
 *

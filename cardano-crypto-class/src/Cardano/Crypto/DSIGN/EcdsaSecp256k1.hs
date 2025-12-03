@@ -127,6 +127,7 @@ import System.IO.Unsafe (unsafeDupablePerformIO)
 newtype MessageHash = MH (PinnedSizedBytes SECP256K1_ECDSA_MESSAGE_BYTES)
   deriving (Eq) via (PinnedSizedBytes SECP256K1_ECDSA_MESSAGE_BYTES)
   deriving stock (Show)
+  deriving newtype (ToCBOR, FromCBOR)
 
 -- | Take a blob of bytes (which is presumed to be a 32-byte hash), verify its
 -- length, and package it into a 'MessageHash' if that length is exactly 32.
