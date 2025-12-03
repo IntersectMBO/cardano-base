@@ -4,10 +4,12 @@
 
 * Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
 * Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
+* Add `packShortByteString` and `packShortByteStringWithOffset`
+* Deprecate `packBytesMaybe`
 
 ## 2.2.3.2
 
-*
+* Fix `FromCBOR` instance for `Hash`
 
 ## 2.2.3.1
 
