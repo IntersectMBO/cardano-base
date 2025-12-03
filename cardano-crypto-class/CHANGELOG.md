@@ -4,6 +4,7 @@
 
 * Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
 * Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
+* Add `ToCBOR` and `FromCBOR` instances for `PackedBytes`
 * Add `packShortByteString` and `packShortByteStringWithOffset`
 * Deprecate `packBytesMaybe`
 

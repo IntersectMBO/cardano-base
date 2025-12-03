@@ -60,8 +60,8 @@ import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-import GHC.TypeLits (KnownNat, Nat, natVal)
 import GHC.Stack (HasCallStack)
+import GHC.TypeLits (KnownNat, Nat, natVal)
 
 import Control.Monad.Trans.Fail.String (errorFail)
 import Data.ByteString (ByteString)
@@ -88,7 +88,7 @@ import Control.DeepSeq (NFData)
 
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (Encoding, FromCBOR (..), Size, ToCBOR (..), serialize')
+import Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..), serialize')
 import Cardano.Crypto.PackedBytes
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.HeapWords (HeapWords (..))
@@ -320,25 +320,9 @@ parseHash t =
 -- CBOR serialisation
 --
 
-instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
-  toCBOR (UnsafeHash h) = toCBOR h
+deriving instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a)
 
-  -- \| 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
-  -- instance for 'ByteString' (as is the above 'toCBOR' method).  'Size'
-  -- computation of length of the bytestring is passed as the first argument to
-  -- 'encodedSizeExpr'.  The 'ByteString' instance will use it to calculate
-  -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
-  encodedSizeExpr _size proxy =
-    encodedSizeExpr (const hashSize) (hashToBytes <$> proxy)
-    where
-      hashSize :: Size
-      hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))
-
-instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
-  fromCBOR = do
-    sbs <- fromCBOR
-    UnsafeHashRep <$> packShortByteString sbs
-  {-# INLINE fromCBOR #-}
+deriving instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a)
 
 --
 -- Deprecated
