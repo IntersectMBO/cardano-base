@@ -286,7 +286,7 @@ prop_raw_deserialise ::
   (ByteString -> Maybe a) ->
   BadInputFor a ->
   Property
-prop_raw_deserialise deserialise (BadInputFor (forbiddenLen, bs)) =
+prop_raw_deserialise deserialise (BadInputFor forbiddenLen bs) =
   checkCoverage
     . cover 50.0 (BS.length bs > forbiddenLen) "too long"
     . cover 50.0 (BS.length bs < forbiddenLen) "too short"
@@ -299,7 +299,7 @@ prop_bad_cbor_bytes ::
   (Show a, FromCBOR a) =>
   BadInputFor a ->
   Property
-prop_bad_cbor_bytes (BadInputFor (forbiddenLen, bs)) =
+prop_bad_cbor_bytes (BadInputFor forbiddenLen bs) =
   checkCoverage
     . cover 50.0 (BS.length bs > forbiddenLen) "too long"
     . cover 50.0 (BS.length bs < forbiddenLen) "too short"
@@ -352,7 +352,10 @@ prop_no_thunks_IO_with mkX =
 
 -- Essentially a ByteString carrying around the length it's not allowed to be.
 -- This is annoying, but so's QuickCheck sometimes.
-newtype BadInputFor (a :: Type) = BadInputFor (Int, ByteString)
+data BadInputFor (a :: Type) = BadInputFor
+  { _badInputExpectedLength :: Int
+  , _badInputBytes :: ByteString
+  }
   deriving (Eq)
 
 instance Show (BadInputFor a) where
@@ -385,7 +388,7 @@ genBadInputFor ::
   Int ->
   Gen (BadInputFor a)
 genBadInputFor forbiddenLen =
-  BadInputFor . (,) forbiddenLen <$> Gen.oneof [tooLow, tooHigh]
+  BadInputFor forbiddenLen <$> Gen.oneof [tooLow, tooHigh]
   where
     tooLow :: Gen ByteString
     tooLow = do
@@ -402,8 +405,8 @@ shrinkBadInputFor ::
   forall (a :: Type).
   BadInputFor a ->
   [BadInputFor a]
-shrinkBadInputFor (BadInputFor (len, bs)) =
-  BadInputFor . (len,) <$> do
+shrinkBadInputFor (BadInputFor len bs) =
+  BadInputFor len <$> do
     bs' <- fromList <$> shrink (toList bs)
     when (BS.length bs > len) (guard (BS.length bs' > len))
     pure bs'
@@ -413,7 +416,7 @@ showBadInputFor ::
   forall (a :: Type).
   BadInputFor a ->
   String
-showBadInputFor (BadInputFor (len, bs)) =
+showBadInputFor (BadInputFor len bs) =
   "BadInputFor [Expected length: " <> show len <> ", Bytes: " <> hexBS bs <> "]"
 
 hexBS :: ByteString -> String
