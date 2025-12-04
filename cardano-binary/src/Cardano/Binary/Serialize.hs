@@ -85,7 +85,7 @@ serializeEncoding' = serialize'
 
 -- | Encode and serialise the given `a` and sorround it with the semantic tag 24
 --   In CBOR diagnostic notation:
---   >>> 24(h'DEADBEEF')
+--   > 24(h'DEADBEEF')
 encodeNestedCbor :: ToCBOR a => a -> Encoding
 encodeNestedCbor = encodeNestedCborBytes . serialize
 

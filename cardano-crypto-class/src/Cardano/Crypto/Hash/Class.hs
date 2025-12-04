@@ -128,18 +128,20 @@ deriving instance HashAlgorithm h => MemPack (Hash h a)
 -- >>> print hash
 -- "0123456789abcdef"
 -- >>> let hash = $$("deadbeef") :: Hash ShortHash ()
--- <interactive>:5:15: error:
+-- ...
 --     • <Hash blake2b_prefix_8>: Expected in decoded form to be: 8 bytes, but got: 4
 --     • In the Template Haskell splice $$("deadbeef")
 --       In the expression: $$("deadbeef") :: Hash ShortHash ()
 --       In an equation for ‘hash’:
 --           hash = $$("deadbeef") :: Hash ShortHash ()
+-- ...
 -- >>> let hash = $$("123") :: Hash ShortHash ()
--- <interactive>:6:15: error:
+-- ...
 --     • <Hash blake2b_prefix_8>: Malformed hex: invalid bytestring size
 --     • In the Template Haskell splice $$("123")
 --       In the expression: $$("123") :: Hash ShortHash ()
 --       In an equation for ‘hash’: hash = $$("123") :: Hash ShortHash ()
+-- ...
 instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
   fromString hexStr = do
     let n = fromInteger $ natVal (Proxy @(SizeHash h))
