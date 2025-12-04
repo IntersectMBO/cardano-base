@@ -46,6 +46,8 @@ common project-config
 library
   import: base, project-config
   hs-source-dirs: src
+  build-tool-depends:
+    hsc2hs:hsc2hs
   exposed-modules:
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.Class
@@ -132,8 +134,6 @@ library
   pkgconfig-depends:
     libblst >=0.3.14,
     libsodium,
-
-  c-sources: cbits/blst_util.c
 
   if flag(secp256k1-support)
     exposed-modules:

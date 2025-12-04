@@ -170,6 +170,9 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 )
 where
 
+-- This module leverages hsc2hs to get the sizes of various BLST structures
+#include "blst.h"
+
 import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
@@ -368,7 +371,7 @@ withNewPT' :: (PTPtr -> IO a) -> IO PT
 withNewPT' = fmap snd . withNewPT
 
 sizePT :: Int
-sizePT = fromIntegral c_size_blst_fp12
+sizePT = #{size blst_fp12}
 
 ---- Curve operations
 
@@ -434,10 +437,10 @@ instance BLS Curve1 where
   c_blst_p_is_equal = c_blst_p1_is_equal
   c_blst_p_is_inf = c_blst_p1_is_inf
 
-  sizePoint_ _ = c_size_blst_p1
+  sizePoint_ _ = #{size blst_p1}
   compressedSizePoint_ _ = 48
   serializedSizePoint_ _ = 96
-  sizeAffine_ _ = c_size_blst_affine1
+  sizeAffine_ _ = #{size blst_p1_affine}
 
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
@@ -466,10 +469,10 @@ instance BLS Curve2 where
   c_blst_p_is_equal = c_blst_p2_is_equal
   c_blst_p_is_inf = c_blst_p2_is_inf
 
-  sizePoint_ _ = c_size_blst_p2
+  sizePoint_ _ = #{size blst_p2}
   compressedSizePoint_ _ = 96
   serializedSizePoint_ _ = 192
-  sizeAffine_ _ = c_size_blst_affine2
+  sizeAffine_ _ = #{size blst_p2_affine}
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
@@ -480,7 +483,7 @@ instance BLS curve => Eq (Affine curve) where
 ---- Safe Scalar types / marshalling
 
 sizeScalar :: Int
-sizeScalar = fromIntegral c_size_blst_scalar
+sizeScalar = #{size blst_scalar}
 
 newtype Scalar = Scalar (ForeignPtr Void)
 
@@ -533,7 +536,7 @@ cloneScalar (Scalar a) = do
   return (Scalar b)
 
 sizeFr :: Int
-sizeFr = fromIntegral c_size_blst_fr
+sizeFr = #{size blst_fr}
 
 newtype Fr = Fr (ForeignPtr Void)
 
@@ -616,9 +619,6 @@ newtype ScratchPtr = ScratchPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
 
-foreign import ccall "size_blst_scalar" c_size_blst_scalar :: CSize
-foreign import ccall "size_blst_fr" c_size_blst_fr :: CSize
-
 foreign import ccall "blst_scalar_fr_check" c_blst_scalar_fr_check :: ScalarPtr -> IO Bool
 
 foreign import ccall "blst_scalar_from_fr" c_blst_scalar_from_fr :: ScalarPtr -> FrPtr -> IO ()
@@ -630,7 +630,6 @@ foreign import ccall "blst_scalar_from_bendian"
 
 ---- Raw Point1 functions
 
-foreign import ccall "size_blst_p1" c_size_blst_p1 :: CSize
 foreign import ccall "blst_p1_on_curve" c_blst_p1_on_curve :: Point1Ptr -> IO Bool
 
 foreign import ccall "blst_p1_add_or_double"
@@ -665,7 +664,6 @@ foreign import ccall "blst_p1s_mult_pippenger"
 
 ---- Raw Point2 functions
 
-foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
 foreign import ccall "blst_p2_on_curve" c_blst_p2_on_curve :: Point2Ptr -> IO Bool
 
 foreign import ccall "blst_p2_add_or_double"
@@ -700,9 +698,6 @@ foreign import ccall "blst_p2s_mult_pippenger"
 
 ---- Affine operations
 
-foreign import ccall "size_blst_affine1" c_size_blst_affine1 :: CSize
-foreign import ccall "size_blst_affine2" c_size_blst_affine2 :: CSize
-
 foreign import ccall "blst_p1_to_affine"
   c_blst_p1_to_affine :: AffinePtr Curve1 -> PointPtr Curve1 -> IO ()
 foreign import ccall "blst_p2_to_affine"
@@ -717,7 +712,6 @@ foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: AffinePtr 
 
 ---- PT operations
 
-foreign import ccall "size_blst_fp12" c_size_blst_fp12 :: CSize
 foreign import ccall "blst_fp12_mul" c_blst_fp12_mul :: PTPtr -> PTPtr -> PTPtr -> IO ()
 foreign import ccall "blst_fp12_is_equal" c_blst_fp12_is_equal :: PTPtr -> PTPtr -> IO Bool
 foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr -> PTPtr -> IO Bool
@@ -727,16 +721,31 @@ foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr ->
 foreign import ccall "blst_miller_loop"
   c_blst_miller_loop :: PTPtr -> Affine2Ptr -> Affine1Ptr -> IO ()
 
----- Raw BLST error constants
+-- hsc2hs constants for BLST_ERROR
 
-foreign import ccall "blst_success" c_blst_success :: CInt
-foreign import ccall "blst_error_bad_encoding" c_blst_error_bad_encoding :: CInt
-foreign import ccall "blst_error_point_not_on_curve" c_blst_error_point_not_on_curve :: CInt
-foreign import ccall "blst_error_point_not_in_group" c_blst_error_point_not_in_group :: CInt
-foreign import ccall "blst_error_aggr_type_mismatch" c_blst_error_aggr_type_mismatch :: CInt
-foreign import ccall "blst_error_verify_fail" c_blst_error_verify_fail :: CInt
-foreign import ccall "blst_error_pk_is_infinity" c_blst_error_pk_is_infinity :: CInt
-foreign import ccall "blst_error_bad_scalar" c_blst_error_bad_scalar :: CInt
+c_blst_success :: CInt
+c_blst_success = #{const BLST_SUCCESS}
+
+c_blst_error_bad_encoding :: CInt
+c_blst_error_bad_encoding = #{const BLST_BAD_ENCODING}
+
+c_blst_error_point_not_on_curve :: CInt
+c_blst_error_point_not_on_curve = #{const BLST_POINT_NOT_ON_CURVE}
+
+c_blst_error_point_not_in_group :: CInt
+c_blst_error_point_not_in_group = #{const BLST_POINT_NOT_IN_GROUP}
+
+c_blst_error_aggr_type_mismatch :: CInt
+c_blst_error_aggr_type_mismatch = #{const BLST_AGGR_TYPE_MISMATCH}
+
+c_blst_error_verify_fail :: CInt
+c_blst_error_verify_fail = #{const BLST_VERIFY_FAIL}
+
+c_blst_error_pk_is_infinity :: CInt
+c_blst_error_pk_is_infinity = #{const BLST_PK_IS_INFINITY}
+
+c_blst_error_bad_scalar :: CInt
+c_blst_error_bad_scalar = #{const BLST_BAD_SCALAR}
 
 ---- Utility functions
 
