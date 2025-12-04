@@ -48,6 +48,7 @@ library
   hs-source-dirs: src
   build-tool-depends:
     hsc2hs:hsc2hs
+
   exposed-modules:
     Cardano.Crypto.DSIGN
     Cardano.Crypto.DSIGN.Class
