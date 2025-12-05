@@ -538,17 +538,17 @@ cloneScalar (Scalar src) = do
 sizeFr :: Int
 sizeFr = BLST_FR_SIZE
 
-newtype Fr = Fr (ForeignPtr Void)
+newtype Fr = Fr (PinnedSizedBytes BLST_FR_SIZE)
 
 withFr :: Fr -> (FrPtr -> IO a) -> IO a
-withFr (Fr p2) go = do
-  withForeignPtr p2 (go . FrPtr)
+withFr (Fr psb) go = do
+  psbUseAsCPtr psb $ \ptr ->
+    go (FrPtr ptr)
 
 withNewFr :: (FrPtr -> IO a) -> IO (a, Fr)
 withNewFr go = do
-  p2 <- mallocForeignPtrBytes sizeFr
-  x <- withForeignPtr p2 (go . FrPtr)
-  return (x, Fr p2)
+  (psb, a) <- psbCreateResult @BLST_FR_SIZE (go . FrPtr)
+  return (a, Fr psb)
 
 withNewFr_ :: (FrPtr -> IO a) -> IO a
 withNewFr_ = fmap fst . withNewFr
@@ -557,12 +557,11 @@ withNewFr' :: (FrPtr -> IO a) -> IO Fr
 withNewFr' = fmap snd . withNewFr
 
 cloneFr :: Fr -> IO Fr
-cloneFr (Fr a) = do
-  b <- mallocForeignPtrBytes sizeFr
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap sizeFr
-  return (Fr b)
+cloneFr (Fr src) = do
+  dst <- psbCreate @BLST_FR_SIZE $ \dstPtr ->
+    psbUseAsCPtr src $ \srcPtr ->
+      copyBytes dstPtr srcPtr sizeFr
+  return (Fr dst)
 
 scalarToInteger :: Scalar -> IO Integer
 scalarToInteger scalar = withScalar scalar $ \scalarPtr -> do
@@ -614,7 +613,7 @@ newtype ScalarPtr = ScalarPtr (Ptr Word8)
 
 -- A pointer to a null-terminated array of pointers to scalars
 newtype ScalarArrayPtr = ScalarArrayPtr (Ptr Void)
-newtype FrPtr = FrPtr (Ptr Void)
+newtype FrPtr = FrPtr (Ptr Word8)
 newtype ScratchPtr = ScratchPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
