@@ -461,6 +461,13 @@ instance BLS Curve1 where
   c_blst_p_is_equal = c_blst_p1_is_equal
   c_blst_p_is_inf = c_blst_p1_is_inf
 
+  -- NOTE: These sizes come from the Zcash-compatible serialization format
+  -- used by blst for G1 (blst_p1_*). See `blst.h`:
+  --
+  --   void blst_p1_serialize(byte out[96], const blst_p1 *in);
+  --   void blst_p1_compress(byte out[48], const blst_p1 *in);
+  --
+  -- i.e. G1 elements are 96 bytes uncompressed, 48 bytes compressed.
   compressedSizePoint_ _ = 48
   serializedSizePoint_ _ = 96
 
@@ -491,6 +498,13 @@ instance BLS Curve2 where
   c_blst_p_is_equal = c_blst_p2_is_equal
   c_blst_p_is_inf = c_blst_p2_is_inf
 
+  -- NOTE: These sizes come from the Zcash-compatible serialization format
+  -- used by blst for G2 (blst_p2_*). See `blst.h`:
+  --
+  --   void blst_p2_serialize(byte out[192], const blst_p2 *in);
+  --   void blst_p2_compress(byte out[96], const blst_p2 *in);
+  --
+  -- i.e. G2 elements are 192 bytes uncompressed, 96 bytes compressed.
   compressedSizePoint_ _ = 96
   serializedSizePoint_ _ = 192
 
