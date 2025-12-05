@@ -213,7 +213,7 @@ type Point1ArrayPtr = PointArrayPtr Curve1
 type Point2ArrayPtr = PointArrayPtr Curve2
 
 -- | A pointer to an affine point on one of the two elliptical curves
-newtype AffinePtr curve = AffinePtr (Ptr Void)
+newtype AffinePtr curve = AffinePtr (Ptr Word8)
 
 -- | A pointer to a contiguous array of affine points
 newtype AffineBlockPtr curve = AffineBlockPtr (Ptr Void)
@@ -264,7 +264,12 @@ type role Point nominal
 type Point1 = Point Curve1
 type Point2 = Point Curve2
 
-newtype Affine curve = Affine (ForeignPtr Void)
+-- | Type family to get the size of an affine point on a given curve
+type family AffineSize curve where
+  AffineSize Curve1 = BLST_AFFINE1_SIZE
+  AffineSize Curve2 = BLST_AFFINE2_SIZE
+
+newtype Affine curve = Affine (PinnedSizedBytes (AffineSize curve))
 
 -- Making sure different 'Affine's are not 'Coercible', which would ruin the
 -- intended type safety:
@@ -319,13 +324,14 @@ clonePoint (Point src) = do
   return (Point dst)
 
 withAffine :: forall a curve. Affine curve -> (AffinePtr curve -> IO a) -> IO a
-withAffine (Affine p) go = withForeignPtr p (go . AffinePtr)
+withAffine (Affine psb) go = do
+  psbUseAsCPtr psb $ \ptr ->
+    go (AffinePtr ptr)
 
 withNewAffine :: forall curve a. BLS curve => (AffinePtr curve -> IO a) -> IO (a, Affine curve)
 withNewAffine go = do
-  p <- mallocForeignPtrBytes (sizeAffine (Proxy @curve))
-  x <- withForeignPtr p (go . AffinePtr)
-  return (x, Affine p)
+  (psb, a) <- psbCreateResult @(AffineSize curve) (go . AffinePtr)
+  return (a, Affine psb)
 
 withNewAffine_ :: BLS curve => (AffinePtr curve -> IO a) -> IO a
 withNewAffine_ = fmap fst . withNewAffine
@@ -387,7 +393,7 @@ sizePT = BLST_FP12_SIZE
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
 -- use higher-level wrappers such as 'blsAddOrDouble', 'blsMult', 'blsCneg', 'blsNeg', etc.
-class KnownNat (PointSize curve) => BLS curve where
+class (KnownNat (PointSize curve), KnownNat (AffineSize curve)) => BLS curve where
   c_blst_on_curve :: PointPtr curve -> IO Bool
 
   c_blst_add_or_double :: PointPtr curve -> PointPtr curve -> PointPtr curve -> IO ()
@@ -422,7 +428,11 @@ class KnownNat (PointSize curve) => BLS curve where
 
   serializedSizePoint_ :: Proxy curve -> CSize
   compressedSizePoint_ :: Proxy curve -> CSize
+
+  -- | Runtime affine point size. Delegates to the type-level 'AffineSize' so that
+  --   compile-time and runtime sizes share a single source of truth.
   sizeAffine_ :: Proxy curve -> CSize
+  sizeAffine_ _ = fromInteger (natVal (Proxy @(AffineSize curve)))
 
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
@@ -453,7 +463,6 @@ instance BLS Curve1 where
 
   compressedSizePoint_ _ = 48
   serializedSizePoint_ _ = 96
-  sizeAffine_ _ = BLST_AFFINE1_SIZE
 
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
@@ -484,7 +493,6 @@ instance BLS Curve2 where
 
   compressedSizePoint_ _ = 96
   serializedSizePoint_ _ = 192
-  sizeAffine_ _ = BLST_AFFINE2_SIZE
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
