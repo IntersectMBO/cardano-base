@@ -229,7 +229,7 @@ type Affine2BlockPtr = AffineBlockPtr Curve2
 type Affine1ArrayPtr = AffineArrayPtr Curve1
 type Affine2ArrayPtr = AffineArrayPtr Curve2
 
-newtype PTPtr = PTPtr (Ptr Void)
+newtype PTPtr = PTPtr (Ptr Word8)
 
 unsafePointFromPointPtr :: PointPtr curve -> Point curve
 unsafePointFromPointPtr (PointPtr ptr) =
@@ -267,7 +267,7 @@ type Affine2 = Affine Curve2
 -- | Target element without the final exponantiation. By defining target elements
 -- | as such, we save up the final exponantiation when computing a pairing, and only
 -- | compute it when necessary (e.g. comparison with another point or serialisation)
-newtype PT = PT (ForeignPtr Void)
+newtype PT = PT (PinnedSizedBytes BLST_FP12_SIZE)
 
 -- | Sizes of various representations of elliptic curve points.
 -- | Size of a curve point in memory
@@ -357,13 +357,13 @@ withAffineBlockArrayPtr affinesBlockPtr numPoints go = do
     go (AffineArrayPtr affineVectorPtr)
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
-withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
+withPT (PT psb) go = psbUseAsCPtr psb $ \ptr ->
+  go (PTPtr ptr)
 
 withNewPT :: (PTPtr -> IO a) -> IO (a, PT)
 withNewPT go = do
-  p <- mallocForeignPtrBytes sizePT
-  x <- withForeignPtr p (go . PTPtr)
-  return (x, PT p)
+  (psb, a) <- psbCreateResult @BLST_FP12_SIZE (go . PTPtr)
+  return (a, PT psb)
 
 withNewPT_ :: (PTPtr -> IO a) -> IO a
 withNewPT_ = fmap fst . withNewPT
