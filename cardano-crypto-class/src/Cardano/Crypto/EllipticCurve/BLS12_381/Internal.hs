@@ -173,6 +173,7 @@ where
 
 #include "blst_util.h"
 
+import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes, psbCreate, psbCreateResult, psbUseAsCPtr)
 import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
@@ -182,7 +183,7 @@ import qualified Data.ByteString.Unsafe as BSU
 import Data.Foldable (foldrM)
 import Data.Proxy (Proxy (..))
 import Data.Void
-import Foreign (Storable (..), poke, sizeOf)
+import Foreign (Storable (..), Word8, poke, sizeOf)
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.ForeignPtr
@@ -485,7 +486,7 @@ instance BLS curve => Eq (Affine curve) where
 sizeScalar :: Int
 sizeScalar = BLST_SCALAR_SIZE
 
-newtype Scalar = Scalar (ForeignPtr Void)
+newtype Scalar = Scalar (PinnedSizedBytes BLST_SCALAR_SIZE)
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
@@ -494,13 +495,13 @@ withIntScalar i go = do
 
 withScalar :: Scalar -> (ScalarPtr -> IO a) -> IO a
 withScalar (Scalar p2) go = do
-  withForeignPtr p2 (go . ScalarPtr)
+  psbUseAsCPtr p2 $ \ptr ->
+    go (ScalarPtr ptr)
 
 withNewScalar :: (ScalarPtr -> IO a) -> IO (a, Scalar)
 withNewScalar go = do
-  p2 <- mallocForeignPtrBytes sizeScalar
-  x <- withForeignPtr p2 (go . ScalarPtr)
-  return (x, Scalar p2)
+  (psb, a) <- psbCreateResult @BLST_SCALAR_SIZE (go . ScalarPtr)
+  return (a, Scalar psb)
 
 withNewScalar_ :: (ScalarPtr -> IO a) -> IO a
 withNewScalar_ = fmap fst . withNewScalar
@@ -528,12 +529,11 @@ withScalarArray scalars go = do
      in accumulate ptr scalars
 
 cloneScalar :: Scalar -> IO Scalar
-cloneScalar (Scalar a) = do
-  b <- mallocForeignPtrBytes sizeScalar
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap sizeScalar
-  return (Scalar b)
+cloneScalar (Scalar src) = do
+  dst <- psbCreate @BLST_SCALAR_SIZE $ \dstPtr ->
+    psbUseAsCPtr src $ \srcPtr ->
+      copyBytes dstPtr srcPtr sizeScalar
+  pure (Scalar dst)
 
 sizeFr :: Int
 sizeFr = BLST_FR_SIZE
@@ -610,7 +610,7 @@ scalarFromInteger n = do
 
 ---- Unsafe types
 
-newtype ScalarPtr = ScalarPtr (Ptr Void)
+newtype ScalarPtr = ScalarPtr (Ptr Word8)
 
 -- A pointer to a null-terminated array of pointers to scalars
 newtype ScalarArrayPtr = ScalarArrayPtr (Ptr Void)
