@@ -190,6 +190,7 @@ import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
+import GHC.TypeLits (KnownNat, natVal)
 import System.IO.Unsafe (unsafePerformIO)
 
 ---- Phantom Types
@@ -200,7 +201,7 @@ data Curve2
 ---- Unsafe PointPtr types
 
 -- | A pointer to a (projective) point one of the two elliptical curves
-newtype PointPtr curve = PointPtr (Ptr Void)
+newtype PointPtr curve = PointPtr (Ptr Word8)
 
 -- | A pointer to a null-terminated array of pointers to points
 newtype PointArrayPtr curve = PointArrayPtr (Ptr Void)
@@ -231,9 +232,12 @@ type Affine2ArrayPtr = AffineArrayPtr Curve2
 
 newtype PTPtr = PTPtr (Ptr Word8)
 
-unsafePointFromPointPtr :: PointPtr curve -> Point curve
-unsafePointFromPointPtr (PointPtr ptr) =
-  Point . unsafePerformIO $ newForeignPtr_ ptr
+unsafePointFromPointPtr :: forall curve. BLS curve => PointPtr curve -> Point curve
+unsafePointFromPointPtr (PointPtr srcPtr) =
+  unsafePerformIO $ do
+    psb <- psbCreate @(PointSize curve) $ \dstPtr ->
+      copyBytes dstPtr srcPtr (sizePoint (Proxy @curve))
+    return (Point psb)
 
 eqAffinePtr :: forall curve. BLS curve => AffinePtr curve -> AffinePtr curve -> IO Bool
 eqAffinePtr (AffinePtr a) (AffinePtr b) =
@@ -244,9 +248,14 @@ instance BLS curve => Eq (AffinePtr curve) where
 
 ---- Safe Point types / marshalling
 
+-- | Type family to get the size of a point on a given curve
+type family PointSize curve where
+  PointSize Curve1 = BLST_P1_SIZE
+  PointSize Curve2 = BLST_P2_SIZE
+
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
-newtype Point curve = Point (ForeignPtr Void)
+newtype Point curve = Point (PinnedSizedBytes (PointSize curve))
 
 -- Making sure different 'Point's are not 'Coercible', which would ruin the
 -- intended type safety:
@@ -287,13 +296,14 @@ sizeAffine :: forall curve. BLS curve => Proxy curve -> Int
 sizeAffine = fromIntegral . sizeAffine_
 
 withPoint :: forall a curve. Point curve -> (PointPtr curve -> IO a) -> IO a
-withPoint (Point p) go = withForeignPtr p (go . PointPtr)
+withPoint (Point psb) go =
+  psbUseAsCPtr psb $ \ptr ->
+    go (PointPtr ptr)
 
 withNewPoint :: forall curve a. BLS curve => (PointPtr curve -> IO a) -> IO (a, Point curve)
 withNewPoint go = do
-  p <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
-  x <- withForeignPtr p (go . PointPtr)
-  return (x, Point p)
+  (psb, a) <- psbCreateResult @(PointSize curve) (go . PointPtr)
+  return (a, Point psb)
 
 withNewPoint_ :: BLS curve => (PointPtr curve -> IO a) -> IO a
 withNewPoint_ = fmap fst . withNewPoint
@@ -302,12 +312,11 @@ withNewPoint' :: BLS curve => (PointPtr curve -> IO a) -> IO (Point curve)
 withNewPoint' = fmap snd . withNewPoint
 
 clonePoint :: forall curve. BLS curve => Point curve -> IO (Point curve)
-clonePoint (Point a) = do
-  b <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap (sizePoint (Proxy @curve))
-  return (Point b)
+clonePoint (Point src) = do
+  dst <- psbCreate @(PointSize curve) $ \dstPtr ->
+    psbUseAsCPtr src $ \srcPtr ->
+      copyBytes dstPtr srcPtr (sizePoint (Proxy @curve))
+  return (Point dst)
 
 withAffine :: forall a curve. Affine curve -> (AffinePtr curve -> IO a) -> IO a
 withAffine (Affine p) go = withForeignPtr p (go . AffinePtr)
@@ -378,7 +387,7 @@ sizePT = BLST_FP12_SIZE
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
 -- use higher-level wrappers such as 'blsAddOrDouble', 'blsMult', 'blsCneg', 'blsNeg', etc.
-class BLS curve where
+class KnownNat (PointSize curve) => BLS curve where
   c_blst_on_curve :: PointPtr curve -> IO Bool
 
   c_blst_add_or_double :: PointPtr curve -> PointPtr curve -> PointPtr curve -> IO ()
@@ -406,7 +415,11 @@ class BLS curve where
   c_blst_p_is_equal :: PointPtr curve -> PointPtr curve -> IO Bool
   c_blst_p_is_inf :: PointPtr curve -> IO Bool
 
+  -- | Runtime point size. Delegates to the type-level 'PointSize' so that
+  --   compile-time and runtime sizes share a single source of truth.
   sizePoint_ :: Proxy curve -> CSize
+  sizePoint_ _ = fromInteger (natVal (Proxy @(PointSize curve)))
+
   serializedSizePoint_ :: Proxy curve -> CSize
   compressedSizePoint_ :: Proxy curve -> CSize
   sizeAffine_ :: Proxy curve -> CSize
@@ -438,7 +451,6 @@ instance BLS Curve1 where
   c_blst_p_is_equal = c_blst_p1_is_equal
   c_blst_p_is_inf = c_blst_p1_is_inf
 
-  sizePoint_ _ = BLST_P1_SIZE
   compressedSizePoint_ _ = 48
   serializedSizePoint_ _ = 96
   sizeAffine_ _ = BLST_AFFINE1_SIZE
@@ -470,7 +482,6 @@ instance BLS Curve2 where
   c_blst_p_is_equal = c_blst_p2_is_equal
   c_blst_p_is_inf = c_blst_p2_is_inf
 
-  sizePoint_ _ = BLST_P2_SIZE
   compressedSizePoint_ _ = 96
   serializedSizePoint_ _ = 192
   sizeAffine_ _ = BLST_AFFINE2_SIZE
