@@ -1,8 +1,9 @@
 # Changelog for `cardano-crypto-tests`
 
-## 2.2.2.1
+## 2.2.3.0
 
-*
+* Improve negative deserialization tests for `Hash` and `DSIGN`
+* Add `prop_bad_cbor_bytes`
 
 ## 2.2.2.0
 

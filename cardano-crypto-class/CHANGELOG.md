@@ -1,8 +1,16 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.2.4.0
+
+* Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
+* Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
+* Add `ToCBOR` and `FromCBOR` instances for `PackedBytes`
+* Add `packShortByteString` and `packShortByteStringWithOffset`
+* Deprecate `packBytesMaybe`
+
 ## 2.2.3.2
 
-*
+* Fix `FromCBOR` instance for `Hash`
 
 ## 2.2.3.1
 

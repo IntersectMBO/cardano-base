@@ -60,14 +60,15 @@ import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat, Nat, natVal)
 
+import Control.Monad.Trans.Fail.String (errorFail)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.ByteString.Short as SBS
 import Data.MemPack (FailT (FailT), MemPack, StateT (StateT), Unpack (Unpack))
 import Data.Word (Word8)
 import Numeric.Natural (Natural)
@@ -87,7 +88,7 @@ import Control.DeepSeq (NFData)
 
 import NoThunks.Class (NoThunks)
 
-import Cardano.Binary (Encoding, FromCBOR (..), Size, ToCBOR (..), serialize')
+import Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..), serialize')
 import Cardano.Crypto.PackedBytes
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.HeapWords (HeapWords (..))
@@ -149,14 +150,10 @@ instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
 instance HashAlgorithm h => IsString (Code Q (Hash h a)) where
   fromString = Code . fromString
 
-pattern UnsafeHash :: forall h a. HashAlgorithm h => ShortByteString -> Hash h a
+pattern UnsafeHash :: forall h a. (HashAlgorithm h, HasCallStack) => ShortByteString -> Hash h a
 pattern UnsafeHash bytes <- UnsafeHashRep (unpackBytes -> bytes)
   where
-    UnsafeHash bytes =
-      case hashFromBytesShort bytes of
-        Nothing ->
-          error "UnsafeHash: mismatched size of the supplied ShortByteString and the expected digest"
-        Just h -> h
+    UnsafeHash = UnsafeHashRep . errorFail . packShortByteString
 {-# COMPLETE UnsafeHash #-}
 
 --
@@ -211,9 +208,10 @@ hashFromBytesShort ::
   -- | It must be a buffer of exact length, as given by 'sizeHash'.
   ShortByteString ->
   Maybe (Hash h a)
-hashFromBytesShort bytes = UnsafeHashRep <$> packBytesMaybe bytes 0
+hashFromBytesShort bytes = UnsafeHashRep <$> packShortByteString bytes
 
--- | Just like `hashFromBytesShort`, but allows using a region of a 'ShortByteString'.
+-- | Just like `hashFromBytesShort`, but allows using a region in a middle of a
+-- 'ShortByteString'. Will return `Nothing` if there is not enough data or offset is negative.
 hashFromOffsetBytesShort ::
   forall h a.
   HashAlgorithm h =>
@@ -222,7 +220,7 @@ hashFromOffsetBytesShort ::
   -- | Offset in number of bytes
   Int ->
   Maybe (Hash h a)
-hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packBytesMaybe bytes offset
+hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packShortByteStringWithOffset bytes offset
 
 -- | The representation of the hash as bytes, as a 'ShortByteString'.
 hashToBytesShort :: Hash h a -> ShortByteString
@@ -322,34 +320,9 @@ parseHash t =
 -- CBOR serialisation
 --
 
-instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a) where
-  toCBOR (UnsafeHash h) = toCBOR h
+deriving instance (HashAlgorithm h, Typeable a) => ToCBOR (Hash h a)
 
-  -- \| 'Size' expression for @Hash h a@, which is expressed using the 'ToCBOR'
-  -- instance for 'ByteString' (as is the above 'toCBOR' method).  'Size'
-  -- computation of length of the bytestring is passed as the first argument to
-  -- 'encodedSizeExpr'.  The 'ByteString' instance will use it to calculate
-  -- @'size' ('Proxy' @('LengthOf' 'ByteString'))@.
-  encodedSizeExpr _size proxy =
-    encodedSizeExpr (const hashSize) (hashToBytes <$> proxy)
-    where
-      hashSize :: Size
-      hashSize = fromIntegral (sizeHash (Proxy :: Proxy h))
-
-instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a) where
-  fromCBOR = do
-    sbs <- fromCBOR
-    case hashFromBytesShort sbs of
-      Just x -> return x
-      Nothing ->
-        fail $
-          "hash bytes wrong size, expected "
-            ++ show expected
-            ++ " but got "
-            ++ show actual
-        where
-          expected = sizeHash (Proxy :: Proxy h)
-          actual = SBS.length sbs
+deriving instance (HashAlgorithm h, Typeable a) => FromCBOR (Hash h a)
 
 --
 -- Deprecated

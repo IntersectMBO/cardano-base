@@ -20,7 +20,15 @@ import Data.MemPack
 import Data.Proxy (Proxy (..))
 import Data.String (fromString)
 import GHC.TypeLits
-import Test.Crypto.Util (Lock, prop_cbor, prop_cbor_size, prop_no_thunks, withLock)
+import Test.Crypto.Util (
+  Lock,
+  prop_bad_cbor_bytes,
+  prop_cbor,
+  prop_cbor_size,
+  prop_no_thunks,
+  prop_raw_deserialise,
+  withLock,
+ )
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Test.Tasty (TestTree, testGroup)
@@ -57,11 +65,11 @@ testHashAlgorithm p =
     n
     [ testProperty "hash size" $ prop_hash_correct_sizeHash @h @[Int]
     , testProperty "serialise" $ prop_hash_cbor @h
+    , testProperty "fail fromCBOR" $ prop_bad_cbor_bytes @(Hash h ())
+    , testProperty "hashFromBytes" $ prop_raw_deserialise (hashFromBytes @h @())
+    , testProperty "hashFromBytesShort" $ prop_raw_deserialise (hashFromBytesShort @h @() . SBS.toShort)
     , testProperty "ToCBOR size" $ prop_hash_cbor_size @h
-    , -- TODO The following property is wrong because show and fromString are not inverses of each other
-      -- Commenting the following out to fix CI and unblock other unrelated PRs to this project.
-
-      testProperty "hashFromStringAsHex/hashToStringFromHash" $
+    , testProperty "hashFromStringAsHex/hashToStringFromHash" $
         prop_hash_hashFromStringAsHex_hashToStringFromHash @h @Float
     , testProperty "hashFromStringAsHex/fromString" $ prop_hash_hashFromStringAsHex_fromString @h @Float
     , testProperty "show/read" $ prop_hash_show_read @h @Float

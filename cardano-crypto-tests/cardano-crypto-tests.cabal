@@ -1,6 +1,6 @@
 cabal-version: 2.2
 name: cardano-crypto-tests
-version: 2.2.2.0
+version: 2.2.3.0
 synopsis: Tests for cardano-crypto-class and -praos
 description: Tests for cardano-crypto-class and -praos
 license: Apache-2.0
@@ -89,7 +89,7 @@ library
     base16-bytestring,
     bytestring >=0.10.12.0,
     cardano-binary,
-    cardano-crypto-class ^>=2.2.2,
+    cardano-crypto-class ^>=2.2.4,
     cardano-crypto-praos >=2.2.1,
     cborg,
     containers,
