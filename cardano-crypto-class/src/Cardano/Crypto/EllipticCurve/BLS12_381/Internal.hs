@@ -25,6 +25,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Phantom Types
   Curve1,
   Curve2,
+  Dual,
 
   -- * Error codes
   c_blst_success,
@@ -40,10 +41,13 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Affine,
   Affine1,
   Affine2,
+  AffineSize,
   BLSTError (..),
   Point (..),
   Point1,
   Point2,
+  PointSize,
+  CompressedPointSize,
   PT,
   Scalar (..),
   Fr (..),
@@ -72,7 +76,9 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_affine_in_g,
     c_blst_generator,
     c_blst_p_is_equal,
-    c_blst_p_is_inf
+    c_blst_p_is_inf,
+    c_blst_sk_to_pk,
+    c_blst_sign
   ),
 
   -- * Pairing check
@@ -84,6 +90,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   c_blst_fp12_mul,
   c_blst_fp12_is_equal,
   c_blst_fp12_finalverify,
+  FinalVerifyOrder,
 
   -- * Scalar functions
   c_blst_scalar_fr_check,
@@ -91,6 +98,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   c_blst_fr_from_scalar,
   c_blst_scalar_from_be_bytes,
   c_blst_bendian_from_scalar,
+  c_blst_keygen,
 
   -- * Marshalling functions
   sizePoint,
@@ -128,6 +136,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   cloneFr,
 
   -- * Utility
+  withMaybeCStringLen,
   integerAsCStrL,
   cstrToInteger,
   integerToBS,
@@ -168,6 +177,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 
   -- * Pairings
   millerLoop,
+  finalVerifyPairs,
 )
 where
 
@@ -197,6 +207,11 @@ import System.IO.Unsafe (unsafePerformIO)
 
 data Curve1
 data Curve2
+
+-- | A type family mapping a curve to its dual curve (its an involution).
+type family Dual curve where
+  Dual Curve1 = Curve2
+  Dual Curve2 = Curve1
 
 ---- Unsafe PointPtr types
 
@@ -252,6 +267,11 @@ instance BLS curve => Eq (AffinePtr curve) where
 type family PointSize curve where
   PointSize Curve1 = CARDANO_BLST_P1_SIZE
   PointSize Curve2 = CARDANO_BLST_P2_SIZE
+
+-- | Type family to get the size of a compressed point on a given curve
+type family CompressedPointSize curve where
+  CompressedPointSize Curve1 = 48
+  CompressedPointSize Curve2 = 96
 
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
@@ -434,6 +454,9 @@ class (KnownNat (PointSize curve), KnownNat (AffineSize curve)) => BLS curve whe
   sizeAffine_ :: Proxy curve -> CSize
   sizeAffine_ _ = fromInteger (natVal (Proxy @(AffineSize curve)))
 
+  c_blst_sk_to_pk :: PointPtr curve -> ScalarPtr -> IO ()
+  c_blst_sign :: Proxy curve -> PointPtr (Dual curve) -> PointPtr (Dual curve) -> ScalarPtr -> IO ()
+
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
 
@@ -471,6 +494,9 @@ instance BLS Curve1 where
   compressedSizePoint_ _ = 48
   serializedSizePoint_ _ = 96
 
+  c_blst_sk_to_pk = c_blst_sk_to_pk_in_g1
+  c_blst_sign _ = c_blst_sign_pk_in_g1
+
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
 
@@ -507,6 +533,9 @@ instance BLS Curve2 where
   -- i.e. G2 elements are 192 bytes uncompressed, 96 bytes compressed.
   compressedSizePoint_ _ = 96
   serializedSizePoint_ _ = 192
+
+  c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
+  c_blst_sign _ = c_blst_sign_pk_in_g2
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
@@ -659,6 +688,8 @@ foreign import ccall "blst_scalar_from_be_bytes"
   c_blst_scalar_from_be_bytes :: ScalarPtr -> Ptr CChar -> CSize -> IO Bool
 foreign import ccall "blst_scalar_from_bendian"
   c_blst_scalar_from_bendian :: ScalarPtr -> Ptr CChar -> IO ()
+foreign import ccall "blst_keygen"
+  c_blst_keygen :: ScalarPtr -> Ptr CChar -> CSize -> Ptr CChar -> CSize -> IO ()
 
 ---- Raw Point1 functions
 
@@ -685,6 +716,11 @@ foreign import ccall "blst_p1_generator" c_blst_p1_generator :: Point1Ptr
 
 foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: Point1Ptr -> Point1Ptr -> IO Bool
 foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: Point1Ptr -> IO Bool
+
+foreign import ccall "blst_sk_to_pk_in_g1"
+  c_blst_sk_to_pk_in_g1 :: Point1Ptr -> ScalarPtr -> IO ()
+foreign import ccall "blst_sign_pk_in_g1"
+  c_blst_sign_pk_in_g1 :: Point2Ptr -> Point2Ptr -> ScalarPtr -> IO ()
 
 foreign import ccall "blst_p1s_mult_pippenger_scratch_sizeof"
   c_blst_p1s_mult_pippenger_scratch_sizeof :: CSize -> CSize
@@ -719,6 +755,11 @@ foreign import ccall "blst_p2_generator" c_blst_p2_generator :: Point2Ptr
 
 foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: Point2Ptr -> Point2Ptr -> IO Bool
 foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: Point2Ptr -> IO Bool
+
+foreign import ccall "blst_sk_to_pk_in_g2"
+  c_blst_sk_to_pk_in_g2 :: Point2Ptr -> ScalarPtr -> IO ()
+foreign import ccall "blst_sign_pk_in_g2"
+  c_blst_sign_pk_in_g2 :: Point1Ptr -> Point1Ptr -> ScalarPtr -> IO ()
 
 foreign import ccall "blst_p2s_mult_pippenger_scratch_sizeof"
   c_blst_p2s_mult_pippenger_scratch_sizeof :: CSize -> CSize
@@ -1116,6 +1157,22 @@ millerLoop p1 p2 =
       withAffine (toAffine p2) $ \ap2 ->
         withNewPT' $ \ppt ->
           c_blst_miller_loop ppt ap2 ap1
+
+-- A single side of e(·,·): the point on `curve` and the point on its `Dual`.
+type PairingSide curve = (Point curve, Point (Dual curve))
+
+class (BLS curve, BLS (Dual curve)) => FinalVerifyOrder curve where
+  millerSide :: PairingSide curve -> PT
+  finalVerifyPairs :: PairingSide curve -> PairingSide curve -> Bool
+  finalVerifyPairs lhs rhs = ptFinalVerify (millerSide lhs) (millerSide rhs)
+
+instance FinalVerifyOrder Curve1 where
+  -- Curve1: miller loop expects (g1, g2)
+  millerSide (g1, g2) = millerLoop g1 g2
+
+instance FinalVerifyOrder Curve2 where
+  -- Curve2: miller loop expects (g1, g2) but our Pair is (g2, g1)
+  millerSide (g2, g1) = millerLoop g1 g2
 
 ---- Utility
 
