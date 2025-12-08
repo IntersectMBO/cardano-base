@@ -4,6 +4,8 @@ This package defines type classes and mock instances for the following cryptogra
 
   - A digital signature scheme
 
+  - An aggregatable signature scheme
+
   - A cryptographic hashing function
 
   - A key-evolving signature scheme

@@ -138,6 +138,9 @@ class
   type Signable v :: Type -> Constraint
   type Signable v = Empty
 
+  type KeyGenContextDSIGN v :: Type
+  type KeyGenContextDSIGN v = ()
+
   signDSIGN ::
     (Signable v a, HasCallStack) =>
     ContextDSIGN v ->
@@ -161,6 +164,9 @@ class
   -- provided seed is not long enough. Callers should ensure that the seed has
   -- is at least 'seedSizeDSIGN' bytes long.
   genKeyDSIGN :: Seed -> SignKeyDSIGN v
+
+  genKeyDSIGNWithKeyInfo :: KeyGenContextDSIGN v -> Seed -> SignKeyDSIGN v
+  genKeyDSIGNWithKeyInfo _ = genKeyDSIGN
 
   --
   -- Serialisation/(de)serialisation in fixed-size raw format
