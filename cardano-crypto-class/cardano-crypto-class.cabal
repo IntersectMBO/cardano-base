@@ -1,4 +1,4 @@
-cabal-version: 2.2
+cabal-version: 3.0
 name: cardano-crypto-class
 version: 2.2.3.2
 synopsis:
