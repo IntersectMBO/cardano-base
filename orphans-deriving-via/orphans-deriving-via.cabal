@@ -1,4 +1,4 @@
-cabal-version: >=1.10
+cabal-version: 3.0
 name: orphans-deriving-via
 version: 0.1.0.2
 synopsis: Orphan instances for the base-deriving-via hooks
@@ -34,4 +34,4 @@ library
     base,
     base-deriving-via,
     deepseq,
-    nothunks
+    nothunks,
