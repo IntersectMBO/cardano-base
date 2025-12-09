@@ -7,10 +7,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- According to the documentation for unsafePerformIO:
 --
@@ -25,17 +27,21 @@
 {-# OPTIONS_GHC -fno-full-laziness #-}
 
 module Cardano.Crypto.DSIGN.BLS12381 (
+  BLS12381DSIGN,
   BLS12381MinVerKeyDSIGN,
   BLS12381MinSigDSIGN,
+  BLS12381CurveConstraints,
   VerKeyDSIGN (..),
   SignKeyDSIGN (..),
   SigDSIGN (..),
+  ProofOfPossessionDSIGN (..),
 ) where
 
 #include "blst_util.h"
 
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (encodedSizeExpr, toCBOR))
 import Cardano.Crypto.DSIGN.Class (
+  DSIGNAggregatable (..),
   DSIGNAlgorithm (
     ContextDSIGN,
     KeyGenContextDSIGN,
@@ -60,12 +66,15 @@ import Cardano.Crypto.DSIGN.Class (
     signDSIGN,
     verifyDSIGN
   ),
+  decodeProofOfPossessionDSIGN,
   decodeSigDSIGN,
   decodeSignKeyDSIGN,
   decodeVerKeyDSIGN,
+  encodeProofOfPossessionDSIGN,
   encodeSigDSIGN,
   encodeSignKeyDSIGN,
   encodeVerKeyDSIGN,
+  encodedProofOfPossessionDSIGNSizeExpr,
   encodedSigDSIGNSizeExpr,
   encodedSignKeyDSIGNSizeExpr,
   encodedVerKeyDSIGNSizeExpr,
@@ -83,14 +92,20 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   PointSize,
   Scalar (..),
   ScalarPtr (..),
+  blsAddOrDouble,
   blsCompress,
   blsGenerator,
   blsHash,
+  blsIsInf,
+  blsMult,
   blsUncompress,
+  blsZero,
   c_blst_keygen,
+  compressedSizePoint,
   finalVerifyPairs,
   scalarFromBS,
   scalarToBS,
+  scalarToInteger,
   withMaybeCStringLen,
   withNewPoint_,
  )
@@ -100,16 +115,17 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbUseAsCPtr,
  )
 import Cardano.Crypto.Seed (getBytesFromSeedT)
-import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
+import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation), splitsAt)
 import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 import Data.Data (Typeable)
+import qualified Data.Foldable as F (foldl')
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import GHC.TypeNats (KnownNat)
+import GHC.TypeNats (KnownNat, type (+))
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -327,3 +343,128 @@ instance
   FromCBOR (SigDSIGN (BLS12381DSIGN curve))
   where
   fromCBOR = decodeSigDSIGN
+
+-- Manual instance to avoid using the PinnedSizedBytes Eq instance
+-- but use the Point Eq instance instead.
+--
+-- Note that a Point on the curve is a representative of an equivalence class.
+-- That is, given a point P, then p ~ [x:y,z] in projective coordinates.
+-- If we round trip via the compressed form (via rawSerialise/Deserialise),
+-- we get a canonical representative of the equivalence class that might differ!
+-- That is, from compressed (x,y) we get back [x:y,0].
+instance
+  ( BLS (Dual curve)
+  , KnownNat (PointSize (Dual curve))
+  ) =>
+  Eq (ProofOfPossessionDSIGN (BLS12381DSIGN curve))
+  where
+  ProofOfPossessionBLS12381 mu1a mu2a == ProofOfPossessionBLS12381 mu1b mu2b =
+    let p1a = Point @(Dual curve) mu1a
+        p1b = Point @(Dual curve) mu1b
+        p2a = Point @(Dual curve) mu2a
+        p2b = Point @(Dual curve) mu2b
+     in p1a == p1b && p2a == p2b
+
+instance
+  ( BLS12381CurveConstraints curve
+  , KnownNat (CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve))
+  ) =>
+  DSIGNAggregatable (BLS12381DSIGN curve)
+  where
+  type
+    -- Sizes used in serialization/deserialization
+    -- so these use the compressed sizes of the BLS12-381 `Point curve`
+    SizeProofOfPossessionDSIGN (BLS12381DSIGN curve) =
+      CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve)
+  data ProofOfPossessionDSIGN (BLS12381DSIGN curve)
+    = ProofOfPossessionBLS12381
+        !(PinnedSizedBytes (PointSize (Dual curve))) -- mu1
+        !(PinnedSizedBytes (PointSize (Dual curve))) -- mu2
+    deriving stock (Show, Generic)
+    deriving anyclass (NoThunks)
+    deriving anyclass (NFData)
+  aggregateVerKeysDSIGNWithoutPoPs verKeys = do
+    -- Sum the verification keys as curve points
+    let aggrPoint :: Point curve
+        aggrPoint =
+          F.foldl' blsAddOrDouble (blsZero @curve) $
+            [ Point @curve verKeyPsb
+            | VerKeyBLS12381 verKeyPsb <- verKeys
+            ]
+    -- Unlikly case, but best to reject infinity as an aggregate verification key
+    -- This happens if for every secret/verification key pair, the inverse of each
+    -- secret key (and thus also the verification key) is also present in the list.
+    if blsIsInf @curve aggrPoint
+      then Left "aggregateVerKeysDSIGN: aggregated verification key is infinity"
+      else
+        let Point aggrPsb = aggrPoint
+         in Right (VerKeyBLS12381 aggrPsb)
+  aggregateSigDSIGN sigs = do
+    -- Sum the signatures as curve points
+    let aggrPoint :: Point (Dual curve)
+        aggrPoint =
+          F.foldl' blsAddOrDouble (blsZero @(Dual curve)) $
+            [ Point @(Dual curve) sigPsb
+            | SigBLS12381 sigPsb <- sigs
+            ]
+    -- Unlikly case, but best to reject infinity as an aggregate signature
+    if blsIsInf @(Dual curve) aggrPoint
+      then Left "aggregateSigDSIGN: aggregated signature is infinity"
+      else
+        let Point aggrPsb = aggrPoint
+         in Right (SigBLS12381 aggrPsb)
+  {-# NOINLINE proveProofOfPossessionDSIGN #-}
+  proveProofOfPossessionDSIGN (dst, aug) (SignKeyBLS12381 skPsb) =
+    unsafeDupablePerformIO $ do
+      skAsInteger <- scalarToInteger (Scalar skPsb)
+      let VerKeyBLS12381 vkPsb =
+            deriveVerKeyDSIGN (SignKeyBLS12381 skPsb) ::
+              VerKeyDSIGN (BLS12381DSIGN curve)
+          vk = blsCompress @curve (Point vkPsb)
+          Point mu1Psb =
+            blsMult (blsHash @(Dual curve) vk dst aug) skAsInteger
+          Point mu2Psb =
+            blsMult (blsGenerator @(Dual curve)) skAsInteger
+      return $ ProofOfPossessionBLS12381 mu1Psb mu2Psb
+  verifyProofOfPossessionDSIGN (dst, aug) (VerKeyBLS12381 vkPsb) (ProofOfPossessionBLS12381 mu1Psb mu2Psb) =
+    let vk = Point vkPsb
+        check1 =
+          finalVerifyPairs @curve (blsGenerator, Point mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
+        check2 = finalVerifyPairs @curve (vk, blsGenerator) (blsGenerator, Point mu2Psb)
+     in if check1 && check2
+          then Right ()
+          else Left "ProofOfPossessionDSIGN BLS12381DSIGN failed to verify."
+  rawSerialiseProofOfPossessionDSIGN (ProofOfPossessionBLS12381 mu1Psb mu2Psb) =
+    blsCompress @(Dual curve) (Point mu1Psb) <> blsCompress @(Dual curve) (Point mu2Psb)
+  rawDeserialiseProofOfPossessionDSIGN bs =
+    -- We use the compressed size of a point in Dual curve to split
+    let chunkSize = compressedSizePoint (Proxy @(Dual curve))
+     in case splitsAt [chunkSize] bs of
+          mu1Bs : mu2Bs : _ ->
+            -- Note that these also performs group membership checks
+            case ( blsUncompress @(Dual curve) mu1Bs
+                 , blsUncompress @(Dual curve) mu2Bs
+                 ) of
+              (Right (Point mu1Psb), Right (Point mu2Psb)) ->
+                Just $ ProofOfPossessionBLS12381 mu1Psb mu2Psb
+              _ ->
+                Nothing
+          _ ->
+            Nothing
+
+instance
+  ( BLS12381CurveConstraints curve
+  , KnownNat (CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve))
+  ) =>
+  ToCBOR (ProofOfPossessionDSIGN (BLS12381DSIGN curve))
+  where
+  toCBOR = encodeProofOfPossessionDSIGN
+  encodedSizeExpr _ = encodedProofOfPossessionDSIGNSizeExpr
+
+instance
+  ( BLS12381CurveConstraints curve
+  , KnownNat (CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve))
+  ) =>
+  FromCBOR (ProofOfPossessionDSIGN (BLS12381DSIGN curve))
+  where
+  fromCBOR = decodeProofOfPossessionDSIGN
