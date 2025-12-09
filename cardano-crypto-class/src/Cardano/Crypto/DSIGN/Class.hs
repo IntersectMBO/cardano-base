@@ -56,10 +56,18 @@ module Cardano.Crypto.DSIGN.Class (
   encodeSignKeyDSIGNM,
   decodeSignKeyDSIGNM,
   rawDeserialiseSignKeyDSIGNM,
+
+  -- * Aggregatable DSIGN algorithms with Proof of Possession
+  DSIGNAggregatable (..),
+  sizeProofOfPossessionDSIGN,
+  encodeProofOfPossessionDSIGN,
+  decodeProofOfPossessionDSIGN,
+  encodedProofOfPossessionDSIGNSizeExpr,
 )
 where
 
 import Control.DeepSeq (NFData)
+import Control.Monad (forM_)
 import Control.Monad.Class.MonadST (MonadST)
 import Control.Monad.Class.MonadThrow (MonadThrow)
 import Data.ByteString (ByteString)
@@ -461,3 +469,136 @@ decodeSignKeyDSIGNM = do
         where
           expected = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v))
           actual = BS.length bs
+
+-- | extention of the `DSGINAlgorithm` to allow for aggregatable digital signature
+-- schemes that support Proof of Possession (PoP) of signing keys. Such schemes enable the
+-- aggregation of multiple signatures and verification keys into a single signature
+-- and verification key, respectively, while ensuring that each verification key is
+-- associated with a valid signing key through the use of Proofs of Possession. The
+-- latter is against rogue-key attacks.
+--
+-- Examples of aggregatable signatures schemes are the BLS signature scheme and
+-- the Pixel scheme.
+class
+  ( DSIGNAlgorithm v
+  , Show (ProofOfPossessionDSIGN v)
+  , Eq (ProofOfPossessionDSIGN v)
+  , NoThunks (ProofOfPossessionDSIGN v)
+  , KnownNat (SizeProofOfPossessionDSIGN v)
+  ) =>
+  DSIGNAggregatable v
+  where
+  type SizeProofOfPossessionDSIGN v :: Nat
+  data ProofOfPossessionDSIGN v :: Type
+
+  -- | Aggregate multiple verification keys into a single verification key
+  --   given their corresponding Proofs of Possession.
+  --
+  -- Note that the signing context is passed since the PoP might depend on it.
+  aggregateVerKeysDSIGN ::
+    HasCallStack =>
+    ContextDSIGN v ->
+    [(VerKeyDSIGN v, ProofOfPossessionDSIGN v)] ->
+    Either String (VerKeyDSIGN v)
+  aggregateVerKeysDSIGN ctx verKeysAndPoPs = do
+    -- Verify every verKey and its PoP (fail-fast)
+    forM_ verKeysAndPoPs $ uncurry (verifyProofOfPossessionDSIGN ctx)
+    aggregateVerKeysDSIGNWithoutPoPs (map fst verKeysAndPoPs)
+
+  -- | Aggregate multiple verification keys into a single verification key
+  --   without requiring their corresponding Proofs of Possession.
+  --  This function is unsafe and should only be used when the caller can
+  --  guarantee that all verification keys are valid (i.e., their PoPs have been
+  --  verified through other means).
+  aggregateVerKeysDSIGNWithoutPoPs ::
+    HasCallStack =>
+    [VerKeyDSIGN v] ->
+    Either String (VerKeyDSIGN v)
+
+  -- | Aggregate multiple signatures into a single signature
+  aggregateSigDSIGN ::
+    HasCallStack =>
+    [SigDSIGN v] ->
+    Either String (SigDSIGN v)
+
+  -- | Verify multiple verification key and Proofs of Possession pairs
+  --  against a single message and group signature.
+  --
+  -- Note that the signing context is passed since the PoP might depend on it.
+  verifyAggregateDSIGN ::
+    (Signable v a, HasCallStack) =>
+    ContextDSIGN v ->
+    [(VerKeyDSIGN v, ProofOfPossessionDSIGN v)] ->
+    a ->
+    SigDSIGN v ->
+    Either String ()
+  verifyAggregateDSIGN ctx verKeysAndPoPs msg sig = do
+    -- Verify every verKey and its PoP (fail-fast)
+    forM_ verKeysAndPoPs $ uncurry (verifyProofOfPossessionDSIGN ctx)
+    verifyAggregateDSIGNWithoutPoPs ctx (map fst verKeysAndPoPs) msg sig
+
+  -- | Verify multiple verification keys without Proofs of Possessions
+  --  against a single message and group signature. This function is unsafe and should only be used
+  --  when the caller can guarantee that all verification keys are valid
+  --  (i.e., their PoPs have been verified through other means).
+  verifyAggregateDSIGNWithoutPoPs ::
+    (Signable v a, HasCallStack) =>
+    ContextDSIGN v ->
+    [VerKeyDSIGN v] ->
+    a ->
+    SigDSIGN v ->
+    Either String ()
+  verifyAggregateDSIGNWithoutPoPs ctx verKeys msg sig = do
+    aggrVer <- aggregateVerKeysDSIGNWithoutPoPs verKeys
+    verifyDSIGN ctx aggrVer msg sig
+
+  -- Produce a PoP from the signing key
+  proveProofOfPossessionDSIGN ::
+    HasCallStack =>
+    ContextDSIGN v ->
+    SignKeyDSIGN v ->
+    ProofOfPossessionDSIGN v
+
+  -- Verify that PoP matches the verification key
+  verifyProofOfPossessionDSIGN ::
+    HasCallStack =>
+    ContextDSIGN v ->
+    VerKeyDSIGN v ->
+    ProofOfPossessionDSIGN v ->
+    Either String ()
+
+  --
+  -- Serialisation/(de)serialisation in fixed-size raw format
+  --
+  rawSerialiseProofOfPossessionDSIGN :: ProofOfPossessionDSIGN v -> ByteString
+  rawDeserialiseProofOfPossessionDSIGN :: ByteString -> Maybe (ProofOfPossessionDSIGN v)
+
+sizeProofOfPossessionDSIGN :: forall v proxy. DSIGNAggregatable v => proxy v -> Word
+sizeProofOfPossessionDSIGN _ = fromInteger (natVal (Proxy @(SizeProofOfPossessionDSIGN v)))
+
+-- encoding and decoding of ProofOfPossession
+encodeProofOfPossessionDSIGN :: DSIGNAggregatable v => ProofOfPossessionDSIGN v -> Encoding
+encodeProofOfPossessionDSIGN = encodeBytes . rawSerialiseProofOfPossessionDSIGN
+
+decodeProofOfPossessionDSIGN ::
+  forall v s. DSIGNAggregatable v => Decoder s (ProofOfPossessionDSIGN v)
+decodeProofOfPossessionDSIGN = do
+  bs <- decodeBytes
+  case rawDeserialiseProofOfPossessionDSIGN bs of
+    Just pop -> return pop
+    Nothing ->
+      failSizeCheck
+        "decodeProofOfPossession"
+        "proof of possession"
+        bs
+        (sizeProofOfPossessionDSIGN (Proxy :: Proxy v))
+
+-- | 'Size' expression for 'ProofOfPossessionDSIGN' which is using 'sizeProofOfPossessionDSIGN'
+-- encoded as 'Size'.
+encodedProofOfPossessionDSIGNSizeExpr ::
+  forall v. DSIGNAggregatable v => Proxy (ProofOfPossessionDSIGN v) -> Size
+encodedProofOfPossessionDSIGNSizeExpr _proxy =
+  -- 'encodeBytes' envelope
+  fromIntegral ((withWordSize :: Word -> Integer) (sizeProofOfPossessionDSIGN (Proxy :: Proxy v)))
+    -- payload
+    + fromIntegral (sizeProofOfPossessionDSIGN (Proxy :: Proxy v))
