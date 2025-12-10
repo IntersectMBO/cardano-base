@@ -71,10 +71,10 @@ test-suite tests
   main-is: Main.hs
   other-modules: Test.Cardano.Slotting.EpochInfo
   build-depends:
+    QuickCheck,
     base,
     cardano-slotting,
-    tasty,
-    tasty-quickcheck,
+    hspec,
 
   ghc-options:
     -threaded

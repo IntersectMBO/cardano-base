@@ -29,55 +29,49 @@ import Test.Crypto.Util (
   prop_raw_deserialise,
   withLock,
  )
+import Test.Hspec (Spec, describe)
+import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck (testProperty)
 
 import qualified Cardano.Crypto.Libsodium as NaCl
 
 --
 -- The list of all tests
 --
-tests :: Lock -> TestTree
+tests :: Lock -> Spec
 tests lock =
-  testGroup
-    "Crypto.Hash"
-    [ testHashAlgorithm (Proxy :: Proxy SHA256)
-    , testHashAlgorithm (Proxy :: Proxy SHA3_256)
-    , testHashAlgorithm (Proxy :: Proxy Blake2b_224)
-    , testHashAlgorithm (Proxy :: Proxy Blake2b_256)
-    , testHashAlgorithm (Proxy :: Proxy Keccak256)
-    , testSodiumHashAlgorithm lock (Proxy :: Proxy SHA256)
-    , testSodiumHashAlgorithm lock (Proxy :: Proxy Blake2b_256)
-    , testHashAlgorithm (Proxy :: Proxy SHA512)
-    , testHashAlgorithm (Proxy :: Proxy SHA3_512)
-    , testPackedBytes
-    ]
+  describe "Crypto.Hash" $ do
+    testHashAlgorithm (Proxy :: Proxy SHA256)
+    testHashAlgorithm (Proxy :: Proxy SHA3_256)
+    testHashAlgorithm (Proxy :: Proxy Blake2b_224)
+    testHashAlgorithm (Proxy :: Proxy Blake2b_256)
+    testHashAlgorithm (Proxy :: Proxy Keccak256)
+    testSodiumHashAlgorithm lock (Proxy :: Proxy SHA256)
+    testSodiumHashAlgorithm lock (Proxy :: Proxy Blake2b_256)
+    testHashAlgorithm (Proxy :: Proxy SHA512)
+    testHashAlgorithm (Proxy :: Proxy SHA3_512)
+    testPackedBytes
 
 testHashAlgorithm ::
   forall proxy h.
   HashAlgorithm h =>
   proxy h ->
-  TestTree
+  Spec
 testHashAlgorithm p =
-  testGroup
-    n
-    [ testProperty "hash size" $ prop_hash_correct_sizeHash @h @[Int]
-    , testProperty "serialise" $ prop_hash_cbor @h
-    , testProperty "fail fromCBOR" $ prop_bad_cbor_bytes @(Hash h ())
-    , testProperty "hashFromBytes" $ prop_raw_deserialise (hashFromBytes @h @())
-    , testProperty "hashFromBytesShort" $ prop_raw_deserialise (hashFromBytesShort @h @() . SBS.toShort)
-    , testProperty "ToCBOR size" $ prop_hash_cbor_size @h
-    , testProperty "hashFromStringAsHex/hashToStringFromHash" $
-        prop_hash_hashFromStringAsHex_hashToStringFromHash @h @Float
-    , testProperty "hashFromStringAsHex/fromString" $ prop_hash_hashFromStringAsHex_fromString @h @Float
-    , testProperty "show/read" $ prop_hash_show_read @h @Float
-    , testProperty "NoThunks" $ prop_no_thunks @(Hash h Int)
-    , testProperty "MemPack RoundTrip" $ prop_MemPackRoundTrip @(Hash h Int)
-    ]
-  where
-    n = hashAlgorithmName p
+  describe (hashAlgorithmName p) $ do
+    prop "hash size" $ prop_hash_correct_sizeHash @h @[Int]
+    prop "serialise" $ prop_hash_cbor @h
+    prop "fail fromCBOR" $ prop_bad_cbor_bytes @(Hash h ())
+    prop "hashFromBytes" $ prop_raw_deserialise (hashFromBytes @h @())
+    prop "hashFromBytesShort" $ prop_raw_deserialise (hashFromBytesShort @h @() . SBS.toShort)
+    prop "ToCBOR size" $ prop_hash_cbor_size @h
+    prop "hashFromStringAsHex/hashToStringFromHash" $
+      prop_hash_hashFromStringAsHex_hashToStringFromHash @h @Float
+    prop "hashFromStringAsHex/fromString" $ prop_hash_hashFromStringAsHex_fromString @h @Float
+    prop "show/read" $ prop_hash_show_read @h @Float
+    prop "NoThunks" $ prop_no_thunks @(Hash h Int)
+    prop "MemPack RoundTrip" $ prop_MemPackRoundTrip @(Hash h Int)
 
 prop_MemPackRoundTrip :: forall a. (MemPack a, Eq a, Show a) => a -> Property
 prop_MemPackRoundTrip a =
@@ -89,62 +83,54 @@ testSodiumHashAlgorithm ::
   NaCl.SodiumHashAlgorithm h =>
   Lock ->
   proxy h ->
-  TestTree
+  Spec
 testSodiumHashAlgorithm lock p =
-  testGroup
-    n
-    [ testProperty "sodium and crypton work the same" $ prop_libsodium_model @h lock Proxy
-    ]
-  where
-    n = hashAlgorithmName p
+  describe (hashAlgorithmName p) $ do
+    prop "sodium and crypton work the same" $ prop_libsodium_model @h lock Proxy
 
-testPackedBytesN :: forall n. KnownNat n => TestHash n -> TestTree
+testPackedBytesN :: forall n. KnownNat n => TestHash n -> Spec
 testPackedBytesN h = do
-  testGroup
-    (hashAlgorithmName (Proxy :: Proxy (TestHash n)))
-    [ testProperty "roundtrip" $ prop_roundtrip h
-    , testProperty "compare" $ prop_compare h
-    , testProperty "xor" $ prop_xor h
-    ]
+  describe (hashAlgorithmName (Proxy :: Proxy (TestHash n))) $ do
+    prop "roundtrip" $ prop_roundtrip h
+    prop "compare" $ prop_compare h
+    prop "xor" $ prop_xor h
 
-testPackedBytes :: TestTree
+testPackedBytes :: Spec
 testPackedBytes =
-  testGroup
-    "PackedBytes"
-    [ testPackedBytesN (TestHash :: TestHash 0)
-    , testPackedBytesN (TestHash :: TestHash 1)
-    , testPackedBytesN (TestHash :: TestHash 2)
-    , testPackedBytesN (TestHash :: TestHash 3)
-    , testPackedBytesN (TestHash :: TestHash 4)
-    , testPackedBytesN (TestHash :: TestHash 5)
-    , testPackedBytesN (TestHash :: TestHash 6)
-    , testPackedBytesN (TestHash :: TestHash 7)
-    , testPackedBytesN (TestHash :: TestHash 8)
-    , testPackedBytesN (TestHash :: TestHash 9)
-    , testPackedBytesN (TestHash :: TestHash 10)
-    , testPackedBytesN (TestHash :: TestHash 11)
-    , testPackedBytesN (TestHash :: TestHash 12)
-    , testPackedBytesN (TestHash :: TestHash 13)
-    , testPackedBytesN (TestHash :: TestHash 14)
-    , testPackedBytesN (TestHash :: TestHash 15)
-    , testPackedBytesN (TestHash :: TestHash 16)
-    , testPackedBytesN (TestHash :: TestHash 17)
-    , testPackedBytesN (TestHash :: TestHash 18)
-    , testPackedBytesN (TestHash :: TestHash 19)
-    , testPackedBytesN (TestHash :: TestHash 20)
-    , testPackedBytesN (TestHash :: TestHash 21)
-    , testPackedBytesN (TestHash :: TestHash 22)
-    , testPackedBytesN (TestHash :: TestHash 23)
-    , testPackedBytesN (TestHash :: TestHash 24)
-    , testPackedBytesN (TestHash :: TestHash 25)
-    , testPackedBytesN (TestHash :: TestHash 26)
-    , testPackedBytesN (TestHash :: TestHash 27)
-    , testPackedBytesN (TestHash :: TestHash 28)
-    , testPackedBytesN (TestHash :: TestHash 29)
-    , testPackedBytesN (TestHash :: TestHash 30)
-    , testPackedBytesN (TestHash :: TestHash 31)
-    , testPackedBytesN (TestHash :: TestHash 32)
-    ]
+  describe "PackedBytes" $ do
+    testPackedBytesN (TestHash :: TestHash 0)
+    testPackedBytesN (TestHash :: TestHash 1)
+    testPackedBytesN (TestHash :: TestHash 2)
+    testPackedBytesN (TestHash :: TestHash 3)
+    testPackedBytesN (TestHash :: TestHash 4)
+    testPackedBytesN (TestHash :: TestHash 5)
+    testPackedBytesN (TestHash :: TestHash 6)
+    testPackedBytesN (TestHash :: TestHash 7)
+    testPackedBytesN (TestHash :: TestHash 8)
+    testPackedBytesN (TestHash :: TestHash 9)
+    testPackedBytesN (TestHash :: TestHash 10)
+    testPackedBytesN (TestHash :: TestHash 11)
+    testPackedBytesN (TestHash :: TestHash 12)
+    testPackedBytesN (TestHash :: TestHash 13)
+    testPackedBytesN (TestHash :: TestHash 14)
+    testPackedBytesN (TestHash :: TestHash 15)
+    testPackedBytesN (TestHash :: TestHash 16)
+    testPackedBytesN (TestHash :: TestHash 17)
+    testPackedBytesN (TestHash :: TestHash 18)
+    testPackedBytesN (TestHash :: TestHash 19)
+    testPackedBytesN (TestHash :: TestHash 20)
+    testPackedBytesN (TestHash :: TestHash 21)
+    testPackedBytesN (TestHash :: TestHash 22)
+    testPackedBytesN (TestHash :: TestHash 23)
+    testPackedBytesN (TestHash :: TestHash 24)
+    testPackedBytesN (TestHash :: TestHash 25)
+    testPackedBytesN (TestHash :: TestHash 26)
+    testPackedBytesN (TestHash :: TestHash 27)
+    testPackedBytesN (TestHash :: TestHash 28)
+    testPackedBytesN (TestHash :: TestHash 29)
+    testPackedBytesN (TestHash :: TestHash 30)
+    testPackedBytesN (TestHash :: TestHash 31)
+    testPackedBytesN (TestHash :: TestHash 32)
 
 prop_hash_cbor :: HashAlgorithm h => Hash h Int -> Property
 prop_hash_cbor = prop_cbor

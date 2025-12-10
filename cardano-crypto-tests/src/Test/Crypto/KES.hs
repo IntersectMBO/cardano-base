@@ -48,10 +48,9 @@ import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import Cardano.Crypto.Util (SignableRepresentation (..))
 
+import Test.Hspec (Expectation, Spec, describe, it, shouldSatisfy)
+import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck
-import Test.Tasty (TestTree, adjustOption, testGroup)
-import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
-import Test.Tasty.QuickCheck (QuickCheckMaxSize (..), testProperty)
 
 import Test.Crypto.AllocLog
 import Test.Crypto.EqST
@@ -82,23 +81,21 @@ import Test.Crypto.Util (
 --
 -- The list of all tests
 --
-tests :: Lock -> TestTree
+tests :: Lock -> Spec
 tests lock =
-  testGroup
-    "Crypto.KES"
-    [ testKESAlloc (Proxy @(SingleKES Ed25519DSIGN)) "SingleKES"
-    , testKESAlloc (Proxy @(Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
-    , testKESAlloc (Proxy @(Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
-    , testKESAlgorithm @(MockKES 7) lock "MockKES"
-    , testKESAlgorithm @(SimpleKES Ed25519DSIGN 7) lock "SimpleKES"
-    , testKESAlgorithm @(SingleKES Ed25519DSIGN) lock "SingleKES"
-    , testKESAlgorithm @(Sum1KES Ed25519DSIGN Blake2b_256) lock "Sum1KES"
-    , testKESAlgorithm @(Sum2KES Ed25519DSIGN Blake2b_256) lock "Sum2KES"
-    , testKESAlgorithm @(Sum5KES Ed25519DSIGN Blake2b_256) lock "Sum5KES"
-    , testKESAlgorithm @(CompactSum1KES Ed25519DSIGN Blake2b_256) lock "CompactSum1KES"
-    , testKESAlgorithm @(CompactSum2KES Ed25519DSIGN Blake2b_256) lock "CompactSum2KES"
-    , testKESAlgorithm @(CompactSum5KES Ed25519DSIGN Blake2b_256) lock "CompactSum5KES"
-    ]
+  describe "Crypto.KES" $ do
+    testKESAlloc (Proxy @(SingleKES Ed25519DSIGN)) "SingleKES"
+    testKESAlloc (Proxy @(Sum1KES Ed25519DSIGN Blake2b_256)) "Sum1KES"
+    testKESAlloc (Proxy @(Sum2KES Ed25519DSIGN Blake2b_256)) "Sum2KES"
+    testKESAlgorithm @(MockKES 7) lock "MockKES"
+    testKESAlgorithm @(SimpleKES Ed25519DSIGN 7) lock "SimpleKES"
+    testKESAlgorithm @(SingleKES Ed25519DSIGN) lock "SingleKES"
+    testKESAlgorithm @(Sum1KES Ed25519DSIGN Blake2b_256) lock "Sum1KES"
+    testKESAlgorithm @(Sum2KES Ed25519DSIGN Blake2b_256) lock "Sum2KES"
+    testKESAlgorithm @(Sum5KES Ed25519DSIGN Blake2b_256) lock "Sum5KES"
+    testKESAlgorithm @(CompactSum1KES Ed25519DSIGN Blake2b_256) lock "CompactSum1KES"
+    testKESAlgorithm @(CompactSum2KES Ed25519DSIGN Blake2b_256) lock "CompactSum2KES"
+    testKESAlgorithm @(CompactSum5KES Ed25519DSIGN Blake2b_256) lock "CompactSum5KES"
 
 --------------------------------------------------------------------------------
 -- Show and Eq instances
@@ -199,16 +196,12 @@ testKESAlloc ::
   KESAlgorithm v =>
   Proxy v ->
   String ->
-  TestTree
+  Spec
 testKESAlloc _p n =
-  testGroup
-    n
-    [ testGroup
-        "Low-level mlocked allocations"
-        [ testCase "genKey" $ testMLockGenKeyKES _p
-        -- , testCase "updateKey" $ testMLockUpdateKeyKES _p
-        ]
-    ]
+  describe n $ do
+    describe "Low-level mlocked allocations" $ do
+      -- it "updateKey" $ testMLockUpdateKeyKES _p
+      it "genKey" $ testMLockGenKeyKES _p
 
 eventTracer :: IORef [event] -> Tracer IO event
 eventTracer logVar = Tracer (\ev -> liftIO $ atomicModifyIORef' logVar (\acc -> (acc ++ [ev], ())))
@@ -224,7 +217,7 @@ testMLockGenKeyKES ::
   forall v.
   KESAlgorithm v =>
   Proxy v ->
-  Assertion
+  Expectation
 testMLockGenKeyKES _p = do
   accumVar <- newIORef []
   let tracer = eventTracer accumVar
@@ -241,8 +234,8 @@ testMLockGenKeyKES _p = do
   traceWith tracer $ MarkerEv "done"
   after <- readIORef accumVar
   let evset = matchAllocLog after
-  assertBool "some allocations happened" (not . null $ [() | AllocEv _ <- after])
-  assertEqual "all allocations deallocated" Set.empty evset
+  [() | AllocEv _ <- after] `shouldSatisfy` (not . null) -- some allocations happened
+  evset `shouldSatisfy` null -- all allocations deallocated
 
 {-# NOINLINE testKESAlgorithm #-}
 testKESAlgorithm ::
@@ -266,212 +259,183 @@ testKESAlgorithm ::
   ) =>
   Lock ->
   String ->
-  TestTree
+  Spec
 testKESAlgorithm lock n =
-  testGroup
-    n
-    [ testProperty "only gen signkey" $ prop_onlyGenSignKeyKES @v lock
-    , testProperty "only gen verkey" $ prop_onlyGenVerKeyKES @v lock
-    , testProperty "one update signkey" $ prop_oneUpdateSignKeyKES @v lock
-    , testProperty "all updates signkey" $ prop_allUpdatesSignKeyKES @v lock
-    , testProperty "total periods" $ prop_totalPeriodsKES @v lock
-    , testGroup
-        "NoThunks"
-        [ testProperty "VerKey" $
-            ioPropertyWithSK @v lock $ \sk ->
-              prop_no_thunks_IO (deriveVerKeyKES sk)
-        , testProperty "SignKey" $
-            ioPropertyWithSK @v lock $
-              prop_no_thunks_IO . return
-        , testProperty "SignKey evolved" $
-            ioPropertyWithSK @v lock $ \sk ->
+  describe n $ do
+    prop "only gen signkey" $ prop_onlyGenSignKeyKES @v lock
+    prop "only gen verkey" $ prop_onlyGenVerKeyKES @v lock
+    prop "one update signkey" $ prop_oneUpdateSignKeyKES @v lock
+    prop "all updates signkey" $ prop_allUpdatesSignKeyKES @v lock
+    prop "total periods" $ prop_totalPeriodsKES @v lock
+    describe "NoThunks" $ do
+      prop "VerKey" $
+        ioPropertyWithSK @v lock $ \sk ->
+          prop_no_thunks_IO (deriveVerKeyKES sk)
+      prop "SignKey" $
+        ioPropertyWithSK @v lock $
+          prop_no_thunks_IO . return
+      prop "SignKey evolved" $
+        ioPropertyWithSK @v lock $ \sk ->
+          bracket
+            (updateKES () sk 0)
+            (maybe (return ()) forgetSignKeyKES)
+            (prop_no_thunks_IO . return)
+      prop "Sig" $ \seedPSB (msg :: Message) ->
+        ioProperty $ withLock lock $ fmap conjoin $ withAllUpdatesKES @v seedPSB $ \t sk -> do
+          prop_no_thunks_IO (signKES () t msg sk)
+      prop "VerKey DirectSerialise" $
+        ioPropertyWithSK @v lock $ \sk -> do
+          vk :: VerKeyKES v <- deriveVerKeyKES sk
+          direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+          prop_no_thunks_IO (return $! direct)
+      prop "SignKey DirectSerialise" $
+        ioPropertyWithSK @v lock $ \sk -> do
+          direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+          prop_no_thunks_IO (return $! direct)
+      prop "VerKey DirectDeserialise" $
+        ioPropertyWithSK @v lock $ \sk -> do
+          vk :: VerKeyKES v <- deriveVerKeyKES sk
+          direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
+          prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
+      prop "SignKey DirectDeserialise" $
+        ioPropertyWithSK @v lock $ \sk -> do
+          direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+          bracket
+            (directDeserialiseFromBS @IO @(SignKeyKES v) $! direct)
+            forgetSignKeyKES
+            (prop_no_thunks_IO . return)
+    prop "same VerKey " $ prop_deriveVerKeyKES @v
+    prop "no forgotten chunks in signkey" $ prop_noErasedBlocksInKey (Proxy @v)
+    describe "serialisation" $ do
+      describe "raw ser only" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            return $ (rawDeserialiseVerKeyKES . rawSerialiseVerKeyKES $ vk) === Just vk
+        prop "SignKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            serialized <- rawSerialiseSignKeyKES sk
+            equals <-
               bracket
-                (updateKES () sk 0)
+                (rawDeserialiseSignKeyKES serialized)
                 (maybe (return ()) forgetSignKeyKES)
-                (prop_no_thunks_IO . return)
-        , testProperty "Sig" $ \seedPSB (msg :: Message) ->
-            ioProperty $ withLock lock $ fmap conjoin $ withAllUpdatesKES @v seedPSB $ \t sk -> do
-              prop_no_thunks_IO (signKES () t msg sk)
-        , testProperty "VerKey DirectSerialise" $
-            ioPropertyWithSK @v lock $ \sk -> do
-              vk :: VerKeyKES v <- deriveVerKeyKES sk
-              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
-              prop_no_thunks_IO (return $! direct)
-        , testProperty "SignKey DirectSerialise" $
-            ioPropertyWithSK @v lock $ \sk -> do
-              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
-              prop_no_thunks_IO (return $! direct)
-        , testProperty "VerKey DirectDeserialise" $
-            ioPropertyWithSK @v lock $ \sk -> do
-              vk :: VerKeyKES v <- deriveVerKeyKES sk
-              direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
-              prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
-        , testProperty "SignKey DirectDeserialise" $
-            ioPropertyWithSK @v lock $ \sk -> do
-              direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+                (\msk' -> Just sk ==! msk')
+            return $
+              counterexample (show serialized) equals
+        prop "Sig" $ \(msg :: Message) ->
+          ioPropertyWithSK @v lock $ \sk -> do
+            sig :: SigKES v <- signKES () 0 msg sk
+            return $ (rawDeserialiseSigKES . rawSerialiseSigKES $ sig) === Just sig
+      describe "size" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === sizeVerKeyKES (Proxy @v)
+        prop "SignKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            serialized <- rawSerialiseSignKeyKES sk
+            evaluate ((fromIntegral . BS.length $ serialized) == sizeSignKeyKES (Proxy @v))
+        prop "Sig" $ \(msg :: Message) ->
+          ioPropertyWithSK @v lock $ \sk -> do
+            sig :: SigKES v <- signKES () 0 msg sk
+            return $ (fromIntegral . BS.length . rawSerialiseSigKES $ sig) === sizeSigKES (Proxy @v)
+      describe "direct CBOR" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            return $ prop_cbor_with encodeVerKeyKES decodeVerKeyKES vk
+        -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
+        -- and require IO for access.
+        prop "Sig" $ \(msg :: Message) ->
+          ioPropertyWithSK @v lock $ \sk -> do
+            sig :: SigKES v <- signKES () 0 msg sk
+            return $ prop_cbor_with encodeSigKES decodeSigKES sig
+        prop "UnsoundSignKeyKES" $ \seedPSB ->
+          let sk :: UnsoundPureSignKeyKES v = mkUnsoundPureSignKeyKES seedPSB
+           in prop_cbor_with encodeUnsoundPureSignKeyKES decodeUnsoundPureSignKeyKES sk
+      describe "To/FromCBOR class" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            return $ prop_cbor vk
+        -- No To/FromCBOR for 'SignKeyKES', see above.
+        prop "Sig" $ \(msg :: Message) ->
+          ioPropertyWithSK @v lock $ \sk -> do
+            sig :: SigKES v <- signKES () 0 msg sk
+            return $ prop_cbor sig
+      describe "ToCBOR size" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            return $ prop_cbor_size vk
+        -- No To/FromCBOR for 'SignKeyKES', see above.
+        prop "Sig" $ \(msg :: Message) ->
+          ioPropertyWithSK @v lock $ \sk -> do
+            sig :: SigKES v <- signKES () 0 msg sk
+            return $ prop_cbor_size sig
+      describe "direct matches class" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            return $ prop_cbor_direct_vs_class encodeVerKeyKES vk
+        -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
+        -- and require IO for access.
+        prop "Sig" $ \(msg :: Message) ->
+          ioPropertyWithSK @v lock $ \sk -> do
+            sig :: SigKES v <- signKES () 0 msg sk
+            return $ prop_cbor_direct_vs_class encodeSigKES sig
+      describe "DirectSerialise" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            vk' <- directDeserialiseFromBS serialized
+            return $ vk === vk'
+        prop "SignKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            equals <-
               bracket
-                (directDeserialiseFromBS @IO @(SignKeyKES v) $! direct)
+                (directDeserialiseFromBS serialized)
                 forgetSignKeyKES
-                (prop_no_thunks_IO . return)
-        ]
-    , testProperty "same VerKey " $ prop_deriveVerKeyKES @v
-    , testProperty "no forgotten chunks in signkey" $ prop_noErasedBlocksInKey (Proxy @v)
-    , testGroup
-        "serialisation"
-        [ testGroup
-            "raw ser only"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  return $ (rawDeserialiseVerKeyKES . rawSerialiseVerKeyKES $ vk) === Just vk
-            , testProperty "SignKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  serialized <- rawSerialiseSignKeyKES sk
-                  equals <-
-                    bracket
-                      (rawDeserialiseSignKeyKES serialized)
-                      (maybe (return ()) forgetSignKeyKES)
-                      (\msk' -> Just sk ==! msk')
-                  return $
-                    counterexample (show serialized) equals
-            , testProperty "Sig" $ \(msg :: Message) ->
-                ioPropertyWithSK @v lock $ \sk -> do
-                  sig :: SigKES v <- signKES () 0 msg sk
-                  return $ (rawDeserialiseSigKES . rawSerialiseSigKES $ sig) === Just sig
-            ]
-        , testGroup
-            "size"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === sizeVerKeyKES (Proxy @v)
-            , testProperty "SignKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  serialized <- rawSerialiseSignKeyKES sk
-                  evaluate ((fromIntegral . BS.length $ serialized) == sizeSignKeyKES (Proxy @v))
-            , testProperty "Sig" $ \(msg :: Message) ->
-                ioPropertyWithSK @v lock $ \sk -> do
-                  sig :: SigKES v <- signKES () 0 msg sk
-                  return $ (fromIntegral . BS.length . rawSerialiseSigKES $ sig) === sizeSigKES (Proxy @v)
-            ]
-        , testGroup
-            "direct CBOR"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  return $ prop_cbor_with encodeVerKeyKES decodeVerKeyKES vk
-            , -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
-              -- and require IO for access.
-              testProperty "Sig" $ \(msg :: Message) ->
-                ioPropertyWithSK @v lock $ \sk -> do
-                  sig :: SigKES v <- signKES () 0 msg sk
-                  return $ prop_cbor_with encodeSigKES decodeSigKES sig
-            , testProperty "UnsoundSignKeyKES" $ \seedPSB ->
-                let sk :: UnsoundPureSignKeyKES v = mkUnsoundPureSignKeyKES seedPSB
-                 in prop_cbor_with encodeUnsoundPureSignKeyKES decodeUnsoundPureSignKeyKES sk
-            ]
-        , testGroup
-            "To/FromCBOR class"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  return $ prop_cbor vk
-            , -- No To/FromCBOR for 'SignKeyKES', see above.
-              testProperty "Sig" $ \(msg :: Message) ->
-                ioPropertyWithSK @v lock $ \sk -> do
-                  sig :: SigKES v <- signKES () 0 msg sk
-                  return $ prop_cbor sig
-            ]
-        , testGroup
-            "ToCBOR size"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  return $ prop_cbor_size vk
-            , -- No To/FromCBOR for 'SignKeyKES', see above.
-              testProperty "Sig" $ \(msg :: Message) ->
-                ioPropertyWithSK @v lock $ \sk -> do
-                  sig :: SigKES v <- signKES () 0 msg sk
-                  return $ prop_cbor_size sig
-            ]
-        , testGroup
-            "direct matches class"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  return $ prop_cbor_direct_vs_class encodeVerKeyKES vk
-            , -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
-              -- and require IO for access.
-              testProperty "Sig" $ \(msg :: Message) ->
-                ioPropertyWithSK @v lock $ \sk -> do
-                  sig :: SigKES v <- signKES () 0 msg sk
-                  return $ prop_cbor_direct_vs_class encodeSigKES sig
-            ]
-        , testGroup
-            "DirectSerialise"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
-                  vk' <- directDeserialiseFromBS serialized
-                  return $ vk === vk'
-            , testProperty "SignKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
-                  equals <-
-                    bracket
-                      (directDeserialiseFromBS serialized)
-                      forgetSignKeyKES
-                      (sk ==!)
-                  return
-                    $ counterexample
-                      ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")")
-                    $ equals
-            ]
-        , testGroup
-            "DirectSerialise matches raw"
-            [ testProperty "VerKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  vk :: VerKeyKES v <- deriveVerKeyKES sk
-                  direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
-                  let raw = rawSerialiseVerKeyKES vk
-                  return $ direct === raw
-            , testProperty "SignKey" $
-                ioPropertyWithSK @v lock $ \sk -> do
-                  direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
-                  raw <- rawSerialiseSignKeyKES sk
-                  return $ direct === raw
-            ]
-        ]
-    , testGroup
-        "verify"
-        [ testProperty "positive" $ prop_verifyKES_positive @v
-        , testProperty "negative (key)" $ prop_verifyKES_negative_key @v
-        , testProperty "negative (message)" $ prop_verifyKES_negative_message @v
-        , adjustOption (\(QuickCheckMaxSize sz) -> QuickCheckMaxSize (min sz 50)) $
-            testProperty "negative (period)" $
-              prop_verifyKES_negative_period @v
-        ]
-    , testGroup
-        "serialisation of all KES evolutions"
-        [ testProperty "VerKey" $ prop_serialise_VerKeyKES @v
-        , testProperty "Sig" $ prop_serialise_SigKES @v
-        ]
-    , -- TODO: this doesn't pass right now, see
-      -- 'prop_key_overwritten_after_forget' for details.
-      --
-      -- , testGroup "forgetting"
-      --   [ testProperty "key overwritten after forget" $ prop_key_overwritten_after_forget (Proxy @v)
-      --   ]
+                (sk ==!)
+            return
+              $ counterexample
+                ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")")
+              $ equals
+      describe "DirectSerialise matches raw" $ do
+        prop "VerKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            vk :: VerKeyKES v <- deriveVerKeyKES sk
+            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            let raw = rawSerialiseVerKeyKES vk
+            return $ direct === raw
+        prop "SignKey" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            raw <- rawSerialiseSignKeyKES sk
+            return $ direct === raw
+    describe "verify" $ do
+      prop "positive" $ prop_verifyKES_positive @v
+      prop "negative (key)" $ prop_verifyKES_negative_key @v
+      prop "negative (message)" $ prop_verifyKES_negative_message @v
+      modifyMaxSuccess (min 50) $
+        prop "negative (period)" $
+          prop_verifyKES_negative_period @v
+    describe "serialisation of all KES evolutions" $ do
+      prop "VerKey" $ prop_serialise_VerKeyKES @v
+      prop "Sig" $ prop_serialise_SigKES @v
+    -- TODO: this doesn't pass right now, see
+    -- 'prop_key_overwritten_after_forget' for details.
+    --
+    --  describe "forgetting" $ do
+    --    prop "key overwritten after forget" $ prop_key_overwritten_after_forget (Proxy @v)
 
-      testGroup
-        "unsound pure"
-        [ testProperty "genKey" $ prop_unsoundPureGenKey @v Proxy
-        , testProperty "updateKES" $ prop_unsoundPureUpdateKES @v Proxy
-        , testProperty "deriveVerKey" $ prop_unsoundPureDeriveVerKey @v Proxy
-        , testProperty "sign" $ prop_unsoundPureSign @v Proxy
-        ]
-    ]
+    describe "unsound pure" $ do
+      prop "genKey" $ prop_unsoundPureGenKey @v Proxy
+      prop "updateKES" $ prop_unsoundPureUpdateKES @v Proxy
+      prop "deriveVerKey" $ prop_unsoundPureDeriveVerKey @v Proxy
+      prop "sign" $ prop_unsoundPureSign @v Proxy
 
 -- | Wrap an IO action that requires a 'SignKeyKES' into one that takes an
 -- mlocked seed to generate the key from. The key is bracketed off to ensure

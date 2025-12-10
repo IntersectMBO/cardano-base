@@ -44,6 +44,5 @@ test-suite test
   build-depends:
     QuickCheck,
     base,
+    hspec,
     measures,
-    tasty,
-    tasty-quickcheck,

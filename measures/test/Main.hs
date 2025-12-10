@@ -4,16 +4,14 @@ module Main (
 )
 where
 
-import Test.Tasty
+import Test.Hspec
 
 import qualified Test.Data.Measure (tests)
 
 main :: IO ()
-main = defaultMain tests
+main = hspec tests
 
-tests :: TestTree
+tests :: Spec
 tests =
-  testGroup
-    "measures package"
-    [ Test.Data.Measure.tests
-    ]
+  describe "measures package" $ do
+    Test.Data.Measure.tests
