@@ -28,13 +28,39 @@ packages:
   measures
   orphans-deriving-via
 
+source-repository-package
+    type: git
+    location: https://github.com/haskell-cryptography/blst-clib
+    tag: 0fd1d38d5ceed5529ac646efae3095b493a97927
+
+source-repository-package
+    type: git
+    location: https://github.com/haskell-cryptography/libsodium-clib
+    tag: 985c18f75a71ff721370940666d71fda53edbb14
+
+source-repository-package
+    type: git
+    location: https://github.com/haskell-cryptography/secp256k1-clib
+    tag: 211b95baad422966c9e719ed70cbc189c58eaae5
+
+package secp256k1-clib
+  flags: +schnorrsig +recovery +ecdh +extrakeys
+
+package sodium-clib
+  -- we need to disable -fPIE in libsodium, otherwise the Haskell code tries to
+  -- link with -fPIE but the static boot libraries haven't been built with -fPIE
+  -- and the link phase fails with cryptic error messages.
+  configure-options: --enable-pie=no
+
+
 -- Ensures colourized output from test runners
 test-show-details: direct
 tests: true
 benchmarks: true
 
 program-options
-  ghc-options: -Werror
+  ghc-options: -Werror -Wno-unused-packages -fhide-source-paths
+
 
 -- Windows cross with bitvec/simd is broken.
 package bitvec
