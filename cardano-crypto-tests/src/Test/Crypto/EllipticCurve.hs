@@ -22,170 +22,157 @@ import qualified Data.Foldable as F (foldl')
 import Data.Proxy (Proxy (..))
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Crypto.Instances ()
+import Test.HUnit (assertBool, assertEqual)
+import Test.Hspec (Spec, describe, it)
+import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (
   Arbitrary (..),
   Property,
   choose,
   chooseAny,
+  frequency,
   oneof,
   suchThatMap,
   (===),
   (==>),
  )
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
-import Test.Tasty.QuickCheck (frequency, testProperty)
 
-tests :: TestTree
+tests :: Spec
 tests =
-  testGroup
-    "Crypto.EllipticCurve"
-    [ testGroup
-        "BLS12_381"
-        [ testUtil "Utility"
-        , testScalar "Scalar"
-        , testBLSCurve "Curve 1" (Proxy @BLS.Curve1)
-        , testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
-        , testPT "PT"
-        , testPairing "Pairing"
-        , testVectors "Vectors"
-        ]
-    ]
+  describe "Crypto.EllipticCurve" $ do
+    describe "BLS12_381" $ do
+      testUtil "Utility"
+      testScalar "Scalar"
+      testBLSCurve "Curve 1" (Proxy @BLS.Curve1)
+      testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
+      testPT "PT"
+      testPairing "Pairing"
+      testVectors "Vectors"
 
-testUtil :: String -> TestTree
+testUtil :: String -> Spec
 testUtil name =
-  testGroup
-    name
-    [ testProperty "Integer / C-String 32 round-trip" $
-        \n ->
-          n >= 0 ==>
-            n < (1 `shiftL` 32 * 8) ==>
-              n === unsafePerformIO (BLS.integerAsCStrL 32 n BLS.cstrToInteger)
-    , testProperty "padBS min length" $ \n bsw ->
-        BS.length (BLS.padBS n (BS.pack bsw)) >= n
-    , testProperty "padBS adds zeroes to front" $ \bsw ->
-        BS.index (BLS.padBS (length bsw + 1) (BS.pack bsw)) 0 === 0
-    , testCase "integerToBS" $ do
-        assertEqual "0x1234" (BS.pack [0x12, 0x34]) (BLS.integerToBS 0x1234)
-        assertEqual "0x12345678" (BS.pack [0x12, 0x34, 0x56, 0x78]) (BLS.integerToBS 0x12345678)
-    ]
+  describe name $ do
+    prop "Integer / C-String 32 round-trip" $
+      \n ->
+        n >= 0 ==>
+          n < (1 `shiftL` 32 * 8) ==>
+            n === unsafePerformIO (BLS.integerAsCStrL 32 n BLS.cstrToInteger)
+    prop "padBS min length" $ \n bsw ->
+      BS.length (BLS.padBS n (BS.pack bsw)) >= n
+    prop "padBS adds zeroes to front" $ \bsw ->
+      BS.index (BLS.padBS (length bsw + 1) (BS.pack bsw)) 0 === 0
+    it "integerToBS" $ do
+      assertEqual "0x1234" (BS.pack [0x12, 0x34]) (BLS.integerToBS 0x1234)
+      assertEqual "0x12345678" (BS.pack [0x12, 0x34, 0x56, 0x78]) (BLS.integerToBS 0x12345678)
 
-testScalar :: String -> TestTree
+testScalar :: String -> Spec
 testScalar name =
-  testGroup
-    name
-    [ testProperty "self-equality" $
-        \(a :: BLS.Scalar) -> a === a
-    , testProperty "to/from BS round-trip" $
-        \s -> Right s === (BLS.scalarFromBS . BLS.scalarToBS $ s)
-    , testProperty "non-negative" $
-        \s -> (unsafePerformIO . BLS.scalarToInteger $ s) >= 0
-    , testProperty "to/from Integer round-trip" $
-        \s -> s === unsafePerformIO (BLS.scalarToInteger s >>= BLS.scalarFromInteger)
-    , testCase "integer from scalar" $ do
-        s <- case BLS.scalarFromBS (BLS.padBS 32 (BS.pack [0x12, 0x34])) of
-          Left err -> error (show err)
-          Right x -> return x
-        let expected = 0x1234
-        actual <- BLS.scalarToInteger s
-        assertEqual "0x1234" expected actual
-    ]
+  describe name $ do
+    prop "self-equality" $
+      \(a :: BLS.Scalar) -> a === a
+    prop "to/from BS round-trip" $
+      \s -> Right s === (BLS.scalarFromBS . BLS.scalarToBS $ s)
+    prop "non-negative" $
+      \s -> (unsafePerformIO . BLS.scalarToInteger $ s) >= 0
+    prop "to/from Integer round-trip" $
+      \s -> s === unsafePerformIO (BLS.scalarToInteger s >>= BLS.scalarFromInteger)
+    it "integer from scalar" $ do
+      s <- case BLS.scalarFromBS (BLS.padBS 32 (BS.pack [0x12, 0x34])) of
+        Left err -> error (show err)
+        Right x -> return x
+      let expected = 0x1234
+      actual <- BLS.scalarToInteger s
+      assertEqual "0x1234" expected actual
 
 testBLSCurve ::
   forall curve.
   BLS.BLS curve =>
-  String -> Proxy curve -> TestTree
+  String -> Proxy curve -> Spec
 testBLSCurve name _ =
-  testGroup
-    name
-    [ testCase "generator in group" $
-        assertBool "" (BLS.blsInGroup (BLS.blsGenerator @curve))
-    , testCase "neg generator in group" $
-        assertBool "" (BLS.blsInGroup (BLS.blsNeg (BLS.blsGenerator @curve)))
-    , testCase "add generator to itself" $
-        assertBool
-          ""
-          (BLS.blsInGroup (BLS.blsAddOrDouble (BLS.blsGenerator @curve) (BLS.blsGenerator @curve)))
-    , testProperty "in group" (BLS.blsInGroup @curve)
-    , testProperty "neg in group" (BLS.blsInGroup @curve . BLS.blsNeg)
-    , testProperty "self-equality" (\(a :: BLS.Point curve) -> a === a)
-    , testProperty "double negation" (\(a :: BLS.Point curve) -> a === BLS.blsNeg (BLS.blsNeg a))
-    , testProperty
-        "adding infinity yields equality"
-        (\(a :: BLS.Point curve) -> BLS.blsAddOrDouble a (BLS.blsZero @curve) === a)
-    , testProperty
-        "addition associative"
-        (testAssoc (BLS.blsAddOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
-    , testProperty
-        "addition commutative"
-        (testCommut (BLS.blsAddOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
-    , testProperty "adding negation yields infinity" (testAddNegYieldsInf @curve)
-    , testProperty "round-trip serialization" $
-        testRoundTripEither @(BLS.Point curve) BLS.blsSerialize BLS.blsDeserialize
-    , testProperty "round-trip compression" $
-        testRoundTripEither @(BLS.Point curve) BLS.blsCompress BLS.blsUncompress
-    , testProperty "mult by p is inf" $ \(a :: BLS.Point curve) ->
-        BLS.blsIsInf (BLS.blsMult a BLS.scalarPeriod)
-    , testProperty "mult by p+1 is identity" $ \(a :: BLS.Point curve) ->
-        BLS.blsMult a (BLS.scalarPeriod + 1) === a
-    , testProperty "scalar mult associative" $ \(a :: BLS.Point curve) (BigInteger b) (BigInteger c) ->
-        BLS.blsMult (BLS.blsMult a b) c === BLS.blsMult (BLS.blsMult a c) b
-    , testProperty "scalar mult distributive left" $ \(a :: BLS.Point curve) (BigInteger b) (BigInteger c) ->
-        BLS.blsMult a (b + c) === BLS.blsAddOrDouble (BLS.blsMult a b) (BLS.blsMult a c)
-    , testProperty "scalar mult distributive right" $ \(a :: BLS.Point curve) (b :: BLS.Point curve) (BigInteger c) ->
-        BLS.blsMult (BLS.blsAddOrDouble a b) c === BLS.blsAddOrDouble (BLS.blsMult a c) (BLS.blsMult b c)
-    , testProperty "MSM matches naive approach" $ \(ssAndPs :: [(BigInteger, BLS.Point curve)]) ->
-        let pairs = [(i, p) | (BigInteger i, p) <- ssAndPs]
-         in BLS.blsMSM pairs
-              === foldr (\(s, p) acc -> BLS.blsAddOrDouble acc (BLS.blsMult p s)) (BLS.blsZero @curve) pairs
-    , testProperty "mult by zero is inf" $ \(a :: BLS.Point curve) ->
-        BLS.blsIsInf (BLS.blsMult a 0)
-    , testProperty "mult by -1 is equal to neg" $ \(a :: BLS.Point curve) ->
-        BLS.blsMult a (-1) === BLS.blsNeg a
-    , testProperty "modular multiplication" $ \(BigInteger a) (BigInteger b) (p :: BLS.Point curve) ->
-        BLS.blsMult p a === BLS.blsMult p (a + b * BLS.scalarPeriod)
-    , testProperty "repeated addition" (prop_repeatedAddition @curve)
-    , testCase "zero is inf" $ assertBool "Zero is at infinity" (BLS.blsIsInf (BLS.blsZero @curve))
-    ]
+  describe name $ do
+    it "generator in group" $
+      assertBool "" (BLS.blsInGroup (BLS.blsGenerator @curve))
+    it "neg generator in group" $
+      assertBool "" (BLS.blsInGroup (BLS.blsNeg (BLS.blsGenerator @curve)))
+    it "add generator to itself" $
+      assertBool
+        ""
+        (BLS.blsInGroup (BLS.blsAddOrDouble (BLS.blsGenerator @curve) (BLS.blsGenerator @curve)))
+    prop "in group" (BLS.blsInGroup @curve)
+    prop "neg in group" (BLS.blsInGroup @curve . BLS.blsNeg)
+    prop "self-equality" (\(a :: BLS.Point curve) -> a === a)
+    prop "double negation" (\(a :: BLS.Point curve) -> a === BLS.blsNeg (BLS.blsNeg a))
+    prop
+      "adding infinity yields equality"
+      (\(a :: BLS.Point curve) -> BLS.blsAddOrDouble a (BLS.blsZero @curve) === a)
+    prop
+      "addition associative"
+      (testAssoc (BLS.blsAddOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
+    prop
+      "addition commutative"
+      (testCommut (BLS.blsAddOrDouble :: BLS.Point curve -> BLS.Point curve -> BLS.Point curve))
+    prop "adding negation yields infinity" (testAddNegYieldsInf @curve)
+    prop "round-trip serialization" $
+      testRoundTripEither @(BLS.Point curve) BLS.blsSerialize BLS.blsDeserialize
+    prop "round-trip compression" $
+      testRoundTripEither @(BLS.Point curve) BLS.blsCompress BLS.blsUncompress
+    prop "mult by p is inf" $ \(a :: BLS.Point curve) ->
+      BLS.blsIsInf (BLS.blsMult a BLS.scalarPeriod)
+    prop "mult by p+1 is identity" $ \(a :: BLS.Point curve) ->
+      BLS.blsMult a (BLS.scalarPeriod + 1) === a
+    prop "scalar mult associative" $ \(a :: BLS.Point curve) (BigInteger b) (BigInteger c) ->
+      BLS.blsMult (BLS.blsMult a b) c === BLS.blsMult (BLS.blsMult a c) b
+    prop "scalar mult distributive left" $ \(a :: BLS.Point curve) (BigInteger b) (BigInteger c) ->
+      BLS.blsMult a (b + c) === BLS.blsAddOrDouble (BLS.blsMult a b) (BLS.blsMult a c)
+    prop "scalar mult distributive right" $ \(a :: BLS.Point curve) (b :: BLS.Point curve) (BigInteger c) ->
+      BLS.blsMult (BLS.blsAddOrDouble a b) c === BLS.blsAddOrDouble (BLS.blsMult a c) (BLS.blsMult b c)
+    prop "MSM matches naive approach" $ \(ssAndPs :: [(BigInteger, BLS.Point curve)]) ->
+      let pairs = [(i, p) | (BigInteger i, p) <- ssAndPs]
+       in BLS.blsMSM pairs
+            === foldr (\(s, p) acc -> BLS.blsAddOrDouble acc (BLS.blsMult p s)) (BLS.blsZero @curve) pairs
+    prop "mult by zero is inf" $ \(a :: BLS.Point curve) ->
+      BLS.blsIsInf (BLS.blsMult a 0)
+    prop "mult by -1 is equal to neg" $ \(a :: BLS.Point curve) ->
+      BLS.blsMult a (-1) === BLS.blsNeg a
+    prop "modular multiplication" $ \(BigInteger a) (BigInteger b) (p :: BLS.Point curve) ->
+      BLS.blsMult p a === BLS.blsMult p (a + b * BLS.scalarPeriod)
+    prop "repeated addition" (prop_repeatedAddition @curve)
+    it "zero is inf" $ assertBool "Zero is at infinity" (BLS.blsIsInf (BLS.blsZero @curve))
 
-testPT :: String -> TestTree
+testPT :: String -> Spec
 testPT name =
-  testGroup
-    name
-    [ testProperty
-        "mult associative"
-        (testAssoc BLS.ptMult)
-    , testProperty
-        "mult commutative"
-        (testCommut BLS.ptMult)
-    , testProperty "self-equality" (\(a :: BLS.PT) -> a === a)
-    , testProperty "self-final-verify" (\(a :: BLS.PT) -> BLS.ptFinalVerify a a)
-    ]
+  describe name $ do
+    prop
+      "mult associative"
+      (testAssoc BLS.ptMult)
+    prop
+      "mult commutative"
+      (testCommut BLS.ptMult)
+    prop "self-equality" (\(a :: BLS.PT) -> a === a)
+    prop "self-final-verify" (\(a :: BLS.PT) -> BLS.ptFinalVerify a a)
 
-testPairing :: String -> TestTree
+testPairing :: String -> Spec
 testPairing name =
-  testGroup
-    name
-    [ testProperty "identity" $ \a b ->
-        pairingCheck
-          (a, b)
-          (a, b)
-    , testProperty "simple" $ \a p q ->
-        pairingCheck
-          (BLS.blsMult p a, q)
-          (p, BLS.blsMult q a)
-    , testProperty "crossover" $ \a b p q ->
-        pairingCheck
-          (BLS.blsMult p a, BLS.blsMult q b)
-          (BLS.blsMult p b, BLS.blsMult q a)
-    , testProperty "shift" $ \a b p q ->
-        pairingCheck
-          (BLS.blsMult p (a * b), q)
-          (BLS.blsMult p a, BLS.blsMult q b)
-    , testProperty "three pairings" prop_threePairings
-    , testProperty "four pairings" prop_fourPairings
-    , testProperty "finalVerify fails on random inputs" prop_randomFailsFinalVerify
-    ]
+  describe name $ do
+    prop "identity" $ \a b ->
+      pairingCheck
+        (a, b)
+        (a, b)
+    prop "simple" $ \a p q ->
+      pairingCheck
+        (BLS.blsMult p a, q)
+        (p, BLS.blsMult q a)
+    prop "crossover" $ \a b p q ->
+      pairingCheck
+        (BLS.blsMult p a, BLS.blsMult q b)
+        (BLS.blsMult p b, BLS.blsMult q a)
+    prop "shift" $ \a b p q ->
+      pairingCheck
+        (BLS.blsMult p (a * b), q)
+        (BLS.blsMult p a, BLS.blsMult q b)
+    prop "three pairings" prop_threePairings
+    prop "four pairings" prop_fourPairings
+    prop "finalVerify fails on random inputs" prop_randomFailsFinalVerify
   where
     pairingCheck (a, b) (c, d) = BLS.ptFinalVerify (BLS.millerLoop a b) (BLS.millerLoop c d)
 
@@ -193,20 +180,18 @@ loadHexFile :: String -> IO [BS.ByteString]
 loadHexFile filename = do
   mapM (either error pure . Base16.decode . BS8.filter (/= '\r')) . BS8.lines =<< BS.readFile filename
 
-testVectors :: String -> TestTree
+testVectors :: String -> Spec
 testVectors name =
-  testGroup
-    name
-    [ testVectorPairings "pairings"
-    , testVectorOperations "operations"
-    , testVectorSerDe "serialization/compression"
-    , testVectorSigAug "signature"
-    , testVectorLargeDst "large-dst"
-    ]
+  describe name $ do
+    testVectorPairings "pairings"
+    testVectorOperations "operations"
+    testVectorSerDe "serialization/compression"
+    testVectorSigAug "signature"
+    testVectorLargeDst "large-dst"
 
-testVectorPairings :: String -> TestTree
+testVectorPairings :: String -> Spec
 testVectorPairings name =
-  testCase name $ do
+  it name $ do
     [ p_raw
       , aP_raw
       , bP_raw
@@ -256,9 +241,9 @@ testVectorPairings name =
         (BLS.ptMult (BLS.millerLoop p aQ) (BLS.millerLoop p bQ))
         (BLS.millerLoop p apbQ)
 
-testVectorOperations :: String -> TestTree
+testVectorOperations :: String -> Spec
 testVectorOperations name =
-  testCase name $ do
+  it name $ do
     [ g1p_raw
       , g1q_raw
       , g1add_raw
@@ -322,9 +307,9 @@ testVectorOperations name =
       g2neg
       (BLS.blsNeg g2p)
 
-testVectorSerDe :: String -> TestTree
+testVectorSerDe :: String -> Spec
 testVectorSerDe name =
-  testCase name $ do
+  it name $ do
     [ g1UncompNotOnCurve
       , g1CompNotOnCurve
       , g1CompNotInGroup
@@ -376,9 +361,9 @@ testVectorSerDe name =
       (Left BLS.BLST_POINT_NOT_IN_GROUP)
       (BLS.blsDeserialize g2UncompNotInGroup :: Either BLS.BLSTError BLS.Point2)
 
-testVectorSigAug :: String -> TestTree
+testVectorSigAug :: String -> Spec
 testVectorSigAug name =
-  testCase name $ do
+  it name $ do
     [sig_raw, pk_raw] <-
       loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/bls_sig_aug_test_vectors"
     let dst = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_"
@@ -393,9 +378,9 @@ testVectorSigAug name =
         (BLS.millerLoop sig BLS.blsGenerator)
         (BLS.millerLoop hashedMsg pk)
 
-testVectorLargeDst :: String -> TestTree
+testVectorLargeDst :: String -> Spec
 testVectorLargeDst name =
-  testCase name $ do
+  it name $ do
     [msg_raw, large_dst_raw, output_raw] <-
       loadHexFile =<< getDataFileName "bls12-381-test-vectors/test_vectors/h2c_large_dst"
     let prefix = "H2C-OVERSIZE-DST-"
