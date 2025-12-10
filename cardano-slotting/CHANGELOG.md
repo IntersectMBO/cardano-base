@@ -2,7 +2,7 @@
 
 ## 0.2.0.2
 
-*
+* Use `Hspec` instead of `Tasty`
 
 ## 0.2.0.1
 
