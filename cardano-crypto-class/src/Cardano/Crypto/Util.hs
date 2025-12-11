@@ -33,6 +33,9 @@ module Cardano.Crypto.Util (
   decodeHexByteString,
   decodeHexString,
   decodeHexStringQ,
+
+  -- * Formatting
+  hexBS,
 )
 where
 
@@ -194,3 +197,7 @@ decodeHexStringQ hexStr n = do
   case decodeHexString hexStr n of
     Left err -> fail $ "<decodeHexByteString>: " ++ err
     Right _ -> [|either error id (decodeHexString hexStr n)|]
+
+hexBS :: ByteString -> String
+hexBS bs =
+  "0x" <> BSC8.unpack (BS16.encode bs) <> " (length " <> show (BS.length bs) <> ")"
