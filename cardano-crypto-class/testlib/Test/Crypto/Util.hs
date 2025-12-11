@@ -10,7 +10,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 
 module Test.Crypto.Util (
   -- * CBOR
@@ -47,6 +46,9 @@ module Test.Crypto.Util (
 
   -- * test messages for signings
   Message (..),
+
+  -- * BLS12381 signature context
+  BLS12381SignContext (..),
 
   -- * Test generation and shrinker helpers
   BadInputFor,
@@ -212,6 +214,34 @@ newtype Message = Message {messageBytes :: ByteString}
 instance Arbitrary Message where
   arbitrary = Message . BS.pack <$> arbitrary
   shrink = map (Message . BS.pack) . shrink . BS.unpack . messageBytes
+
+--------------------------------------------------------------------------------
+-- BLS12381 signature context
+--------------------------------------------------------------------------------
+
+data BLS12381SignContext = BLS12381SignContext
+  { blsSignContextDst :: Maybe ByteString
+  , blsSignContextDAug :: Maybe ByteString
+  }
+  deriving (Eq, Show)
+
+instance Arbitrary BLS12381SignContext where
+  arbitrary = do
+    dst <- Gen.frequency [(1, return Nothing), (100, Just . BS.pack <$> arbitrary)]
+    aug <- Gen.frequency [(1, return Nothing), (100, Just . BS.pack <$> arbitrary)]
+    return $ BLS12381SignContext dst aug
+  shrink (BLS12381SignContext dst aug) =
+    [ BLS12381SignContext dst' aug
+    | dst' <- shrinkMaybeByteString dst
+    ]
+      ++ [ BLS12381SignContext dst aug'
+         | aug' <- shrinkMaybeByteString aug
+         ]
+    where
+      shrinkMaybeByteString :: Maybe ByteString -> [Maybe ByteString]
+      shrinkMaybeByteString Nothing = []
+      shrinkMaybeByteString (Just bs) =
+        Nothing : map (Just . BS.pack) (shrink (BS.unpack bs))
 
 --------------------------------------------------------------------------------
 -- Serialisation properties
