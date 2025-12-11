@@ -65,6 +65,7 @@ library
   hs-source-dirs: src
   other-modules: Paths_cardano_crypto_tests
   exposed-modules:
+    Bench.Crypto.BLS
     Bench.Crypto.BenchData
     Bench.Crypto.DSIGN
     Bench.Crypto.HASH
