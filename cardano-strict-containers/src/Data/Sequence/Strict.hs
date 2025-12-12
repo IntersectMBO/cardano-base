@@ -289,8 +289,8 @@ spanr p (StrictSeq xs) = toStrictSeqTuple (Seq.spanr p xs)
 -- counting from 0. If the specified position is negative or at
 -- least the length of the sequence, 'lookup' returns 'Nothing'.
 --
--- prop> 0 <= i < length xs ==> lookup i xs == Just (toList xs !! i)
--- prop> i < 0 || i >= length xs ==> lookup i xs = Nothing
+-- prop> let xs = fromList ys in 0 <= i && i < length xs ==> lookup i xs == Just (toList xs !! i)
+-- prop> let xs = fromList ys in i < 0 || i >= length xs ==> lookup i xs == Nothing
 --
 -- Unlike 'index', this can be used to retrieve an element without
 -- forcing it. For example, to insert the fifth element of a sequence
