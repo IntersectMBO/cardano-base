@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
@@ -170,6 +171,9 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
 )
 where
 
+#include "blst_util.h"
+
+import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes, psbCreate, psbCreateResult, psbUseAsCPtr)
 import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
@@ -179,13 +183,14 @@ import qualified Data.ByteString.Unsafe as BSU
 import Data.Foldable (foldrM)
 import Data.Proxy (Proxy (..))
 import Data.Void
-import Foreign (Storable (..), poke, sizeOf)
+import Foreign (Storable (..), Word8, poke, sizeOf)
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
+import GHC.TypeLits (KnownNat, natVal)
 import System.IO.Unsafe (unsafePerformIO)
 
 ---- Phantom Types
@@ -196,7 +201,7 @@ data Curve2
 ---- Unsafe PointPtr types
 
 -- | A pointer to a (projective) point one of the two elliptical curves
-newtype PointPtr curve = PointPtr (Ptr Void)
+newtype PointPtr curve = PointPtr (Ptr Word8)
 
 -- | A pointer to a null-terminated array of pointers to points
 newtype PointArrayPtr curve = PointArrayPtr (Ptr Void)
@@ -208,7 +213,7 @@ type Point1ArrayPtr = PointArrayPtr Curve1
 type Point2ArrayPtr = PointArrayPtr Curve2
 
 -- | A pointer to an affine point on one of the two elliptical curves
-newtype AffinePtr curve = AffinePtr (Ptr Void)
+newtype AffinePtr curve = AffinePtr (Ptr Word8)
 
 -- | A pointer to a contiguous array of affine points
 newtype AffineBlockPtr curve = AffineBlockPtr (Ptr Void)
@@ -225,11 +230,14 @@ type Affine2BlockPtr = AffineBlockPtr Curve2
 type Affine1ArrayPtr = AffineArrayPtr Curve1
 type Affine2ArrayPtr = AffineArrayPtr Curve2
 
-newtype PTPtr = PTPtr (Ptr Void)
+newtype PTPtr = PTPtr (Ptr Word8)
 
-unsafePointFromPointPtr :: PointPtr curve -> Point curve
-unsafePointFromPointPtr (PointPtr ptr) =
-  Point . unsafePerformIO $ newForeignPtr_ ptr
+unsafePointFromPointPtr :: forall curve. BLS curve => PointPtr curve -> Point curve
+unsafePointFromPointPtr (PointPtr srcPtr) =
+  unsafePerformIO $ do
+    psb <- psbCreate @(PointSize curve) $ \dstPtr ->
+      copyBytes dstPtr srcPtr (sizePoint (Proxy @curve))
+    return (Point psb)
 
 eqAffinePtr :: forall curve. BLS curve => AffinePtr curve -> AffinePtr curve -> IO Bool
 eqAffinePtr (AffinePtr a) (AffinePtr b) =
@@ -240,9 +248,14 @@ instance BLS curve => Eq (AffinePtr curve) where
 
 ---- Safe Point types / marshalling
 
+-- | Type family to get the size of a point on a given curve
+type family PointSize curve where
+  PointSize Curve1 = BLST_P1_SIZE
+  PointSize Curve2 = BLST_P2_SIZE
+
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
-newtype Point curve = Point (ForeignPtr Void)
+newtype Point curve = Point (PinnedSizedBytes (PointSize curve))
 
 -- Making sure different 'Point's are not 'Coercible', which would ruin the
 -- intended type safety:
@@ -251,7 +264,12 @@ type role Point nominal
 type Point1 = Point Curve1
 type Point2 = Point Curve2
 
-newtype Affine curve = Affine (ForeignPtr Void)
+-- | Type family to get the size of an affine point on a given curve
+type family AffineSize curve where
+  AffineSize Curve1 = BLST_AFFINE1_SIZE
+  AffineSize Curve2 = BLST_AFFINE2_SIZE
+
+newtype Affine curve = Affine (PinnedSizedBytes (AffineSize curve))
 
 -- Making sure different 'Affine's are not 'Coercible', which would ruin the
 -- intended type safety:
@@ -263,7 +281,7 @@ type Affine2 = Affine Curve2
 -- | Target element without the final exponantiation. By defining target elements
 -- | as such, we save up the final exponantiation when computing a pairing, and only
 -- | compute it when necessary (e.g. comparison with another point or serialisation)
-newtype PT = PT (ForeignPtr Void)
+newtype PT = PT (PinnedSizedBytes BLST_FP12_SIZE)
 
 -- | Sizes of various representations of elliptic curve points.
 -- | Size of a curve point in memory
@@ -283,13 +301,14 @@ sizeAffine :: forall curve. BLS curve => Proxy curve -> Int
 sizeAffine = fromIntegral . sizeAffine_
 
 withPoint :: forall a curve. Point curve -> (PointPtr curve -> IO a) -> IO a
-withPoint (Point p) go = withForeignPtr p (go . PointPtr)
+withPoint (Point psb) go =
+  psbUseAsCPtr psb $ \ptr ->
+    go (PointPtr ptr)
 
 withNewPoint :: forall curve a. BLS curve => (PointPtr curve -> IO a) -> IO (a, Point curve)
 withNewPoint go = do
-  p <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
-  x <- withForeignPtr p (go . PointPtr)
-  return (x, Point p)
+  (psb, a) <- psbCreateResult @(PointSize curve) (go . PointPtr)
+  return (a, Point psb)
 
 withNewPoint_ :: BLS curve => (PointPtr curve -> IO a) -> IO a
 withNewPoint_ = fmap fst . withNewPoint
@@ -298,21 +317,21 @@ withNewPoint' :: BLS curve => (PointPtr curve -> IO a) -> IO (Point curve)
 withNewPoint' = fmap snd . withNewPoint
 
 clonePoint :: forall curve. BLS curve => Point curve -> IO (Point curve)
-clonePoint (Point a) = do
-  b <- mallocForeignPtrBytes (sizePoint (Proxy @curve))
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap (sizePoint (Proxy @curve))
-  return (Point b)
+clonePoint (Point src) = do
+  dst <- psbCreate @(PointSize curve) $ \dstPtr ->
+    psbUseAsCPtr src $ \srcPtr ->
+      copyBytes dstPtr srcPtr (sizePoint (Proxy @curve))
+  return (Point dst)
 
 withAffine :: forall a curve. Affine curve -> (AffinePtr curve -> IO a) -> IO a
-withAffine (Affine p) go = withForeignPtr p (go . AffinePtr)
+withAffine (Affine psb) go = do
+  psbUseAsCPtr psb $ \ptr ->
+    go (AffinePtr ptr)
 
 withNewAffine :: forall curve a. BLS curve => (AffinePtr curve -> IO a) -> IO (a, Affine curve)
 withNewAffine go = do
-  p <- mallocForeignPtrBytes (sizeAffine (Proxy @curve))
-  x <- withForeignPtr p (go . AffinePtr)
-  return (x, Affine p)
+  (psb, a) <- psbCreateResult @(AffineSize curve) (go . AffinePtr)
+  return (a, Affine psb)
 
 withNewAffine_ :: BLS curve => (AffinePtr curve -> IO a) -> IO a
 withNewAffine_ = fmap fst . withNewAffine
@@ -353,13 +372,13 @@ withAffineBlockArrayPtr affinesBlockPtr numPoints go = do
     go (AffineArrayPtr affineVectorPtr)
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
-withPT (PT pt) go = withForeignPtr pt (go . PTPtr)
+withPT (PT psb) go = psbUseAsCPtr psb $ \ptr ->
+  go (PTPtr ptr)
 
 withNewPT :: (PTPtr -> IO a) -> IO (a, PT)
 withNewPT go = do
-  p <- mallocForeignPtrBytes sizePT
-  x <- withForeignPtr p (go . PTPtr)
-  return (x, PT p)
+  (psb, a) <- psbCreateResult @BLST_FP12_SIZE (go . PTPtr)
+  return (a, PT psb)
 
 withNewPT_ :: (PTPtr -> IO a) -> IO a
 withNewPT_ = fmap fst . withNewPT
@@ -368,13 +387,13 @@ withNewPT' :: (PTPtr -> IO a) -> IO PT
 withNewPT' = fmap snd . withNewPT
 
 sizePT :: Int
-sizePT = fromIntegral c_size_blst_fp12
+sizePT = BLST_FP12_SIZE
 
 ---- Curve operations
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
 -- use higher-level wrappers such as 'blsAddOrDouble', 'blsMult', 'blsCneg', 'blsNeg', etc.
-class BLS curve where
+class (KnownNat (PointSize curve), KnownNat (AffineSize curve)) => BLS curve where
   c_blst_on_curve :: PointPtr curve -> IO Bool
 
   c_blst_add_or_double :: PointPtr curve -> PointPtr curve -> PointPtr curve -> IO ()
@@ -402,10 +421,18 @@ class BLS curve where
   c_blst_p_is_equal :: PointPtr curve -> PointPtr curve -> IO Bool
   c_blst_p_is_inf :: PointPtr curve -> IO Bool
 
+  -- | Runtime point size. Delegates to the type-level 'PointSize' so that
+  --   compile-time and runtime sizes share a single source of truth.
   sizePoint_ :: Proxy curve -> CSize
+  sizePoint_ _ = fromInteger (natVal (Proxy @(PointSize curve)))
+
   serializedSizePoint_ :: Proxy curve -> CSize
   compressedSizePoint_ :: Proxy curve -> CSize
+
+  -- | Runtime affine point size. Delegates to the type-level 'AffineSize' so that
+  --   compile-time and runtime sizes share a single source of truth.
   sizeAffine_ :: Proxy curve -> CSize
+  sizeAffine_ _ = fromInteger (natVal (Proxy @(AffineSize curve)))
 
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
@@ -434,10 +461,15 @@ instance BLS Curve1 where
   c_blst_p_is_equal = c_blst_p1_is_equal
   c_blst_p_is_inf = c_blst_p1_is_inf
 
-  sizePoint_ _ = c_size_blst_p1
+  -- NOTE: These sizes come from the Zcash-compatible serialization format
+  -- used by blst for G1 (blst_p1_*). See `blst.h`:
+  --
+  --   void blst_p1_serialize(byte out[96], const blst_p1 *in);
+  --   void blst_p1_compress(byte out[48], const blst_p1 *in);
+  --
+  -- i.e. G1 elements are 96 bytes uncompressed, 48 bytes compressed.
   compressedSizePoint_ _ = 48
   serializedSizePoint_ _ = 96
-  sizeAffine_ _ = c_size_blst_affine1
 
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
@@ -466,10 +498,15 @@ instance BLS Curve2 where
   c_blst_p_is_equal = c_blst_p2_is_equal
   c_blst_p_is_inf = c_blst_p2_is_inf
 
-  sizePoint_ _ = c_size_blst_p2
+  -- NOTE: These sizes come from the Zcash-compatible serialization format
+  -- used by blst for G2 (blst_p2_*). See `blst.h`:
+  --
+  --   void blst_p2_serialize(byte out[192], const blst_p2 *in);
+  --   void blst_p2_compress(byte out[96], const blst_p2 *in);
+  --
+  -- i.e. G2 elements are 192 bytes uncompressed, 96 bytes compressed.
   compressedSizePoint_ _ = 96
   serializedSizePoint_ _ = 192
-  sizeAffine_ _ = c_size_blst_affine2
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
@@ -480,9 +517,9 @@ instance BLS curve => Eq (Affine curve) where
 ---- Safe Scalar types / marshalling
 
 sizeScalar :: Int
-sizeScalar = fromIntegral c_size_blst_scalar
+sizeScalar = BLST_SCALAR_SIZE
 
-newtype Scalar = Scalar (ForeignPtr Void)
+newtype Scalar = Scalar (PinnedSizedBytes BLST_SCALAR_SIZE)
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
@@ -491,13 +528,13 @@ withIntScalar i go = do
 
 withScalar :: Scalar -> (ScalarPtr -> IO a) -> IO a
 withScalar (Scalar p2) go = do
-  withForeignPtr p2 (go . ScalarPtr)
+  psbUseAsCPtr p2 $ \ptr ->
+    go (ScalarPtr ptr)
 
 withNewScalar :: (ScalarPtr -> IO a) -> IO (a, Scalar)
 withNewScalar go = do
-  p2 <- mallocForeignPtrBytes sizeScalar
-  x <- withForeignPtr p2 (go . ScalarPtr)
-  return (x, Scalar p2)
+  (psb, a) <- psbCreateResult @BLST_SCALAR_SIZE (go . ScalarPtr)
+  return (a, Scalar psb)
 
 withNewScalar_ :: (ScalarPtr -> IO a) -> IO a
 withNewScalar_ = fmap fst . withNewScalar
@@ -525,27 +562,26 @@ withScalarArray scalars go = do
      in accumulate ptr scalars
 
 cloneScalar :: Scalar -> IO Scalar
-cloneScalar (Scalar a) = do
-  b <- mallocForeignPtrBytes sizeScalar
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap sizeScalar
-  return (Scalar b)
+cloneScalar (Scalar src) = do
+  dst <- psbCreate @BLST_SCALAR_SIZE $ \dstPtr ->
+    psbUseAsCPtr src $ \srcPtr ->
+      copyBytes dstPtr srcPtr sizeScalar
+  pure (Scalar dst)
 
 sizeFr :: Int
-sizeFr = fromIntegral c_size_blst_fr
+sizeFr = BLST_FR_SIZE
 
-newtype Fr = Fr (ForeignPtr Void)
+newtype Fr = Fr (PinnedSizedBytes BLST_FR_SIZE)
 
 withFr :: Fr -> (FrPtr -> IO a) -> IO a
-withFr (Fr p2) go = do
-  withForeignPtr p2 (go . FrPtr)
+withFr (Fr psb) go = do
+  psbUseAsCPtr psb $ \ptr ->
+    go (FrPtr ptr)
 
 withNewFr :: (FrPtr -> IO a) -> IO (a, Fr)
 withNewFr go = do
-  p2 <- mallocForeignPtrBytes sizeFr
-  x <- withForeignPtr p2 (go . FrPtr)
-  return (x, Fr p2)
+  (psb, a) <- psbCreateResult @BLST_FR_SIZE (go . FrPtr)
+  return (a, Fr psb)
 
 withNewFr_ :: (FrPtr -> IO a) -> IO a
 withNewFr_ = fmap fst . withNewFr
@@ -554,12 +590,11 @@ withNewFr' :: (FrPtr -> IO a) -> IO Fr
 withNewFr' = fmap snd . withNewFr
 
 cloneFr :: Fr -> IO Fr
-cloneFr (Fr a) = do
-  b <- mallocForeignPtrBytes sizeFr
-  withForeignPtr a $ \ap ->
-    withForeignPtr b $ \bp ->
-      copyBytes bp ap sizeFr
-  return (Fr b)
+cloneFr (Fr src) = do
+  dst <- psbCreate @BLST_FR_SIZE $ \dstPtr ->
+    psbUseAsCPtr src $ \srcPtr ->
+      copyBytes dstPtr srcPtr sizeFr
+  return (Fr dst)
 
 scalarToInteger :: Scalar -> IO Integer
 scalarToInteger scalar = withScalar scalar $ \scalarPtr -> do
@@ -607,17 +642,14 @@ scalarFromInteger n = do
 
 ---- Unsafe types
 
-newtype ScalarPtr = ScalarPtr (Ptr Void)
+newtype ScalarPtr = ScalarPtr (Ptr Word8)
 
 -- A pointer to a null-terminated array of pointers to scalars
 newtype ScalarArrayPtr = ScalarArrayPtr (Ptr Void)
-newtype FrPtr = FrPtr (Ptr Void)
+newtype FrPtr = FrPtr (Ptr Word8)
 newtype ScratchPtr = ScratchPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
-
-foreign import ccall "size_blst_scalar" c_size_blst_scalar :: CSize
-foreign import ccall "size_blst_fr" c_size_blst_fr :: CSize
 
 foreign import ccall "blst_scalar_fr_check" c_blst_scalar_fr_check :: ScalarPtr -> IO Bool
 
@@ -630,7 +662,6 @@ foreign import ccall "blst_scalar_from_bendian"
 
 ---- Raw Point1 functions
 
-foreign import ccall "size_blst_p1" c_size_blst_p1 :: CSize
 foreign import ccall "blst_p1_on_curve" c_blst_p1_on_curve :: Point1Ptr -> IO Bool
 
 foreign import ccall "blst_p1_add_or_double"
@@ -665,7 +696,6 @@ foreign import ccall "blst_p1s_mult_pippenger"
 
 ---- Raw Point2 functions
 
-foreign import ccall "size_blst_p2" c_size_blst_p2 :: CSize
 foreign import ccall "blst_p2_on_curve" c_blst_p2_on_curve :: Point2Ptr -> IO Bool
 
 foreign import ccall "blst_p2_add_or_double"
@@ -700,9 +730,6 @@ foreign import ccall "blst_p2s_mult_pippenger"
 
 ---- Affine operations
 
-foreign import ccall "size_blst_affine1" c_size_blst_affine1 :: CSize
-foreign import ccall "size_blst_affine2" c_size_blst_affine2 :: CSize
-
 foreign import ccall "blst_p1_to_affine"
   c_blst_p1_to_affine :: AffinePtr Curve1 -> PointPtr Curve1 -> IO ()
 foreign import ccall "blst_p2_to_affine"
@@ -717,7 +744,6 @@ foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: AffinePtr 
 
 ---- PT operations
 
-foreign import ccall "size_blst_fp12" c_size_blst_fp12 :: CSize
 foreign import ccall "blst_fp12_mul" c_blst_fp12_mul :: PTPtr -> PTPtr -> PTPtr -> IO ()
 foreign import ccall "blst_fp12_is_equal" c_blst_fp12_is_equal :: PTPtr -> PTPtr -> IO Bool
 foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr -> PTPtr -> IO Bool

@@ -1,0 +1,9 @@
+#pragma once
+
+#define BLST_P1_SIZE 144
+#define BLST_P2_SIZE 288
+#define BLST_AFFINE1_SIZE 96
+#define BLST_AFFINE2_SIZE 192
+#define BLST_SCALAR_SIZE 32
+#define BLST_FR_SIZE 32
+#define BLST_FP12_SIZE 576
