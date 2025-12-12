@@ -140,7 +140,7 @@ decodeNestedCbor = do
 --
 -- In CBOR notation, if the data was serialised as:
 --
--- >>> 24(h'DEADBEEF')
+-- > 24(h'DEADBEEF')
 --
 -- then `decodeNestedCborBytes` yields the inner 'DEADBEEF', unchanged.
 decodeNestedCborBytes :: D.Decoder s BS.ByteString
