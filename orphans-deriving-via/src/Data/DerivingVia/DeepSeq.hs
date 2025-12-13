@@ -8,8 +8,7 @@
 
 -- | "GHC.Generics" definition of 'rnf'
 module Data.DerivingVia.DeepSeq (
-
-)
+  )
 where
 
 import Control.DeepSeq

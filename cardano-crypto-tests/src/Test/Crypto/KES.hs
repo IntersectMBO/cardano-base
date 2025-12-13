@@ -480,7 +480,9 @@ testKESAlgorithm lock n =
 -- here).
 withSK ::
   KESAlgorithm v =>
-  PinnedSizedBytes (SeedSizeKES v) -> (SignKeyKES v -> IO b) -> IO b
+  PinnedSizedBytes (SeedSizeKES v) ->
+  (SignKeyKES v -> IO b) ->
+  IO b
 withSK seedPSB =
   bracket
     (withMLockedSeedFromPSB seedPSB genKeyKES)
@@ -488,7 +490,8 @@ withSK seedPSB =
 
 mkUnsoundPureSignKeyKES ::
   UnsoundPureKESAlgorithm v =>
-  PinnedSizedBytes (SeedSizeKES v) -> UnsoundPureSignKeyKES v
+  PinnedSizedBytes (SeedSizeKES v) ->
+  UnsoundPureSignKeyKES v
 mkUnsoundPureSignKeyKES psb =
   let seed = mkSeedFromBytes . psbToByteString $ psb
    in unsoundPureGenKeyKES seed
@@ -536,14 +539,18 @@ ioPropertyWithSK lock action seedPSB =
 prop_onlyGenSignKeyKES ::
   forall v.
   KESAlgorithm v =>
-  Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Lock ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_onlyGenSignKeyKES lock =
   ioPropertyWithSK @v lock $ const noExceptionsThrown
 
 prop_onlyGenVerKeyKES ::
   forall v.
   KESAlgorithm v =>
-  Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Lock ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_onlyGenVerKeyKES lock =
   ioPropertyWithSK @v lock $ doesNotThrow . deriveVerKeyKES
 
@@ -552,7 +559,9 @@ prop_oneUpdateSignKeyKES ::
   ( ContextKES v ~ ()
   , KESAlgorithm v
   ) =>
-  Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Lock ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_oneUpdateSignKeyKES lock seedPSB =
   ioProperty . withLock lock . withMLockedSeedFromPSB seedPSB $ \seed -> do
     sk <- genKeyKES @v seed
@@ -566,7 +575,9 @@ prop_allUpdatesSignKeyKES ::
   ( ContextKES v ~ ()
   , KESAlgorithm v
   ) =>
-  Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Lock ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_allUpdatesSignKeyKES lock seedPSB =
   ioProperty . withLock lock $ do
     void $ withAllUpdatesKES_ @v seedPSB $ const (return ())
@@ -579,7 +590,9 @@ prop_totalPeriodsKES ::
   ( ContextKES v ~ ()
   , KESAlgorithm v
   ) =>
-  Lock -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Lock ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_totalPeriodsKES lock seed =
   ioProperty . withLock lock $ do
     sks <- withAllUpdatesKES_ @v seed (const . return $ ())
@@ -599,7 +612,8 @@ prop_deriveVerKeyKES ::
   ( ContextKES v ~ ()
   , KESAlgorithm v
   ) =>
-  PinnedSizedBytes (SeedSizeKES v) -> Property
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_deriveVerKeyKES seedPSB =
   ioProperty $ do
     vk_0 <- do
@@ -622,7 +636,8 @@ prop_verifyKES_positive ::
   , Signable v ~ SignableRepresentation
   , KESAlgorithm v
   ) =>
-  PinnedSizedBytes (SeedSizeKES v) -> Gen Property
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Gen Property
 prop_verifyKES_positive seedPSB = do
   xs :: [Message] <- vectorOf totalPeriods arbitrary
   return $
@@ -718,7 +733,7 @@ prop_verifyKES_negative_period seedPSB x =
       return $
         conjoin
           [ counterexample ("periods " ++ show (t, t')) $
-              verifyKES () vk t' x sig =/= Right ()
+            verifyKES () vk t' x sig =/= Right ()
           | t' <- [0 .. totalPeriods - 1]
           , t /= t'
           ]
@@ -837,7 +852,8 @@ withNullSeed =
 withNullSK ::
   forall m v a.
   (KESAlgorithm v, MonadThrow m, MonadST m) =>
-  (SignKeyKES v -> m a) -> m a
+  (SignKeyKES v -> m a) ->
+  m a
 withNullSK =
   bracket
     (withNullSeed genKeyKES)
@@ -876,7 +892,9 @@ prop_unsoundPureGenKey ::
   ( UnsoundPureKESAlgorithm v
   , EqST (SignKeyKES v)
   ) =>
-  Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Proxy v ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_unsoundPureGenKey _ seedPSB = ioProperty $ do
   let seed = mkSeedFromBytes $ psbToByteString seedPSB
   let skPure = unsoundPureGenKeyKES @v seed
@@ -889,7 +907,9 @@ prop_unsoundPureGenKey _ seedPSB = ioProperty $ do
 prop_unsoundPureDeriveVerKey ::
   forall v.
   UnsoundPureKESAlgorithm v =>
-  Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Proxy v ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_unsoundPureDeriveVerKey _ seedPSB = ioProperty $ do
   let seed = mkSeedFromBytes $ psbToByteString seedPSB
   let skPure = unsoundPureGenKeyKES @v seed
@@ -903,7 +923,9 @@ prop_unsoundPureUpdateKES ::
   , ContextKES v ~ ()
   , EqST (SignKeyKES v)
   ) =>
-  Proxy v -> PinnedSizedBytes (SeedSizeKES v) -> Property
+  Proxy v ->
+  PinnedSizedBytes (SeedSizeKES v) ->
+  Property
 prop_unsoundPureUpdateKES _ seedPSB = ioProperty $ do
   let seed = mkSeedFromBytes $ psbToByteString seedPSB
   let skPure = unsoundPureGenKeyKES @v seed

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
@@ -394,7 +395,13 @@ instance
 -- VerKey instances
 --
 
-deriving instance HashAlgorithm h => Show (VerKeyKES (CompactSumKES h d))
+deriving instance
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  HashAlgorithm h =>
+#endif
+  Show (VerKeyKES (CompactSumKES h d))
 deriving instance Eq (VerKeyKES (CompactSumKES h d))
 
 deriving via

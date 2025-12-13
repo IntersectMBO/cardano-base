@@ -121,8 +121,7 @@ runMonadRandomWithSeed s a =
     Right x -> x
     Left e -> throw e
 
-data SeedBytesExhausted
-  = SeedBytesExhausted
+data SeedBytesExhausted = SeedBytesExhausted
   { seedBytesSupplied :: Int
   , seedBytesDemanded :: Int
   }
@@ -130,8 +129,7 @@ data SeedBytesExhausted
 
 instance Exception SeedBytesExhausted
 
-newtype MonadRandomFromSeed a
-  = MonadRandomFromSeed
+newtype MonadRandomFromSeed a = MonadRandomFromSeed
   { unMonadRandomFromSeed :: StateT Seed (ExceptT SeedBytesExhausted Identity) a
   }
   deriving newtype (Functor, Applicative, Monad)
