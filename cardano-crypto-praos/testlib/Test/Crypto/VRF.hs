@@ -29,7 +29,7 @@ import GHC.Stack (HasCallStack)
 import qualified Text.ParserCombinators.ReadP as Parse
 import qualified Text.Read as Read
 
-import Paths_cardano_crypto_tests (getDataFileName)
+import Paths_cardano_crypto_praos (getDataFileName)
 import Test.Crypto.Util
 import Test.HUnit (assertBool, assertFailure, (@?=))
 import Test.Hspec (Expectation, Spec, describe, it)

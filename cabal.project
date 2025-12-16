@@ -21,7 +21,6 @@ packages:
   cardano-crypto-class
   cardano-crypto-peras
   cardano-crypto-praos
-  cardano-crypto-tests
   cardano-git-rev
   cardano-slotting
   cardano-strict-containers

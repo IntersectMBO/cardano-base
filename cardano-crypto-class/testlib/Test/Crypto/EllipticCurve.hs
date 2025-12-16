@@ -7,7 +7,7 @@
 module Test.Crypto.EllipticCurve
 where
 
-import Paths_cardano_crypto_tests
+import Paths_cardano_crypto_class (getDataFileName)
 
 import Test.Crypto.Util (eitherShowError)
 
