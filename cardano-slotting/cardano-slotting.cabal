@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-slotting
-version: 0.2.0.1
+version: 0.2.0.2
 synopsis: Key slotting types for cardano libraries
 license: Apache-2.0
 license-files:
@@ -71,10 +71,10 @@ test-suite tests
   main-is: Main.hs
   other-modules: Test.Cardano.Slotting.EpochInfo
   build-depends:
+    QuickCheck,
     base,
     cardano-slotting,
-    tasty,
-    tasty-quickcheck,
+    hspec,
 
   ghc-options:
     -threaded

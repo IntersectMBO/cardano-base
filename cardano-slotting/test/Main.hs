@@ -1,8 +1,8 @@
 import Test.Cardano.Slotting.EpochInfo (epochInfoTests)
-import Test.Tasty
+import Test.Hspec
 
 main :: IO ()
-main = defaultMain tests
+main = hspec tests
 
-tests :: TestTree
-tests = testGroup "EpochInfo" [epochInfoTests]
+tests :: Spec
+tests = describe "EpochInfo" epochInfoTests

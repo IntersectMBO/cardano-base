@@ -1,4 +1,4 @@
-cabal-version: >=1.10
+cabal-version: 3.0
 name: cardano-strict-containers
 version: 0.1.5.0
 synopsis: Various strict container types
@@ -39,4 +39,4 @@ library
     deepseq,
     fingertree,
     nothunks,
-    serialise
+    serialise,
