@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-crypto-praos
-version: 2.2.1.1
+version: 2.2.2.0
 synopsis: Crypto primitives from libsodium
 description: VRF (and KES, tba) primitives from libsodium.
 license: Apache-2.0
@@ -34,6 +34,22 @@ extra-source-files:
   cbits/private/fe_51/fe.h
   cbits/vrf03/crypto_vrf_ietfdraft03.h
   cbits/vrf13_batchcompat/crypto_vrf_ietfdraft13.h
+
+data-files:
+  test_vectors/vrf_ver03_generated_1
+  test_vectors/vrf_ver03_generated_2
+  test_vectors/vrf_ver03_generated_3
+  test_vectors/vrf_ver03_generated_4
+  test_vectors/vrf_ver03_standard_10
+  test_vectors/vrf_ver03_standard_11
+  test_vectors/vrf_ver03_standard_12
+  test_vectors/vrf_ver13_generated_1
+  test_vectors/vrf_ver13_generated_2
+  test_vectors/vrf_ver13_generated_3
+  test_vectors/vrf_ver13_generated_4
+  test_vectors/vrf_ver13_standard_10
+  test_vectors/vrf_ver13_standard_11
+  test_vectors/vrf_ver13_standard_12
 
 flag external-libsodium-vrf
   description:
@@ -70,7 +86,7 @@ library
     base,
     bytestring,
     cardano-binary,
-    cardano-crypto-class >=2.1.1,
+    cardano-crypto-class >=2.2.4,
     deepseq,
     nothunks,
 
@@ -87,3 +103,55 @@ library
       cbits/vrf13_batchcompat/prove.c
       cbits/vrf13_batchcompat/verify.c
       cbits/vrf13_batchcompat/vrf.c
+
+library testlib
+  import: base, project-config
+  hs-source-dirs: testlib
+  visibility: public
+  exposed-modules: Test.Crypto.VRF
+  other-modules: Paths_cardano_crypto_praos
+  autogen-modules: Paths_cardano_crypto_praos
+  build-depends:
+    HUnit,
+    QuickCheck,
+    base,
+    bytestring >=0.10.12.0,
+    cardano-crypto-class:{cardano-crypto-class, testlib},
+    cardano-crypto-praos,
+    hspec,
+
+test-suite tests
+  import: base, project-config
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  other-modules: Paths_cardano_crypto_praos
+  autogen-modules: Paths_cardano_crypto_praos
+  main-is: Main.hs
+  build-depends:
+    base,
+    cardano-crypto-class,
+    cardano-crypto-praos:testlib,
+    hspec,
+
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+
+benchmark bench
+  import: base, project-config
+  type: exitcode-stdio-1.0
+  hs-source-dirs: bench
+  main-is: Main.hs
+  other-modules:
+    Bench.Crypto.VRF
+
+  build-depends:
+    base,
+    bytestring,
+    cardano-crypto-class:{cardano-crypto-class, benchlib},
+    cardano-crypto-praos,
+    criterion,
+    deepseq,
+
+  ghc-options: -threaded
