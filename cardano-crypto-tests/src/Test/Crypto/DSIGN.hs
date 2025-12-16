@@ -29,8 +29,8 @@ import Test.QuickCheck (
   ioProperty,
   counterexample,
   )
-import Test.Tasty (TestTree, testGroup, adjustOption)
-import Test.Tasty.QuickCheck (testProperty, QuickCheckTests)
+import Test.Hspec (Spec, describe)
+import Test.Hspec.QuickCheck (prop, modifyMaxSize)
 
 import qualified Data.ByteString as BS
 import Cardano.Crypto.Libsodium
@@ -97,7 +97,11 @@ import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
 import Test.Crypto.Util (
+#if SECP256K1_ENABLED
   BadInputFor,
+  genBadInputFor,
+  shrinkBadInputFor,
+#endif
   Message,
   prop_raw_serialise,
   prop_raw_deserialise,
@@ -110,8 +114,6 @@ import Test.Crypto.Util (
   prop_no_thunks,
   prop_no_thunks_IO,
   arbitrarySeedOfSize,
-  genBadInputFor,
-  shrinkBadInputFor,
   Lock,
   withLock,
   directSerialiseToBS,
@@ -179,12 +181,10 @@ defaultSigGen = do
   msg :: Message <- arbitrary
   signDSIGN () msg <$> defaultSignKeyGen
 
-#ifdef SECP256K1_ENABLED
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
-defaultTestEnough :: QuickCheckTests -> QuickCheckTests
-defaultTestEnough = max 10_000
-#endif
+testEnough :: Spec -> Spec
+testEnough = modifyMaxSize (const 10_000)
 
 {- HLINT ignore "Use <$>" -}
 {- HLINT ignore "Reduce duplication" -}
@@ -192,28 +192,25 @@ defaultTestEnough = max 10_000
 --
 -- The list of all tests
 --
-tests :: Lock -> TestTree
+tests :: Lock -> Spec
 tests lock =
-  testGroup "Crypto.DSIGN"
-    [ testGroup "Pure"
-      [ testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
-      , testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
-      , testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
+  describe "Crypto.DSIGN" $ do
+     describe "Pure" $ do
+       testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
+       testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
+       testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
 #ifdef SECP256K1_ENABLED
-      , testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
-      , testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
-      -- Specific tests related only to ecdsa
-      , testEcdsaInvalidMessageHash "EcdsaSecp256k1InvalidMessageHash"
-      , testEcdsaWithHashAlgorithm (Proxy @SHA3_256) "EcdsaSecp256k1WithSHA3_256"
-      , testEcdsaWithHashAlgorithm (Proxy @Blake2b_256) "EcdsaSecp256k1WithBlake2b_256"
-      , testEcdsaWithHashAlgorithm (Proxy @SHA256) "EcdsaSecp256k1WithSHA256"
-      , testEcdsaWithHashAlgorithm (Proxy @Keccak256) "EcdsaSecp256k1WithKeccak256"
+       testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
+       testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
+       -- Specific tests related only to ecdsa
+       testEcdsaInvalidMessageHash "EcdsaSecp256k1InvalidMessageHash"
+       testEcdsaWithHashAlgorithm (Proxy @SHA3_256) "EcdsaSecp256k1WithSHA3_256"
+       testEcdsaWithHashAlgorithm (Proxy @Blake2b_256) "EcdsaSecp256k1WithBlake2b_256"
+       testEcdsaWithHashAlgorithm (Proxy @SHA256) "EcdsaSecp256k1WithSHA256"
+       testEcdsaWithHashAlgorithm (Proxy @Keccak256) "EcdsaSecp256k1WithKeccak256"
 #endif
-      ]
-    , testGroup "MLocked"
-      [ testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
-      ]
-    ]
+     describe "MLocked" $ do
+      testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
 
 testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,
@@ -231,100 +228,90 @@ testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
   Gen (SigDSIGN v) ->
   Gen a ->
   String ->
-  TestTree
-testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name $ [
-  testGroup "serialization" [
-    testGroup "raw" [
-      testProperty "VerKey serialization" .
+  Spec
+testDSIGNAlgorithm genSig genMsg name = testEnough . describe name $ do
+  describe "serialization" $ do
+    describe "raw" $ do
+      prop "VerKey serialization" .
         forAllShow (defaultVerKeyGen @v)
                    ppShow $
-                   prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN,
-      testProperty "VerKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseVerKeyDSIGN @v),
-      testProperty "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(VerKeyDSIGN v),
-      testProperty "SignKey serialization" .
+                   prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN
+      prop "VerKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseVerKeyDSIGN @v)
+      prop "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(VerKeyDSIGN v)
+      prop "SignKey serialization" .
         forAllShow (defaultSignKeyGen @v)
                    ppShow $
-                   prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN,
-      testProperty "SignKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseSignKeyDSIGN @v),
-      testProperty "SignKey fail fromCBOR" $ prop_bad_cbor_bytes @(SignKeyDSIGN v),
-      testProperty "Sig serialization" .
+                   prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN
+      prop "SignKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseSignKeyDSIGN @v)
+      prop "SignKey fail fromCBOR" $ prop_bad_cbor_bytes @(SignKeyDSIGN v)
+      prop "Sig serialization" .
         forAllShow genSig
                    ppShow $
-                   prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN,
-      testProperty "Sig deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseSigDSIGN @v),
-      testProperty "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(SigDSIGN v)
-      ],
-    testGroup "size" [
-      testProperty "VerKey" .
+                   prop_raw_serialise rawSerialiseSigDSIGN rawDeserialiseSigDSIGN
+      prop "Sig deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseSigDSIGN @v)
+      prop "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(SigDSIGN v)
+    describe "size" $ do
+      prop "VerKey" .
         forAllShow (defaultVerKeyGen @v)
                    ppShow $
-                   prop_size_serialise rawSerialiseVerKeyDSIGN (sizeVerKeyDSIGN (Proxy @v)),
-      testProperty "SignKey" .
+                   prop_size_serialise rawSerialiseVerKeyDSIGN (sizeVerKeyDSIGN (Proxy @v))
+      prop "SignKey" .
         forAllShow (defaultSignKeyGen @v)
                    ppShow $
-                   prop_size_serialise rawSerialiseSignKeyDSIGN (sizeSignKeyDSIGN (Proxy @v)),
-      testProperty "Sig" .
+                   prop_size_serialise rawSerialiseSignKeyDSIGN (sizeSignKeyDSIGN (Proxy @v))
+      prop "Sig" .
         forAllShow genSig
                    ppShow $
                    prop_size_serialise rawSerialiseSigDSIGN (sizeSigDSIGN (Proxy @v))
-      ],
-    testGroup "direct CBOR" [
-      testProperty "VerKey" .
+    describe "direct CBOR" $ do
+      prop "VerKey" .
         forAllShow (defaultVerKeyGen @v)
                    ppShow $
-                   prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN,
-      testProperty "SignKey" .
+                   prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN
+      prop "SignKey" .
         forAllShow (defaultSignKeyGen @v)
                    ppShow $
-                   prop_cbor_with encodeSignKeyDSIGN decodeSignKeyDSIGN,
-      testProperty "Sig" .
+                   prop_cbor_with encodeSignKeyDSIGN decodeSignKeyDSIGN
+      prop "Sig" .
         forAllShow genSig
                    ppShow $
                    prop_cbor_with encodeSigDSIGN decodeSigDSIGN
-      ],
-    testGroup "To/FromCBOR class" [
-      testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor,
-      testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor,
-      testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor
-      ],
-    testGroup "ToCBOR size" [
-      testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor_size,
-      testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor_size,
-      testProperty "Sig" . forAllShow genSig ppShow $ prop_cbor_size
-      ],
-    testGroup "direct matches class" [
-      testProperty "VerKey" .
+    describe "To/FromCBOR class" $ do
+      prop "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor
+      prop "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor
+      prop "Sig" . forAllShow genSig ppShow $ prop_cbor
+    describe "ToCBOR size" $ do
+      prop "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor_size
+      prop "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor_size
+      prop "Sig" . forAllShow genSig ppShow $ prop_cbor_size
+    describe "direct matches class" $ do
+      prop "VerKey" .
         forAllShow (defaultVerKeyGen @v) ppShow $
-        prop_cbor_direct_vs_class encodeVerKeyDSIGN,
-      testProperty "SignKey" .
+        prop_cbor_direct_vs_class encodeVerKeyDSIGN
+      prop "SignKey" .
         forAllShow (defaultSignKeyGen @v) ppShow $
-        prop_cbor_direct_vs_class encodeSignKeyDSIGN,
-      testProperty "Sig" .
+        prop_cbor_direct_vs_class encodeSignKeyDSIGN
+      prop "Sig" .
         forAllShow genSig ppShow $
         prop_cbor_direct_vs_class encodeSigDSIGN
-      ]
-    ],
-    testGroup "verify" [
-      testProperty "signing and verifying with matching keys" .
+    describe "verify" $ do
+      prop "signing and verifying with matching keys" .
         forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @v) ppShow $
-        prop_dsign_verify,
-      testProperty "verifying with wrong key" .
+        prop_dsign_verify
+      prop "verifying with wrong key" .
         forAllShow genWrongKey ppShow $
-        prop_dsign_verify_wrong_key,
-      testProperty "verifying wrong message" .
+        prop_dsign_verify_wrong_key
+      prop "verifying wrong message" .
         forAllShow genWrongMsg ppShow $
         prop_dsign_verify_wrong_msg
-    ],
-    testGroup "NoThunks" [
-      testProperty "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_no_thunks,
-      testProperty "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_no_thunks,
-      testProperty "Sig" . forAllShow genSig ppShow $ prop_no_thunks,
-      testProperty "VerKey rawSerialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
-        prop_no_thunks (rawSerialiseVerKeyDSIGN vk),
-      testProperty "VerKey rawDeserialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
+    describe "NoThunks" $ do
+      prop "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_no_thunks
+      prop "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_no_thunks
+      prop "Sig" . forAllShow genSig ppShow $ prop_no_thunks
+      prop "VerKey rawSerialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
+        prop_no_thunks (rawSerialiseVerKeyDSIGN vk)
+      prop "VerKey rawDeserialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
         prop_no_thunks (fromJust $! rawDeserialiseVerKeyDSIGN @v . rawSerialiseVerKeyDSIGN $ vk)
-    ]
-  ]
   where
     genWrongKey :: Gen (a, SignKeyDSIGN v, SignKeyDSIGN v)
     genWrongKey = do
@@ -338,8 +325,6 @@ testDSIGNAlgorithm genSig genMsg name = adjustOption testEnough . testGroup name
       msg2 <- Gen.suchThat genMsg (/= msg1)
       sk <- defaultSignKeyGen
       pure (msg1, msg2, sk)
-    testEnough :: QuickCheckTests -> QuickCheckTests
-    testEnough = max 10_000
 
 testDSIGNMAlgorithm
   :: forall v. ( -- change back to DSIGNMAlgorithm when unsound API is phased out
@@ -365,99 +350,93 @@ testDSIGNMAlgorithm
   => Lock
   -> Proxy v
   -> String
-  -> TestTree
+  -> Spec
 testDSIGNMAlgorithm lock _ n =
-  testGroup n
-    [ testGroup "serialisation"
-      [ testGroup "raw"
-        [ testProperty "VerKey" $
+  describe n $ do
+     describe "serialisation" $ do
+       describe "raw" $ do
+         prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk <- deriveVerKeyDSIGNM sk
               return $ (rawDeserialiseVerKeyDSIGN . rawSerialiseVerKeyDSIGN $ vk) === Just vk
-        , testProperty "SignKey" $
+         prop "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               serialized <- rawSerialiseSignKeyDSIGNM sk
               bracket
                 (rawDeserialiseSignKeyDSIGNM serialized)
                 (maybe (return ()) forgetSignKeyDSIGNM)
                 (\msk' -> Just sk ==! msk')
-        , testProperty "Sig" $ \(msg :: Message) ->
+         prop "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig <- signDSIGNM () msg sk
               return $ (rawDeserialiseSigDSIGN . rawSerialiseSigDSIGN $ sig) === Just sig
-        ]
-      , testGroup "size"
-        [ testProperty "VerKey" $
+       describe "size" $ do
+         prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk <- deriveVerKeyDSIGNM sk
               return $ (fromIntegral . BS.length . rawSerialiseVerKeyDSIGN $ vk) === sizeVerKeyDSIGN (Proxy @v)
-        , testProperty "SignKey" $
+         prop "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               serialized <- rawSerialiseSignKeyDSIGNM sk
               evaluate ((fromIntegral . BS.length $ serialized) == sizeSignKeyDSIGN (Proxy @v))
-        , testProperty "Sig" $ \(msg :: Message) ->
+         prop "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
               return $ (fromIntegral . BS.length . rawSerialiseSigDSIGN $ sig) === sizeSigDSIGN (Proxy @v)
-        ]
 
-      , testGroup "direct CBOR"
-        [ testProperty "VerKey" $
+       describe "direct CBOR" $ do
+         prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
-        , testProperty "Sig" $ \(msg :: Message) -> do
+         prop "Sig" $ \(msg :: Message) -> do
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
               return $ prop_cbor_with encodeSigDSIGN decodeSigDSIGN sig
-        ]
 
-      , testGroup "To/FromCBOR class"
-        [ testProperty "VerKey"  $
+       describe "To/FromCBOR class" $ do
+         prop "VerKey"  $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
-        , testProperty "Sig" $ \(msg :: Message) ->
+         prop "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
               return $ prop_cbor sig
-        ]
 
-      , testGroup "ToCBOR size"
-        [ testProperty "VerKey"  $
+       describe "ToCBOR size" $ do
+         prop "VerKey"  $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor_size vk
         -- No To/FromCBOR for 'SignKeyDSIGNM', see above.
-        , testProperty "Sig" $ \(msg :: Message) ->
+         prop "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
               return $ prop_cbor_size sig
-        ]
 
-      , testGroup "direct matches class"
-        [ testProperty "VerKey" $
+       describe "direct matches class" $ do
+         prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
               return $ prop_cbor_direct_vs_class encodeVerKeyDSIGN vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
-        , testProperty "Sig" $ \(msg :: Message) ->
+         prop "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
               return $ prop_cbor_direct_vs_class encodeSigDSIGN sig
-        ]
-      , testGroup "DirectSerialise"
-        [ testProperty "VerKey" $
+       describe "DirectSerialise" $ do
+         prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
               serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
               vk' <- directDeserialiseFromBS serialized
               return $ vk === vk'
-        , testProperty "SignKey" $
+         prop "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
               sk' <- directDeserialiseFromBS serialized
@@ -466,66 +445,58 @@ testDSIGNMAlgorithm lock _ n =
               return $
                 counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
                 equals
-        ]
-      , testGroup "DirectSerialise matches raw"
-        [ testProperty "VerKey" $
+       describe "DirectSerialise matches raw" $ do
+         prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
               direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
               let raw = rawSerialiseVerKeyDSIGN vk
               return $ direct === raw
-        , testProperty "SignKey" $
+         prop "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
               raw <- rawSerialiseSignKeyDSIGNM sk
               return $ direct === raw
-        ]
-      ]
 
-    , testGroup "verify"
-      [ testProperty "verify positive" $
+     describe "verify" $ do
+       prop "verify positive" $
           prop_dsignm_verify_pos lock (Proxy @v)
-      , testProperty "verify negative (wrong key)" $
+       prop "verify negative (wrong key)" $
           prop_dsignm_verify_neg_key lock (Proxy @v)
-      , testProperty "verify negative (wrong message)" $
+       prop "verify negative (wrong message)" $
           prop_dsignm_verify_neg_msg lock (Proxy @v)
-      ]
 
-    , testGroup "seed extraction"
-      [ testProperty "extracted seed equals original seed" $ prop_dsignm_seed_roundtrip (Proxy @v)
-      ]
+     describe "seed extraction" $ do
+       prop "extracted seed equals original seed" $ prop_dsignm_seed_roundtrip (Proxy @v)
 
-    , testGroup "forgetting"
-      [ testProperty "key overwritten after forget" $ prop_key_overwritten_after_forget (Proxy @v)
-      ]
+     describe "forgetting" $ do
+       prop "key overwritten after forget" $ prop_key_overwritten_after_forget (Proxy @v)
 
-    , testGroup "NoThunks"
-      [ testProperty "VerKey" $
+     describe "NoThunks" $ do
+       prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> prop_no_thunks_IO (deriveVerKeyDSIGNM sk)
-      , testProperty "SignKey" $
+       prop "SignKey" $
           ioPropertyWithSK @v lock $ prop_no_thunks_IO . return
-      , testProperty "Sig"     $ \(msg :: Message) ->
+       prop "Sig"     $ \(msg :: Message) ->
           ioPropertyWithSK @v lock $ prop_no_thunks_IO . signDSIGNM () msg
-      , testProperty "SignKey DirectSerialise" $
+       prop "SignKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
             prop_no_thunks_IO (return $! direct)
-      , testProperty "SignKey DirectDeserialise" $
+       prop "SignKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyDSIGN (Proxy @v)) sk
             prop_no_thunks_IO (directDeserialiseFromBS @IO @(SignKeyDSIGNM v) $! direct)
-      , testProperty "VerKey DirectSerialise" $
+       prop "VerKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk <- deriveVerKeyDSIGNM sk
             direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
             prop_no_thunks_IO (return $! direct)
-      , testProperty "VerKey DirectDeserialise" $
+       prop "VerKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk <- deriveVerKeyDSIGNM sk
             direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyDSIGN (Proxy @v)) vk
             prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyDSIGN v) $! direct)
-      ]
-    ]
 
 -- | Wrap an IO action that requires a 'SignKeyDSIGNM' into one that takes an
 -- mlocked seed to generate the key from. The key is bracketed off to ensure
@@ -674,22 +645,20 @@ instance Arbitrary (BadInputFor MessageHash) where
   arbitrary = genBadInputFor (fromIntegral (natVal $ Proxy @SECP256K1_ECDSA_MESSAGE_BYTES))
   shrink = shrinkBadInputFor
 
-testEcdsaInvalidMessageHash :: String -> TestTree
-testEcdsaInvalidMessageHash name = adjustOption defaultTestEnough . testGroup name $ [
-    testProperty "MessageHash deserialization (wrong length)" $
-      prop_raw_deserialise toMessageHash,
-    testProperty "MessageHash fail fromCBOR" $ prop_bad_cbor_bytes @MessageHash
-  ]
+testEcdsaInvalidMessageHash :: String -> Spec
+testEcdsaInvalidMessageHash name = testEnough . describe name $ do
+    prop "MessageHash deserialization (wrong length)" $
+      prop_raw_deserialise toMessageHash
+    prop "MessageHash fail fromCBOR" $ prop_bad_cbor_bytes @MessageHash
 
 testEcdsaWithHashAlgorithm ::
   forall (h :: Type).
   (HashAlgorithm h, SizeHash h ~ SECP256K1_ECDSA_MESSAGE_BYTES) =>
-  Proxy h -> String -> TestTree
-testEcdsaWithHashAlgorithm _ name = adjustOption defaultTestEnough . testGroup name $ [
-    testProperty "Ecdsa sign and verify" .
+  Proxy h -> String -> Spec
+testEcdsaWithHashAlgorithm _ name = testEnough . describe name $ do
+  prop "Ecdsa sign and verify" .
     forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @EcdsaSecp256k1DSIGN) ppShow $
       prop_dsign_verify
-  ]
   where
     genMsg :: Gen MessageHash
     genMsg = hashAndPack (Proxy @h) . messageBytes <$> arbitrary

@@ -66,8 +66,8 @@ import Test.Crypto.Vector.Vectors (
   wrongLengthVerKeyTestVectorsRaw,
   wrongSchnorrVerKeyTestVector,
  )
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (assertBool, assertEqual, testCase)
+import Test.HUnit (assertBool, assertEqual)
+import Test.Hspec (Spec, describe, it)
 
 ecdsaProxy :: Proxy EcdsaSecp256k1DSIGN
 ecdsaProxy = Proxy
@@ -75,47 +75,41 @@ ecdsaProxy = Proxy
 schnorrProxy :: Proxy SchnorrSecp256k1DSIGN
 schnorrProxy = Proxy
 
-tests :: TestTree
+tests :: Spec
 tests =
-  testGroup
-    "Secp256k1 Test Vectors"
-    [ -- Note : Proxies are here repetead due to specific test vectors need to be used with specific proxy
-      testGroup
-        "EcdsaSecp256k1"
-        [ signAndVerifyTest ecdsaProxy
-        , verifyOnlyTest ecdsaVerKeyAndSigVerifyTestVectors
-        , wrongMessageHashLengthTest
-        , mismatchSignKeyVerKeyTest wrongEcdsaVerKeyTestVector
-        , mismatchMessageSignatureTest ecdsaMismatchMessageAndSignature
-        , verKeyNotOnCurveParserTest ecdsaProxy verKeyNotOnCurveTestVectorRaw
-        , invalidLengthVerKeyParserTest
-            ecdsaProxy
-            wrongLengthVerKeyTestVectorsRaw
-            invalidEcdsaVerKeyLengthError
-        , invalidLengthSignatureParserTest
-            ecdsaProxy
-            ecdsaWrongLengthSigTestVectorsRaw
-            invalidEcdsaSigLengthError
-        , negativeSignatureTest ecdsaNegSigTestVectors
-        ]
-    , testGroup
-        "SchnorrSecp256k1"
-        [ signAndVerifyTest schnorrProxy
-        , verifyOnlyTest schnorrVerKeyAndSigVerifyTestVectors
-        , mismatchSignKeyVerKeyTest wrongSchnorrVerKeyTestVector
-        , mismatchMessageSignatureTest schnorrMismatchMessageAndSignature
-        , -- Note: First byte is dropped for schnorr as it doesn't require Y-cordinate information and assumed to be even and our vectors contains Y-information.
-          verKeyNotOnCurveParserTest schnorrProxy (Utils.dropBytes 1 verKeyNotOnCurveTestVectorRaw)
-        , invalidLengthVerKeyParserTest
-            schnorrProxy
-            (map (Utils.dropBytes 1) wrongLengthVerKeyTestVectorsRaw)
-            invalidSchnorrVerKeyLengthError
-        , invalidLengthSignatureParserTest
-            schnorrProxy
-            schnorrWrongLengthSigTestVectorsRaw
-            invalidSchnorrSigLengthError
-        ]
-    ]
+  describe "Secp256k1 Test Vectors" $ do
+    -- Note : Proxies are here repetead due to specific test vectors need to be used with specific proxy
+    describe "EcdsaSecp256k1" $ do
+      signAndVerifyTest ecdsaProxy
+      verifyOnlyTest ecdsaVerKeyAndSigVerifyTestVectors
+      wrongMessageHashLengthTest
+      mismatchSignKeyVerKeyTest wrongEcdsaVerKeyTestVector
+      mismatchMessageSignatureTest ecdsaMismatchMessageAndSignature
+      verKeyNotOnCurveParserTest ecdsaProxy verKeyNotOnCurveTestVectorRaw
+      invalidLengthVerKeyParserTest
+        ecdsaProxy
+        wrongLengthVerKeyTestVectorsRaw
+        invalidEcdsaVerKeyLengthError
+      invalidLengthSignatureParserTest
+        ecdsaProxy
+        ecdsaWrongLengthSigTestVectorsRaw
+        invalidEcdsaSigLengthError
+      negativeSignatureTest ecdsaNegSigTestVectors
+    describe "SchnorrSecp256k1" $ do
+      signAndVerifyTest schnorrProxy
+      verifyOnlyTest schnorrVerKeyAndSigVerifyTestVectors
+      mismatchSignKeyVerKeyTest wrongSchnorrVerKeyTestVector
+      mismatchMessageSignatureTest schnorrMismatchMessageAndSignature
+      -- Note: First byte is dropped for schnorr as it doesn't require Y-cordinate information and assumed to be even and our vectors contains Y-information.
+      verKeyNotOnCurveParserTest schnorrProxy (Utils.dropBytes 1 verKeyNotOnCurveTestVectorRaw)
+      invalidLengthVerKeyParserTest
+        schnorrProxy
+        (map (Utils.dropBytes 1) wrongLengthVerKeyTestVectorsRaw)
+        invalidSchnorrVerKeyLengthError
+      invalidLengthSignatureParserTest
+        schnorrProxy
+        schnorrWrongLengthSigTestVectorsRaw
+        invalidSchnorrSigLengthError
 
 negativeSignatureTest ::
   forall v a.
@@ -125,9 +119,9 @@ negativeSignatureTest ::
   , ToSignable v a
   ) =>
   (VerKeyDSIGN v, ByteString, SigDSIGN v) ->
-  TestTree
+  Spec
 negativeSignatureTest (vKey, msg, sig) =
-  testCase "Verification should fail when using negative signature." $ do
+  it "Verification should fail when using negative signature." $ do
     let result = verifyDSIGN () vKey (toSignable (Proxy @v) msg) sig
     assertBool "Test failed. Verification should be false for negative signature." $ isLeft result
 
@@ -139,9 +133,9 @@ invalidLengthSignatureParserTest ::
   Proxy v ->
   [HexStringInCBOR] ->
   InvalidLengthErrorFunction ->
-  TestTree
+  Spec
 invalidLengthSignatureParserTest _ invalidLengthSigs errorF =
-  testCase "Parsing should fail when using invalid length signatures." $
+  it "Parsing should fail when using invalid length signatures." $
     forM_ invalidLengthSigs $ \invalidSig -> do
       let (DeserialiseFailure _ actualError) = invalidSigParserTest (Proxy @v) invalidSig
       assertEqual
@@ -179,9 +173,9 @@ invalidLengthVerKeyParserTest ::
   Proxy v ->
   [HexStringInCBOR] ->
   InvalidLengthErrorFunction ->
-  TestTree
+  Spec
 invalidLengthVerKeyParserTest _ invalidLengthVKeys errorF =
-  testCase "Parsing should fail when using invalid length verification keys." $
+  it "Parsing should fail when using invalid length verification keys." $
     forM_ invalidLengthVKeys $ \invalidVKey -> do
       let (DeserialiseFailure _ actualError) = invalidVerKeyParserTest (Proxy @v) invalidVKey
       assertEqual
@@ -195,8 +189,8 @@ verKeyNotOnCurveParserTest ::
   FromCBOR (VerKeyDSIGN v) =>
   Proxy v ->
   HexStringInCBOR ->
-  TestTree
-verKeyNotOnCurveParserTest _ rawVKey = testCase "Parsing should fail when trying to parse verification key not on the curve." $ do
+  Spec
+verKeyNotOnCurveParserTest _ rawVKey = it "Parsing should fail when trying to parse verification key not on the curve." $ do
   let (DeserialiseFailure _ actualError) = invalidVerKeyParserTest (Proxy @v) rawVKey
   assertEqual "Expected cannot decode key error." cannotDecodeVerificationKeyError actualError
 
@@ -232,9 +226,9 @@ mismatchMessageSignatureTest ::
   , ToSignable v a
   ) =>
   [(ByteString, VerKeyDSIGN v, SigDSIGN v)] ->
-  TestTree
+  Spec
 mismatchMessageSignatureTest mismatchMessageSignatureVectors =
-  testCase
+  it
     "Verification should not be successful when using mismatch message, signature and vice versa."
     $ forM_
       mismatchMessageSignatureVectors
@@ -253,14 +247,14 @@ mismatchSignKeyVerKeyTest ::
   , FromCBOR (SignKeyDSIGN v)
   ) =>
   VerKeyDSIGN v ->
-  TestTree
-mismatchSignKeyVerKeyTest vKey = testCase "Verification should not be successful when using wrong verification key." $ do
+  Spec
+mismatchSignKeyVerKeyTest vKey = it "Verification should not be successful when using wrong verification key." $ do
   let result = signAndVerifyWithVkey (Proxy @v) defaultSKey vKey defaultMessage
   assertBool "Test failed. Verification should not be successful." $ isLeft result
 
 -- Wrong message hash length parser test for ecdsa
-wrongMessageHashLengthTest :: TestTree
-wrongMessageHashLengthTest = testCase "toMessageHash should return Nothing when using invalid length message hash." $
+wrongMessageHashLengthTest :: Spec
+wrongMessageHashLengthTest = it "toMessageHash should return Nothing when using invalid length message hash." $
   forM_ wrongLengthMessageHashTestVectors $ \msg -> do
     let msgHash = toMessageHash msg
     assertBool "Test failed. Wrong message hash length is treated as right." $ isNothing msgHash
@@ -274,8 +268,8 @@ verifyOnlyTest ::
   , ToSignable v a
   ) =>
   (VerKeyDSIGN v, ByteString, SigDSIGN v) ->
-  TestTree
-verifyOnlyTest (vKey, msg, sig) = testCase "Verification only should be successful." $ verifyOnly (Proxy @v) vKey msg sig
+  Spec
+verifyOnlyTest (vKey, msg, sig) = it "Verification only should be successful." $ verifyOnly (Proxy @v) vKey msg sig
 
 -- Sign using given sKey and verify it
 signAndVerifyTest ::
@@ -287,9 +281,9 @@ signAndVerifyTest ::
   , FromCBOR (SignKeyDSIGN v)
   ) =>
   Proxy v ->
-  TestTree
+  Spec
 signAndVerifyTest _ =
-  testCase "Signing and verifications should be successful." $
+  it "Signing and verifications should be successful." $
     mapM_ (uncurry $ signAndVerify (Proxy @v)) signAndVerifyTestVectors
 
 -- Sign a message using sign key, dervive verification key and check the signature

@@ -6,18 +6,17 @@ module Test.Data.Measure (
 where
 
 import GHC.Natural
-import Test.Tasty
-import Test.Tasty.QuickCheck
+import Test.Hspec
+import Test.Hspec.QuickCheck
+import Test.QuickCheck
 
 import qualified Data.Measure as M
 
-tests :: TestTree
+tests :: Spec
 tests =
-  testGroup
-    "Data.Measure"
-    [ testProperty "uncurry (++) undoes splitAt" prop_idAppendSplitAt
-    , testProperty "take and drop agrees with splitAt" prop_eqTakeDropSplitAt
-    ]
+  describe "Data.Measure" $ do
+    prop "uncurry (++) undoes splitAt" prop_idAppendSplitAt
+    prop "take and drop agrees with splitAt" prop_eqTakeDropSplitAt
 
 --------------------------------------------------------------------------------
 -- A nice measure to run tests with

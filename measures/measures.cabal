@@ -1,6 +1,6 @@
-cabal-version: >=1.10
+cabal-version: 3.0
 name: measures
-version: 0.1.0.2
+version: 0.1.0.3
 synopsis: An abstraction for (tuples of) measured quantities
 license: Apache-2.0
 license-files:
@@ -32,7 +32,7 @@ library
 
   build-depends:
     base,
-    base-deriving-via
+    base-deriving-via,
 
 test-suite test
   hs-source-dirs: test
@@ -44,6 +44,5 @@ test-suite test
   build-depends:
     QuickCheck,
     base,
+    hspec,
     measures,
-    tasty,
-    tasty-quickcheck

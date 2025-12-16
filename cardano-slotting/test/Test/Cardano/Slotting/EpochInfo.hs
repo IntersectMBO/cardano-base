@@ -6,11 +6,11 @@ import Cardano.Slotting.EpochInfo.Impl (fixedEpochInfo)
 import Cardano.Slotting.Slot (EpochNo (EpochNo), EpochSize (EpochSize), SlotNo (SlotNo))
 import Cardano.Slotting.Time (slotLengthFromSec)
 import Data.Functor.Identity (Identity)
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.QuickCheck as QC (
+import Test.Hspec (Spec, describe)
+import Test.Hspec.QuickCheck (prop)
+import Test.QuickCheck (
   Arbitrary (arbitrary),
   choose,
-  testProperty,
   (===),
  )
 
@@ -33,17 +33,15 @@ newtype TestEpochNo = TestEpochNo EpochNo
 instance Arbitrary TestEpochNo where
   arbitrary = TestEpochNo . EpochNo <$> choose (0, 20)
 
-epochInfoTests :: TestTree
+epochInfoTests :: Spec
 epochInfoTests =
-  testGroup
-    "linearExtend"
-    [ QC.testProperty "epochSize matches" $ \(TestSlotNo basisSlot, TestEpochNo sn) ->
-        epochInfoSize_ baseEpochInfo sn === epochInfoSize_ (extendedEpochInfo basisSlot) sn
-    , QC.testProperty "epochFirst matches" $ \(TestSlotNo basisSlot, TestEpochNo sn) ->
-        epochInfoFirst_ baseEpochInfo sn === epochInfoFirst_ (extendedEpochInfo basisSlot) sn
-    , QC.testProperty "epochEpoch matches" $ \(TestSlotNo basisSlot, TestSlotNo sn) ->
-        epochInfoEpoch_ baseEpochInfo sn === epochInfoEpoch_ (extendedEpochInfo basisSlot) sn
-    , QC.testProperty "epochTime matches" $ \(TestSlotNo basisSlot, TestSlotNo sn) ->
-        epochInfoSlotToRelativeTime_ baseEpochInfo sn
-          === epochInfoSlotToRelativeTime_ (extendedEpochInfo basisSlot) sn
-    ]
+  describe "linearExtend" $ do
+    prop "epochSize matches" $ \(TestSlotNo basisSlot, TestEpochNo sn) ->
+      epochInfoSize_ baseEpochInfo sn === epochInfoSize_ (extendedEpochInfo basisSlot) sn
+    prop "epochFirst matches" $ \(TestSlotNo basisSlot, TestEpochNo sn) ->
+      epochInfoFirst_ baseEpochInfo sn === epochInfoFirst_ (extendedEpochInfo basisSlot) sn
+    prop "epochEpoch matches" $ \(TestSlotNo basisSlot, TestSlotNo sn) ->
+      epochInfoEpoch_ baseEpochInfo sn === epochInfoEpoch_ (extendedEpochInfo basisSlot) sn
+    prop "epochTime matches" $ \(TestSlotNo basisSlot, TestSlotNo sn) ->
+      epochInfoSlotToRelativeTime_ baseEpochInfo sn
+        === epochInfoSlotToRelativeTime_ (extendedEpochInfo basisSlot) sn

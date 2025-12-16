@@ -1,6 +1,6 @@
-cabal-version: 2.2
+cabal-version: 3.0
 name: cardano-crypto-tests
-version: 2.2.3.0
+version: 2.3.0.0
 synopsis: Tests for cardano-crypto-class and -praos
 description: Tests for cardano-crypto-class and -praos
 license: Apache-2.0
@@ -84,6 +84,7 @@ library
     Test.Crypto.Vector.SerializationUtils
 
   build-depends:
+    HUnit,
     QuickCheck,
     base,
     base16-bytestring,
@@ -98,15 +99,13 @@ library
     crypton,
     deepseq,
     formatting,
+    hspec,
     io-classes >=1.4.0,
     mempack,
     mtl,
     nothunks,
     pretty-show,
     quickcheck-instances,
-    tasty,
-    tasty-hunit,
-    tasty-quickcheck,
     vector,
 
   if flag(secp256k1-support)
@@ -126,8 +125,7 @@ test-suite test-crypto
     base,
     cardano-crypto-class,
     cardano-crypto-tests,
-    tasty,
-    tasty-quickcheck,
+    hspec,
 
   if flag(secp256k1-support)
     cpp-options: -DSECP256K1_ENABLED

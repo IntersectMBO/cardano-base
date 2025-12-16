@@ -12,8 +12,8 @@ import qualified Test.Crypto.Regressions
 import qualified Test.Crypto.Vector.Secp256k1DSIGN
 #endif
 import qualified Test.Crypto.EllipticCurve
-import Test.Tasty (TestTree, adjustOption, testGroup, defaultMain)
-import Test.Tasty.QuickCheck (QuickCheckTests (QuickCheckTests))
+import Test.Hspec (Spec, describe, hspec)
+import Test.Hspec.QuickCheck (modifyMaxSuccess)
 import Cardano.Crypto.Libsodium (sodiumInit)
 import Test.Crypto.Util (Lock, mkLock)
 
@@ -27,21 +27,20 @@ main = do
   -- fine.
   mlockLock <- mkLock
 
-  defaultMain (tests mlockLock)
+  hspec (tests mlockLock)
 
-tests :: Lock -> TestTree
+tests :: Lock -> Spec
 tests mlockLock =
   -- The default QuickCheck test count is 100. This is too few to catch
   -- anything, so we set a minimum of 1000.
-  adjustOption (\(QuickCheckTests i) -> QuickCheckTests $ max i 1000) .
-    testGroup "cardano-crypto-class" $
-      [ Test.Crypto.DSIGN.tests mlockLock
-      , Test.Crypto.Hash.tests mlockLock
-      , Test.Crypto.KES.tests mlockLock
-      , Test.Crypto.VRF.tests
-      , Test.Crypto.Regressions.tests
+  modifyMaxSuccess (max 1000) .
+    describe "cardano-crypto-class" $ do
+      Test.Crypto.DSIGN.tests mlockLock
+      Test.Crypto.Hash.tests mlockLock
+      Test.Crypto.KES.tests mlockLock
+      Test.Crypto.VRF.tests
+      Test.Crypto.Regressions.tests
 #ifdef SECP256K1_ENABLED
-      , Test.Crypto.Vector.Secp256k1DSIGN.tests
+      Test.Crypto.Vector.Secp256k1DSIGN.tests
 #endif
-      , Test.Crypto.EllipticCurve.tests
-      ]
+      Test.Crypto.EllipticCurve.tests

@@ -1,7 +1,8 @@
 # Changelog for `cardano-crypto-tests`
 
-## 2.2.3.0
+## 2.3.0.0
 
+* Use `Hspec` instead of `Tasty`
 * Improve negative deserialization tests for `Hash` and `DSIGN`
 * Add `prop_bad_cbor_bytes`
 
