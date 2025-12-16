@@ -78,7 +78,8 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
     c_blst_p_is_equal,
     c_blst_p_is_inf,
     c_blst_sk_to_pk,
-    c_blst_sign
+    c_blst_sign,
+    c_blst_core_verify
   ),
 
   -- * Pairing check
@@ -141,6 +142,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   cstrToInteger,
   integerToBS,
   padBS,
+  mkBLSTError,
 
   -- * Point1/G1 operations
   blsInGroup,
@@ -456,6 +458,17 @@ class (KnownNat (PointSize curve), KnownNat (AffineSize curve)) => BLS curve whe
 
   c_blst_sk_to_pk :: PointPtr curve -> ScalarPtr -> IO ()
   c_blst_sign :: Proxy curve -> PointPtr (Dual curve) -> PointPtr (Dual curve) -> ScalarPtr -> IO ()
+  c_blst_core_verify ::
+    AffinePtr curve ->
+    AffinePtr (Dual curve) ->
+    Bool ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    IO CInt
 
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
@@ -483,6 +496,7 @@ instance BLS Curve1 where
 
   c_blst_p_is_equal = c_blst_p1_is_equal
   c_blst_p_is_inf = c_blst_p1_is_inf
+  c_blst_core_verify = c_blst_core_verify_pk_in_g1
 
   -- NOTE: These sizes come from the Zcash-compatible serialization format
   -- used by blst for G1 (blst_p1_*). See `blst.h`:
@@ -536,6 +550,7 @@ instance BLS Curve2 where
 
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
   c_blst_sign _ = c_blst_sign_pk_in_g2
+  c_blst_core_verify = c_blst_core_verify_pk_in_g2
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
@@ -793,6 +808,34 @@ foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr ->
 
 foreign import ccall "blst_miller_loop"
   c_blst_miller_loop :: PTPtr -> Affine2Ptr -> Affine1Ptr -> IO ()
+
+---- BLS signature aggregation
+
+foreign import ccall "blst_core_verify_pk_in_g1"
+  c_blst_core_verify_pk_in_g1 ::
+    Affine1Ptr ->
+    Affine2Ptr ->
+    Bool ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    IO CInt
+
+foreign import ccall "blst_core_verify_pk_in_g2"
+  c_blst_core_verify_pk_in_g2 ::
+    Affine2Ptr ->
+    Affine1Ptr ->
+    Bool ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    Ptr CChar ->
+    CSize ->
+    IO CInt
 
 ---- Raw BLST error constants
 
