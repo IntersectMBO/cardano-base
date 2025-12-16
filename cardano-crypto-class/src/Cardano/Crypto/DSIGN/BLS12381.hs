@@ -82,6 +82,7 @@ import Cardano.Crypto.DSIGN.Class (
  )
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   BLS (..),
+  BLSTError (..),
   CompressedPointSize,
   Curve1,
   Curve2,
@@ -103,9 +104,12 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   c_blst_keygen,
   compressedSizePoint,
   finalVerifyPairs,
+  mkBLSTError,
   scalarFromBS,
   scalarToBS,
   scalarToInteger,
+  toAffine,
+  withAffine,
   withMaybeCStringLen,
   withNewPoint_,
  )
@@ -255,12 +259,27 @@ instance
   {-# NOINLINE verifyDSIGN #-}
   -- \| Context can hold domain seperation tag and/or augmentation data for signatures
   verifyDSIGN (dst, aug) (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
-    let bs = getSignableRepresentation msg
-     in -- here we check that e(g1, sig) == e(pk, H(msg)) or equivalently
-        -- e(sig, g2) == e(H(msg),pk) depending on the curve choice for pk/sig.
-        if finalVerifyPairs @curve (blsGenerator, Point sigPsb) (Point pbPsb, blsHash bs dst aug)
-          then Right ()
-          else Left "SigDSIGN BLS12381DSIGN failed to verify."
+    unsafeDupablePerformIO $ do
+      withMaybeCStringLen dst $ \(pDst, dstLen) -> do
+        withAffine (toAffine @curve (Point pbPsb)) $ \pkAff ->
+          withAffine (toAffine @(Dual curve) (Point sigPsb)) $ \sigAff ->
+            withMaybeCStringLen aug $ \(pAug, augLen) ->
+              unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(pMsg, msgLen) -> do
+                err <-
+                  c_blst_core_verify @curve
+                    pkAff
+                    sigAff
+                    True
+                    pMsg
+                    (fromIntegral msgLen)
+                    pDst
+                    (fromIntegral dstLen)
+                    pAug
+                    (fromIntegral augLen)
+                case mkBLSTError err of
+                  BLST_SUCCESS -> return $ Right ()
+                  _ -> return $ Left "SigDSIGN BLS12381DSIGN failed to verify"
+
   {-# NOINLINE genKeyDSIGN #-}
   genKeyDSIGN = genKeyDSIGNWithKeyInfo Nothing
   {-# NOINLINE genKeyDSIGNWithKeyInfo #-}
