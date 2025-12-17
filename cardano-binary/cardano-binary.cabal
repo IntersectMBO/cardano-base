@@ -82,7 +82,7 @@ library testlib
     text,
     tree-diff,
 
-test-suite test
+test-suite tests
   import: base, project-config
   hs-source-dirs: test
   main-is: test.hs
