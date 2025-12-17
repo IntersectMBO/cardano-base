@@ -13,7 +13,7 @@ maintainer: operations@iohk.io
 copyright: 2019-2021 IOHK
 category: Currency
 build-type: Simple
-extra-source-files:
+extra-doc-files:
   CHANGELOG.md
   README.md
 
