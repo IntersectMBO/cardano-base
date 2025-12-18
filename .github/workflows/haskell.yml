@@ -161,12 +161,6 @@ jobs:
         path: |
           dist-newstyle/**/*.log
 
-    - name: Cache HLS artifacts (used to speed up GitHub Codespaces bootstrapping)
-      if: runner.os == 'Linux' && matrix.ghc == '9.6.7'
-      uses: input-output-hk/actions/cache@latest
-      with:
-        ghc_version: ${{ matrix.ghc == '9.6.7' && 'ghc96' }}
-
   fourmolu:
     runs-on: ubuntu-latest
 
