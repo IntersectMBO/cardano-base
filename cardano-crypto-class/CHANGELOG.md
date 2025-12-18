@@ -2,6 +2,7 @@
 
 ## 2.2.4.0
 
+* Add `cbits/blst_util.h` to `c-sources`
 * Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
 * Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
 * Add `ToCBOR` and `FromCBOR` instances for `PackedBytes`

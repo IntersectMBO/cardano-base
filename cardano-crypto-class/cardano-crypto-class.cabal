@@ -133,7 +133,10 @@ library
     libblst >=0.3.14,
     libsodium,
 
-  c-sources: cbits/blst_util.c
+  c-sources:
+    cbits/blst_util.c
+    cbits/blst_util.h
+
   include-dirs: cbits
   includes: blst_util.h
 
