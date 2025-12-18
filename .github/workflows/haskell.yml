@@ -154,13 +154,6 @@ jobs:
         PATH="$(cabal path --installdir):$PATH"
         scripts/doctest.sh
 
-    - name: Save logs
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ runner.os }}-${{ matrix.ghc }} Build & test logs
-        path: |
-          dist-newstyle/**/*.log
-
   fourmolu:
     runs-on: ubuntu-latest
 
