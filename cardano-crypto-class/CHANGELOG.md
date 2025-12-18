@@ -7,6 +7,7 @@
 * Add `byteArrayToNatural`, `naturalToByteArray` and `byteArrayToInteger`.
 * Expose `bytesToInteger`
 * Add `hashToByteArray`
+* Add `BLS12-381` aggregatable signature schemes
 * Add Cabal components using code moved from `cardano-crypto-tests`:
   - `lib:testlib`
   - `lib:benchlib`
