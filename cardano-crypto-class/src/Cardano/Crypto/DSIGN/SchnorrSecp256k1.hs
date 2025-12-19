@@ -22,7 +22,7 @@
 module Cardano.Crypto.DSIGN.SchnorrSecp256k1 (
   SchnorrSecp256k1DSIGN,
   VerKeyDSIGN,
-  SignKeyDSIGN,
+  SignKeyDSIGN (..),
   SigDSIGN,
 ) where
 

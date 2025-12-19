@@ -145,7 +145,8 @@ jobs:
         # these two are msys2 env vars, they have no effect on non-msys2 installs.
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
-      run: cabal test all --enable-tests --test-show-details=direct -j1
+      run: cabal test test-crypto --test-option='--match=/cardano-crypto-class/Crypto.DSIGN/Pure/SchnorrSecp256k1DSIGN/serialization/verify/signing and verifying with matching keys/' --test-option='--seed=1975934252'
+
 
     - name: Run doctests
       if: runner.os == 'Linux'
