@@ -30,7 +30,7 @@ import Test.QuickCheck (
   counterexample,
   )
 import Test.Hspec (Spec, describe)
-import Test.Hspec.QuickCheck (prop, modifyMaxSize)
+import Test.Hspec.QuickCheck (prop, modifyMaxSuccess)
 
 import qualified Data.ByteString as BS
 import Cardano.Crypto.Libsodium
@@ -184,7 +184,7 @@ defaultSigGen = do
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
 testEnough :: Spec -> Spec
-testEnough = modifyMaxSize (const 10_000)
+testEnough = modifyMaxSuccess (max 10_000)
 
 {- HLINT ignore "Use <$>" -}
 {- HLINT ignore "Reduce duplication" -}
