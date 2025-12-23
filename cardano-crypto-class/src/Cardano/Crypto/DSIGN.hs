@@ -6,6 +6,7 @@ module Cardano.Crypto.DSIGN (
 )
 where
 
+import Cardano.Crypto.DSIGN.BLS12381 as X
 import Cardano.Crypto.DSIGN.Class as X
 import Cardano.Crypto.DSIGN.Ed25519 as X
 import Cardano.Crypto.DSIGN.Ed448 as X
