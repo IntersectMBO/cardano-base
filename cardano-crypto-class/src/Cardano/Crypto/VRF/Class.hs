@@ -211,8 +211,11 @@ instance
 --
 -- The output size is a fixed number of bytes and is given by 'sizeOutputVRF'.
 newtype OutputVRF v = OutputVRF {getOutputVRFBytes :: ByteString}
-  deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoThunks)
+  deriving (Eq, Ord, Show, ToCBOR, NoThunks)
   deriving newtype (NFData)
+
+instance Typeable v => FromCBOR (OutputVRF v) where
+  fromCBOR = OutputVRF . BS.copy <$> fromCBOR
 
 -- | The output bytes of the VRF interpreted as a big endian natural number.
 --
