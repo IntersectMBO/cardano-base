@@ -1,4 +1,4 @@
-cabal-version: 2.2
+cabal-version: 3.0
 name: cardano-crypto-peras
 version: 0.1.0.0
 synopsis: Crypto primitives for Peras
@@ -13,7 +13,7 @@ maintainer: operations@iohk.io
 copyright: 2025 IOHK
 category: Currency
 build-type: Simple
-extra-source-files:
+extra-doc-files:
   CHANGELOG.md
   README.md
 

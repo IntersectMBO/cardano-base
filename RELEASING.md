@@ -247,13 +247,3 @@ do not deserve to be released into the World. They will neither be released nor
 versioned. Bounds on the local dependencies do not need to be updated for such packages,
 because they will always use the versions for dependencies from within the repository,
 rather than from CHaPs.
-
-## Test packages
-
-Here are test suite packages that are still subject to the versioning and release process,
-but do not require changelog updates:
-
-* `cardano-crypto-tests`
-
-It is mostly used internally and is planned to be deprecated and removed in some distant
-future in favor of a public sublibrary `testlib` for each relevant package.

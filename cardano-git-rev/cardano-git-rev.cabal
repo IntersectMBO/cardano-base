@@ -16,7 +16,7 @@ license-files:
   NOTICE
 
 build-type: Simple
-extra-source-files:
+extra-doc-files:
   CHANGELOG.md
   README.md
 
