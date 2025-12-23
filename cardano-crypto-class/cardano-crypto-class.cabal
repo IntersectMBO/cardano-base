@@ -117,7 +117,7 @@ library
     aeson,
     base16-bytestring >=1,
     bytestring,
-    cardano-binary >=1.6,
+    cardano-binary >=1.7.3,
     cardano-strict-containers,
     crypton,
     deepseq,

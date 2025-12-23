@@ -59,23 +59,26 @@ module Cardano.Crypto.VRF.Praos (
 )
 where
 
-import Cardano.Binary (
-  FromCBOR (..),
-  ToCBOR (..),
- )
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
 import Cardano.Crypto.VRF.Class
 import qualified Cardano.Crypto.VRF.PraosBatchCompat as BC
 import Control.DeepSeq (NFData (..))
-import Control.Monad (void)
+import Control.Monad (void, (<$!>))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
-import Data.Maybe (fromMaybe)
+import Data.Primitive.ByteArray (
+  ByteArray,
+  copyPtrToMutableByteArray,
+  newByteArray,
+  unsafeFreezeByteArray,
+ )
 import Data.Proxy (Proxy (..))
+import Data.Word (Word8)
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc
@@ -253,6 +256,20 @@ seedFromBytes bs = unsafePerformIO $ do
 outputBytes :: Output -> ByteString
 outputBytes (Output op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
   BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_outputbytes)
+
+-- | Convert a proof verification output hash into a 'ByteArray' that we can
+-- inspect.
+outputByteArray :: Output -> ByteArray
+outputByteArray (Output op) =
+  unsafePerformIO $
+    withForeignPtr op $ \ptr -> do
+      let numBytes = fromIntegral @CSize @Int crypto_vrf_outputbytes
+      mba <- newByteArray numBytes
+      copyPtrToMutableByteArray mba 0 (castPtr ptr :: Ptr Word8) numBytes
+      unsafeFreezeByteArray mba
+
+outputToOutputVRF :: Output -> OutputVRF v
+outputToOutputVRF = OutputVRF . outputByteArray
 
 -- | Convert a proof into a 'ByteString' that we can inspect.
 proofBytes :: Proof -> ByteString
@@ -462,7 +479,7 @@ outputToBatchCompat praosOutput =
   if vrfKeySizeVRF /= BC.vrfKeySizeVRF
     then error "OutputVRF: Unable to convert PraosSK to BatchCompatSK."
     else
-      OutputVRF (getOutputVRFBytes praosOutput)
+      OutputVRF (getOutputVRFByteArray praosOutput)
 
 -- | Verify a VRF proof and validate the Verification Key. Returns 'Just' a hash of
 -- the verification result on success, 'Nothing' if the verification did not
@@ -521,12 +538,12 @@ instance VRFAlgorithm PraosVRF where
 
   evalVRF = \_ msg (SignKeyPraosVRF sk) ->
     let msgBS = getSignableRepresentation msg
-        !proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
-        !output = maybe (error "Invalid Proof") outputBytes $ outputFromProof proof
-     in (OutputVRF output, CertPraosVRF proof)
+        !proofVRF@(CertPraosVRF proof) = maybe (error "Invalid Key") CertPraosVRF $ prove sk msgBS
+        !outputVRF = maybe (error "Invalid Proof") outputToOutputVRF $ outputFromProof proof
+     in (outputVRF, proofVRF)
 
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (CertPraosVRF proof) ->
-    (OutputVRF . outputBytes) <$> verify pk proof (getSignableRepresentation msg)
+    outputToOutputVRF <$!> verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_seedbytes

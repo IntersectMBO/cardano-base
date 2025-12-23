@@ -19,8 +19,12 @@ module Cardano.Crypto.Util (
   splitsAt,
 
   -- * Low level conversions
+  bytesToInteger,
   bytesToNatural,
   naturalToBytes,
+  byteArrayToNatural,
+  naturalToByteArray,
+  byteArrayToInteger,
 
   -- * ByteString manipulation
   slice,
@@ -33,6 +37,7 @@ module Cardano.Crypto.Util (
 where
 
 import Control.Monad (unless)
+import Data.Array.Byte (ByteArray (..))
 import Data.Bifunctor (first)
 import Data.Bits
 import Data.ByteString (ByteString)
@@ -40,20 +45,22 @@ import qualified Data.ByteString as BS
 import Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.ByteString.Internal as BS
+import qualified Data.ByteString.Short as SBS
 import Data.Char (isAscii)
+import Data.MemPack.Buffer (byteArrayFromShortByteString)
 import Data.Word
 import Language.Haskell.TH
 import Numeric.Natural
 
 import Foreign.ForeignPtr (withForeignPtr)
-import GHC.Exts (Addr#, Int#, Word#)
+import GHC.Exts (Addr#, Int#, Word#, sizeofByteArray#)
 import qualified GHC.Exts as GHC
 import qualified GHC.Natural as GHC
 
 import Crypto.Random (MonadRandom (..))
 
 import GHC.IO (unsafeDupablePerformIO)
-import GHC.Num.Integer (integerFromAddr)
+import GHC.Num.Integer (integerFromAddr, integerFromByteArray)
 
 class Empty a
 instance Empty a
@@ -112,16 +119,24 @@ splitsAt = go 0
       | otherwise = []
 
 -- | Create a 'Natural' out of a 'ByteString', in big endian.
---
--- This is fast enough to use in production.
 bytesToNatural :: ByteString -> Natural
 bytesToNatural = GHC.naturalFromInteger . bytesToInteger
+
+-- | Create a 'Natural' out of a 'ByteArray', in big endian.
+byteArrayToNatural :: ByteArray -> Natural
+byteArrayToNatural = GHC.naturalFromInteger . byteArrayToInteger
 
 -- | The inverse of 'bytesToNatural'. Note that this is a naive implementation
 -- and only suitable for tests.
 naturalToBytes :: Int -> Natural -> ByteString
 naturalToBytes = writeBinaryNatural
 
+-- | The inverse of 'bytesToNatural'. Note that this is a naive implementation
+-- and only suitable for tests.
+naturalToByteArray :: Int -> Natural -> ByteArray
+naturalToByteArray numBytes = byteArrayFromShortByteString . SBS.toShort . writeBinaryNatural numBytes
+
+-- | Create a 'Integer' out of a 'ByteString', in big endian.
 bytesToInteger :: ByteString -> Integer
 bytesToInteger (BS.PS fp (GHC.I# off#) (GHC.I# len#)) =
   -- This should be safe since we're simply reading from ByteString (which is
@@ -136,6 +151,13 @@ bytesToInteger (BS.PS fp (GHC.I# off#) (GHC.I# len#)) =
   where
     importIntegerFromAddr :: Addr# -> Word# -> Int# -> IO Integer
     importIntegerFromAddr addr sz = integerFromAddr sz addr
+
+-- | Create a 'Integer' out of a 'ByteArray', in big endian.
+byteArrayToInteger :: ByteArray -> Integer
+byteArrayToInteger (ByteArray ba#) =
+  -- The last parmaeter (`1#`) tells the import function to use big
+  -- endian encoding. The one before last (`0#`) is the offset
+  integerFromByteArray (GHC.int2Word# (sizeofByteArray# ba#)) ba# (GHC.int2Word# 0#) 1#
 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size =

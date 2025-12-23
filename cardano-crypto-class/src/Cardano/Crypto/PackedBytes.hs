@@ -19,6 +19,7 @@ module Cardano.Crypto.PackedBytes
   , packShortByteString
   , packShortByteStringWithOffset
   , packPinnedBytes
+  , unpackAsByteArray
   , unpackBytes
   , unpackPinnedBytes
   , xorPackedBytes
@@ -189,6 +190,10 @@ withPinnedMutableByteArray n f = do
     f mba
     unsafeFreezeByteArray mba
 {-# INLINE withPinnedMutableByteArray #-}
+
+unpackAsByteArray :: PackedBytes n -> ByteArray
+unpackAsByteArray = unpackBytesWith withMutableByteArray
+{-# INLINE unpackAsByteArray #-}
 
 unpackBytes :: PackedBytes n -> ShortByteString
 unpackBytes = byteArrayToShortByteString . unpackBytesWith withMutableByteArray
