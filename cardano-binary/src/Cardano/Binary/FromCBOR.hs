@@ -375,7 +375,7 @@ instance
     return (a, b, c, d, e, f, g, h)
 
 instance FromCBOR BS.ByteString where
-  fromCBOR = D.decodeBytes
+  fromCBOR = BS.copy <$> D.decodeBytes
 
 instance FromCBOR Text where
   fromCBOR = D.decodeString
