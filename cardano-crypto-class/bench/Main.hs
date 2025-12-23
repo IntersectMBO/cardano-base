@@ -6,7 +6,6 @@ import Criterion.Main
 import qualified Bench.Crypto.DSIGN (benchmarks)
 import qualified Bench.Crypto.HASH (benchmarks)
 import qualified Bench.Crypto.KES (benchmarks)
-import qualified Bench.Crypto.VRF (benchmarks)
 
 main :: IO ()
 main = do
@@ -18,5 +17,4 @@ benchmarks =
   [ Bench.Crypto.DSIGN.benchmarks
   , Bench.Crypto.HASH.benchmarks
   , Bench.Crypto.KES.benchmarks
-  , Bench.Crypto.VRF.benchmarks
   ]

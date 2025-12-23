@@ -2,6 +2,11 @@
 
 ## 2.2.4.0
 
+* Add Cabal components using code moved from `cardano-crypto-tests`:
+  - `lib:testlib`
+  - `lib:benchlib`
+  - `test:tests`
+  - `bench:bench`
 * Add `cbits/blst_util.h` to `c-sources`
 * Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
 * Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
@@ -9,6 +14,26 @@
 * Add `packShortByteString` and `packShortByteStringWithOffset`
 * Deprecate `packBytesMaybe`
 * Refactor BLS12-381 module to use `PinnedSizedBytes`
+
+### `testlib`
+
+* Add with modules:
+  - `Test.Crypto.AllocLog`
+  - `Test.Crypto.DSIGN`
+  - `Test.Crypto.EllipticCurve`
+  - `Test.Crypto.EqST`
+  - `Test.Crypto.Hash`
+  - `Test.Crypto.Instances`
+  - `Test.Crypto.KES`
+  - `Test.Crypto.Regressions`
+  - `Test.Crypto.RunIO`
+  - `Test.Crypto.Util`
+  - `Test.Crypto.Vector.SerializationUtils`
+
+### `benchlib`
+
+* Add with module:
+  - `Bench.Crypto.BenchData`
 
 ## 2.2.3.2
 

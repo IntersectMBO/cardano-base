@@ -6,7 +6,6 @@ module Main (main) where
 import qualified Test.Crypto.DSIGN
 import qualified Test.Crypto.Hash
 import qualified Test.Crypto.KES
-import qualified Test.Crypto.VRF
 import qualified Test.Crypto.Regressions
 #ifdef SECP256K1_ENABLED
 import qualified Test.Crypto.Vector.Secp256k1DSIGN
@@ -38,7 +37,6 @@ tests mlockLock =
       Test.Crypto.DSIGN.tests mlockLock
       Test.Crypto.Hash.tests mlockLock
       Test.Crypto.KES.tests mlockLock
-      Test.Crypto.VRF.tests
       Test.Crypto.Regressions.tests
 #ifdef SECP256K1_ENABLED
       Test.Crypto.Vector.Secp256k1DSIGN.tests

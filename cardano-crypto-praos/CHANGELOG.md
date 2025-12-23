@@ -1,8 +1,16 @@
 # Changelog for `cardano-crypto-praos`
 
-## 2.2.1.2
+## 2.2.2.0
 
-*
+* Add Cabal components using code moved from `cardano-crypto-tests`:
+  - `lib:testlib`
+  - `test:tests`
+  - `bench:bench`
+
+### `testlib`
+
+* Add with module:
+  - `Test.Crypto.VRF`
 
 ## 2.2.1.1
 
