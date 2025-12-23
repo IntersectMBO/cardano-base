@@ -21,6 +21,9 @@ extra-doc-files:
   CHANGELOG.md
   README.md
 
+extra-source-files:
+  cbits/blst_util.h
+
 data-files:
   bls12-381-test-vectors/test_vectors/bls_sig_aug_test_vectors
   bls12-381-test-vectors/test_vectors/ec_operations_test_vectors
@@ -140,12 +143,8 @@ library
     libblst >=0.3.14,
     libsodium,
 
-  c-sources:
-    cbits/blst_util.c
-
+  c-sources: cbits/blst_util.c
   include-dirs: cbits
-  includes: blst_util.h
-  install-includes: blst_util.h
 
   if flag(secp256k1-support)
     exposed-modules:
