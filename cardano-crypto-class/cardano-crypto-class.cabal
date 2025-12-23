@@ -142,10 +142,10 @@ library
 
   c-sources:
     cbits/blst_util.c
-    cbits/blst_util.h
 
   include-dirs: cbits
   includes: blst_util.h
+  install-includes: blst_util.h
 
   if flag(secp256k1-support)
     exposed-modules:

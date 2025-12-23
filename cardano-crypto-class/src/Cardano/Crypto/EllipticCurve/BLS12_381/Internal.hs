@@ -250,8 +250,8 @@ instance BLS curve => Eq (AffinePtr curve) where
 
 -- | Type family to get the size of a point on a given curve
 type family PointSize curve where
-  PointSize Curve1 = BLST_P1_SIZE
-  PointSize Curve2 = BLST_P2_SIZE
+  PointSize Curve1 = CARDANO_BLST_P1_SIZE
+  PointSize Curve2 = CARDANO_BLST_P2_SIZE
 
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
@@ -266,8 +266,8 @@ type Point2 = Point Curve2
 
 -- | Type family to get the size of an affine point on a given curve
 type family AffineSize curve where
-  AffineSize Curve1 = BLST_AFFINE1_SIZE
-  AffineSize Curve2 = BLST_AFFINE2_SIZE
+  AffineSize Curve1 = CARDANO_BLST_AFFINE1_SIZE
+  AffineSize Curve2 = CARDANO_BLST_AFFINE2_SIZE
 
 newtype Affine curve = Affine (PinnedSizedBytes (AffineSize curve))
 
@@ -281,7 +281,7 @@ type Affine2 = Affine Curve2
 -- | Target element without the final exponantiation. By defining target elements
 -- | as such, we save up the final exponantiation when computing a pairing, and only
 -- | compute it when necessary (e.g. comparison with another point or serialisation)
-newtype PT = PT (PinnedSizedBytes BLST_FP12_SIZE)
+newtype PT = PT (PinnedSizedBytes CARDANO_BLST_FP12_SIZE)
 
 -- | Sizes of various representations of elliptic curve points.
 -- | Size of a curve point in memory
@@ -377,7 +377,7 @@ withPT (PT psb) go = psbUseAsCPtr psb $ \ptr ->
 
 withNewPT :: (PTPtr -> IO a) -> IO (a, PT)
 withNewPT go = do
-  (psb, a) <- psbCreateResult @BLST_FP12_SIZE (go . PTPtr)
+  (psb, a) <- psbCreateResult @CARDANO_BLST_FP12_SIZE (go . PTPtr)
   return (a, PT psb)
 
 withNewPT_ :: (PTPtr -> IO a) -> IO a
@@ -387,7 +387,7 @@ withNewPT' :: (PTPtr -> IO a) -> IO PT
 withNewPT' = fmap snd . withNewPT
 
 sizePT :: Int
-sizePT = BLST_FP12_SIZE
+sizePT = CARDANO_BLST_FP12_SIZE
 
 ---- Curve operations
 
@@ -517,9 +517,9 @@ instance BLS curve => Eq (Affine curve) where
 ---- Safe Scalar types / marshalling
 
 sizeScalar :: Int
-sizeScalar = BLST_SCALAR_SIZE
+sizeScalar = CARDANO_BLST_SCALAR_SIZE
 
-newtype Scalar = Scalar (PinnedSizedBytes BLST_SCALAR_SIZE)
+newtype Scalar = Scalar (PinnedSizedBytes CARDANO_BLST_SCALAR_SIZE)
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
@@ -533,7 +533,7 @@ withScalar (Scalar p2) go = do
 
 withNewScalar :: (ScalarPtr -> IO a) -> IO (a, Scalar)
 withNewScalar go = do
-  (psb, a) <- psbCreateResult @BLST_SCALAR_SIZE (go . ScalarPtr)
+  (psb, a) <- psbCreateResult @CARDANO_BLST_SCALAR_SIZE (go . ScalarPtr)
   return (a, Scalar psb)
 
 withNewScalar_ :: (ScalarPtr -> IO a) -> IO a
@@ -563,15 +563,15 @@ withScalarArray scalars go = do
 
 cloneScalar :: Scalar -> IO Scalar
 cloneScalar (Scalar src) = do
-  dst <- psbCreate @BLST_SCALAR_SIZE $ \dstPtr ->
+  dst <- psbCreate @CARDANO_BLST_SCALAR_SIZE $ \dstPtr ->
     psbUseAsCPtr src $ \srcPtr ->
       copyBytes dstPtr srcPtr sizeScalar
   pure (Scalar dst)
 
 sizeFr :: Int
-sizeFr = BLST_FR_SIZE
+sizeFr = CARDANO_BLST_FR_SIZE
 
-newtype Fr = Fr (PinnedSizedBytes BLST_FR_SIZE)
+newtype Fr = Fr (PinnedSizedBytes CARDANO_BLST_FR_SIZE)
 
 withFr :: Fr -> (FrPtr -> IO a) -> IO a
 withFr (Fr psb) go = do
@@ -580,7 +580,7 @@ withFr (Fr psb) go = do
 
 withNewFr :: (FrPtr -> IO a) -> IO (a, Fr)
 withNewFr go = do
-  (psb, a) <- psbCreateResult @BLST_FR_SIZE (go . FrPtr)
+  (psb, a) <- psbCreateResult @CARDANO_BLST_FR_SIZE (go . FrPtr)
   return (a, Fr psb)
 
 withNewFr_ :: (FrPtr -> IO a) -> IO a
@@ -591,7 +591,7 @@ withNewFr' = fmap snd . withNewFr
 
 cloneFr :: Fr -> IO Fr
 cloneFr (Fr src) = do
-  dst <- psbCreate @BLST_FR_SIZE $ \dstPtr ->
+  dst <- psbCreate @CARDANO_BLST_FR_SIZE $ \dstPtr ->
     psbUseAsCPtr src $ \srcPtr ->
       copyBytes dstPtr srcPtr sizeFr
   return (Fr dst)
@@ -755,14 +755,14 @@ foreign import ccall "blst_miller_loop"
 
 ---- Raw BLST error constants
 
-foreign import ccall "blst_success" c_blst_success :: CInt
-foreign import ccall "blst_error_bad_encoding" c_blst_error_bad_encoding :: CInt
-foreign import ccall "blst_error_point_not_on_curve" c_blst_error_point_not_on_curve :: CInt
-foreign import ccall "blst_error_point_not_in_group" c_blst_error_point_not_in_group :: CInt
-foreign import ccall "blst_error_aggr_type_mismatch" c_blst_error_aggr_type_mismatch :: CInt
-foreign import ccall "blst_error_verify_fail" c_blst_error_verify_fail :: CInt
-foreign import ccall "blst_error_pk_is_infinity" c_blst_error_pk_is_infinity :: CInt
-foreign import ccall "blst_error_bad_scalar" c_blst_error_bad_scalar :: CInt
+foreign import ccall "cardano_blst_success" c_blst_success :: CInt
+foreign import ccall "cardano_blst_error_bad_encoding" c_blst_error_bad_encoding :: CInt
+foreign import ccall "cardano_blst_error_point_not_on_curve" c_blst_error_point_not_on_curve :: CInt
+foreign import ccall "cardano_blst_error_point_not_in_group" c_blst_error_point_not_in_group :: CInt
+foreign import ccall "cardano_blst_error_aggr_type_mismatch" c_blst_error_aggr_type_mismatch :: CInt
+foreign import ccall "cardano_blst_error_verify_fail" c_blst_error_verify_fail :: CInt
+foreign import ccall "cardano_blst_error_pk_is_infinity" c_blst_error_pk_is_infinity :: CInt
+foreign import ccall "cardano_blst_error_bad_scalar" c_blst_error_bad_scalar :: CInt
 
 ---- Utility functions
 
