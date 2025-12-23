@@ -1,10 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NumDecimals #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Cardano.Binary.FromCBOR (
   FromCBOR (..),
@@ -31,7 +33,7 @@ where
 
 import Prelude hiding ((.))
 
-import Codec.CBOR.ByteArray as BA (ByteArray (BA))
+import qualified Codec.CBOR.ByteArray as BA (ByteArray (..))
 import Codec.CBOR.Decoding as D
 import Codec.CBOR.FlatTerm
 import qualified Codec.CBOR.Read as CBOR.Read
@@ -39,6 +41,7 @@ import Codec.CBOR.Term
 import Control.Category (Category ((.)))
 import Control.Exception (Exception)
 import Control.Monad (replicateM, when)
+import Data.Array.Byte (ByteArray)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Short as SBS
@@ -383,10 +386,17 @@ instance FromCBOR Text where
 instance FromCBOR BSL.ByteString where
   fromCBOR = BSL.fromStrict <$> fromCBOR
 
+instance FromCBOR BA.ByteArray where
+  fromCBOR = D.decodeByteArray
+
+-- TODO: Once support for GHC-9.6.7 is dropped, this can use newtype deriving:
+-- deriving via ByteArray instance FromCBOR ShortByteString
 instance FromCBOR SBS.ShortByteString where
   fromCBOR = do
     BA.BA (Prim.ByteArray ba) <- D.decodeByteArray
     return $ SBS ba
+
+deriving via BA.ByteArray instance FromCBOR ByteArray
 
 instance FromCBOR a => FromCBOR [a] where
   fromCBOR = decodeListWith fromCBOR
