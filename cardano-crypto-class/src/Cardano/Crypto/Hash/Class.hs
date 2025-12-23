@@ -27,6 +27,7 @@ module Cardano.Crypto.Hash.Class (
 
   -- * Conversions
   castHash,
+  hashToByteArray,
   hashToBytes,
   hashFromBytes,
   hashToBytesShort,
@@ -55,22 +56,22 @@ module Cardano.Crypto.Hash.Class (
 )
 where
 
-import qualified Data.Foldable as F (foldl')
-import Data.Maybe (maybeToList)
-import Data.Proxy (Proxy (..))
-import Data.Typeable (Typeable)
-import GHC.Generics (Generic)
-import GHC.Stack (HasCallStack)
-import GHC.TypeLits (KnownNat, Nat, natVal)
-
 import Control.Monad.Trans.Fail.String (errorFail)
+import Data.Array.Byte (ByteArray)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
+import qualified Data.Foldable as F (foldl')
+import Data.Maybe (maybeToList)
 import Data.MemPack (FailT (FailT), MemPack, StateT (StateT), Unpack (Unpack))
+import Data.Proxy (Proxy (..))
+import Data.Typeable (Typeable)
 import Data.Word (Word8)
+import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack)
+import GHC.TypeLits (KnownNat, Nat, natVal)
 import Numeric.Natural (Natural)
 
 import Data.String (IsString (..))
@@ -224,9 +225,15 @@ hashFromOffsetBytesShort ::
   Maybe (Hash h a)
 hashFromOffsetBytesShort bytes offset = UnsafeHashRep <$> packShortByteStringWithOffset bytes offset
 
--- | The representation of the hash as bytes, as a 'ShortByteString'.
+-- | /O(n)/ - The representation of the hash as a 'ShortByteString'.
 hashToBytesShort :: Hash h a -> ShortByteString
 hashToBytesShort (UnsafeHashRep h) = unpackBytes h
+
+-- | /O(n)/ - The representation of the hash as a 'ByteArray'.
+--
+-- @since 2.3.0
+hashToByteArray :: Hash h a -> ByteArray
+hashToByteArray (UnsafeHashRep h) = unpackAsByteArray h
 
 -- | /O(1)/ - Get the underlying hash representation
 hashToPackedBytes :: Hash h a -> PackedBytes (SizeHash h)

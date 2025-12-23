@@ -134,7 +134,7 @@ evalVRF' ::
   (OutputVRF MockVRF, CertVRF MockVRF)
 evalVRF' a sk@(SignKeyMockVRF n) =
   let y =
-        hashToBytes $
+        hashToByteArray $
           hashWithSerialiser @ShortHash id $
             toCBOR (getSignableRepresentation a) <> toCBOR sk
    in (OutputVRF y, CertMockVRF n)

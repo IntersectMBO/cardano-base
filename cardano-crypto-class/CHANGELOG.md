@@ -1,7 +1,11 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.2.4.0
+## 2.3.0.0
 
+* Switch `OutputVRF` to use `ByteArray` instead of `ByteString`. Change field accessor name to `getOutputVRFByteArray`
+* Add `byteArrayToNatural`, `naturalToByteArray` and `byteArrayToInteger`.
+* Expose `bytesToInteger`
+* Add `hashToByteArray`
 * Add Cabal components using code moved from `cardano-crypto-tests`:
   - `lib:testlib`
   - `lib:benchlib`

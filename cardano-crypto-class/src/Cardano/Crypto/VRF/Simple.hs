@@ -17,21 +17,19 @@ module Cardano.Crypto.VRF.Simple (
 )
 where
 
-import Control.DeepSeq (NFData, force)
-import Data.Proxy (Proxy (..))
-import GHC.Generics (Generic)
-import NoThunks.Class (InspectHeap (..), NoThunks)
-import Numeric.Natural (Natural)
-
 import Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
-
-import qualified Crypto.PubKey.ECC.Prim as C
-import qualified Crypto.PubKey.ECC.Types as C
-
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util
 import Cardano.Crypto.VRF.Class
+import Control.DeepSeq (NFData, force)
+import qualified Crypto.PubKey.ECC.Prim as C
+import qualified Crypto.PubKey.ECC.Types as C
+import Data.Array.Byte (ByteArray)
+import Data.Proxy (Proxy (..))
+import GHC.Generics (Generic)
+import NoThunks.Class (InspectHeap (..), NoThunks)
+import Numeric.Natural (Natural)
 
 data SimpleVRF
 
@@ -93,6 +91,9 @@ pow' (Point p) n = Point $ C.pointMul curve n p
 h :: Encoding -> ByteString
 h = hashToBytes . hashWithSerialiser @H id
 
+hashedEncodingAsByteArray :: Encoding -> ByteArray
+hashedEncodingAsByteArray = hashToByteArray . hashWithSerialiser @H id
+
 h' :: Encoding -> Integer -> Point
 h' enc l = pow $ mod (l * (fromIntegral . bytesToNatural $ h enc)) q
 
@@ -143,10 +144,10 @@ instance VRFAlgorithm SimpleVRF where
   evalVRF () a' sk@(SignKeySimpleVRF k) =
     let a = getSignableRepresentation a'
         u = h' (toCBOR a) k
-        y = h $ toCBOR a <> toCBOR u
+        y = hashedEncodingAsByteArray $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
 
-        r = fromIntegral (bytesToNatural y) `mod` q
+        r = fromIntegral (byteArrayToNatural y) `mod` q
         c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
         s = mod (r + k * fromIntegral (bytesToNatural c)) q
      in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
@@ -157,7 +158,7 @@ instance VRFAlgorithm SimpleVRF where
         c = certC cert
         c' = -fromIntegral c
         s = certS cert
-        o = h (toCBOR a <> toCBOR u)
+        o = hashedEncodingAsByteArray (toCBOR a <> toCBOR u)
         rhs =
           h $
             toCBOR a
