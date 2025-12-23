@@ -144,6 +144,7 @@ library
     cbits/blst_util.c
 
   include-dirs: cbits
+  includes: blst_util.h
   install-includes: blst_util.h
 
   if flag(secp256k1-support)
