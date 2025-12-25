@@ -26,10 +26,9 @@ module Cardano.Crypto.PackedBytes
   , xorPackedBytes
   ) where
 
+import Codec.CBOR.Decoding as D (decodeBytes)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), Size)
 import Codec.Serialise (Serialise(..))
-import Codec.Serialise.Decoding (decodeBytes)
-import Codec.Serialise.Encoding (encodeBytes)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (unless, when)
 import Control.Monad.Primitive (primitive_)
@@ -143,8 +142,8 @@ instance KnownNat n => MemPack (PackedBytes n) where
   {-# INLINE unpackM #-}
 
 instance KnownNat n => Serialise (PackedBytes n) where
-  encode = encodeBytes . unpackPinnedBytes
-  decode = packPinnedBytes <$> decodeBytes
+  encode = toCBOR
+  decode = fromCBOR
 
 instance KnownNat n => ToCBOR (PackedBytes n) where
   toCBOR = toCBOR . unpackBytes
@@ -157,7 +156,7 @@ instance KnownNat n => ToCBOR (PackedBytes n) where
       packedBytesSize = fromInteger (natVal' (proxy# @n))
 
 instance KnownNat n => FromCBOR (PackedBytes n) where
-  fromCBOR = fromCBOR >>= packShortByteString
+  fromCBOR = D.decodeBytes >>= packByteString
   {-# INLINE fromCBOR #-}
 
 xorPackedBytes :: PackedBytes n -> PackedBytes n -> PackedBytes n
