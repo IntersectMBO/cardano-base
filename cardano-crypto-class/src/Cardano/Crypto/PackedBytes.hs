@@ -16,6 +16,7 @@ module Cardano.Crypto.PackedBytes
   ( PackedBytes(..)
   , packBytes
   , packBytesMaybe
+  , packByteString
   , packShortByteString
   , packShortByteStringWithOffset
   , packPinnedBytes
@@ -35,7 +36,7 @@ import Control.Monad.Primitive (primitive_)
 import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
 import Control.Monad.State.Strict (MonadState(state))
 import Data.Bits
-import Data.ByteString
+import Data.ByteString as BS
 import Data.ByteString.Internal as BS (accursedUnutterablePerformIO,
                                        fromForeignPtr, toForeignPtr)
 import Data.ByteString.Short.Internal as SBS
@@ -287,15 +288,35 @@ packBytesMaybe = packShortByteStringWithOffset
 -- | Construct `PackedBytes` from a `ShortByteString`. This function is safe and will fail
 --  if the buffer size does not match expected size of packed bytes exactly.
 --
--- @since 2.2.4.0
+-- @since 2.3.0.0
+packByteString :: forall n m. (KnownNat n, MonadFail m) => ByteString -> m (PackedBytes n)
+packByteString = packedBytesSizeGuard BS.length packPinnedBytes
+{-# INLINE packByteString #-}
+
+-- | Construct `PackedBytes` from a `ShortByteString`. This function is safe and will fail
+--  if the buffer size does not match expected size of packed bytes exactly.
+--
+-- @since 2.3.0.0
 packShortByteString :: forall n m. (KnownNat n, MonadFail m) => ShortByteString -> m (PackedBytes n)
-packShortByteString bs = do
-  let bufferSize = SBS.length bs
+packShortByteString = packedBytesSizeGuard SBS.length (`packBytes` 0)
+{-# INLINE packShortByteString #-}
+
+packedBytesSizeGuard ::
+  forall b n m. (KnownNat n, MonadFail m) =>
+  -- | Function for getting the size of the source buffer
+  (b -> Int) ->
+  -- | Function for packing the buffer in full
+  (b -> PackedBytes n) ->
+  -- | The actual buffer to be packed
+  b ->
+  m (PackedBytes n)
+packedBytesSizeGuard getSizeOfBuffer packBuffer buf = do
+  let bufferSize = getSizeOfBuffer buf
       size = fromInteger (natVal' (proxy# @n))
   unless (size == bufferSize) $ do
     fail $ "Number of bytes mismatch. Expected " <> show size <> " number of bytes, but got " <> show bufferSize
-  pure $ packBytes bs 0
-{-# INLINE packShortByteString #-}
+  pure $ packBuffer buf
+{-# INLINE packedBytesSizeGuard #-}
 
 -- | Construct `PackedBytes` from a `ShortByteString` and a non-negative offset in number of bytes
 -- from the beginning. This function is safe, but it only checks whether there are enough
