@@ -86,9 +86,10 @@ library
     base,
     bytestring,
     cardano-binary,
-    cardano-crypto-class >=2.2.4,
+    cardano-crypto-class >=2.3,
     deepseq,
     nothunks,
+    primitive,
 
   pkgconfig-depends: libsodium
 

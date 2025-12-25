@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
@@ -66,23 +67,24 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
 )
 where
 
-import Cardano.Binary (
-  FromCBOR (..),
-  ToCBOR (..),
- )
-
+import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
 import Cardano.Crypto.VRF.Class
-
 import Control.DeepSeq (NFData (..))
-import Control.Monad (void)
+import Control.Monad (void, (<$!>))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Coerce (coerce)
-import Data.Maybe (fromMaybe)
+import Data.Primitive.ByteArray (
+  ByteArray,
+  copyPtrToMutableByteArray,
+  newByteArray,
+  unsafeFreezeByteArray,
+ )
 import Data.Proxy (Proxy (..))
+import Data.Word (Word8)
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc
@@ -277,6 +279,20 @@ unsafeRawSeed (Seed fp) = withForeignPtr fp $ \ptr ->
 outputBytes :: Output -> ByteString
 outputBytes (Output op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
   BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft13_outputbytes)
+
+-- | Convert a proof verification output hash into a 'ByteArray' that we can
+-- inspect.
+outputByteArray :: Output -> ByteArray
+outputByteArray (Output op) =
+  unsafePerformIO $
+    withForeignPtr op $ \ptr -> do
+      let numBytes = fromIntegral @CSize @Int crypto_vrf_ietfdraft13_outputbytes
+      mba <- newByteArray numBytes
+      copyPtrToMutableByteArray mba 0 (castPtr ptr :: Ptr Word8) numBytes
+      unsafeFreezeByteArray mba
+
+outputToOutputVRF :: Output -> OutputVRF v
+outputToOutputVRF = OutputVRF . outputByteArray
 
 -- | Convert a proof into a 'ByteString' that we can inspect.
 proofBytes :: Proof -> ByteString
@@ -528,14 +544,13 @@ instance VRFAlgorithm PraosBatchCompatVRF where
 
   evalVRF = \_ msg (SignKeyPraosBatchCompatVRF sk) ->
     let msgBS = getSignableRepresentation msg
-        proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
-        output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
-     in output `seq`
-          proof `seq`
-            (OutputVRF (outputBytes output), CertPraosBatchCompatVRF proof)
+        !proofVRF@(CertPraosBatchCompatVRF proof) =
+          maybe (error "Invalid Key") CertPraosBatchCompatVRF $ prove sk msgBS
+        !outputVRF = maybe (error "Invalid Proof") outputToOutputVRF $ outputFromProof proof
+     in (outputVRF, proofVRF)
 
   verifyVRF = \_ (VerKeyPraosBatchCompatVRF pk) msg (CertPraosBatchCompatVRF proof) ->
-    (OutputVRF . outputBytes) <$> verify pk proof (getSignableRepresentation msg)
+    outputToOutputVRF <$!> verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_ietfdraft13_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_ietfdraft13_seedbytes
