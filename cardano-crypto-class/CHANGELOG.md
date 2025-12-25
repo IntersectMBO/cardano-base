@@ -15,6 +15,7 @@
 * Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
 * Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
 * Add `ToCBOR` and `FromCBOR` instances for `PackedBytes`
+* Add `packByteString`
 * Add `packShortByteString` and `packShortByteStringWithOffset`
 * Deprecate `packBytesMaybe`
 * Refactor BLS12-381 module to use `PinnedSizedBytes`
