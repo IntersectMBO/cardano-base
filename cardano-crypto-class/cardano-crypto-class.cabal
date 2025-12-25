@@ -119,6 +119,7 @@ library
     bytestring,
     cardano-binary >=1.7.3,
     cardano-strict-containers,
+    cborg,
     crypton,
     deepseq,
     heapwords,
