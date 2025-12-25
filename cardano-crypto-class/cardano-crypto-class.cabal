@@ -130,7 +130,6 @@ library
     mtl,
     nothunks,
     primitive >=0.8,
-    serialise,
     template-haskell,
     text,
     th-compat,
