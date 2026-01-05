@@ -408,6 +408,7 @@ instance
     -- so these use the compressed sizes of the BLS12-381 `Point curve`
     SizeProofOfPossessionDSIGN (BLS12381DSIGN curve) =
       CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve)
+
   data ProofOfPossessionDSIGN (BLS12381DSIGN curve)
     = ProofOfPossessionBLS12381
         !(PinnedSizedBytes (PointSize (Dual curve))) -- mu1
@@ -415,6 +416,7 @@ instance
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
+
   aggregateVerKeysDSIGNWithoutPoPs verKeys = do
     -- Sum the verification keys as curve points
     let aggrPoint :: Point curve
@@ -423,14 +425,16 @@ instance
             [ Point @curve verKeyPsb
             | VerKeyBLS12381 verKeyPsb <- verKeys
             ]
-    -- Unlikly case, but best to reject infinity as an aggregate verification key
-    -- This happens if for every secret/verification key pair, the inverse of each
-    -- secret key (and thus also the verification key) is also present in the list.
+    -- Unlikely case, but best to reject infinity as an aggregate verification
+    -- key. This happens if, for every secret/verification key pair, the inverse
+    -- of each secret key (and thus also the verification key) is also present
+    -- in the list.
     if blsIsInf @curve aggrPoint
       then Left "aggregateVerKeysDSIGN: aggregated verification key is infinity"
       else
         let Point aggrPsb = aggrPoint
          in Right (VerKeyBLS12381 aggrPsb)
+
   aggregateSigDSIGN sigs = do
     -- Sum the signatures as curve points
     let aggrPoint :: Point (Dual curve)
@@ -439,12 +443,13 @@ instance
             [ Point @(Dual curve) sigPsb
             | SigBLS12381 sigPsb <- sigs
             ]
-    -- Unlikly case, but best to reject infinity as an aggregate signature
+    -- Unlikely case, but best to reject infinity as an aggregate signature
     if blsIsInf @(Dual curve) aggrPoint
       then Left "aggregateSigDSIGN: aggregated signature is infinity"
       else
         let Point aggrPsb = aggrPoint
          in Right (SigBLS12381 aggrPsb)
+
   {-# NOINLINE proveProofOfPossessionDSIGN #-}
   proveProofOfPossessionDSIGN (dst, aug) (SignKeyBLS12381 skPsb) =
     unsafeDupablePerformIO $ do
