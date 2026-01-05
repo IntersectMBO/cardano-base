@@ -209,12 +209,14 @@ instance
   -- \| Context can hold domain seperation tag and/or augmentation data for signatures
   type ContextDSIGN (BLS12381DSIGN curve) = (Maybe ByteString, Maybe ByteString)
   type KeyGenContextDSIGN (BLS12381DSIGN curve) = Maybe ByteString
+
   newtype VerKeyDSIGN (BLS12381DSIGN curve)
     = -- Note that the internal representation is the uncompressed point size
       VerKeyBLS12381 (PinnedSizedBytes (PointSize curve))
     deriving newtype (NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
+
   newtype SignKeyDSIGN (BLS12381DSIGN curve)
     = SignKeyBLS12381 (PinnedSizedBytes (SizeSignKeyDSIGN (BLS12381DSIGN curve)))
     -- Us Eq from PinnedSizedBytes is needed here, as we need constant time
@@ -222,18 +224,22 @@ instance
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
+
   newtype SigDSIGN (BLS12381DSIGN curve)
     = -- Note that the internal representation is the uncompressed point size
       SigBLS12381 (PinnedSizedBytes (PointSize (Dual curve)))
     deriving newtype (NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
+
   algorithmNameDSIGN _ = "bls12-381-" ++ symbolVal (Proxy @(CurveVariant curve))
+
   {-# NOINLINE deriveVerKeyDSIGN #-}
   deriveVerKeyDSIGN (SignKeyBLS12381 skPsb) = do
     VerKeyBLS12381 $ unsafeDupablePerformIO . psbUseAsCPtr skPsb $ \skp ->
       psbCreate $ \vkPtp ->
         c_blst_sk_to_pk @curve (PointPtr vkPtp) (ScalarPtr skp)
+
   {-# NOINLINE signDSIGN #-}
   signDSIGN (dst, aug) msg (SignKeyBLS12381 skPsb) =
     SigBLS12381 $ unsafeDupablePerformIO . psbCreate $ \sigPts -> do
@@ -256,6 +262,7 @@ instance
                   (PointPtr sigPts)
                   hashPtr
                   (ScalarPtr skPtp)
+
   {-# NOINLINE verifyDSIGN #-}
   -- \| Context can hold domain seperation tag and/or augmentation data for signatures
   verifyDSIGN (dst, aug) (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
@@ -282,6 +289,7 @@ instance
 
   {-# NOINLINE genKeyDSIGN #-}
   genKeyDSIGN = genKeyDSIGNWithKeyInfo Nothing
+
   {-# NOINLINE genKeyDSIGNWithKeyInfo #-}
   -- \| Generate a signing key from a seed and optional key info
   -- as per the IETF bls signature draft 05
@@ -296,11 +304,14 @@ instance
 
   -- \| Note that this also compresses the signature according to the ZCash standard
   rawSerialiseSigDSIGN (SigBLS12381 sigPSB) = blsCompress @(Dual curve) (Point sigPSB)
+
   {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
   -- \| Note that this also compresses the verification key according to the ZCash standard
   rawSerialiseVerKeyDSIGN (VerKeyBLS12381 vkPSB) = blsCompress @curve (Point vkPSB)
+
   {-# NOINLINE rawSerialiseSignKeyDSIGN #-}
   rawSerialiseSignKeyDSIGN (SignKeyBLS12381 skPSB) = scalarToBS (Scalar skPSB)
+
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs =
     -- Note that this also performs a group membership check.
@@ -308,6 +319,7 @@ instance
     case blsUncompress @curve bs of
       Left _ -> Nothing
       Right (Point vkPsb) -> Just (VerKeyBLS12381 vkPsb)
+
   {-# NOINLINE rawDeserialiseSignKeyDSIGN #-}
   rawDeserialiseSignKeyDSIGN bs =
     -- A signing key is strictly a BE integer mod the curve order.
@@ -317,6 +329,7 @@ instance
     case scalarFromBS bs of
       Left _ -> Nothing
       Right (Scalar skPsb) -> Just (SignKeyBLS12381 skPsb)
+
   rawDeserialiseSigDSIGN bs =
     -- Note that this also performs a group membership check.
     -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
