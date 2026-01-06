@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -550,9 +551,21 @@ data SignKeyWithPeriodKES v
   }
   deriving (Generic)
 
-deriving instance (KESAlgorithm v, Eq (SignKeyKES v)) => Eq (SignKeyWithPeriodKES v)
+deriving instance (
+#if __GLASGOW_HASKELL__ < 914
+  -- This constraints is REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  KESAlgorithm v,
+#endif
+  Eq (SignKeyKES v)) => Eq (SignKeyWithPeriodKES v)
 
-deriving instance (KESAlgorithm v, Show (SignKeyKES v)) => Show (SignKeyWithPeriodKES v)
+deriving instance (
+#if __GLASGOW_HASKELL__ < 914
+  -- This constraints is REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  KESAlgorithm v,
+#endif
+  Show (SignKeyKES v)) => Show (SignKeyWithPeriodKES v)
 
 instance KESAlgorithm v => NoThunks (SignKeyWithPeriodKES v)
 
