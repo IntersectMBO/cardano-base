@@ -5,6 +5,9 @@ set -euo pipefail
 # Packages to run doctests for; defaults to all packages if none are specified
 PACKAGES=("$@")
 
+# Ensure the doctest executables can be found
+PATH=$(cabal path --installdir):$PATH
+
 # Install doctest's Cabal integration, if it's not present already
 if [[ -z "$(type -t cabal-doctest)" ]]
 then
@@ -28,9 +31,6 @@ then
   echo "  Doctest ghc: $(getExecutablePath "$doctest_ghc")" >&2
   exit 1
 fi
-
-# Ensure the cabal-doctest executable can be found
-PATH=$(cabal path --installdir):$PATH
 
 # Ensure other scripts (eg cabal-targets.hs) can be found
 case "$0" in

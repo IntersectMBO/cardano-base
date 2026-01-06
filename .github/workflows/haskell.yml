@@ -147,11 +147,46 @@ jobs:
         MSYSTEM: MINGW64
       run: cabal test all --enable-tests --test-show-details=direct -j1
 
-    - name: Run doctests
-      if: runner.os == 'Linux'
+  doctests:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: ["9.6.7", "9.8.4", "9.10.2", "9.12.2"]
+
+    steps:
+    - name: Install Haskell
+      uses: input-output-hk/actions/haskell@latest
+      id: setup-haskell
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: 3.14.1.0
+
+    - name: Install system dependencies
+      uses: input-output-hk/actions/base@latest
+      with:
+        use-sodium-vrf: false # default is true
+
+    - uses: actions/checkout@v4
+
+    - name: Cabal update
+      run: cabal update
+
+    - name: Configure build
+      shell: bash
       run: |
-        cabal install doctest --flag cabal-doctest --ignore-project --overwrite-policy=always
-        PATH="$(cabal path --installdir):$PATH"
+        cp ".github/workflows/cabal.project.local.ci.$(uname -s)" cabal.project.local
+        echo "# cabal.project.local"
+        cat cabal.project.local
+
+    - name: Run doctests
+      run: |
+        cabal build all --dry-run
         scripts/doctest.sh
 
   fourmolu:
