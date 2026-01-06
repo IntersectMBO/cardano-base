@@ -150,8 +150,7 @@ instance FromCBOR (SigDSIGN MockDSIGN) where
 --
 -- We don't include the actual value here as that would require propagating a
 -- 'Show' constraint.
-data VerificationFailure
-  = MockVerificationFailure
+data VerificationFailure = MockVerificationFailure
   { vErrVerKey :: VerKeyDSIGN MockDSIGN
   , vErrSignature :: SigDSIGN MockDSIGN
   , vErrCallStack :: String
@@ -160,6 +159,8 @@ data VerificationFailure
 
 mockSign ::
   SignableRepresentation a =>
-  a -> SignKeyDSIGN MockDSIGN -> SigDSIGN MockDSIGN
+  a ->
+  SignKeyDSIGN MockDSIGN ->
+  SigDSIGN MockDSIGN
 mockSign a (SignKeyMockDSIGN n) =
   SigMockDSIGN (castHash (hashWith getSignableRepresentation a)) n
