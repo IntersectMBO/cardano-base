@@ -116,10 +116,8 @@ cOrError :: MonadST m => (forall s. ST s Int) -> m (Maybe Errno)
 cOrError action = stToIO $ do
   res <- action
   if res == 0
-    then
-      return Nothing
-    else
-      Just <$> unsafeIOToST getErrno
+    then return Nothing
+    else Just <$> unsafeIOToST getErrno
 
 -- | Throws an error when 'Just' an 'Errno' is given.
 throwOnErrno :: MonadThrow m => String -> String -> Maybe Errno -> m ()

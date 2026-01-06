@@ -11,8 +11,8 @@ repository cardano-haskell-packages
 
 -- The index-states
 index-state:
-  , hackage.haskell.org 2025-10-13T20:51:29Z
-  , cardano-haskell-packages 2025-10-07T11:20:00Z
+  , hackage.haskell.org 2026-01-05T23:03:18Z
+  , cardano-haskell-packages 2026-01-05T11:07:19Z
 
 packages:
   base-deriving-via
@@ -40,3 +40,107 @@ program-options
 package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
+
+if impl(ghc >=9.14)
+  constraints:
+    , nothunks ^>= 0.2
+    , QuickCheck < 2.17.0.0
+
+-- cabal-allow-newer
+if impl (ghc >= 9.14)
+  allow-newer:
+    , OneTuple:base
+    , aeson:base
+    , aeson:bytestring
+    , aeson:containers
+    , aeson:data-fix
+    , aeson:deepseq
+    , aeson:ghc-prim
+    , aeson:hashable
+    , aeson:mtl
+    , aeson:primitive
+    , aeson:scientific
+    , aeson:template-haskell
+    , aeson:text
+    , aeson:these
+    , aeson:time
+    , aeson:time-compat
+    , assoc:base
+    , async:base
+    , base:ghc-prim
+    , bifunctors:template-haskell
+    , binary:containers
+    , binary-orphans:base
+    , boring:base
+    , bytestring:deepseq
+    , bytestring:template-haskell
+    , cardano-binary:cborg
+    , cborg:base
+    , concurrent-output:process
+    , containers:array
+    , containers:template-haskell
+    , data-fix:base
+    , directory:base
+    , directory:time
+    , filepath:bytestring
+    , free:containers
+    , free:template-haskell
+    , free:transformers
+    , generically:base
+    , ghc-heap:containers
+    , hashable:base
+    , hashable:bytestring
+    , hashable:containers
+    , hashable:ghc-bignum
+    , hedgehog:async
+    , hedgehog:template-haskell
+    , hedgehog:time
+    , hsc2hs:base
+    , indexed-traversable:base
+    , indexed-traversable:containers
+    , indexed-traversable-instances:base
+    , integer-conversion:base
+    , integer-logarithms:base
+    , integer-logarithms:ghc-bignum
+    , io-classes:base
+    , microstache:aeson
+    , microstache:base
+    , nothunks:containers
+    , nothunks:time
+    , parallel:base
+    , parsec:base
+    , parsec:bytestring
+    , process:base
+    , quickcheck-instances:array
+    , quickcheck-instances:base
+    , quickcheck-instances:bytestring
+    , quickcheck-instances:containers
+    , recursion-schemes:template-haskell
+    , scientific:base
+    , scientific:containers
+    , scientific:template-haskell
+    , semialign:base
+    , semialign:containers
+    , serialise:base
+    , serialise:bytestring
+    , serialise:containers
+    , splitmix:base
+    , statistics:parallel
+    , tagged:template-haskell
+    , text:template-haskell
+    , text-iso8601:time
+    , text-short:base
+    , text-short:template-haskell
+    , th-abstraction:template-haskell
+    , th-compat:template-haskell
+    , these:base
+    , time-compat:base
+    , time-compat:time
+    , tree-diff:base
+    , tree-diff:containers
+    , tree-diff:parsec
+    , tree-diff:time
+    , unordered-containers:hashable
+    , uuid-types:template-haskell
+    , vector-th-unbox:base
+    , vector-th-unbox:template-haskell

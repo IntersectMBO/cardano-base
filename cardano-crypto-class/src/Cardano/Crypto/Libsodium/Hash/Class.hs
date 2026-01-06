@@ -50,14 +50,18 @@ class HashAlgorithm h => SodiumHashAlgorithm h where
 digestMLockedStorable ::
   forall h a proxy.
   (SodiumHashAlgorithm h, Storable a) =>
-  proxy h -> Ptr a -> IO (MLockedSizedBytes (SizeHash h))
+  proxy h ->
+  Ptr a ->
+  IO (MLockedSizedBytes (SizeHash h))
 digestMLockedStorable p ptr =
   naclDigestPtr p ptr ((sizeOf (undefined :: a)))
 
 digestMLockedBS ::
   forall h proxy.
   SodiumHashAlgorithm h =>
-  proxy h -> BS.ByteString -> IO (MLockedSizedBytes (SizeHash h))
+  proxy h ->
+  BS.ByteString ->
+  IO (MLockedSizedBytes (SizeHash h))
 digestMLockedBS p bs =
   BS.useAsCStringLen bs $ \(ptr, len) ->
     naclDigestPtr p (castPtr ptr) len

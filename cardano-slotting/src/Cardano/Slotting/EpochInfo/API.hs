@@ -36,8 +36,7 @@ import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 -- to state, and so either uses the monad for that or uses the monad to reify
 -- failure due to cached state information being too stale for the current
 -- query.
-data EpochInfo m
-  = EpochInfo
+data EpochInfo m = EpochInfo
   { epochInfoSize_ :: HasCallStack => EpochNo -> m EpochSize
   -- ^ Return the size of the given epoch as a number of slots
   --
@@ -55,7 +54,8 @@ data EpochInfo m
   -- > s `inRange` epochInfoRange (epochInfoEpoch s)
   , epochInfoSlotToRelativeTime_ ::
       HasCallStack =>
-      SlotNo -> m RelativeTime
+      SlotNo ->
+      m RelativeTime
   -- ^ The 'RelativeTime' of the start of the given slot
   --
   -- This calculation depends on the varying slot lengths of the relevant
@@ -64,7 +64,8 @@ data EpochInfo m
   -- See also 'epochInfoSlotToUTCTime'.
   , epochInfoSlotLength_ ::
       HasCallStack =>
-      SlotNo -> m SlotLength
+      SlotNo ->
+      m SlotLength
   -- ^ Return the length of the specified slot.
   }
   deriving (NoThunks) via OnlyCheckWhnfNamed "EpochInfo" (EpochInfo m)

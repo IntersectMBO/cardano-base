@@ -186,8 +186,7 @@ parserHex :: Maybe Int -> Parse.ReadP BS.ByteString
 parserHex lenM = do
   str <- parseString
   if str == "empty"
-    then
-      pure BS.empty
+    then pure BS.empty
     else case lenM of
       Just len -> handleDecode str len
       Nothing -> handleDecode str (length str `div` 2)
@@ -229,10 +228,8 @@ parserVRFTestVector = do
   testVectorMessage <- parseContent "alpha" (parserHex Nothing)
   testVectorProof <-
     if testVectorName == "PraosVRF"
-      then
-        parseContent "pi" (parserHex (Just 80))
-      else
-        parseContent "pi" (parserHex (Just 128))
+      then parseContent "pi" (parserHex (Just 80))
+      else parseContent "pi" (parserHex (Just 128))
   testVectorHash <- parseContent "beta" (parserHex (Just 64))
   pure VRFTestVector {..}
 
