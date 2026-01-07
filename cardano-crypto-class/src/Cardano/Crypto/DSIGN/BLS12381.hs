@@ -127,6 +127,7 @@ import Data.Data (Typeable)
 import qualified Data.Foldable as F (foldl')
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
+import Foreign.C.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import GHC.TypeNats (KnownNat, type (+))
@@ -252,11 +253,11 @@ instance
                 c_blst_hash @(DualCurve curve)
                   hashPtr
                   msgPtr
-                  (fromIntegral msgLen)
+                  (fromIntegral @Int @CSize msgLen)
                   dstPtr
-                  (fromIntegral dstLen)
+                  (fromIntegral @Int @CSize dstLen)
                   augPtr
-                  (fromIntegral augLen)
+                  (fromIntegral @Int @CSize augLen)
                 c_blst_sign @curve
                   (PointPtr sigPts)
                   hashPtr
@@ -277,14 +278,14 @@ instance
                     sigAff
                     True
                     pMsg
-                    (fromIntegral msgLen)
+                    (fromIntegral @Int @CSize msgLen)
                     pDst
-                    (fromIntegral dstLen)
+                    (fromIntegral @Int @CSize dstLen)
                     pAug
-                    (fromIntegral augLen)
+                    (fromIntegral @Int @CSize augLen)
                 case mkBLSTError err of
                   BLST_SUCCESS -> return $ Right ()
-                  _ -> return $ Left "SigDSIGN BLS12381DSIGN failed to verify"
+                  _ -> return $ Left "verifyDSIGN: BLS12381DSIGN signature failed to verify"
 
   {-# NOINLINE genKeyDSIGN #-}
   genKeyDSIGN = genKeyDSIGNWithKeyInfo Nothing
@@ -299,7 +300,12 @@ instance
             withMaybeCStringLen keyInfo $ \(infoPtr, infoLen) ->
               unsafeUseAsCStringLen bs $ \(ikmPtr, ikmLen) ->
                 psbCreate $ \skp ->
-                  c_blst_keygen (ScalarPtr skp) ikmPtr (fromIntegral ikmLen) infoPtr (fromIntegral infoLen)
+                  c_blst_keygen
+                    (ScalarPtr skp)
+                    ikmPtr
+                    (fromIntegral @Int @CSize ikmLen)
+                    infoPtr
+                    (fromIntegral @Int @CSize infoLen)
 
   -- \| Note that this also compresses the signature according to the ZCash standard
   rawSerialiseSigDSIGN (SigBLS12381 sigPSB) = blsCompress @(DualCurve curve) (Point sigPSB)
@@ -476,7 +482,7 @@ instance
     -- We use the compressed size of a point in DualCurve curve to split
     let chunkSize = compressedSizePoint (Proxy @(DualCurve curve))
      in case splitsAt [chunkSize] bs of
-          mu1Bs : mu2Bs : _ ->
+          [mu1Bs, mu2Bs] ->
             -- Note that these also performs group membership checks
             case ( blsUncompress @(DualCurve curve) mu1Bs
                  , blsUncompress @(DualCurve curve) mu2Bs
