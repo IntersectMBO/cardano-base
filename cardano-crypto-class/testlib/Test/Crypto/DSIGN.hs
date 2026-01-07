@@ -96,9 +96,9 @@ import Cardano.Crypto.DSIGN (
   BLS12381DSIGN,
 
   DSIGNAggregatable (..),
-  sizeProofOfPossessionDSIGN,
-  encodeProofOfPossessionDSIGN,
-  decodeProofOfPossessionDSIGN
+  sizePossessionProofDSIGN,
+  encodePossessionProofDSIGN,
+  decodePossessionProofDSIGN
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2)
@@ -194,16 +194,16 @@ defaultSigGen = do
   msg :: Message <- arbitrary
   signDSIGN () msg <$> defaultSignKeyGen
 
-defaultProofOfPossessionGen
+defaultPossessionProofGen
   :: forall v.
      ( DSIGNAggregatable v
      )
   => Gen (ContextDSIGN v)
-  -> Gen (ProofOfPossessionDSIGN v)
-defaultProofOfPossessionGen genContext = do
+  -> Gen (PossessionProofDSIGN v)
+defaultPossessionProofGen genContext = do
   ctx <- genContext
   sk  <- defaultSignKeyGen @v
-  pure $ proveProofOfPossessionDSIGN ctx sk
+  pure $ createPossessionProofDSIGN ctx sk
 
 blsContextGen :: Gen (ContextDSIGN (BLS12381DSIGN curve))
 blsContextGen = do
@@ -500,8 +500,7 @@ testDSIGNMAlgorithm lock _ n =
               equals <- sk ==! sk'
               forgetSignKeyDSIGNM sk'
               return $
-                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
-                equals
+                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") equals
        describe "DirectSerialise matches raw" $ do
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
@@ -741,9 +740,9 @@ prop_dsignm_verify_neg_msg lock _ a a' =
 
 -- Tests and instances for DSIGNAggregatable v
 
-instance DSIGNAggregatable v => Arbitrary (BadInputFor (ProofOfPossessionDSIGN v)) where
+instance DSIGNAggregatable v => Arbitrary (BadInputFor (PossessionProofDSIGN v)) where
   arbitrary =
-    genBadInputFor (fromIntegral $ sizeProofOfPossessionDSIGN (Proxy @v))
+    genBadInputFor (fromIntegral $ sizePossessionProofDSIGN (Proxy @v))
   shrink = shrinkBadInputFor
 
 testDSIGNAggregatableWithContext
@@ -751,8 +750,8 @@ testDSIGNAggregatableWithContext
      ( DSIGNAggregatable v
      , Signable v Message
      , Show (ContextDSIGN v)
-     , ToCBOR (ProofOfPossessionDSIGN v)
-     , FromCBOR (ProofOfPossessionDSIGN v)
+     , ToCBOR (PossessionProofDSIGN v)
+     , FromCBOR (PossessionProofDSIGN v)
      )
   => Proxy v
   -> Gen (ContextDSIGN v)
@@ -763,40 +762,40 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
   describe "serialization" $ do
     describe "raw" $ do
       prop "PoP serialization" .
-        forAllShow (defaultProofOfPossessionGen @v genContext)
+        forAllShow (defaultPossessionProofGen @v genContext)
                    ppShow $
-                   prop_raw_serialise rawSerialiseProofOfPossessionDSIGN rawDeserialiseProofOfPossessionDSIGN
-      prop "PoP deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseProofOfPossessionDSIGN @v)
-      prop "PoP fail fromCBOR" $ prop_bad_cbor_bytes @(ProofOfPossessionDSIGN v)
+                   prop_raw_serialise rawSerialisePossessionProofDSIGN rawDeserialisePossessionProofDSIGN
+      prop "PoP deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialisePossessionProofDSIGN @v)
+      prop "PoP fail fromCBOR" $ prop_bad_cbor_bytes @(PossessionProofDSIGN v)
     describe "size" $ do
       prop "PoP" .
-        forAllShow (defaultProofOfPossessionGen @v genContext)
+        forAllShow (defaultPossessionProofGen @v genContext)
                    ppShow $
-                   prop_size_serialise rawSerialiseProofOfPossessionDSIGN (sizeProofOfPossessionDSIGN (Proxy @v))
+                   prop_size_serialise rawSerialisePossessionProofDSIGN (sizePossessionProofDSIGN (Proxy @v))
     describe "direct CBOR" $ do
       prop "PoP" .
-        forAllShow (defaultProofOfPossessionGen @v genContext)
+        forAllShow (defaultPossessionProofGen @v genContext)
                    ppShow $
-                   prop_cbor_with encodeProofOfPossessionDSIGN decodeProofOfPossessionDSIGN
+                   prop_cbor_with encodePossessionProofDSIGN decodePossessionProofDSIGN
     describe "To/FromCBOR class" $ do
-      prop "PoP" . forAllShow (defaultProofOfPossessionGen @v genContext) ppShow $ prop_cbor
+      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_cbor
     describe "ToCBOR size" $ do
-      prop "PoP" . forAllShow (defaultProofOfPossessionGen @v genContext) ppShow $ prop_cbor_size
+      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_cbor_size
     describe "direct matches class" $ do
       prop "PoP" .
-        forAllShow (defaultProofOfPossessionGen @v genContext) ppShow $
-        prop_cbor_direct_vs_class encodeProofOfPossessionDSIGN
+        forAllShow (defaultPossessionProofGen @v genContext) ppShow $
+        prop_cbor_direct_vs_class encodePossessionProofDSIGN
   describe "aggregate" $ do
     prop "aggregate verify positive" $
       forAllShow (genAggregateCase genContext genMsg) ppShow $
           \(ctx, msg, vksPops, sigs) ->
-            case aggregateSigDSIGN @v sigs of
+            case aggregateSigsDSIGN @v sigs of
               Left _  -> counterexample "aggregateSigDSIGN failed" False
               Right s -> verifyAggregateDSIGN @v ctx vksPops msg s === Right ()
     prop "aggregate verify negative (wrong message)" $
       forAllShow (genAggregateCase2Msgs genContext genMsg) ppShow $
         \(ctx, msg, msg', vksPops, sigs) ->
-          msg /= msg' ==> case aggregateSigDSIGN @v sigs of
+          msg /= msg' ==> case aggregateSigsDSIGN @v sigs of
             Left _  -> counterexample "aggregateSigDSIGN failed" False
             Right s -> verifyAggregateDSIGN @v ctx vksPops msg' s =/= Right ()
     prop "aggregate verify negative (wrong PoP)" $
@@ -805,17 +804,17 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
             case vksPops of
               (a:b:rest) ->
                 let vksPops' = (fst a, snd b) : (fst b, snd a) : rest
-                in case aggregateSigDSIGN @v sigs of
+                in case aggregateSigsDSIGN @v sigs of
                     Left _  -> counterexample "aggregateSigDSIGN failed" False
                     Right s -> verifyAggregateDSIGN @v ctx vksPops' msg s =/= Right ()
               _ ->
                 counterexample "genAggregateCaseAtLeast2 produced <2 entries (bug in generator)" False
     describe "NoThunks" $ do
-      prop "PoP" . forAllShow (defaultProofOfPossessionGen @v genContext) ppShow $ prop_no_thunks
-      prop "PoP rawSerialise" . forAllShow (defaultProofOfPossessionGen @v genContext) ppShow $ \pop ->
-        prop_no_thunks (rawSerialiseProofOfPossessionDSIGN pop)
-      prop "PoP rawDeserialise" . forAllShow (defaultProofOfPossessionGen @v genContext) ppShow $ \pop ->
-        prop_no_thunks (fromJust $! rawDeserialiseProofOfPossessionDSIGN @v . rawSerialiseProofOfPossessionDSIGN $ pop)
+      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_no_thunks
+      prop "PoP rawSerialise" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ \pop ->
+        prop_no_thunks (rawSerialisePossessionProofDSIGN pop)
+      prop "PoP rawDeserialise" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ \pop ->
+        prop_no_thunks (fromJust $! rawDeserialisePossessionProofDSIGN @v . rawSerialisePossessionProofDSIGN $ pop)
   where
     genAggregateCase genCtx genMsg' = do
       ctx <- genCtx
@@ -825,7 +824,7 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
       n   <- Gen.chooseInt (1, 8)
       sks <- replicateM n (defaultSignKeyGen @v)
       let vksPops = [ ( deriveVerKeyDSIGN sk
-                     , proveProofOfPossessionDSIGN ctx sk
+                     , createPossessionProofDSIGN ctx sk
                      )
                    | sk <- sks
                    ]
@@ -843,7 +842,7 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
       n   <- Gen.chooseInt (2, 8)
       sks <- replicateM n (defaultSignKeyGen @v)
       let vksPops = [ ( deriveVerKeyDSIGN sk
-                     , proveProofOfPossessionDSIGN ctx sk
+                     , createPossessionProofDSIGN ctx sk
                      )
                    | sk <- sks
                    ]
