@@ -6,7 +6,7 @@
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 
 module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Unsafe Types
@@ -25,7 +25,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   -- * Phantom Types
   Curve1,
   Curve2,
-  Dual,
+  DualCurve,
 
   -- * Error codes
   c_blst_success,
@@ -193,6 +193,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Unsafe as BSU
 import Data.Foldable (foldrM)
+import Data.Kind (Type)
 import Data.Proxy (Proxy (..))
 import Data.Void
 import Foreign (Storable (..), Word8, poke, sizeOf)
@@ -202,7 +203,7 @@ import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
-import GHC.TypeLits (KnownNat, natVal)
+import GHC.TypeLits (KnownNat, Nat, natVal)
 import System.IO.Unsafe (unsafePerformIO)
 
 ---- Phantom Types
@@ -211,9 +212,9 @@ data Curve1
 data Curve2
 
 -- | A type family mapping a curve to its dual curve (its an involution).
-type family Dual curve where
-  Dual Curve1 = Curve2
-  Dual Curve2 = Curve1
+type family DualCurve curve = dual | dual -> curve where
+  DualCurve Curve1 = Curve2
+  DualCurve Curve2 = Curve1
 
 ---- Unsafe PointPtr types
 
@@ -270,10 +271,25 @@ type family PointSize curve where
   PointSize Curve1 = CARDANO_BLST_P1_SIZE
   PointSize Curve2 = CARDANO_BLST_P2_SIZE
 
+-- NOTE: These sizes come from the Zcash-compatible serialization format
+-- used by blst for G1/G2 (blst_{p1,p2}_*). See `blst.h`:
+--
+--   void blst_p1_serialize(byte out[96], const blst_p1 *in);
+--   void blst_p1_compress(byte out[48], const blst_p1 *in);
+--   void blst_p2_serialize(byte out[192], const blst_p2 *in);
+--   void blst_p2_compress(byte out[96], const blst_p2 *in);
+--
+-- i.e. G1/G2 elements are 96/192 bytes uncompressed, 48/96 bytes compressed.
+
 -- | Type family to get the size of a compressed point on a given curve
-type family CompressedPointSize curve where
+type family CompressedPointSize (curve :: Type) :: Nat where
   CompressedPointSize Curve1 = 48
   CompressedPointSize Curve2 = 96
+
+-- | Type family to get the size of a serialized point on a given curve
+type family SerializedPointSize (curve :: Type) :: Nat where
+  SerializedPointSize Curve1 = 96
+  SerializedPointSize Curve2 = 192
 
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
@@ -415,7 +431,14 @@ sizePT = CARDANO_BLST_FP12_SIZE
 
 -- | BLS curve operations. Class methods are low-level; user code will want to
 -- use higher-level wrappers such as 'blsAddOrDouble', 'blsMult', 'blsCneg', 'blsNeg', etc.
-class (KnownNat (PointSize curve), KnownNat (AffineSize curve)) => BLS curve where
+class
+  ( KnownNat (PointSize curve)
+  , KnownNat (AffineSize curve)
+  , KnownNat (CompressedPointSize curve)
+  , KnownNat (SerializedPointSize curve)
+  ) =>
+  BLS curve
+  where
   c_blst_on_curve :: PointPtr curve -> IO Bool
 
   c_blst_add_or_double :: PointPtr curve -> PointPtr curve -> PointPtr curve -> IO ()
@@ -449,7 +472,11 @@ class (KnownNat (PointSize curve), KnownNat (AffineSize curve)) => BLS curve whe
   sizePoint_ _ = fromInteger (natVal (Proxy @(PointSize curve)))
 
   serializedSizePoint_ :: Proxy curve -> CSize
+  serializedSizePoint_ _ =
+    fromInteger (natVal (Proxy @(SerializedPointSize curve)))
   compressedSizePoint_ :: Proxy curve -> CSize
+  compressedSizePoint_ _ =
+    fromInteger (natVal (Proxy @(CompressedPointSize curve)))
 
   -- | Runtime affine point size. Delegates to the type-level 'AffineSize' so that
   --   compile-time and runtime sizes share a single source of truth.
@@ -457,10 +484,18 @@ class (KnownNat (PointSize curve), KnownNat (AffineSize curve)) => BLS curve whe
   sizeAffine_ _ = fromInteger (natVal (Proxy @(AffineSize curve)))
 
   c_blst_sk_to_pk :: PointPtr curve -> ScalarPtr -> IO ()
-  c_blst_sign :: Proxy curve -> PointPtr (Dual curve) -> PointPtr (Dual curve) -> ScalarPtr -> IO ()
+  c_blst_sign ::
+    PointPtr (DualCurve curve) -> PointPtr (DualCurve curve) -> ScalarPtr -> IO ()
+
+  -- | Core signature verification function.
+  -- This function is used with the following signature:
+  --
+  -- c_blst_core_verify @curve pk sig True msg msgLen dst dstLen aug augLen
+  --
+  -- where the `True` indicates we are using the `Hash to Curve` method.
   c_blst_core_verify ::
     AffinePtr curve ->
-    AffinePtr (Dual curve) ->
+    AffinePtr (DualCurve curve) ->
     Bool ->
     Ptr CChar ->
     CSize ->
@@ -498,18 +533,8 @@ instance BLS Curve1 where
   c_blst_p_is_inf = c_blst_p1_is_inf
   c_blst_core_verify = c_blst_core_verify_pk_in_g1
 
-  -- NOTE: These sizes come from the Zcash-compatible serialization format
-  -- used by blst for G1 (blst_p1_*). See `blst.h`:
-  --
-  --   void blst_p1_serialize(byte out[96], const blst_p1 *in);
-  --   void blst_p1_compress(byte out[48], const blst_p1 *in);
-  --
-  -- i.e. G1 elements are 96 bytes uncompressed, 48 bytes compressed.
-  compressedSizePoint_ _ = 48
-  serializedSizePoint_ _ = 96
-
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g1
-  c_blst_sign _ = c_blst_sign_pk_in_g1
+  c_blst_sign = c_blst_sign_pk_in_g1
 
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
@@ -538,18 +563,8 @@ instance BLS Curve2 where
   c_blst_p_is_equal = c_blst_p2_is_equal
   c_blst_p_is_inf = c_blst_p2_is_inf
 
-  -- NOTE: These sizes come from the Zcash-compatible serialization format
-  -- used by blst for G2 (blst_p2_*). See `blst.h`:
-  --
-  --   void blst_p2_serialize(byte out[192], const blst_p2 *in);
-  --   void blst_p2_compress(byte out[96], const blst_p2 *in);
-  --
-  -- i.e. G2 elements are 192 bytes uncompressed, 96 bytes compressed.
-  compressedSizePoint_ _ = 96
-  serializedSizePoint_ _ = 192
-
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
-  c_blst_sign _ = c_blst_sign_pk_in_g2
+  c_blst_sign = c_blst_sign_pk_in_g2
   c_blst_core_verify = c_blst_core_verify_pk_in_g2
 
 instance BLS curve => Eq (Affine curve) where
@@ -1043,7 +1058,7 @@ blsGenerator = unsafePointFromPointPtr c_blst_generator
 
 blsZero :: forall curve. BLS curve => Point curve
 blsZero =
-  -- Compressed serialised G1 points are bytestrings of length 48: see CIP-0381.
+  -- Compressed serialised G1/G2 points are bytestrings of length 48/96: see CIP-0381.
   let b = BS.pack (0xc0 : replicate (compressedSizePoint (Proxy @curve) - 1) 0x00)
    in case blsUncompress b of
         Left err ->
@@ -1201,10 +1216,10 @@ millerLoop p1 p2 =
         withNewPT' $ \ppt ->
           c_blst_miller_loop ppt ap2 ap1
 
--- A single side of e(·,·): the point on `curve` and the point on its `Dual`.
-type PairingSide curve = (Point curve, Point (Dual curve))
+-- A single side of e(·,·): the point on `curve` and the point on its `DualCurve`.
+type PairingSide curve = (Point curve, Point (DualCurve curve))
 
-class (BLS curve, BLS (Dual curve)) => FinalVerifyOrder curve where
+class (BLS curve, BLS (DualCurve curve)) => FinalVerifyOrder curve where
   millerSide :: PairingSide curve -> PT
   finalVerifyPairs :: PairingSide curve -> PairingSide curve -> Bool
   finalVerifyPairs lhs rhs = ptFinalVerify (millerSide lhs) (millerSide rhs)
