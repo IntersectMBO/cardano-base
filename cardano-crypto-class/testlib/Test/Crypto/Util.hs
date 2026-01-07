@@ -49,6 +49,7 @@ module Test.Crypto.Util (
 
   -- * BLS12381 signature context
   BLS12381SignContext (..),
+  blsSigContextGen,
 
   -- * Test generation and shrinker helpers
   BadInputFor,
@@ -225,23 +226,11 @@ data BLS12381SignContext = BLS12381SignContext
   }
   deriving (Eq, Show)
 
-instance Arbitrary BLS12381SignContext where
-  arbitrary = do
-    dst <- Gen.frequency [(1, return Nothing), (100, Just . BS.pack <$> arbitrary)]
-    aug <- Gen.frequency [(1, return Nothing), (100, Just . BS.pack <$> arbitrary)]
-    return $ BLS12381SignContext dst aug
-  shrink (BLS12381SignContext dst aug) =
-    [ BLS12381SignContext dst' aug
-    | dst' <- shrinkMaybeByteString dst
-    ]
-      ++ [ BLS12381SignContext dst aug'
-         | aug' <- shrinkMaybeByteString aug
-         ]
-    where
-      shrinkMaybeByteString :: Maybe ByteString -> [Maybe ByteString]
-      shrinkMaybeByteString Nothing = []
-      shrinkMaybeByteString (Just bs) =
-        Nothing : map (Just . BS.pack) (shrink (BS.unpack bs))
+blsSigContextGen :: Gen (Maybe ByteString, Maybe ByteString)
+blsSigContextGen = do
+  dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
+  aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
+  pure (dst, aug)
 
 --------------------------------------------------------------------------------
 -- Serialisation properties
