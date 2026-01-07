@@ -34,7 +34,7 @@ module Cardano.Crypto.DSIGN.BLS12381 (
   VerKeyDSIGN (..),
   SignKeyDSIGN (..),
   SigDSIGN (..),
-  ProofOfPossessionDSIGN (..),
+  PossessionProofDSIGN (..),
 ) where
 
 #include "blst_util.h"
@@ -66,15 +66,15 @@ import Cardano.Crypto.DSIGN.Class (
     signDSIGN,
     verifyDSIGN
   ),
-  decodeProofOfPossessionDSIGN,
+  decodePossessionProofDSIGN,
   decodeSigDSIGN,
   decodeSignKeyDSIGN,
   decodeVerKeyDSIGN,
-  encodeProofOfPossessionDSIGN,
+  encodePossessionProofDSIGN,
   encodeSigDSIGN,
   encodeSignKeyDSIGN,
   encodeVerKeyDSIGN,
-  encodedProofOfPossessionDSIGNSizeExpr,
+  encodedPossessionProofDSIGNSizeExpr,
   encodedSigDSIGNSizeExpr,
   encodedSignKeyDSIGNSizeExpr,
   encodedVerKeyDSIGNSizeExpr,
@@ -388,9 +388,9 @@ instance
   ( BLS (Dual curve)
   , KnownNat (PointSize (Dual curve))
   ) =>
-  Eq (ProofOfPossessionDSIGN (BLS12381DSIGN curve))
+  Eq (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
-  ProofOfPossessionBLS12381 mu1a mu2a == ProofOfPossessionBLS12381 mu1b mu2b =
+  PossessionProofBLS12381 mu1a mu2a == PossessionProofBLS12381 mu1b mu2b =
     let p1a = Point @(Dual curve) mu1a
         p1b = Point @(Dual curve) mu1b
         p2a = Point @(Dual curve) mu2a
@@ -406,11 +406,11 @@ instance
   type
     -- Sizes used in serialization/deserialization
     -- so these use the compressed sizes of the BLS12-381 `Point curve`
-    SizeProofOfPossessionDSIGN (BLS12381DSIGN curve) =
+    PossessionProofSizeDSIGN (BLS12381DSIGN curve) =
       CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve)
 
-  data ProofOfPossessionDSIGN (BLS12381DSIGN curve)
-    = ProofOfPossessionBLS12381
+  data PossessionProofDSIGN (BLS12381DSIGN curve)
+    = PossessionProofBLS12381
         !(PinnedSizedBytes (PointSize (Dual curve))) -- mu1
         !(PinnedSizedBytes (PointSize (Dual curve))) -- mu2
     deriving stock (Show, Generic)
@@ -435,7 +435,7 @@ instance
         let Point aggrPsb = aggrPoint
          in Right (VerKeyBLS12381 aggrPsb)
 
-  aggregateSigDSIGN sigs = do
+  aggregateSigsDSIGN sigs = do
     -- Sum the signatures as curve points
     let aggrPoint :: Point (Dual curve)
         aggrPoint =
@@ -450,8 +450,8 @@ instance
         let Point aggrPsb = aggrPoint
          in Right (SigBLS12381 aggrPsb)
 
-  {-# NOINLINE proveProofOfPossessionDSIGN #-}
-  proveProofOfPossessionDSIGN (dst, aug) (SignKeyBLS12381 skPsb) =
+  {-# NOINLINE createPossessionProofDSIGN #-}
+  createPossessionProofDSIGN (dst, aug) (SignKeyBLS12381 skPsb) =
     unsafeDupablePerformIO $ do
       skAsInteger <- scalarToInteger (Scalar skPsb)
       let VerKeyBLS12381 vkPsb =
@@ -462,18 +462,18 @@ instance
             blsMult (blsHash @(Dual curve) vk dst aug) skAsInteger
           Point mu2Psb =
             blsMult (blsGenerator @(Dual curve)) skAsInteger
-      return $ ProofOfPossessionBLS12381 mu1Psb mu2Psb
-  verifyProofOfPossessionDSIGN (dst, aug) (VerKeyBLS12381 vkPsb) (ProofOfPossessionBLS12381 mu1Psb mu2Psb) =
+      return $ PossessionProofBLS12381 mu1Psb mu2Psb
+  verifyPossessionProofDSIGN (dst, aug) (VerKeyBLS12381 vkPsb) (PossessionProofBLS12381 mu1Psb mu2Psb) =
     let vk = Point vkPsb
         check1 =
           finalVerifyPairs @curve (blsGenerator, Point mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
         check2 = finalVerifyPairs @curve (vk, blsGenerator) (blsGenerator, Point mu2Psb)
      in if check1 && check2
           then Right ()
-          else Left "ProofOfPossessionDSIGN BLS12381DSIGN failed to verify."
-  rawSerialiseProofOfPossessionDSIGN (ProofOfPossessionBLS12381 mu1Psb mu2Psb) =
+          else Left "PossessionProofDSIGN BLS12381DSIGN failed to verify."
+  rawSerialisePossessionProofDSIGN (PossessionProofBLS12381 mu1Psb mu2Psb) =
     blsCompress @(Dual curve) (Point mu1Psb) <> blsCompress @(Dual curve) (Point mu2Psb)
-  rawDeserialiseProofOfPossessionDSIGN bs =
+  rawDeserialisePossessionProofDSIGN bs =
     -- We use the compressed size of a point in Dual curve to split
     let chunkSize = compressedSizePoint (Proxy @(Dual curve))
      in case splitsAt [chunkSize] bs of
@@ -483,7 +483,7 @@ instance
                  , blsUncompress @(Dual curve) mu2Bs
                  ) of
               (Right (Point mu1Psb), Right (Point mu2Psb)) ->
-                Just $ ProofOfPossessionBLS12381 mu1Psb mu2Psb
+                Just $ PossessionProofBLS12381 mu1Psb mu2Psb
               _ ->
                 Nothing
           _ ->
@@ -493,15 +493,15 @@ instance
   ( BLS12381CurveConstraints curve
   , KnownNat (CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve))
   ) =>
-  ToCBOR (ProofOfPossessionDSIGN (BLS12381DSIGN curve))
+  ToCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
-  toCBOR = encodeProofOfPossessionDSIGN
-  encodedSizeExpr _ = encodedProofOfPossessionDSIGNSizeExpr
+  toCBOR = encodePossessionProofDSIGN
+  encodedSizeExpr _ = encodedPossessionProofDSIGNSizeExpr
 
 instance
   ( BLS12381CurveConstraints curve
   , KnownNat (CompressedPointSize (Dual curve) + CompressedPointSize (Dual curve))
   ) =>
-  FromCBOR (ProofOfPossessionDSIGN (BLS12381DSIGN curve))
+  FromCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
-  fromCBOR = decodeProofOfPossessionDSIGN
+  fromCBOR = decodePossessionProofDSIGN

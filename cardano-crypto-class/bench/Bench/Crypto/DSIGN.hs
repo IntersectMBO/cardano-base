@@ -126,7 +126,7 @@ benchAggDSIGN :: forall v a
     , NFData (SignKeyDSIGN v)
     , NFData (VerKeyDSIGN v)
     , NFData (SigDSIGN v)
-    , NFData (ProofOfPossessionDSIGN v)
+    , NFData (PossessionProofDSIGN v)
     )
   => Proxy v
   -> String
@@ -155,7 +155,7 @@ benchAggDSIGN _ lbl =
 
           , env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "aggregateSig" $
-                nf (aggregateSigDSIGN @v) (caseSigs c)
+                nf (aggregateSigsDSIGN @v) (caseSigs c)
 
           , env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "verifyAggregate (with PoPs)" $
@@ -173,7 +173,7 @@ benchAggDSIGN _ lbl =
 data AggCase v = AggCase
   { caseSKs    :: ![SignKeyDSIGN v]
   , caseVKs    :: ![VerKeyDSIGN v]
-  , caseVKPoPs :: ![(VerKeyDSIGN v, ProofOfPossessionDSIGN v)]
+  , caseVKPoPs :: ![(VerKeyDSIGN v, PossessionProofDSIGN v)]
   , caseSigs   :: ![SigDSIGN v]
   , caseAggSig :: !(SigDSIGN v)
   }
@@ -181,7 +181,7 @@ data AggCase v = AggCase
 instance
   ( NFData (SignKeyDSIGN v)
   , NFData (VerKeyDSIGN v)
-  , NFData (ProofOfPossessionDSIGN v)
+  , NFData (PossessionProofDSIGN v)
   , NFData (SigDSIGN v)
   ) => NFData (AggCase v) where
   rnf (AggCase sks vks vkp sigs ags) =
@@ -196,21 +196,21 @@ mkCase :: forall v a. (DSIGNAggregatable v, Signable v a)
 mkCase ctx msg n =
   let sks  = replicate n (genKeyDSIGN @v testSeed)
       vks  = map deriveVerKeyDSIGN sks
-      pops = map (proveProofOfPossessionDSIGN @v ctx) sks
+      pops = map (createPossessionProofDSIGN @v ctx) sks
       sigs = map (signDSIGN @v ctx msg) sks
       vkp  = zip vks pops
       ags  =
-        case aggregateSigDSIGN @v sigs of
+        case aggregateSigsDSIGN @v sigs of
           Left err -> error err
           Right s  -> s
   in AggCase sks vks vkp sigs ags
 
 proveAllPoPs :: forall v. DSIGNAggregatable v
-  => ContextDSIGN v -> [SignKeyDSIGN v] -> [ProofOfPossessionDSIGN v]
-proveAllPoPs ctx = map (proveProofOfPossessionDSIGN @v ctx)
+  => ContextDSIGN v -> [SignKeyDSIGN v] -> [PossessionProofDSIGN v]
+proveAllPoPs ctx = map (createPossessionProofDSIGN @v ctx)
 
 verifyAllPoPs :: forall v. DSIGNAggregatable v
   => ContextDSIGN v
-  -> [(VerKeyDSIGN v, ProofOfPossessionDSIGN v)]
+  -> [(VerKeyDSIGN v, PossessionProofDSIGN v)]
   -> Either String ()
-verifyAllPoPs ctx = F.foldl' (\acc (vk,pop) -> acc >> verifyProofOfPossessionDSIGN @v ctx vk pop) (Right ())
+verifyAllPoPs ctx = F.foldl' (\acc (vk,pop) -> acc >> verifyPossessionProofDSIGN @v ctx vk pop) (Right ())
