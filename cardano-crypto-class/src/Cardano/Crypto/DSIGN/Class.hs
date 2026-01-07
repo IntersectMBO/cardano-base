@@ -59,10 +59,10 @@ module Cardano.Crypto.DSIGN.Class (
 
   -- * Aggregatable DSIGN algorithms with Proof of Possession
   DSIGNAggregatable (..),
-  sizeProofOfPossessionDSIGN,
-  encodeProofOfPossessionDSIGN,
-  decodeProofOfPossessionDSIGN,
-  encodedProofOfPossessionDSIGNSizeExpr,
+  sizePossessionProofDSIGN,
+  encodePossessionProofDSIGN,
+  decodePossessionProofDSIGN,
+  encodedPossessionProofDSIGNSizeExpr,
 )
 where
 
@@ -482,15 +482,15 @@ decodeSignKeyDSIGNM = do
 -- the Pixel scheme.
 class
   ( DSIGNAlgorithm v
-  , Show (ProofOfPossessionDSIGN v)
-  , Eq (ProofOfPossessionDSIGN v)
-  , NoThunks (ProofOfPossessionDSIGN v)
-  , KnownNat (SizeProofOfPossessionDSIGN v)
+  , Show (PossessionProofDSIGN v)
+  , Eq (PossessionProofDSIGN v)
+  , NoThunks (PossessionProofDSIGN v)
+  , KnownNat (PossessionProofSizeDSIGN v)
   ) =>
   DSIGNAggregatable v
   where
-  type SizeProofOfPossessionDSIGN v :: Nat
-  data ProofOfPossessionDSIGN v :: Type
+  type PossessionProofSizeDSIGN v :: Nat
+  data PossessionProofDSIGN v :: Type
 
   -- | Aggregate multiple verification keys into a single verification key given
   -- their corresponding Proofs of Possession.
@@ -499,11 +499,11 @@ class
   aggregateVerKeysDSIGN ::
     HasCallStack =>
     ContextDSIGN v ->
-    [(VerKeyDSIGN v, ProofOfPossessionDSIGN v)] ->
+    [(VerKeyDSIGN v, PossessionProofDSIGN v)] ->
     Either String (VerKeyDSIGN v)
   aggregateVerKeysDSIGN ctx verKeysAndPoPs = do
     -- Verify every verKey and its PoP (fail-fast)
-    forM_ verKeysAndPoPs $ uncurry (verifyProofOfPossessionDSIGN ctx)
+    forM_ verKeysAndPoPs $ uncurry (verifyPossessionProofDSIGN ctx)
     aggregateVerKeysDSIGNWithoutPoPs (map fst verKeysAndPoPs)
 
   -- | Aggregate multiple verification keys into a single verification key
@@ -517,7 +517,7 @@ class
     Either String (VerKeyDSIGN v)
 
   -- | Aggregate multiple signatures into a single signature
-  aggregateSigDSIGN ::
+  aggregateSigsDSIGN ::
     HasCallStack =>
     [SigDSIGN v] ->
     Either String (SigDSIGN v)
@@ -529,13 +529,13 @@ class
   verifyAggregateDSIGN ::
     (Signable v a, HasCallStack) =>
     ContextDSIGN v ->
-    [(VerKeyDSIGN v, ProofOfPossessionDSIGN v)] ->
+    [(VerKeyDSIGN v, PossessionProofDSIGN v)] ->
     a ->
     SigDSIGN v ->
     Either String ()
   verifyAggregateDSIGN ctx verKeysAndPoPs msg sig = do
     -- Verify every verKey and its PoP (fail-fast)
-    forM_ verKeysAndPoPs $ uncurry (verifyProofOfPossessionDSIGN ctx)
+    forM_ verKeysAndPoPs $ uncurry (verifyPossessionProofDSIGN ctx)
     verifyAggregateDSIGNWithoutPoPs ctx (map fst verKeysAndPoPs) msg sig
 
   -- | Verify multiple verification keys without Proofs of Possessions against a
@@ -553,54 +553,54 @@ class
     aggrVer <- aggregateVerKeysDSIGNWithoutPoPs verKeys
     verifyDSIGN ctx aggrVer msg sig
 
-  -- | Produce a PoP from the signing key.
-  proveProofOfPossessionDSIGN ::
+  -- | Create a PoP from the signing key.
+  createPossessionProofDSIGN ::
     HasCallStack =>
     ContextDSIGN v ->
     SignKeyDSIGN v ->
-    ProofOfPossessionDSIGN v
+    PossessionProofDSIGN v
 
   -- | Verify that PoP matches the verification key.
-  verifyProofOfPossessionDSIGN ::
+  verifyPossessionProofDSIGN ::
     HasCallStack =>
     ContextDSIGN v ->
     VerKeyDSIGN v ->
-    ProofOfPossessionDSIGN v ->
+    PossessionProofDSIGN v ->
     Either String ()
 
   -- | Serialise a PoP into fixed-size raw bytes.
-  rawSerialiseProofOfPossessionDSIGN :: ProofOfPossessionDSIGN v -> ByteString
+  rawSerialisePossessionProofDSIGN :: PossessionProofDSIGN v -> ByteString
 
   -- | Deserialise a PoP from fixed-size raw bytes.
-  rawDeserialiseProofOfPossessionDSIGN :: ByteString -> Maybe (ProofOfPossessionDSIGN v)
+  rawDeserialisePossessionProofDSIGN :: ByteString -> Maybe (PossessionProofDSIGN v)
 
-sizeProofOfPossessionDSIGN :: forall v proxy. DSIGNAggregatable v => proxy v -> Word
-sizeProofOfPossessionDSIGN _ = fromInteger (natVal (Proxy @(SizeProofOfPossessionDSIGN v)))
+sizePossessionProofDSIGN :: forall v proxy. DSIGNAggregatable v => proxy v -> Word
+sizePossessionProofDSIGN _ = fromInteger (natVal (Proxy @(PossessionProofSizeDSIGN v)))
 
 -- | Encode a PoP into CBOR.
-encodeProofOfPossessionDSIGN :: DSIGNAggregatable v => ProofOfPossessionDSIGN v -> Encoding
-encodeProofOfPossessionDSIGN = encodeBytes . rawSerialiseProofOfPossessionDSIGN
+encodePossessionProofDSIGN :: DSIGNAggregatable v => PossessionProofDSIGN v -> Encoding
+encodePossessionProofDSIGN = encodeBytes . rawSerialisePossessionProofDSIGN
 
 -- | Decode a PoP from CBOR.
-decodeProofOfPossessionDSIGN ::
-  forall v s. DSIGNAggregatable v => Decoder s (ProofOfPossessionDSIGN v)
-decodeProofOfPossessionDSIGN = do
+decodePossessionProofDSIGN ::
+  forall v s. DSIGNAggregatable v => Decoder s (PossessionProofDSIGN v)
+decodePossessionProofDSIGN = do
   bs <- decodeBytes
-  case rawDeserialiseProofOfPossessionDSIGN bs of
+  case rawDeserialisePossessionProofDSIGN bs of
     Just pop -> return pop
     Nothing ->
       failSizeCheck
-        "decodeProofOfPossession"
+        "decodePossessionProof"
         "proof of possession"
         bs
-        (sizeProofOfPossessionDSIGN (Proxy :: Proxy v))
+        (sizePossessionProofDSIGN (Proxy :: Proxy v))
 
--- | 'Size' expression for 'ProofOfPossessionDSIGN' which is using 'sizeProofOfPossessionDSIGN'
+-- | 'Size' expression for 'PossessionProofDSIGN' which is using 'sizePossessionProofDSIGN'
 -- encoded as 'Size'.
-encodedProofOfPossessionDSIGNSizeExpr ::
-  forall v. DSIGNAggregatable v => Proxy (ProofOfPossessionDSIGN v) -> Size
-encodedProofOfPossessionDSIGNSizeExpr _proxy =
+encodedPossessionProofDSIGNSizeExpr ::
+  forall v. DSIGNAggregatable v => Proxy (PossessionProofDSIGN v) -> Size
+encodedPossessionProofDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeProofOfPossessionDSIGN (Proxy :: Proxy v)))
+  fromIntegral ((withWordSize :: Word -> Integer) (sizePossessionProofDSIGN (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeProofOfPossessionDSIGN (Proxy :: Proxy v))
+    + fromIntegral (sizePossessionProofDSIGN (Proxy :: Proxy v))
