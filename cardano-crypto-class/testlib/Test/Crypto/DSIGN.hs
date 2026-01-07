@@ -125,7 +125,7 @@ import Test.Crypto.Util (
   directSerialiseToBS,
   directDeserialiseFromBS,
   hexBS,
-  BLS12381SignContext (..),
+  blsSigContextGen,
   )
 import Cardano.Crypto.Libsodium.MLockedSeed
 
@@ -160,7 +160,7 @@ ed448SigGen = defaultSigGen
 blsSigGen :: forall curve. BLS12381CurveConstraints curve => Gen (SigDSIGN (BLS12381DSIGN curve))
 blsSigGen = do
   msg :: Message <- arbitrary
-  BLS12381SignContext dst aug :: BLS12381SignContext <- arbitrary
+  (dst, aug) <- blsSigContextGen
   signDSIGN (dst,aug) msg <$> defaultSignKeyGen @(BLS12381DSIGN curve)
 
 #ifdef SECP256K1_ENABLED
@@ -205,11 +205,6 @@ defaultPossessionProofGen genContext = do
   sk  <- defaultSignKeyGen @v
   pure $ createPossessionProofDSIGN ctx sk
 
-blsContextGen :: Gen (ContextDSIGN (BLS12381DSIGN curve))
-blsContextGen = do
-  BLS12381SignContext dst aug <- arbitrary
-  pure (dst, aug)
-
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
 testEnough :: Spec -> Spec
@@ -228,8 +223,8 @@ tests lock =
        testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
        testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
        testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
-       testDSIGNAlgorithmWithContext (blsContextGen @Curve1) (blsSigGen @Curve1) (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
-       testDSIGNAlgorithmWithContext (blsContextGen @Curve2) (blsSigGen @Curve2) (arbitrary @Message) "BLS12381MinSigDSIGN"
+       testDSIGNAlgorithmWithContext blsSigContextGen (blsSigGen @Curve1) (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+       testDSIGNAlgorithmWithContext blsSigContextGen (blsSigGen @Curve2) (arbitrary @Message) "BLS12381MinSigDSIGN"
 #ifdef SECP256K1_ENABLED
        testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
        testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
@@ -243,8 +238,8 @@ tests lock =
      describe "MLocked" $ do
       testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
      describe "Aggregatable" $ do
-      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) (blsContextGen @Curve1) (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
-      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) (blsContextGen @Curve2) (arbitrary @Message) "BLS12381MinSigDSIGN"
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) blsSigContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) blsSigContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
 
 testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,
@@ -794,8 +789,8 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
               Right s -> verifyAggregateDSIGN @v ctx vksPops msg s === Right ()
     prop "aggregate verify negative (wrong message)" $
       forAllShow (genAggregateCase2Msgs genContext genMsg) ppShow $
-        \(ctx, msg, msg', vksPops, sigs) ->
-          msg /= msg' ==> case aggregateSigsDSIGN @v sigs of
+        \(ctx, msg', vksPops, sigs) ->
+          case aggregateSigsDSIGN @v sigs of
             Left _  -> counterexample "aggregateSigDSIGN failed" False
             Right s -> verifyAggregateDSIGN @v ctx vksPops msg' s =/= Right ()
     prop "aggregate verify negative (wrong PoP)" $
@@ -833,7 +828,7 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
     genAggregateCase2Msgs genCtx genMsg' = do
       (ctx, msg, vksPops, sigs) <- genAggregateCase genCtx genMsg'
       msg' <- Gen.suchThat genMsg' (/= msg)
-      pure (ctx, msg, msg', vksPops, sigs)
+      pure (ctx, msg', vksPops, sigs)
     genAggregateCaseAtLeast2 genCtx genMsg' = do
       ctx <- genCtx
       msg <- genMsg'
