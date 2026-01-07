@@ -324,19 +324,19 @@ newtype PT = PT (PinnedSizedBytes CARDANO_BLST_FP12_SIZE)
 -- | Sizes of various representations of elliptic curve points.
 -- | Size of a curve point in memory
 sizePoint :: forall curve. BLS curve => Proxy curve -> Int
-sizePoint = fromIntegral . sizePoint_
+sizePoint = fromIntegral @CSize @Int . sizePoint_
 
 -- | Size of a curved point when serialized in compressed form
 compressedSizePoint :: forall curve. BLS curve => Proxy curve -> Int
-compressedSizePoint = fromIntegral . compressedSizePoint_
+compressedSizePoint = fromIntegral @CSize @Int . compressedSizePoint_
 
 -- | Size of a curved point when serialized in uncompressed form
 serializedSizePoint :: forall curve. BLS curve => Proxy curve -> Int
-serializedSizePoint = fromIntegral . serializedSizePoint_
+serializedSizePoint = fromIntegral @CSize @Int . serializedSizePoint_
 
 -- | In-memory size of the affine representation of a curve point
 sizeAffine :: forall curve. BLS curve => Proxy curve -> Int
-sizeAffine = fromIntegral . sizeAffine_
+sizeAffine = fromIntegral @CSize @Int . sizeAffine_
 
 withPoint :: forall a curve. Point curve -> (PointPtr curve -> IO a) -> IO a
 withPoint (Point psb) go =
@@ -671,7 +671,7 @@ cstrToInteger p l = do
       | otherwise = do
           val <- peek ptr
           res <- go (pred n) (plusPtr ptr 1)
-          return $ res .|. shiftL (fromIntegral val) (8 * pred n)
+          return $ res .|. shiftL (fromIntegral @CUChar @Integer val) (8 * pred n)
 
 integerToBS :: Integer -> ByteString
 integerToBS k
@@ -679,7 +679,7 @@ integerToBS k
   | otherwise = go 0 [] k
   where
     go !i !acc 0 = BSI.unsafePackLenBytes i acc
-    go !i !acc n = go (i + 1) (fromIntegral n : acc) (n `shiftR` 8)
+    go !i !acc n = go (i + 1) (fromIntegral @Integer @Word8 n : acc) (n `shiftR` 8)
 
 padBS :: Int -> ByteString -> ByteString
 padBS i b
@@ -941,7 +941,7 @@ blsMult in1 inS = unsafePerformIO $ do
       withIntScalar inS $ \inSp -> do
         -- Multiply by 8, because blst_mult takes number of *bits*, but
         -- sizeScalar is in *bytes*
-        c_blst_mult outp in1p inSp (fromIntegral sizeScalar * 8)
+        c_blst_mult outp in1p inSp (fromIntegral @Int @CSize sizeScalar * 8)
 
 -- | Conditional curve point negation.
 -- @blsCneg x cond = if cond then neg x else x@
@@ -1026,11 +1026,11 @@ blsHash msg mDST mAug = unsafePerformIO $
           c_blst_hash
             pPtr
             msgPtr
-            (fromIntegral msgLen)
+            (fromIntegral @Int @CSize msgLen)
             dstPtr
-            (fromIntegral dstLen)
+            (fromIntegral @Int @CSize dstLen)
             augPtr
-            (fromIntegral augLen)
+            (fromIntegral @Int @CSize augLen)
 
 toAffine :: BLS curve => Point curve -> Affine curve
 toAffine p = unsafePerformIO $
@@ -1092,7 +1092,7 @@ scalarFromBS bs = unsafePerformIO $ do
     if l == sizeScalar
       then do
         (success, scalar) <- withNewScalar $ \scalarPtr ->
-          c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral l)
+          c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral @Int @CSize l)
         if success
           then
             return $ Right scalar
@@ -1167,7 +1167,7 @@ blsMSM ssAndps = unsafePerformIO $ do
         withPointArray points $ \numPoints pointArrayPtr -> do
           withScalarArray scalars $ \_ scalarArrayPtr -> do
             let numPoints' :: CSize
-                numPoints' = fromIntegral numPoints
+                numPoints' = fromIntegral @Int @CSize numPoints
                 scratchSize :: Int
                 scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
             allocaBytes (numPoints * sizeAffine (Proxy @curve)) $ \affinesBlockPtr -> do
