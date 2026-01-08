@@ -28,6 +28,7 @@ import Test.QuickCheck (
   forAllShow,
   ioProperty,
   counterexample,
+  withMaxSuccess,
   )
 import Test.Hspec (Spec, describe)
 import Test.Hspec.QuickCheck (prop, modifyMaxSuccess)
@@ -38,7 +39,6 @@ import Cardano.Crypto.Libsodium
 import Text.Show.Pretty (ppShow)
 
 #ifdef SECP256K1_ENABLED
-import Control.Monad (replicateM)
 import qualified GHC.Exts as GHC
 #endif
 
@@ -48,6 +48,7 @@ import Data.Proxy (Proxy (..))
 import Data.Maybe (fromJust)
 
 import Control.Exception (evaluate, bracket)
+import Control.Monad (replicateM)
 
 import Cardano.Crypto.DSIGN (
   MockDSIGN,
@@ -67,6 +68,7 @@ import Cardano.Crypto.DSIGN (
     rawSerialiseSigDSIGN,
     rawDeserialiseSigDSIGN
     ),
+  aggregateVerKeysDSIGN,
   sizeVerKeyDSIGN,
   sizeSignKeyDSIGN,
   sizeSigDSIGN,
@@ -91,17 +93,24 @@ import Cardano.Crypto.DSIGN (
   genKeyDSIGNM,
 
   getSeedDSIGNM,
-  forgetSignKeyDSIGNM
+  forgetSignKeyDSIGNM,
+  BLS12381CurveConstraints,
+  BLS12381DSIGN,
+
+  DSIGNAggregatable (..),
+  BLS12381SignContext (..),
+  sizePossessionProofDSIGN,
+  encodePossessionProofDSIGN,
+  decodePossessionProofDSIGN
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
+import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
 import Test.Crypto.Util (
-#if SECP256K1_ENABLED
   BadInputFor,
   genBadInputFor,
   shrinkBadInputFor,
-#endif
   Message,
   prop_raw_serialise,
   prop_raw_deserialise,
@@ -150,6 +159,18 @@ ed25519SigGen = defaultSigGen
 ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
 ed448SigGen = defaultSigGen
 
+blsSigGen :: forall curve. BLS12381CurveConstraints curve => Gen (SigDSIGN (BLS12381DSIGN curve))
+blsSigGen = do
+  msg :: Message <- arbitrary
+  ctx <- blsSigContextGen
+  signDSIGN ctx msg <$> defaultSignKeyGen @(BLS12381DSIGN curve)
+
+blsSigContextGen :: Gen BLS12381SignContext
+blsSigContextGen = do
+  dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
+  aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
+  pure BLS12381SignContext {blsSignContextAug = aug, blsSignContextDst = dst}
+
 #ifdef SECP256K1_ENABLED
 ecdsaSigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
 ecdsaSigGen = do
@@ -181,6 +202,17 @@ defaultSigGen = do
   msg :: Message <- arbitrary
   signDSIGN () msg <$> defaultSignKeyGen
 
+defaultPossessionProofGen
+  :: forall v.
+     ( DSIGNAggregatable v
+     )
+  => Gen (ContextDSIGN v)
+  -> Gen (PossessionProofDSIGN v)
+defaultPossessionProofGen genContext = do
+  ctx <- genContext
+  sk  <- defaultSignKeyGen @v
+  pure $ createPossessionProofDSIGN ctx sk
+
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
 testEnough :: Spec -> Spec
@@ -199,6 +231,8 @@ tests lock =
        testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
        testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
        testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
+       testDSIGNAlgorithmWithContext blsSigContextGen (blsSigGen @Curve1) (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+       testDSIGNAlgorithmWithContext blsSigContextGen (blsSigGen @Curve2) (arbitrary @Message) "BLS12381MinSigDSIGN"
 #ifdef SECP256K1_ENABLED
        testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
        testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
@@ -211,12 +245,15 @@ tests lock =
 #endif
      describe "MLocked" $ do
       testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
+     describe "Aggregatable" $ do
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) blsSigContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) blsSigContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
 
-testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
+testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,
    Signable v a,
-   ContextDSIGN v ~ (),
    Show a,
+   Show (ContextDSIGN v),
    Eq (SignKeyDSIGN v),
    Eq a,
    ToCBOR (VerKeyDSIGN v),
@@ -225,11 +262,12 @@ testDSIGNAlgorithm :: forall (v :: Type) (a :: Type).
    FromCBOR (SignKeyDSIGN v),
    ToCBOR (SigDSIGN v),
    FromCBOR (SigDSIGN v)) =>
+  Gen (ContextDSIGN v) ->
   Gen (SigDSIGN v) ->
   Gen a ->
   String ->
   Spec
-testDSIGNAlgorithm genSig genMsg name = testEnough . describe name $ do
+testDSIGNAlgorithmWithContext genContext genSig genMsg name = testEnough . describe name $ do
   describe "serialization" $ do
     describe "raw" $ do
       prop "VerKey serialization" .
@@ -296,7 +334,7 @@ testDSIGNAlgorithm genSig genMsg name = testEnough . describe name $ do
         prop_cbor_direct_vs_class encodeSigDSIGN
     describe "verify" $ do
       prop "signing and verifying with matching keys" .
-        forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @v) ppShow $
+        forAllShow ((,,) <$> genContext <*> genMsg <*> defaultSignKeyGen @v) ppShow $
         prop_dsign_verify
       prop "verifying with wrong key" .
         forAllShow genWrongKey ppShow $
@@ -313,18 +351,40 @@ testDSIGNAlgorithm genSig genMsg name = testEnough . describe name $ do
       prop "VerKey rawDeserialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
         prop_no_thunks (fromJust $! rawDeserialiseVerKeyDSIGN @v . rawSerialiseVerKeyDSIGN $ vk)
   where
-    genWrongKey :: Gen (a, SignKeyDSIGN v, SignKeyDSIGN v)
+    genWrongKey :: Gen (ContextDSIGN v, a, SignKeyDSIGN v, SignKeyDSIGN v)
     genWrongKey = do
+      ctx <- genContext
       sk1 <- defaultSignKeyGen
       sk2 <- Gen.suchThat defaultSignKeyGen (/= sk1)
       msg <- genMsg
-      pure (msg, sk1, sk2)
-    genWrongMsg :: Gen (a, a, SignKeyDSIGN v)
+      pure (ctx, msg, sk1, sk2)
+    genWrongMsg :: Gen (ContextDSIGN v, a, a, SignKeyDSIGN v)
     genWrongMsg = do
+      ctx <- genContext
       msg1 <- genMsg
       msg2 <- Gen.suchThat genMsg (/= msg1)
       sk <- defaultSignKeyGen
-      pure (msg1, msg2, sk)
+      pure (ctx, msg1, msg2, sk)
+
+testDSIGNAlgorithm :: forall v a.
+  ( DSIGNAlgorithm v
+  , Signable v a
+  , ContextDSIGN v ~ ()
+  , Show a
+  , Eq (SignKeyDSIGN v)
+  , Eq a
+  , ToCBOR (VerKeyDSIGN v)
+  , FromCBOR (VerKeyDSIGN v)
+  , ToCBOR (SignKeyDSIGN v)
+  , FromCBOR (SignKeyDSIGN v)
+  , ToCBOR (SigDSIGN v)
+  , FromCBOR (SigDSIGN v)
+  ) =>
+  Gen (SigDSIGN v) ->
+  Gen a ->
+  String ->
+  Spec
+testDSIGNAlgorithm = testDSIGNAlgorithmWithContext (pure ())
 
 testDSIGNMAlgorithm
   :: forall v. ( -- change back to DSIGNMAlgorithm when unsound API is phased out
@@ -443,8 +503,7 @@ testDSIGNMAlgorithm lock _ n =
               equals <- sk ==! sk'
               forgetSignKeyDSIGNM sk'
               return $
-                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") $
-                equals
+                counterexample ("Serialized: " ++ hexBS serialized ++ " (length: " ++ show (BS.length serialized) ++ ")") equals
        describe "DirectSerialise matches raw" $ do
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
@@ -571,30 +630,28 @@ prop_dsignm_seed_roundtrip p seedPSB = ioProperty . withMLockedSeedFromPSB seedP
 prop_dsign_verify
   :: forall (v :: Type) (a :: Type) .
      ( DSIGNAlgorithm v
-     , ContextDSIGN v ~ ()
      , Signable v a
      )
-  => (a, SignKeyDSIGN v)
+  => (ContextDSIGN v,a, SignKeyDSIGN v)
   -> Property
-prop_dsign_verify (msg, sk) =
-  let signed = signDSIGN () msg sk
+prop_dsign_verify (ctx, msg, sk) =
+  let signed = signDSIGN ctx msg sk
       vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN () vk msg signed === Right ()
+    in verifyDSIGN ctx vk msg signed === Right ()
 
 -- If we sign a message with one key, and try to verify with another, then
 -- verification fails.
 prop_dsign_verify_wrong_key
   :: forall (v :: Type) (a :: Type) .
      ( DSIGNAlgorithm v
-     , ContextDSIGN v ~ ()
      , Signable v a
      )
-  => (a, SignKeyDSIGN v, SignKeyDSIGN v)
+  => (ContextDSIGN v, a, SignKeyDSIGN v, SignKeyDSIGN v)
   -> Property
-prop_dsign_verify_wrong_key (msg, sk, sk') =
-  let signed = signDSIGN () msg sk
+prop_dsign_verify_wrong_key (ctx, msg, sk, sk') =
+  let signed = signDSIGN ctx msg sk
       vk' = deriveVerKeyDSIGN sk'
-    in verifyDSIGN () vk' msg signed =/= Right ()
+    in verifyDSIGN ctx vk' msg signed =/= Right ()
 
 prop_dsignm_verify_pos
   :: forall v. (DSIGNMAlgorithm v, ContextDSIGN v ~ (), Signable v Message)
@@ -632,13 +689,13 @@ prop_dsignm_verify_neg_key lock _ msg seedPSB seedPSB' =
 -- message, then verification fails.
 prop_dsign_verify_wrong_msg
   :: forall (v :: Type) (a :: Type) .
-  (DSIGNAlgorithm v, Signable v a, ContextDSIGN v ~ ())
-  => (a, a, SignKeyDSIGN v)
+  (DSIGNAlgorithm v, Signable v a)
+  => (ContextDSIGN v ,a, a, SignKeyDSIGN v)
   -> Property
-prop_dsign_verify_wrong_msg (msg, msg', sk) =
-  let signed = signDSIGN () msg sk
+prop_dsign_verify_wrong_msg (ctx, msg, msg', sk) =
+  let signed = signDSIGN ctx msg sk
       vk = deriveVerKeyDSIGN sk
-    in verifyDSIGN () vk msg' signed =/= Right ()
+    in verifyDSIGN ctx vk msg' signed =/= Right ()
 
 #ifdef SECP256K1_ENABLED
 instance Arbitrary (BadInputFor MessageHash) where
@@ -657,11 +714,14 @@ testEcdsaWithHashAlgorithm ::
   Proxy h -> String -> Spec
 testEcdsaWithHashAlgorithm _ name = testEnough . describe name $ do
   prop "Ecdsa sign and verify" .
-    forAllShow ((,) <$> genMsg <*> defaultSignKeyGen @EcdsaSecp256k1DSIGN) ppShow $
+    forAllShow ((,,) <$> genContext <*> genMsg <*> defaultSignKeyGen @EcdsaSecp256k1DSIGN) ppShow $
       prop_dsign_verify
   where
     genMsg :: Gen MessageHash
     genMsg = hashAndPack (Proxy @h) . messageBytes <$> arbitrary
+    genContext :: Gen (ContextDSIGN EcdsaSecp256k1DSIGN)
+    genContext = pure ()
+
 #endif
 
 prop_dsignm_verify_neg_msg
@@ -680,3 +740,114 @@ prop_dsignm_verify_neg_msg lock _ a a' =
       a /= a' ==> verifyDSIGN () vk a' sig =/= Right ()
 
 -- TODO: verify that DSIGN and DSIGNM implementations match (see #363)
+
+-- Tests and instances for DSIGNAggregatable v
+
+instance DSIGNAggregatable v => Arbitrary (BadInputFor (PossessionProofDSIGN v)) where
+  arbitrary =
+    genBadInputFor (fromIntegral $ sizePossessionProofDSIGN (Proxy @v))
+  shrink = shrinkBadInputFor
+
+testDSIGNAggregatableWithContext
+  :: forall (v :: Type).
+     ( DSIGNAggregatable v
+     , Signable v Message
+     , Show (ContextDSIGN v)
+     , ToCBOR (PossessionProofDSIGN v)
+     , FromCBOR (PossessionProofDSIGN v)
+     )
+  => Proxy v
+  -> Gen (ContextDSIGN v)
+  -> Gen Message
+  -> String
+  -> Spec
+testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describe name $ do
+  describe "serialization" $ do
+    describe "raw" $ do
+      prop "PoP serialization" .
+        forAllShow (defaultPossessionProofGen @v genContext)
+                   ppShow $
+                   prop_raw_serialise rawSerialisePossessionProofDSIGN rawDeserialisePossessionProofDSIGN
+      prop "PoP deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialisePossessionProofDSIGN @v)
+      prop "PoP fail fromCBOR" $ prop_bad_cbor_bytes @(PossessionProofDSIGN v)
+    describe "size" $ do
+      prop "PoP" .
+        forAllShow (defaultPossessionProofGen @v genContext)
+                   ppShow $
+                   prop_size_serialise rawSerialisePossessionProofDSIGN (sizePossessionProofDSIGN (Proxy @v))
+    describe "direct CBOR" $ do
+      prop "PoP" .
+        forAllShow (defaultPossessionProofGen @v genContext)
+                   ppShow $
+                   prop_cbor_with encodePossessionProofDSIGN decodePossessionProofDSIGN
+    describe "To/FromCBOR class" $ do
+      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_cbor
+    describe "ToCBOR size" $ do
+      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_cbor_size
+    describe "direct matches class" $ do
+      prop "PoP" .
+        forAllShow (defaultPossessionProofGen @v genContext) ppShow $
+        prop_cbor_direct_vs_class encodePossessionProofDSIGN
+  describe "aggregate" $ do
+    prop "aggregate verify positive" $
+      withMaxSuccess 1000 .
+      forAllShow (genAggregateCase genContext genMsg) ppShow $
+          \(ctx, msg, vksPops, sigs) -> (=== Right ()) $ do
+            sig <- aggregateSigsDSIGN @v sigs
+            aggVk <- aggregateVerKeysDSIGN ctx vksPops
+            verifyDSIGN @v ctx aggVk msg sig
+    prop "aggregate verify negative (wrong message)" $
+      withMaxSuccess 1000 .
+      forAllShow (genAggregateCase genContext genMsg) ppShow $ \(ctx, msg, vksPops, sigs) ->
+          forAllShow arbitrary ppShow $ \msg' ->
+            msg /= msg' ==> (=/= Right ()) $ do
+                sig <- aggregateSigsDSIGN @v sigs
+                aggVk <- aggregateVerKeysDSIGN ctx vksPops
+                verifyDSIGN @v ctx aggVk msg' sig
+    prop "aggregate verify negative (wrong PoP)" $
+        forAllShow (genAggregateCaseAtLeast2 genContext genMsg) ppShow $
+          \(ctx, msg, vksPops, sigs) ->
+            case vksPops of
+              (a:b:rest) -> (=/= Right ()) $ do
+                let vksPops' = (fst a, snd b) : (fst b, snd a) : rest
+                sig <- aggregateSigsDSIGN @v sigs
+                aggVk <- aggregateVerKeysDSIGN ctx vksPops'
+                verifyDSIGN @v ctx aggVk msg sig
+              _ ->
+                counterexample "genAggregateCaseAtLeast2 produced <2 entries (bug in generator)" False
+    describe "NoThunks" $ do
+      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_no_thunks
+      prop "PoP rawSerialise" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ \pop ->
+        prop_no_thunks (rawSerialisePossessionProofDSIGN pop)
+      prop "PoP rawDeserialise" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ \pop ->
+        prop_no_thunks (fromJust $! rawDeserialisePossessionProofDSIGN @v . rawSerialisePossessionProofDSIGN $ pop)
+  where
+    genAggregateCase genCtx genMsg' = do
+      ctx <- genCtx
+      msg <- genMsg'
+      -- These crypto operations can be expensive, so limit the number of
+      -- signatures to a reasonable number for testing.
+      n   <- Gen.chooseInt (1, 8)
+      sks <- replicateM n (defaultSignKeyGen @v)
+      let vksPops = [ ( deriveVerKeyDSIGN sk
+                     , createPossessionProofDSIGN ctx sk
+                     )
+                   | sk <- sks
+                   ]
+          sigs = [ signDSIGN ctx msg sk | sk <- sks ]
+      pure (ctx, msg, vksPops, sigs)
+
+    genAggregateCaseAtLeast2 genCtx genMsg' = do
+      ctx <- genCtx
+      msg <- genMsg'
+      -- These crypto operations can be expensive, so limit the number of
+      -- signatures to a reasonable number for testing.
+      n   <- Gen.chooseInt (2, 8)
+      sks <- replicateM n (defaultSignKeyGen @v)
+      let vksPops = [ ( deriveVerKeyDSIGN sk
+                     , createPossessionProofDSIGN ctx sk
+                     )
+                   | sk <- sks
+                   ]
+          sigs = [ signDSIGN ctx msg sk | sk <- sks ]
+      pure (ctx, msg, vksPops, sigs)
