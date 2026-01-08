@@ -151,21 +151,11 @@ benchAggDSIGN _ lbl =
 
           , env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "aggregateVerKeys (no PoPs)" $
-                nf (aggregateVerKeysDSIGNWithoutPoPs @v) (caseVKs c)
+                nf (uncheckedAggregateVerKeysDSIGN @v) (caseVKs c)
 
           , env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "aggregateSig" $
                 nf (aggregateSigsDSIGN @v) (caseSigs c)
-
-          , env (pure (mkCase @v ctx msg n)) $ \c ->
-              bench "verifyAggregate (with PoPs)" $
-                nf (\(vksPops, sig) -> verifyAggregateDSIGN @v ctx vksPops msg sig)
-                    (caseVKPoPs c, caseAggSig c)
-
-          , env (pure (mkCase @v ctx msg n)) $ \c ->
-              bench "verifyAggregate (no PoPs)" $
-                nf (\(vks, sig) -> verifyAggregateDSIGNWithoutPoPs @v ctx vks msg sig)
-                   (caseVKs c, caseAggSig c)
           ]
       | n <- ns
       ]
@@ -175,7 +165,6 @@ data AggCase v = AggCase
   , caseVKs    :: ![VerKeyDSIGN v]
   , caseVKPoPs :: ![(VerKeyDSIGN v, PossessionProofDSIGN v)]
   , caseSigs   :: ![SigDSIGN v]
-  , caseAggSig :: !(SigDSIGN v)
   }
 
 instance
@@ -184,12 +173,11 @@ instance
   , NFData (PossessionProofDSIGN v)
   , NFData (SigDSIGN v)
   ) => NFData (AggCase v) where
-  rnf (AggCase sks vks vkp sigs ags) =
+  rnf (AggCase sks vks vkp sigs) =
     rnf sks `seq`
     rnf vks `seq`
     rnf vkp `seq`
-    rnf sigs `seq`
-    rnf ags
+    rnf sigs
 
 mkCase :: forall v a. (DSIGNAggregatable v, Signable v a)
   => ContextDSIGN v -> a -> Int -> AggCase v
@@ -199,11 +187,7 @@ mkCase ctx msg n =
       pops = map (createPossessionProofDSIGN @v ctx) sks
       sigs = map (signDSIGN @v ctx msg) sks
       vkp  = zip vks pops
-      ags  =
-        case aggregateSigsDSIGN @v sigs of
-          Left err -> error err
-          Right s  -> s
-  in AggCase sks vks vkp sigs ags
+  in AggCase sks vks vkp sigs
 
 proveAllPoPs :: forall v. DSIGNAggregatable v
   => ContextDSIGN v -> [SignKeyDSIGN v] -> [PossessionProofDSIGN v]
