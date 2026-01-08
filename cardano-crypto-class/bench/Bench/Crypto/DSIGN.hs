@@ -29,7 +29,7 @@ import Cardano.Crypto.Hash.Blake2b
 import Criterion
 
 import Bench.Crypto.BenchData
-import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381MinVerKeyDSIGN, BLS12381DSIGN)
+import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381MinVerKeyDSIGN, BLS12381DSIGN, BLS12381SignContext (..))
 
 benchmarks :: Benchmark
 benchmarks = bgroup "DSIGN"
@@ -116,7 +116,7 @@ instance ExampleContext SchnorrSecp256k1DSIGN where
 
 -- | This example context sets both the dst and augmentation to Nothing.
 instance ExampleContext (BLS12381DSIGN curve) where
-  exampleContext _ = (Nothing, Nothing)
+  exampleContext _ = BLS12381SignContext Nothing Nothing
 
 benchAggDSIGN :: forall v a
   . ( DSIGNAggregatable v

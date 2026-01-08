@@ -47,10 +47,6 @@ module Test.Crypto.Util (
   -- * test messages for signings
   Message (..),
 
-  -- * BLS12381 signature context
-  BLS12381SignContext (..),
-  blsSigContextGen,
-
   -- * Test generation and shrinker helpers
   BadInputFor,
   genBadInputFor,
@@ -215,22 +211,6 @@ newtype Message = Message {messageBytes :: ByteString}
 instance Arbitrary Message where
   arbitrary = Message . BS.pack <$> arbitrary
   shrink = map (Message . BS.pack) . shrink . BS.unpack . messageBytes
-
---------------------------------------------------------------------------------
--- BLS12381 signature context
---------------------------------------------------------------------------------
-
-data BLS12381SignContext = BLS12381SignContext
-  { blsSignContextDst :: Maybe ByteString
-  , blsSignContextDAug :: Maybe ByteString
-  }
-  deriving (Eq, Show)
-
-blsSigContextGen :: Gen (Maybe ByteString, Maybe ByteString)
-blsSigContextGen = do
-  dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
-  aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
-  pure (dst, aug)
 
 --------------------------------------------------------------------------------
 -- Serialisation properties

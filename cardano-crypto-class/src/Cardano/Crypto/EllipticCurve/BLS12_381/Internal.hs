@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -186,6 +188,7 @@ where
 #include "blst_util.h"
 
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes, psbCreate, psbCreateResult, psbUseAsCPtr)
+import Control.DeepSeq (NFData (..))
 import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
@@ -204,6 +207,7 @@ import Foreign.Marshal.Alloc (allocaBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import GHC.TypeLits (KnownNat, Nat, natVal)
+import NoThunks.Class (NoThunks (..))
 import System.IO.Unsafe (unsafePerformIO)
 
 ---- Phantom Types
@@ -294,6 +298,7 @@ type family SerializedPointSize (curve :: Type) :: Nat where
 -- | A point on an elliptic curve. This type guarantees that the point is part of the
 -- | prime order subgroup.
 newtype Point curve = Point (PinnedSizedBytes (PointSize curve))
+  deriving newtype (NFData, NoThunks, Show)
 
 -- Making sure different 'Point's are not 'Coercible', which would ruin the
 -- intended type safety:
