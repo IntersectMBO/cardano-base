@@ -10,6 +10,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -35,6 +36,7 @@ module Cardano.Crypto.DSIGN.BLS12381 (
   SignKeyDSIGN (..),
   SigDSIGN (..),
   PossessionProofDSIGN (..),
+  BLS12381SignContext (..),
 ) where
 
 #include "blst_util.h"
@@ -89,8 +91,6 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   DualCurve,
   FinalVerifyOrder,
   Point (..),
-  PointPtr (..),
-  PointSize,
   Scalar (..),
   ScalarPtr (..),
   blsAddOrDouble,
@@ -111,6 +111,7 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   toAffine,
   withAffine,
   withMaybeCStringLen,
+  withNewPoint',
   withNewPoint_,
  )
 import Cardano.Crypto.PinnedSizedBytes (
@@ -150,39 +151,12 @@ type family CurveVariant (c :: Type) :: Symbol where
   CurveVariant Curve1 = "BLS-Signature-Mininimal-Verification-Key-Size"
   CurveVariant Curve2 = "BLS-Signature-Mininimal-Signature-Size"
 
--- Manual instance to avoid using the PinnedSizedBytes Eq instance
--- but use the Point Eq instance instead.
---
--- Note that a Point on the curve is a representative of an equivalence class.
--- That is, given a point P, then p ~ [x:y,z] in projective coordinates.
--- If we round trip via the compressed form (via rawSerialise/Deserialise),
--- we get a canonical representative of the equivalence class that might differ!
--- That is, from compressed (x,y) we get back [x:y,0].
-instance
-  BLS curve =>
-  Eq (VerKeyDSIGN (BLS12381DSIGN curve))
-  where
-  VerKeyBLS12381 vk1 == VerKeyBLS12381 vk2 =
-    let p1 = Point @curve vk1
-        p2 = Point @curve vk2
-     in p1 == p2
-
--- Manual instance to avoid using the PinnedSizedBytes Eq instance
--- but use the Point Eq instance instead.
---
--- Note that a Point on the curve is a representative of an equivalence class.
--- That is, given a point P, then p ~ [x:y,z] in projective coordinates.
--- If we round trip via the compressed form (via rawSerialise/Deserialise),
--- we get a canonical representative of the equivalence class that might differ!
--- That is, from compressed (x,y) we get back [x:y,0].
-instance
-  BLS (DualCurve curve) =>
-  Eq (SigDSIGN (BLS12381DSIGN curve))
-  where
-  SigBLS12381 s1 == SigBLS12381 s2 =
-    let p1 = Point @(DualCurve curve) s1
-        p2 = Point @(DualCurve curve) s2
-     in p1 == p2
+data BLS12381SignContext = BLS12381SignContext
+  { blsSignContextDst :: !(Maybe ByteString)
+  , blsSignContextAug :: !(Maybe ByteString)
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (NFData, NoThunks)
 
 type BLS12381CurveConstraints curve =
   ( BLS curve
@@ -201,26 +175,26 @@ instance
   type SeedSizeDSIGN (BLS12381DSIGN curve) = CARDANO_BLST_SCALAR_SIZE
   type SizeSignKeyDSIGN (BLS12381DSIGN curve) = CARDANO_BLST_SCALAR_SIZE
 
-  -- \| These *Sizes* are used in the serialization/deserialization
+  -- These *Sizes* are used in the serialization/deserialization
   -- so these use the compressed sizes of the BLS12-381 `Point curve`
   type SizeVerKeyDSIGN (BLS12381DSIGN curve) = CompressedPointSize curve
   type SizeSigDSIGN (BLS12381DSIGN curve) = CompressedPointSize (DualCurve curve)
   type Signable (BLS12381DSIGN curve) = SignableRepresentation
 
-  -- \| Context can hold domain seperation tag and/or augmentation data for signatures
-  type ContextDSIGN (BLS12381DSIGN curve) = (Maybe ByteString, Maybe ByteString)
+  -- Context can hold domain separation tag and/or augmentation data for signatures
+  type ContextDSIGN (BLS12381DSIGN curve) = BLS12381SignContext
   type KeyGenContextDSIGN (BLS12381DSIGN curve) = Maybe ByteString
 
   newtype VerKeyDSIGN (BLS12381DSIGN curve)
     = -- Note that the internal representation is the uncompressed point size
-      VerKeyBLS12381 (PinnedSizedBytes (PointSize curve))
+      VerKeyBLS12381 (Point curve)
     deriving newtype (NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
 
   newtype SignKeyDSIGN (BLS12381DSIGN curve)
     = SignKeyBLS12381 (PinnedSizedBytes (SizeSignKeyDSIGN (BLS12381DSIGN curve)))
-    -- Us Eq from PinnedSizedBytes is needed here, as we need constant time
+    -- The use of Eq from PinnedSizedBytes is needed here, as we need constant time
     -- comparison for signing keys
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
@@ -228,7 +202,7 @@ instance
 
   newtype SigDSIGN (BLS12381DSIGN curve)
     = -- Note that the internal representation is the uncompressed point size
-      SigBLS12381 (PinnedSizedBytes (PointSize (DualCurve curve)))
+      SigBLS12381 (Point (DualCurve curve))
     deriving newtype (NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
@@ -238,12 +212,12 @@ instance
   {-# NOINLINE deriveVerKeyDSIGN #-}
   deriveVerKeyDSIGN (SignKeyBLS12381 skPsb) = do
     VerKeyBLS12381 $ unsafeDupablePerformIO . psbUseAsCPtr skPsb $ \skp ->
-      psbCreate $ \vkPtp ->
-        c_blst_sk_to_pk @curve (PointPtr vkPtp) (ScalarPtr skp)
+      withNewPoint' @curve $ \vkPtp -> do
+        c_blst_sk_to_pk @curve vkPtp (ScalarPtr skp)
 
   {-# NOINLINE signDSIGN #-}
-  signDSIGN (dst, aug) msg (SignKeyBLS12381 skPsb) =
-    SigBLS12381 $ unsafeDupablePerformIO . psbCreate $ \sigPts -> do
+  signDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} msg (SignKeyBLS12381 skPsb) =
+    SigBLS12381 $ unsafeDupablePerformIO . withNewPoint' $ \sigPts -> do
       let bs = getSignableRepresentation msg
       withMaybeCStringLen dst $ \(dstPtr, dstLen) ->
         withMaybeCStringLen aug $ \(augPtr, augLen) ->
@@ -259,17 +233,17 @@ instance
                   augPtr
                   (fromIntegral @Int @CSize augLen)
                 c_blst_sign @curve
-                  (PointPtr sigPts)
+                  sigPts
                   hashPtr
                   (ScalarPtr skPtp)
 
   {-# NOINLINE verifyDSIGN #-}
-  -- \| Context can hold domain seperation tag and/or augmentation data for signatures
-  verifyDSIGN (dst, aug) (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
+  -- \| Context can hold domain separation tag and/or augmentation data for signatures
+  verifyDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
     unsafeDupablePerformIO $ do
       withMaybeCStringLen dst $ \(pDst, dstLen) -> do
-        withAffine (toAffine @curve (Point pbPsb)) $ \pkAff ->
-          withAffine (toAffine @(DualCurve curve) (Point sigPsb)) $ \sigAff ->
+        withAffine (toAffine @curve pbPsb) $ \pkAff ->
+          withAffine (toAffine @(DualCurve curve) sigPsb) $ \sigAff ->
             withMaybeCStringLen aug $ \(pAug, augLen) ->
               unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(pMsg, msgLen) -> do
                 err <-
@@ -308,11 +282,11 @@ instance
                     (fromIntegral @Int @CSize infoLen)
 
   -- \| Note that this also compresses the signature according to the ZCash standard
-  rawSerialiseSigDSIGN (SigBLS12381 sigPSB) = blsCompress @(DualCurve curve) (Point sigPSB)
+  rawSerialiseSigDSIGN (SigBLS12381 sigPSB) = blsCompress @(DualCurve curve) sigPSB
 
   {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
   -- \| Note that this also compresses the verification key according to the ZCash standard
-  rawSerialiseVerKeyDSIGN (VerKeyBLS12381 vkPSB) = blsCompress @curve (Point vkPSB)
+  rawSerialiseVerKeyDSIGN (VerKeyBLS12381 vkPSB) = blsCompress @curve vkPSB
 
   {-# NOINLINE rawSerialiseSignKeyDSIGN #-}
   rawSerialiseSignKeyDSIGN (SignKeyBLS12381 skPSB) = scalarToBS (Scalar skPSB)
@@ -323,7 +297,7 @@ instance
     -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
     case blsUncompress @curve bs of
       Left _ -> Nothing
-      Right (Point vkPsb) -> Just (VerKeyBLS12381 vkPsb)
+      Right vkPsb -> Just (VerKeyBLS12381 vkPsb)
 
   {-# NOINLINE rawDeserialiseSignKeyDSIGN #-}
   rawDeserialiseSignKeyDSIGN bs =
@@ -340,7 +314,15 @@ instance
     -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
     case blsUncompress @(DualCurve curve) bs of
       Left _ -> Nothing
-      Right (Point sigPsb) -> Just (SigBLS12381 sigPsb)
+      Right sigPsb -> Just (SigBLS12381 sigPsb)
+
+deriving stock instance
+  BLS curve =>
+  Eq (VerKeyDSIGN (BLS12381DSIGN curve))
+
+deriving stock instance
+  BLS (DualCurve curve) =>
+  Eq (SigDSIGN (BLS12381DSIGN curve))
 
 instance
   BLS12381CurveConstraints curve =>
@@ -375,32 +357,19 @@ instance
   toCBOR = encodeSigDSIGN
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
+-- | Helper functions to extract the internal Point representation
+verKeyToPoint :: VerKeyDSIGN (BLS12381DSIGN curve) -> Point curve
+verKeyToPoint (VerKeyBLS12381 p) = p
+
+-- | Helper functions to extract the internal Point representation
+sigToPoint :: SigDSIGN (BLS12381DSIGN curve) -> Point (DualCurve curve)
+sigToPoint (SigBLS12381 p) = p
+
 instance
   BLS12381CurveConstraints curve =>
   FromCBOR (SigDSIGN (BLS12381DSIGN curve))
   where
   fromCBOR = decodeSigDSIGN
-
--- Manual instance to avoid using the PinnedSizedBytes Eq instance
--- but use the Point Eq instance instead.
---
--- Note that a Point on the curve is a representative of an equivalence class.
--- That is, given a point P, then p ~ [x:y,z] in projective coordinates.
--- If we round trip via the compressed form (via rawSerialise/Deserialise),
--- we get a canonical representative of the equivalence class that might differ!
--- That is, from compressed (x,y) we get back [x:y,0].
-instance
-  ( BLS (DualCurve curve)
-  , KnownNat (PointSize (DualCurve curve))
-  ) =>
-  Eq (PossessionProofDSIGN (BLS12381DSIGN curve))
-  where
-  PossessionProofBLS12381 mu1a mu2a == PossessionProofBLS12381 mu1b mu2b =
-    let p1a = Point @(DualCurve curve) mu1a
-        p1b = Point @(DualCurve curve) mu1b
-        p2a = Point @(DualCurve curve) mu2a
-        p2b = Point @(DualCurve curve) mu2b
-     in p1a == p1b && p2a == p2b
 
 instance
   ( BLS12381CurveConstraints curve
@@ -414,70 +383,57 @@ instance
     PossessionProofSizeDSIGN (BLS12381DSIGN curve) =
       CompressedPointSize (DualCurve curve) + CompressedPointSize (DualCurve curve)
 
-  data PossessionProofDSIGN (BLS12381DSIGN curve)
-    = PossessionProofBLS12381
-        !(PinnedSizedBytes (PointSize (DualCurve curve))) -- mu1
-        !(PinnedSizedBytes (PointSize (DualCurve curve))) -- mu2
+  data PossessionProofDSIGN (BLS12381DSIGN curve) = PossessionProofBLS12381
+    { mu1 :: !(Point (DualCurve curve))
+    , mu2 :: !(Point (DualCurve curve))
+    }
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
 
   uncheckedAggregateVerKeysDSIGN verKeys = do
     -- Sum the verification keys as curve points
-    let aggrPoint :: Point curve
-        aggrPoint =
-          F.foldl' blsAddOrDouble (blsZero @curve) $
-            [ Point @curve verKeyPsb
-            | VerKeyBLS12381 verKeyPsb <- verKeys
-            ]
+    let aggrPoint =
+          F.foldl' blsAddOrDouble (blsZero @curve) (map verKeyToPoint verKeys)
     -- Unlikely case, but best to reject infinity as an aggregate verification
     -- key. This happens if, for every secret/verification key pair, the inverse
     -- of each secret key (and thus also the verification key) is also present
     -- in the list.
     if blsIsInf @curve aggrPoint
       then Left "aggregateVerKeysDSIGN: aggregated verification key is infinity"
-      else
-        let Point aggrPsb = aggrPoint
-         in Right (VerKeyBLS12381 aggrPsb)
+      else Right $ VerKeyBLS12381 aggrPoint
 
   aggregateSigsDSIGN sigs = do
     -- Sum the signatures as curve points
-    let aggrPoint :: Point (DualCurve curve)
-        aggrPoint =
-          F.foldl' blsAddOrDouble (blsZero @(DualCurve curve)) $
-            [ Point @(DualCurve curve) sigPsb
-            | SigBLS12381 sigPsb <- sigs
-            ]
+    let aggrPoint =
+          F.foldl' blsAddOrDouble (blsZero @(DualCurve curve)) (map sigToPoint sigs)
     -- Unlikely case, but best to reject infinity as an aggregate signature
     if blsIsInf @(DualCurve curve) aggrPoint
       then Left "aggregateSigDSIGN: aggregated signature is infinity"
-      else
-        let Point aggrPsb = aggrPoint
-         in Right (SigBLS12381 aggrPsb)
+      else Right $ SigBLS12381 aggrPoint
 
   {-# NOINLINE createPossessionProofDSIGN #-}
-  createPossessionProofDSIGN (dst, aug) (SignKeyBLS12381 skPsb) =
+  createPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (SignKeyBLS12381 skPsb) =
     unsafeDupablePerformIO $ do
       skAsInteger <- scalarToInteger (Scalar skPsb)
       let VerKeyBLS12381 vkPsb =
             deriveVerKeyDSIGN (SignKeyBLS12381 skPsb) ::
               VerKeyDSIGN (BLS12381DSIGN curve)
-          vk = blsCompress @curve (Point vkPsb)
-          Point mu1Psb =
+          vk = blsCompress @curve vkPsb
+          mu1Psb =
             blsMult (blsHash @(DualCurve curve) vk dst aug) skAsInteger
-          Point mu2Psb =
+          mu2Psb =
             blsMult (blsGenerator @(DualCurve curve)) skAsInteger
       return $ PossessionProofBLS12381 mu1Psb mu2Psb
-  verifyPossessionProofDSIGN (dst, aug) (VerKeyBLS12381 vkPsb) (PossessionProofBLS12381 mu1Psb mu2Psb) =
-    let vk = Point vkPsb
-        check1 =
-          finalVerifyPairs @curve (blsGenerator, Point mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
-        check2 = finalVerifyPairs @curve (vk, blsGenerator) (blsGenerator, Point mu2Psb)
+  verifyPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 vk) (PossessionProofBLS12381 mu1Psb mu2Psb) =
+    let check1 =
+          finalVerifyPairs @curve (blsGenerator, mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
+        check2 = finalVerifyPairs @curve (vk, blsGenerator) (blsGenerator, mu2Psb)
      in if check1 && check2
           then Right ()
           else Left "PossessionProofDSIGN BLS12381DSIGN failed to verify."
   rawSerialisePossessionProofDSIGN (PossessionProofBLS12381 mu1Psb mu2Psb) =
-    blsCompress @(DualCurve curve) (Point mu1Psb) <> blsCompress @(DualCurve curve) (Point mu2Psb)
+    blsCompress @(DualCurve curve) mu1Psb <> blsCompress @(DualCurve curve) mu2Psb
   rawDeserialisePossessionProofDSIGN bs =
     -- We use the compressed size of a point in DualCurve curve to split
     let chunkSize = compressedSizePoint (Proxy @(DualCurve curve))
@@ -487,12 +443,16 @@ instance
             case ( blsUncompress @(DualCurve curve) mu1Bs
                  , blsUncompress @(DualCurve curve) mu2Bs
                  ) of
-              (Right (Point mu1Psb), Right (Point mu2Psb)) ->
+              (Right mu1Psb, Right mu2Psb) ->
                 Just $ PossessionProofBLS12381 mu1Psb mu2Psb
               _ ->
                 Nothing
           _ ->
             Nothing
+
+deriving stock instance
+  BLS (DualCurve curve) =>
+  Eq (PossessionProofDSIGN (BLS12381DSIGN curve))
 
 instance
   ( BLS12381CurveConstraints curve

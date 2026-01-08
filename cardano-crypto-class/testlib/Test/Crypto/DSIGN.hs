@@ -98,6 +98,7 @@ import Cardano.Crypto.DSIGN (
   BLS12381DSIGN,
 
   DSIGNAggregatable (..),
+  BLS12381SignContext (..),
   sizePossessionProofDSIGN,
   encodePossessionProofDSIGN,
   decodePossessionProofDSIGN
@@ -127,7 +128,6 @@ import Test.Crypto.Util (
   directSerialiseToBS,
   directDeserialiseFromBS,
   hexBS,
-  blsSigContextGen,
   )
 import Cardano.Crypto.Libsodium.MLockedSeed
 
@@ -162,8 +162,14 @@ ed448SigGen = defaultSigGen
 blsSigGen :: forall curve. BLS12381CurveConstraints curve => Gen (SigDSIGN (BLS12381DSIGN curve))
 blsSigGen = do
   msg :: Message <- arbitrary
-  (dst, aug) <- blsSigContextGen
-  signDSIGN (dst,aug) msg <$> defaultSignKeyGen @(BLS12381DSIGN curve)
+  ctx <- blsSigContextGen
+  signDSIGN ctx msg <$> defaultSignKeyGen @(BLS12381DSIGN curve)
+
+blsSigContextGen :: Gen BLS12381SignContext
+blsSigContextGen = do
+  dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
+  aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
+  pure BLS12381SignContext {blsSignContextAug = aug, blsSignContextDst = dst}
 
 #ifdef SECP256K1_ENABLED
 ecdsaSigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
