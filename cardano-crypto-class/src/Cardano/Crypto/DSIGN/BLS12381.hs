@@ -422,7 +422,7 @@ instance
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
 
-  aggregateVerKeysDSIGNWithoutPoPs verKeys = do
+  uncheckedAggregateVerKeysDSIGN verKeys = do
     -- Sum the verification keys as curve points
     let aggrPoint :: Point curve
         aggrPoint =

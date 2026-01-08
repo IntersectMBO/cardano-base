@@ -59,6 +59,7 @@ module Cardano.Crypto.DSIGN.Class (
 
   -- * Aggregatable DSIGN algorithms with Proof of Possession
   DSIGNAggregatable (..),
+  aggregateVerKeysDSIGN,
   sizePossessionProofDSIGN,
   encodePossessionProofDSIGN,
   decodePossessionProofDSIGN,
@@ -492,26 +493,13 @@ class
   type PossessionProofSizeDSIGN v :: Nat
   data PossessionProofDSIGN v :: Type
 
-  -- | Aggregate multiple verification keys into a single verification key given
-  -- their corresponding Proofs of Possession.
-  --
-  -- Note that the signing context is passed since the PoP might depend on it.
-  aggregateVerKeysDSIGN ::
-    HasCallStack =>
-    ContextDSIGN v ->
-    [(VerKeyDSIGN v, PossessionProofDSIGN v)] ->
-    Either String (VerKeyDSIGN v)
-  aggregateVerKeysDSIGN ctx verKeysAndPoPs = do
-    -- Verify every verKey and its PoP (fail-fast)
-    forM_ verKeysAndPoPs $ uncurry (verifyPossessionProofDSIGN ctx)
-    aggregateVerKeysDSIGNWithoutPoPs (map fst verKeysAndPoPs)
-
   -- | Aggregate multiple verification keys into a single verification key
   -- without requiring their corresponding Proofs of Possession. This function
-  -- is unsafe and should only be used when the caller can guarantee that all
-  -- verification keys are valid (i.e., their PoPs have been verified through
-  -- other means).
-  aggregateVerKeysDSIGNWithoutPoPs ::
+  -- is unsafe and should only be used when verification keys are valid (i.e.,
+  -- their PoPs have been verified through other means). See
+  -- 'aggregateVerKeysDSIGN' for a function that does this using
+  -- 'verifyPossessionProofDSIGN'.
+  uncheckedAggregateVerKeysDSIGN ::
     HasCallStack =>
     [VerKeyDSIGN v] ->
     Either String (VerKeyDSIGN v)
@@ -521,37 +509,6 @@ class
     HasCallStack =>
     [SigDSIGN v] ->
     Either String (SigDSIGN v)
-
-  -- | Verify multiple verification key and Proofs of Possession pairs against a
-  -- single message and group signature.
-  --
-  -- Note that the signing context is passed since the PoP might depend on it.
-  verifyAggregateDSIGN ::
-    (Signable v a, HasCallStack) =>
-    ContextDSIGN v ->
-    [(VerKeyDSIGN v, PossessionProofDSIGN v)] ->
-    a ->
-    SigDSIGN v ->
-    Either String ()
-  verifyAggregateDSIGN ctx verKeysAndPoPs msg sig = do
-    -- Verify every verKey and its PoP (fail-fast)
-    forM_ verKeysAndPoPs $ uncurry (verifyPossessionProofDSIGN ctx)
-    verifyAggregateDSIGNWithoutPoPs ctx (map fst verKeysAndPoPs) msg sig
-
-  -- | Verify multiple verification keys without Proofs of Possessions against a
-  -- single message and group signature. This function is unsafe and should only
-  -- be used when the caller can guarantee that all verification keys are valid
-  -- (i.e., their PoPs have been verified through other means).
-  verifyAggregateDSIGNWithoutPoPs ::
-    (Signable v a, HasCallStack) =>
-    ContextDSIGN v ->
-    [VerKeyDSIGN v] ->
-    a ->
-    SigDSIGN v ->
-    Either String ()
-  verifyAggregateDSIGNWithoutPoPs ctx verKeys msg sig = do
-    aggrVer <- aggregateVerKeysDSIGNWithoutPoPs verKeys
-    verifyDSIGN ctx aggrVer msg sig
 
   -- | Create a PoP from the signing key.
   createPossessionProofDSIGN ::
@@ -573,6 +530,20 @@ class
 
   -- | Deserialise a PoP from fixed-size raw bytes.
   rawDeserialisePossessionProofDSIGN :: ByteString -> Maybe (PossessionProofDSIGN v)
+
+-- | Aggregate multiple verification keys into a single verification key given
+-- their corresponding Proofs of Possession.
+--
+-- Note that the signing context is passed since the PoP might depend on it.
+aggregateVerKeysDSIGN ::
+  (HasCallStack, DSIGNAggregatable v) =>
+  ContextDSIGN v ->
+  [(VerKeyDSIGN v, PossessionProofDSIGN v)] ->
+  Either String (VerKeyDSIGN v)
+aggregateVerKeysDSIGN ctx verKeysAndPoPs = do
+  -- Verify every verKey and its PoP (fail-fast)
+  forM_ verKeysAndPoPs $ uncurry (verifyPossessionProofDSIGN ctx)
+  uncheckedAggregateVerKeysDSIGN (map fst verKeysAndPoPs)
 
 sizePossessionProofDSIGN :: forall v proxy. DSIGNAggregatable v => proxy v -> Word
 sizePossessionProofDSIGN _ = fromInteger (natVal (Proxy @(PossessionProofSizeDSIGN v)))

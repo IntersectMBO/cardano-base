@@ -28,6 +28,7 @@ import Test.QuickCheck (
   forAllShow,
   ioProperty,
   counterexample,
+  withMaxSuccess,
   )
 import Test.Hspec (Spec, describe)
 import Test.Hspec.QuickCheck (prop, modifyMaxSuccess)
@@ -67,6 +68,7 @@ import Cardano.Crypto.DSIGN (
     rawSerialiseSigDSIGN,
     rawDeserialiseSigDSIGN
     ),
+  aggregateVerKeysDSIGN,
   sizeVerKeyDSIGN,
   sizeSignKeyDSIGN,
   sizeSigDSIGN,
@@ -782,26 +784,29 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
         prop_cbor_direct_vs_class encodePossessionProofDSIGN
   describe "aggregate" $ do
     prop "aggregate verify positive" $
+      withMaxSuccess 1000 .
       forAllShow (genAggregateCase genContext genMsg) ppShow $
-          \(ctx, msg, vksPops, sigs) ->
-            case aggregateSigsDSIGN @v sigs of
-              Left _  -> counterexample "aggregateSigDSIGN failed" False
-              Right s -> verifyAggregateDSIGN @v ctx vksPops msg s === Right ()
+          \(ctx, msg, vksPops, sigs) -> (=== Right ()) $ do
+            sig <- aggregateSigsDSIGN @v sigs
+            aggVk <- aggregateVerKeysDSIGN ctx vksPops
+            verifyDSIGN @v ctx aggVk msg sig
     prop "aggregate verify negative (wrong message)" $
-      forAllShow (genAggregateCase2Msgs genContext genMsg) ppShow $
-        \(ctx, msg', vksPops, sigs) ->
-          case aggregateSigsDSIGN @v sigs of
-            Left _  -> counterexample "aggregateSigDSIGN failed" False
-            Right s -> verifyAggregateDSIGN @v ctx vksPops msg' s =/= Right ()
+      withMaxSuccess 1000 .
+      forAllShow (genAggregateCase genContext genMsg) ppShow $ \(ctx, msg, vksPops, sigs) ->
+          forAllShow arbitrary ppShow $ \msg' ->
+            msg /= msg' ==> (=/= Right ()) $ do
+                sig <- aggregateSigsDSIGN @v sigs
+                aggVk <- aggregateVerKeysDSIGN ctx vksPops
+                verifyDSIGN @v ctx aggVk msg' sig
     prop "aggregate verify negative (wrong PoP)" $
         forAllShow (genAggregateCaseAtLeast2 genContext genMsg) ppShow $
           \(ctx, msg, vksPops, sigs) ->
             case vksPops of
-              (a:b:rest) ->
+              (a:b:rest) -> (=/= Right ()) $ do
                 let vksPops' = (fst a, snd b) : (fst b, snd a) : rest
-                in case aggregateSigsDSIGN @v sigs of
-                    Left _  -> counterexample "aggregateSigDSIGN failed" False
-                    Right s -> verifyAggregateDSIGN @v ctx vksPops' msg s =/= Right ()
+                sig <- aggregateSigsDSIGN @v sigs
+                aggVk <- aggregateVerKeysDSIGN ctx vksPops'
+                verifyDSIGN @v ctx aggVk msg sig
               _ ->
                 counterexample "genAggregateCaseAtLeast2 produced <2 entries (bug in generator)" False
     describe "NoThunks" $ do
@@ -825,10 +830,7 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
                    ]
           sigs = [ signDSIGN ctx msg sk | sk <- sks ]
       pure (ctx, msg, vksPops, sigs)
-    genAggregateCase2Msgs genCtx genMsg' = do
-      (ctx, msg, vksPops, sigs) <- genAggregateCase genCtx genMsg'
-      msg' <- Gen.suchThat genMsg' (/= msg)
-      pure (ctx, msg', vksPops, sigs)
+
     genAggregateCaseAtLeast2 genCtx genMsg' = do
       ctx <- genCtx
       msg <- genMsg'
