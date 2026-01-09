@@ -486,8 +486,5 @@ instance Arbitrary BLS.Scalar where
                         Right v -> Just v
                     )
 
-instance Show BLS.Scalar where
-  show = show . BLS.scalarToBS
-
 instance BLS.BLS curve => Show (BLS.Affine curve) where
   show = show . BLS.fromAffine
