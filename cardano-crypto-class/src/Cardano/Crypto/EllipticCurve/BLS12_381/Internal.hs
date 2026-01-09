@@ -93,7 +93,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   c_blst_fp12_mul,
   c_blst_fp12_is_equal,
   c_blst_fp12_finalverify,
-  FinalVerifyOrder,
 
   -- * Scalar functions
   c_blst_scalar_fr_check,
@@ -471,23 +470,6 @@ class
   c_blst_p_is_equal :: PointPtr curve -> PointPtr curve -> IO Bool
   c_blst_p_is_inf :: PointPtr curve -> IO Bool
 
-  -- | Runtime point size. Delegates to the type-level 'PointSize' so that
-  --   compile-time and runtime sizes share a single source of truth.
-  sizePoint_ :: Proxy curve -> CSize
-  sizePoint_ _ = fromInteger (natVal (Proxy @(PointSize curve)))
-
-  serializedSizePoint_ :: Proxy curve -> CSize
-  serializedSizePoint_ _ =
-    fromInteger (natVal (Proxy @(SerializedPointSize curve)))
-  compressedSizePoint_ :: Proxy curve -> CSize
-  compressedSizePoint_ _ =
-    fromInteger (natVal (Proxy @(CompressedPointSize curve)))
-
-  -- | Runtime affine point size. Delegates to the type-level 'AffineSize' so that
-  --   compile-time and runtime sizes share a single source of truth.
-  sizeAffine_ :: Proxy curve -> CSize
-  sizeAffine_ _ = fromInteger (natVal (Proxy @(AffineSize curve)))
-
   c_blst_sk_to_pk :: PointPtr curve -> ScalarPtr -> IO ()
   c_blst_sign ::
     PointPtr (DualCurve curve) -> PointPtr (DualCurve curve) -> ScalarPtr -> IO ()
@@ -509,6 +491,25 @@ class
     Ptr CChar ->
     CSize ->
     IO CInt
+
+  millerSide :: PairingSide curve -> PT
+
+  -- | Runtime point size. Delegates to the type-level 'PointSize' so that
+  --   compile-time and runtime sizes share a single source of truth.
+  sizePoint_ :: Proxy curve -> CSize
+  sizePoint_ _ = fromInteger (natVal (Proxy @(PointSize curve)))
+
+  serializedSizePoint_ :: Proxy curve -> CSize
+  serializedSizePoint_ _ =
+    fromInteger (natVal (Proxy @(SerializedPointSize curve)))
+  compressedSizePoint_ :: Proxy curve -> CSize
+  compressedSizePoint_ _ =
+    fromInteger (natVal (Proxy @(CompressedPointSize curve)))
+
+  -- | Runtime affine point size. Delegates to the type-level 'AffineSize' so that
+  --   compile-time and runtime sizes share a single source of truth.
+  sizeAffine_ :: Proxy curve -> CSize
+  sizeAffine_ _ = fromInteger (natVal (Proxy @(AffineSize curve)))
 
 instance BLS Curve1 where
   c_blst_on_curve = c_blst_p1_on_curve
@@ -540,6 +541,7 @@ instance BLS Curve1 where
 
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g1
   c_blst_sign = c_blst_sign_pk_in_g1
+  millerSide (g1, g2) = millerLoop g1 g2
 
 instance BLS Curve2 where
   c_blst_on_curve = c_blst_p2_on_curve
@@ -571,6 +573,7 @@ instance BLS Curve2 where
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
   c_blst_sign = c_blst_sign_pk_in_g2
   c_blst_core_verify = c_blst_core_verify_pk_in_g2
+  millerSide (g2, g1) = millerLoop g1 g2
 
 instance BLS curve => Eq (Affine curve) where
   a == b = unsafePerformIO $
@@ -584,6 +587,7 @@ sizeScalar :: Int
 sizeScalar = CARDANO_BLST_SCALAR_SIZE
 
 newtype Scalar = Scalar (PinnedSizedBytes CARDANO_BLST_SCALAR_SIZE)
+  deriving newtype (NFData, NoThunks, Show)
 
 withIntScalar :: Integer -> (ScalarPtr -> IO a) -> IO a
 withIntScalar i go = do
@@ -1224,18 +1228,9 @@ millerLoop p1 p2 =
 -- A single side of e(·,·): the point on `curve` and the point on its `DualCurve`.
 type PairingSide curve = (Point curve, Point (DualCurve curve))
 
-class (BLS curve, BLS (DualCurve curve)) => FinalVerifyOrder curve where
-  millerSide :: PairingSide curve -> PT
-  finalVerifyPairs :: PairingSide curve -> PairingSide curve -> Bool
-  finalVerifyPairs lhs rhs = ptFinalVerify (millerSide lhs) (millerSide rhs)
-
-instance FinalVerifyOrder Curve1 where
-  -- Curve1: miller loop expects (g1, g2)
-  millerSide (g1, g2) = millerLoop g1 g2
-
-instance FinalVerifyOrder Curve2 where
-  -- Curve2: miller loop expects (g1, g2) but our Pair is (g2, g1)
-  millerSide (g2, g1) = millerLoop g1 g2
+finalVerifyPairs :: forall curve. BLS curve => PairingSide curve -> PairingSide curve -> Bool
+finalVerifyPairs lhs rhs =
+  ptFinalVerify (millerSide @curve lhs) (millerSide @curve rhs)
 
 ---- Utility
 
