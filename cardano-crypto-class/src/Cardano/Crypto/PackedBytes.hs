@@ -16,25 +16,25 @@ module Cardano.Crypto.PackedBytes
   ( PackedBytes(..)
   , packBytes
   , packBytesMaybe
+  , packByteString
   , packShortByteString
   , packShortByteStringWithOffset
   , packPinnedBytes
+  , unpackAsByteArray
   , unpackBytes
   , unpackPinnedBytes
   , xorPackedBytes
   ) where
 
+import Codec.CBOR.Decoding as D (decodeBytes)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), Size)
-import Codec.Serialise (Serialise(..))
-import Codec.Serialise.Decoding (decodeBytes)
-import Codec.Serialise.Encoding (encodeBytes)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (unless, when)
 import Control.Monad.Primitive (primitive_)
 import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
 import Control.Monad.State.Strict (MonadState(state))
 import Data.Bits
-import Data.ByteString
+import Data.ByteString as BS
 import Data.ByteString.Internal as BS (accursedUnutterablePerformIO,
                                        fromForeignPtr, toForeignPtr)
 import Data.ByteString.Short.Internal as SBS
@@ -140,10 +140,6 @@ instance KnownNat n => MemPack (PackedBytes n) where
       (\addr# -> accursedUnutterablePerformIO $ packPinnedPtr (Ptr (addr# `plusAddr#` curPos#)))
   {-# INLINE unpackM #-}
 
-instance KnownNat n => Serialise (PackedBytes n) where
-  encode = encodeBytes . unpackPinnedBytes
-  decode = packPinnedBytes <$> decodeBytes
-
 instance KnownNat n => ToCBOR (PackedBytes n) where
   toCBOR = toCBOR . unpackBytes
   {-# INLINE toCBOR #-}
@@ -155,7 +151,7 @@ instance KnownNat n => ToCBOR (PackedBytes n) where
       packedBytesSize = fromInteger (natVal' (proxy# @n))
 
 instance KnownNat n => FromCBOR (PackedBytes n) where
-  fromCBOR = fromCBOR >>= packShortByteString
+  fromCBOR = D.decodeBytes >>= packByteString
   {-# INLINE fromCBOR #-}
 
 xorPackedBytes :: PackedBytes n -> PackedBytes n -> PackedBytes n
@@ -189,6 +185,10 @@ withPinnedMutableByteArray n f = do
     f mba
     unsafeFreezeByteArray mba
 {-# INLINE withPinnedMutableByteArray #-}
+
+unpackAsByteArray :: PackedBytes n -> ByteArray
+unpackAsByteArray = unpackBytesWith withMutableByteArray
+{-# INLINE unpackAsByteArray #-}
 
 unpackBytes :: PackedBytes n -> ShortByteString
 unpackBytes = byteArrayToShortByteString . unpackBytesWith withMutableByteArray
@@ -282,15 +282,35 @@ packBytesMaybe = packShortByteStringWithOffset
 -- | Construct `PackedBytes` from a `ShortByteString`. This function is safe and will fail
 --  if the buffer size does not match expected size of packed bytes exactly.
 --
--- @since 2.2.4.0
+-- @since 2.3.0.0
+packByteString :: forall n m. (KnownNat n, MonadFail m) => ByteString -> m (PackedBytes n)
+packByteString = packedBytesSizeGuard BS.length packPinnedBytes
+{-# INLINE packByteString #-}
+
+-- | Construct `PackedBytes` from a `ShortByteString`. This function is safe and will fail
+--  if the buffer size does not match expected size of packed bytes exactly.
+--
+-- @since 2.3.0.0
 packShortByteString :: forall n m. (KnownNat n, MonadFail m) => ShortByteString -> m (PackedBytes n)
-packShortByteString bs = do
-  let bufferSize = SBS.length bs
+packShortByteString = packedBytesSizeGuard SBS.length (`packBytes` 0)
+{-# INLINE packShortByteString #-}
+
+packedBytesSizeGuard ::
+  forall b n m. (KnownNat n, MonadFail m) =>
+  -- | Function for getting the size of the source buffer
+  (b -> Int) ->
+  -- | Function for packing the buffer in full
+  (b -> PackedBytes n) ->
+  -- | The actual buffer to be packed
+  b ->
+  m (PackedBytes n)
+packedBytesSizeGuard getSizeOfBuffer packBuffer buf = do
+  let bufferSize = getSizeOfBuffer buf
       size = fromInteger (natVal' (proxy# @n))
   unless (size == bufferSize) $ do
     fail $ "Number of bytes mismatch. Expected " <> show size <> " number of bytes, but got " <> show bufferSize
-  pure $ packBytes bs 0
-{-# INLINE packShortByteString #-}
+  pure $ packBuffer buf
+{-# INLINE packedBytesSizeGuard #-}
 
 -- | Construct `PackedBytes` from a `ShortByteString` and a non-negative offset in number of bytes
 -- from the beginning. This function is safe, but it only checks whether there are enough

@@ -20,6 +20,8 @@ import Cardano.Crypto.VRF.Praos
 import qualified Cardano.Crypto.VRF.Praos as Ver03
 import Cardano.Crypto.VRF.PraosBatchCompat
 import qualified Cardano.Crypto.VRF.PraosBatchCompat as Ver13
+import Data.Array.Byte (ByteArray (..))
+import qualified Data.ByteString.Short as SBS
 
 import qualified Data.ByteString as BS
 import qualified Data.Char as Char
@@ -490,5 +492,6 @@ instance
 
 instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
   arbitrary = do
-    bytes <- BS.pack <$> vectorOf (fromIntegral (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
-    return $ OutputVRF bytes
+    sbs <- SBS.pack <$> vectorOf (fromIntegral (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
+    case sbs of
+      SBS.SBS ba -> return $ OutputVRF $ ByteArray ba

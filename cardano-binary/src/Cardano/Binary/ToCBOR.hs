@@ -1,14 +1,16 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NumDecimals #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Cardano.Binary.ToCBOR (
@@ -44,10 +46,12 @@ where
 
 import Prelude hiding ((.))
 
+import qualified Codec.CBOR.ByteArray as BA (ByteArray (..), sizeofByteArray)
 import Codec.CBOR.ByteArray.Sliced as BAS
 import Codec.CBOR.Encoding as E
 import Codec.CBOR.Term
 import Control.Category (Category ((.)))
+import Data.Array.Byte (ByteArray)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Short as SBS
@@ -651,6 +655,18 @@ instance ToCBOR Text.Text where
      in
       bsLength + apMono "withWordSize" withWordSize bsLength
 
+instance ToCBOR BA.ByteArray where
+  toCBOR cborgByteArray@(BA.BA ba) =
+    E.encodeByteArray $ BAS.SBA ba 0 (BA.sizeofByteArray cborgByteArray)
+
+  encodedSizeExpr size _ =
+    let len = size (Proxy @(LengthOf BA.ByteArray))
+     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
+
+deriving via BA.ByteArray instance ToCBOR ByteArray
+
+-- TODO: Once support for GHC-9.6.7 is dropped, this can use newtype deriving:
+-- deriving via ByteArray instance ToCBOR ShortByteString
 instance ToCBOR SBS.ShortByteString where
   toCBOR sbs@(SBS ba) =
     E.encodeByteArray $ BAS.SBA (Prim.ByteArray ba) 0 (SBS.length sbs)
