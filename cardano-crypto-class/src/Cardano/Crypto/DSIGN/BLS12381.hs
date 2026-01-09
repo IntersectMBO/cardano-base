@@ -89,7 +89,6 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Curve1,
   Curve2,
   DualCurve,
-  FinalVerifyOrder,
   Point (..),
   Scalar (..),
   ScalarPtr (..),
@@ -114,8 +113,8 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   withNewPoint',
   withNewPoint_,
  )
+import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 import Cardano.Crypto.PinnedSizedBytes (
-  PinnedSizedBytes,
   psbCreate,
   psbUseAsCPtr,
  )
@@ -162,7 +161,6 @@ data BLS12381SignContext = BLS12381SignContext
 type BLS12381CurveConstraints curve =
   ( BLS curve
   , BLS (DualCurve curve)
-  , FinalVerifyOrder curve
   , KnownSymbol (CurveVariant curve)
   , KnownNat (CompressedPointSize curve)
   , KnownNat (CompressedPointSize (DualCurve curve))
@@ -194,11 +192,9 @@ instance
     deriving anyclass (NoThunks)
 
   newtype SignKeyDSIGN (BLS12381DSIGN curve)
-    = SignKeyBLS12381 (PinnedSizedBytes (SizeSignKeyDSIGN (BLS12381DSIGN curve)))
-    -- The use of Eq from PinnedSizedBytes is needed here, as we need constant time
-    -- comparison for signing keys
-    deriving newtype (Eq, NFData)
-    deriving stock (Show, Generic)
+    = SignKeyBLS12381 Scalar
+    deriving newtype (NFData)
+    deriving stock (Generic)
     deriving anyclass (NoThunks)
 
   newtype SigDSIGN (BLS12381DSIGN curve)
@@ -211,13 +207,13 @@ instance
   algorithmNameDSIGN _ = "bls12-381-" ++ symbolVal (Proxy @(CurveVariant curve))
 
   {-# INLINE deriveVerKeyDSIGN #-}
-  deriveVerKeyDSIGN (SignKeyBLS12381 skPsb) = do
+  deriveVerKeyDSIGN (SignKeyBLS12381 (Scalar skPsb)) = do
     VerKeyBLS12381 $ unsafeDupablePerformIO . psbUseAsCPtr skPsb $ \skp ->
       withNewPoint' @curve $ \vkPtp -> do
         c_blst_sk_to_pk @curve vkPtp (ScalarPtr skp)
 
   {-# INLINE signDSIGN #-}
-  signDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} msg (SignKeyBLS12381 skPsb) =
+  signDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} msg (SignKeyBLS12381 (Scalar skPsb)) =
     SigBLS12381 $ unsafeDupablePerformIO $ do
       psbUseAsCPtr skPsb $ \skPtp -> do
         withNewPoint_ @(DualCurve curve) $ \hashPtr -> do
@@ -266,7 +262,7 @@ instance
   -- Generate a signing key from a seed and optional key info
   -- as per the IETF bls signature draft 05
   genKeyDSIGNWithKeyInfo keyInfo seed =
-    SignKeyBLS12381 $
+    SignKeyBLS12381 . Scalar $
       let (bs, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @(BLS12381DSIGN curve))) seed
        in unsafeDupablePerformIO $ do
             withMaybeCStringLen keyInfo $ \(infoPtr, infoLen) ->
@@ -288,7 +284,7 @@ instance
   rawSerialiseVerKeyDSIGN (VerKeyBLS12381 vkPSB) = blsCompress @curve vkPSB
 
   {-# INLINE rawSerialiseSignKeyDSIGN #-}
-  rawSerialiseSignKeyDSIGN (SignKeyBLS12381 skPSB) = scalarToBS (Scalar skPSB)
+  rawSerialiseSignKeyDSIGN (SignKeyBLS12381 skPSB) = scalarToBS skPSB
 
   {-# INLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs =
@@ -306,7 +302,7 @@ instance
     -- they are valid Scalars, i.e., less than the curve order (255 bits).
     case scalarFromBS bs of
       Left _ -> Nothing
-      Right (Scalar skPsb) -> Just (SignKeyBLS12381 skPsb)
+      Right skScalar -> Just (SignKeyBLS12381 skScalar)
 
   {-# INLINE rawDeserialiseSigDSIGN #-}
   rawDeserialiseSigDSIGN bs =
@@ -323,6 +319,20 @@ deriving stock instance
 deriving stock instance
   BLS (DualCurve curve) =>
   Eq (SigDSIGN (BLS12381DSIGN curve))
+
+-- Constant-time equality for signing keys
+instance Eq (SignKeyDSIGN (BLS12381DSIGN curve)) where
+  (SignKeyBLS12381 (Scalar sk1Psb)) == (SignKeyBLS12381 (Scalar sk2Psb)) =
+    unsafeDupablePerformIO $
+      psbUseAsCPtr sk1Psb $ \sk1Ptr ->
+        psbUseAsCPtr sk2Psb $ \sk2Ptr -> do
+          res <- c_sodium_compare sk1Ptr sk2Ptr size
+          pure (res == 0)
+    where
+      size = fromIntegral @Int @CSize CARDANO_BLST_SCALAR_SIZE
+
+instance Show (SignKeyDSIGN (BLS12381DSIGN curve)) where
+  show _ = "BLS12381DSIGN:<secret>"
 
 instance
   BLS12381CurveConstraints curve =>
@@ -415,11 +425,11 @@ instance
       else Right $ SigBLS12381 aggrPoint
 
   {-# INLINE createPossessionProofDSIGN #-}
-  createPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (SignKeyBLS12381 skPsb) =
+  createPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (SignKeyBLS12381 skScalar) =
     unsafeDupablePerformIO $ do
-      skAsInteger <- scalarToInteger (Scalar skPsb)
+      skAsInteger <- scalarToInteger skScalar
       let VerKeyBLS12381 vkPsb =
-            deriveVerKeyDSIGN (SignKeyBLS12381 skPsb) ::
+            deriveVerKeyDSIGN (SignKeyBLS12381 skScalar) ::
               VerKeyDSIGN (BLS12381DSIGN curve)
           vk = blsCompress @curve vkPsb
           mu1Psb =

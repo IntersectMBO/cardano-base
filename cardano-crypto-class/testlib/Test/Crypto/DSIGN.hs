@@ -765,29 +765,22 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
   describe "serialization" $ do
     describe "raw" $ do
       prop "PoP serialization" .
-        forAllShow (defaultPossessionProofGen @v genContext)
-                   ppShow $
-                   prop_raw_serialise rawSerialisePossessionProofDSIGN rawDeserialisePossessionProofDSIGN
+        forAllPoP $ prop_raw_serialise rawSerialisePossessionProofDSIGN rawDeserialisePossessionProofDSIGN
       prop "PoP deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialisePossessionProofDSIGN @v)
       prop "PoP fail fromCBOR" $ prop_bad_cbor_bytes @(PossessionProofDSIGN v)
     describe "size" $ do
       prop "PoP" .
-        forAllShow (defaultPossessionProofGen @v genContext)
-                   ppShow $
-                   prop_size_serialise rawSerialisePossessionProofDSIGN (sizePossessionProofDSIGN (Proxy @v))
+        forAllPoP $ prop_size_serialise rawSerialisePossessionProofDSIGN (sizePossessionProofDSIGN (Proxy @v))
     describe "direct CBOR" $ do
       prop "PoP" .
-        forAllShow (defaultPossessionProofGen @v genContext)
-                   ppShow $
-                   prop_cbor_with encodePossessionProofDSIGN decodePossessionProofDSIGN
+        forAllPoP $ prop_cbor_with encodePossessionProofDSIGN decodePossessionProofDSIGN
     describe "To/FromCBOR class" $ do
-      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_cbor
+      prop "PoP" . forAllPoP $ prop_cbor
     describe "ToCBOR size" $ do
-      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_cbor_size
+      prop "PoP" . forAllPoP $ prop_cbor_size
     describe "direct matches class" $ do
       prop "PoP" .
-        forAllShow (defaultPossessionProofGen @v genContext) ppShow $
-        prop_cbor_direct_vs_class encodePossessionProofDSIGN
+        forAllPoP $ prop_cbor_direct_vs_class encodePossessionProofDSIGN
   describe "aggregate" $ do
     prop "aggregate verify positive" $
       withMaxSuccess 1000 .
@@ -816,12 +809,18 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
               _ ->
                 counterexample "genAggregateCaseAtLeast2 produced <2 entries (bug in generator)" False
     describe "NoThunks" $ do
-      prop "PoP" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ prop_no_thunks
-      prop "PoP rawSerialise" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ \pop ->
+      prop "PoP" . forAllPoP $ prop_no_thunks
+      prop "PoP rawSerialise" . forAllPoP $ \pop ->
         prop_no_thunks (rawSerialisePossessionProofDSIGN pop)
-      prop "PoP rawDeserialise" . forAllShow (defaultPossessionProofGen @v genContext) ppShow $ \pop ->
+      prop "PoP rawDeserialise" . forAllPoP $ \pop ->
         prop_no_thunks (fromJust $! rawDeserialisePossessionProofDSIGN @v . rawSerialisePossessionProofDSIGN $ pop)
   where
+    forAllPoP
+      :: Testable prop
+      => (PossessionProofDSIGN v -> prop)
+      -> Property
+    forAllPoP =
+      forAllShow (defaultPossessionProofGen @v genContext) ppShow
     genAggregateCase genCtx genMsg' = do
       ctx <- genCtx
       msg <- genMsg'
