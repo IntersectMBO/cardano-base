@@ -3,6 +3,7 @@
 ## 2.2.4.0
 
 * Add `BLS12-381` aggregatable signature schemes
+* Extend `DSIGNAlgorithm v` to also support optional `genKeyDSIGNWithKeyInfo`
 * Introduce `DSIGNAggregatable v` class that extends `DSIGNAlgorithm v`
 * Add Cabal components using code moved from `cardano-crypto-tests`:
   - `lib:testlib`
