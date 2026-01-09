@@ -1,7 +1,12 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.2.4.0
+## 2.3.0.0
 
+* Remove `Serialise` instance for `PackedBytes` as unused
+* Switch `OutputVRF` to use `ByteArray` instead of `ByteString`. Change field accessor name to `getOutputVRFByteArray`
+* Add `byteArrayToNatural`, `naturalToByteArray` and `byteArrayToInteger`.
+* Expose `bytesToInteger`
+* Add `hashToByteArray`
 * Add Cabal components using code moved from `cardano-crypto-tests`:
   - `lib:testlib`
   - `lib:benchlib`
@@ -11,6 +16,7 @@
 * Add `ToCBOR` and `FromCBOR` instances for `MessageHash`
 * Add `ToCBOR` and `FromCBOR` instances for `PinnedSizedBytes`
 * Add `ToCBOR` and `FromCBOR` instances for `PackedBytes`
+* Add `packByteString`
 * Add `packShortByteString` and `packShortByteStringWithOffset`
 * Deprecate `packBytesMaybe`
 * Refactor BLS12-381 module to use `PinnedSizedBytes`

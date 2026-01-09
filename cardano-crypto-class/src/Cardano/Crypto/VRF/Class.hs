@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -19,6 +20,7 @@ module Cardano.Crypto.VRF.Class (
 
   -- ** VRF output
   OutputVRF (..),
+  getOutputVRFBytes,
   getOutputVRFNatural,
   mkTestOutputVRF,
 
@@ -42,20 +44,6 @@ module Cardano.Crypto.VRF.Class (
 )
 where
 
-import Control.DeepSeq (NFData)
-import Data.ByteString (ByteString)
-import Data.Kind (Type)
-import Data.Proxy (Proxy (..))
-import Data.Typeable (Typeable)
-import GHC.Exts (Constraint)
-import GHC.Generics (Generic)
-import GHC.Stack
-import GHC.TypeLits (ErrorMessage (..), TypeError)
-import NoThunks.Class (NoThunks)
-import Numeric.Natural (Natural)
-
-import qualified Data.ByteString as BS
-
 import Cardano.Binary (
   Decoder,
   Encoding,
@@ -68,10 +56,24 @@ import Cardano.Binary (
   enforceSize,
   withWordSize,
  )
-
 import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, hashWith)
 import Cardano.Crypto.Seed (Seed)
-import Cardano.Crypto.Util (Empty, bytesToNatural, naturalToBytes)
+import Cardano.Crypto.Util (Empty, byteArrayToNatural, naturalToByteArray)
+import Control.DeepSeq (NFData)
+import Data.Array.Byte (ByteArray)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.ByteString.Short as SBS (fromShort)
+import Data.Kind (Type)
+import Data.MemPack.Buffer (byteArrayToShortByteString)
+import Data.Proxy (Proxy (..))
+import Data.Typeable (Typeable)
+import GHC.Exts (Constraint)
+import GHC.Generics (Generic)
+import GHC.Stack
+import GHC.TypeLits (ErrorMessage (..), TypeError)
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
+import Numeric.Natural (Natural)
 
 class
   ( Typeable v
@@ -210,22 +212,31 @@ instance
 -- | The output bytes of the VRF.
 --
 -- The output size is a fixed number of bytes and is given by 'sizeOutputVRF'.
-newtype OutputVRF v = OutputVRF {getOutputVRFBytes :: ByteString}
-  deriving (Eq, Ord, Show, ToCBOR, FromCBOR, NoThunks)
+newtype OutputVRF v = OutputVRF {getOutputVRFByteArray :: ByteArray}
+  deriving (Eq, Ord, Show, ToCBOR, FromCBOR)
   deriving newtype (NFData)
+
+-- ByteArray is already in NF
+deriving via
+  OnlyCheckWhnfNamed "OutputVRF" (OutputVRF v)
+  instance
+    NoThunks (OutputVRF v)
+
+getOutputVRFBytes :: OutputVRF v -> ByteString
+getOutputVRFBytes = SBS.fromShort . byteArrayToShortByteString . getOutputVRFByteArray
 
 -- | The output bytes of the VRF interpreted as a big endian natural number.
 --
 -- The range of this number is determined by the size of the VRF output bytes.
 -- It is thus in the range @0 ..  2 ^ (8 * sizeOutputVRF proxy) - 1@.
 getOutputVRFNatural :: OutputVRF v -> Natural
-getOutputVRFNatural = bytesToNatural . getOutputVRFBytes
+getOutputVRFNatural = byteArrayToNatural . getOutputVRFByteArray
 
 -- | For testing purposes, make an 'OutputVRF' from a 'Natural'.
 --
 -- The 'OutputVRF' will be of the appropriate size for the 'VRFAlgorithm'.
 mkTestOutputVRF :: forall v. VRFAlgorithm v => Natural -> OutputVRF v
-mkTestOutputVRF = OutputVRF . naturalToBytes sz
+mkTestOutputVRF = OutputVRF . naturalToByteArray sz
   where
     sz = fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
 
