@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -343,18 +344,36 @@ instance
 -- VerKey instances
 --
 
-deriving instance HashAlgorithm h => Show (VerKeyKES (SumKES h d))
+deriving instance
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  HashAlgorithm h =>
+#endif
+  Show (VerKeyKES (SumKES h d))
 deriving instance Eq (VerKeyKES (SumKES h d))
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d)
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  , SodiumHashAlgorithm h
+#endif
+  , SizeHash h ~ SeedSizeKES d) =>
   ToCBOR (VerKeyKES (SumKES h d))
   where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d)
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  , SodiumHashAlgorithm h
+#endif
+  , SizeHash h ~ SeedSizeKES d) =>
   FromCBOR (VerKeyKES (SumKES h d))
   where
   fromCBOR = decodeVerKeyKES
@@ -387,20 +406,45 @@ deriving via
 -- Sig instances
 --
 
-deriving instance (KESAlgorithm d, KESAlgorithm (SumKES h d)) => Show (SigKES (SumKES h d))
-deriving instance (KESAlgorithm d, KESAlgorithm (SumKES h d)) => Eq (SigKES (SumKES h d))
+deriving instance (KESAlgorithm d
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  , KESAlgorithm (SumKES h d)
+#endif
+  ) => Show (SigKES (SumKES h d))
+deriving instance (KESAlgorithm d
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  , KESAlgorithm (SumKES h d)
+#endif
+  ) => Eq (SigKES (SumKES h d))
 
 instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d),
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  SodiumHashAlgorithm h,
+#endif
+  SizeHash h ~ SeedSizeKES d) =>
   ToCBOR (SigKES (SumKES h d))
   where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d),
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+
+  SodiumHashAlgorithm h,
+#endif
+  SizeHash h ~ SeedSizeKES d) =>
   FromCBOR (SigKES (SumKES h d))
   where
   fromCBOR = decodeSigKES
@@ -514,7 +558,11 @@ instance
   ( SizeHash h ~ SeedSizeKES d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
   , KnownNat (SizeVerKeyKES (SumKES h d))
+#endif
   , KnownNat (SizeSignKeyKES (SumKES h d))
   , KnownNat (SizeSigKES (SumKES h d))
   ) =>
@@ -527,7 +575,11 @@ instance
   ( SizeHash h ~ SeedSizeKES d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
+#if __GLASGOW_HASKELL__ < 914
+  -- These constraints are REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
   , KnownNat (SizeVerKeyKES (SumKES h d))
+#endif
   , KnownNat (SizeSignKeyKES (SumKES h d))
   , KnownNat (SizeSigKES (SumKES h d))
   ) =>

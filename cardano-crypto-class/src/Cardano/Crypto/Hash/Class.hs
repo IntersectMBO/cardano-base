@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -300,7 +301,13 @@ instance HashAlgorithm h => ToJSONKey (Hash h a) where
 instance HashAlgorithm h => FromJSONKey (Hash h a) where
   fromJSONKey = Aeson.FromJSONKeyTextParser parseHash
 
-instance HashAlgorithm h => ToJSON (Hash h a) where
+instance
+#if __GLASGOW_HASKELL__ < 914
+  -- This constraints is REQUIRED for ghc < 9.14 but REDUNDANT for ghc >= 9.14
+  -- See https://gitlab.haskell.org/ghc/ghc/-/issues/26381#note_637863
+  HashAlgorithm h =>
+#endif
+  ToJSON (Hash h a) where
   toJSON = toJSON . hashToTextAsHex
   toEncoding = toEncoding . hashToTextAsHex
 

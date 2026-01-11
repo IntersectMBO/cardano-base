@@ -11,8 +11,8 @@ repository cardano-haskell-packages
 
 -- The index-states
 index-state:
-  , hackage.haskell.org 2025-10-13T20:51:29Z
-  , cardano-haskell-packages 2025-10-07T11:20:00Z
+  , hackage.haskell.org 2026-01-11T20:39:46Z
+  , cardano-haskell-packages 2026-01-08T17:40:53Z
 
 packages:
   base-deriving-via
@@ -40,3 +40,67 @@ program-options
 package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
+
+if impl(ghc >=9.14)
+  constraints:
+    , QuickCheck < 2.17.0.0
+
+-- cabal-allow-newer
+if impl (ghc >= 9.14)
+  allow-newer:
+    -- https://github.com/haskell/aeson/issues/1155
+    , aeson:base
+    , aeson:bytestring
+    , aeson:deepseq
+    , aeson:ghc-prim
+    , aeson:template-haskell
+    , aeson:time
+
+    -- https://github.com/haskellari/binary-orphans/issues/67
+    , binary-orphans:base
+
+    -- https://github.com/phadej/boring/issues/48
+    , boring:base
+
+    -- https://github.com/well-typed/cborg/issues/373
+    , cborg:base
+
+    -- https://github.com/hedgehogqa/haskell-hedgehog/issues/566
+    , hedgehog:template-haskell
+
+    -- https://github.com/haskellari/indexed-traversable/issues/49
+    , indexed-traversable:base
+
+    -- https://github.com/haskellari/indexed-traversable/issues/50
+    , indexed-traversable-instances:base
+
+    -- https://github.com/haskellari/microstache/issues/45
+    , microstache:base
+
+    -- https://github.com/haskell/parsec/issues/197
+    , parsec:base
+
+    , quickcheck-instances:base
+    , quickcheck-instances:bytestring
+
+    -- https://github.com/recursion-schemes/recursion-schemes/issues/174
+    , recursion-schemes:template-haskell
+
+    -- https://github.com/haskellari/these/issues/211
+    , semialign:base
+
+    -- https://github.com/well-typed/cborg/issues/373
+    , serialise:base
+    , serialise:bytestring
+
+    -- https://github.com/haskellari/these/issues/211
+    , these:base
+
+    -- https://github.com/haskellari/time-compat/issues/48
+    , time-compat:base
+
+    -- https://github.com/haskellari/tree-diff/issues/102
+    , tree-diff:base
+
+    -- https://github.com/haskell-hvr/uuid/issues/95
+    , uuid-types:template-haskell
