@@ -112,8 +112,7 @@ instance VRFAlgorithm SimpleVRF where
     deriving (NoThunks) via InspectHeap C.PrivateNumber
     deriving anyclass (NFData)
 
-  data CertVRF SimpleVRF
-    = CertSimpleVRF
+  data CertVRF SimpleVRF = CertSimpleVRF
     { certU :: !Point -- 15 byte point numbers, round up to 16
     , certC :: !Natural -- md5 hash, so 16 bytes
     , certS :: !Integer -- at most q, so 15 bytes, round up to 16
