@@ -28,6 +28,7 @@ module Cardano.Crypto.PackedBytes
 
 import Codec.CBOR.Decoding as D (decodeBytes)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), Size)
+import Codec.Serialise (Serialise(..))
 import Control.DeepSeq (NFData(..))
 import Control.Monad (unless, when)
 import Control.Monad.Primitive (primitive_)
@@ -139,6 +140,10 @@ instance KnownNat n => MemPack (PackedBytes n) where
       -- related to the `IO` we are escaping.
       (\addr# -> accursedUnutterablePerformIO $ packPinnedPtr (Ptr (addr# `plusAddr#` curPos#)))
   {-# INLINE unpackM #-}
+
+instance KnownNat n => Serialise (PackedBytes n) where
+  encode = toCBOR
+  decode = fromCBOR
 
 instance KnownNat n => ToCBOR (PackedBytes n) where
   toCBOR = toCBOR . unpackBytes
