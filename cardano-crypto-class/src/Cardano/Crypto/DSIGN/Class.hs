@@ -174,8 +174,8 @@ class
   -- is at least 'seedSizeDSIGN' bytes long.
   genKeyDSIGN :: Seed -> SignKeyDSIGN v
 
-  genKeyDSIGNWithKeyInfo :: KeyGenContextDSIGN v -> Seed -> SignKeyDSIGN v
-  genKeyDSIGNWithKeyInfo _ = genKeyDSIGN
+  genKeyDSIGNWithContext :: KeyGenContextDSIGN v -> Seed -> SignKeyDSIGN v
+  genKeyDSIGNWithContext _ = genKeyDSIGN
 
   --
   -- Serialisation/(de)serialisation in fixed-size raw format
