@@ -8,7 +8,7 @@
 * Expose `bytesToInteger`
 * Add `hashToByteArray`
 * Add `BLS12-381` aggregatable signature schemes
-* Extend `DSIGNAlgorithm v` to also support optional `genKeyDSIGNWithKeyInfo`
+* Extend `DSIGNAlgorithm v` to also support optional `genKeyDSIGNWithContext`
 * Introduce `DSIGNAggregatable v` class that extends `DSIGNAlgorithm v`
 * Add Cabal components using code moved from `cardano-crypto-tests`:
   - `lib:testlib`

@@ -58,7 +58,7 @@ import Cardano.Crypto.DSIGN.Class (
     algorithmNameDSIGN,
     deriveVerKeyDSIGN,
     genKeyDSIGN,
-    genKeyDSIGNWithKeyInfo,
+    genKeyDSIGNWithContext,
     rawDeserialiseSigDSIGN,
     rawDeserialiseSignKeyDSIGN,
     rawDeserialiseVerKeyDSIGN,
@@ -256,12 +256,12 @@ instance
                   _ -> Left "verifyDSIGN: BLS12381DSIGN signature failed to verify"
 
   {-# INLINE genKeyDSIGN #-}
-  genKeyDSIGN = genKeyDSIGNWithKeyInfo Nothing
+  genKeyDSIGN = genKeyDSIGNWithContext Nothing
 
-  {-# INLINE genKeyDSIGNWithKeyInfo #-}
+  {-# INLINE genKeyDSIGNWithContext #-}
   -- Generate a signing key from a seed and optional key info
   -- as per the IETF bls signature draft 05
-  genKeyDSIGNWithKeyInfo keyInfo seed =
+  genKeyDSIGNWithContext keyInfo seed =
     SignKeyBLS12381 . Scalar $
       let (bs, _) = getBytesFromSeedT (seedSizeDSIGN (Proxy @(BLS12381DSIGN curve))) seed
        in unsafeDupablePerformIO $ do
