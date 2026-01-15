@@ -33,6 +33,7 @@ where
 
 import Prelude hiding ((.))
 
+import Cardano.Base.IP (IPv4, IPv6, toIPv4w, toIPv6w)
 import qualified Codec.CBOR.ByteArray as BA (ByteArray (..))
 import Codec.CBOR.Decoding as D
 import Codec.CBOR.FlatTerm
@@ -624,3 +625,13 @@ toCborError = either cborError pure
 -- | Convert a `B.Buildable` error message into a 'MonadFail' failure.
 cborError :: (MonadFail m, B.Buildable e) => e -> m a
 cborError = fail . formatToString build
+
+--------------------------------------------------------------------------------
+-- IP addresses
+--------------------------------------------------------------------------------
+
+instance FromCBOR IPv4 where
+  fromCBOR = toIPv4w <$> fromCBOR
+
+instance FromCBOR IPv6 where
+  fromCBOR = toIPv6w <$> fromCBOR

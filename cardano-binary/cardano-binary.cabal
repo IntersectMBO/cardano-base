@@ -44,6 +44,7 @@ library
   build-depends:
     base,
     bytestring,
+    cardano-base,
     cborg >=0.2.9 && <0.3,
     containers,
     data-fix,
