@@ -196,6 +196,7 @@ library testlib
     nothunks,
     pretty-show,
     quickcheck-instances,
+    random,
     vector,
 
   if flag(secp256k1-support)

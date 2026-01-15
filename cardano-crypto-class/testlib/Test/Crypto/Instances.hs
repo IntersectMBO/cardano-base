@@ -1,4 +1,7 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -7,16 +10,20 @@ module Test.Crypto.Instances (
   withMLockedSeedFromPSB,
 ) where
 
+import Cardano.Crypto.DSIGN.Class hiding (Signable)
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.PinnedSizedBytes
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow
+import Data.ByteString (ByteString)
 import Data.Maybe (mapMaybe)
 import Data.Proxy (Proxy (Proxy))
 import GHC.Exts (fromList, fromListN, toList)
+import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat, natVal)
-import Test.QuickCheck (Arbitrary (..))
+import System.Random.Stateful (uniformByteString)
+import Test.QuickCheck (Arbitrary (..), Gen)
 import qualified Test.QuickCheck.Gen as Gen
 
 -- We cannot allow this instance, because it doesn't guarantee timely
@@ -62,3 +69,27 @@ instance KnownNat n => Arbitrary (PinnedSizedBytes n) where
       psbFromByteStringCheck
   shrink psb = case toList . psbToByteString $ psb of
     bytes -> mapMaybe (psbFromByteStringCheck . fromList) . shrink $ bytes
+
+instance DSIGNAlgorithm v => Arbitrary (VerKeyDSIGN v) where
+  arbitrary = deriveVerKeyDSIGN <$> arbitrary
+
+genByteString :: Int -> Gen ByteString
+genByteString n = fmap fst . Gen.MkGen $ \g _ -> uniformByteString n g
+
+errorInvalidSize :: HasCallStack => Int -> Maybe a -> Gen a
+errorInvalidSize n = maybe (error $ "Impossible: Invalid size " ++ show n) pure
+
+instance DSIGNAlgorithm v => Arbitrary (SignKeyDSIGN v) where
+  arbitrary = do
+    let n = fromIntegral (sizeSignKeyDSIGN (Proxy @v))
+    bs <- genByteString n
+    errorInvalidSize n $ rawDeserialiseSignKeyDSIGN bs
+
+instance DSIGNAlgorithm v => Arbitrary (SigDSIGN v) where
+  arbitrary = do
+    let n = fromIntegral (sizeSigDSIGN (Proxy @v))
+    bs <- genByteString n
+    errorInvalidSize n $ rawDeserialiseSigDSIGN bs
+
+instance DSIGNAlgorithm v => Arbitrary (SignedDSIGN v a) where
+  arbitrary = SignedDSIGN <$> arbitrary
