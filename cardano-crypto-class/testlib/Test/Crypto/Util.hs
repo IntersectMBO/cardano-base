@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
@@ -10,6 +11,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Crypto.Util (
   -- * CBOR
@@ -43,6 +45,9 @@ module Test.Crypto.Util (
   unSizedSeed,
   arbitrarySeedOfSize,
   arbitrarySeedBytesOfSize,
+
+  -- * Keygen
+  prop_keygen_context_changes_verkey,
 
   -- * test messages for signings
   Message (..),
@@ -90,7 +95,7 @@ import Cardano.Binary (
   szSimplify,
  )
 import Cardano.Crypto.DSIGN.Class (
-  DSIGNAlgorithm (SigDSIGN, SignKeyDSIGN, VerKeyDSIGN),
+  DSIGNAlgorithm (..),
   sizeSigDSIGN,
   sizeSignKeyDSIGN,
   sizeVerKeyDSIGN,
@@ -153,9 +158,11 @@ import Test.QuickCheck (
   shrink,
   vector,
   (.&&.),
+  (=/=),
   (===),
  )
 import qualified Test.QuickCheck.Gen as Gen
+import Test.QuickCheck.Property ((==>))
 import Text.Show.Pretty (ppShow)
 
 --------------------------------------------------------------------------------
@@ -211,6 +218,45 @@ newtype Message = Message {messageBytes :: ByteString}
 instance Arbitrary Message where
   arbitrary = Message . BS.pack <$> arbitrary
   shrink = map (Message . BS.pack) . shrink . BS.unpack . messageBytes
+
+--------------------------------------------------------------------------------
+-- Key gen properties
+--------------------------------------------------------------------------------
+
+-- | For algorithms where key generation depends on a keygen context:
+-- using the same seed but different keygen contexts should yield different
+-- verification keys.
+prop_keygen_context_changes_verkey ::
+  forall v.
+  ( DSIGNAlgorithm v
+  , Eq (KeyGenContextDSIGN v)
+  , Show (KeyGenContextDSIGN v)
+  ) =>
+  Proxy v ->
+  Gen (KeyGenContextDSIGN v) ->
+  SizedSeed (SeedSizeDSIGN v) ->
+  Property
+prop_keygen_context_changes_verkey _ genKeyCtx (SizedSeed seed) =
+  forAllBlind genKeyCtx $ \kc1 ->
+    forAllBlind genKeyCtx $ \kc2 ->
+      kc1
+        /= kc2
+          ==> let vk1 = deriveVerKeyDSIGN (genKeyDSIGNWithContext @v kc1 seed)
+                  vk2 = deriveVerKeyDSIGN (genKeyDSIGNWithContext @v kc2 seed)
+               in counterexample
+                    ( "kc1 = "
+                        ++ ppShow kc1
+                        ++ "\n"
+                        ++ "kc2 = "
+                        ++ ppShow kc2
+                        ++ "\n"
+                        ++ "vk1 = "
+                        ++ ppShow vk1
+                        ++ "\n"
+                        ++ "vk2 = "
+                        ++ ppShow vk2
+                    )
+                    (vk1 =/= vk2)
 
 --------------------------------------------------------------------------------
 -- Serialisation properties

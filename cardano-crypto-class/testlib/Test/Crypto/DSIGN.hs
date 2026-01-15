@@ -48,26 +48,12 @@ import Data.Proxy (Proxy (..))
 import Data.Maybe (fromJust)
 
 import Control.Exception (evaluate, bracket)
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, when)
 
 import Cardano.Crypto.DSIGN (
   MockDSIGN,
   Ed25519DSIGN,
   Ed448DSIGN,
-  DSIGNAlgorithm (
-    SeedSizeDSIGN,
-    VerKeyDSIGN,
-    SignKeyDSIGN,
-    SigDSIGN,
-    ContextDSIGN,
-    Signable,
-    rawSerialiseVerKeyDSIGN,
-    rawDeserialiseVerKeyDSIGN,
-    rawSerialiseSignKeyDSIGN,
-    rawDeserialiseSignKeyDSIGN,
-    rawSerialiseSigDSIGN,
-    rawDeserialiseSigDSIGN
-    ),
   aggregateVerKeysDSIGN,
   sizeVerKeyDSIGN,
   sizeSignKeyDSIGN,
@@ -78,23 +64,17 @@ import Cardano.Crypto.DSIGN (
   decodeSignKeyDSIGN,
   encodeSigDSIGN,
   decodeSigDSIGN,
-  signDSIGN,
-  deriveVerKeyDSIGN,
-  verifyDSIGN,
-  genKeyDSIGN,
   seedSizeDSIGN,
 
-  DSIGNMAlgorithm (SignKeyDSIGNM, deriveVerKeyDSIGNM),
+  DSIGNMAlgorithm (..),
   UnsoundDSIGNMAlgorithm,
   rawSerialiseSignKeyDSIGNM,
   rawDeserialiseSignKeyDSIGNM,
   signDSIGNM,
-  deriveVerKeyDSIGN,
   genKeyDSIGNM,
 
   getSeedDSIGNM,
   forgetSignKeyDSIGNM,
-  BLS12381CurveConstraints,
   BLS12381DSIGN,
 
   DSIGNAggregatable (..),
@@ -112,6 +92,7 @@ import Test.Crypto.Util (
   genBadInputFor,
   shrinkBadInputFor,
   Message,
+  prop_keygen_context_changes_verkey,
   prop_raw_serialise,
   prop_raw_deserialise,
   prop_size_serialise,
@@ -148,69 +129,64 @@ import Test.Crypto.Util (
 import Cardano.Crypto.SECP256K1.Constants (SECP256K1_ECDSA_MESSAGE_BYTES)
 import GHC.TypeLits (natVal)
 import Cardano.Crypto.Hash (SHA3_256, HashAlgorithm (SizeHash), Blake2b_256, SHA256, Keccak256)
+import Cardano.Crypto.DSIGN.Class (DSIGNAlgorithm(..))
+import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN)
+import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinVerKeyDSIGN)
 #endif
 
-mockSigGen :: Gen (SigDSIGN MockDSIGN)
-mockSigGen = defaultSigGen
+blsGenKeyWithContextGen :: Gen (Maybe BS.ByteString)
+blsGenKeyWithContextGen =
+  Gen.frequency
+    [ (1, pure Nothing)
+    , (100, Just <$> genNonEmptyBS)
+    ]
+  where
+    -- note that the context Nothing and Just "" are considered the same.
+    genNonEmptyBS = Gen.suchThat (BS.pack <$> arbitrary) (not . BS.null)
 
-ed25519SigGen :: Gen (SigDSIGN Ed25519DSIGN)
-ed25519SigGen = defaultSigGen
 
-ed448SigGen :: Gen (SigDSIGN Ed448DSIGN)
-ed448SigGen = defaultSigGen
-
-blsSigGen :: forall curve. BLS12381CurveConstraints curve => Gen (SigDSIGN (BLS12381DSIGN curve))
-blsSigGen = do
-  msg :: Message <- arbitrary
-  ctx <- blsSigContextGen
-  signDSIGN ctx msg <$> defaultSignKeyGen @(BLS12381DSIGN curve)
-
-blsSigContextGen :: Gen BLS12381SignContext
-blsSigContextGen = do
+blsSignContextGen :: Gen BLS12381SignContext
+blsSignContextGen = do
   dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
   aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
   pure BLS12381SignContext {blsSignContextAug = aug, blsSignContextDst = dst}
 
+
 #ifdef SECP256K1_ENABLED
-ecdsaSigGen :: Gen (SigDSIGN EcdsaSecp256k1DSIGN)
-ecdsaSigGen = do
-  msg <- genEcdsaMsg
-  signDSIGN () msg <$> defaultSignKeyGen
-
-schnorrSigGen :: Gen (SigDSIGN SchnorrSecp256k1DSIGN)
-schnorrSigGen = defaultSigGen
-
 genEcdsaMsg :: Gen MessageHash
 genEcdsaMsg =
   Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary)
                   toMessageHash
 #endif
 
-defaultVerKeyGen :: forall (a :: Type) .
-  (DSIGNAlgorithm a) => Gen (VerKeyDSIGN a)
-defaultVerKeyGen = deriveVerKeyDSIGN <$> defaultSignKeyGen @a
+defaultSignKeyWithContextGen
+  :: forall (v :: Type).
+     DSIGNAlgorithm v
+  => Gen (KeyGenContextDSIGN v)
+  -> Gen (SignKeyDSIGN v)
+defaultSignKeyWithContextGen genKeyCtx = do
+  keyCtx <- genKeyCtx
+  seed   <- arbitrarySeedOfSize (seedSizeDSIGN (Proxy @v))
+  pure $ genKeyDSIGNWithContext @v keyCtx seed
 
-defaultSignKeyGen :: forall (a :: Type).
-  (DSIGNAlgorithm a) => Gen (SignKeyDSIGN a)
+defaultSignKeyGen
+  :: forall (v :: Type).
+     ( DSIGNAlgorithm v
+     , KeyGenContextDSIGN v ~ ()
+     )
+  => Gen (SignKeyDSIGN v)
 defaultSignKeyGen =
-  genKeyDSIGN <$> arbitrarySeedOfSize (seedSizeDSIGN (Proxy :: Proxy a))
-
-defaultSigGen :: forall (a :: Type) .
-  (DSIGNAlgorithm a, ContextDSIGN a ~ (), Signable a Message) =>
-  Gen (SigDSIGN a)
-defaultSigGen = do
-  msg :: Message <- arbitrary
-  signDSIGN () msg <$> defaultSignKeyGen
+  defaultSignKeyWithContextGen @v (pure ())
 
 defaultPossessionProofGen
   :: forall v.
-     ( DSIGNAggregatable v
-     )
+     DSIGNAggregatable v
   => Gen (ContextDSIGN v)
+  -> Gen (KeyGenContextDSIGN v)
   -> Gen (PossessionProofDSIGN v)
-defaultPossessionProofGen genContext = do
+defaultPossessionProofGen genContext genKeyCtx = do
   ctx <- genContext
-  sk  <- defaultSignKeyGen @v
+  sk  <- defaultSignKeyWithContextGen @v genKeyCtx
   pure $ createPossessionProofDSIGN ctx sk
 
 -- Used for adjusting no of quick check tests
@@ -228,14 +204,14 @@ tests :: Lock -> Spec
 tests lock =
   describe "Crypto.DSIGN" $ do
      describe "Pure" $ do
-       testDSIGNAlgorithm mockSigGen (arbitrary @Message) "MockDSIGN"
-       testDSIGNAlgorithm ed25519SigGen (arbitrary @Message) "Ed25519DSIGN"
-       testDSIGNAlgorithm ed448SigGen (arbitrary @Message) "Ed448DSIGN"
-       testDSIGNAlgorithmWithContext blsSigContextGen (blsSigGen @Curve1) (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
-       testDSIGNAlgorithmWithContext blsSigContextGen (blsSigGen @Curve2) (arbitrary @Message) "BLS12381MinSigDSIGN"
+       testDSIGNAlgorithm (Proxy @MockDSIGN) (arbitrary @Message) "MockDSIGN"
+       testDSIGNAlgorithm (Proxy @Ed25519DSIGN) (arbitrary @Message) "Ed25519DSIGN"
+       testDSIGNAlgorithm (Proxy @Ed448DSIGN) (arbitrary @Message) "Ed448DSIGN"
+       testDSIGNAlgorithmWithContext (Proxy @BLS12381MinVerKeyDSIGN) True blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+       testDSIGNAlgorithmWithContext (Proxy @BLS12381MinSigDSIGN) True blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
 #ifdef SECP256K1_ENABLED
-       testDSIGNAlgorithm ecdsaSigGen genEcdsaMsg "EcdsaSecp256k1DSIGN"
-       testDSIGNAlgorithm schnorrSigGen (arbitrary @Message) "SchnorrSecp256k1DSIGN"
+       testDSIGNAlgorithm (Proxy @EcdsaSecp256k1DSIGN) genEcdsaMsg "EcdsaSecp256k1DSIGN"
+       testDSIGNAlgorithm (Proxy @SchnorrSecp256k1DSIGN) (arbitrary @Message) "SchnorrSecp256k1DSIGN"
        -- Specific tests related only to ecdsa
        testEcdsaInvalidMessageHash "EcdsaSecp256k1InvalidMessageHash"
        testEcdsaWithHashAlgorithm (Proxy @SHA3_256) "EcdsaSecp256k1WithSHA3_256"
@@ -246,11 +222,13 @@ tests lock =
      describe "MLocked" $ do
       testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
      describe "Aggregatable" $ do
-      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) blsSigContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
-      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) blsSigContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
 
 testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,
+   Eq (KeyGenContextDSIGN v),
+   Show (KeyGenContextDSIGN v),
    Signable v a,
    Show a,
    Show (ContextDSIGN v),
@@ -262,22 +240,31 @@ testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
    FromCBOR (SignKeyDSIGN v),
    ToCBOR (SigDSIGN v),
    FromCBOR (SigDSIGN v)) =>
+  Proxy v ->
+  Bool ->
   Gen (ContextDSIGN v) ->
-  Gen (SigDSIGN v) ->
+  Gen (KeyGenContextDSIGN v) ->
   Gen a ->
   String ->
   Spec
-testDSIGNAlgorithmWithContext genContext genSig genMsg name = testEnough . describe name $ do
+testDSIGNAlgorithmWithContext proxy ctxMatters genContext genKeyCtx genMsg name = testEnough . describe name $ do
+  when ctxMatters $
+    describe "keygen context" $ do
+      prop "same seed, different keygen contexts results in different ver keys" $
+        prop_keygen_context_changes_verkey proxy genKeyCtx
+  -- describe "keygen context" $ do
+  --   prop "same seed, different keygen contexts results in different ver keys" $
+  --     prop_keygen_context_changes_verkey proxy genKeyCtx
   describe "serialization" $ do
     describe "raw" $ do
       prop "VerKey serialization" .
-        forAllShow (defaultVerKeyGen @v)
+        forAllShow genVerKey
                    ppShow $
                    prop_raw_serialise rawSerialiseVerKeyDSIGN rawDeserialiseVerKeyDSIGN
       prop "VerKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseVerKeyDSIGN @v)
       prop "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(VerKeyDSIGN v)
       prop "SignKey serialization" .
-        forAllShow (defaultSignKeyGen @v)
+        forAllShow (defaultSignKeyWithContextGen @v genKeyCtx)
                    ppShow $
                    prop_raw_serialise rawSerialiseSignKeyDSIGN rawDeserialiseSignKeyDSIGN
       prop "SignKey deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialiseSignKeyDSIGN @v)
@@ -290,11 +277,11 @@ testDSIGNAlgorithmWithContext genContext genSig genMsg name = testEnough . descr
       prop "VerKey fail fromCBOR" $ prop_bad_cbor_bytes @(SigDSIGN v)
     describe "size" $ do
       prop "VerKey" .
-        forAllShow (defaultVerKeyGen @v)
+        forAllShow genVerKey
                    ppShow $
                    prop_size_serialise rawSerialiseVerKeyDSIGN (sizeVerKeyDSIGN (Proxy @v))
       prop "SignKey" .
-        forAllShow (defaultSignKeyGen @v)
+        forAllShow (defaultSignKeyWithContextGen @v genKeyCtx)
                    ppShow $
                    prop_size_serialise rawSerialiseSignKeyDSIGN (sizeSignKeyDSIGN (Proxy @v))
       prop "Sig" .
@@ -303,11 +290,11 @@ testDSIGNAlgorithmWithContext genContext genSig genMsg name = testEnough . descr
                    prop_size_serialise rawSerialiseSigDSIGN (sizeSigDSIGN (Proxy @v))
     describe "direct CBOR" $ do
       prop "VerKey" .
-        forAllShow (defaultVerKeyGen @v)
+        forAllShow genVerKey
                    ppShow $
                    prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN
       prop "SignKey" .
-        forAllShow (defaultSignKeyGen @v)
+        forAllShow (defaultSignKeyWithContextGen @v genKeyCtx)
                    ppShow $
                    prop_cbor_with encodeSignKeyDSIGN decodeSignKeyDSIGN
       prop "Sig" .
@@ -315,26 +302,26 @@ testDSIGNAlgorithmWithContext genContext genSig genMsg name = testEnough . descr
                    ppShow $
                    prop_cbor_with encodeSigDSIGN decodeSigDSIGN
     describe "To/FromCBOR class" $ do
-      prop "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor
-      prop "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor
+      prop "VerKey" . forAllShow genVerKey ppShow $ prop_cbor
+      prop "SignKey" . forAllShow (defaultSignKeyWithContextGen @v genKeyCtx) ppShow $ prop_cbor
       prop "Sig" . forAllShow genSig ppShow $ prop_cbor
     describe "ToCBOR size" $ do
-      prop "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_cbor_size
-      prop "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_cbor_size
+      prop "VerKey" . forAllShow genVerKey ppShow $ prop_cbor_size
+      prop "SignKey" . forAllShow (defaultSignKeyWithContextGen @v genKeyCtx) ppShow $ prop_cbor_size
       prop "Sig" . forAllShow genSig ppShow $ prop_cbor_size
     describe "direct matches class" $ do
       prop "VerKey" .
-        forAllShow (defaultVerKeyGen @v) ppShow $
+        forAllShow genVerKey ppShow $
         prop_cbor_direct_vs_class encodeVerKeyDSIGN
       prop "SignKey" .
-        forAllShow (defaultSignKeyGen @v) ppShow $
+        forAllShow (defaultSignKeyWithContextGen @v genKeyCtx) ppShow $
         prop_cbor_direct_vs_class encodeSignKeyDSIGN
       prop "Sig" .
         forAllShow genSig ppShow $
         prop_cbor_direct_vs_class encodeSigDSIGN
     describe "verify" $ do
       prop "signing and verifying with matching keys" .
-        forAllShow ((,,) <$> genContext <*> genMsg <*> defaultSignKeyGen @v) ppShow $
+        forAllShow ((,,) <$> genContext <*> genMsg <*> defaultSignKeyWithContextGen @v genKeyCtx) ppShow $
         prop_dsign_verify
       prop "verifying with wrong key" .
         forAllShow genWrongKey ppShow $
@@ -343,19 +330,19 @@ testDSIGNAlgorithmWithContext genContext genSig genMsg name = testEnough . descr
         forAllShow genWrongMsg ppShow $
         prop_dsign_verify_wrong_msg
     describe "NoThunks" $ do
-      prop "VerKey" . forAllShow (defaultVerKeyGen @v) ppShow $ prop_no_thunks
-      prop "SignKey" . forAllShow (defaultSignKeyGen @v) ppShow $ prop_no_thunks
+      prop "VerKey" . forAllShow genVerKey ppShow $ prop_no_thunks
+      prop "SignKey" . forAllShow (defaultSignKeyWithContextGen @v genKeyCtx) ppShow $ prop_no_thunks
       prop "Sig" . forAllShow genSig ppShow $ prop_no_thunks
-      prop "VerKey rawSerialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
+      prop "VerKey rawSerialise" . forAllShow genVerKey ppShow $ \vk ->
         prop_no_thunks (rawSerialiseVerKeyDSIGN vk)
-      prop "VerKey rawDeserialise" . forAllShow (defaultVerKeyGen @v) ppShow $ \vk ->
+      prop "VerKey rawDeserialise" . forAllShow genVerKey ppShow $ \vk ->
         prop_no_thunks (fromJust $! rawDeserialiseVerKeyDSIGN @v . rawSerialiseVerKeyDSIGN $ vk)
   where
     genWrongKey :: Gen (ContextDSIGN v, a, SignKeyDSIGN v, SignKeyDSIGN v)
     genWrongKey = do
       ctx <- genContext
-      sk1 <- defaultSignKeyGen
-      sk2 <- Gen.suchThat defaultSignKeyGen (/= sk1)
+      sk1 <- defaultSignKeyWithContextGen genKeyCtx
+      sk2 <- Gen.suchThat (defaultSignKeyWithContextGen genKeyCtx) (/= sk1)
       msg <- genMsg
       pure (ctx, msg, sk1, sk2)
     genWrongMsg :: Gen (ContextDSIGN v, a, a, SignKeyDSIGN v)
@@ -363,13 +350,24 @@ testDSIGNAlgorithmWithContext genContext genSig genMsg name = testEnough . descr
       ctx <- genContext
       msg1 <- genMsg
       msg2 <- Gen.suchThat genMsg (/= msg1)
-      sk <- defaultSignKeyGen
+      sk <- defaultSignKeyWithContextGen genKeyCtx
       pure (ctx, msg1, msg2, sk)
+    genSignKey :: Gen (SignKeyDSIGN v)
+    genSignKey = defaultSignKeyWithContextGen @v genKeyCtx
+    genVerKey :: Gen (VerKeyDSIGN v)
+    genVerKey = deriveVerKeyDSIGN <$> genSignKey
+    genSig :: Gen (SigDSIGN v)
+    genSig = do
+      ctx <- genContext
+      msg <- genMsg
+      sk  <- genSignKey
+      pure $ signDSIGN @v ctx msg sk
 
 testDSIGNAlgorithm :: forall v a.
   ( DSIGNAlgorithm v
   , Signable v a
   , ContextDSIGN v ~ ()
+  , KeyGenContextDSIGN v ~ ()
   , Show a
   , Eq (SignKeyDSIGN v)
   , Eq a
@@ -380,11 +378,12 @@ testDSIGNAlgorithm :: forall v a.
   , ToCBOR (SigDSIGN v)
   , FromCBOR (SigDSIGN v)
   ) =>
-  Gen (SigDSIGN v) ->
+  Proxy v ->
   Gen a ->
   String ->
   Spec
-testDSIGNAlgorithm = testDSIGNAlgorithmWithContext (pure ())
+testDSIGNAlgorithm proxy = testDSIGNAlgorithmWithContext @v proxy False (pure ()) (pure ())
+
 
 testDSIGNMAlgorithm
   :: forall v. ( -- change back to DSIGNMAlgorithm when unsound API is phased out
@@ -758,10 +757,11 @@ testDSIGNAggregatableWithContext
      )
   => Proxy v
   -> Gen (ContextDSIGN v)
+  -> Gen (KeyGenContextDSIGN v)
   -> Gen Message
   -> String
   -> Spec
-testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describe name $ do
+testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough . describe name $ do
   describe "serialization" $ do
     describe "raw" $ do
       prop "PoP serialization" .
@@ -820,14 +820,14 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
       => (PossessionProofDSIGN v -> prop)
       -> Property
     forAllPoP =
-      forAllShow (defaultPossessionProofGen @v genContext) ppShow
+      forAllShow (defaultPossessionProofGen @v genContext genKeyCtx) ppShow
     genAggregateCase genCtx genMsg' = do
       ctx <- genCtx
       msg <- genMsg'
       -- These crypto operations can be expensive, so limit the number of
       -- signatures to a reasonable number for testing.
       n   <- Gen.chooseInt (1, 8)
-      sks <- replicateM n (defaultSignKeyGen @v)
+      sks <- replicateM n (defaultSignKeyWithContextGen @v genKeyCtx)
       let vksPops = [ ( deriveVerKeyDSIGN sk
                      , createPossessionProofDSIGN ctx sk
                      )
@@ -842,7 +842,7 @@ testDSIGNAggregatableWithContext _ genContext genMsg name = testEnough . describ
       -- These crypto operations can be expensive, so limit the number of
       -- signatures to a reasonable number for testing.
       n   <- Gen.chooseInt (2, 8)
-      sks <- replicateM n (defaultSignKeyGen @v)
+      sks <- replicateM n (defaultSignKeyWithContextGen @v genKeyCtx)
       let vksPops = [ ( deriveVerKeyDSIGN sk
                      , createPossessionProofDSIGN ctx sk
                      )
