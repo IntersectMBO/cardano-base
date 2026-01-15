@@ -44,6 +44,7 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   -- * Conversions
   unsafeRawSeed,
   outputBytes,
+  outputByteArray,
   outputFromBytes,
   outputFromProof,
   proofBytes,
@@ -91,6 +92,8 @@ import Foreign.Ptr
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..), OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
+import Data.Primitive.ByteArray (ByteArray, copyPtrToMutableByteArray, newByteArray, unsafeFreezeByteArray)
+import Data.Word (Word8)
 
 -- Value types.
 --
@@ -277,6 +280,17 @@ unsafeRawSeed (Seed fp) = withForeignPtr fp $ \ptr ->
 outputBytes :: Output -> ByteString
 outputBytes (Output op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
   BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft13_outputbytes)
+
+-- | Convert a proof verification output hash into a 'ByteArray' that we can
+-- inspect.
+outputByteArray :: Output -> ByteArray
+outputByteArray (Output op) =
+  unsafePerformIO $
+    withForeignPtr op $ \ptr -> do
+      let numBytes = fromIntegral @CSize @Int crypto_vrf_ietfdraft13_outputbytes
+      mba <- newByteArray numBytes
+      copyPtrToMutableByteArray mba 0 (castPtr ptr :: Ptr Word8) numBytes
+      unsafeFreezeByteArray mba
 
 -- | Convert a proof into a 'ByteString' that we can inspect.
 proofBytes :: Proof -> ByteString
@@ -532,10 +546,10 @@ instance VRFAlgorithm PraosBatchCompatVRF where
         output = fromMaybe (error "Invalid Proof") $ outputFromProof proof
      in output `seq`
           proof `seq`
-            (OutputVRF (outputBytes output), CertPraosBatchCompatVRF proof)
+            (OutputVRF (outputByteArray output), CertPraosBatchCompatVRF proof)
 
   verifyVRF = \_ (VerKeyPraosBatchCompatVRF pk) msg (CertPraosBatchCompatVRF proof) ->
-    (OutputVRF . outputBytes) <$> verify pk proof (getSignableRepresentation msg)
+    (OutputVRF . outputByteArray) <$> verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_ietfdraft13_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_ietfdraft13_seedbytes

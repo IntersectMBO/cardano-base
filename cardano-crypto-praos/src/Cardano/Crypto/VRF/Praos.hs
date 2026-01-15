@@ -84,6 +84,14 @@ import Foreign.Ptr
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnf (..), OnlyCheckWhnfNamed (..))
 import System.IO.Unsafe (unsafePerformIO)
+import Data.Primitive.ByteArray (
+  ByteArray,
+  copyPtrToMutableByteArray,
+  newByteArray,
+  unsafeFreezeByteArray,
+ )
+import Data.Word (Word8)
+
 
 -- Value types.
 --
@@ -253,6 +261,17 @@ seedFromBytes bs = unsafePerformIO $ do
 outputBytes :: Output -> ByteString
 outputBytes (Output op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
   BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_outputbytes)
+
+-- | Convert a proof verification output hash into a 'ByteArray' that we can
+-- inspect.
+outputByteArray :: Output -> ByteArray
+outputByteArray (Output op) =
+  unsafePerformIO $
+    withForeignPtr op $ \ptr -> do
+      let numBytes = fromIntegral @CSize @Int crypto_vrf_outputbytes
+      mba <- newByteArray numBytes
+      copyPtrToMutableByteArray mba 0 (castPtr ptr :: Ptr Word8) numBytes
+      unsafeFreezeByteArray mba
 
 -- | Convert a proof into a 'ByteString' that we can inspect.
 proofBytes :: Proof -> ByteString
@@ -462,7 +481,7 @@ outputToBatchCompat praosOutput =
   if vrfKeySizeVRF /= BC.vrfKeySizeVRF
     then error "OutputVRF: Unable to convert PraosSK to BatchCompatSK."
     else
-      OutputVRF (getOutputVRFBytes praosOutput)
+      OutputVRF (getOutputVRFByteArray praosOutput)
 
 -- | Verify a VRF proof and validate the Verification Key. Returns 'Just' a hash of
 -- the verification result on success, 'Nothing' if the verification did not
@@ -522,11 +541,11 @@ instance VRFAlgorithm PraosVRF where
   evalVRF = \_ msg (SignKeyPraosVRF sk) ->
     let msgBS = getSignableRepresentation msg
         !proof = fromMaybe (error "Invalid Key") $ prove sk msgBS
-        !output = maybe (error "Invalid Proof") outputBytes $ outputFromProof proof
+        !output = maybe (error "Invalid Proof") outputByteArray $ outputFromProof proof
      in (OutputVRF output, CertPraosVRF proof)
 
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (CertPraosVRF proof) ->
-    (OutputVRF . outputBytes) <$> verify pk proof (getSignableRepresentation msg)
+    (OutputVRF . outputByteArray) <$> verify pk proof (getSignableRepresentation msg)
 
   sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
   seedSizeVRF _ = fromIntegral crypto_vrf_seedbytes
