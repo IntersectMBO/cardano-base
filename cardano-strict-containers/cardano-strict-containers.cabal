@@ -13,16 +13,22 @@ maintainer: operations@iohk.io
 copyright: IOHK
 build-type: Simple
 
-library
+common language
   default-language: Haskell2010
-  hs-source-dirs: src
+
+common warnings
   ghc-options:
     -Wall
     -Wcompat
     -Wincomplete-record-updates
     -Wincomplete-uni-patterns
+    -Wpartial-fields
     -Wredundant-constraints
+    -Wunused-packages
 
+library
+  import: language, warnings
+  hs-source-dirs: src
   exposed-modules:
     Data.FingerTree.Strict
     Data.Maybe.Strict
@@ -33,10 +39,21 @@ library
     aeson,
     base,
     cardano-binary >=1.6,
-    cborg,
     containers,
     data-default-class,
     deepseq,
     fingertree,
     nothunks,
     serialise,
+
+library testlib
+  import: language, warnings
+  visibility: public
+  hs-source-dirs: testlib
+  exposed-modules:
+    Test.Cardano.StrictContainers.Instances
+
+  build-depends:
+    QuickCheck,
+    base,
+    cardano-strict-containers,
