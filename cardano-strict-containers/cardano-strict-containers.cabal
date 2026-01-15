@@ -13,9 +13,10 @@ maintainer: operations@iohk.io
 copyright: IOHK
 build-type: Simple
 
-library
+common language
   default-language: Haskell2010
-  hs-source-dirs: src
+
+common warnings
   ghc-options:
     -Wall
     -Wcompat
@@ -23,6 +24,9 @@ library
     -Wincomplete-uni-patterns
     -Wredundant-constraints
 
+library
+  import language, warnings
+  hs-source-dirs: src
   exposed-modules:
     Data.FingerTree.Strict
     Data.Maybe.Strict
@@ -40,3 +44,15 @@ library
     fingertree,
     nothunks,
     serialise,
+
+library testlib
+  import language, warnings
+  visibility: public
+  hs-source-dirs: testlib
+  exposed-modules:
+    Test.Cardano.StrictContainers.Instances
+
+  build-depends:
+    base,
+    cardano-strict-containers,
+    QuickCheck,
