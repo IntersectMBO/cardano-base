@@ -42,6 +42,8 @@ import Test.QuickCheck (
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, HasCallStack, assertBool, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck (testProperty, vectorOf)
+import Data.Array.Byte (ByteArray (ByteArray))
+import Data.ByteString.Short (ShortByteString (SBS), fromShort, toShort)
 
 {- HLINT IGNORE "Use <$>" -}
 --
@@ -512,4 +514,6 @@ instance
 instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
   arbitrary = do
     bytes <- BS.pack <$> vectorOf (fromIntegral (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
-    return $ OutputVRF bytes
+    return $ OutputVRF (unShortByteString $ toShort bytes)
+    where
+      unShortByteString (SBS b) = ByteArray b
