@@ -2,6 +2,7 @@
 
 ## 0.2.0.2
 
+* Add `Arbitrary` instances for `BlockNo`, `EpochInterval`, `EpochSize`, `SystemStart`, `WithOrigin`
 * Use `Hspec` instead of `Tasty`
 
 ## 0.2.0.1
