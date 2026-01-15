@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -48,8 +49,10 @@ import Cardano.Binary (
   Decoder,
   Encoding,
   FromCBOR (..),
+  LengthOf,
   Size,
   ToCBOR (..),
+  apMono,
   decodeBytes,
   encodeBytes,
   encodeListLen,
@@ -62,8 +65,8 @@ import Cardano.Crypto.Util (Empty, byteArrayToNatural, naturalToByteArray)
 import Control.DeepSeq (NFData)
 import Data.Array.Byte (ByteArray)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString as BS
-import Data.ByteString.Short as SBS (fromShort)
 import Data.Kind (Type)
 import Data.MemPack.Buffer (byteArrayToShortByteString)
 import Data.Proxy (Proxy (..))
@@ -74,6 +77,13 @@ import GHC.Stack
 import GHC.TypeLits (ErrorMessage (..), TypeError)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import Numeric.Natural (Natural)
+import Codec.CBOR.Decoding as D
+import Codec.CBOR.Encoding as E
+import Codec.CBOR.ByteArray.Sliced as BAS
+import qualified Codec.CBOR.ByteArray as BA
+import qualified Data.Primitive.ByteArray as Prim
+
+
 
 class
   ( Typeable v
@@ -208,6 +218,22 @@ instance
   Ord (VerKeyVRF v)
   where
   compare = error "unsupported"
+
+
+instance FromCBOR BA.ByteArray where
+  fromCBOR = D.decodeByteArray
+
+deriving via BA.ByteArray instance FromCBOR ByteArray
+
+instance ToCBOR BA.ByteArray where
+  toCBOR cborgByteArray@(BA.BA ba) =
+    E.encodeByteArray $ BAS.SBA ba 0 (BA.sizeofByteArray cborgByteArray)
+
+  encodedSizeExpr size _ =
+    let len = size (Proxy @(LengthOf BA.ByteArray))
+     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
+
+deriving via BA.ByteArray instance ToCBOR ByteArray
 
 -- | The output bytes of the VRF.
 --

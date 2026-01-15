@@ -63,6 +63,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BSC
 import Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short as SBS
 import qualified Data.Foldable as F (foldl')
 import Data.Maybe (maybeToList)
 import Data.MemPack (FailT (FailT), MemPack, StateT (StateT), Unpack (Unpack))
