@@ -17,6 +17,7 @@ module Cardano.Crypto.VRF.Simple (
 )
 where
 
+import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed

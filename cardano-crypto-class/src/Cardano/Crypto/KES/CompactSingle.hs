@@ -56,13 +56,13 @@ import NoThunks.Class (NoThunks)
 import Control.DeepSeq (NFData)
 import Control.Exception (assert)
 
+import Cardano.Base.Bytes (slice)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class as DSIGN
 import Cardano.Crypto.DirectSerialise
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.KES.Class
-import Cardano.Crypto.Util (slice)
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
 -- single time period.
