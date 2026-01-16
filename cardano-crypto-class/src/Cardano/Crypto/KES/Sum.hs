@@ -58,6 +58,7 @@ import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
+import Cardano.Base.Bytes (slice)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DirectSerialise
@@ -68,7 +69,6 @@ import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Libsodium.Memory
 import Cardano.Crypto.Seed
-import Cardano.Crypto.Util
 
 import Control.DeepSeq (NFData (..))
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)

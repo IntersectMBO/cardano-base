@@ -30,6 +30,7 @@ import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
 
+import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DirectSerialise

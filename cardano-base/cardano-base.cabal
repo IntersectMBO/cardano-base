@@ -32,9 +32,13 @@ library
   import: project-config
   hs-source-dirs: src
   exposed-modules:
+    Cardano.Base.Bytes
     Cardano.Base.FeatureFlags
     Cardano.Base.Proxy
 
   build-depends:
     aeson,
+    bytestring,
+    mempack,
     nothunks,
+    primitive,
