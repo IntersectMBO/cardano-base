@@ -322,7 +322,7 @@ deriving stock instance
 
 -- Constant-time equality for signing keys
 instance Eq (SignKeyDSIGN (BLS12381DSIGN curve)) where
-  (SignKeyBLS12381 (Scalar sk1Psb)) == (SignKeyBLS12381 (Scalar sk2Psb)) =
+  SignKeyBLS12381 (Scalar sk1Psb) == SignKeyBLS12381 (Scalar sk2Psb) =
     unsafeDupablePerformIO $
       psbUseAsCPtr sk1Psb $ \sk1Ptr ->
         psbUseAsCPtr sk2Psb $ \sk2Ptr -> do
