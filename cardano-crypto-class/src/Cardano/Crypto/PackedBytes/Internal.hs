@@ -27,6 +27,7 @@ module Cardano.Crypto.PackedBytes.Internal
   ) where
 
 import Codec.CBOR.Decoding as D (decodeBytes)
+import Cardano.Base.Bytes (byteArrayToByteString)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), Size)
 import Control.DeepSeq (NFData(..))
 import Control.Monad (unless, when)
@@ -35,11 +36,10 @@ import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
 import Control.Monad.State.Strict (MonadState(state))
 import Data.Bits
 import Data.ByteString as BS
-import Data.ByteString.Internal as BS (accursedUnutterablePerformIO,
-                                       fromForeignPtr, toForeignPtr)
+import Data.ByteString.Internal as BS (accursedUnutterablePerformIO, toForeignPtr)
 import Data.ByteString.Short.Internal as SBS
 import Data.MemPack (guardAdvanceUnpack, st_, MemPack(..), Pack(Pack))
-import Data.MemPack.Buffer (Buffer(buffer), byteArrayToShortByteString, pinnedByteArrayToForeignPtr)
+import Data.MemPack.Buffer (Buffer(buffer), byteArrayToShortByteString)
 import Data.Primitive.ByteArray
 import Data.Primitive.PrimArray (PrimArray(..), imapPrimArray, indexPrimArray)
 import Data.Typeable
@@ -482,13 +482,6 @@ writeWord32BE (MutableByteArray mba#) (I# i#) w =
     !(W32# w#) = byteSwap32 w
 #endif
 {-# INLINE writeWord32BE #-}
-
-byteArrayToByteString :: ByteArray -> ByteString
-byteArrayToByteString ba@(ByteArray ba#)
-  | isByteArrayPinned ba =
-    BS.fromForeignPtr (pinnedByteArrayToForeignPtr ba#) 0 (sizeofByteArray ba)
-  | otherwise = SBS.fromShort (byteArrayToShortByteString ba)
-{-# INLINE byteArrayToByteString #-}
 
 -- Usage of `accursedUnutterablePerformIO` here is safe because we only use it
 -- for indexing into an immutable `ByteString`, which is analogous to

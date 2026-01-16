@@ -124,6 +124,7 @@ library
     aeson,
     base16-bytestring >=1,
     bytestring,
+    cardano-base >=0.1.2,
     cardano-binary >=1.7.3,
     cardano-strict-containers,
     cborg,
