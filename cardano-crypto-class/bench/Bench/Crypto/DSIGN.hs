@@ -134,7 +134,7 @@ benchAggDSIGN :: forall v a
 benchAggDSIGN _ lbl =
   let msg = exampleSignable (Proxy @v)
       ctx = exampleContext (Proxy @v)
-      ns = 1 : [100, 200 .. 1000]
+      ns = 1 : [100, 200, 300]
   in bgroup (lbl <> "/Aggregatable") $
       [ bgroup ("n=" <> show n)
           [ env (pure (mkCase @v ctx msg n)) $ \c ->
