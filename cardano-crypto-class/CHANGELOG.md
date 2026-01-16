@@ -2,6 +2,7 @@
 
 ## 2.3.0.0
 
+* Add `Arbitrary` instances for `CertVRF`, `CertifiedVRF`, `OutputVRF`, `SignKeyVRF`, `VerKeyVRF`
 * Remove `byteArrayToByteString`, `slice`, `splitsAt`
 * Rename types in the `KES` class to use the suffix of `Size` instead of the prefix.
 * Rename types in the `Hash` class to use the suffix of `Size` instead of the prefix.

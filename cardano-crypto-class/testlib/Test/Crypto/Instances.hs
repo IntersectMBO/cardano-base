@@ -1,5 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Crypto.Instances (
@@ -10,13 +11,17 @@ module Test.Crypto.Instances (
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.PinnedSizedBytes
+import Cardano.Crypto.Util
+import Cardano.Crypto.VRF.Class
 import Control.Monad.Class.MonadST
 import Control.Monad.Class.MonadThrow
 import Data.Maybe (mapMaybe)
 import Data.Proxy (Proxy (Proxy))
 import GHC.Exts (fromList, fromListN, toList)
 import GHC.TypeLits (KnownNat, natVal)
-import Test.QuickCheck (Arbitrary (..))
+import Test.Cardano.Base.Bytes (genByteArray)
+import Test.Crypto.Util (Message, arbitrarySeedOfSize)
+import Test.QuickCheck (Arbitrary (..), Gen)
 import qualified Test.QuickCheck.Gen as Gen
 
 -- We cannot allow this instance, because it doesn't guarantee timely
@@ -62,3 +67,37 @@ instance KnownNat n => Arbitrary (PinnedSizedBytes n) where
       psbFromByteStringCheck
   shrink psb = case toList . psbToByteString $ psb of
     bytes -> mapMaybe (psbFromByteStringCheck . fromList) . shrink $ bytes
+
+instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
+  arbitrary = do
+    let n = fromIntegral @Word @Int (sizeOutputVRF (Proxy @v))
+    OutputVRF <$> genByteArray n
+
+instance VRFAlgorithm v => Arbitrary (VerKeyVRF v) where
+  arbitrary = deriveVerKeyVRF <$> arbitrary
+
+instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
+  arbitrary = genKeyVRF <$> arbitrarySeedOfSize seedSize
+    where
+      seedSize = seedSizeVRF (Proxy :: Proxy v)
+
+instance
+  ( VRFAlgorithm v
+  , ContextVRF v ~ ()
+  , Signable v ~ SignableRepresentation
+  ) =>
+  Arbitrary (CertVRF v)
+  where
+  arbitrary = do
+    a <- arbitrary :: Gen Message
+    sk <- arbitrary
+    return $ snd $ evalVRF () a sk
+
+instance
+  (ContextVRF v ~ (), Signable v ~ SignableRepresentation, VRFAlgorithm v) =>
+  Arbitrary (CertifiedVRF v a)
+  where
+  arbitrary = CertifiedVRF <$> arbitrary <*> genCertVRF
+    where
+      genCertVRF :: Gen (CertVRF v)
+      genCertVRF = arbitrary
