@@ -478,8 +478,7 @@ outputToBatchCompat :: OutputVRF PraosVRF -> OutputVRF BC.PraosBatchCompatVRF
 outputToBatchCompat praosOutput =
   if vrfKeySizeVRF /= BC.vrfKeySizeVRF
     then error "OutputVRF: Unable to convert PraosSK to BatchCompatSK."
-    else
-      OutputVRF (getOutputVRFByteArray praosOutput)
+    else OutputVRF (getOutputVRFByteArray praosOutput)
 
 -- | Verify a VRF proof and validate the Verification Key. Returns 'Just' a hash of
 -- the verification result on success, 'Nothing' if the verification did not

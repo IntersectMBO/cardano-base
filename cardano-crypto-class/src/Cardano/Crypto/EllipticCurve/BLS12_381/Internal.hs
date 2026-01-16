@@ -404,7 +404,10 @@ withPointArray points go = do
 withAffineBlockArrayPtr ::
   forall curve a.
   BLS curve =>
-  Ptr Void -> Int -> (AffineArrayPtr curve -> IO a) -> IO a
+  Ptr Void ->
+  Int ->
+  (AffineArrayPtr curve -> IO a) ->
+  IO a
 withAffineBlockArrayPtr affinesBlockPtr numPoints go = do
   allocaBytes (numPoints * sizeOf (nullPtr :: Ptr ())) $ \affineVectorPtr -> do
     let ptrArray = castPtr affineVectorPtr :: Ptr (Ptr ())
@@ -973,14 +976,11 @@ blsUncompress bs = unsafePerformIO $ do
         (err, affine) <- withNewAffine $ \ap -> c_blst_uncompress ap bytes
         let p = fromAffine affine
         if err /= 0
-          then
-            return $ Left $ mkBLSTError err
+          then return $ Left $ mkBLSTError err
           else
             if blsInGroup p
-              then
-                return $ Right p
-              else
-                return $ Left BLST_POINT_NOT_IN_GROUP
+              then return $ Right p
+              else return $ Left BLST_POINT_NOT_IN_GROUP
       else do
         return $ Left BLST_BAD_ENCODING
 
@@ -992,14 +992,11 @@ blsDeserialize bs = unsafePerformIO $ do
         (err, affine) <- withNewAffine $ \ap -> c_blst_deserialize ap bytes
         let p = fromAffine affine
         if err /= 0
-          then
-            return $ Left $ mkBLSTError err
+          then return $ Left $ mkBLSTError err
           else
             if blsInGroup p
-              then
-                return $ Right p
-              else
-                return $ Left BLST_POINT_NOT_IN_GROUP
+              then return $ Right p
+              else return $ Left BLST_POINT_NOT_IN_GROUP
       else do
         return $ Left BLST_BAD_ENCODING
 
@@ -1103,12 +1100,9 @@ scalarFromBS bs = unsafePerformIO $ do
         (success, scalar) <- withNewScalar $ \scalarPtr ->
           c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral @Int @CSize l)
         if success
-          then
-            return $ Right scalar
-          else
-            return $ Left BLST_BAD_SCALAR
-      else
-        return $ Left BLST_BAD_SCALAR
+          then return $ Right scalar
+          else return $ Left BLST_BAD_SCALAR
+      else return $ Left BLST_BAD_SCALAR
 
 scalarToBS :: Scalar -> ByteString
 scalarToBS scalar = BSI.fromForeignPtr (castForeignPtr ptr) 0 sizeScalar

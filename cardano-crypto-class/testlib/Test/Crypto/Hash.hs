@@ -149,25 +149,31 @@ prop_hash_correct_sizeHash h =
 prop_hash_show_read ::
   forall h a.
   HashAlgorithm h =>
-  Hash h a -> Property
+  Hash h a ->
+  Property
 prop_hash_show_read h = read (show h) === h
 
 prop_hash_hashFromStringAsHex_fromString ::
   forall h a.
   HashAlgorithm h =>
-  Hash h a -> Property
+  Hash h a ->
+  Property
 prop_hash_hashFromStringAsHex_fromString h = let s = hashToStringAsHex h in fromJust (hashFromStringAsHex @h @a s) === fromString s
 
 prop_hash_hashFromStringAsHex_hashToStringFromHash ::
   forall h a.
   HashAlgorithm h =>
-  Hash h a -> Property
+  Hash h a ->
+  Property
 prop_hash_hashFromStringAsHex_hashToStringFromHash h = fromJust (hashFromStringAsHex @h @a (hashToStringAsHex h)) === h
 
 prop_libsodium_model ::
   forall h.
   NaCl.SodiumHashAlgorithm h =>
-  Lock -> Proxy h -> BS.ByteString -> Property
+  Lock ->
+  Proxy h ->
+  BS.ByteString ->
+  Property
 prop_libsodium_model lock p bs = ioProperty . withLock lock $ do
   actual <-
     bracket

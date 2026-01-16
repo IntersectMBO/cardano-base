@@ -9,8 +9,7 @@
 
 -- | "GHC.Generics" definition of 'NoThunks'
 module Data.DerivingVia.NoThunks (
-
-)
+  )
 where
 
 import Data.DerivingVia

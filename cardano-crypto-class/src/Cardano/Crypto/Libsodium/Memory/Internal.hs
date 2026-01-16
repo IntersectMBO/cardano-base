@@ -155,21 +155,21 @@ mlockedMallocIO :: CSize -> IO (MLockedForeignPtr a)
 mlockedMallocIO size =
   SFP <$> do
     if
-      | size <= 32 -> do
-          fmap coerce $ stToIO $ grabNextBlock mlockedPool32
-      | size <= 64 -> do
-          fmap coerce $ stToIO $ grabNextBlock mlockedPool64
-      | size <= 128 -> do
-          fmap coerce $ stToIO $ grabNextBlock mlockedPool128
-      | size <= 256 -> do
-          fmap coerce $ stToIO $ grabNextBlock mlockedPool256
-      | size <= 512 -> do
-          fmap coerce $ stToIO $ grabNextBlock mlockedPool512
-      | otherwise -> do
-          mask_ $ do
-            ptr <- sodiumMalloc size
-            Foreign.newForeignPtr ptr $ do
-              sodiumFree ptr size
+        | size <= 32 -> do
+            fmap coerce $ stToIO $ grabNextBlock mlockedPool32
+        | size <= 64 -> do
+            fmap coerce $ stToIO $ grabNextBlock mlockedPool64
+        | size <= 128 -> do
+            fmap coerce $ stToIO $ grabNextBlock mlockedPool128
+        | size <= 256 -> do
+            fmap coerce $ stToIO $ grabNextBlock mlockedPool256
+        | size <= 512 -> do
+            fmap coerce $ stToIO $ grabNextBlock mlockedPool512
+        | otherwise -> do
+            mask_ $ do
+              ptr <- sodiumMalloc size
+              Foreign.newForeignPtr ptr $ do
+                sodiumFree ptr size
 
 sodiumMalloc :: CSize -> IO (Ptr a)
 sodiumMalloc size = do
@@ -234,8 +234,7 @@ packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
 packByteStringCStringLen =
   unsafeIOToMonadST . BS.packCStringLen
 
-newtype MLockedAllocator m
-  = MLockedAllocator
+newtype MLockedAllocator m = MLockedAllocator
   { mlAllocate :: forall a. CSize -> m (MLockedForeignPtr a)
   }
 

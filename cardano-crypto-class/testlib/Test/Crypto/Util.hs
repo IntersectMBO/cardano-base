@@ -168,8 +168,7 @@ import Text.Show.Pretty (ppShow)
 --------------------------------------------------------------------------------
 -- Connecting MonadRandom to Gen
 --------------------------------------------------------------------------------
-newtype TestSeed
-  = TestSeed
+newtype TestSeed = TestSeed
   { getTestSeed :: (Word64, Word64, Word64, Word64, Word64)
   }
   deriving (Show, Eq, Ord, FromCBOR, ToCBOR)
@@ -264,7 +263,8 @@ prop_keygen_context_changes_verkey _ genKeyCtx (SizedSeed seed) =
 
 prop_cbor ::
   (ToCBOR a, FromCBOR a, Eq a, Show a) =>
-  a -> Property
+  a ->
+  Property
 prop_cbor = prop_cbor_with toCBOR fromCBOR
 
 prop_cbor_size :: forall a. ToCBOR a => a -> Property

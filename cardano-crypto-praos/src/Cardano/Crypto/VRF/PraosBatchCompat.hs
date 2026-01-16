@@ -249,8 +249,7 @@ copyFromByteString :: Ptr a -> ByteString -> Int -> IO ()
 copyFromByteString ptr bs lenExpected =
   BS.useAsCStringLen bs $ \(cstr, lenActual) ->
     if lenActual >= lenExpected
-      then
-        copyBytes (castPtr ptr) cstr lenExpected
+      then copyBytes (castPtr ptr) cstr lenExpected
       else
         error $
           "Invalid input size, expected at least " <> show lenExpected <> ", but got " <> show lenActual
