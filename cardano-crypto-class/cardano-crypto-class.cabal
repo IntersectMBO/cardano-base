@@ -189,6 +189,7 @@ library testlib
     base,
     base16-bytestring,
     bytestring >=0.10.12.0,
+    cardano-base:testlib,
     cardano-binary,
     cardano-crypto-class,
     cborg,
