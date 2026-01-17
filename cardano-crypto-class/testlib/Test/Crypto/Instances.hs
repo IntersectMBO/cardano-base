@@ -24,7 +24,7 @@ import Data.Proxy (Proxy (Proxy))
 import GHC.Exts (fromList, fromListN, toList)
 import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat, natVal)
-import System.Random.Stateful (uniformByteString)
+import System.Random.Stateful (uniformByteStringM, runStateGen_)
 import Test.Crypto.Util (Message, arbitrarySeedOfSize)
 import Test.QuickCheck (Arbitrary (..), Gen, vectorOf)
 import qualified Test.QuickCheck.Gen as Gen
@@ -77,7 +77,7 @@ instance DSIGNAlgorithm v => Arbitrary (VerKeyDSIGN v) where
   arbitrary = deriveVerKeyDSIGN <$> arbitrary
 
 genByteString :: Int -> Gen ByteString
-genByteString n = fmap fst . Gen.MkGen $ \g _ -> uniformByteString n g
+genByteString n = Gen.MkGen $ \r _ -> runStateGen_ r $ uniformByteStringM n
 
 errorInvalidSize :: HasCallStack => Int -> Maybe a -> Gen a
 errorInvalidSize n = maybe (error $ "Impossible: Invalid size " ++ show n) pure
