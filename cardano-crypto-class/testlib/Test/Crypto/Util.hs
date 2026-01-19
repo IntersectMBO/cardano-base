@@ -11,6 +11,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Crypto.Util (
@@ -197,7 +198,7 @@ instance Arbitrary TestSeed where
 newtype SizedSeed (n :: Nat) = SizedSeed {unSizedSeed :: Seed} deriving (Show)
 
 instance KnownNat n => Arbitrary (SizedSeed n) where
-  arbitrary = SizedSeed <$> arbitrarySeedOfSize (fromIntegral $ natVal (Proxy :: Proxy n))
+  arbitrary = SizedSeed <$> arbitrarySeedOfSize (fromIntegral @Integer @Word $ natVal (Proxy :: Proxy n))
 
 arbitrarySeedOfSize :: Word -> Gen Seed
 arbitrarySeedOfSize sz =
@@ -205,7 +206,7 @@ arbitrarySeedOfSize sz =
 
 arbitrarySeedBytesOfSize :: Word -> Gen ByteString
 arbitrarySeedBytesOfSize sz =
-  BS.pack <$> vector (fromIntegral sz)
+  BS.pack <$> vector (fromIntegral @Word @Int sz)
 
 --------------------------------------------------------------------------------
 -- Messages to sign
@@ -273,7 +274,7 @@ prop_cbor_size a =
     .&&. counterexample (show len ++ " ≰ " ++ show hi) (len <= hi)
   where
     len, lo, hi :: Natural
-    len = fromIntegral $ BS.length (toStrictByteString (toCBOR a))
+    len = fromIntegral @Int @Natural $ BS.length (toStrictByteString (toCBOR a))
     Range {lo, hi} =
       case szSimplify $ encodedSizeExpr szGreedy (Proxy :: Proxy a) of
         Right x -> x
@@ -365,7 +366,7 @@ prop_cbor_direct_vs_class encoder x =
 
 prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
 prop_size_serialise serialise size x =
-  BS.length (serialise x) === fromIntegral size
+  BS.length (serialise x) === fromIntegral @Word @Int size
 
 --------------------------------------------------------------------------------
 -- NoThunks
@@ -407,19 +408,19 @@ instance Show (BadInputFor a) where
   show = showBadInputFor
 
 instance HashAlgorithm h => Arbitrary (BadInputFor (Hash h a)) where
-  arbitrary = genBadInputFor (fromIntegral (sizeHash (Proxy :: Proxy h)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeHash (Proxy :: Proxy h)))
   shrink = shrinkBadInputFor
 
 instance DSIGNAlgorithm v => Arbitrary (BadInputFor (VerKeyDSIGN v)) where
-  arbitrary = genBadInputFor (fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy v)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeVerKeyDSIGN (Proxy :: Proxy v)))
   shrink = shrinkBadInputFor
 
 instance DSIGNAlgorithm v => Arbitrary (BadInputFor (SignKeyDSIGN v)) where
-  arbitrary = genBadInputFor (fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeSignKeyDSIGN (Proxy :: Proxy v)))
   shrink = shrinkBadInputFor
 
 instance DSIGNAlgorithm v => Arbitrary (BadInputFor (SigDSIGN v)) where
-  arbitrary = genBadInputFor (fromIntegral (sizeSigDSIGN (Proxy :: Proxy v)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeSigDSIGN (Proxy :: Proxy v)))
   shrink = shrinkBadInputFor
 
 -- Coercion around a phantom parameter here is dangerous, as there's an implicit
@@ -509,7 +510,7 @@ directSerialiseToBS ::
 directSerialiseToBS dstsize val = do
   allocaBytes dstsize $ \dst -> do
     directSerialiseBufChecked dst dstsize val
-    packByteStringCStringLen (dst, fromIntegral dstsize)
+    packByteStringCStringLen (dst, dstsize)
 
 directDeserialiseFromBS ::
   forall m a.

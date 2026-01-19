@@ -95,7 +95,7 @@ hashedEncodingAsByteArray :: Encoding -> ByteArray
 hashedEncodingAsByteArray = hashToByteArray . hashWithSerialiser @H id
 
 h' :: Encoding -> Integer -> Point
-h' enc l = pow $ mod (l * (fromIntegral . bytesToNatural $ h enc)) q
+h' enc l = pow $ mod (l * (fromIntegral @Natural @Integer . bytesToNatural $ h enc)) q
 
 instance VRFAlgorithm SimpleVRF where
   --
@@ -146,16 +146,16 @@ instance VRFAlgorithm SimpleVRF where
         y = hashedEncodingAsByteArray $ toCBOR a <> toCBOR u
         VerKeySimpleVRF v = deriveVerKeyVRF sk
 
-        r = fromIntegral (byteArrayToNatural y) `mod` q
+        r = fromIntegral @Natural @Integer (byteArrayToNatural y) `mod` q
         c = h $ toCBOR a <> toCBOR v <> toCBOR (pow r) <> toCBOR (h' (toCBOR a) r)
-        s = mod (r + k * fromIntegral (bytesToNatural c)) q
+        s = mod (r + k * fromIntegral @Natural @Integer (bytesToNatural c)) q
      in (OutputVRF y, CertSimpleVRF u (bytesToNatural c) s)
 
   verifyVRF () (VerKeySimpleVRF v) a' cert =
     let a = getSignableRepresentation a'
         u = certU cert
         c = certC cert
-        c' = -fromIntegral c
+        c' = -fromIntegral @Natural @Integer c
         s = certS cert
         o = hashedEncodingAsByteArray (toCBOR a <> toCBOR u)
         rhs =

@@ -8,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -126,7 +127,7 @@ instance
 
   rawDeserialiseVerKeyKES = fmap VerKeyCompactSingleKES . rawDeserialiseVerKeyDSIGN
   rawDeserialiseSigKES b = do
-    guard (BS.length b == fromIntegral size_total)
+    guard (BS.length b == fromIntegral @Period @Int size_total)
     sigma <- rawDeserialiseSigDSIGN b_sig
     vk <- rawDeserialiseVerKeyDSIGN b_vk
     return (SigCompactSingleKES sigma vk)
@@ -275,8 +276,8 @@ instance
 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size =
-  BS.take (fromIntegral size)
-    . BS.drop (fromIntegral offset)
+  BS.take (fromIntegral @Period @Int size)
+    . BS.drop (fromIntegral @Period @Int offset)
 
 --
 -- UnsoundPureSignKey instances

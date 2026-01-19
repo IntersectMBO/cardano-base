@@ -1169,9 +1169,7 @@ blsMSM ssAndps = unsafePerformIO $ do
       withNewPoint' @curve $ \resultPtr -> do
         withPointArray points $ \numPoints pointArrayPtr -> do
           withScalarArray scalars $ \_ scalarArrayPtr -> do
-            let numPoints' :: CSize
-                numPoints' = fromIntegral @Int @CSize numPoints
-                scratchSize :: Int
+            let numPoints' = fromIntegral @Int @CSize numPoints
                 scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
             allocaBytes (numPoints * sizeAffine (Proxy @curve)) $ \affinesBlockPtr -> do
               c_blst_to_affines (AffineBlockPtr affinesBlockPtr) pointArrayPtr numPoints'

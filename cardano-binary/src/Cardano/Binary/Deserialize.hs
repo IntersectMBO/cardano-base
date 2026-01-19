@@ -39,6 +39,7 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 
 import Cardano.Binary.FromCBOR (DecoderError (..), FromCBOR (..), cborError, toCborError)
+import Data.Word (Word8)
 
 -- | Deserialize a Haskell value from the external binary representation
 --   (which must have been made using 'serialize' or related function).
@@ -124,7 +125,7 @@ decodeNestedCborTag = do
     cborError $
       DecoderErrorUnknownTag
         "decodeNestedCborTag"
-        (fromIntegral t)
+        (fromIntegral @Word @Word8 t)
 
 -- | Remove the the semantic tag 24 from the enclosed CBOR data item,
 -- decoding back the inner `ByteString` as a proper Haskell type.

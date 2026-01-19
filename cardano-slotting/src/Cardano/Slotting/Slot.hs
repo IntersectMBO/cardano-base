@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Cardano.Slotting.Slot (
   SlotNo (..),
@@ -137,4 +138,4 @@ binOpEpochNo op en1 en2 = EpochNo $ op (unEpochNo en1) (unEpochNo en2)
 
 -- | Add a EpochInterval (a positive change) to an EpochNo to get a new EpochNo
 addEpochInterval :: EpochNo -> EpochInterval -> EpochNo
-addEpochInterval (EpochNo n) (EpochInterval m) = EpochNo (n + fromIntegral m)
+addEpochInterval (EpochNo n) (EpochInterval m) = EpochNo (n + fromIntegral @Word32 @Word64 m)

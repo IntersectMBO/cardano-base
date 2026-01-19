@@ -476,7 +476,7 @@ decodeSignKeyKES ::
   Decoder s (m (Maybe (SignKeyKES v)))
 decodeSignKeyKES = do
   bs <- decodeBytes
-  let expected = fromIntegral (sizeSignKeyKES (Proxy @v))
+  let expected = fromIntegral @Word @Int (sizeSignKeyKES (Proxy @v))
       actual = BS.length bs
   if actual /= expected
     then
@@ -572,27 +572,27 @@ updateKESWithPeriod c (SignKeyWithPeriodKES sk t) = runMaybeT $ do
 encodedVerKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (VerKeyKES v) -> Size
 encodedVerKeyKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeVerKeyKES (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeVerKeyKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeVerKeyKES (Proxy :: Proxy v))
 
 -- | 'Size' expression for 'SignKeyKES' which is using 'sizeSignKeyKES' encoded
 -- as 'Size'.
 encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
 encodedSignKeyKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy @v)))
+  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy @v)))
     -- payload
-    + fromIntegral (sizeSignKeyKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeSignKeyKES (Proxy :: Proxy v))
 
 -- | 'Size' expression for 'SigKES' which is using 'sizeSigKES' encoded as
 -- 'Size'.
 encodedSigKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SigKES v) -> Size
 encodedSigKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeSigKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeSigKES (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeSigKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeSigKES (Proxy :: Proxy v))
 
 hashPairOfVKeys ::
   (KESAlgorithm d, HashAlgorithm h) =>

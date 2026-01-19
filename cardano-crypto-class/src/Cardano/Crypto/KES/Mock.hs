@@ -47,6 +47,7 @@ import Cardano.Crypto.Libsodium.Memory (
  )
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util
+import Foreign.C.Types (CSize)
 
 data MockKES (t :: Nat)
 
@@ -107,7 +108,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     | otherwise =
         Left "KES verification failed"
 
-  totalPeriodsKES _ = fromIntegral (natVal (Proxy @t))
+  totalPeriodsKES _ = fromIntegral @Nat @Period (natVal (Proxy @t))
 
   --
   -- raw serialise/deserialise
@@ -221,7 +222,7 @@ rawDeserialiseSignKeyMockKES ::
 rawDeserialiseSignKeyMockKES bs
   | [vkb, tb] <- splitsAt [8, 8] bs
   , Just vk <- rawDeserialiseVerKeyKES vkb
-  , let t = fromIntegral (readBinaryWord64 tb) =
+  , let t = fromIntegral @Word64 @Period (readBinaryWord64 tb) =
       Just $! SignKeyMockKES vk t
   | otherwise =
       Nothing
@@ -232,7 +233,7 @@ rawSerialiseSignKeyMockKES ::
   ByteString
 rawSerialiseSignKeyMockKES (SignKeyMockKES vk t) =
   rawSerialiseVerKeyKES vk
-    <> writeBinaryWord64 (fromIntegral t)
+    <> writeBinaryWord64 (fromIntegral @Period @Word64 t)
 
 instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
   toCBOR = encodeVerKeyKES
@@ -258,14 +259,14 @@ instance KnownNat t => FromCBOR (UnsoundPureSignKeyKES (MockKES t)) where
 instance KnownNat t => DirectSerialise (SignKeyKES (MockKES t)) where
   directSerialise put sk = do
     let bs = rawSerialiseSignKeyMockKES sk
-    unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral len)
+    unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral @Int @CSize len)
 
 instance KnownNat t => DirectDeserialise (SignKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral $ sizeSignKeyKES (Proxy @(MockKES t))
+    let len = fromIntegral @Period @Int $ sizeSignKeyKES (Proxy @(MockKES t))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
-      pull (castPtr ptr) (fromIntegral len)
+      pull (castPtr ptr) (fromIntegral @Int @CSize len)
     let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(SignKeyKES (MockKES t))") return $
       rawDeserialiseSignKeyMockKES bs
@@ -273,14 +274,14 @@ instance KnownNat t => DirectDeserialise (SignKeyKES (MockKES t)) where
 instance KnownNat t => DirectSerialise (VerKeyKES (MockKES t)) where
   directSerialise push sk = do
     let bs = rawSerialiseVerKeyKES sk
-    unpackByteStringCStringLen bs $ \(cstr, len) -> push cstr (fromIntegral len)
+    unpackByteStringCStringLen bs $ \(cstr, len) -> push cstr (fromIntegral @Int @CSize len)
 
 instance KnownNat t => DirectDeserialise (VerKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral $ sizeVerKeyKES (Proxy @(MockKES t))
+    let len = fromIntegral @Period @Int $ sizeVerKeyKES (Proxy @(MockKES t))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
-      pull (castPtr ptr) (fromIntegral len)
+      pull (castPtr ptr) (fromIntegral @Int @CSize len)
     let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
       rawDeserialiseVerKeyKES bs

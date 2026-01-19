@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -24,4 +25,4 @@ data Blake2bPrefix (n :: Nat)
 instance (KnownNat n, CmpNat n 33 ~ 'LT) => HashAlgorithm (Blake2bPrefix n) where
   type SizeHash (Blake2bPrefix n) = n
   hashAlgorithmName _ = "blake2b_prefix_" <> show (natVal (Proxy :: Proxy n))
-  digest _ = blake2b_libsodium (fromIntegral (natVal (Proxy :: Proxy n)))
+  digest _ = blake2b_libsodium (fromIntegral @Integer @Int (natVal (Proxy :: Proxy n)))

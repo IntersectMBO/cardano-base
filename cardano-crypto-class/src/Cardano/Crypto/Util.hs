@@ -4,6 +4,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 module Cardano.Crypto.Util (
@@ -90,23 +91,23 @@ getRandomWord64 = readBinaryWord64 <$> getRandomBytes 8
 
 readBinaryWord64 :: ByteString -> Word64
 readBinaryWord64 =
-  BS.foldl' (\acc w8 -> unsafeShiftL acc 8 + fromIntegral w8) 0
+  BS.foldl' (\acc w8 -> unsafeShiftL acc 8 + fromIntegral @Word8 @Word64 w8) 0
 
 readBinaryNatural :: ByteString -> Natural
 readBinaryNatural =
-  BS.foldl' (\acc w8 -> unsafeShiftL acc 8 + fromIntegral w8) 0
+  BS.foldl' (\acc w8 -> unsafeShiftL acc 8 + fromIntegral @Word8 @Natural w8) 0
 
 writeBinaryWord64 :: Word64 -> ByteString
 writeBinaryWord64 =
   BS.reverse
     . fst
-    . BS.unfoldrN 8 (\w -> Just (fromIntegral w, unsafeShiftR w 8))
+    . BS.unfoldrN 8 (\w -> Just (fromIntegral @Word64 @Word8 w, unsafeShiftR w 8))
 
 writeBinaryNatural :: Int -> Natural -> ByteString
 writeBinaryNatural bytes =
   BS.reverse
     . fst
-    . BS.unfoldrN bytes (\w -> Just (fromIntegral w, unsafeShiftR w 8))
+    . BS.unfoldrN bytes (\w -> Just (fromIntegral @Natural @Word8 w, unsafeShiftR w 8))
 
 splitsAt :: [Int] -> ByteString -> [ByteString]
 splitsAt = go 0
@@ -161,8 +162,8 @@ byteArrayToInteger (ByteArray ba#) =
 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size =
-  BS.take (fromIntegral size)
-    . BS.drop (fromIntegral offset)
+  BS.take (fromIntegral @Word @Int size)
+    . BS.drop (fromIntegral @Word @Int offset)
 
 -- | Decode base16 ByteString, while ensuring expected length.
 decodeHexByteString :: ByteString -> Int -> Either String ByteString

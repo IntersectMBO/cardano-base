@@ -144,7 +144,7 @@ prop_hash_correct_sizeHash ::
   Hash h a ->
   Property
 prop_hash_correct_sizeHash h =
-  BS.length (hashToBytes h) === fromIntegral (sizeHash (Proxy :: Proxy h))
+  BS.length (hashToBytes h) === fromIntegral @Word @Int (sizeHash (Proxy :: Proxy h))
 
 prop_hash_show_read ::
   forall h a.
@@ -201,7 +201,7 @@ data TestHash (n :: Nat) = TestHash
 instance KnownNat n => HashAlgorithm (TestHash n) where
   type SizeHash (TestHash n) = n
   hashAlgorithmName px = "TestHash " ++ show (sizeHash px)
-  digest px _ = BS.pack (replicate (fromIntegral (sizeHash px)) 0)
+  digest px _ = BS.pack (replicate (fromIntegral @Word @Int (sizeHash px)) 0)
 
 prop_roundtrip ::
   forall n.

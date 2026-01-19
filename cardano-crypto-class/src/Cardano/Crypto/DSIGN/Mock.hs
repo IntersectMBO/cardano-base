@@ -5,6 +5,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -118,7 +119,7 @@ instance DSIGNAlgorithm MockDSIGN where
         Nothing
 
   rawDeserialiseSigDSIGN bs
-    | [hb, kb] <- splitsAt [fromIntegral $ sizeHash (Proxy :: Proxy ShortHash), 8] bs
+    | [hb, kb] <- splitsAt [fromIntegral @Word @Int $ sizeHash (Proxy :: Proxy ShortHash), 8] bs
     , Just h <- hashFromBytes hb
     , let k = readBinaryWord64 kb =
         Just $! SigMockDSIGN h k

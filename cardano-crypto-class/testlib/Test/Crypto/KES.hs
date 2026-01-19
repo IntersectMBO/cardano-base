@@ -30,7 +30,7 @@ import Data.Proxy (Proxy (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
-import GHC.TypeNats (KnownNat, natVal)
+import GHC.TypeNats (KnownNat, Nat, natVal)
 
 import Control.Monad (void)
 import Control.Monad.Class.MonadST
@@ -155,7 +155,7 @@ instance
 
 genInitialSignKeyKES :: forall k. UnsoundPureKESAlgorithm k => Gen (UnsoundPureSignKeyKES k)
 genInitialSignKeyKES = do
-  bytes <- BS.pack <$> vector (fromIntegral $ seedSizeKES (Proxy @k))
+  bytes <- BS.pack <$> vector (fromIntegral @Word @Int $ seedSizeKES (Proxy @k))
   let seed = mkSeedFromBytes bytes
   return $ unsoundPureGenKeyKES seed
 
@@ -286,20 +286,20 @@ testKESAlgorithm lock n =
       prop "VerKey DirectSerialise" $
         ioPropertyWithSK @v lock $ \sk -> do
           vk :: VerKeyKES v <- deriveVerKeyKES sk
-          direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+          direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyKES (Proxy @v)) vk
           prop_no_thunks_IO (return $! direct)
       prop "SignKey DirectSerialise" $
         ioPropertyWithSK @v lock $ \sk -> do
-          direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+          direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyKES (Proxy @v)) sk
           prop_no_thunks_IO (return $! direct)
       prop "VerKey DirectDeserialise" $
         ioPropertyWithSK @v lock $ \sk -> do
           vk :: VerKeyKES v <- deriveVerKeyKES sk
-          direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) $! vk
+          direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyKES (Proxy @v)) $! vk
           prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
       prop "SignKey DirectDeserialise" $
         ioPropertyWithSK @v lock $ \sk -> do
-          direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+          direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyKES (Proxy @v)) sk
           bracket
             (directDeserialiseFromBS @IO @(SignKeyKES v) $! direct)
             forgetSignKeyKES
@@ -330,15 +330,16 @@ testKESAlgorithm lock n =
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            return $ (fromIntegral . BS.length . rawSerialiseVerKeyKES $ vk) === sizeVerKeyKES (Proxy @v)
+            return $
+              (fromIntegral @Int @Word . BS.length . rawSerialiseVerKeyKES $ vk) === sizeVerKeyKES (Proxy @v)
         prop "SignKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             serialized <- rawSerialiseSignKeyKES sk
-            evaluate ((fromIntegral . BS.length $ serialized) == sizeSignKeyKES (Proxy @v))
+            evaluate ((fromIntegral @Int @Word . BS.length $ serialized) == sizeSignKeyKES (Proxy @v))
         prop "Sig" $ \(msg :: Message) ->
           ioPropertyWithSK @v lock $ \sk -> do
             sig :: SigKES v <- signKES () 0 msg sk
-            return $ (fromIntegral . BS.length . rawSerialiseSigKES $ sig) === sizeSigKES (Proxy @v)
+            return $ (fromIntegral @Int @Word . BS.length . rawSerialiseSigKES $ sig) === sizeSigKES (Proxy @v)
       describe "direct CBOR" $ do
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
@@ -388,12 +389,12 @@ testKESAlgorithm lock n =
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            serialized <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            serialized <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyKES (Proxy @v)) vk
             vk' <- directDeserialiseFromBS serialized
             return $ vk === vk'
         prop "SignKey" $
           ioPropertyWithSK @v lock $ \sk -> do
-            serialized <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            serialized <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyKES (Proxy @v)) sk
             equals <-
               bracket
                 (directDeserialiseFromBS serialized)
@@ -407,12 +408,12 @@ testKESAlgorithm lock n =
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            direct <- directSerialiseToBS (fromIntegral $ sizeVerKeyKES (Proxy @v)) vk
+            direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyKES (Proxy @v)) vk
             let raw = rawSerialiseVerKeyKES vk
             return $ direct === raw
         prop "SignKey" $
           ioPropertyWithSK @v lock $ \sk -> do
-            direct <- directSerialiseToBS (fromIntegral $ sizeSignKeyKES (Proxy @v)) sk
+            direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyKES (Proxy @v)) sk
             raw <- rawSerialiseSignKeyKES sk
             return $ direct === raw
     describe "verify" $ do
@@ -567,7 +568,7 @@ prop_totalPeriodsKES lock seed =
             length sks === totalPeriods
   where
     totalPeriods :: Int
-    totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
+    totalPeriods = fromIntegral @Word @Int (totalPeriodsKES (Proxy :: Proxy v))
 
 -- | If we start with a signing key, and all its evolutions, the verification
 -- keys we derive from each one are the same.
@@ -614,7 +615,7 @@ prop_verifyKES_positive seedPSB = do
               vk <- deriveVerKeyKES sk_0
               forgetSignKeyKES sk_0
               withAllUpdatesKES seedPSB $ \t sk -> do
-                let x = cycle xs !! fromIntegral t
+                let x = cycle xs !! fromIntegral @Word @Int t
                 sig <- signKES () t x sk
                 let verResult = verifyKES () vk t x sig
                 return $
@@ -622,7 +623,7 @@ prop_verifyKES_positive seedPSB = do
                     verResult === Right ()
   where
     totalPeriods :: Int
-    totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
+    totalPeriods = fromIntegral @Word @Int (totalPeriodsKES (Proxy :: Proxy v))
 
 -- | If we sign a message @a@with one list of signing key evolutions, if we
 -- try to verify the signature (and message @a@) using a verification key
@@ -703,7 +704,7 @@ prop_verifyKES_negative_period seedPSB x =
           ]
   where
     totalPeriods :: Word
-    totalPeriods = fromIntegral (totalPeriodsKES (Proxy :: Proxy v))
+    totalPeriods = totalPeriodsKES (Proxy :: Proxy v)
 
 -- | Check 'prop_raw_serialise', 'prop_cbor_with' and 'prop_size_serialise'
 -- for 'VerKeyKES' on /all/ the KES key evolutions.
@@ -810,7 +811,7 @@ withAllUpdatesKES seedPSB f = withMLockedSeedFromPSB seedPSB $ \seed -> do
 withNullSeed :: forall m n a. (MonadThrow m, MonadST m, KnownNat n) => (MLockedSeed n -> m a) -> m a
 withNullSeed =
   bracket
-    (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral $ natVal (Proxy @n)) 0))
+    (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral @Nat @Int $ natVal (Proxy @n)) 0))
     mlockedSeedFinalize
 
 withNullSK ::
@@ -837,7 +838,7 @@ prop_noErasedBlocksInKey ::
   Property
 prop_noErasedBlocksInKey kesAlgorithm =
   ioProperty . withNullSK @IO @v $ \sk -> do
-    let size :: Int = fromIntegral $ sizeSignKeyKES kesAlgorithm
+    let size :: Int = fromIntegral @Word @Int $ sizeSignKeyKES kesAlgorithm
     serialized <- directSerialiseToBS size sk
     forgetSignKeyKES sk
     return $ counterexample (hexBS serialized) $ not (hasLongRunOfFF serialized)

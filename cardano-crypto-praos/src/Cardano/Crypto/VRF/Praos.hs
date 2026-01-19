@@ -59,7 +59,7 @@ module Cardano.Crypto.VRF.Praos (
 )
 where
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -193,21 +193,21 @@ foreign import ccall "crypto_vrf_ietfdraft03_proof_to_hash"
 -- Key size constants
 
 certSizeVRF :: Int
-certSizeVRF = fromIntegral $! crypto_vrf_bytes
+certSizeVRF = fromIntegral @CSize @Int $! crypto_vrf_bytes
 
 signKeySizeVRF :: Int
-signKeySizeVRF = fromIntegral $! crypto_vrf_secretkeybytes
+signKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_secretkeybytes
 
 verKeySizeVRF :: Int
-verKeySizeVRF = fromIntegral $! crypto_vrf_publickeybytes
+verKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_publickeybytes
 
 vrfKeySizeVRF :: Int
-vrfKeySizeVRF = fromIntegral $! crypto_vrf_outputbytes
+vrfKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_outputbytes
 
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
 mkSeed = do
-  ptr <- mallocBytes (fromIntegral crypto_vrf_seedbytes)
+  ptr <- mallocBytes (fromIntegral @CSize @Int crypto_vrf_seedbytes)
   Seed <$> newForeignPtr finalizerFree ptr
 
 -- | Generate a random seed.
@@ -243,19 +243,19 @@ copyFromByteString ptr bs lenExpected =
 
 seedFromBytes :: ByteString -> Seed
 seedFromBytes bs
-  | BS.length bs /= fromIntegral crypto_vrf_seedbytes =
+  | BS.length bs /= fromIntegral @CSize @Int crypto_vrf_seedbytes =
       error $ "Expected " ++ show crypto_vrf_seedbytes ++ " bytes"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
-    copyFromByteString ptr bs (fromIntegral crypto_vrf_seedbytes)
+    copyFromByteString ptr bs (fromIntegral @CSize @Int crypto_vrf_seedbytes)
   return seed
 
 -- | Convert a proof verification output hash into a 'ByteString' that we can
 -- inspect.
 outputBytes :: Output -> ByteString
 outputBytes (Output op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
-  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_outputbytes)
+  BS.packCStringLen (castPtr ptr, fromIntegral @CSize @Int crypto_vrf_outputbytes)
 
 -- | Convert a proof verification output hash into a 'ByteArray' that we can
 -- inspect.
@@ -295,7 +295,7 @@ instance Eq Proof where
 instance ToCBOR Proof where
   toCBOR = toCBOR . proofBytes
   encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral certSizeVRF) (Proxy :: Proxy ByteString)
+    encodedSizeExpr (\_ -> fromIntegral @Int @Size certSizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR Proof where
   fromCBOR = fromCBOR >>= proofFromBytes
@@ -309,7 +309,7 @@ instance Eq SignKey where
 instance ToCBOR SignKey where
   toCBOR = toCBOR . skBytes
   encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral signKeySizeVRF) (Proxy :: Proxy ByteString)
+    encodedSizeExpr (\_ -> fromIntegral @Int @Size signKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR SignKey where
   fromCBOR = fromCBOR >>= skFromBytes
@@ -323,7 +323,7 @@ instance Eq VerKey where
 instance ToCBOR VerKey where
   toCBOR = toCBOR . vkBytes
   encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral verKeySizeVRF) (Proxy :: Proxy ByteString)
+    encodedSizeExpr (\_ -> fromIntegral @Int @Size verKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR VerKey where
   fromCBOR = fromCBOR >>= vkFromBytes
@@ -396,7 +396,9 @@ vkFromBytes bs = do
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
 mkOutput :: IO Output
-mkOutput = fmap Output $ newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_outputbytes)
+mkOutput =
+  fmap Output $
+    newForeignPtr finalizerFree =<< mallocBytes (fromIntegral @CSize @Int crypto_vrf_outputbytes)
 
 outputFromBytes :: MonadFail m => ByteString -> m Output
 outputFromBytes bs = do
@@ -455,7 +457,7 @@ prove sk msg =
       proof <- mkProof
       BS.useAsCStringLen msg $ \(m, mlen) -> do
         withForeignPtr (unProof proof) $ \proofPtr -> do
-          crypto_vrf_prove proofPtr skPtr m (fromIntegral mlen) >>= \case
+          crypto_vrf_prove proofPtr skPtr m (fromIntegral @Int @CULLong mlen) >>= \case
             0 -> return $ Just $! proof
             _ -> return Nothing
 
@@ -494,7 +496,7 @@ verify pk proof msg =
         output <- mkOutput
         BS.useAsCStringLen msg $ \(m, mlen) -> do
           withForeignPtr (unOutput output) $ \outputPtr -> do
-            crypto_vrf_verify outputPtr pkPtr proofPtr m (fromIntegral mlen) >>= \case
+            crypto_vrf_verify outputPtr pkPtr proofPtr m (fromIntegral @Int @CULLong mlen) >>= \case
               0 -> return $ Just $! output
               _ -> return Nothing
 
@@ -544,11 +546,13 @@ instance VRFAlgorithm PraosVRF where
   verifyVRF = \_ (VerKeyPraosVRF pk) msg (CertPraosVRF proof) ->
     outputToOutputVRF <$!> verify pk proof (getSignableRepresentation msg)
 
-  sizeOutputVRF _ = fromIntegral crypto_vrf_outputbytes
-  seedSizeVRF _ = fromIntegral crypto_vrf_seedbytes
+  sizeOutputVRF _ = fromIntegral @CSize @Word crypto_vrf_outputbytes
+  seedSizeVRF _ = fromIntegral @CSize @Word crypto_vrf_seedbytes
 
   genKeyPairVRF = \cryptoseed ->
-    let seed = seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_seedbytes) $ cryptoseed
+    let seed =
+          seedFromBytes . fst . getBytesFromSeedT (fromIntegral @CSize @Word crypto_vrf_seedbytes) $
+            cryptoseed
         !(!pk, !sk) = keypairFromSeed seed
      in (SignKeyPraosVRF sk, VerKeyPraosVRF pk)
 
@@ -561,6 +565,6 @@ instance VRFAlgorithm PraosVRF where
   rawDeserialiseCertVRF = fmap CertPraosVRF . proofFromBytes
   {-# INLINE rawDeserialiseCertVRF #-}
 
-  sizeVerKeyVRF _ = fromIntegral verKeySizeVRF
-  sizeSignKeyVRF _ = fromIntegral signKeySizeVRF
-  sizeCertVRF _ = fromIntegral certSizeVRF
+  sizeVerKeyVRF _ = fromIntegral @Int @Word verKeySizeVRF
+  sizeSignKeyVRF _ = fromIntegral @Int @Word signKeySizeVRF
+  sizeCertVRF _ = fromIntegral @Int @Word certSizeVRF

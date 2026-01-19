@@ -67,7 +67,7 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
 )
 where
 
-import Cardano.Binary (FromCBOR (..), ToCBOR (..))
+import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -203,27 +203,27 @@ foreign import ccall "crypto_vrf_ietfdraft13_proof_to_hash_batchcompat"
 -- Key size constants
 
 certSizeVRF :: Int
-certSizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_bytes_batchcompat
+certSizeVRF = fromIntegral @CSize @Int $! crypto_vrf_ietfdraft13_bytes_batchcompat
 
 signKeySizeVRF :: Int
-signKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_secretkeybytes
+signKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_ietfdraft13_secretkeybytes
 
 verKeySizeVRF :: Int
-verKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_publickeybytes
+verKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_ietfdraft13_publickeybytes
 
 vrfKeySizeVRF :: Int
-vrfKeySizeVRF = fromIntegral $! crypto_vrf_ietfdraft13_outputbytes
+vrfKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_ietfdraft13_outputbytes
 
 ioSignKeySizeVRF :: IO Int
-ioSignKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_secretkeybytes
+ioSignKeySizeVRF = fromIntegral @CSize @Int <$> io_crypto_vrf_ietfdraft13_secretkeybytes
 
 ioVerKeySizeVRF :: IO Int
-ioVerKeySizeVRF = fromIntegral <$> io_crypto_vrf_ietfdraft13_publickeybytes
+ioVerKeySizeVRF = fromIntegral @CSize @Int <$> io_crypto_vrf_ietfdraft13_publickeybytes
 
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
 mkSeed = do
-  ptr <- mallocBytes (fromIntegral crypto_vrf_ietfdraft13_seedbytes)
+  ptr <- mallocBytes (fromIntegral @CSize @Int crypto_vrf_ietfdraft13_seedbytes)
   Seed <$> newForeignPtr finalizerFree ptr
 
 -- | Generate a random seed.
@@ -256,12 +256,12 @@ copyFromByteString ptr bs lenExpected =
 
 seedFromBytes :: ByteString -> Seed
 seedFromBytes bs
-  | BS.length bs /= fromIntegral crypto_vrf_ietfdraft13_seedbytes =
+  | BS.length bs /= fromIntegral @CSize @Int crypto_vrf_ietfdraft13_seedbytes =
       error $ "Expected " ++ show crypto_vrf_ietfdraft13_seedbytes ++ " bytes"
 seedFromBytes bs = unsafePerformIO $ do
   seed <- mkSeed
   withForeignPtr (unSeed seed) $ \ptr ->
-    copyFromByteString ptr bs (fromIntegral crypto_vrf_ietfdraft13_seedbytes)
+    copyFromByteString ptr bs (fromIntegral @CSize @Int crypto_vrf_ietfdraft13_seedbytes)
   return seed
 
 -- | Convert an opaque 'Seed' into a 'ByteString' that we can inspect.
@@ -271,13 +271,13 @@ seedFromBytes bs = unsafePerformIO $ do
 -- secured seed into non-locked (swappable) memory.
 unsafeRawSeed :: Seed -> IO ByteString
 unsafeRawSeed (Seed fp) = withForeignPtr fp $ \ptr ->
-  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft13_seedbytes)
+  BS.packCStringLen (castPtr ptr, fromIntegral @CSize @Int crypto_vrf_ietfdraft13_seedbytes)
 
 -- | Convert a proof verification output hash into a 'ByteString' that we can
 -- inspect.
 outputBytes :: Output -> ByteString
 outputBytes (Output op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
-  BS.packCStringLen (castPtr ptr, fromIntegral crypto_vrf_ietfdraft13_outputbytes)
+  BS.packCStringLen (castPtr ptr, fromIntegral @CSize @Int crypto_vrf_ietfdraft13_outputbytes)
 
 -- | Convert a proof verification output hash into a 'ByteArray' that we can
 -- inspect.
@@ -317,7 +317,7 @@ instance Eq Proof where
 instance ToCBOR Proof where
   toCBOR = toCBOR . proofBytes
   encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral certSizeVRF) (Proxy :: Proxy ByteString)
+    encodedSizeExpr (\_ -> fromIntegral @Int @Size certSizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR Proof where
   fromCBOR = proofFromBytes <$> fromCBOR
@@ -331,7 +331,7 @@ instance Eq SignKey where
 instance ToCBOR SignKey where
   toCBOR = toCBOR . skBytes
   encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral signKeySizeVRF) (Proxy :: Proxy ByteString)
+    encodedSizeExpr (\_ -> fromIntegral @Int @Size signKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR SignKey where
   fromCBOR = skFromBytes <$> fromCBOR
@@ -345,7 +345,7 @@ instance Eq VerKey where
 instance ToCBOR VerKey where
   toCBOR = toCBOR . vkBytes
   encodedSizeExpr _ _ =
-    encodedSizeExpr (\_ -> fromIntegral verKeySizeVRF) (Proxy :: Proxy ByteString)
+    encodedSizeExpr (\_ -> fromIntegral @Int @Size verKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR VerKey where
   fromCBOR = vkFromBytes <$> fromCBOR
@@ -423,7 +423,8 @@ vkFromBytes bs = unsafePerformIO $ do
 mkOutput :: IO Output
 mkOutput =
   fmap Output $
-    newForeignPtr finalizerFree =<< mallocBytes (fromIntegral crypto_vrf_ietfdraft13_outputbytes)
+    newForeignPtr finalizerFree
+      =<< mallocBytes (fromIntegral @CSize @Int crypto_vrf_ietfdraft13_outputbytes)
 
 outputFromBytes :: MonadFail m => ByteString -> m Output
 outputFromBytes bs = do
@@ -482,7 +483,7 @@ prove sk msg =
       proof <- mkProof
       BS.useAsCStringLen msg $ \(m, mlen) -> do
         withForeignPtr (unProof proof) $ \proofPtr -> do
-          crypto_vrf_ietfdraft13_prove_batchcompat proofPtr skPtr m (fromIntegral mlen) >>= \case
+          crypto_vrf_ietfdraft13_prove_batchcompat proofPtr skPtr m (fromIntegral @Int @CULLong mlen) >>= \case
             0 -> return $ Just $! proof
             _ -> return Nothing
 
@@ -500,9 +501,15 @@ verify pk proof msg =
         output <- mkOutput
         BS.useAsCStringLen msg $ \(m, mlen) -> do
           withForeignPtr (unOutput output) $ \outputPtr -> do
-            crypto_vrf_ietfdraft13_verify_batchcompat outputPtr pkPtr proofPtr m (fromIntegral mlen) >>= \case
-              0 -> return $ Just $! output
-              _ -> return Nothing
+            crypto_vrf_ietfdraft13_verify_batchcompat
+              outputPtr
+              pkPtr
+              proofPtr
+              m
+              (fromIntegral @Int @CULLong mlen)
+              >>= \case
+                0 -> return $ Just $! output
+                _ -> return Nothing
 
 outputFromProof :: Proof -> Maybe Output
 outputFromProof (Proof p) =
@@ -551,12 +558,13 @@ instance VRFAlgorithm PraosBatchCompatVRF where
   verifyVRF = \_ (VerKeyPraosBatchCompatVRF pk) msg (CertPraosBatchCompatVRF proof) ->
     outputToOutputVRF <$!> verify pk proof (getSignableRepresentation msg)
 
-  sizeOutputVRF _ = fromIntegral crypto_vrf_ietfdraft13_outputbytes
-  seedSizeVRF _ = fromIntegral crypto_vrf_ietfdraft13_seedbytes
+  sizeOutputVRF _ = fromIntegral @CSize @Word crypto_vrf_ietfdraft13_outputbytes
+  seedSizeVRF _ = fromIntegral @CSize @Word crypto_vrf_ietfdraft13_seedbytes
 
   genKeyPairVRF = \cryptoseed ->
     let seed =
-          seedFromBytes . fst . getBytesFromSeedT (fromIntegral crypto_vrf_ietfdraft13_seedbytes) $ cryptoseed
+          seedFromBytes . fst . getBytesFromSeedT (fromIntegral @CSize @Word crypto_vrf_ietfdraft13_seedbytes) $
+            cryptoseed
         (pk, sk) = keypairFromSeed seed
      in sk `seq` pk `seq` (SignKeyPraosBatchCompatVRF sk, VerKeyPraosBatchCompatVRF pk)
 
@@ -567,9 +575,9 @@ instance VRFAlgorithm PraosBatchCompatVRF where
   rawDeserialiseSignKeyVRF = fmap (SignKeyPraosBatchCompatVRF . skFromBytes) . assertLength signKeySizeVRF
   rawDeserialiseCertVRF = fmap (CertPraosBatchCompatVRF . proofFromBytes) . assertLength certSizeVRF
 
-  sizeVerKeyVRF _ = fromIntegral verKeySizeVRF
-  sizeSignKeyVRF _ = fromIntegral signKeySizeVRF
-  sizeCertVRF _ = fromIntegral certSizeVRF
+  sizeVerKeyVRF _ = fromIntegral @Int @Word verKeySizeVRF
+  sizeSignKeyVRF _ = fromIntegral @Int @Word signKeySizeVRF
+  sizeCertVRF _ = fromIntegral @Int @Word certSizeVRF
 
 assertLength :: Int -> ByteString -> Maybe ByteString
 assertLength l bs

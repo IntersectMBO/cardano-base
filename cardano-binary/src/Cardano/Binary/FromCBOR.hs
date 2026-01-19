@@ -7,6 +7,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Cardano.Binary.FromCBOR (
   FromCBOR (..),
@@ -413,7 +414,7 @@ instance (FromCBOR a, FromCBOR b) => FromCBOR (Either a b) where
       1 -> do
         !x <- fromCBOR
         return (Right x)
-      _ -> cborError $ DecoderErrorUnknownTag "Either" (fromIntegral t)
+      _ -> cborError $ DecoderErrorUnknownTag "Either" (fromIntegral @Word @Word8 t)
 
 instance FromCBOR a => FromCBOR (NonEmpty a) where
   fromCBOR =
@@ -437,7 +438,7 @@ decodeMaybe decodeValue = do
     1 -> do
       !x <- decodeValue
       return (Just x)
-    _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral n)
+    _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral @Int @Word8 n)
 
 decodeNullMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
 decodeNullMaybe decoder = do
@@ -537,7 +538,7 @@ setTag = 258
 decodeSetTag :: D.Decoder s ()
 decodeSetTag = do
   t <- D.decodeTag
-  when (t /= setTag) $ cborError $ DecoderErrorUnknownTag "Set" (fromIntegral t)
+  when (t /= setTag) $ cborError $ DecoderErrorUnknownTag "Set" (fromIntegral @Word @Word8 t)
 
 decodeSetSkel :: (Ord a, FromCBOR a) => ([a] -> c) -> D.Decoder s c
 decodeSetSkel fromDistinctAscList = do

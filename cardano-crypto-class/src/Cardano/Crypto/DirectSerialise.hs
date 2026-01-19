@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Direct (de-)serialisation to / from raw memory.
 --
@@ -75,10 +76,10 @@ directSerialiseTo writeBytes dstsize val = do
   let pusher :: Ptr CChar -> CSize -> m ()
       pusher src srcsize = do
         pos <- stToIO $ readSTRef posRef
-        let pos' = pos + fromIntegral srcsize
+        let pos' = pos + fromIntegral @CSize @Int srcsize
         when (pos' > dstsize) $
           sizeCheckFailed (dstsize - pos) (pos' - pos)
-        writeBytes pos src (fromIntegral srcsize)
+        writeBytes pos src srcsize
         stToIO $ writeSTRef posRef pos'
   directSerialise pusher val
   stToIO $ readSTRef posRef
@@ -147,10 +148,10 @@ directDeserialiseFrom readBytes srcsize = do
   let puller :: Ptr CChar -> CSize -> m ()
       puller dst dstsize = do
         pos <- stToIO $ readSTRef posRef
-        let pos' = pos + fromIntegral dstsize
+        let pos' = pos + fromIntegral @CSize @Int dstsize
         when (pos' > srcsize) $
           sizeCheckFailed (srcsize - pos) (pos' - pos)
-        readBytes pos dst (fromIntegral dstsize)
+        readBytes pos dst dstsize
         stToIO $ writeSTRef posRef pos'
   (,) <$> directDeserialise puller <*> stToIO (readSTRef posRef)
 

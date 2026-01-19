@@ -47,6 +47,7 @@ import Cardano.Crypto.Seed
 import Cardano.Crypto.Util
 import Data.Maybe (fromMaybe)
 import Data.Unit.Strict (forceElemsToWHNF)
+import GHC.TypeLits (Natural)
 
 data SimpleKES d (t :: Nat)
 
@@ -113,7 +114,7 @@ instance
 
   algorithmNameKES proxy = "simple_" ++ show (totalPeriodsKES proxy)
 
-  totalPeriodsKES _ = fromIntegral (natVal (Proxy @t))
+  totalPeriodsKES _ = fromIntegral @Natural @Word (natVal (Proxy @t))
 
   --
   -- Core algorithm operations
@@ -123,7 +124,7 @@ instance
   type Signable (SimpleKES d t) = DSIGN.Signable d
 
   verifyKES ctxt (VerKeySimpleKES vks) j a (SigSimpleKES sig) =
-    case vks !? fromIntegral j of
+    case vks !? fromIntegral @Period @Int j of
       Nothing -> Left "KES verification failed: out of range"
       Just vk -> verifyDSIGN ctxt vk a sig
 
@@ -142,8 +143,8 @@ instance
     rawSerialiseSigDSIGN sig
 
   rawDeserialiseVerKeyKES bs
-    | let duration = fromIntegral (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy d))
+    | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
+          sizeKey = fromIntegral @Word @Int (sizeVerKeyDSIGN (Proxy :: Proxy d))
     , vkbs <- splitsAt (replicate duration sizeKey) bs
     , length vkbs == duration
     , Just vks <- mapM rawDeserialiseVerKeyDSIGN vkbs =
@@ -157,12 +158,12 @@ instance
     VerKeySimpleKES <$!> Vec.mapM deriveVerKeyDSIGNM sks
 
   signKES ctxt j a (SignKeySimpleKES sks) =
-    case sks !? fromIntegral j of
+    case sks !? fromIntegral @Period @Int j of
       Nothing -> error ("SimpleKES.signKES: period out of range " ++ show j)
       Just sk -> SigSimpleKES <$!> (signDSIGNM ctxt a $! sk)
 
   updateKESWith allocator _ (ThunkySignKeySimpleKES sk) t
-    | t + 1 < fromIntegral (natVal (Proxy @t)) = do
+    | t + 1 < fromIntegral @Natural @Period (natVal (Proxy @t)) = do
         sk' <- Vec.mapM (cloneKeyDSIGNMWith allocator) sk
         return $! Just $! SignKeySimpleKES sk'
     | otherwise = return Nothing
@@ -173,9 +174,9 @@ instance
 
   genKeyKESWith allocator (MLockedSeed mlsb) = do
     let seedSize = seedSizeDSIGN (Proxy :: Proxy d)
-        duration = fromIntegral (natVal (Proxy @t))
+        duration = fromIntegral @Natural @Int (natVal (Proxy @t))
     sks <- Vec.generateM duration $ \t -> do
-      withMLSBChunk mlsb (fromIntegral t * fromIntegral seedSize) $ \mlsb' -> do
+      withMLSBChunk mlsb (t * fromIntegral @Word @Int seedSize) $ \mlsb' -> do
         genKeyDSIGNMWith allocator (MLockedSeed mlsb')
     return $! SignKeySimpleKES sks
 
@@ -199,20 +200,20 @@ instance
     deriving (Generic)
 
   unsoundPureGenKeyKES seed =
-    let seedSize = fromIntegral (seedSizeDSIGN (Proxy :: Proxy d))
-        duration = fromIntegral (natVal (Proxy @t))
+    let seedSize = fromIntegral @Word @Int (seedSizeDSIGN (Proxy :: Proxy d))
+        duration = fromIntegral @Natural @Int (natVal (Proxy @t))
         seedChunk t =
           mkSeedFromBytes (BS.take seedSize . BS.drop (seedSize * t) $ getSeedBytes seed)
      in UnsoundPureSignKeySimpleKES $
           Vec.generate duration (genKeyDSIGN . seedChunk)
 
   unsoundPureSignKES ctxt j a (UnsoundPureSignKeySimpleKES sks) =
-    case sks !? fromIntegral j of
+    case sks !? fromIntegral @Period @Int j of
       Nothing -> error ("SimpleKES.unsoundPureSignKES: period out of range " ++ show j)
       Just sk -> SigSimpleKES $! signDSIGN ctxt a sk
 
   unsoundPureUpdateKES _ (UnsoundPureThunkySignKeySimpleKES sk) t
-    | t + 1 < fromIntegral (natVal (Proxy @t)) =
+    | t + 1 < fromIntegral @Natural @Period (natVal (Proxy @t)) =
         Just $! UnsoundPureThunkySignKeySimpleKES sk
     | otherwise =
         Nothing
@@ -232,8 +233,8 @@ instance
     foldMap rawSerialiseSignKeyDSIGN sks
 
   rawDeserialiseUnsoundPureSignKeyKES bs
-    | let duration = fromIntegral (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
+    | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
+          sizeKey = fromIntegral @Word @Int (sizeSignKeyDSIGN (Proxy :: Proxy d))
           skbs = splitsAt (replicate duration sizeKey) bs
     , length skbs == duration =
         do
@@ -254,8 +255,8 @@ instance
     BS.concat <$!> mapM rawSerialiseSignKeyDSIGNM (Vec.toList sks)
 
   rawDeserialiseSignKeyKESWith allocator bs
-    | let duration = fromIntegral (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy d))
+    | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
+          sizeKey = fromIntegral @Word @Int (sizeSignKeyDSIGN (Proxy :: Proxy d))
     , skbs <- splitsAt (replicate duration sizeKey) bs
     , length skbs == duration =
         runMaybeT $ do
@@ -331,7 +332,7 @@ instance DirectSerialise (VerKeyDSIGN d) => DirectSerialise (VerKeyKES (SimpleKE
 
 instance (DirectDeserialise (VerKeyDSIGN d), KnownNat t) => DirectDeserialise (VerKeyKES (SimpleKES d t)) where
   directDeserialise pull = do
-    let duration = fromIntegral (natVal (Proxy :: Proxy t))
+    let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
     vks <- Vec.replicateM duration (directDeserialise pull)
     return $! VerKeySimpleKES vks
 
@@ -341,6 +342,6 @@ instance DirectSerialise (SignKeyDSIGNM d) => DirectSerialise (SignKeyKES (Simpl
 
 instance (DirectDeserialise (SignKeyDSIGNM d), KnownNat t) => DirectDeserialise (SignKeyKES (SimpleKES d t)) where
   directDeserialise pull = do
-    let duration = fromIntegral (natVal (Proxy :: Proxy t))
+    let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
     sks <- Vec.replicateM duration (directDeserialise pull)
     return $! SignKeySimpleKES sks

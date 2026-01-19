@@ -116,8 +116,8 @@ withMLSBChunk mlsb offset action
           stToIO $ unsafeIOToST (newForeignPtr_ . castPtr $ plusPtr ptr offset)
         action (MLSB $! SFP $! fptr)
   where
-    chunkSize = fromIntegral (natVal (Proxy @n'))
-    parentSize = fromIntegral (natVal mlsb)
+    chunkSize = fromIntegral @Integer @Int (natVal (Proxy @n'))
+    parentSize = fromIntegral @Integer @Int (natVal mlsb)
 
 mlsbSize :: KnownNat n => MLockedSizedBytes n -> CSize
 mlsbSize mlsb = fromInteger (natVal mlsb)
@@ -198,7 +198,7 @@ mlsbFromByteStringWith allocator bs = do
   dst <- mlsbNewWith allocator
   withMLSB dst $ \ptr -> stToIO . unsafeIOToST $ do
     BS.useAsCStringLen bs $ \(ptrBS, len) -> do
-      copyMem (castPtr ptr) ptrBS (min (fromIntegral len) (mlsbSize dst))
+      copyMem (castPtr ptr) ptrBS (min (fromIntegral @Int @CSize len) (mlsbSize dst))
   return dst
 
 -- | Allocate a new 'MLockedSizedBytes', and fill it with the contents of a
@@ -239,7 +239,7 @@ mlsbAsByteString :: forall n. KnownNat n => MLockedSizedBytes n -> BS.ByteString
 mlsbAsByteString mlsb@(MLSB (SFP fptr)) = BSI.PS (castForeignPtr fptr) 0 size
   where
     size :: Int
-    size = fromIntegral (mlsbSize mlsb)
+    size = fromIntegral @CSize @Int (mlsbSize mlsb)
 
 -- | /Note:/ this function will leak mlocked memory to the Haskell heap
 -- and should not be used in production code.
@@ -249,7 +249,7 @@ mlsbToByteString mlsb =
     stToIO . unsafeIOToST $ BS.packCStringLen (castPtr ptr, size)
   where
     size :: Int
-    size = fromIntegral (mlsbSize mlsb)
+    size = fromIntegral @CSize @Int (mlsbSize mlsb)
 
 -- | Use an 'MLockedSizedBytes' value as a raw C pointer. Care should be taken
 -- to never copy the contents of the 'MLockedSizedBytes' value into managed

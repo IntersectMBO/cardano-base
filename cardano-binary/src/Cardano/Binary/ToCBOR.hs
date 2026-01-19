@@ -6,7 +6,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE NumDecimals #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -383,10 +382,10 @@ szSimplify = cata $ \case
       Left x -> x
       Right r ->
         if lo r == hi r
-          then fromIntegral (lo r)
+          then fromIntegral @Natural @Size (lo r)
           else
             szCases
-              [Case "lo" (fromIntegral $ lo r), Case "hi" (fromIntegral $ hi r)]
+              [Case "lo" (fromIntegral @Natural @Size $ lo r), Case "hi" (fromIntegral @Natural @Size $ hi r)]
 
 -- | Force any thunks in the given @Size@ expression.
 --
@@ -409,9 +408,9 @@ szBounds :: ToCBOR a => a -> Either Size (Range Natural)
 szBounds = szSimplify . szGreedy . pure
 
 -- | Compute encoded size of an integer
-withWordSize :: (Integral s, Integral a) => s -> a
+withWordSize :: forall s a. (Integral s, Integral a) => s -> a
 withWordSize x =
-  let s = fromIntegral x :: Integer
+  let s = fromIntegral @s @Integer x
    in if
         | s <= 0x17 && s >= (-0x18) -> 1
         | s <= 0xff && s >= (-0x100) -> 2
@@ -455,7 +454,7 @@ encodedSizeRange _ =
     ]
   where
     mkCase :: Text -> a -> Case Size
-    mkCase n x = Case n (fromIntegral $ (withWordSize :: a -> Integer) x)
+    mkCase n x = Case n (fromIntegral @Integer @Size $ (withWordSize :: a -> Integer) x)
 
 instance ToCBOR Word where
   toCBOR = E.encodeWord
@@ -491,11 +490,11 @@ instance ToCBOR Int64 where
 
 instance ToCBOR Float where
   toCBOR = E.encodeFloat
-  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Float))
+  encodedSizeExpr _ _ = 1 + fromIntegral @Int @Size (sizeOf (0 :: Float))
 
 instance ToCBOR Double where
   toCBOR = E.encodeDouble
-  encodedSizeExpr _ _ = 1 + fromIntegral (sizeOf (0 :: Double))
+  encodedSizeExpr _ _ = 1 + fromIntegral @Int @Size (sizeOf (0 :: Double))
 
 instance ToCBOR a => ToCBOR (Ratio a) where
   toCBOR r = E.encodeListLen 2 <> toCBOR (numerator r) <> toCBOR (denominator r)
@@ -644,7 +643,7 @@ instance ToCBOR BS.ByteString where
   toCBOR = E.encodeBytes
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf BS.ByteString))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
+     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
 
 instance ToCBOR Text.Text where
   toCBOR = E.encodeString
@@ -662,7 +661,7 @@ instance ToCBOR BA.ByteArray where
 
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf BA.ByteArray))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
+     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
 
 deriving via BA.ByteArray instance ToCBOR ByteArray
 
@@ -674,13 +673,13 @@ instance ToCBOR SBS.ShortByteString where
 
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf SBS.ShortByteString))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
+     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
 
 instance ToCBOR BS.Lazy.ByteString where
   toCBOR = toCBOR . BS.Lazy.toStrict
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf BS.Lazy.ByteString))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral) len + len
+     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
 
 instance ToCBOR a => ToCBOR [a] where
   toCBOR xs = E.encodeListLenIndef <> foldr (\x r -> toCBOR x <> r) E.encodeBreak xs
@@ -713,7 +712,7 @@ encodeSeq encValue f = variableListLenEncoding (Seq.length f) (foldMap' encValue
 
 exactListLenEncoding :: Int -> Encoding -> Encoding
 exactListLenEncoding len contents =
-  encodeListLen (fromIntegral len :: Word) <> contents
+  encodeListLen (fromIntegral @Int @Word len) <> contents
 {-# INLINE exactListLenEncoding #-}
 
 -- | Conditionally use variable length encoding for list like structures with length
@@ -757,7 +756,7 @@ encodeContainerSkel ::
   container ->
   E.Encoding
 encodeContainerSkel encodeLen size foldFunction f c =
-  encodeLen (fromIntegral (size c)) <> foldFunction f mempty c
+  encodeLen (fromIntegral @Int @Word (size c)) <> foldFunction f mempty c
 {-# INLINE encodeContainerSkel #-}
 
 encodeMapSkel ::

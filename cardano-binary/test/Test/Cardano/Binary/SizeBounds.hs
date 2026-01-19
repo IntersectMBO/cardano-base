@@ -21,6 +21,7 @@ import Hedgehog (Gen, Group (..), checkParallel)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+import Data.Int (Int64)
 import Test.Cardano.Binary.Helpers
 
 tests :: IO Bool
@@ -49,7 +50,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @Int)
-                        , SizeConstant $ fromIntegral (withWordSize x :: Integer)
+                        , SizeConstant $ fromIntegral @Integer @Size (withWordSize x :: Integer)
                         )
                       ]
                 , precise = True
@@ -100,7 +101,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @(LengthOf BS.ByteString))
-                        , SizeConstant $ fromIntegral $ BS.length bs
+                        , SizeConstant $ fromIntegral @Int @Size $ BS.length bs
                         )
                       ]
                 , precise = True
@@ -115,7 +116,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @(LengthOf LBS.ByteString))
-                        , SizeConstant $ fromIntegral $ LBS.length bs
+                        , SizeConstant $ fromIntegral @Int64 @Size $ LBS.length bs
                         )
                       ]
                 , gen = LBS.fromStrict <$> Gen.bytes (Range.linear 0 1000)
@@ -131,7 +132,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @(LengthOf T.Text))
-                        , SizeConstant $ fromIntegral $ T.length bs
+                        , SizeConstant $ fromIntegral @Int @Size $ T.length bs
                         )
                       ]
                 }
@@ -145,7 +146,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @(LengthOf T.Text))
-                        , SizeConstant $ fromIntegral $ T.length bs
+                        , SizeConstant $ fromIntegral @Int @Size $ T.length bs
                         )
                       ]
                 }
@@ -159,7 +160,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @(LengthOf [Bool]))
-                        , SizeConstant $ fromIntegral $ length bs
+                        , SizeConstant $ fromIntegral @Int @Size $ length bs
                         )
                       ]
                 , precise = True
@@ -174,7 +175,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @(LengthOf [Bool]))
-                        , SizeConstant $ fromIntegral $ length bs
+                        , SizeConstant $ fromIntegral @Int @Size $ length bs
                         )
                       ]
                 , precise = True

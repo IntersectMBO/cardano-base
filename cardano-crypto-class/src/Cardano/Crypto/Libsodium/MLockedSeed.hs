@@ -30,7 +30,9 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Class.MonadST (MonadST)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word8)
+import Foreign.C.Types (CSize)
 import Foreign.Ptr (Ptr, castPtr)
+import GHC.TypeLits (Natural)
 import GHC.TypeNats (KnownNat, natVal)
 import NoThunks.Class (NoThunks)
 
@@ -43,13 +45,13 @@ newtype MLockedSeed n = MLockedSeed {mlockedSeedMLSB :: MLockedSizedBytes n}
 instance KnownNat n => DirectSerialise (MLockedSeed n) where
   directSerialise push seed =
     mlockedSeedUseAsCPtr seed $ \ptr ->
-      push (castPtr ptr) (fromIntegral $ natVal seed)
+      push (castPtr ptr) (fromIntegral @Natural @CSize $ natVal seed)
 
 instance KnownNat n => DirectDeserialise (MLockedSeed n) where
   directDeserialise pull = do
     seed <- mlockedSeedNew
     mlockedSeedUseAsCPtr seed $ \ptr ->
-      pull (castPtr ptr) (fromIntegral $ natVal seed)
+      pull (castPtr ptr) (fromIntegral @Natural @CSize $ natVal seed)
     return seed
 
 withMLockedSeedAsMLSB ::
@@ -94,7 +96,7 @@ mlockedSeedNewRandomWith allocator = do
     c_sodium_randombytes_buf dst size
   return mls
   where
-    size = fromIntegral $ natVal (Proxy @n)
+    size = fromIntegral @Natural @CSize $ natVal (Proxy @n)
 
 mlockedSeedFinalize :: MonadST m => MLockedSeed n -> m ()
 mlockedSeedFinalize = mlsbFinalize . mlockedSeedMLSB

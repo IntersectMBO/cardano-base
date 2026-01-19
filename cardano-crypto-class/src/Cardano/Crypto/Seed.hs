@@ -1,6 +1,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Seeds for key generation.
 module Cardano.Crypto.Seed (
@@ -57,7 +58,7 @@ getSeedBytes (Seed s) = s
 
 getSeedSize :: Seed -> Word
 getSeedSize (Seed bs) =
-  fromIntegral . max 0 $ BS.length bs
+  fromIntegral @Int @Word . max 0 $ BS.length bs
 
 -- | Get a number of bytes from the seed. This will fail if not enough bytes
 -- are available. This can be chained multiple times provided the seed is big
@@ -70,12 +71,12 @@ getBytesFromSeed n s =
 
 getBytesFromSeedEither :: Word -> Seed -> Either SeedBytesExhausted (ByteString, Seed)
 getBytesFromSeedEither n (Seed s)
-  | n == fromIntegral (BS.length b) =
+  | n == fromIntegral @Int @Word (BS.length b) =
       Right (b, Seed s')
   | otherwise =
-      Left $ SeedBytesExhausted (fromIntegral $ BS.length b) (fromIntegral n)
+      Left $ SeedBytesExhausted (BS.length b) (fromIntegral @Word @Int n)
   where
-    (b, s') = BS.splitAt (fromIntegral n) s
+    (b, s') = BS.splitAt (fromIntegral @Word @Int n) s
 
 -- | A flavor of 'getBytesFromSeed' that throws 'SeedBytesExhausted' instead of
 -- returning 'Nothing'.
@@ -102,7 +103,7 @@ expandSeed p (Seed s) =
 
 -- | Obtain a 'Seed' by reading @n@ bytes of entropy from the operating system.
 readSeedFromSystemEntropy :: Word -> IO Seed
-readSeedFromSystemEntropy n = mkSeedFromBytes <$> getEntropy (fromIntegral n)
+readSeedFromSystemEntropy n = mkSeedFromBytes <$> getEntropy (fromIntegral @Word @Int n)
 
 --
 -- Support for MonadRandom
@@ -140,7 +141,7 @@ getRandomBytesFromSeed n =
     StateT $ \s ->
       ExceptT $
         Identity $
-          getBytesFromSeedEither (fromIntegral n) s
+          getBytesFromSeedEither (fromIntegral @Int @Word n) s
 
 instance MonadRandom MonadRandomFromSeed where
   getRandomBytes n = BA.convert <$> getRandomBytesFromSeed n
