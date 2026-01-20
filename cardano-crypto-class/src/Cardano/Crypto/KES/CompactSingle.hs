@@ -76,7 +76,7 @@ deriving instance
 
 instance
   ( DSIGNMAlgorithm d
-  , KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)
+  , KnownNat (SigSizeDSIGN d + VerKeySizeDSIGN d)
   ) =>
   KESAlgorithm (CompactSingleKES d)
   where
@@ -115,9 +115,9 @@ instance
   -- raw serialise/deserialise
   --
 
-  type SizeVerKeyKES (CompactSingleKES d) = SizeVerKeyDSIGN d
-  type SizeSignKeyKES (CompactSingleKES d) = SizeSignKeyDSIGN d
-  type SizeSigKES (CompactSingleKES d) = SizeSigDSIGN d + SizeVerKeyDSIGN d
+  type SizeVerKeyKES (CompactSingleKES d) = VerKeySizeDSIGN d
+  type SizeSignKeyKES (CompactSingleKES d) = SignKeySizeDSIGN d
+  type SizeSigKES (CompactSingleKES d) = SigSizeDSIGN d + VerKeySizeDSIGN d
 
   hashVerKeyKES (VerKeyCompactSingleKES vk) =
     castHash (hashVerKeyDSIGN vk)
@@ -136,8 +136,8 @@ instance
       b_sig = slice off_sig size_sig b
       b_vk = slice off_vk size_vk b
 
-      size_sig = sizeSigDSIGN (Proxy :: Proxy d)
-      size_vk = sizeVerKeyDSIGN (Proxy :: Proxy d)
+      size_sig = sigSizeDSIGN (Proxy :: Proxy d)
+      size_vk = verKeySizeDSIGN (Proxy :: Proxy d)
       size_total = sizeSigKES (Proxy :: Proxy (CompactSingleKES d))
 
       off_sig = 0 :: Word
@@ -230,14 +230,14 @@ deriving instance DSIGNMAlgorithm d => Show (VerKeyKES (CompactSingleKES d))
 deriving instance DSIGNMAlgorithm d => Eq (VerKeyKES (CompactSingleKES d))
 
 instance
-  (DSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) =>
+  (DSIGNMAlgorithm d, KnownNat (SigSizeDSIGN d + VerKeySizeDSIGN d)) =>
   ToCBOR (VerKeyKES (CompactSingleKES d))
   where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance
-  (DSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) =>
+  (DSIGNMAlgorithm d, KnownNat (SigSizeDSIGN d + VerKeySizeDSIGN d)) =>
   FromCBOR (VerKeyKES (CompactSingleKES d))
   where
   fromCBOR = decodeVerKeyKES
@@ -284,14 +284,14 @@ deriving instance
   (DSIGNAlgorithm d, Eq (SignKeyDSIGN d)) => Eq (UnsoundPureSignKeyKES (CompactSingleKES d))
 
 instance
-  (UnsoundDSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) =>
+  (UnsoundDSIGNMAlgorithm d, KnownNat (SigSizeDSIGN d + VerKeySizeDSIGN d)) =>
   ToCBOR (UnsoundPureSignKeyKES (CompactSingleKES d))
   where
   toCBOR = encodeUnsoundPureSignKeyKES
   encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (CompactSingleKES d)))
 
 instance
-  (UnsoundDSIGNMAlgorithm d, KnownNat (SizeSigDSIGN d + SizeVerKeyDSIGN d)) =>
+  (UnsoundDSIGNMAlgorithm d, KnownNat (SigSizeDSIGN d + VerKeySizeDSIGN d)) =>
   FromCBOR (UnsoundPureSignKeyKES (CompactSingleKES d))
   where
   fromCBOR = decodeUnsoundPureSignKeyKES
