@@ -2,6 +2,23 @@
 
 ## 2.3.0.0
 
+* Rename types in the `KES` class to use the suffix of `Size` instead of the prefix.
+* Rename types in the `Hash` class to use the suffix of `Size` instead of the prefix.
+* Rename types in the `DSIGN` class to use the suffix of `Size` instead of the prefix.
+* Deprecated type `SizeVerKeyDSIGN` in favor of `VerKeySizeDSIGN`
+* Deprecated function `sizeVerKeyDSIGN` in favor of `verKeySizeDSIGN`
+* Deprecated type `SizeSignKeyDSIGN` in favor of `SignKeySizeDSIGN`
+* Deprecated function `sizeSignKeyDSIGN` in favor of `signKeySizeDSIGN`
+* Deprecated type `SizeSigDSIGN` in favor of `SigSizeDSIGN`
+* Deprecated function `sizeSigDSIGN` in favor of `sigSizeDSIGN`
+* Deprecated type `SizeHash` in favor of `HashSize`
+* Deprecated function `sizeHash` in favor of `hashSize`
+* Deprecated type `SizeVerKeyKES` in favor of `VerKeySizeKES`
+* Deprecated function `sizeVerKeyKES` in favor of `verKeySizeKES`
+* Deprecated type `SizeSignKeyKES` in favor of `SignKeySizeKES`
+* Deprecated function `sizeSignKeyKES` in favor of `signKeySizeKES`
+* Deprecated type `SizeSigKES` in favor of `SigSizeKES`
+* Deprecated function `sizeSigKES` in favor of `sigSizeKES`
 * Expose `Cardano.Crypto.PackedBytes` module with a safe API
 * Remove `Serialise` instance for `PackedBytes` as unused
 * Switch `OutputVRF` to use `ByteArray` instead of `ByteString`. Change field accessor name to `getOutputVRFByteArray`
