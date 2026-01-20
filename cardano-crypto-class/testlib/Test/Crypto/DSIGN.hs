@@ -55,9 +55,9 @@ import Cardano.Crypto.DSIGN (
   Ed25519DSIGN,
   Ed448DSIGN,
   aggregateVerKeysDSIGN,
-  sizeVerKeyDSIGN,
-  sizeSignKeyDSIGN,
-  sizeSigDSIGN,
+  verKeySizeDSIGN,
+  signKeySizeDSIGN,
+  sigSizeDSIGN,
   encodeVerKeyDSIGN,
   decodeVerKeyDSIGN,
   encodeSignKeyDSIGN,
@@ -79,7 +79,7 @@ import Cardano.Crypto.DSIGN (
 
   DSIGNAggregatable (..),
   BLS12381SignContext (..),
-  sizePossessionProofDSIGN,
+  possessionProofSizeDSIGN,
   encodePossessionProofDSIGN,
   decodePossessionProofDSIGN
   )
@@ -279,15 +279,15 @@ testDSIGNAlgorithmWithContext proxy ctxMatters genContext genKeyCtx genMsg name 
       prop "VerKey" .
         forAllShow genVerKey
                    ppShow $
-                   prop_size_serialise rawSerialiseVerKeyDSIGN (sizeVerKeyDSIGN (Proxy @v))
+                   prop_size_serialise rawSerialiseVerKeyDSIGN (verKeySizeDSIGN (Proxy @v))
       prop "SignKey" .
         forAllShow (defaultSignKeyWithContextGen @v genKeyCtx)
                    ppShow $
-                   prop_size_serialise rawSerialiseSignKeyDSIGN (sizeSignKeyDSIGN (Proxy @v))
+                   prop_size_serialise rawSerialiseSignKeyDSIGN (signKeySizeDSIGN (Proxy @v))
       prop "Sig" .
         forAllShow genSig
                    ppShow $
-                   prop_size_serialise rawSerialiseSigDSIGN (sizeSigDSIGN (Proxy @v))
+                   prop_size_serialise rawSerialiseSigDSIGN (sigSizeDSIGN (Proxy @v))
     describe "direct CBOR" $ do
       prop "VerKey" .
         forAllShow genVerKey
@@ -433,15 +433,15 @@ testDSIGNMAlgorithm lock _ n =
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk <- deriveVerKeyDSIGNM sk
-              return $ (fromIntegral @Int @Word . BS.length . rawSerialiseVerKeyDSIGN $ vk) === sizeVerKeyDSIGN (Proxy @v)
+              return $ (fromIntegral @Int @Word . BS.length . rawSerialiseVerKeyDSIGN $ vk) === verKeySizeDSIGN (Proxy @v)
          prop "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               serialized <- rawSerialiseSignKeyDSIGNM sk
-              evaluate ((fromIntegral @Int @Word . BS.length $ serialized) == sizeSignKeyDSIGN (Proxy @v))
+              evaluate ((fromIntegral @Int @Word . BS.length $ serialized) == signKeySizeDSIGN (Proxy @v))
          prop "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
-              return $ (fromIntegral @Int @Word . BS.length . rawSerialiseSigDSIGN $ sig) === sizeSigDSIGN (Proxy @v)
+              return $ (fromIntegral @Int @Word . BS.length . rawSerialiseSigDSIGN $ sig) === sigSizeDSIGN (Proxy @v)
 
        describe "direct CBOR" $ do
          prop "VerKey" $
@@ -492,12 +492,12 @@ testDSIGNMAlgorithm lock _ n =
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
-              serialized <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyDSIGN (Proxy @v)) vk
+              serialized <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeDSIGN (Proxy @v)) vk
               vk' <- directDeserialiseFromBS serialized
               return $ vk === vk'
          prop "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
-              serialized <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyDSIGN (Proxy @v)) sk
+              serialized <- directSerialiseToBS (fromIntegral @Word @Int $ signKeySizeDSIGN (Proxy @v)) sk
               sk' <- directDeserialiseFromBS serialized
               equals <- sk ==! sk'
               forgetSignKeyDSIGNM sk'
@@ -507,12 +507,12 @@ testDSIGNMAlgorithm lock _ n =
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
-              direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyDSIGN (Proxy @v)) vk
+              direct <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeDSIGN (Proxy @v)) vk
               let raw = rawSerialiseVerKeyDSIGN vk
               return $ direct === raw
          prop "SignKey" $
             ioPropertyWithSK @v lock $ \sk -> do
-              direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyDSIGN (Proxy @v)) sk
+              direct <- directSerialiseToBS (fromIntegral @Word @Int $ signKeySizeDSIGN (Proxy @v)) sk
               raw <- rawSerialiseSignKeyDSIGNM sk
               return $ direct === raw
 
@@ -539,21 +539,21 @@ testDSIGNMAlgorithm lock _ n =
           ioPropertyWithSK @v lock $ prop_no_thunks_IO . signDSIGNM () msg
        prop "SignKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
-            direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyDSIGN (Proxy @v)) sk
+            direct <- directSerialiseToBS (fromIntegral @Word @Int $ signKeySizeDSIGN (Proxy @v)) sk
             prop_no_thunks_IO (return $! direct)
        prop "SignKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
-            direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeSignKeyDSIGN (Proxy @v)) sk
+            direct <- directSerialiseToBS (fromIntegral @Word @Int $ signKeySizeDSIGN (Proxy @v)) sk
             prop_no_thunks_IO (directDeserialiseFromBS @IO @(SignKeyDSIGNM v) $! direct)
        prop "VerKey DirectSerialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk <- deriveVerKeyDSIGNM sk
-            direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyDSIGN (Proxy @v)) vk
+            direct <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeDSIGN (Proxy @v)) vk
             prop_no_thunks_IO (return $! direct)
        prop "VerKey DirectDeserialise" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk <- deriveVerKeyDSIGNM sk
-            direct <- directSerialiseToBS (fromIntegral @Word @Int $ sizeVerKeyDSIGN (Proxy @v)) vk
+            direct <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeDSIGN (Proxy @v)) vk
             prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyDSIGN v) $! direct)
 
 -- | Wrap an IO action that requires a 'SignKeyDSIGNM' into one that takes an
@@ -744,7 +744,7 @@ prop_dsignm_verify_neg_msg lock _ a a' =
 
 instance DSIGNAggregatable v => Arbitrary (BadInputFor (PossessionProofDSIGN v)) where
   arbitrary =
-    genBadInputFor (fromIntegral @Word @Int $ sizePossessionProofDSIGN (Proxy @v))
+    genBadInputFor (fromIntegral @Word @Int $ possessionProofSizeDSIGN (Proxy @v))
   shrink = shrinkBadInputFor
 
 testDSIGNAggregatableWithContext
@@ -770,7 +770,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       prop "PoP fail fromCBOR" $ prop_bad_cbor_bytes @(PossessionProofDSIGN v)
     describe "size" $ do
       prop "PoP" .
-        forAllPoP $ prop_size_serialise rawSerialisePossessionProofDSIGN (sizePossessionProofDSIGN (Proxy @v))
+        forAllPoP $ prop_size_serialise rawSerialisePossessionProofDSIGN (possessionProofSizeDSIGN (Proxy @v))
     describe "direct CBOR" $ do
       prop "PoP" .
         forAllPoP $ prop_cbor_with encodePossessionProofDSIGN decodePossessionProofDSIGN

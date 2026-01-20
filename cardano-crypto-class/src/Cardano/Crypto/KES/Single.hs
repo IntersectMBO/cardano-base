@@ -97,9 +97,9 @@ instance DSIGNMAlgorithm d => KESAlgorithm (SingleKES d) where
   -- raw serialise/deserialise
   --
 
-  type SizeVerKeyKES (SingleKES d) = SizeVerKeyDSIGN d
-  type SizeSignKeyKES (SingleKES d) = SizeSignKeyDSIGN d
-  type SizeSigKES (SingleKES d) = SizeSigDSIGN d
+  type SizeVerKeyKES (SingleKES d) = VerKeySizeDSIGN d
+  type SizeSignKeyKES (SingleKES d) = SignKeySizeDSIGN d
+  type SizeSigKES (SingleKES d) = SigSizeDSIGN d
 
   hashVerKeyKES (VerKeySingleKES vk) =
     castHash (hashVerKeyDSIGN vk)

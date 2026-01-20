@@ -39,9 +39,9 @@ data MockDSIGN
 
 instance DSIGNAlgorithm MockDSIGN where
   type SeedSizeDSIGN MockDSIGN = 8
-  type SizeVerKeyDSIGN MockDSIGN = 8 -- for 64 bit int
-  type SizeSignKeyDSIGN MockDSIGN = 8
-  type SizeSigDSIGN MockDSIGN = SizeHash ShortHash + 8
+  type VerKeySizeDSIGN MockDSIGN = 8 -- for 64 bit int
+  type SignKeySizeDSIGN MockDSIGN = 8
+  type SigSizeDSIGN MockDSIGN = SizeHash ShortHash + 8
 
   --
   -- Key and signature types

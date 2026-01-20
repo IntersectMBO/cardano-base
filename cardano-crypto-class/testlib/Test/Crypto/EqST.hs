@@ -79,7 +79,7 @@ deriving via
     KnownNat n => EqST (MLockedSeed n)
 
 deriving via
-  (MLockedSizedBytes (SizeSignKeyDSIGN Ed25519DSIGN))
+  (MLockedSizedBytes (SignKeySizeDSIGN Ed25519DSIGN))
   instance
     EqST (SignKeyDSIGNM Ed25519DSIGN)
 

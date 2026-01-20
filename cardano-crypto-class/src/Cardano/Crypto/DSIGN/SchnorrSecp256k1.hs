@@ -31,12 +31,12 @@ import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (
     SeedSizeDSIGN,
     SigDSIGN,
+    SigSizeDSIGN,
     SignKeyDSIGN,
+    SignKeySizeDSIGN,
     Signable,
-    SizeSigDSIGN,
-    SizeSignKeyDSIGN,
-    SizeVerKeyDSIGN,
     VerKeyDSIGN,
+    VerKeySizeDSIGN,
     algorithmNameDSIGN,
     deriveVerKeyDSIGN,
     genKeyDSIGN,
@@ -105,9 +105,9 @@ data SchnorrSecp256k1DSIGN
 
 instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   type SeedSizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
-  type SizeSigDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_SIGNATURE_BYTES
-  type SizeSignKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
-  type SizeVerKeyDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PUBKEY_BYTES
+  type SigSizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_SIGNATURE_BYTES
+  type SignKeySizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
+  type VerKeySizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PUBKEY_BYTES
   type Signable SchnorrSecp256k1DSIGN = SignableRepresentation
   newtype VerKeyDSIGN SchnorrSecp256k1DSIGN
     = VerKeySchnorrSecp256k1 (PinnedSizedBytes SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL)
@@ -115,12 +115,12 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
   newtype SignKeyDSIGN SchnorrSecp256k1DSIGN
-    = SignKeySchnorrSecp256k1 (PinnedSizedBytes (SizeSignKeyDSIGN SchnorrSecp256k1DSIGN))
+    = SignKeySchnorrSecp256k1 (PinnedSizedBytes (SignKeySizeDSIGN SchnorrSecp256k1DSIGN))
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
   newtype SigDSIGN SchnorrSecp256k1DSIGN
-    = SigSchnorrSecp256k1 (PinnedSizedBytes (SizeSigDSIGN SchnorrSecp256k1DSIGN))
+    = SigSchnorrSecp256k1 (PinnedSizedBytes (SigSizeDSIGN SchnorrSecp256k1DSIGN))
     deriving newtype (Eq, NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
@@ -200,7 +200,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs =
     unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, len) ->
-      if len /= (fromIntegral @Natural @Int . natVal $ Proxy @(SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
+      if len /= (fromIntegral @Natural @Int . natVal $ Proxy @(VerKeySizeDSIGN SchnorrSecp256k1DSIGN))
         then pure Nothing
         else do
           let dataPtr = castPtr ptr

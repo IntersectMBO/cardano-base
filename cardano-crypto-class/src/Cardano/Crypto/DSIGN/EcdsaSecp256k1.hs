@@ -40,12 +40,12 @@ import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (
     SeedSizeDSIGN,
     SigDSIGN,
+    SigSizeDSIGN,
     SignKeyDSIGN,
+    SignKeySizeDSIGN,
     Signable,
-    SizeSigDSIGN,
-    SizeSignKeyDSIGN,
-    SizeVerKeyDSIGN,
     VerKeyDSIGN,
+    VerKeySizeDSIGN,
     algorithmNameDSIGN,
     deriveVerKeyDSIGN,
     genKeyDSIGN,
@@ -156,9 +156,9 @@ data EcdsaSecp256k1DSIGN
 
 instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
   type SeedSizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PRIVKEY_BYTES
-  type SizeSigDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_SIGNATURE_BYTES
-  type SizeSignKeyDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PRIVKEY_BYTES
-  type SizeVerKeyDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PUBKEY_BYTES
+  type SigSizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_SIGNATURE_BYTES
+  type SignKeySizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PRIVKEY_BYTES
+  type VerKeySizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PUBKEY_BYTES
   type Signable EcdsaSecp256k1DSIGN = ((~) MessageHash)
   newtype VerKeyDSIGN EcdsaSecp256k1DSIGN
     = VerKeyEcdsaSecp256k1 (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)

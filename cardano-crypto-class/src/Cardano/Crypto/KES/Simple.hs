@@ -85,8 +85,8 @@ instance
   ( DSIGNMAlgorithm d
   , KnownNat t
   , KnownNat (SeedSizeDSIGN d * t)
-  , KnownNat (SizeVerKeyDSIGN d * t)
-  , KnownNat (SizeSignKeyDSIGN d * t)
+  , KnownNat (VerKeySizeDSIGN d * t)
+  , KnownNat (SignKeySizeDSIGN d * t)
   ) =>
   KESAlgorithm (SimpleKES d t)
   where
@@ -132,9 +132,9 @@ instance
   -- raw serialise/deserialise
   --
 
-  type SizeVerKeyKES (SimpleKES d t) = SizeVerKeyDSIGN d * t
-  type SizeSignKeyKES (SimpleKES d t) = SizeSignKeyDSIGN d * t
-  type SizeSigKES (SimpleKES d t) = SizeSigDSIGN d
+  type SizeVerKeyKES (SimpleKES d t) = VerKeySizeDSIGN d * t
+  type SizeSignKeyKES (SimpleKES d t) = SignKeySizeDSIGN d * t
+  type SizeSigKES (SimpleKES d t) = SigSizeDSIGN d
 
   rawSerialiseVerKeyKES (VerKeySimpleKES vks) =
     BS.concat [rawSerialiseVerKeyDSIGN vk | vk <- Vec.toList vks]
@@ -144,7 +144,7 @@ instance
 
   rawDeserialiseVerKeyKES bs
     | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral @Word @Int (sizeVerKeyDSIGN (Proxy :: Proxy d))
+          sizeKey = fromIntegral @Word @Int (verKeySizeDSIGN (Proxy :: Proxy d))
     , vkbs <- splitsAt (replicate duration sizeKey) bs
     , length vkbs == duration
     , Just vks <- mapM rawDeserialiseVerKeyDSIGN vkbs =
@@ -234,7 +234,7 @@ instance
 
   rawDeserialiseUnsoundPureSignKeyKES bs
     | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral @Word @Int (sizeSignKeyDSIGN (Proxy :: Proxy d))
+          sizeKey = fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy d))
           skbs = splitsAt (replicate duration sizeKey) bs
     , length skbs == duration =
         do
@@ -256,7 +256,7 @@ instance
 
   rawDeserialiseSignKeyKESWith allocator bs
     | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral @Word @Int (sizeSignKeyDSIGN (Proxy :: Proxy d))
+          sizeKey = fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy d))
     , skbs <- splitsAt (replicate duration sizeKey) bs
     , length skbs == duration =
         runMaybeT $ do
@@ -284,8 +284,8 @@ instance
   ( DSIGNMAlgorithm d
   , KnownNat t
   , KnownNat (SeedSizeDSIGN d * t)
-  , KnownNat (SizeVerKeyDSIGN d * t)
-  , KnownNat (SizeSignKeyDSIGN d * t)
+  , KnownNat (VerKeySizeDSIGN d * t)
+  , KnownNat (SignKeySizeDSIGN d * t)
   ) =>
   ToCBOR (VerKeyKES (SimpleKES d t))
   where
@@ -296,8 +296,8 @@ instance
   ( DSIGNMAlgorithm d
   , KnownNat t
   , KnownNat (SeedSizeDSIGN d * t)
-  , KnownNat (SizeVerKeyDSIGN d * t)
-  , KnownNat (SizeSignKeyDSIGN d * t)
+  , KnownNat (VerKeySizeDSIGN d * t)
+  , KnownNat (SignKeySizeDSIGN d * t)
   ) =>
   FromCBOR (VerKeyKES (SimpleKES d t))
   where
@@ -307,8 +307,8 @@ instance
   ( DSIGNMAlgorithm d
   , KnownNat t
   , KnownNat (SeedSizeDSIGN d * t)
-  , KnownNat (SizeVerKeyDSIGN d * t)
-  , KnownNat (SizeSignKeyDSIGN d * t)
+  , KnownNat (VerKeySizeDSIGN d * t)
+  , KnownNat (SignKeySizeDSIGN d * t)
   ) =>
   ToCBOR (SigKES (SimpleKES d t))
   where
@@ -319,8 +319,8 @@ instance
   ( DSIGNMAlgorithm d
   , KnownNat t
   , KnownNat (SeedSizeDSIGN d * t)
-  , KnownNat (SizeVerKeyDSIGN d * t)
-  , KnownNat (SizeSignKeyDSIGN d * t)
+  , KnownNat (VerKeySizeDSIGN d * t)
+  , KnownNat (SignKeySizeDSIGN d * t)
   ) =>
   FromCBOR (SigKES (SimpleKES d t))
   where
