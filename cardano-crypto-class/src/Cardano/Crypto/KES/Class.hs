@@ -572,7 +572,7 @@ updateKESWithPeriod c (SignKeyWithPeriodKES sk t) = runMaybeT $ do
 encodedVerKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (VerKeyKES v) -> Size
 encodedVerKeyKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeVerKeyKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeVerKeyKES (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeVerKeyKES (Proxy :: Proxy v))
 
@@ -581,7 +581,7 @@ encodedVerKeyKESSizeExpr _proxy =
 encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
 encodedSignKeyKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeSignKeyKES (Proxy @v)))
+  fromIntegral @Integer @Size (withWordSize (sizeSignKeyKES (Proxy @v)))
     -- payload
     + fromIntegral @Word @Size (sizeSignKeyKES (Proxy :: Proxy v))
 
@@ -590,7 +590,7 @@ encodedSignKeyKESSizeExpr _proxy =
 encodedSigKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SigKES v) -> Size
 encodedSigKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeSigKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeSigKES (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeSigKES (Proxy :: Proxy v))
 

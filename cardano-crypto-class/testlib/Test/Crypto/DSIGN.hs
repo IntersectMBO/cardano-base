@@ -744,7 +744,7 @@ prop_dsignm_verify_neg_msg lock _ a a' =
 
 instance DSIGNAggregatable v => Arbitrary (BadInputFor (PossessionProofDSIGN v)) where
   arbitrary =
-    genBadInputFor (fromIntegral $ sizePossessionProofDSIGN (Proxy @v))
+    genBadInputFor (fromIntegral @Word @Int $ sizePossessionProofDSIGN (Proxy @v))
   shrink = shrinkBadInputFor
 
 testDSIGNAggregatableWithContext

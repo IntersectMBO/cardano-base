@@ -320,7 +320,7 @@ decodeSignedDSIGN = SignedDSIGN <$> decodeSigDSIGN
 encodedVerKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (VerKeyDSIGN v) -> Size
 encodedVerKeyDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeVerKeyDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeVerKeyDSIGN (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeVerKeyDSIGN (Proxy :: Proxy v))
 
@@ -330,7 +330,7 @@ encodedSignKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SignKeyDSIGN
 encodedSignKeyDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
   fromIntegral @Integer @Size
-    ((withWordSize :: Word -> Integer) (sizeSignKeyDSIGN (Proxy :: Proxy v)))
+    (withWordSize (sizeSignKeyDSIGN (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeSignKeyDSIGN (Proxy :: Proxy v))
 
@@ -339,7 +339,7 @@ encodedSignKeyDSIGNSizeExpr _proxy =
 encodedSigDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SigDSIGN v) -> Size
 encodedSigDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeSigDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeSigDSIGN (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeSigDSIGN (Proxy :: Proxy v))
 
@@ -573,6 +573,6 @@ encodedPossessionProofDSIGNSizeExpr ::
   forall v. DSIGNAggregatable v => Proxy (PossessionProofDSIGN v) -> Size
 encodedPossessionProofDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizePossessionProofDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizePossessionProofDSIGN (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizePossessionProofDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizePossessionProofDSIGN (Proxy :: Proxy v))

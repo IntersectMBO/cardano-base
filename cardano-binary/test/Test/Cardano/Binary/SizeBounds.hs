@@ -50,7 +50,7 @@ tests =
                     M.fromList
                       [
                         ( typeRep (Proxy @Int)
-                        , SizeConstant $ fromIntegral @Integer @Size (withWordSize x :: Integer)
+                        , SizeConstant $ fromIntegral @Integer @Size $ withWordSize x
                         )
                       ]
                 , precise = True

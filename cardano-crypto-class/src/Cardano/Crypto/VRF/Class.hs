@@ -377,7 +377,7 @@ verifyCertified ctxt vk a CertifiedVRF {certifiedOutput, certifiedProof} =
 encodedVerKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (VerKeyVRF v) -> Size
 encodedVerKeyVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeVerKeyVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeVerKeyVRF (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeVerKeyVRF (Proxy :: Proxy v))
 
@@ -386,7 +386,7 @@ encodedVerKeyVRFSizeExpr _proxy =
 encodedSignKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (SignKeyVRF v) -> Size
 encodedSignKeyVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeSignKeyVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeSignKeyVRF (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeSignKeyVRF (Proxy :: Proxy v))
 
@@ -395,6 +395,6 @@ encodedSignKeyVRFSizeExpr _proxy =
 encodedCertVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (CertVRF v) -> Size
 encodedCertVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size ((withWordSize :: Word -> Integer) (sizeCertVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeCertVRF (Proxy :: Proxy v)))
     -- payload
     + fromIntegral @Word @Size (sizeCertVRF (Proxy :: Proxy v))

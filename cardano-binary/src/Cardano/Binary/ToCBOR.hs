@@ -410,12 +410,12 @@ szBounds = szSimplify . szGreedy . pure
 -- | Compute encoded size of an integer
 withWordSize :: forall s a. (Integral s, Integral a) => s -> a
 withWordSize x =
-  let s = fromIntegral @s @Integer x
+  let i = fromIntegral @s @Integer x
    in if
-        | s <= 0x17 && s >= (-0x18) -> 1
-        | s <= 0xff && s >= (-0x100) -> 2
-        | s <= 0xffff && s >= (-0x10000) -> 3
-        | s <= 0xffffffff && s >= (-0x100000000) -> 5
+        | i <= 0x17 && i >= (-0x18) -> 1
+        | i <= 0xff && i >= (-0x100) -> 2
+        | i <= 0xffff && i >= (-0x10000) -> 3
+        | i <= 0xffffffff && i >= (-0x100000000) -> 5
         | otherwise -> 9
 
 instance ToCBOR Encoding where
@@ -454,7 +454,7 @@ encodedSizeRange _ =
     ]
   where
     mkCase :: Text -> a -> Case Size
-    mkCase n x = Case n (fromIntegral @Integer @Size $ (withWordSize :: a -> Integer) x)
+    mkCase n x = Case n (fromIntegral @Integer @Size $ withWordSize x)
 
 instance ToCBOR Word where
   toCBOR = E.encodeWord
@@ -643,7 +643,7 @@ instance ToCBOR BS.ByteString where
   toCBOR = E.encodeBytes
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf BS.ByteString))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
+     in apMono "withWordSize" (withWordSize . fromIntegral @Natural @Int) len + len
 
 instance ToCBOR Text.Text where
   toCBOR = E.encodeString
@@ -661,7 +661,7 @@ instance ToCBOR BA.ByteArray where
 
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf BA.ByteArray))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
+     in apMono "withWordSize" (withWordSize . fromIntegral @Natural @Int) len + len
 
 deriving via BA.ByteArray instance ToCBOR ByteArray
 
@@ -673,13 +673,13 @@ instance ToCBOR SBS.ShortByteString where
 
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf SBS.ShortByteString))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
+     in apMono "withWordSize" (withWordSize . fromIntegral @Natural @Int) len + len
 
 instance ToCBOR BS.Lazy.ByteString where
   toCBOR = toCBOR . BS.Lazy.toStrict
   encodedSizeExpr size _ =
     let len = size (Proxy @(LengthOf BS.Lazy.ByteString))
-     in apMono "withWordSize@Int" (withWordSize @Int . fromIntegral @Natural @Int) len + len
+     in apMono "withWordSize" (withWordSize . fromIntegral @Natural @Int) len + len
 
 instance ToCBOR a => ToCBOR [a] where
   toCBOR xs = E.encodeListLenIndef <> foldr (\x r -> toCBOR x <> r) E.encodeBreak xs
