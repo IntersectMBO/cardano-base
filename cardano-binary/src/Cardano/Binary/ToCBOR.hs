@@ -64,6 +64,7 @@ import Data.Fix ( Fix(..) )
 #else
 import Data.Functor.Foldable (Fix(..))
 #endif
+import Cardano.Base.IP (IPv4, IPv6, fromIPv4w, fromIPv6w)
 import Data.Foldable (foldMap', toList)
 import Data.Functor.Foldable (cata, project)
 import Data.Int (Int32, Int64)
@@ -839,3 +840,13 @@ instance ToCBOR UTCTime where
     where
       (year, dayOfYear) = toOrdinalDate day
       timeOfDayPico = diffTimeToPicoseconds timeOfDay
+
+--------------------------------------------------------------------------------
+-- IP addresses
+--------------------------------------------------------------------------------
+
+instance ToCBOR IPv4 where
+  toCBOR = toCBOR . fromIPv4w
+
+instance ToCBOR IPv6 where
+  toCBOR = toCBOR . fromIPv6w

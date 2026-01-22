@@ -1,0 +1,143 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+-- | This module provides newtype wrappers for 'IPv4' and 'IPv6' addresses
+-- from the @iproute@ package. These wrappers exist to have a correct 'Show'
+-- instance and eliminate the need for orphan instances.
+module Cardano.Base.IP (
+  IPv4,
+  IPv6,
+  mkIPv4,
+  unIPv4,
+  mkIPv6,
+  unIPv6,
+  toIPv4,
+  toIPv4w,
+  fromIPv4,
+  fromIPv4w,
+  toIPv6,
+  toIPv6w,
+  fromIPv6,
+  fromIPv6w,
+  fromHostAddress6,
+)
+where
+
+import Control.DeepSeq (NFData (..), rwhnf)
+import Data.Aeson (FromJSON (..), ToJSON (..))
+import qualified Data.Aeson as Aeson
+import qualified Data.IP as IP
+import qualified Data.Text as Text
+import Data.Word (Word32)
+import GHC.Generics (Generic)
+import NoThunks.Class (NoThunks (..))
+import Text.Read (readMaybe, readPrec)
+
+newtype IPv4 = IPv4 {unIPv4 :: IP.IPv4}
+  deriving newtype (Eq, Ord)
+  deriving stock (Generic)
+
+instance NFData IPv4 where
+  rnf = rwhnf
+
+instance NoThunks IPv4 where
+  wNoThunks _ (IPv4 _) = return Nothing
+  showTypeOf _ = "IPv4"
+
+-- >>> show (toIPv4 [192, 168, 1, 1])
+-- "\"192.168.1.1\""
+instance Show IPv4 where
+  show (IPv4 ip) = show (show ip)
+
+-- >>> read "\"192.168.1.1\"" :: IPv4
+-- "192.168.1.1"
+instance Read IPv4 where
+  readPrec = do
+    s <- readPrec
+    case readMaybe s of
+      Just ip -> pure (mkIPv4 ip)
+      Nothing -> fail "invalid IPv4"
+
+instance FromJSON IPv4 where
+  parseJSON =
+    Aeson.withText "IPv4" $ \txt -> case readMaybe (Text.unpack txt) of
+      Just ip -> pure (mkIPv4 ip)
+      Nothing -> fail $ "failed to read as IPv4 " ++ show txt
+
+instance ToJSON IPv4 where
+  toJSON (IPv4 ip) = Aeson.toJSON (show ip)
+
+newtype IPv6 = IPv6 {unIPv6 :: IP.IPv6}
+  deriving newtype (Eq, Ord)
+
+instance NFData IPv6 where
+  rnf = rwhnf
+
+instance NoThunks IPv6 where
+  wNoThunks _ (IPv6 _) = return Nothing
+  showTypeOf _ = "IPv6"
+
+-- >>> show (toIPv6 [0x2001, 0xdb8, 0, 0, 0, 0, 0, 1])
+-- "\"2001:db8::1\""
+instance Show IPv6 where
+  show (IPv6 ip) = show (show ip)
+
+-- >>> read "\"2001:db8::1\"" :: IPv6
+-- "2001:db8::1"
+instance Read IPv6 where
+  readPrec = do
+    s <- readPrec
+    case readMaybe s of
+      Just ip -> pure (mkIPv6 ip)
+      Nothing -> fail "invalid IPv6"
+
+instance FromJSON IPv6 where
+  parseJSON =
+    Aeson.withText "IPv6" $ \txt -> case readMaybe (Text.unpack txt) of
+      Just ip -> pure (mkIPv6 ip)
+      Nothing -> fail $ "failed to read as IPv6 " ++ show txt
+
+instance ToJSON IPv6 where
+  toJSON (IPv6 ip) = Aeson.toJSON (show ip)
+
+-- | Wrap an 'IP.IPv4' address
+mkIPv4 :: IP.IPv4 -> IPv4
+mkIPv4 = IPv4
+
+-- >>> toIPv4 [192, 168, 1, 1]
+-- "192.168.1.1"
+toIPv4 :: [Int] -> IPv4
+toIPv4 = mkIPv4 . IP.toIPv4
+
+toIPv4w :: Word32 -> IPv4
+toIPv4w = mkIPv4 . IP.toIPv4w
+
+fromIPv4 :: IPv4 -> [Int]
+fromIPv4 = IP.fromIPv4 . unIPv4
+
+fromIPv4w :: IPv4 -> Word32
+fromIPv4w = IP.fromIPv4w . unIPv4
+
+-- | Wrap an 'IP.IPv6' address, forcing evaluation to guarantee no thunks
+mkIPv6 :: IP.IPv6 -> IPv6
+mkIPv6 ipv6 = case IP.toHostAddress6 ipv6 of
+  (!_, !_, !_, !_) -> IPv6 ipv6
+
+-- >>> toIPv6 [0x2001, 0xdb8, 0, 0, 0, 0, 0, 1]
+-- "2001:db8::1"
+toIPv6 :: [Int] -> IPv6
+toIPv6 = mkIPv6 . IP.toIPv6
+
+toIPv6w :: (Word32, Word32, Word32, Word32) -> IPv6
+toIPv6w = mkIPv6 . IP.toIPv6w
+
+fromHostAddress6 :: (Word32, Word32, Word32, Word32) -> IPv6
+fromHostAddress6 = toIPv6w
+
+fromIPv6 :: IPv6 -> [Int]
+fromIPv6 (IPv6 ip) = IP.fromIPv6 ip
+
+fromIPv6w :: IPv6 -> (Word32, Word32, Word32, Word32)
+fromIPv6w (IPv6 ip) = IP.toHostAddress6 ip
