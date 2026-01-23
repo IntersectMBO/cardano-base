@@ -431,14 +431,14 @@ writeWord64BE (MutableByteArray mba#) (I# i#) (W64# w#) =
 
 indexWord64BE :: ByteArray -> Int -> Word64
 indexWord64BE ba i =
-  (fromIntegral @Word64 @Int (indexWord32BE ba i) `shiftL` 32) .|. fromIntegral @Word64 @Int (indexWord32BE ba (i + 4))
+  (fromIntegral @Word32 @Word64 (indexWord32BE ba i) `shiftL` 32) .|. fromIntegral @Word32 @Word64 (indexWord32BE ba (i + 4))
 {-# INLINE indexWord64BE #-}
 
 peekWord64BE :: Ptr a -> Int -> IO Word64
 peekWord64BE ptr i = do
   u <- peekWord32BE ptr i
   l <- peekWord32BE ptr (i + 4)
-  pure ((fromIntegral @Int @Word64 u `shiftL` 32) .|. fromIntegral @Int @Word64 l)
+  pure ((fromIntegral @Word32 @Word64 u `shiftL` 32) .|. fromIntegral @Word32 @Word64 l)
 {-# INLINE peekWord64BE #-}
 
 writeWord64BE :: MutableByteArray s -> Int -> Word64 -> ST s ()

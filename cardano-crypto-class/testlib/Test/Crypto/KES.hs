@@ -30,7 +30,7 @@ import Data.Proxy (Proxy (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Foreign.Ptr (WordPtr)
-import GHC.TypeNats (KnownNat, Nat, natVal)
+import GHC.TypeNats (KnownNat, natVal)
 
 import Control.Monad (void)
 import Control.Monad.Class.MonadST
@@ -52,6 +52,7 @@ import Test.Hspec (Expectation, Spec, describe, it, shouldSatisfy)
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck
 
+import GHC.TypeLits (Natural)
 import Test.Crypto.AllocLog
 import Test.Crypto.EqST
 import Test.Crypto.Instances (withMLockedSeedFromPSB)
@@ -811,7 +812,7 @@ withAllUpdatesKES seedPSB f = withMLockedSeedFromPSB seedPSB $ \seed -> do
 withNullSeed :: forall m n a. (MonadThrow m, MonadST m, KnownNat n) => (MLockedSeed n -> m a) -> m a
 withNullSeed =
   bracket
-    (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral @Nat @Int $ natVal (Proxy @n)) 0))
+    (MLockedSeed <$> mlsbFromByteString (BS.replicate (fromIntegral @Natural @Int $ natVal (Proxy @n)) 0))
     mlockedSeedFinalize
 
 withNullSK ::
@@ -838,7 +839,7 @@ prop_noErasedBlocksInKey ::
   Property
 prop_noErasedBlocksInKey kesAlgorithm =
   ioProperty . withNullSK @IO @v $ \sk -> do
-    let size :: Int = fromIntegral @Word @Int $ sizeSignKeyKES kesAlgorithm
+    let size = fromIntegral @Word @Int $ sizeSignKeyKES kesAlgorithm
     serialized <- directSerialiseToBS size sk
     forgetSignKeyKES sk
     return $ counterexample (hexBS serialized) $ not (hasLongRunOfFF serialized)

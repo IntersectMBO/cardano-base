@@ -217,7 +217,7 @@ instance
   {-# INLINE rawDeserialiseVerKeyKES #-}
 
   rawDeserialiseSigKES b = do
-    guard (BS.length b == fromIntegral @Period @Int size_total)
+    guard (BS.length b == fromIntegral @Word @Int size_total)
     sigma <- rawDeserialiseSigKES b_sig
     vk_0 <- rawDeserialiseVerKeyKES b_vk0
     vk_1 <- rawDeserialiseVerKeyKES b_vk1
@@ -317,7 +317,7 @@ instance
 
   {-# NOINLINE rawDeserialiseSignKeyKESWith #-}
   rawDeserialiseSignKeyKESWith allocator b = runMaybeT $ do
-    guard (BS.length b == fromIntegral @Period @Int size_total)
+    guard (BS.length b == fromIntegral @Word @Int size_total)
     sk <- MaybeT $ rawDeserialiseSignKeyKESWith allocator b_sk
     r <- MaybeT $ mlsbFromByteStringCheckWith allocator b_r
     vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES b_vk0
@@ -438,7 +438,7 @@ instance
         return $! UnsoundPureSignKeySumKES sk' r_1 vk_0 vk_1
     | t + 1 == _T = do
         let sk' = unsoundPureGenKeyKES r_1
-        let r_1' = mkSeedFromBytes (BS.replicate (fromIntegral @Period @Int (seedSizeKES (Proxy @d))) 0)
+        let r_1' = mkSeedFromBytes (BS.replicate (fromIntegral @Word @Int (seedSizeKES (Proxy @d))) 0)
         return $! UnsoundPureSignKeySumKES sk' r_1' vk_0 vk_1
     | otherwise = do
         sk' <- unsoundPureUpdateKES ctx sk (t - _T)
@@ -479,7 +479,7 @@ instance
           ]
 
   rawDeserialiseUnsoundPureSignKeyKES b = do
-    guard (BS.length b == fromIntegral @Period @Int size_total)
+    guard (BS.length b == fromIntegral @Word @Int size_total)
     sk <- rawDeserialiseUnsoundPureSignKeyKES b_sk
     let r = mkSeedFromBytes b_r
     vk_0 <- rawDeserialiseVerKeyKES b_vk0
@@ -553,7 +553,7 @@ instance
   directSerialise push (SignKeySumKES sk r vk0 vk1) = do
     directSerialise push sk
     mlockedSeedUseAsCPtr r $ \ptr ->
-      push (castPtr ptr) (fromIntegral @Period @CSize $ seedSizeKES (Proxy :: Proxy d))
+      push (castPtr ptr) (fromIntegral @Word @CSize $ seedSizeKES (Proxy :: Proxy d))
     directSerialise push vk0
     directSerialise push vk1
 
@@ -569,7 +569,7 @@ instance
 
     r <- mlockedSeedNew
     mlockedSeedUseAsCPtr r $ \ptr ->
-      pull (castPtr ptr) (fromIntegral @Period @CSize $ seedSizeKES (Proxy :: Proxy d))
+      pull (castPtr ptr) (fromIntegral @Word @CSize $ seedSizeKES (Proxy :: Proxy d))
 
     vk0 <- directDeserialise pull
     vk1 <- directDeserialise pull
@@ -586,7 +586,7 @@ instance
   DirectDeserialise (VerKeyKES (SumKES h d))
   where
   directDeserialise pull = do
-    let len = fromIntegral @Period @Int $ sizeHash (Proxy @h)
+    let len = fromIntegral @Word @Int $ sizeHash (Proxy @h)
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr -> do
       pull (castPtr ptr) (fromIntegral @Int @CSize len)

@@ -410,7 +410,7 @@ szBounds = szSimplify . szGreedy . pure
 -- | Compute encoded size of an integer
 withWordSize :: forall s a. (Integral s, Integral a) => s -> a
 withWordSize x =
-  let i = fromIntegral @s @Integer x
+  let i = toInteger x
    in if
         | i <= 0x17 && i >= (-0x18) -> 1
         | i <= 0xff && i >= (-0x100) -> 2

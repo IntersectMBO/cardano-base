@@ -110,7 +110,7 @@ data DecoderError
   | DecoderErrorLeftover Text BS.ByteString
   | -- | A size mismatch @DecoderErrorSizeMismatch label expectedSize actualSize@
     DecoderErrorSizeMismatch Text Int Int
-  | DecoderErrorUnknownTag Text Word8
+  | DecoderErrorUnknownTag Text Word
   | DecoderErrorVoid
   deriving (Eq, Show)
 
@@ -414,7 +414,7 @@ instance (FromCBOR a, FromCBOR b) => FromCBOR (Either a b) where
       1 -> do
         !x <- fromCBOR
         return (Right x)
-      _ -> cborError $ DecoderErrorUnknownTag "Either" (fromIntegral @Word @Word8 t)
+      _ -> cborError $ DecoderErrorUnknownTag "Either" t
 
 instance FromCBOR a => FromCBOR (NonEmpty a) where
   fromCBOR =
@@ -438,7 +438,7 @@ decodeMaybe decodeValue = do
     1 -> do
       !x <- decodeValue
       return (Just x)
-    _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral @Int @Word8 n)
+    _ -> cborError $ DecoderErrorUnknownTag "Maybe" (fromIntegral @Int @Word n)
 
 decodeNullMaybe :: D.Decoder s a -> D.Decoder s (Maybe a)
 decodeNullMaybe decoder = do
@@ -538,7 +538,7 @@ setTag = 258
 decodeSetTag :: D.Decoder s ()
 decodeSetTag = do
   t <- D.decodeTag
-  when (t /= setTag) $ cborError $ DecoderErrorUnknownTag "Set" (fromIntegral @Word @Word8 t)
+  when (t /= setTag) $ cborError $ DecoderErrorUnknownTag "Set" t
 
 decodeSetSkel :: (Ord a, FromCBOR a) => ([a] -> c) -> D.Decoder s c
 decodeSetSkel fromDistinctAscList = do

@@ -58,7 +58,7 @@ getSeedBytes (Seed s) = s
 
 getSeedSize :: Seed -> Word
 getSeedSize (Seed bs) =
-  fromIntegral @Int @Word . max 0 $ BS.length bs
+  fromIntegral @Int @Word $ BS.length bs
 
 -- | Get a number of bytes from the seed. This will fail if not enough bytes
 -- are available. This can be chained multiple times provided the seed is big
@@ -74,7 +74,7 @@ getBytesFromSeedEither n (Seed s)
   | n == fromIntegral @Int @Word (BS.length b) =
       Right (b, Seed s')
   | otherwise =
-      Left $ SeedBytesExhausted (BS.length b) (fromIntegral @Word @Int n)
+      Left $ SeedBytesExhausted (BS.length b) n
   where
     (b, s') = BS.splitAt (fromIntegral @Word @Int n) s
 
@@ -124,7 +124,7 @@ runMonadRandomWithSeed s a =
 
 data SeedBytesExhausted = SeedBytesExhausted
   { seedBytesSupplied :: Int
-  , seedBytesDemanded :: Int
+  , seedBytesDemanded :: Word
   }
   deriving (Show)
 
@@ -141,7 +141,7 @@ getRandomBytesFromSeed n =
     StateT $ \s ->
       ExceptT $
         Identity $
-          getBytesFromSeedEither (fromIntegral @Int @Word n) s
+          getBytesFromSeedEither (fromIntegral @Int @Word (max 0 n)) s
 
 instance MonadRandom MonadRandomFromSeed where
   getRandomBytes n = BA.convert <$> getRandomBytesFromSeed n

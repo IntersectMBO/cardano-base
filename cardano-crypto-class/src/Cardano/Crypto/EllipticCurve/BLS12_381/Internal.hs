@@ -683,7 +683,7 @@ cstrToInteger p l = do
       | otherwise = do
           val <- peek ptr
           res <- go (pred n) (plusPtr ptr 1)
-          return $ res .|. shiftL (fromIntegral @CUChar @Integer val) (8 * pred n)
+          return $ res .|. shiftL (toInteger val) (8 * pred n)
 
 integerToBS :: Integer -> ByteString
 integerToBS k

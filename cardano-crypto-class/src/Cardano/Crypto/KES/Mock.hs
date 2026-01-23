@@ -25,7 +25,7 @@ import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
 import Foreign.Ptr (castPtr)
 import GHC.Generics (Generic)
-import GHC.TypeNats (KnownNat, Nat, natVal)
+import GHC.TypeNats (KnownNat, Nat, Natural, natVal)
 import NoThunks.Class (NoThunks)
 
 import Control.Exception (assert)
@@ -108,7 +108,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     | otherwise =
         Left "KES verification failed"
 
-  totalPeriodsKES _ = fromIntegral @Nat @Period (natVal (Proxy @t))
+  totalPeriodsKES _ = fromIntegral @Natural @Period (natVal (Proxy @t))
 
   --
   -- raw serialise/deserialise
@@ -263,7 +263,7 @@ instance KnownNat t => DirectSerialise (SignKeyKES (MockKES t)) where
 
 instance KnownNat t => DirectDeserialise (SignKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral @Period @Int $ sizeSignKeyKES (Proxy @(MockKES t))
+    let len = fromIntegral @Word @Int $ sizeSignKeyKES (Proxy @(MockKES t))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
       pull (castPtr ptr) (fromIntegral @Int @CSize len)
@@ -278,7 +278,7 @@ instance KnownNat t => DirectSerialise (VerKeyKES (MockKES t)) where
 
 instance KnownNat t => DirectDeserialise (VerKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral @Period @Int $ sizeVerKeyKES (Proxy @(MockKES t))
+    let len = fromIntegral @Word @Int $ sizeVerKeyKES (Proxy @(MockKES t))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
       pull (castPtr ptr) (fromIntegral @Int @CSize len)

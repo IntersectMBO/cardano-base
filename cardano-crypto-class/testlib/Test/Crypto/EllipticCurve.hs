@@ -404,7 +404,7 @@ testCommut f a b =
   f a b === f b a
 
 prop_repeatedAddition :: forall curve. BLS.BLS curve => Int -> BLS.Point curve -> Property
-prop_repeatedAddition a p = BLS.blsMult p (fromIntegral @Int @Integer a) === repeatedAdd a p
+prop_repeatedAddition a p = BLS.blsMult p (toInteger a) === repeatedAdd a p
   where
     repeatedAdd :: Int -> BLS.Point curve -> BLS.Point curve
     repeatedAdd scalar point =

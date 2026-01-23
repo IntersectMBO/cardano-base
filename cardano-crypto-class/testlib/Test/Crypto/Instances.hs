@@ -56,7 +56,7 @@ withMLockedSeedFromPSB psb =
 
 instance KnownNat n => Arbitrary (PinnedSizedBytes n) where
   arbitrary = do
-    let size :: Int = fromIntegral @Integer @Int . natVal $ Proxy @n
+    let size = fromIntegral @Integer @Int . natVal $ Proxy @n
     Gen.suchThatMap
       (fromListN size <$> Gen.vectorOf size arbitrary)
       psbFromByteStringCheck
