@@ -42,9 +42,9 @@ instance KESAlgorithm NeverKES where
 
   totalPeriodsKES _ = 0
 
-  type SizeVerKeyKES NeverKES = 0
-  type SizeSignKeyKES NeverKES = 0
-  type SizeSigKES NeverKES = 0
+  type VerKeySizeKES NeverKES = 0
+  type SignKeySizeKES NeverKES = 0
+  type SigSizeKES NeverKES = 0
 
   rawSerialiseVerKeyKES _ = mempty
   rawSerialiseSigKES _ = mempty

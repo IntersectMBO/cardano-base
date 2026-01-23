@@ -115,9 +115,9 @@ instance
   -- raw serialise/deserialise
   --
 
-  type SizeVerKeyKES (CompactSingleKES d) = VerKeySizeDSIGN d
-  type SizeSignKeyKES (CompactSingleKES d) = SignKeySizeDSIGN d
-  type SizeSigKES (CompactSingleKES d) = SigSizeDSIGN d + VerKeySizeDSIGN d
+  type VerKeySizeKES (CompactSingleKES d) = VerKeySizeDSIGN d
+  type SignKeySizeKES (CompactSingleKES d) = SignKeySizeDSIGN d
+  type SigSizeKES (CompactSingleKES d) = SigSizeDSIGN d + VerKeySizeDSIGN d
 
   hashVerKeyKES (VerKeyCompactSingleKES vk) =
     castHash (hashVerKeyDSIGN vk)
@@ -138,7 +138,7 @@ instance
 
       size_sig = sigSizeDSIGN (Proxy :: Proxy d)
       size_vk = verKeySizeDSIGN (Proxy :: Proxy d)
-      size_total = sizeSigKES (Proxy :: Proxy (CompactSingleKES d))
+      size_total = sigSizeKES (Proxy :: Proxy (CompactSingleKES d))
 
       off_sig = 0 :: Word
       off_vk = size_sig
@@ -263,14 +263,14 @@ deriving instance DSIGNMAlgorithm d => Eq (SigKES (CompactSingleKES d))
 instance DSIGNMAlgorithm d => NoThunks (SigKES (CompactSingleKES d))
 
 instance
-  (DSIGNMAlgorithm d, KnownNat (SizeSigKES (CompactSingleKES d))) =>
+  (DSIGNMAlgorithm d, KnownNat (SigSizeKES (CompactSingleKES d))) =>
   ToCBOR (SigKES (CompactSingleKES d))
   where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance
-  (DSIGNMAlgorithm d, KnownNat (SizeSigKES (CompactSingleKES d))) =>
+  (DSIGNMAlgorithm d, KnownNat (SigSizeKES (CompactSingleKES d))) =>
   FromCBOR (SigKES (CompactSingleKES d))
   where
   fromCBOR = decodeSigKES

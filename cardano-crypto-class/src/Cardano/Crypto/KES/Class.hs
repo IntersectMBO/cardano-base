@@ -22,6 +22,11 @@ module Cardano.Crypto.KES.Class (
   OptimizedKESAlgorithm (..),
   verifyOptimizedKES,
 
+  -- * Deprecated size synonyms
+  sizeVerKeyKES,
+  sizeSignKeyKES,
+  sizeSigKES,
+
   -- * 'SignKeyWithPeriodKES' wrapper
   SignKeyWithPeriodKES (..),
   updateKESWithPeriod,
@@ -45,9 +50,9 @@ module Cardano.Crypto.KES.Class (
   encodedSigKESSizeExpr,
 
   -- * Raw sizes
-  sizeVerKeyKES,
-  sizeSigKES,
-  sizeSignKeyKES,
+  verKeySizeKES,
+  sigSizeKES,
+  signKeySizeKES,
   seedSizeKES,
 
   -- * Unsound APIs
@@ -96,6 +101,10 @@ import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (Empty)
 
+{-# DEPRECATED SizeVerKeyKES "In favor of `VerKeySizeKES`" #-}
+{-# DEPRECATED SizeSignKeyKES "In favor of `SignKeySizeKES`" #-}
+{-# DEPRECATED SizeSigKES "In favor of `SigSizeKES`" #-}
+
 class
   ( Typeable v
   , Show (VerKeyKES v)
@@ -106,9 +115,9 @@ class
   , NoThunks (SignKeyKES v)
   , NoThunks (VerKeyKES v)
   , KnownNat (SeedSizeKES v)
-  , KnownNat (SizeVerKeyKES v)
-  , KnownNat (SizeSignKeyKES v)
-  , KnownNat (SizeSigKES v)
+  , KnownNat (VerKeySizeKES v)
+  , KnownNat (SignKeySizeKES v)
+  , KnownNat (SigSizeKES v)
   ) =>
   KESAlgorithm v
   where
@@ -120,9 +129,16 @@ class
   data SignKeyKES v :: Type
 
   type SeedSizeKES v :: Nat
+  type VerKeySizeKES v :: Nat
+  type SignKeySizeKES v :: Nat
+  type SigSizeKES v :: Nat
+
   type SizeVerKeyKES v :: Nat
+  type SizeVerKeyKES v = VerKeySizeKES v
   type SizeSignKeyKES v :: Nat
+  type SizeSignKeyKES v = SignKeySizeKES v
   type SizeSigKES v :: Nat
+  type SizeSigKES v = SigSizeKES v
 
   --
   -- Metadata and basic key operations
@@ -225,14 +241,26 @@ class
     SignKeyKES v ->
     m ()
 
+verKeySizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
+verKeySizeKES _ = fromInteger (natVal (Proxy @(VerKeySizeKES v)))
+
+sigSizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
+sigSizeKES _ = fromInteger (natVal (Proxy @(SigSizeKES v)))
+
+signKeySizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
+signKeySizeKES _ = fromInteger (natVal (Proxy @(SignKeySizeKES v)))
+
+{-# DEPRECATED sizeVerKeyKES "In favor of `verKeySizeKES`" #-}
 sizeVerKeyKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeVerKeyKES _ = fromInteger (natVal (Proxy @(SizeVerKeyKES v)))
+sizeVerKeyKES = verKeySizeKES
 
-sizeSigKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeSigKES _ = fromInteger (natVal (Proxy @(SizeSigKES v)))
-
+{-# DEPRECATED sizeSignKeyKES "In favor of `signKeySizeKES`" #-}
 sizeSignKeyKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeSignKeyKES _ = fromInteger (natVal (Proxy @(SizeSignKeyKES v)))
+sizeSignKeyKES = signKeySizeKES
+
+{-# DEPRECATED sizeSigKES "In favor of `sigSizeKES`" #-}
+sizeSigKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
+sizeSigKES = sigSizeKES
 
 -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
 seedSizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
@@ -450,7 +478,7 @@ decodeVerKeyKES = do
   bs <- decodeBytes
   case rawDeserialiseVerKeyKES bs of
     Just vk -> return vk
-    Nothing -> failSizeCheck "decodeVerKeyKES" "key" bs (sizeVerKeyKES (Proxy :: Proxy v))
+    Nothing -> failSizeCheck "decodeVerKeyKES" "key" bs (verKeySizeKES (Proxy :: Proxy v))
 {-# INLINE decodeVerKeyKES #-}
 
 decodeUnsoundPureSignKeyKES ::
@@ -459,7 +487,7 @@ decodeUnsoundPureSignKeyKES = do
   bs <- decodeBytes
   case rawDeserialiseUnsoundPureSignKeyKES bs of
     Just vk -> return vk
-    Nothing -> failSizeCheck "decodeUnsoundPureSignKeyKES" "key" bs (sizeSignKeyKES (Proxy :: Proxy v))
+    Nothing -> failSizeCheck "decodeUnsoundPureSignKeyKES" "key" bs (signKeySizeKES (Proxy :: Proxy v))
 {-# INLINE decodeUnsoundPureSignKeyKES #-}
 
 decodeSigKES :: forall v s. KESAlgorithm v => Decoder s (SigKES v)
@@ -467,7 +495,7 @@ decodeSigKES = do
   bs <- decodeBytes
   case rawDeserialiseSigKES bs of
     Just sig -> return sig
-    Nothing -> failSizeCheck "decodeSigKES" "signature" bs (sizeSigKES (Proxy :: Proxy v))
+    Nothing -> failSizeCheck "decodeSigKES" "signature" bs (sigSizeKES (Proxy :: Proxy v))
 {-# INLINE decodeSigKES #-}
 
 decodeSignKeyKES ::
@@ -476,7 +504,7 @@ decodeSignKeyKES ::
   Decoder s (m (Maybe (SignKeyKES v)))
 decodeSignKeyKES = do
   bs <- decodeBytes
-  let expected = fromIntegral @Word @Int (sizeSignKeyKES (Proxy @v))
+  let expected = fromIntegral @Word @Int (signKeySizeKES (Proxy @v))
       actual = BS.length bs
   if actual /= expected
     then
@@ -567,32 +595,32 @@ updateKESWithPeriod c (SignKeyWithPeriodKES sk t) = runMaybeT $ do
 -- 'Size' expressions for 'ToCBOR' instances.
 --
 
--- | 'Size' expression for 'VerKeyKES' which is using 'sizeVerKeyKES' encoded
+-- | 'Size' expression for 'VerKeyKES' which is using 'verKeySizeKES' encoded
 -- as 'Size'.
 encodedVerKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (VerKeyKES v) -> Size
 encodedVerKeyKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sizeVerKeyKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (verKeySizeKES (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral @Word @Size (sizeVerKeyKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (verKeySizeKES (Proxy :: Proxy v))
 
--- | 'Size' expression for 'SignKeyKES' which is using 'sizeSignKeyKES' encoded
+-- | 'Size' expression for 'SignKeyKES' which is using 'signKeySizeKES' encoded
 -- as 'Size'.
 encodedSignKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SignKeyKES v) -> Size
 encodedSignKeyKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sizeSignKeyKES (Proxy @v)))
+  fromIntegral @Integer @Size (withWordSize (signKeySizeKES (Proxy @v)))
     -- payload
-    + fromIntegral @Word @Size (sizeSignKeyKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (signKeySizeKES (Proxy :: Proxy v))
 
--- | 'Size' expression for 'SigKES' which is using 'sizeSigKES' encoded as
+-- | 'Size' expression for 'SigKES' which is using 'sigSizeKES' encoded as
 -- 'Size'.
 encodedSigKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SigKES v) -> Size
 encodedSigKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sizeSigKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sigSizeKES (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral @Word @Size (sizeSigKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sigSizeKES (Proxy :: Proxy v))
 
 hashPairOfVKeys ::
   (KESAlgorithm d, HashAlgorithm h) =>

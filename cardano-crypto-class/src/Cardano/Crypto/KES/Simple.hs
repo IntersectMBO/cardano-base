@@ -132,9 +132,9 @@ instance
   -- raw serialise/deserialise
   --
 
-  type SizeVerKeyKES (SimpleKES d t) = VerKeySizeDSIGN d * t
-  type SizeSignKeyKES (SimpleKES d t) = SignKeySizeDSIGN d * t
-  type SizeSigKES (SimpleKES d t) = SigSizeDSIGN d
+  type VerKeySizeKES (SimpleKES d t) = VerKeySizeDSIGN d * t
+  type SignKeySizeKES (SimpleKES d t) = SignKeySizeDSIGN d * t
+  type SigSizeKES (SimpleKES d t) = SigSizeDSIGN d
 
   rawSerialiseVerKeyKES (VerKeySimpleKES vks) =
     BS.concat [rawSerialiseVerKeyDSIGN vk | vk <- Vec.toList vks]
