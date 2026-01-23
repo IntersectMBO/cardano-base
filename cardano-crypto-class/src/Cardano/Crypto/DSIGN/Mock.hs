@@ -41,7 +41,7 @@ instance DSIGNAlgorithm MockDSIGN where
   type SeedSizeDSIGN MockDSIGN = 8
   type VerKeySizeDSIGN MockDSIGN = 8 -- for 64 bit int
   type SignKeySizeDSIGN MockDSIGN = 8
-  type SigSizeDSIGN MockDSIGN = SizeHash ShortHash + 8
+  type SigSizeDSIGN MockDSIGN = HashSize ShortHash + 8
 
   --
   -- Key and signature types
@@ -119,7 +119,7 @@ instance DSIGNAlgorithm MockDSIGN where
         Nothing
 
   rawDeserialiseSigDSIGN bs
-    | [hb, kb] <- splitsAt [fromIntegral @Word @Int $ sizeHash (Proxy :: Proxy ShortHash), 8] bs
+    | [hb, kb] <- splitsAt [fromIntegral @Word @Int $ hashSize (Proxy :: Proxy ShortHash), 8] bs
     , Just h <- hashFromBytes hb
     , let k = readBinaryWord64 kb =
         Just $! SigMockDSIGN h k

@@ -11,6 +11,6 @@ import Cardano.Crypto.Hash.Class
 data NeverHash
 
 instance HashAlgorithm NeverHash where
-  type SizeHash NeverHash = 0
+  type HashSize NeverHash = 0
   hashAlgorithmName _ = "never"
   digest = error "HASH not available"

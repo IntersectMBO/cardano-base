@@ -13,7 +13,7 @@ where
 import Cardano.Crypto.Libsodium.C (c_crypto_generichash_blake2b)
 import Control.Monad (unless)
 
-import Cardano.Crypto.Hash.Class (HashAlgorithm (..), SizeHash, digest, hashAlgorithmName)
+import Cardano.Crypto.Hash.Class (HashAlgorithm (..), HashSize, digest, hashAlgorithmName)
 import Foreign.C.Error (errnoToIOError, getErrno)
 import Foreign.Ptr (castPtr, nullPtr)
 import GHC.IO.Exception (ioException)
@@ -26,12 +26,12 @@ data Blake2b_224
 data Blake2b_256
 
 instance HashAlgorithm Blake2b_224 where
-  type SizeHash Blake2b_224 = 28
+  type HashSize Blake2b_224 = 28
   hashAlgorithmName _ = "blake2b_224"
   digest _ = blake2b_libsodium 28
 
 instance HashAlgorithm Blake2b_256 where
-  type SizeHash Blake2b_256 = 32
+  type HashSize Blake2b_256 = 32
   hashAlgorithmName _ = "blake2b_256"
   digest _ = blake2b_libsodium 32
 

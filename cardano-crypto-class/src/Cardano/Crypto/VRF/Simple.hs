@@ -168,7 +168,7 @@ instance VRFAlgorithm SimpleVRF where
           then Just (OutputVRF o)
           else Nothing
 
-  sizeOutputVRF _ = sizeHash (Proxy :: Proxy H)
+  sizeOutputVRF _ = hashSize (Proxy :: Proxy H)
 
   --
   -- Key generation

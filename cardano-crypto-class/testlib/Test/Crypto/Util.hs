@@ -102,7 +102,7 @@ import Cardano.Crypto.DSIGN.Class (
   verKeySizeDSIGN,
  )
 import Cardano.Crypto.DirectSerialise
-import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, sizeHash)
+import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, hashSize)
 import Cardano.Crypto.Libsodium.Memory (
   allocaBytes,
   packByteStringCStringLen,
@@ -408,7 +408,7 @@ instance Show (BadInputFor a) where
   show = showBadInputFor
 
 instance HashAlgorithm h => Arbitrary (BadInputFor (Hash h a)) where
-  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeHash (Proxy :: Proxy h)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (hashSize (Proxy :: Proxy h)))
   shrink = shrinkBadInputFor
 
 instance DSIGNAlgorithm v => Arbitrary (BadInputFor (VerKeyDSIGN v)) where

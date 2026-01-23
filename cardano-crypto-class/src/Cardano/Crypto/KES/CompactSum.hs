@@ -157,7 +157,7 @@ instance
 instance
   ( OptimizedKESAlgorithm d
   , SodiumHashAlgorithm h -- needed for secure forgetting
-  , SizeHash h ~ SeedSizeKES d -- can be relaxed
+  , HashSize h ~ SeedSizeKES d -- can be relaxed
   , NoThunks (VerKeyKES (CompactSumKES h d))
   , KnownNat (SizeVerKeyKES (CompactSumKES h d))
   , KnownNat (SizeSignKeyKES (CompactSumKES h d))
@@ -226,7 +226,7 @@ instance
   -- raw serialise/deserialise
   --
 
-  type SizeVerKeyKES (CompactSumKES h d) = SizeHash h
+  type SizeVerKeyKES (CompactSumKES h d) = HashSize h
   type
     SizeSignKeyKES (CompactSumKES h d) =
       SizeSignKeyKES d
@@ -408,7 +408,7 @@ instance KESAlgorithm d => NoThunks (VerKeyKES (CompactSumKES h d))
 instance
   ( OptimizedKESAlgorithm d
   , SodiumHashAlgorithm h
-  , SizeHash h ~ SeedSizeKES d
+  , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
   , KnownNat (SizeVerKeyKES (CompactSumKES h d))
   , KnownNat (SizeSignKeyKES (CompactSumKES h d))
@@ -422,7 +422,7 @@ instance
 instance
   ( OptimizedKESAlgorithm d
   , SodiumHashAlgorithm h
-  , SizeHash h ~ SeedSizeKES d
+  , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
   , KnownNat (SizeVerKeyKES (CompactSumKES h d))
   , KnownNat (SizeSignKeyKES (CompactSumKES h d))
@@ -443,12 +443,12 @@ instance
 --
 -- instance (OptimizedKESAlgorithm d) => NoThunks (VerKeyKES  (CompactSumKES h d))
 --
--- instance (OptimizedKESAlgorithm d, HashAlgorithm h, SizeHash h ~ SeedSizeKES d)
+-- instance (OptimizedKESAlgorithm d, HashAlgorithm h, HashSize h ~ SeedSizeKES d)
 --       => ToCBOR (SignKeyKES (CompactSumKES h d)) where
 --   toCBOR = encodeSignKeyKES
 --   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 --
--- instance (OptimizedKESAlgorithm d, HashAlgorithm h, SizeHash h ~ SeedSizeKES d)
+-- instance (OptimizedKESAlgorithm d, HashAlgorithm h, HashSize h ~ SeedSizeKES d)
 --       => FromCBOR (SignKeyKES (CompactSumKES h d)) where
 --   fromCBOR = decodeSignKeyKES
 
@@ -464,7 +464,7 @@ instance KESAlgorithm d => NoThunks (SigKES (CompactSumKES h d))
 instance
   ( OptimizedKESAlgorithm d
   , SodiumHashAlgorithm h
-  , SizeHash h ~ SeedSizeKES d
+  , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
   , KnownNat (SizeVerKeyKES (CompactSumKES h d))
   , KnownNat (SizeSignKeyKES (CompactSumKES h d))
@@ -478,7 +478,7 @@ instance
 instance
   ( OptimizedKESAlgorithm d
   , SodiumHashAlgorithm h
-  , SizeHash h ~ SeedSizeKES d
+  , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
   , KnownNat (SizeVerKeyKES (CompactSumKES h d))
   , KnownNat (SizeSignKeyKES (CompactSumKES h d))
@@ -597,7 +597,7 @@ deriving instance
   (KESAlgorithm d, Eq (UnsoundPureSignKeyKES d)) => Eq (UnsoundPureSignKeyKES (CompactSumKES h d))
 
 instance
-  ( SizeHash h ~ SeedSizeKES d
+  ( HashSize h ~ SeedSizeKES d
   , OptimizedKESAlgorithm d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
@@ -611,7 +611,7 @@ instance
   encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (CompactSumKES h d)))
 
 instance
-  ( SizeHash h ~ SeedSizeKES d
+  ( HashSize h ~ SeedSizeKES d
   , OptimizedKESAlgorithm d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
@@ -669,7 +669,7 @@ instance
   DirectDeserialise (VerKeyKES (CompactSumKES h d))
   where
   directDeserialise pull = do
-    let len = fromIntegral @Word @Int $ sizeHash (Proxy @h)
+    let len = fromIntegral @Word @Int $ hashSize (Proxy @h)
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr -> do
       pull (castPtr ptr) (fromIntegral @Int @CSize len)

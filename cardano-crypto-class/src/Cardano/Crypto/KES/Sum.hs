@@ -122,7 +122,7 @@ instance
 instance
   ( KESAlgorithm d
   , SodiumHashAlgorithm h -- needed for secure forgetting
-  , SizeHash h ~ SeedSizeKES d -- can be relaxed
+  , HashSize h ~ SeedSizeKES d -- can be relaxed
   , KnownNat ((SizeSignKeyKES d + SeedSizeKES d) + (2 * SizeVerKeyKES d))
   , KnownNat (SizeSigKES d + (SizeVerKeyKES d * 2))
   ) =>
@@ -193,7 +193,7 @@ instance
   -- raw serialise/deserialise
   --
 
-  type SizeVerKeyKES (SumKES h d) = SizeHash h
+  type SizeVerKeyKES (SumKES h d) = HashSize h
   type
     SizeSignKeyKES (SumKES h d) =
       SizeSignKeyKES d
@@ -347,14 +347,14 @@ deriving instance HashAlgorithm h => Show (VerKeyKES (SumKES h d))
 deriving instance Eq (VerKeyKES (SumKES h d))
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, HashSize h ~ SeedSizeKES d) =>
   ToCBOR (VerKeyKES (SumKES h d))
   where
   toCBOR = encodeVerKeyKES
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, HashSize h ~ SeedSizeKES d) =>
   FromCBOR (VerKeyKES (SumKES h d))
   where
   fromCBOR = decodeVerKeyKES
@@ -369,12 +369,12 @@ instance KESAlgorithm d => NoThunks (VerKeyKES (SumKES h d))
 -- These instances would violate mlocking protections, bleeding secret keys
 -- onto the GHC heap.
 --
--- instance (KESAlgorithm d, HashAlgorithm h, SizeHash h ~ SeedSizeKES d)
+-- instance (KESAlgorithm d, HashAlgorithm h, HashSize h ~ SeedSizeKES d)
 --       => ToCBOR (SignKeyKES (SumKES h d)) where
 --   toCBOR = encodeSignKeyKES
 --   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 --
--- instance (KESAlgorithm d, HashAlgorithm h, SizeHash h ~ SeedSizeKES d)
+-- instance (KESAlgorithm d, HashAlgorithm h, HashSize h ~ SeedSizeKES d)
 --       => FromCBOR (SignKeyKES (SumKES h d)) where
 --   fromCBOR = decodeSignKeyKES
 
@@ -393,14 +393,14 @@ deriving instance (KESAlgorithm d, KESAlgorithm (SumKES h d)) => Eq (SigKES (Sum
 instance KESAlgorithm d => NoThunks (SigKES (SumKES h d))
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, HashSize h ~ SeedSizeKES d) =>
   ToCBOR (SigKES (SumKES h d))
   where
   toCBOR = encodeSigKES
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance
-  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, SizeHash h ~ SeedSizeKES d) =>
+  (KESAlgorithm (SumKES h d), SodiumHashAlgorithm h, HashSize h ~ SeedSizeKES d) =>
   FromCBOR (SigKES (SumKES h d))
   where
   fromCBOR = decodeSigKES
@@ -511,7 +511,7 @@ deriving instance
   (KESAlgorithm d, Eq (UnsoundPureSignKeyKES d)) => Eq (UnsoundPureSignKeyKES (SumKES h d))
 
 instance
-  ( SizeHash h ~ SeedSizeKES d
+  ( HashSize h ~ SeedSizeKES d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
   , KnownNat (SizeVerKeyKES (SumKES h d))
@@ -524,7 +524,7 @@ instance
   encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (SumKES h d)))
 
 instance
-  ( SizeHash h ~ SeedSizeKES d
+  ( HashSize h ~ SeedSizeKES d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
   , KnownNat (SizeVerKeyKES (SumKES h d))
@@ -586,7 +586,7 @@ instance
   DirectDeserialise (VerKeyKES (SumKES h d))
   where
   directDeserialise pull = do
-    let len = fromIntegral @Word @Int $ sizeHash (Proxy @h)
+    let len = fromIntegral @Word @Int $ hashSize (Proxy @h)
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr -> do
       pull (castPtr ptr) (fromIntegral @Int @CSize len)

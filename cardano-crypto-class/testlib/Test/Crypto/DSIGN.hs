@@ -128,7 +128,7 @@ import Test.Crypto.Util (
   )
 import Cardano.Crypto.SECP256K1.Constants (SECP256K1_ECDSA_MESSAGE_BYTES)
 import GHC.TypeLits (natVal)
-import Cardano.Crypto.Hash (SHA3_256, HashAlgorithm (SizeHash), Blake2b_256, SHA256, Keccak256)
+import Cardano.Crypto.Hash (SHA3_256, HashAlgorithm (HashSize), Blake2b_256, SHA256, Keccak256)
 import Cardano.Crypto.DSIGN.Class (DSIGNAlgorithm(..))
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN)
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinVerKeyDSIGN)
@@ -709,7 +709,7 @@ testEcdsaInvalidMessageHash name = testEnough . describe name $ do
 
 testEcdsaWithHashAlgorithm ::
   forall (h :: Type).
-  (HashAlgorithm h, SizeHash h ~ SECP256K1_ECDSA_MESSAGE_BYTES) =>
+  (HashAlgorithm h, HashSize h ~ SECP256K1_ECDSA_MESSAGE_BYTES) =>
   Proxy h -> String -> Spec
 testEcdsaWithHashAlgorithm _ name = testEnough . describe name $ do
   prop "Ecdsa sign and verify" .

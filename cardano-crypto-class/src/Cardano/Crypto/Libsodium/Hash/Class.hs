@@ -25,7 +25,7 @@ import GHC.TypeLits
 
 import qualified Data.ByteString as BS
 
-import Cardano.Crypto.Hash (Blake2b_256, HashAlgorithm (SizeHash), SHA256)
+import Cardano.Crypto.Hash (Blake2b_256, HashAlgorithm (HashSize), SHA256)
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
 import Foreign.C.Types (CULLong)
@@ -43,7 +43,7 @@ class HashAlgorithm h => SodiumHashAlgorithm h where
     Ptr a ->
     -- | input length
     Int ->
-    IO (MLockedSizedBytes (SizeHash h))
+    IO (MLockedSizedBytes (HashSize h))
 
 -- TODO: provide interface for multi-part?
 -- That will be useful to hashing ('1' <> oldseed).
@@ -53,16 +53,16 @@ digestMLockedStorable ::
   (SodiumHashAlgorithm h, Storable a) =>
   proxy h ->
   Ptr a ->
-  IO (MLockedSizedBytes (SizeHash h))
+  IO (MLockedSizedBytes (HashSize h))
 digestMLockedStorable p ptr =
-  naclDigestPtr p ptr ((sizeOf (undefined :: a)))
+  naclDigestPtr p ptr (sizeOf (undefined :: a))
 
 digestMLockedBS ::
   forall h proxy.
   SodiumHashAlgorithm h =>
   proxy h ->
   BS.ByteString ->
-  IO (MLockedSizedBytes (SizeHash h))
+  IO (MLockedSizedBytes (HashSize h))
 digestMLockedBS p bs =
   BS.useAsCStringLen bs $ \(ptr, len) ->
     naclDigestPtr p (castPtr ptr) len
@@ -73,7 +73,7 @@ digestMLockedBS p bs =
 
 instance SodiumHashAlgorithm SHA256 where
   naclDigestPtr ::
-    forall proxy a. proxy SHA256 -> Ptr a -> Int -> IO (MLockedSizedBytes (SizeHash SHA256))
+    forall proxy a. proxy SHA256 -> Ptr a -> Int -> IO (MLockedSizedBytes (HashSize SHA256))
   naclDigestPtr _ input inputlen = do
     output <- mlsbNew
     mlsbUseAsSizedPtr output $ \output' -> do
@@ -84,12 +84,12 @@ instance SodiumHashAlgorithm SHA256 where
     return output
 
 -- Test that manually written numbers are the same as in libsodium
-_testSHA256 :: SizeHash SHA256 :~: CRYPTO_SHA256_BYTES
+_testSHA256 :: HashSize SHA256 :~: CRYPTO_SHA256_BYTES
 _testSHA256 = Refl
 
 instance SodiumHashAlgorithm Blake2b_256 where
   naclDigestPtr ::
-    forall proxy a. proxy Blake2b_256 -> Ptr a -> Int -> IO (MLockedSizedBytes (SizeHash Blake2b_256))
+    forall proxy a. proxy Blake2b_256 -> Ptr a -> Int -> IO (MLockedSizedBytes (HashSize Blake2b_256))
   naclDigestPtr _ input inputlen = do
     output <- mlsbNew
     mlsbUseAsCPtr output $ \output' -> do
@@ -107,5 +107,5 @@ instance SodiumHashAlgorithm Blake2b_256 where
           errnoToIOError "digestMLocked @Blake2b_256: c_crypto_hash_sha256" errno Nothing Nothing
     return output
 
-_testBlake2b256 :: SizeHash Blake2b_256 :~: CRYPTO_BLAKE2B_256_BYTES
+_testBlake2b256 :: HashSize Blake2b_256 :~: CRYPTO_BLAKE2B_256_BYTES
 _testBlake2b256 = Refl
