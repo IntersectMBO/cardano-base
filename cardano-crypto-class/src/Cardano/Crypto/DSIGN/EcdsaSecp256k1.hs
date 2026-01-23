@@ -68,7 +68,7 @@ import Cardano.Crypto.DSIGN.Class (
   encodedSignKeyDSIGNSizeExpr,
   encodedVerKeyDSIGNSizeExpr,
  )
-import Cardano.Crypto.Hash.Class (HashAlgorithm (SizeHash, digest))
+import Cardano.Crypto.Hash.Class (HashAlgorithm (HashSize, digest))
 import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
   psbCreateLen,
@@ -141,7 +141,7 @@ fromMessageHash (MH psb) = psbToByteString psb
 -- | A helper to use with the 'HashAlgorithm' API, as this can ensure sizing.
 hashAndPack ::
   forall (h :: Type).
-  (HashAlgorithm h, SizeHash h ~ SECP256K1_ECDSA_MESSAGE_BYTES) =>
+  (HashAlgorithm h, HashSize h ~ SECP256K1_ECDSA_MESSAGE_BYTES) =>
   Proxy h ->
   ByteString ->
   MessageHash

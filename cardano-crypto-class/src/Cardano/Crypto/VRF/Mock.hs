@@ -62,7 +62,7 @@ instance VRFAlgorithm MockVRF where
     where
       (o, c') = evalVRF' a (SignKeyMockVRF n)
 
-  sizeOutputVRF _ = sizeHash (Proxy :: Proxy ShortHash)
+  sizeOutputVRF _ = hashSize (Proxy :: Proxy ShortHash)
 
   --
   -- Key generation

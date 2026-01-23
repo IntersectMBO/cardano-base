@@ -15,7 +15,7 @@ import qualified "crypton" Crypto.Hash as H
 data Keccak256
 
 instance HashAlgorithm Keccak256 where
-  type SizeHash Keccak256 = 32
+  type HashSize Keccak256 = 32
   hashAlgorithmName _ = "keccak256"
   digest _ = convert . H.hash
 

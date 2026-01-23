@@ -15,7 +15,7 @@ import qualified "crypton" Crypto.Hash as H
 data RIPEMD160
 
 instance HashAlgorithm RIPEMD160 where
-  type SizeHash RIPEMD160 = 20
+  type HashSize RIPEMD160 = 20
   hashAlgorithmName _ = "RIPEMD160"
   digest _ = convert . H.hash
 

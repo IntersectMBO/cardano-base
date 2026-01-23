@@ -23,6 +23,6 @@ type ShortHash = Blake2bPrefix 8
 data Blake2bPrefix (n :: Nat)
 
 instance (KnownNat n, CmpNat n 33 ~ 'LT) => HashAlgorithm (Blake2bPrefix n) where
-  type SizeHash (Blake2bPrefix n) = n
+  type HashSize (Blake2bPrefix n) = n
   hashAlgorithmName _ = "blake2b_prefix_" <> show (natVal (Proxy :: Proxy n))
   digest _ = blake2b_libsodium (fromIntegral @Integer @Int (natVal (Proxy :: Proxy n)))
