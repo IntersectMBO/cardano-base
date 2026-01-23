@@ -89,9 +89,9 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
   algorithmNameKES proxy = "mock_" ++ show (totalPeriodsKES proxy)
 
-  type SizeVerKeyKES (MockKES t) = 8
-  type SizeSignKeyKES (MockKES t) = 16
-  type SizeSigKES (MockKES t) = 24
+  type VerKeySizeKES (MockKES t) = 8
+  type SignKeySizeKES (MockKES t) = 16
+  type SigSizeKES (MockKES t) = 24
 
   --
   -- Core algorithm operations
@@ -263,7 +263,7 @@ instance KnownNat t => DirectSerialise (SignKeyKES (MockKES t)) where
 
 instance KnownNat t => DirectDeserialise (SignKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral @Word @Int $ sizeSignKeyKES (Proxy @(MockKES t))
+    let len = fromIntegral @Word @Int $ signKeySizeKES (Proxy @(MockKES t))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
       pull (castPtr ptr) (fromIntegral @Int @CSize len)
@@ -278,7 +278,7 @@ instance KnownNat t => DirectSerialise (VerKeyKES (MockKES t)) where
 
 instance KnownNat t => DirectDeserialise (VerKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral @Word @Int $ sizeVerKeyKES (Proxy @(MockKES t))
+    let len = fromIntegral @Word @Int $ verKeySizeKES (Proxy @(MockKES t))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
       pull (castPtr ptr) (fromIntegral @Int @CSize len)
