@@ -40,3 +40,31 @@ program-options
 package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
+
+-- cabal-allow-newer
+if impl(ghc >=9.14)
+  allow-newer:
+    , aeson:base
+    , aeson:bytestring
+    , aeson:containers
+    , aeson:deepseq
+    , aeson:ghc-prim
+    , aeson:template-haskell
+    , aeson:time
+    , binary-orphans:base
+    , boring:base
+    , cborg:base
+    , indexed-traversable:base
+    , indexed-traversable-instances:base
+    , microstache:base
+    , parsec:base
+    , quickcheck-instances:base
+    , quickcheck-instances:bytestring
+    , recursion-schemes:template-haskell
+    , semialign:base
+    , serialise:base
+    , serialise:bytestring
+    , these:base
+    , time-compat:base
+    , tree-diff:base
+    , uuid-types:template-haskell
