@@ -142,7 +142,9 @@ fromMessageHash (MH psb) = psbToByteString psb
 hashAndPack ::
   forall (h :: Type).
   (HashAlgorithm h, SizeHash h ~ SECP256K1_ECDSA_MESSAGE_BYTES) =>
-  Proxy h -> ByteString -> MessageHash
+  Proxy h ->
+  ByteString ->
+  MessageHash
 hashAndPack p bs = case psbFromByteStringCheck . digest p $ bs of
   Nothing ->
     error $

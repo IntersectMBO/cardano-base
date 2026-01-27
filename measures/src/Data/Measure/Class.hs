@@ -186,7 +186,9 @@ instance BoundedMeasure Word64 where
 -- Throws 'DataMeasureClassOverflowException'
 checkedPlus ::
   (Prelude.Bounded a, Prelude.Integral a) =>
-  a -> a -> a
+  a ->
+  a ->
+  a
 checkedPlus x y =
   if x Prelude.> Prelude.maxBound Prelude.- y
     then throw DataMeasureClassOverflowException
