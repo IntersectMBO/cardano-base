@@ -90,7 +90,7 @@ import Control.DeepSeq (NFData)
 import NoThunks.Class (NoThunks)
 
 import Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..), serialize')
-import Cardano.Crypto.PackedBytes
+import Cardano.Crypto.PackedBytes.Internal
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.HeapWords (HeapWords (..))
 

@@ -2,6 +2,7 @@
 
 ## 2.3.0.0
 
+* Expose `Cardano.Crypto.PackedBytes` module with a safe API
 * Remove `Serialise` instance for `PackedBytes` as unused
 * Switch `OutputVRF` to use `ByteArray` instead of `ByteString`. Change field accessor name to `getOutputVRFByteArray`
 * Add `byteArrayToNatural`, `naturalToByteArray` and `byteArrayToInteger`.

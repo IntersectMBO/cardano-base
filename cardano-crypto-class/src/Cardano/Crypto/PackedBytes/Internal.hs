@@ -12,7 +12,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 
 {- FOURMOLU_DISABLE -}
-module Cardano.Crypto.PackedBytes
+module Cardano.Crypto.PackedBytes.Internal
   ( PackedBytes(..)
   , packBytes
   , packBytesMaybe
