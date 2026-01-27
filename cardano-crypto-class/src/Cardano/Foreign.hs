@@ -46,7 +46,7 @@ memcpySized (SizedPtr dest) (SizedPtr src) = void (c_memcpy dest src size)
     size = fromInteger (natVal (Proxy @n))
 
 memsetSized :: forall n. KnownNat n => SizedPtr n -> Word8 -> IO ()
-memsetSized (SizedPtr s) c = void (c_memset s (fromIntegral c) size)
+memsetSized (SizedPtr s) c = void (c_memset s (fromIntegral @Word8 @Int c) size)
   where
     size :: CSize
     size = fromInteger (natVal (Proxy @n))

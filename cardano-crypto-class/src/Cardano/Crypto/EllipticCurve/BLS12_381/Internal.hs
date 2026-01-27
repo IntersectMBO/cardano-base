@@ -683,7 +683,7 @@ cstrToInteger p l = do
       | otherwise = do
           val <- peek ptr
           res <- go (pred n) (plusPtr ptr 1)
-          return $ res .|. shiftL (fromIntegral @CUChar @Integer val) (8 * pred n)
+          return $ res .|. shiftL (toInteger val) (8 * pred n)
 
 integerToBS :: Integer -> ByteString
 integerToBS k
@@ -1169,9 +1169,7 @@ blsMSM ssAndps = unsafePerformIO $ do
       withNewPoint' @curve $ \resultPtr -> do
         withPointArray points $ \numPoints pointArrayPtr -> do
           withScalarArray scalars $ \_ scalarArrayPtr -> do
-            let numPoints' :: CSize
-                numPoints' = fromIntegral @Int @CSize numPoints
-                scratchSize :: Int
+            let numPoints' = fromIntegral @Int @CSize numPoints
                 scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
             allocaBytes (numPoints * sizeAffine (Proxy @curve)) $ \affinesBlockPtr -> do
               c_blst_to_affines (AffineBlockPtr affinesBlockPtr) pointArrayPtr numPoints'

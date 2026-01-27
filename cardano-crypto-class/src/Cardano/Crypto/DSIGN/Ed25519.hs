@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -76,6 +77,7 @@ import Cardano.Crypto.PinnedSizedBytes (
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util (SignableRepresentation (..))
 import Cardano.Foreign
+import Foreign.C.Types (CSize, CULLong)
 
 data Ed25519DSIGN
 
@@ -203,7 +205,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
                     c_crypto_sign_ed25519_sk_to_pk pkPtr skPtr
                   psbCreateSized $ \sigPtr -> do
                     cOrThrowError "signDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_detached" $
-                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
+                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral @Int @CULLong len) skPtr
 
   verifyDSIGN () (VerKeyEd25519DSIGN vk) a (SigEd25519DSIGN sig) =
     let bs = getSignableRepresentation a
@@ -211,7 +213,8 @@ instance DSIGNAlgorithm Ed25519DSIGN where
           BS.useAsCStringLen bs $ \(ptr, len) ->
             psbUseAsSizedPtr vk $ \vkPtr ->
               psbUseAsSizedPtr sig $ \sigPtr -> do
-                res <- c_crypto_sign_ed25519_verify_detached sigPtr (castPtr ptr) (fromIntegral len) vkPtr
+                res <-
+                  c_crypto_sign_ed25519_verify_detached sigPtr (castPtr ptr) (fromIntegral @Int @CULLong len) vkPtr
                 if res == 0
                   then return (Right ())
                   else do
@@ -248,7 +251,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
   rawDeserialiseVerKeyDSIGN = fmap VerKeyEd25519DSIGN . psbFromByteStringCheck
   {-# INLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseSignKeyDSIGN bs = do
-    guard (fromIntegral (BS.length bs) == seedSizeDSIGN (Proxy @Ed25519DSIGN))
+    guard (fromIntegral @Int @Word (BS.length bs) == seedSizeDSIGN (Proxy @Ed25519DSIGN))
     pure . genKeyDSIGN . mkSeedFromBytes $ bs
   rawDeserialiseSigDSIGN = fmap SigEd25519DSIGN . psbFromByteStringCheck
   {-# INLINE rawDeserialiseSigDSIGN #-}
@@ -284,7 +287,7 @@ instance DSIGNMAlgorithm Ed25519DSIGN where
                 stToIO $ do
                   cOrError $ unsafeIOToST $ do
                     BS.useAsCStringLen bs $ \(ptr, len) ->
-                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
+                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral @Int @CULLong len) skPtr
             throwOnErrno "signDSIGNM @Ed25519DSIGN" "c_crypto_sign_ed25519_detached" maybeErrno
             return psb
 
@@ -396,7 +399,7 @@ instance DirectSerialise (SignKeyDSIGNM Ed25519DSIGN) where
       ( \seed -> mlockedSeedUseAsCPtr seed $ \ptr ->
           push
             (castPtr ptr)
-            (fromIntegral $ seedSizeDSIGN (Proxy @Ed25519DSIGN))
+            (fromIntegral @Word @CSize $ seedSizeDSIGN (Proxy @Ed25519DSIGN))
       )
 
 instance DirectDeserialise (SignKeyDSIGNM Ed25519DSIGN) where
@@ -410,7 +413,7 @@ instance DirectDeserialise (SignKeyDSIGNM Ed25519DSIGN) where
           mlockedSeedUseAsCPtr seed $ \ptr -> do
             pull
               (castPtr ptr)
-              (fromIntegral $ seedSizeDSIGN (Proxy @Ed25519DSIGN))
+              (fromIntegral @Word @CSize $ seedSizeDSIGN (Proxy @Ed25519DSIGN))
           genKeyDSIGNM seed
       )
 
@@ -419,12 +422,12 @@ instance DirectSerialise (VerKeyDSIGN Ed25519DSIGN) where
     psbUseAsCPtrLen psb $ \ptr _ ->
       push
         (castPtr ptr)
-        (fromIntegral $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
 
 instance DirectDeserialise (VerKeyDSIGN Ed25519DSIGN) where
   directDeserialise pull = do
     psb <- psbCreate $ \ptr ->
       pull
         (castPtr ptr)
-        (fromIntegral $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
     return $! VerKeyEd25519DSIGN psb

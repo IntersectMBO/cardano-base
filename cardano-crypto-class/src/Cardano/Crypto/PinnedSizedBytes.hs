@@ -297,7 +297,7 @@ psbUseAsCPtrLen ::
   (Ptr Word8 -> CSize -> m r) ->
   m r
 psbUseAsCPtrLen (PSB ba) f = do
-  let len :: CSize = fromIntegral . natVal $ Proxy @n
+  let len = fromIntegral @Integer @CSize . natVal $ Proxy @n
   runAndTouch ba (`f` len)
 
 -- | As 'psbUseAsCPtr', but does not \'forget\' the size.
@@ -377,9 +377,9 @@ psbCreateResultLen ::
   (Ptr Word8 -> CSize -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateResultLen f = do
-  let len :: Int = fromIntegral . natVal $ Proxy @n
+  let len = fromIntegral @Integer @Int . natVal $ Proxy @n
   mba <- stToIO (newPinnedByteArray len)
-  res <- f (mutableByteArrayContents mba) (fromIntegral len)
+  res <- f (mutableByteArrayContents mba) (fromIntegral @Int @CSize len)
   arr <- stToIO (unsafeFreezeByteArray mba)
   pure (PSB arr, res)
 

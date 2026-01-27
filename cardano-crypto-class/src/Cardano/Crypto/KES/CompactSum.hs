@@ -106,6 +106,7 @@ import Cardano.Crypto.Util
 import Control.DeepSeq (NFData (..))
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
+import Foreign.C.Types (CSize)
 import Foreign.Ptr (castPtr)
 import GHC.TypeLits (KnownNat, type (*), type (+))
 
@@ -247,7 +248,7 @@ instance
   rawDeserialiseVerKeyKES = fmap VerKeyCompactSumKES . hashFromBytes
 
   rawDeserialiseSigKES b = do
-    guard (BS.length b == fromIntegral size_total)
+    guard (BS.length b == fromIntegral @Word @Int size_total)
     sigma <- rawDeserialiseSigKES b_sig
     vk <- rawDeserialiseVerKeyKES b_vk
     return (SigCompactSumKES sigma vk)
@@ -345,7 +346,7 @@ instance
 
   {-# NOINLINE rawDeserialiseSignKeyKESWith #-}
   rawDeserialiseSignKeyKESWith allocator b = runMaybeT $ do
-    guard (BS.length b == fromIntegral size_total)
+    guard (BS.length b == fromIntegral @Word @Int size_total)
     sk <- MaybeT $ rawDeserialiseSignKeyKESWith allocator b_sk
     r <- MaybeT $ mlsbFromByteStringCheckWith allocator b_r
     vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES b_vk0
@@ -521,7 +522,7 @@ instance
         return $! UnsoundPureSignKeyCompactSumKES sk' r_1' vk_0 vk_1
     | t + 1 == _T = do
         let sk' = unsoundPureGenKeyKES r_1
-        let r_1' = mkSeedFromBytes (BS.replicate (fromIntegral (seedSizeKES (Proxy @d))) 0)
+        let r_1' = mkSeedFromBytes (BS.replicate (fromIntegral @Word @Int (seedSizeKES (Proxy @d))) 0)
         return $! UnsoundPureSignKeyCompactSumKES sk' r_1' vk_0 vk_1
     | otherwise = do
         sk' <- unsoundPureUpdateKES ctx sk (t - _T)
@@ -564,7 +565,7 @@ instance
           ]
 
   rawDeserialiseUnsoundPureSignKeyKES b = do
-    guard (BS.length b == fromIntegral size_total)
+    guard (BS.length b == fromIntegral @Word @Int size_total)
     sk <- rawDeserialiseUnsoundPureSignKeyKES b_sk
     let r = mkSeedFromBytes b_r
     vk_0 <- rawDeserialiseVerKeyKES b_vk0
@@ -661,17 +662,16 @@ instance
 instance DirectSerialise (VerKeyKES (CompactSumKES h d)) where
   directSerialise push (VerKeyCompactSumKES h) =
     unpackByteStringCStringLen (hashToBytes h) $ \(ptr, len) ->
-      push (castPtr ptr) (fromIntegral len)
+      push (castPtr ptr) (fromIntegral @Int @CSize len)
 
 instance
   HashAlgorithm h =>
   DirectDeserialise (VerKeyKES (CompactSumKES h d))
   where
   directDeserialise pull = do
-    let len :: Num a => a
-        len = fromIntegral $ sizeHash (Proxy @h)
+    let len = fromIntegral @Word @Int $ sizeHash (Proxy @h)
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr -> do
-      pull (castPtr ptr) len
+      pull (castPtr ptr) (fromIntegral @Int @CSize len)
     let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "Invalid hash") return $! VerKeyCompactSumKES <$!> hashFromBytes bs

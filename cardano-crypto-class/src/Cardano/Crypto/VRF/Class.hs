@@ -10,6 +10,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -238,7 +239,7 @@ getOutputVRFNatural = byteArrayToNatural . getOutputVRFByteArray
 mkTestOutputVRF :: forall v. VRFAlgorithm v => Natural -> OutputVRF v
 mkTestOutputVRF = OutputVRF . naturalToByteArray sz
   where
-    sz = fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
+    sz = fromIntegral @Word @Int (sizeOutputVRF (Proxy :: Proxy v))
 
 --
 -- Convenient CBOR encoding/decoding
@@ -270,7 +271,7 @@ decodeVerKeyVRF = do
             )
       | otherwise -> fail "decodeVerKeyVRF: cannot decode key"
       where
-        expected = fromIntegral (sizeVerKeyVRF (Proxy :: Proxy v))
+        expected = fromIntegral @Word @Int (sizeVerKeyVRF (Proxy :: Proxy v))
         actual = BS.length bs
 {-# INLINEABLE decodeVerKeyVRF #-}
 
@@ -289,7 +290,7 @@ decodeSignKeyVRF = do
             )
       | otherwise -> fail "decodeSignKeyVRF: cannot decode key"
       where
-        expected = fromIntegral (sizeSignKeyVRF (Proxy :: Proxy v))
+        expected = fromIntegral @Word @Int (sizeSignKeyVRF (Proxy :: Proxy v))
         actual = BS.length bs
 
 decodeCertVRF :: forall v s. VRFAlgorithm v => Decoder s (CertVRF v)
@@ -307,7 +308,7 @@ decodeCertVRF = do
             )
       | otherwise -> fail "decodeCertVRF: cannot decode key"
       where
-        expected = fromIntegral (sizeCertVRF (Proxy :: Proxy v))
+        expected = fromIntegral @Word @Int (sizeCertVRF (Proxy :: Proxy v))
         actual = BS.length bs
 {-# INLINEABLE decodeCertVRF #-}
 
@@ -333,11 +334,11 @@ instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
   encodedSizeExpr _size proxy =
     1
       + certifiedOutputSize (certifiedOutput <$> proxy)
-      + fromIntegral (sizeCertVRF (Proxy :: Proxy v))
+      + fromIntegral @Word @Size (sizeCertVRF (Proxy :: Proxy v))
     where
       certifiedOutputSize :: Proxy (OutputVRF v) -> Size
       certifiedOutputSize _proxy =
-        fromIntegral $ sizeOutputVRF (Proxy :: Proxy v)
+        fromIntegral @Word @Size (sizeOutputVRF (Proxy :: Proxy v))
 
 instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
   fromCBOR =
@@ -376,24 +377,24 @@ verifyCertified ctxt vk a CertifiedVRF {certifiedOutput, certifiedProof} =
 encodedVerKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (VerKeyVRF v) -> Size
 encodedVerKeyVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeVerKeyVRF (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeVerKeyVRF (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeVerKeyVRF (Proxy :: Proxy v))
 
 -- | 'Size' expression for 'SignKeyVRF' which is using 'sizeSignKeyVRF' encoded
 -- as 'Size'
 encodedSignKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (SignKeyVRF v) -> Size
 encodedSignKeyVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeSignKeyVRF (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeSignKeyVRF (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeSignKeyVRF (Proxy :: Proxy v))
 
 -- | 'Size' expression for 'CertVRF' which is using 'sizeCertVRF' encoded as
 -- 'Size'.
 encodedCertVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (CertVRF v) -> Size
 encodedCertVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeCertVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeCertVRF (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeCertVRF (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeCertVRF (Proxy :: Proxy v))

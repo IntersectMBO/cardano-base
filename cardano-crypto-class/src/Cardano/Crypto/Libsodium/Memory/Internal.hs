@@ -108,17 +108,17 @@ unsafeIOToMonadST = stToIO . unsafeIOToST
 makeMLockedPool :: forall n s. KnownNat n => ST s (Pool n s)
 makeMLockedPool = do
   initPool
-    (max 1 . fromIntegral $ 4096 `div` natVal (Proxy @n) `div` 64)
+    (max 1 . fromIntegral @Integer @Int $ 4096 `div` natVal (Proxy @n) `div` 64)
     ( \size -> unsafeIOToST $ mask_ $ do
-        ptr <- sodiumMalloc (fromIntegral size)
-        Foreign.newForeignPtr ptr (sodiumFree ptr (fromIntegral size))
+        ptr <- sodiumMalloc (fromIntegral @Int @CSize size)
+        Foreign.newForeignPtr ptr (sodiumFree ptr (fromIntegral @Int @CSize size))
     )
     ( \ptr -> do
         eraseMem (Proxy @n) ptr
     )
 
 eraseMem :: forall n a. KnownNat n => Proxy n -> Ptr a -> IO ()
-eraseMem proxy ptr = fillBytes ptr 0xff (fromIntegral $ natVal proxy)
+eraseMem proxy ptr = fillBytes ptr 0xff (fromIntegral @Integer @Int $ natVal proxy)
 
 mlockedPool32 :: Pool 32 RealWorld
 mlockedPool32 = unsafePerformIO $ stToIO makeMLockedPool
@@ -227,7 +227,7 @@ unpackByteStringCStringLen bs f = do
   let len = BS.length bs
   allocaBytes len $ \buf -> do
     unsafeIOToMonadST $ BS.unsafeUseAsCString bs $ \ptr -> do
-      copyMem buf ptr (fromIntegral len)
+      copyMem buf ptr (fromIntegral @Int @CSize len)
     f (buf, len)
 
 packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
@@ -284,10 +284,10 @@ mlockedAllocForeignPtrWith allocator =
     dummy = undefined
 
     size :: CSize
-    size = fromIntegral $ sizeOf dummy
+    size = fromIntegral @Int @CSize $ sizeOf dummy
 
     align :: CSize
-    align = fromIntegral $ alignment dummy
+    align = fromIntegral @Int @CSize $ alignment dummy
 
 mlockedAlloca :: forall a b m. (MonadST m, MonadThrow m) => CSize -> (Ptr a -> m b) -> m b
 mlockedAlloca = mlockedAllocaWith mlockedMalloc

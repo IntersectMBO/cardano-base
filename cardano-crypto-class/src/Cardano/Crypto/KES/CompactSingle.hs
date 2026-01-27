@@ -8,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -61,6 +62,7 @@ import Cardano.Crypto.DSIGN.Class as DSIGN
 import Cardano.Crypto.DirectSerialise
 import Cardano.Crypto.Hash.Class
 import Cardano.Crypto.KES.Class
+import Cardano.Crypto.Util (slice)
 
 -- | A standard signature scheme is a forward-secure signature scheme with a
 -- single time period.
@@ -126,7 +128,7 @@ instance
 
   rawDeserialiseVerKeyKES = fmap VerKeyCompactSingleKES . rawDeserialiseVerKeyDSIGN
   rawDeserialiseSigKES b = do
-    guard (BS.length b == fromIntegral size_total)
+    guard (BS.length b == fromIntegral @Word @Int size_total)
     sigma <- rawDeserialiseSigDSIGN b_sig
     vk <- rawDeserialiseVerKeyDSIGN b_vk
     return (SigCompactSingleKES sigma vk)
@@ -272,11 +274,6 @@ instance
   FromCBOR (SigKES (CompactSingleKES d))
   where
   fromCBOR = decodeSigKES
-
-slice :: Word -> Word -> ByteString -> ByteString
-slice offset size =
-  BS.take (fromIntegral size)
-    . BS.drop (fromIntegral offset)
 
 --
 -- UnsoundPureSignKey instances

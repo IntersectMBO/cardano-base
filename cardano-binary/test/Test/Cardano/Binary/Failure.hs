@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Cardano.Binary.Failure (tests)
 where
@@ -68,7 +69,7 @@ prop_shouldFailSet = property $ do
   ls <- forAll $ Gen.list (Range.constant 0 20) (Gen.int Range.constantBounded)
   let set =
         encodeTag 258
-          <> encodeListLen (fromIntegral (length ls + 2))
+          <> encodeListLen (fromIntegral @Int @Word (length ls + 2))
           <> mconcat (toCBOR <$> (4 : 3 : ls))
   assertIsLeft (decode set :: Either DecoderError (Set Int))
 

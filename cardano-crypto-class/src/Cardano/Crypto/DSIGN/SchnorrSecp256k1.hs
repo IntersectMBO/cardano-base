@@ -93,10 +93,11 @@ import Data.ByteString (useAsCStringLen)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 import Data.Primitive.Ptr (copyPtr)
 import Data.Proxy (Proxy (Proxy))
+import Foreign.C.Types (CSize)
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (castPtr, nullPtr)
 import GHC.Generics (Generic)
-import GHC.TypeNats (natVal)
+import GHC.TypeNats (Natural, natVal)
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -153,7 +154,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
                 ctx
                 sigp
                 (castPtr msgp)
-                (fromIntegral msgLen)
+                (fromIntegral @Int @CSize msgLen)
                 kpp
                 nullPtr
             when (res' /= 1) (error "signDSIGN: Failed to sign SchnorrSecp256k1DSIGN message")
@@ -170,7 +171,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
                 ctx
                 sigp
                 (castPtr msgp)
-                (fromIntegral msgLen)
+                (fromIntegral @Int @CSize msgLen)
                 pkp
         pure $
           if res == 0
@@ -199,7 +200,7 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
   rawDeserialiseVerKeyDSIGN bs =
     unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, len) ->
-      if len /= (fromIntegral . natVal $ Proxy @(SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
+      if len /= (fromIntegral @Natural @Int . natVal $ Proxy @(SizeVerKeyDSIGN SchnorrSecp256k1DSIGN))
         then pure Nothing
         else do
           let dataPtr = castPtr ptr

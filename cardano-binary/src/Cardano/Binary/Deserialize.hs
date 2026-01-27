@@ -124,7 +124,7 @@ decodeNestedCborTag = do
     cborError $
       DecoderErrorUnknownTag
         "decodeNestedCborTag"
-        (fromIntegral t)
+        t
 
 -- | Remove the the semantic tag 24 from the enclosed CBOR data item,
 -- decoding back the inner `ByteString` as a proper Haskell type.

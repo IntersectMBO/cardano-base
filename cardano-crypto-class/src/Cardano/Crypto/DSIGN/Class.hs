@@ -272,7 +272,7 @@ failSizeCheck fname name bs expectedSize
         )
   | otherwise = fail $ fname ++ ": cannot decode " ++ name
   where
-    actualSize = fromIntegral (BS.length bs)
+    actualSize = fromIntegral @Int @Word (BS.length bs)
 {-# NOINLINE failSizeCheck #-}
 
 newtype SignedDSIGN v a = SignedDSIGN (SigDSIGN v)
@@ -320,27 +320,28 @@ decodeSignedDSIGN = SignedDSIGN <$> decodeSigDSIGN
 encodedVerKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (VerKeyDSIGN v) -> Size
 encodedVerKeyDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeVerKeyDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeVerKeyDSIGN (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeVerKeyDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeVerKeyDSIGN (Proxy :: Proxy v))
 
 -- | 'Size' expression for 'SignKeyDSIGN' which is using 'sizeSignKeyDSIGN'
 -- encoded as 'Size'.
 encodedSignKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SignKeyDSIGN v) -> Size
 encodedSignKeyDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeSignKeyDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size
+    (withWordSize (sizeSignKeyDSIGN (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeSignKeyDSIGN (Proxy :: Proxy v))
 
 -- | 'Size' expression for 'SigDSIGN' which is using 'sizeSigDSIGN' encoded as
 -- 'Size'.
 encodedSigDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SigDSIGN v) -> Size
 encodedSigDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizeSigDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizeSigDSIGN (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizeSigDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizeSigDSIGN (Proxy :: Proxy v))
 
 class (DSIGNAlgorithm v, NoThunks (SignKeyDSIGNM v)) => DSIGNMAlgorithm v where
   data SignKeyDSIGNM v :: Type
@@ -468,7 +469,7 @@ decodeSignKeyDSIGNM = do
               )
         | otherwise -> error "decodeSignKeyDSIGNM: cannot decode key"
         where
-          expected = fromIntegral (sizeSignKeyDSIGN (Proxy :: Proxy v))
+          expected = fromIntegral @Word @Int (sizeSignKeyDSIGN (Proxy :: Proxy v))
           actual = BS.length bs
 
 -- | Extension of the `DSIGNAlgorithm` to allow for aggregatable digital
@@ -572,6 +573,6 @@ encodedPossessionProofDSIGNSizeExpr ::
   forall v. DSIGNAggregatable v => Proxy (PossessionProofDSIGN v) -> Size
 encodedPossessionProofDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral ((withWordSize :: Word -> Integer) (sizePossessionProofDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (sizePossessionProofDSIGN (Proxy :: Proxy v)))
     -- payload
-    + fromIntegral (sizePossessionProofDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (sizePossessionProofDSIGN (Proxy :: Proxy v))

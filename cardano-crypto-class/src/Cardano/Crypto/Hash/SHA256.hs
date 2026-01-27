@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the SHA256 hashing algorithm.
@@ -20,6 +21,7 @@ import GHC.TypeLits (natVal)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
+import Foreign.C.Types (CULLong)
 
 data SHA256
 
@@ -32,9 +34,13 @@ sha256_libsodium :: B.ByteString -> B.ByteString
 sha256_libsodium input =
   BI.unsafeCreate expected_size $ \outptr ->
     B.useAsCStringLen input $ \(inptr, inputlen) -> do
-      res <- c_crypto_hash_sha256 (SizedPtr (castPtr outptr)) (castPtr inptr) (fromIntegral inputlen)
+      res <-
+        c_crypto_hash_sha256
+          (SizedPtr (castPtr outptr))
+          (castPtr inptr)
+          (fromIntegral @Int @CULLong inputlen)
       unless (res == 0) $ do
         errno <- getErrno
         ioException $ errnoToIOError "digest @SHA256: c_crypto_hash_sha256" errno Nothing Nothing
   where
-    expected_size = fromIntegral (natVal (Proxy :: Proxy (SizeHash SHA256)))
+    expected_size = fromIntegral @Integer @Int (natVal (Proxy :: Proxy (SizeHash SHA256)))

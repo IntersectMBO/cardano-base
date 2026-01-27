@@ -64,6 +64,7 @@ import Cardano.Binary (
   szWithCtx,
   unsafeDeserialize,
  )
+import Data.Int (Int64)
 
 --------------------------------------------------------------------------------
 -- From/to tests
@@ -262,4 +263,4 @@ szVerify ctx x = case szSimplify (szWithCtx ctx (pure x)) of
   Right range -> OutOfBounds sz range
   where
     sz :: Natural
-    sz = fromIntegral $ LBS.length $ serialize x
+    sz = fromIntegral @Int64 @Natural $ LBS.length $ serialize x

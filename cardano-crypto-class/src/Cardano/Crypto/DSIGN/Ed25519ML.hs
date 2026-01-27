@@ -153,7 +153,8 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
           BS.useAsCStringLen bs $ \(ptr, len) ->
             psbUseAsSizedPtr vk $ \vkPtr ->
               psbUseAsSizedPtr sig $ \sigPtr -> do
-                res <- c_crypto_sign_ed25519_verify_detached sigPtr (castPtr ptr) (fromIntegral len) vkPtr
+                res <-
+                  c_crypto_sign_ed25519_verify_detached sigPtr (castPtr ptr) (fromIntegral @CSize @Int len) vkPtr
                 if res == 0
                   then return (Right ())
                   else return (Left "Verification failed")
@@ -215,7 +216,7 @@ instance DSIGNMAlgorithm Ed25519DSIGNM where
                 withLiftST $ \fromST -> fromST $ do
                   cOrError $ unsafeIOToST $ do
                     BS.useAsCStringLen bs $ \(ptr, len) ->
-                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral len) skPtr
+                      c_crypto_sign_ed25519_detached sigPtr nullPtr (castPtr ptr) (fromIntegral @CSize @Int len) skPtr
             throwOnErrno "signDSIGNM @Ed25519DSIGNM" "c_crypto_sign_ed25519_detached" maybeErrno
             return psb
 

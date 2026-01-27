@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 -- | For use in trivial cases, such as in mocks, tests, etc.
 module Cardano.Slotting.EpochInfo.Impl (
   fixedEpochInfo,
@@ -11,6 +13,8 @@ where
 import Cardano.Slotting.EpochInfo.API
 import Cardano.Slotting.Slot (EpochNo (..), EpochSize (..), SlotNo (..))
 import Cardano.Slotting.Time (RelativeTime (..), SlotLength, getSlotLength)
+import Data.Time (NominalDiffTime)
+import Data.Word (Word64)
 
 -- | The 'EpochInfo' induced by assuming the epoch size and slot length are
 -- fixed for the entire system lifetime
@@ -22,7 +26,7 @@ fixedEpochInfo (EpochSize size) slotLength =
     , epochInfoFirst_ = \e -> return $ fixedEpochInfoFirst (EpochSize size) e
     , epochInfoEpoch_ = \sl -> return $ fixedEpochInfoEpoch (EpochSize size) sl
     , epochInfoSlotToRelativeTime_ = \(SlotNo slot) ->
-        return $ RelativeTime (fromIntegral slot * getSlotLength slotLength)
+        return $ RelativeTime (fromIntegral @Word64 @NominalDiffTime slot * getSlotLength slotLength)
     , epochInfoSlotLength_ = const $ pure slotLength
     }
 

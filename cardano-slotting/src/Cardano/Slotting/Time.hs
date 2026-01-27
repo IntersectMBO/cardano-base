@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Cardano.Slotting.Time (
   -- * System time
@@ -104,10 +106,10 @@ multRelativeTime :: Integral f => RelativeTime -> f -> RelativeTime
 multRelativeTime (RelativeTime t) =
   RelativeTime . multNominalDiffTime t
 
-multNominalDiffTime :: Integral f => NominalDiffTime -> f -> NominalDiffTime
+multNominalDiffTime :: forall f. Integral f => NominalDiffTime -> f -> NominalDiffTime
 multNominalDiffTime t f =
   secondsToNominalDiffTime $
-    nominalDiffTimeToSeconds t * fromIntegral f
+    nominalDiffTimeToSeconds t * fromIntegral @f @Pico f
 
 {-------------------------------------------------------------------------------
   SlotLength

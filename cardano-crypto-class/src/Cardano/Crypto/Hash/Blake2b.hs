@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Implementation of the Blake2b hashing algorithm, with various sizes.
@@ -19,6 +20,7 @@ import GHC.IO.Exception (ioException)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as BI
+import Foreign.C.Types (CSize, CULLong)
 
 data Blake2b_224
 data Blake2b_256
@@ -40,9 +42,9 @@ blake2b_libsodium size input =
       res <-
         c_crypto_generichash_blake2b
           (castPtr outptr)
-          (fromIntegral size)
+          (fromIntegral @Int @CSize size)
           (castPtr inptr)
-          (fromIntegral inputlen)
+          (fromIntegral @Int @CULLong inputlen)
           nullPtr
           0 -- we used unkeyed hash
       unless (res == 0) $ do

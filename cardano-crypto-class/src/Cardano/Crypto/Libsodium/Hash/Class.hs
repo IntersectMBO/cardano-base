@@ -28,6 +28,7 @@ import qualified Data.ByteString as BS
 import Cardano.Crypto.Hash (Blake2b_256, HashAlgorithm (SizeHash), SHA256)
 import Cardano.Crypto.Libsodium.C
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
+import Foreign.C.Types (CULLong)
 
 -------------------------------------------------------------------------------
 -- Type-Class
@@ -76,7 +77,7 @@ instance SodiumHashAlgorithm SHA256 where
   naclDigestPtr _ input inputlen = do
     output <- mlsbNew
     mlsbUseAsSizedPtr output $ \output' -> do
-      res <- c_crypto_hash_sha256 output' (castPtr input) (fromIntegral inputlen)
+      res <- c_crypto_hash_sha256 output' (castPtr input) (fromIntegral @Int @CULLong inputlen)
       unless (res == 0) $ do
         errno <- getErrno
         ioException $ errnoToIOError "digestMLocked @SHA256: c_crypto_hash_sha256" errno Nothing Nothing
@@ -97,7 +98,7 @@ instance SodiumHashAlgorithm Blake2b_256 where
           output'
           (fromInteger $ natVal (Proxy @CRYPTO_BLAKE2B_256_BYTES)) -- output
           (castPtr input)
-          (fromIntegral inputlen) -- input
+          (fromIntegral @Int @CULLong inputlen) -- input
           nullPtr
           0 -- key, unused
       unless (res == 0) $ do

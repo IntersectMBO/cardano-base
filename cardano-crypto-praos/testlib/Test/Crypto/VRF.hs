@@ -28,6 +28,7 @@ import qualified Data.Char as Char
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64, Word8)
 import GHC.Stack (HasCallStack)
+import GHC.TypeLits (Natural)
 import qualified Text.ParserCombinators.ReadP as Parse
 import qualified Text.Read as Read
 
@@ -381,7 +382,7 @@ prop_vrf_output_size ::
 prop_vrf_output_size a sk =
   let (out, _c) = evalVRF () a sk
    in BS.length (getOutputVRFBytes out)
-        === fromIntegral (sizeOutputVRF (Proxy :: Proxy v))
+        === fromIntegral @Word @Int (sizeOutputVRF (Proxy :: Proxy v))
 
 prop_vrf_output_natural ::
   forall v.
@@ -411,7 +412,8 @@ prop_bytesToNatural ws =
 prop_naturalToBytes :: NonNegative Int -> Word64 -> Property
 prop_naturalToBytes (NonNegative sz) n =
   sz >= 8 ==>
-    bytesToNatural (naturalToBytes sz (fromIntegral n)) == fromIntegral n
+    bytesToNatural (naturalToBytes sz (fromIntegral @Word64 @Natural n))
+      == fromIntegral @Word64 @Natural n
 
 --
 -- Praos <-> BatchCompatPraos VerKey conversion
@@ -489,6 +491,6 @@ instance
 
 instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
   arbitrary = do
-    sbs <- SBS.pack <$> vectorOf (fromIntegral (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
+    sbs <- SBS.pack <$> vectorOf (fromIntegral @Word @Int (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
     case sbs of
       SBS.SBS ba -> return $ OutputVRF $ ByteArray ba

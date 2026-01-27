@@ -199,7 +199,7 @@ hashFromBytes ::
   ByteString ->
   Maybe (Hash h a)
 hashFromBytes bytes
-  | BS.length bytes == fromIntegral (sizeHash (Proxy :: Proxy h)) =
+  | BS.length bytes == fromIntegral @Word @Int (sizeHash (Proxy :: Proxy h)) =
       Just $ UnsafeHashRep (packPinnedBytes bytes)
   | otherwise =
       Nothing
@@ -346,7 +346,7 @@ fromHash :: Hash h a -> Natural
 fromHash = F.foldl' f 0 . BS.unpack . hashToBytes
   where
     f :: Natural -> Word8 -> Natural
-    f n b = n * 256 + fromIntegral b
+    f n b = n * 256 + fromIntegral @Word8 @Natural b
 
 {-# DEPRECATED hashRaw "Use hashWith" #-}
 hashRaw :: forall h a. HashAlgorithm h => (a -> ByteString) -> a -> Hash h a
