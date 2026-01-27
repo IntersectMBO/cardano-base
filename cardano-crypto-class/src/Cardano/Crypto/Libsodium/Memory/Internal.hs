@@ -234,8 +234,7 @@ packByteStringCStringLen :: MonadST m => CStringLen -> m ByteString
 packByteStringCStringLen =
   unsafeIOToMonadST . BS.packCStringLen
 
-newtype MLockedAllocator m
-  = MLockedAllocator
+newtype MLockedAllocator m = MLockedAllocator
   { mlAllocate :: forall a. CSize -> m (MLockedForeignPtr a)
   }
 

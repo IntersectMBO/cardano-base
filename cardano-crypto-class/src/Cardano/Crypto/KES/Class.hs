@@ -400,10 +400,8 @@ verifyOptimizedKES ctx vk t a sig = do
   verifySigKES ctx t a sig
   let vk' = verKeyFromSigKES ctx t sig
   if vk' == vk
-    then
-      return ()
-    else
-      Left "KES verification failed"
+    then return ()
+    else Left "KES verification failed"
 
 --
 -- Do not provide Ord instances for keys, see #38
@@ -488,8 +486,7 @@ decodeSignKeyKES = do
             ++ " bytes but got "
             ++ show actual
         )
-    else
-      return $ rawDeserialiseSignKeyKES bs
+    else return $ rawDeserialiseSignKeyKES bs
 
 -- | The KES period. Periods are enumerated from zero.
 --
@@ -543,8 +540,7 @@ decodeSignedKES = SignedKES <$> decodeSigKES
 {-# INLINE decodeSignedKES #-}
 
 -- | A sign key bundled with its associated period.
-data SignKeyWithPeriodKES v
-  = SignKeyWithPeriodKES
+data SignKeyWithPeriodKES v = SignKeyWithPeriodKES
   { skWithoutPeriodKES :: !(SignKeyKES v)
   , periodKES :: !Period
   }

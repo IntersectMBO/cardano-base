@@ -85,10 +85,8 @@ cOrError action = do
   withLiftST $ \fromST -> fromST $ do
     res <- action
     if res == 0
-      then
-        return Nothing
-      else
-        Just <$> unsafeIOToST getErrno
+      then return Nothing
+      else Just <$> unsafeIOToST getErrno
 
 -- | Throws an error when 'Just' an 'Errno' is given.
 throwOnErrno :: MonadThrow m => String -> String -> Maybe Errno -> m ()
@@ -157,10 +155,8 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
               psbUseAsSizedPtr sig $ \sigPtr -> do
                 res <- c_crypto_sign_ed25519_verify_detached sigPtr (castPtr ptr) (fromIntegral len) vkPtr
                 if res == 0
-                  then
-                    return (Right ())
-                  else
-                    return (Left "Verification failed")
+                  then return (Right ())
+                  else return (Left "Verification failed")
 
   --
   -- raw serialise/deserialise

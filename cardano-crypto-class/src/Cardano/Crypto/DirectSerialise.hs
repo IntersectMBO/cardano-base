@@ -25,8 +25,7 @@ import Data.STRef (newSTRef, readSTRef, writeSTRef)
 import Foreign.C.Types
 import Foreign.Ptr
 
-data SizeCheckException
-  = SizeCheckException
+data SizeCheckException = SizeCheckException
   { expectedSize :: Int
   , actualSize :: Int
   }
