@@ -105,6 +105,7 @@ library
     Cardano.Crypto.Libsodium.Memory
     Cardano.Crypto.Libsodium.Memory.Internal
     Cardano.Crypto.Libsodium.UnsafeC
+    Cardano.Crypto.PackedBytes
     Cardano.Crypto.PinnedSizedBytes
     Cardano.Crypto.Seed
     Cardano.Crypto.Util
@@ -116,7 +117,7 @@ library
     Cardano.Foreign
 
   other-modules:
-    Cardano.Crypto.PackedBytes
+    Cardano.Crypto.PackedBytes.Internal
 
   build-depends:
     FailT,
