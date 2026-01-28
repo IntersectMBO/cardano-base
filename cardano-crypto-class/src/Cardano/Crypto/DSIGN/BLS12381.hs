@@ -38,12 +38,12 @@ import Cardano.Crypto.DSIGN.Class (
     KeyGenContextDSIGN,
     SeedSizeDSIGN,
     SigDSIGN,
+    SigSizeDSIGN,
     SignKeyDSIGN,
+    SignKeySizeDSIGN,
     Signable,
-    SizeSigDSIGN,
-    SizeSignKeyDSIGN,
-    SizeVerKeyDSIGN,
     VerKeyDSIGN,
+    VerKeySizeDSIGN,
     algorithmNameDSIGN,
     deriveVerKeyDSIGN,
     genKeyDSIGN,
@@ -161,12 +161,12 @@ instance
   DSIGNAlgorithm (BLS12381DSIGN curve)
   where
   type SeedSizeDSIGN (BLS12381DSIGN curve) = CARDANO_BLST_SCALAR_SIZE
-  type SizeSignKeyDSIGN (BLS12381DSIGN curve) = CARDANO_BLST_SCALAR_SIZE
+  type SignKeySizeDSIGN (BLS12381DSIGN curve) = CARDANO_BLST_SCALAR_SIZE
 
   -- These *Sizes* are used in the serialization/deserialization
   -- so these use the compressed sizes of the BLS12-381 `Point curve`
-  type SizeVerKeyDSIGN (BLS12381DSIGN curve) = CompressedPointSize curve
-  type SizeSigDSIGN (BLS12381DSIGN curve) = CompressedPointSize (DualCurve curve)
+  type VerKeySizeDSIGN (BLS12381DSIGN curve) = CompressedPointSize curve
+  type SigSizeDSIGN (BLS12381DSIGN curve) = CompressedPointSize (DualCurve curve)
   type Signable (BLS12381DSIGN curve) = SignableRepresentation
 
   -- Context can hold domain separation tag and/or augmentation data for signatures

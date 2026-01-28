@@ -11,15 +11,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class (
   HashAlgorithm (..),
-  sizeHash,
+  hashSize,
   ByteString,
   Hash (UnsafeHash),
   PackedBytes (PackedBytes8, PackedBytes28, PackedBytes32),
+
+  -- * Deprecated size synonyms
+  sizeHash,
 
   -- * Core operations
   hashWith,
@@ -96,22 +100,31 @@ import Cardano.HeapWords (HeapWords (..))
 
 import qualified Data.ByteString.Short.Internal as SBSI
 
-class (KnownNat (SizeHash h), Typeable h) => HashAlgorithm h where
+{-# DEPRECATED SizeHash "In favor of `HashSize`" #-}
+
+class (KnownNat (HashSize h), Typeable h) => HashAlgorithm h where
   -- TODO: eliminate this Typeable constraint needed only for the ToCBOR
   -- the ToCBOR should not need it either
 
   -- | Size of hash digest
+  type HashSize h :: Nat
+
   type SizeHash h :: Nat
+  type SizeHash h = HashSize h
 
   hashAlgorithmName :: proxy h -> String
 
   digest :: proxy h -> ByteString -> ByteString
 
 -- | The size in bytes of the output of 'digest'
-sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
-sizeHash _ = fromInteger (natVal (Proxy @(SizeHash h)))
+hashSize :: forall h proxy. HashAlgorithm h => proxy h -> Word
+hashSize _ = fromInteger (natVal (Proxy @(HashSize h)))
 
-newtype Hash h a = UnsafeHashRep (PackedBytes (SizeHash h))
+{-# DEPRECATED sizeHash "In favor of `hashSize`" #-}
+sizeHash :: forall h proxy. HashAlgorithm h => proxy h -> Word
+sizeHash _ = fromInteger (natVal (Proxy @(HashSize h)))
+
+newtype Hash h a = UnsafeHashRep (PackedBytes (HashSize h))
   deriving (Eq, Ord, Generic, NoThunks, NFData)
 
 deriving instance HashAlgorithm h => MemPack (Hash h a)
@@ -145,7 +158,7 @@ deriving instance HashAlgorithm h => MemPack (Hash h a)
 -- ...
 instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
   fromString hexStr = do
-    let n = fromInteger $ natVal (Proxy @(SizeHash h))
+    let n = fromInteger $ natVal (Proxy @(HashSize h))
     case decodeHexString hexStr n of
       Left err -> fail $ "<Hash " ++ hashAlgorithmName (Proxy :: Proxy h) ++ ">: " ++ err
       Right _ -> examineSplice [||either error (UnsafeHashRep . packPinnedBytes) (decodeHexString hexStr n)||]
@@ -195,11 +208,11 @@ hashToBytes (UnsafeHashRep h) = unpackPinnedBytes h
 hashFromBytes ::
   forall h a.
   HashAlgorithm h =>
-  -- | It must have an exact length, as given by 'sizeHash'.
+  -- | It must have an exact length, as given by 'hashSize'.
   ByteString ->
   Maybe (Hash h a)
 hashFromBytes bytes
-  | BS.length bytes == fromIntegral @Word @Int (sizeHash (Proxy :: Proxy h)) =
+  | BS.length bytes == fromIntegral @Word @Int (hashSize (Proxy :: Proxy h)) =
       Just $ UnsafeHashRep (packPinnedBytes bytes)
   | otherwise =
       Nothing
@@ -208,7 +221,7 @@ hashFromBytes bytes
 hashFromBytesShort ::
   forall h a.
   HashAlgorithm h =>
-  -- | It must be a buffer of exact length, as given by 'sizeHash'.
+  -- | It must be a buffer of exact length, as given by 'hashSize'.
   ShortByteString ->
   Maybe (Hash h a)
 hashFromBytesShort bytes = UnsafeHashRep <$> packShortByteString bytes
@@ -218,7 +231,7 @@ hashFromBytesShort bytes = UnsafeHashRep <$> packShortByteString bytes
 hashFromOffsetBytesShort ::
   forall h a.
   HashAlgorithm h =>
-  -- | It must be a buffer that contains at least 'sizeHash' many bytes staring at an offset.
+  -- | It must be a buffer that contains at least 'hashSize' many bytes staring at an offset.
   ShortByteString ->
   -- | Offset in number of bytes
   Int ->
@@ -236,11 +249,11 @@ hashToByteArray :: Hash h a -> ByteArray
 hashToByteArray (UnsafeHashRep h) = unpackAsByteArray h
 
 -- | /O(1)/ - Get the underlying hash representation
-hashToPackedBytes :: Hash h a -> PackedBytes (SizeHash h)
+hashToPackedBytes :: Hash h a -> PackedBytes (HashSize h)
 hashToPackedBytes (UnsafeHashRep pb) = pb
 
 -- | /O(1)/ - Construct hash from the underlying representation
-hashFromPackedBytes :: PackedBytes (SizeHash h) -> Hash h a
+hashFromPackedBytes :: PackedBytes (HashSize h) -> Hash h a
 hashFromPackedBytes = UnsafeHashRep
 
 --

@@ -67,7 +67,7 @@ instance NoThunks (VerKeyDSIGNM Ed25519DSIGNM)
 instance NoThunks (SigDSIGNM Ed25519DSIGNM)
 
 deriving via
-  (MLockedSizedBytes (SizeSignKeyDSIGNM Ed25519DSIGNM))
+  (MLockedSizedBytes (SignKeySizeDSIGNM Ed25519DSIGNM))
   instance
     NoThunks (SignKeyDSIGNM Ed25519DSIGNM)
 
@@ -100,7 +100,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
 
   -- \| Ed25519 key size is 32 octets
   -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
-  type SizeVerKeyDSIGNM Ed25519DSIGNM = CRYPTO_SIGN_ED25519_PUBLICKEYBYTES
+  type VerKeySizeDSIGNM Ed25519DSIGNM = CRYPTO_SIGN_ED25519_PUBLICKEYBYTES
 
   -- \| Ed25519 secret key size is 32 octets; however, libsodium packs both
   -- the secret key and the public key into a 64-octet compound and exposes
@@ -109,16 +109,16 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
   -- efficiency, we use the 64-octet compounds internally (this is what
   -- libsodium expects), but we only serialize the 32-octet secret key part
   -- (the libsodium \"seed\").
-  type SizeSignKeyDSIGNM Ed25519DSIGNM = CRYPTO_SIGN_ED25519_SEEDBYTES
+  type SignKeySizeDSIGNM Ed25519DSIGNM = CRYPTO_SIGN_ED25519_SEEDBYTES
 
   -- \| Ed25519 signature size is 64 octets
-  type SizeSigDSIGNM Ed25519DSIGNM = CRYPTO_SIGN_ED25519_BYTES
+  type SigSizeDSIGNM Ed25519DSIGNM = CRYPTO_SIGN_ED25519_BYTES
 
   --
   -- Key and signature types
   --
 
-  newtype VerKeyDSIGNM Ed25519DSIGNM = VerKeyEd25519DSIGNM (PinnedSizedBytes (SizeVerKeyDSIGNM Ed25519DSIGNM))
+  newtype VerKeyDSIGNM Ed25519DSIGNM = VerKeyEd25519DSIGNM (PinnedSizedBytes (VerKeySizeDSIGNM Ed25519DSIGNM))
     deriving (Show, Eq, Generic)
     deriving newtype (NFData)
 
@@ -131,7 +131,7 @@ instance DSIGNMAlgorithmBase Ed25519DSIGNM where
     = SignKeyEd25519DSIGNM (MLockedSizedBytes CRYPTO_SIGN_ED25519_SECRETKEYBYTES)
     deriving (Show)
 
-  newtype SigDSIGNM Ed25519DSIGNM = SigEd25519DSIGNM (PinnedSizedBytes (SizeSigDSIGNM Ed25519DSIGNM))
+  newtype SigDSIGNM Ed25519DSIGNM = SigEd25519DSIGNM (PinnedSizedBytes (SigSizeDSIGNM Ed25519DSIGNM))
     deriving (Show, Eq, Generic)
     deriving newtype (NFData)
 

@@ -8,7 +8,7 @@ module Cardano.Crypto.Hash.SHA256 (
 )
 where
 
-import Cardano.Crypto.Hash.Class (HashAlgorithm, SizeHash, digest, hashAlgorithmName)
+import Cardano.Crypto.Hash.Class (HashAlgorithm, HashSize, digest, hashAlgorithmName)
 import Cardano.Crypto.Libsodium.C (c_crypto_hash_sha256)
 import Cardano.Foreign (SizedPtr (SizedPtr))
 import Control.Monad (unless)
@@ -26,7 +26,7 @@ import Foreign.C.Types (CULLong)
 data SHA256
 
 instance HashAlgorithm SHA256 where
-  type SizeHash SHA256 = 32
+  type HashSize SHA256 = 32
   hashAlgorithmName _ = "sha256"
   digest _ = sha256_libsodium
 
@@ -43,4 +43,4 @@ sha256_libsodium input =
         errno <- getErrno
         ioException $ errnoToIOError "digest @SHA256: c_crypto_hash_sha256" errno Nothing Nothing
   where
-    expected_size = fromIntegral @Integer @Int (natVal (Proxy :: Proxy (SizeHash SHA256)))
+    expected_size = fromIntegral @Integer @Int (natVal (Proxy :: Proxy (HashSize SHA256)))

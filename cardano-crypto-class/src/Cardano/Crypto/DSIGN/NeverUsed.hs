@@ -26,9 +26,9 @@ data NeverDSIGN
 
 instance DSIGNAlgorithm NeverDSIGN where
   type SeedSizeDSIGN NeverDSIGN = 0
-  type SizeVerKeyDSIGN NeverDSIGN = 0
-  type SizeSignKeyDSIGN NeverDSIGN = 0
-  type SizeSigDSIGN NeverDSIGN = 0
+  type VerKeySizeDSIGN NeverDSIGN = 0
+  type SignKeySizeDSIGN NeverDSIGN = 0
+  type SigSizeDSIGN NeverDSIGN = 0
 
   data VerKeyDSIGN NeverDSIGN = NeverUsedVerKeyDSIGN
     deriving (Show, Eq, Generic, NoThunks)

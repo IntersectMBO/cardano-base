@@ -20,7 +20,7 @@ import Foreign.Ptr (castPtr, plusPtr)
 import Foreign.Storable (Storable (poke))
 import GHC.TypeLits
 
-import Cardano.Crypto.Hash (HashAlgorithm (SizeHash))
+import Cardano.Crypto.Hash (HashAlgorithm (HashSize))
 import Cardano.Crypto.Libsodium.Hash.Class
 import Cardano.Crypto.Libsodium.MLockedBytes.Internal
 import Cardano.Crypto.Libsodium.Memory
@@ -36,8 +36,8 @@ expandHash ::
   forall h m proxy.
   (SodiumHashAlgorithm h, MonadST m, MonadThrow m) =>
   proxy h ->
-  MLockedSizedBytes (SizeHash h) ->
-  m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
+  MLockedSizedBytes (HashSize h) ->
+  m (MLockedSizedBytes (HashSize h), MLockedSizedBytes (HashSize h))
 expandHash = expandHashWith mlockedMalloc
 
 expandHashWith ::
@@ -45,8 +45,8 @@ expandHashWith ::
   (SodiumHashAlgorithm h, MonadST m, MonadThrow m) =>
   MLockedAllocator m ->
   proxy h ->
-  MLockedSizedBytes (SizeHash h) ->
-  m (MLockedSizedBytes (SizeHash h), MLockedSizedBytes (SizeHash h))
+  MLockedSizedBytes (HashSize h) ->
+  m (MLockedSizedBytes (HashSize h), MLockedSizedBytes (HashSize h))
 expandHashWith allocator h (MLSB sfptr) = do
   withMLockedForeignPtr sfptr $ \ptr -> do
     l <- mlockedAllocaWith allocator size1 $ \ptr' -> do
@@ -67,4 +67,4 @@ expandHashWith allocator h (MLSB sfptr) = do
     size1 = size + 1
 
     size :: CSize
-    size = fromInteger $ natVal (Proxy @(SizeHash h))
+    size = fromInteger $ natVal (Proxy @(HashSize h))
