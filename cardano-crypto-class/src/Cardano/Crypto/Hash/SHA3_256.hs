@@ -15,7 +15,7 @@ import qualified "crypton" Crypto.Hash as H
 data SHA3_256
 
 instance HashAlgorithm SHA3_256 where
-  type SizeHash SHA3_256 = 32
+  type HashSize SHA3_256 = 32
   hashAlgorithmName _ = "sha3-256"
   digest _ = convert . H.hash
 

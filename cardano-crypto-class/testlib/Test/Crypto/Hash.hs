@@ -60,7 +60,7 @@ testHashAlgorithm ::
   Spec
 testHashAlgorithm p =
   describe (hashAlgorithmName p) $ do
-    prop "hash size" $ prop_hash_correct_sizeHash @h @[Int]
+    prop "hash size" $ prop_hash_correct_hashSize @h @[Int]
     prop "serialise" $ prop_hash_cbor @h
     prop "fail fromCBOR" $ prop_bad_cbor_bytes @(Hash h ())
     prop "hashFromBytes" $ prop_raw_deserialise (hashFromBytes @h @())
@@ -138,13 +138,13 @@ prop_hash_cbor = prop_cbor
 prop_hash_cbor_size :: HashAlgorithm h => Hash h Int -> Property
 prop_hash_cbor_size = prop_cbor_size
 
-prop_hash_correct_sizeHash ::
+prop_hash_correct_hashSize ::
   forall h a.
   HashAlgorithm h =>
   Hash h a ->
   Property
-prop_hash_correct_sizeHash h =
-  BS.length (hashToBytes h) === fromIntegral @Word @Int (sizeHash (Proxy :: Proxy h))
+prop_hash_correct_hashSize h =
+  BS.length (hashToBytes h) === fromIntegral @Word @Int (hashSize (Proxy :: Proxy h))
 
 prop_hash_show_read ::
   forall h a.
@@ -199,9 +199,9 @@ instance HashAlgorithm h => Arbitrary (Hash h a) where
 data TestHash (n :: Nat) = TestHash
 
 instance KnownNat n => HashAlgorithm (TestHash n) where
-  type SizeHash (TestHash n) = n
-  hashAlgorithmName px = "TestHash " ++ show (sizeHash px)
-  digest px _ = BS.pack (replicate (fromIntegral @Word @Int (sizeHash px)) 0)
+  type HashSize (TestHash n) = n
+  hashAlgorithmName px = "TestHash " ++ show (hashSize px)
+  digest px _ = BS.pack (replicate (fromIntegral @Word @Int (hashSize px)) 0)
 
 prop_roundtrip ::
   forall n.

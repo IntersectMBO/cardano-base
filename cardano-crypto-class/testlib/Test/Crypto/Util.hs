@@ -97,12 +97,12 @@ import Cardano.Binary (
  )
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (..),
-  sizeSigDSIGN,
-  sizeSignKeyDSIGN,
-  sizeVerKeyDSIGN,
+  sigSizeDSIGN,
+  signKeySizeDSIGN,
+  verKeySizeDSIGN,
  )
 import Cardano.Crypto.DirectSerialise
-import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, sizeHash)
+import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, hashSize)
 import Cardano.Crypto.Libsodium.Memory (
   allocaBytes,
   packByteStringCStringLen,
@@ -408,19 +408,19 @@ instance Show (BadInputFor a) where
   show = showBadInputFor
 
 instance HashAlgorithm h => Arbitrary (BadInputFor (Hash h a)) where
-  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeHash (Proxy :: Proxy h)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (hashSize (Proxy :: Proxy h)))
   shrink = shrinkBadInputFor
 
 instance DSIGNAlgorithm v => Arbitrary (BadInputFor (VerKeyDSIGN v)) where
-  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeVerKeyDSIGN (Proxy :: Proxy v)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (verKeySizeDSIGN (Proxy :: Proxy v)))
   shrink = shrinkBadInputFor
 
 instance DSIGNAlgorithm v => Arbitrary (BadInputFor (SignKeyDSIGN v)) where
-  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeSignKeyDSIGN (Proxy :: Proxy v)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy v)))
   shrink = shrinkBadInputFor
 
 instance DSIGNAlgorithm v => Arbitrary (BadInputFor (SigDSIGN v)) where
-  arbitrary = genBadInputFor (fromIntegral @Word @Int (sizeSigDSIGN (Proxy :: Proxy v)))
+  arbitrary = genBadInputFor (fromIntegral @Word @Int (sigSizeDSIGN (Proxy :: Proxy v)))
   shrink = shrinkBadInputFor
 
 -- Coercion around a phantom parameter here is dangerous, as there's an implicit

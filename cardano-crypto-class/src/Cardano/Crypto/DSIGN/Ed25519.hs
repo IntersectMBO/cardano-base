@@ -86,7 +86,7 @@ instance NoThunks (SignKeyDSIGN Ed25519DSIGN)
 instance NoThunks (SigDSIGN Ed25519DSIGN)
 
 deriving via
-  (MLockedSizedBytes (SizeSignKeyDSIGN Ed25519DSIGN))
+  (MLockedSizedBytes (SignKeySizeDSIGN Ed25519DSIGN))
   instance
     NoThunks (SignKeyDSIGNM Ed25519DSIGN)
 
@@ -136,7 +136,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
 
   -- \| Ed25519 key size is 32 octets
   -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
-  type SizeVerKeyDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_PUBLICKEYBYTES
+  type VerKeySizeDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_PUBLICKEYBYTES
 
   -- \| Ed25519 secret key size is 32 octets; however, libsodium packs both
   -- the secret key and the public key into a 64-octet compound and exposes
@@ -147,16 +147,16 @@ instance DSIGNAlgorithm Ed25519DSIGN where
   -- (the libsodium \"seed\"). And because of this, we need to define the
   -- sign key size to be SEEDBYTES (which is 32), not PRIVATEKEYBYTES (which
   -- would be 64).
-  type SizeSignKeyDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_SEEDBYTES
+  type SignKeySizeDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_SEEDBYTES
 
   -- \| Ed25519 signature size is 64 octets
-  type SizeSigDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_BYTES
+  type SigSizeDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_BYTES
 
   --
   -- Key and signature types
   --
 
-  newtype VerKeyDSIGN Ed25519DSIGN = VerKeyEd25519DSIGN (PinnedSizedBytes (SizeVerKeyDSIGN Ed25519DSIGN))
+  newtype VerKeyDSIGN Ed25519DSIGN = VerKeyEd25519DSIGN (PinnedSizedBytes (VerKeySizeDSIGN Ed25519DSIGN))
     deriving (Show, Eq, Generic)
     deriving newtype (NFData)
 
@@ -170,7 +170,7 @@ instance DSIGNAlgorithm Ed25519DSIGN where
     deriving (Show, Eq, Generic)
     deriving newtype (NFData)
 
-  newtype SigDSIGN Ed25519DSIGN = SigEd25519DSIGN (PinnedSizedBytes (SizeSigDSIGN Ed25519DSIGN))
+  newtype SigDSIGN Ed25519DSIGN = SigEd25519DSIGN (PinnedSizedBytes (SigSizeDSIGN Ed25519DSIGN))
     deriving (Show, Eq, Generic)
     deriving newtype (NFData)
 
@@ -390,7 +390,7 @@ instance DirectSerialise (SignKeyDSIGNM Ed25519DSIGN) where
   -- /Note:/ We only serialize the 32-byte seed, not the full 64-byte key. The
   -- latter contains both the seed and the 32-byte verification key, which is
   -- convenient, but redundant, since we can always reconstruct it from the
-  -- seed. This is also reflected in the 'SizeSignKeyDSIGNM', which equals
+  -- seed. This is also reflected in the 'SignKeySizeDSIGNM', which equals
   -- 'SeedSizeDSIGNM' == 32, rather than reporting the in-memory size of 64.
   directSerialise push sk = do
     bracket
@@ -422,12 +422,12 @@ instance DirectSerialise (VerKeyDSIGN Ed25519DSIGN) where
     psbUseAsCPtrLen psb $ \ptr _ ->
       push
         (castPtr ptr)
-        (fromIntegral @Word @CSize $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ verKeySizeDSIGN (Proxy @Ed25519DSIGN))
 
 instance DirectDeserialise (VerKeyDSIGN Ed25519DSIGN) where
   directDeserialise pull = do
     psb <- psbCreate $ \ptr ->
       pull
         (castPtr ptr)
-        (fromIntegral @Word @CSize $ sizeVerKeyDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ verKeySizeDSIGN (Proxy @Ed25519DSIGN))
     return $! VerKeyEd25519DSIGN psb

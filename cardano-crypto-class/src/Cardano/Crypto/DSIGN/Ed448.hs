@@ -35,9 +35,9 @@ instance DSIGNAlgorithm Ed448DSIGN where
   type SeedSizeDSIGN Ed448DSIGN = 57
 
   -- \| Goldilocks points are 448 bits long
-  type SizeVerKeyDSIGN Ed448DSIGN = 57
-  type SizeSignKeyDSIGN Ed448DSIGN = 57
-  type SizeSigDSIGN Ed448DSIGN = 114
+  type VerKeySizeDSIGN Ed448DSIGN = 57
+  type SignKeySizeDSIGN Ed448DSIGN = 57
+  type SigSizeDSIGN Ed448DSIGN = 114
 
   --
   -- Key and signature types

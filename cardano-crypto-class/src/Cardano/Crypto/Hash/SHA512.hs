@@ -15,7 +15,7 @@ import qualified "crypton" Crypto.Hash as H
 data SHA512
 
 instance HashAlgorithm SHA512 where
-  type SizeHash SHA512 = 64
+  type HashSize SHA512 = 64
   hashAlgorithmName _ = "sha512"
   digest _ = convert . H.hash
 
