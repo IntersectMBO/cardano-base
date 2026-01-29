@@ -35,6 +35,7 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, natVal, type (*))
 import NoThunks.Class (NoThunks)
 
+import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN
@@ -44,7 +45,6 @@ import Cardano.Crypto.KES.Class
 import Cardano.Crypto.Libsodium.MLockedBytes
 import Cardano.Crypto.Libsodium.MLockedSeed
 import Cardano.Crypto.Seed
-import Cardano.Crypto.Util
 import Data.Maybe (fromMaybe)
 import Data.Unit.Strict (forceElemsToWHNF)
 import GHC.TypeLits (Natural)

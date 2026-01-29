@@ -1,12 +1,9 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Test.Crypto.VRF (
@@ -20,9 +17,6 @@ import Cardano.Crypto.VRF.Praos
 import qualified Cardano.Crypto.VRF.Praos as Ver03
 import Cardano.Crypto.VRF.PraosBatchCompat
 import qualified Cardano.Crypto.VRF.PraosBatchCompat as Ver13
-import Data.Array.Byte (ByteArray (..))
-import qualified Data.ByteString.Short as SBS
-
 import qualified Data.ByteString as BS
 import qualified Data.Char as Char
 import Data.Proxy (Proxy (..))
@@ -33,17 +27,15 @@ import qualified Text.ParserCombinators.ReadP as Parse
 import qualified Text.Read as Read
 
 import Paths_cardano_crypto_praos (getDataFileName)
+import Test.Crypto.Instances ()
 import Test.Crypto.Util
 import Test.HUnit (assertBool, assertFailure, (@?=))
 import Test.Hspec (Expectation, Spec, describe, it)
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (
-  Arbitrary (..),
-  Gen,
   NonNegative (..),
   Property,
   counterexample,
-  vectorOf,
   (===),
   (==>),
  )
@@ -461,36 +453,3 @@ prop_signKeyValidConversion sharedBytes =
     skBatchCompat = genKeyVRF . unSizedSeed $ sharedBytes
    in
     skBatchCompat == skToBatchCompat skPraos
-
---
--- Arbitrary instances
---
-
-instance VRFAlgorithm v => Arbitrary (VerKeyVRF v) where
-  arbitrary = deriveVerKeyVRF <$> arbitrary
-  shrink = const []
-
-instance VRFAlgorithm v => Arbitrary (SignKeyVRF v) where
-  arbitrary = genKeyVRF <$> arbitrarySeedOfSize seedSize
-    where
-      seedSize = seedSizeVRF (Proxy :: Proxy v)
-  shrink = const []
-
-instance
-  ( VRFAlgorithm v
-  , ContextVRF v ~ ()
-  , Signable v ~ SignableRepresentation
-  ) =>
-  Arbitrary (CertVRF v)
-  where
-  arbitrary = do
-    a <- arbitrary :: Gen Message
-    sk <- arbitrary
-    return $ snd $ evalVRF () a sk
-  shrink = const []
-
-instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
-  arbitrary = do
-    sbs <- SBS.pack <$> vectorOf (fromIntegral @Word @Int (sizeOutputVRF (Proxy :: Proxy v))) arbitrary
-    case sbs of
-      SBS.SBS ba -> return $ OutputVRF $ ByteArray ba
