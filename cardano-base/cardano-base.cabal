@@ -39,14 +39,17 @@ library
   import: project-config
   hs-source-dirs: src
   exposed-modules:
+    Cardano.Base.Bytes
     Cardano.Base.FeatureFlags
     Cardano.Base.IP
     Cardano.Base.Proxy
 
   build-depends:
     aeson,
+    bytestring,
     deepseq,
     iproute,
+    mempack,
     nothunks,
     text,
 
@@ -56,11 +59,15 @@ library testlib
   hs-source-dirs: testlib
   exposed-modules:
     Test.Cardano.Base.Arbitrary
+    Test.Cardano.Base.Bytes
     Test.Cardano.Base.TreeDiff
 
   build-depends:
     QuickCheck,
+    bytestring,
     cardano-base,
+    mempack,
+    random,
     tree-diff,
 
 test-suite tests

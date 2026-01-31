@@ -28,6 +28,7 @@ import GHC.Stack
 import GHC.TypeLits (type (+))
 import NoThunks.Class (NoThunks)
 
+import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class

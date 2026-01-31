@@ -62,6 +62,7 @@ library testlib
     QuickCheck,
     base,
     cardano-slotting,
+    quickcheck-instances,
     tree-diff,
 
 test-suite tests

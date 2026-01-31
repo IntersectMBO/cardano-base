@@ -17,18 +17,14 @@ module Cardano.Crypto.Util (
   writeBinaryWord64,
   readBinaryNatural,
   writeBinaryNatural,
-  splitsAt,
 
   -- * Low level conversions
   bytesToInteger,
   bytesToNatural,
   naturalToBytes,
+  byteArrayToInteger,
   byteArrayToNatural,
   naturalToByteArray,
-  byteArrayToInteger,
-
-  -- * ByteString manipulation
-  slice,
 
   -- * Base16 conversion
   decodeHexByteString,
@@ -37,6 +33,7 @@ module Cardano.Crypto.Util (
 )
 where
 
+import Cardano.Base.Bytes (byteStringToByteArray)
 import Control.Monad (unless)
 import Data.Array.Byte (ByteArray (..))
 import Data.Bifunctor (first)
@@ -46,9 +43,7 @@ import qualified Data.ByteString as BS
 import Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.ByteString.Internal as BS
-import qualified Data.ByteString.Short as SBS
 import Data.Char (isAscii)
-import Data.MemPack.Buffer (byteArrayFromShortByteString)
 import Data.Word
 import Language.Haskell.TH
 import Numeric.Natural
@@ -109,16 +104,6 @@ writeBinaryNatural bytes =
     . fst
     . BS.unfoldrN bytes (\w -> Just (fromIntegral @Natural @Word8 w, unsafeShiftR w 8))
 
-splitsAt :: [Int] -> ByteString -> [ByteString]
-splitsAt = go 0
-  where
-    go !_ [] bs
-      | BS.null bs = []
-      | otherwise = [bs]
-    go !off (sz : szs) bs
-      | BS.length bs >= sz = BS.take sz bs : go (off + sz) szs (BS.drop sz bs)
-      | otherwise = []
-
 -- | Create a 'Natural' out of a 'ByteString', in big endian.
 bytesToNatural :: ByteString -> Natural
 bytesToNatural = GHC.naturalFromInteger . bytesToInteger
@@ -135,7 +120,7 @@ naturalToBytes = writeBinaryNatural
 -- | The inverse of 'bytesToNatural'. Note that this is a naive implementation
 -- and only suitable for tests.
 naturalToByteArray :: Int -> Natural -> ByteArray
-naturalToByteArray numBytes = byteArrayFromShortByteString . SBS.toShort . writeBinaryNatural numBytes
+naturalToByteArray numBytes = byteStringToByteArray . writeBinaryNatural numBytes
 
 -- | Create a 'Integer' out of a 'ByteString', in big endian.
 bytesToInteger :: ByteString -> Integer
@@ -159,11 +144,6 @@ byteArrayToInteger (ByteArray ba#) =
   -- The last parmaeter (`1#`) tells the import function to use big
   -- endian encoding. The one before last (`0#`) is the offset
   integerFromByteArray (GHC.int2Word# (sizeofByteArray# ba#)) ba# (GHC.int2Word# 0#) 1#
-
-slice :: Word -> Word -> ByteString -> ByteString
-slice offset size =
-  BS.take (fromIntegral @Word @Int size)
-    . BS.drop (fromIntegral @Word @Int offset)
 
 -- | Decode base16 ByteString, while ensuring expected length.
 decodeHexByteString :: ByteString -> Int -> Either String ByteString

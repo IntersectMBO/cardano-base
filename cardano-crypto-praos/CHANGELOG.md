@@ -2,6 +2,7 @@
 
 ## 2.2.2.0
 
+* Remove `Arbitrary` instances for `CertVRF`, `OutputVRF`, `SignKeyVRF`, `VerKeyVRF`
 * Add Cabal components using code moved from `cardano-crypto-tests`:
   - `lib:testlib`
   - `test:tests`
