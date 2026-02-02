@@ -2,6 +2,7 @@
 
 ## 2.2.4.0
 
+* Add `BLS12-381` aggregatable signature schemes
 * Add Cabal components using code moved from `cardano-crypto-tests`:
   - `lib:testlib`
   - `lib:benchlib`
