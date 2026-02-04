@@ -1,5 +1,9 @@
 # Changelog for `cardano-slotting`
 
+## 0.2.0.3
+
+*
+
 ## 0.2.0.2
 
 * Add `Arbitrary` instances for `BlockNo`, `EpochInterval`, `EpochSize`, `SystemStart`, `WithOrigin`
