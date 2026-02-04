@@ -1,5 +1,9 @@
 # Changelog for `cardano-strict-containers`
 
+## 0.1.6.1
+
+*
+
 ## 0.1.6.0
 
 * Added to `Data.Sequence.Strict`:
