@@ -1,5 +1,13 @@
 # Changelog for `cardano-binary`
 
+## 1.8.0.0
+
+*
+
+### `testlib`
+
+* Add `Arbitrary` instances for `ByteArray`, `SlicedByteArray` and `Term` from `cborg`
+
 ## 1.7.3.0
 
 * Change `DecoderError(DecoderErrorUnknownTag)` to use `Word` instead of `Word8`
