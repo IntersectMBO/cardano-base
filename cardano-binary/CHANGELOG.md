@@ -1,5 +1,9 @@
 # Changelog for `cardano-binary`
 
+## 1.8.0.1
+
+*
+
 ## 1.8.0.0
 
 * Bump version to reflect changes added in `1.7.3.0`:

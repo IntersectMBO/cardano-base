@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.3.0.1
+
+*
+
 ## 2.3.0.0
 
 * Add `Arbitrary` instances for `SigDSIGN`, `SignKeyDSIGN`, `SignedDSIGN`, `VerKeyDSIGN`
