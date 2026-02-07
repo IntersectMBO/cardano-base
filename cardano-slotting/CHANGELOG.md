@@ -1,6 +1,12 @@
 # Changelog for `cardano-slotting`
 
+## 0.2.1.0
+
+* Bump version to reflect breaking changes added in `0.2.0.2`
+
 ## 0.2.0.2
+
+*Deprecated*
 
 * Add `Arbitrary` instances for `BlockNo`, `EpochInterval`, `EpochSize`, `SystemStart`, `WithOrigin`
 * Use `Hspec` instead of `Tasty`
