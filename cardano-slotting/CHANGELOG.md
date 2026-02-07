@@ -2,11 +2,13 @@
 
 ## 0.2.1.0
 
-* Bump version to reflect breaking changes added in `0.2.0.2`
+* Bump version to reflect changes added in `0.2.0.2`:
+  - Add `Arbitrary` instances for `BlockNo`, `EpochInterval`, `EpochSize`, `SystemStart`, `WithOrigin`
+* Use `Hspec` instead of `Tasty`
 
 ## 0.2.0.2
 
-*Deprecated*
+*DEPRECATED* - introduced a semantically visible change
 
 * Add `Arbitrary` instances for `BlockNo`, `EpochInterval`, `EpochSize`, `SystemStart`, `WithOrigin`
 * Use `Hspec` instead of `Tasty`
