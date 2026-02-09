@@ -28,6 +28,7 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks)
 
+import Control.DeepSeq (NFData)
 import Control.Exception (assert)
 
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
@@ -284,3 +285,5 @@ instance KnownNat t => DirectDeserialise (VerKeyKES (MockKES t)) where
     let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
       rawDeserialiseVerKeyKES bs
+
+instance NFData (VerKeyKES (MockKES t))
