@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-praos`
 
+## 2.2.2.1
+
+*
+
 ## 2.2.2.0
 
 * Remove `Arbitrary` instances for `CertVRF`, `OutputVRF`, `SignKeyVRF`, `VerKeyVRF`
