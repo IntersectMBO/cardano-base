@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.2.4.0
+
+* Add NFData instance for MockKES.
+
 ## 2.2.3.1
 
 * Add package bound on pkg-config lib blst in #544
