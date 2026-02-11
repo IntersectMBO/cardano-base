@@ -168,7 +168,7 @@ CHaP. (TODO: implement a script that lists all of the package that fit the above
 
    ```
    $ git tag cardano-crypto-class-2.20.1.1 deadbeef...
-   $ git push tag cardano-crypto-class-2.20.1.1
+   $ git push origin cardano-crypto-class-2.20.1.1
    ```
 
 4. Create a PR to `master` that updates `CHANGELOG.md` files for all of the packages that
