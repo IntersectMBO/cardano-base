@@ -28,6 +28,7 @@ import GHC.Generics (Generic)
 import GHC.TypeNats (KnownNat, Nat, Natural, natVal)
 import NoThunks.Class (NoThunks)
 
+import Control.DeepSeq (NFData)
 import Control.Exception (assert)
 
 import Cardano.Base.Bytes (splitsAt)
@@ -72,7 +73,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
   newtype VerKeyKES (MockKES t) = VerKeyMockKES Word64
     deriving stock (Show, Eq, Generic)
-    deriving newtype (NoThunks)
+    deriving newtype (NFData, NoThunks)
 
   data SigKES (MockKES t)
     = SigMockKES !(Hash ShortHash ()) !(SignKeyKES (MockKES t))

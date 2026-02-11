@@ -1,8 +1,8 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.3.0.1
+## 2.3.1.0
 
-*
+* Added `NFData` instance to `VerKeyKES (MockKES t)`.
 
 ## 2.3.0.0
 
@@ -48,6 +48,7 @@
 * Add `packShortByteString` and `packShortByteStringWithOffset`
 * Deprecate `packBytesMaybe`
 * Refactor BLS12-381 module to use `PinnedSizedBytes`
+* Removal of `NFData` instance of `VerKeyKES (MockKES t)`
 
 ### `testlib`
 
@@ -135,4 +136,3 @@
 ## 2.0.0.1
 
 * Initial release
-
