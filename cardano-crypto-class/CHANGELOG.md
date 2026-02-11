@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.3.1.1
+
+*
+
 ## 2.3.1.0
 
 * Added `NFData` instance to `VerKeyKES (MockKES t)`.
