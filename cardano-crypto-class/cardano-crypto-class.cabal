@@ -50,7 +50,8 @@ common project-config
     -Wincomplete-record-updates
     -Wincomplete-uni-patterns
     -Wpartial-fields
-    -Wunused-packages
+  -- -Wunused-packages -- disabled because cabal doesn't detect the use of
+  -- clib packages...
 
   -- ghc-9.14 gives redundant constraint warnings on some constraints
   -- that are needed for earlier compilers.
@@ -143,13 +144,12 @@ library
     th-compat,
     transformers,
     vector,
+    blst-clib >=0.3.14,
+    sodium-clib
 
   if impl(ghc <9.0.0)
     build-depends:
       integer-gmp
-  pkgconfig-depends:
-    libblst >=0.3.14,
-    libsodium,
 
   c-sources: cbits/blst_util.c
   include-dirs: cbits
@@ -161,7 +161,7 @@ library
       Cardano.Crypto.SECP256K1.C
       Cardano.Crypto.SECP256K1.Constants
 
-    pkgconfig-depends: libsecp256k1
+    build-depends: secp256k1-clib
     cpp-options: -DSECP256K1_ENABLED
 
 library testlib
