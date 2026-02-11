@@ -51,7 +51,16 @@
             inputs.iohkNix.overlays.haskell-nix-crypto
           ];
           inherit system;
-          inherit (inputs.haskellNix) config;
+          config = inputs.haskellNix // {
+            allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+              "android-sdk-ndk"
+              "android-sdk-platform-tools"
+              "platform-tools"
+              "ndk"
+              "armv7a-unknown-linux-androideabi-ndk-toolchain-wrapper"
+              "armv7a-unknown-linux-androideabi-ndk-toolchain"
+            ];
+          };
         };
         inherit (nixpkgs) lib;
 
@@ -126,12 +135,13 @@
           };
           flake = {
             # on linux, build/test other supported compilers
-            # TODO uncomment this to enable GHC 9.12 testing
-            # variants = lib.genAttrs ["ghc912"] (compiler-nix-name: {
-            #   inherit compiler-nix-name;
-            # });
+            variants = lib.genAttrs ["ghc912"] (compiler-nix-name: {
+              inherit compiler-nix-name;
+            });
             # we also want cross compilation to windows.
-            crossPlatforms = p: lib.optional (system == "x86_64-linux") p.ucrt64;
+            crossPlatforms = p: lib.optionals (system == "x86_64-linux") ([p.ucrt64]
+              # and armv7a-android to test 32bit builds
+              ++ lib.optional (config.compiler-nix-name != "ghc967") p.armv7a-android-prebuilt);
           };
 
           # package customizations as needed. Where cabal.project is not
