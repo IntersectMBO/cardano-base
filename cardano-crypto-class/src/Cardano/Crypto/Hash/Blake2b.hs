@@ -6,6 +6,7 @@
 module Cardano.Crypto.Hash.Blake2b (
   Blake2b_224,
   Blake2b_256,
+  Blake2b_512,
   blake2b_libsodium, -- Used for Hash.Short
 )
 where
@@ -24,6 +25,7 @@ import Foreign.C.Types (CSize, CULLong)
 
 data Blake2b_224
 data Blake2b_256
+data Blake2b_512
 
 instance HashAlgorithm Blake2b_224 where
   type HashSize Blake2b_224 = 28
@@ -34,6 +36,11 @@ instance HashAlgorithm Blake2b_256 where
   type HashSize Blake2b_256 = 32
   hashAlgorithmName _ = "blake2b_256"
   digest _ = blake2b_libsodium 32
+
+instance HashAlgorithm Blake2b_512 where
+  type HashSize Blake2b_512 = 64
+  hashAlgorithmName _ = "blake2b_512"
+  digest _ = blake2b_libsodium 64
 
 blake2b_libsodium :: Int -> B.ByteString -> B.ByteString
 blake2b_libsodium size input =

@@ -46,6 +46,7 @@ tests lock =
     testHashAlgorithm (Proxy :: Proxy SHA3_256)
     testHashAlgorithm (Proxy :: Proxy Blake2b_224)
     testHashAlgorithm (Proxy :: Proxy Blake2b_256)
+    testHashAlgorithm (Proxy :: Proxy Blake2b_512)
     testHashAlgorithm (Proxy :: Proxy Keccak256)
     testSodiumHashAlgorithm lock (Proxy :: Proxy SHA256)
     testSodiumHashAlgorithm lock (Proxy :: Proxy Blake2b_256)

@@ -22,6 +22,7 @@ benchmarks =
     "HASH"
     [ benchHASH (Proxy @Blake2b_224) "Blake2b_224"
     , benchHASH (Proxy @Blake2b_256) "Blake2b_256"
+    , benchHASH (Proxy @Blake2b_512) "Blake2b_512"
     ]
 
 benchHASH ::
