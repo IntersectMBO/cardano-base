@@ -90,7 +90,6 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsUncompress,
   blsZero,
   c_blst_keygen,
-  compressedSizePoint,
   finalVerifyPairs,
   mkBLSTError,
   scalarFromBS,
@@ -111,7 +110,6 @@ import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
 import Control.DeepSeq (NFData)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 import Data.Data (Typeable)
 import qualified Data.Foldable as F (foldl')
@@ -371,21 +369,16 @@ instance
   fromCBOR = decodeSigDSIGN
 
 instance
-  ( BLS12381CurveConstraints curve
-  , KnownNat (CompressedPointSize (DualCurve curve) + CompressedPointSize (DualCurve curve))
-  ) =>
+  BLS12381CurveConstraints curve =>
   DSIGNAggregatable (BLS12381DSIGN curve)
   where
   type
     -- Sizes used in serialization/deserialization
     -- so these use the compressed sizes of the BLS12-381 `Point curve`
     PossessionProofSizeDSIGN (BLS12381DSIGN curve) =
-      CompressedPointSize (DualCurve curve) + CompressedPointSize (DualCurve curve)
+      CompressedPointSize (DualCurve curve)
 
-  data PossessionProofDSIGN (BLS12381DSIGN curve) = PossessionProofBLS12381
-    { mu1 :: !(Point (DualCurve curve))
-    , mu2 :: !(Point (DualCurve curve))
-    }
+  newtype PossessionProofDSIGN (BLS12381DSIGN curve) = PossessionProofBLS12381 (Point (DualCurve curve))
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
@@ -423,31 +416,22 @@ instance
           vk = blsCompress @curve vkPsb
           mu1Psb =
             blsMult (blsHash @(DualCurve curve) vk dst aug) skAsInteger
-          mu2Psb =
-            blsMult (blsGenerator @(DualCurve curve)) skAsInteger
-      return $ PossessionProofBLS12381 mu1Psb mu2Psb
+      return $ PossessionProofBLS12381 mu1Psb
   {-# INLINE verifyPossessionProofDSIGN #-}
-  verifyPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 vk) (PossessionProofBLS12381 mu1Psb mu2Psb) =
-    let check1 =
-          finalVerifyPairs @curve (blsGenerator, mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
-        check2 = finalVerifyPairs @curve (vk, blsGenerator) (blsGenerator, mu2Psb)
-     in if check1 && check2
-          then Right ()
-          else Left "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify."
+  verifyPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 vk) (PossessionProofBLS12381 mu1Psb) =
+    if finalVerifyPairs @curve (blsGenerator, mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
+      then Right ()
+      else Left "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify."
   {-# INLINE rawSerialisePossessionProofDSIGN #-}
-  rawSerialisePossessionProofDSIGN (PossessionProofBLS12381 mu1Psb mu2Psb) =
-    blsCompress @(DualCurve curve) mu1Psb <> blsCompress @(DualCurve curve) mu2Psb
+  rawSerialisePossessionProofDSIGN (PossessionProofBLS12381 mu1Psb) =
+    blsCompress @(DualCurve curve) mu1Psb
   {-# INLINE rawDeserialisePossessionProofDSIGN #-}
-  rawDeserialisePossessionProofDSIGN bs =
-    let chunkSize = compressedSizePoint (Proxy @(DualCurve curve))
-        (mu1Bs, mu2Bs) = BS.splitAt chunkSize bs
-     in do
-          -- Note that these also perform group membership and size checks.
-          -- It will also ensure that all of the supplied `ByteString` is consumed
-          -- through the size checks.
-          Right mu1Point <- pure $ blsUncompress @(DualCurve curve) mu1Bs
-          Right mu2Point <- pure $ blsUncompress @(DualCurve curve) mu2Bs
-          Just $ PossessionProofBLS12381 mu1Point mu2Point
+  rawDeserialisePossessionProofDSIGN bs = do
+    -- Note that these also perform group membership and size checks.
+    -- It will also ensure that all of the supplied `ByteString` is consumed
+    -- through the size checks.
+    Right mu1Point <- pure $ blsUncompress @(DualCurve curve) bs
+    Just $ PossessionProofBLS12381 mu1Point
 
 deriving stock instance
   BLS (DualCurve curve) =>
