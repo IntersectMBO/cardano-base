@@ -86,7 +86,6 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsGenerator,
   blsHash,
   blsIsInf,
-  blsMult,
   blsUncompress,
   blsZero,
   c_blst_keygen,
@@ -94,7 +93,6 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   mkBLSTError,
   scalarFromBS,
   scalarToBS,
-  scalarToInteger,
   toAffine,
   withAffine,
   withMaybeCStringLen,
@@ -407,16 +405,10 @@ instance
       else Right $ SigBLS12381 aggrPoint
 
   {-# INLINE createPossessionProofDSIGN #-}
-  createPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (SignKeyBLS12381 skScalar) =
-    unsafeDupablePerformIO $ do
-      skAsInteger <- scalarToInteger skScalar
-      let VerKeyBLS12381 vkPsb =
-            deriveVerKeyDSIGN (SignKeyBLS12381 skScalar) ::
-              VerKeyDSIGN (BLS12381DSIGN curve)
-          vk = blsCompress @curve vkPsb
-          mu1Psb =
-            blsMult (blsHash @(DualCurve curve) vk dst aug) skAsInteger
-      return $ PossessionProofBLS12381 mu1Psb
+  createPossessionProofDSIGN ctx sk =
+    let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
+        SigBLS12381 sig = signDSIGN ctx (rawSerialiseVerKeyDSIGN vk) sk
+     in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
   verifyPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 vk) (PossessionProofBLS12381 mu1Psb) =
     if finalVerifyPairs @curve (blsGenerator, mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
