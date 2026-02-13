@@ -83,13 +83,10 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   ScalarPtr (..),
   blsAddOrDouble,
   blsCompress,
-  blsGenerator,
-  blsHash,
   blsIsInf,
   blsUncompress,
   blsZero,
   c_blst_keygen,
-  finalVerifyPairs,
   mkBLSTError,
   scalarFromBS,
   scalarToBS,
@@ -107,6 +104,7 @@ import Cardano.Crypto.PinnedSizedBytes (
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 import Data.Data (Typeable)
@@ -410,10 +408,11 @@ instance
         SigBLS12381 sig = signDSIGN ctx (rawSerialiseVerKeyDSIGN vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
-  verifyPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 vk) (PossessionProofBLS12381 mu1Psb) =
-    if finalVerifyPairs @curve (blsGenerator, mu1Psb) (vk, blsHash (blsCompress vk) dst aug)
-      then Right ()
-      else Left "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify."
+  verifyPossessionProofDSIGN ctx vk (PossessionProofBLS12381 mu1Psb) =
+    first
+      (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
+      (verifyDSIGN ctx vk (rawSerialiseVerKeyDSIGN vk) (SigBLS12381 mu1Psb))
+
   {-# INLINE rawSerialisePossessionProofDSIGN #-}
   rawSerialisePossessionProofDSIGN (PossessionProofBLS12381 mu1Psb) =
     blsCompress @(DualCurve curve) mu1Psb
