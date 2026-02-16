@@ -10,6 +10,7 @@ import qualified Test.Crypto.Regressions
 #ifdef SECP256K1_ENABLED
 import qualified Test.Crypto.Vector.Secp256k1DSIGN
 #endif
+import qualified Test.Crypto.Vector.BLS12381DSIGN
 import qualified Test.Crypto.EllipticCurve
 import Test.Hspec (Spec, describe, hspec)
 import Test.Hspec.QuickCheck (modifyMaxSuccess)
@@ -41,4 +42,5 @@ tests mlockLock =
 #ifdef SECP256K1_ENABLED
       Test.Crypto.Vector.Secp256k1DSIGN.tests
 #endif
+      Test.Crypto.Vector.BLS12381DSIGN.tests
       Test.Crypto.EllipticCurve.tests
