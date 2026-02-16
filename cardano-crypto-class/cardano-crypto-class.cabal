@@ -179,7 +179,9 @@ library testlib
     Test.Crypto.Regressions
     Test.Crypto.RunIO
     Test.Crypto.Util
+    Test.Crypto.Vector.BLS12381DSIGN
     Test.Crypto.Vector.SerializationUtils
+    Test.Crypto.Vector.Vectors
 
   other-modules: Paths_cardano_crypto_class
   autogen-modules: Paths_cardano_crypto_class
@@ -211,7 +213,6 @@ library testlib
     exposed-modules:
       Test.Crypto.Vector.Secp256k1DSIGN
       Test.Crypto.Vector.StringConstants
-      Test.Crypto.Vector.Vectors
 
 library benchlib
   import: base, project-config
