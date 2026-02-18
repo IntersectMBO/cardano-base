@@ -1,5 +1,9 @@
 # Changelog for `cardano-slotting`
 
+## 0.2.1.1
+
+*
+
 ## 0.2.1.0
 
 * Bump version to reflect changes added in `0.2.0.2`:
