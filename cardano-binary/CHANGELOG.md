@@ -1,14 +1,18 @@
 # Changelog for `cardano-binary`
 
+## 1.9.0.0
+
+*
+
+### `testlib`
+
+* Add `Arbitrary` instances for `ByteArray`, `SlicedByteArray` and `Term` from `cborg`
+
 ## 1.8.0.0
 
 * Bump version to reflect changes added in `1.7.3.0`:
   - Change `DecoderError(DecoderErrorUnknownTag)` to use `Word` instead of `Word8`
 * Add `FromCBOR` and `ToCBOR` instances for `Codec.CBOR.ByteArray.ByteArray` and `Data.Array.Byte.ByteArray`
-
-### `testlib`
-
-* Add `Arbitrary` instances for `ByteArray`, `SlicedByteArray` and `Term` from `cborg`
 
 ## 1.7.3.0
 
