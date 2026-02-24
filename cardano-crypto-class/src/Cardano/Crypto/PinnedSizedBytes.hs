@@ -34,7 +34,10 @@ module Cardano.Crypto.PinnedSizedBytes (
   psbCreateResult,
   psbCreateResultLen,
   psbCreateSizedResult,
+  psbCreateSizedAligned,
+  psbCreateSizedResultAligned,
   ptrPsbToSizedPtr,
+  psbToPackedBytes,
 ) where
 
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
@@ -51,6 +54,7 @@ import Data.Primitive.ByteArray (
   copyByteArrayToAddr,
   foldrByteArray,
   mutableByteArrayContents,
+  newAlignedPinnedByteArray,
   newPinnedByteArray,
   unsafeFreezeByteArray,
   writeByteArray,
@@ -75,8 +79,10 @@ import qualified Data.ByteString as BS
 import qualified Data.Primitive as Prim
 
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
+import Cardano.Crypto.PackedBytes.Internal (PackedBytes, packBytes)
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.Foreign
+import Data.MemPack.Buffer (byteArrayToShortByteString)
 
 {- HLINT ignore "Reduce duplication" -}
 
@@ -189,6 +195,9 @@ psbToBytes (PSB ba) = foldrByteArray (:) [] ba
 
 psbToByteString :: PinnedSizedBytes n -> BS.ByteString
 psbToByteString = BS.pack . psbToBytes
+
+psbToPackedBytes :: KnownNat n => PinnedSizedBytes n -> PackedBytes n
+psbToPackedBytes (PSB ba) = packBytes (byteArrayToShortByteString ba) 0
 
 -- | See @'IsString' ('PinnedSizedBytes' n)@ instance.
 --
@@ -403,6 +412,35 @@ psbCreateSizedResult ::
   (SizedPtr n -> m r) ->
   m (PinnedSizedBytes n, r)
 psbCreateSizedResult f = psbCreateResult (f . SizedPtr . castPtr)
+
+-- | As 'psbCreateSized', but with a specified alignment (in bytes) for the
+-- underlying pinned memory.
+{-# INLINE psbCreateSizedAligned #-}
+psbCreateSizedAligned ::
+  forall (n :: Nat) (m :: Type -> Type).
+  (KnownNat n, MonadST m) =>
+  Int ->
+  (SizedPtr n -> m ()) ->
+  m (PinnedSizedBytes n)
+psbCreateSizedAligned al k = fst <$> psbCreateSizedResultAligned al k
+
+-- | As 'psbCreateSizedResult', but with a specified alignment (in bytes) for the
+-- underlying pinned memory.
+-- The same caveats apply to this function as to 'psbCreateSizedResult': the
+-- 'SizedPtr' given to the function argument /must not/ be returned as @r@.
+{-# INLINE psbCreateSizedResultAligned #-}
+psbCreateSizedResultAligned ::
+  forall (n :: Nat) (r :: Type) (m :: Type -> Type).
+  (KnownNat n, MonadST m) =>
+  Int ->
+  (SizedPtr n -> m r) ->
+  m (PinnedSizedBytes n, r)
+psbCreateSizedResultAligned al f = do
+  let len = fromIntegral @Integer @Int . natVal $ Proxy @n
+  mpba <- stToIO (newAlignedPinnedByteArray len al)
+  res <- f (SizedPtr $ castPtr $ mutableByteArrayContents mpba)
+  arr <- stToIO (unsafeFreezeByteArray mpba)
+  pure (PSB arr, res)
 
 ptrPsbToSizedPtr :: Ptr (PinnedSizedBytes n) -> SizedPtr n
 ptrPsbToSizedPtr = SizedPtr . castPtr

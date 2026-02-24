@@ -5,6 +5,7 @@ module Cardano.Crypto.Libsodium.Constants (
     CRYPTO_BLAKE2B_256_BYTES,
     CRYPTO_SHA256_STATE_SIZE,
     CRYPTO_SHA512_STATE_SIZE,
+    CRYPTO_BLAKE2B_STATE_SIZE,
     CRYPTO_BLAKE2B_256_STATE_SIZE,
     CRYPTO_SIGN_ED25519_BYTES,
     CRYPTO_SIGN_ED25519_SEEDBYTES,
@@ -23,7 +24,10 @@ type CRYPTO_BLAKE2B_256_BYTES = #{const crypto_generichash_blake2b_BYTES}
 
 type CRYPTO_SHA256_STATE_SIZE = #{size crypto_hash_sha256_state}
 type CRYPTO_SHA512_STATE_SIZE = #{size crypto_hash_sha512_state}
-type CRYPTO_BLAKE2B_256_STATE_SIZE = #{size crypto_generichash_blake2b_state}
+type CRYPTO_BLAKE2B_STATE_SIZE = #{size crypto_generichash_blake2b_state}
+
+{-# DEPRECATED CRYPTO_BLAKE2B_256_STATE_SIZE "Use CRYPTO_BLAKE2B_STATE_SIZE instead" #-}
+type CRYPTO_BLAKE2B_256_STATE_SIZE = CRYPTO_BLAKE2B_STATE_SIZE
 
 type CRYPTO_SIGN_ED25519_BYTES = #{const crypto_sign_ed25519_BYTES}
 type CRYPTO_SIGN_ED25519_SEEDBYTES = #{const crypto_sign_ed25519_SEEDBYTES}

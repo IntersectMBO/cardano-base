@@ -47,6 +47,7 @@ module Cardano.Crypto.Libsodium.C (
   CRYPTO_BLAKE2B_256_BYTES,
   CRYPTO_SHA256_STATE_SIZE,
   CRYPTO_SHA512_STATE_SIZE,
+  CRYPTO_BLAKE2B_STATE_SIZE,
   CRYPTO_BLAKE2B_256_STATE_SIZE,
   CRYPTO_SIGN_ED25519_BYTES,
   CRYPTO_SIGN_ED25519_SEEDBYTES,
@@ -148,17 +149,17 @@ foreign import capi unsafe "sodium.h crypto_generichash_blake2b"
 -- | @int crypto_generichash_blake2b_init(crypto_generichash_blake2b_state *state, const unsigned char *key, const size_t keylen, const size_t outlen);@
 foreign import capi unsafe "sodium.h crypto_generichash_blake2b_init"
   c_crypto_generichash_blake2b_init ::
-    SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr key -> CSize -> CSize -> IO Int
+    SizedPtr CRYPTO_BLAKE2B_STATE_SIZE -> Ptr key -> CSize -> CSize -> IO Int
 
 -- | @int crypto_generichash_blake2b_update(crypto_generichash_blake2b_state *state, const unsigned char *in, unsigned long long inlen);@
 foreign import capi unsafe "sodium.h crypto_generichash_blake2b_update"
   c_crypto_generichash_blake2b_update ::
-    SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr CUChar -> CULLong -> IO Int
+    SizedPtr CRYPTO_BLAKE2B_STATE_SIZE -> Ptr CUChar -> CULLong -> IO Int
 
 -- | @int crypto_generichash_blake2b_final(crypto_generichash_blake2b_state *state, unsigned char *out, const size_t outlen);@
 foreign import capi unsafe "sodium.h crypto_generichash_blake2b_final"
   c_crypto_generichash_blake2b_final ::
-    SizedPtr CRYPTO_BLAKE2B_256_STATE_SIZE -> Ptr out -> CSize -> IO Int
+    SizedPtr CRYPTO_BLAKE2B_STATE_SIZE -> Ptr out -> CSize -> IO Int
 
 -------------------------------------------------------------------------------
 -- Signing: ED25519

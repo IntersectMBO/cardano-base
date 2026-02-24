@@ -1,8 +1,12 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.3.1.1
+## 2.3.2.0
 
-*
+* Add `psbToPackedBytes` to `Cardano.Crypto.PinnedSizedBytes`
+* Add `IncrementalHashAlgorithm` typeclass with `Blake2b_224` and `Blake2b_256` instances
+* Add `withHashContext` and `withHashContextST` for resource management when incremental hashing
+* Add `psbCreateSizedAligned` and `psbCreateSizedResultAligned` to `Cardano.Crypto.PinnedSizedBytes`
+* Deprecate `CRYPTO_BLAKE2B_256_STATE_SIZE`; add `CRYPTO_BLAKE2B_STATE_SIZE` in its place
 
 ## 2.3.1.0
 

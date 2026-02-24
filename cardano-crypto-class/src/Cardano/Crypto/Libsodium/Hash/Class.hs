@@ -45,9 +45,6 @@ class HashAlgorithm h => SodiumHashAlgorithm h where
     Int ->
     IO (MLockedSizedBytes (HashSize h))
 
--- TODO: provide interface for multi-part?
--- That will be useful to hashing ('1' <> oldseed).
-
 digestMLockedStorable ::
   forall h a proxy.
   (SodiumHashAlgorithm h, Storable a) =>
