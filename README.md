@@ -6,13 +6,43 @@ A collection of miscellaneous packages used by Cardano that cover:
 * serialization
 * slotting
 
-Each sub-project has its own README.
+Each sub-project has its own README:
+
+* [`cardano-binary`](./cardano-binary): CBOR serialisation types and typeclasses.
+* [`cardano-crypto-class`](./cardano-crypto-class): Abstract cryptographic interfaces.
+* [`cardano-crypto-praos`](./cardano-crypto-praos): Concrete VRF implementation for Ouroboros Praos.
+* [`cardano-slotting`](./cardano-slotting): Key slotting and real-time conversion types.
+* [`cardano-strict-containers`](./cardano-strict-containers): Strict variants of standard containers to avoid space leaks.
+* [`base-deriving-via`](./base-deriving-via): General hooks and newtypes for `DerivingVia`.
+* [`orphans-deriving-via`](./orphans-deriving-via): Orphan instances for deriving via hooks.
+* [`heapwords`](./heapwords): Tooling for measuring in-memory representation size of data structures.
+* [`measures`](./measures): Abstractions for measured quantities.
 
 Haddocks for all packages from the `master` branch can be found at
 [base.cardano.intersectmbo.org](https://base.cardano.intersectmbo.org/)
 
 All releases for packages found in this repository are recorded in the
 [Cardano Haskell package repository](https://github.com/intersectmbo/cardano-haskell-packages)
+
+## Developer Onboarding Path
+
+If you are new to the `cardano-base` packages, here is the recommended path to familiarize yourself with the codebase:
+
+1. **Serialization First:** Start with `cardano-binary` to understand how data moves across the network and is stored on-chain using CBOR.
+2. **Cryptographic Foundations:** Read `cardano-crypto-class` to learn the interfaces for hashing, signing, and VRFs, without getting bogged down in implementation details.
+3. **Advanced Crypto:** Dive into `cardano-crypto-praos` for the concrete VRF implementations, or explore `cardano-crypto-peras` if looking at specific protocol details.
+4. **Time & Slots:** Review `cardano-slotting` to understand how time is handled in Ouroboros.
+5. **Memory & Optimization:** Look at `cardano-strict-containers` for avoiding space leaks, and `heapwords` for profiling data sizes.
+6. **Derivation Tooling:** Check out `base-deriving-via` to see how boilerplate is minimized across the project.
+
+## Integration Guide
+
+These packages are designed to work together to form the foundational layer of a Cardano node.
+
+* **Binary + Crypto:** Hash algorithms in `cardano-crypto-class` use `cardano-binary`'s `ToCBOR` instances to compute hashes over structured data (`hashWithSerialiser toCBOR`).
+* **Binary + Slotting:** Slotting types (`SlotNo`, `EpochNo`) provide `ToCBOR`/`FromCBOR` instances ensuring temporal data can be serialized.
+* **Crypto + Slotting:** The Praos VRF (`cardano-crypto-praos`) evaluates over a combination of epoch predictability and slot numbers, linking cryptographics directly to `cardano-slotting`.
+* **Memory Optimization:** All components prefer the strict collections from `cardano-strict-containers` to prevent unintended thunk build-ups, and `heapwords` can be used to write tests confirming the layout size of cryptographic and time-based structures.
 
 ## Building
 
