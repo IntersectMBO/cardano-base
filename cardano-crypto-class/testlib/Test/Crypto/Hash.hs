@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -20,6 +21,7 @@ import Data.MemPack
 import Data.Proxy (Proxy (..))
 import Data.String (fromString)
 import GHC.TypeLits
+import Test.Cardano.Base.Bytes (genByteString)
 import Test.Crypto.Util (
   Lock,
   prop_bad_cbor_bytes,
@@ -49,6 +51,8 @@ tests lock =
     testHashAlgorithm (Proxy :: Proxy Keccak256)
     testSodiumHashAlgorithm lock (Proxy :: Proxy SHA256)
     testSodiumHashAlgorithm lock (Proxy :: Proxy Blake2b_256)
+    testIncrementalHashAlgorithm (Proxy :: Proxy Blake2b_224)
+    testIncrementalHashAlgorithm (Proxy :: Proxy Blake2b_256)
     testHashAlgorithm (Proxy :: Proxy SHA512)
     testHashAlgorithm (Proxy :: Proxy SHA3_512)
     testPackedBytes
@@ -183,6 +187,41 @@ prop_libsodium_model lock p bs = ioProperty . withLock lock $ do
   return (expected === actual)
   where
     expected = digest p bs
+
+testIncrementalHashAlgorithm ::
+  forall proxy h.
+  IncrementalHashAlgorithm h =>
+  proxy h ->
+  Spec
+testIncrementalHashAlgorithm p =
+  describe (hashAlgorithmName p ++ " incremental") $ do
+    prop "chunked equivalence" $ prop_incremental_chunked @h
+
+-- | Incremental hashing produces the same result as single-shot.
+prop_incremental_chunked ::
+  forall h.
+  IncrementalHashAlgorithm h =>
+  Property
+prop_incremental_chunked =
+  forAll genInput $ \bs ->
+    forAll (chop bs) $ \chunks -> do
+      let ((), actual) = withHashContextST @h $ \ctx ->
+            mapM_ (hashUpdate ctx) chunks
+      counterexample ("input length: " ++ show (BS.length bs)) $
+        counterexample ("chunks: " ++ show (map BS.length chunks)) $
+          actual === hashWith @h id bs
+  where
+    -- arbitrary bytestrings are too short to cross the hash algorithm block size
+    -- (e.g. Blake2b uses 128 bytes)
+    genInput = choose (0, 4096) >>= genByteString
+
+    chop :: BS.ByteString -> Gen [BS.ByteString]
+    chop bs
+      | BS.null bs = pure [BS.empty]
+      | otherwise = do
+          n <- choose (0, BS.length bs)
+          let (chunk, rest) = BS.splitAt n bs
+          (chunk :) <$> chop rest
 
 --
 -- Arbitrary instances

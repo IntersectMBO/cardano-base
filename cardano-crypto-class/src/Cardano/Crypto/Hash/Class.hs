@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -6,6 +7,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -17,6 +19,9 @@
 -- | Abstract hashing functionality.
 module Cardano.Crypto.Hash.Class (
   HashAlgorithm (..),
+  IncrementalHashAlgorithm (..),
+  withHashContext,
+  withHashContextST,
   hashSize,
   ByteString,
   Hash (UnsafeHash),
@@ -60,6 +65,9 @@ module Cardano.Crypto.Hash.Class (
 )
 where
 
+import Control.Monad.Class.MonadST (MonadST)
+import Control.Monad.Primitive (PrimState)
+import Control.Monad.ST (ST, runST)
 import Control.Monad.Trans.Fail.String (errorFail)
 import Data.Array.Byte (ByteArray)
 import Data.ByteString (ByteString)
@@ -377,3 +385,38 @@ getHashBytesAsHex = hashToBytesAsHex
 xor :: Hash h a -> Hash h a -> Hash h a
 xor (UnsafeHashRep x) (UnsafeHashRep y) = UnsafeHashRep (xorPackedBytes x y)
 {-# INLINE xor #-}
+
+-- | Hash algorithms that support incremental (multi-part) hashing.
+--
+-- The context MUST NOT be used after calling 'hashFinalize'.
+class HashAlgorithm h => IncrementalHashAlgorithm h where
+  data HashContext h s
+
+  -- | Allocate and initialize a new hash context.
+  hashInit :: MonadST m => m (HashContext h (PrimState m))
+
+  -- | Feed a chunk of data into the hash context.
+  hashUpdate :: MonadST m => HashContext h (PrimState m) -> ByteString -> m ()
+
+  -- | Finalize the hash context, returning the typed 'Hash'.
+  --
+  -- The context MUST NOT be used after calling this function.
+  hashFinalize :: MonadST m => HashContext h (PrimState m) -> m (Hash h a)
+
+withHashContext ::
+  forall h a b m.
+  (IncrementalHashAlgorithm h, MonadST m) =>
+  (HashContext h (PrimState m) -> m a) ->
+  m (a, Hash h b)
+withHashContext f = do
+  ctx <- hashInit
+  res <- f ctx
+  h <- hashFinalize ctx
+  pure (res, h)
+
+withHashContextST ::
+  forall h a b.
+  IncrementalHashAlgorithm h =>
+  (forall s. HashContext h s -> ST s a) ->
+  (a, Hash h b)
+withHashContextST f = runST $ withHashContext f
