@@ -856,7 +856,7 @@ foreign import ccall "cardano_blst_error_bad_scalar" c_blst_error_bad_scalar :: 
 
 ---- Utility functions
 
-foreign import ccall "memcmp" c_memcmp :: Ptr a -> Ptr a -> CSize -> IO CSize
+foreign import ccall "memcmp" c_memcmp :: Ptr a -> Ptr a -> CSize -> IO CInt
 foreign import ccall "blst_bendian_from_scalar"
   c_blst_bendian_from_scalar :: Ptr CChar -> ScalarPtr -> IO ()
 
