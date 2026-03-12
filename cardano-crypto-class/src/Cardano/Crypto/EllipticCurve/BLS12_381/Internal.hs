@@ -201,7 +201,7 @@ import Foreign.C.String
 import Foreign.C.Types
 import Foreign.ForeignPtr
 import Foreign.Marshal.Alloc (allocaBytes)
-import Foreign.Marshal.Utils (copyBytes)
+import Foreign.Marshal.Utils (copyBytes, fromBool, toBool)
 import Foreign.Ptr (Ptr, castPtr, nullPtr, plusPtr)
 import GHC.TypeLits (KnownNat, Nat, natVal)
 import NoThunks.Class (NoThunks (..))
@@ -495,11 +495,11 @@ class
   sizeAffine_ _ = fromInteger (natVal (Proxy @(AffineSize curve)))
 
 instance BLS Curve1 where
-  c_blst_on_curve = c_blst_p1_on_curve
+  c_blst_on_curve p = toBool <$> c_blst_p1_on_curve p
 
   c_blst_add_or_double = c_blst_p1_add_or_double
   c_blst_mult = c_blst_p1_mult
-  c_blst_cneg = c_blst_p1_cneg
+  c_blst_cneg p bool = c_blst_p1_cneg p (fromBool bool)
 
   c_blst_scratch_sizeof _ = c_blst_p1s_mult_pippenger_scratch_sizeof
   c_blst_to_affines = c_blst_p1s_to_affine
@@ -511,27 +511,26 @@ instance BLS Curve1 where
   c_blst_uncompress = c_blst_p1_uncompress
   c_blst_deserialize = c_blst_p1_deserialize
 
-  c_blst_in_g = c_blst_p1_in_g1
+  c_blst_in_g p = toBool <$> c_blst_p1_in_g1 p
   c_blst_to_affine = c_blst_p1_to_affine
   c_blst_from_affine = c_blst_p1_from_affine
-  c_blst_affine_in_g = c_blst_p1_affine_in_g1
+  c_blst_affine_in_g p = toBool <$> c_blst_p1_affine_in_g1 p
 
   c_blst_generator = c_blst_p1_generator
 
-  c_blst_p_is_equal = c_blst_p1_is_equal
-  c_blst_p_is_inf = c_blst_p1_is_inf
-  c_blst_core_verify = c_blst_core_verify_pk_in_g1
-
+  c_blst_p_is_equal p q = toBool <$> c_blst_p1_is_equal p q
+  c_blst_p_is_inf p = toBool <$> c_blst_p1_is_inf p
+  c_blst_core_verify p1 p2 bool = c_blst_core_verify_pk_in_g1 p1 p2 (fromBool bool)
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g1
   c_blst_sign = c_blst_sign_pk_in_g1
   millerSide (g1, g2) = millerLoop g1 g2
 
 instance BLS Curve2 where
-  c_blst_on_curve = c_blst_p2_on_curve
+  c_blst_on_curve p = toBool <$> c_blst_p2_on_curve p
 
   c_blst_add_or_double = c_blst_p2_add_or_double
   c_blst_mult = c_blst_p2_mult
-  c_blst_cneg = c_blst_p2_cneg
+  c_blst_cneg p bool = c_blst_p2_cneg p (fromBool bool)
 
   c_blst_scratch_sizeof _ = c_blst_p2s_mult_pippenger_scratch_sizeof
   c_blst_to_affines = c_blst_p2s_to_affine
@@ -543,19 +542,19 @@ instance BLS Curve2 where
   c_blst_uncompress = c_blst_p2_uncompress
   c_blst_deserialize = c_blst_p2_deserialize
 
-  c_blst_in_g = c_blst_p2_in_g2
+  c_blst_in_g p = toBool <$> c_blst_p2_in_g2 p
   c_blst_to_affine = c_blst_p2_to_affine
   c_blst_from_affine = c_blst_p2_from_affine
-  c_blst_affine_in_g = c_blst_p2_affine_in_g2
+  c_blst_affine_in_g p = toBool <$> c_blst_p2_affine_in_g2 p
 
   c_blst_generator = c_blst_p2_generator
 
-  c_blst_p_is_equal = c_blst_p2_is_equal
-  c_blst_p_is_inf = c_blst_p2_is_inf
+  c_blst_p_is_equal p q = toBool <$> c_blst_p2_is_equal p q
+  c_blst_p_is_inf p = toBool <$> c_blst_p2_is_inf p
 
   c_blst_sk_to_pk = c_blst_sk_to_pk_in_g2
   c_blst_sign = c_blst_sign_pk_in_g2
-  c_blst_core_verify = c_blst_core_verify_pk_in_g2
+  c_blst_core_verify p2 p1 bool = c_blst_core_verify_pk_in_g2 p2 p1 (fromBool bool)
   millerSide (g2, g1) = millerLoop g1 g2
 
 instance BLS curve => Eq (Affine curve) where
@@ -701,12 +700,12 @@ newtype ScratchPtr = ScratchPtr (Ptr Void)
 
 ---- Raw Scalar / Fr functions
 
-foreign import ccall "blst_scalar_fr_check" c_blst_scalar_fr_check :: ScalarPtr -> IO Bool
+foreign import ccall "blst_scalar_fr_check" c_blst_scalar_fr_check :: ScalarPtr -> IO CBool
 
 foreign import ccall "blst_scalar_from_fr" c_blst_scalar_from_fr :: ScalarPtr -> FrPtr -> IO ()
 foreign import ccall "blst_fr_from_scalar" c_blst_fr_from_scalar :: FrPtr -> ScalarPtr -> IO ()
 foreign import ccall "blst_scalar_from_be_bytes"
-  c_blst_scalar_from_be_bytes :: ScalarPtr -> Ptr CChar -> CSize -> IO Bool
+  c_blst_scalar_from_be_bytes :: ScalarPtr -> Ptr CChar -> CSize -> IO CBool
 foreign import ccall "blst_scalar_from_bendian"
   c_blst_scalar_from_bendian :: ScalarPtr -> Ptr CChar -> IO ()
 foreign import ccall "blst_keygen"
@@ -714,13 +713,13 @@ foreign import ccall "blst_keygen"
 
 ---- Raw Point1 functions
 
-foreign import ccall "blst_p1_on_curve" c_blst_p1_on_curve :: Point1Ptr -> IO Bool
+foreign import ccall "blst_p1_on_curve" c_blst_p1_on_curve :: Point1Ptr -> IO CBool
 
 foreign import ccall "blst_p1_add_or_double"
   c_blst_p1_add_or_double :: Point1Ptr -> Point1Ptr -> Point1Ptr -> IO ()
 foreign import ccall "blst_p1_mult"
   c_blst_p1_mult :: Point1Ptr -> Point1Ptr -> ScalarPtr -> CSize -> IO ()
-foreign import ccall "blst_p1_cneg" c_blst_p1_cneg :: Point1Ptr -> Bool -> IO ()
+foreign import ccall "blst_p1_cneg" c_blst_p1_cneg :: Point1Ptr -> CBool -> IO ()
 
 foreign import ccall "blst_hash_to_g1"
   c_blst_hash_to_g1 ::
@@ -731,12 +730,12 @@ foreign import ccall "blst_p1_uncompress" c_blst_p1_uncompress :: Affine1Ptr -> 
 foreign import ccall "blst_p1_deserialize"
   c_blst_p1_deserialize :: Affine1Ptr -> Ptr CChar -> IO CInt
 
-foreign import ccall "blst_p1_in_g1" c_blst_p1_in_g1 :: Point1Ptr -> IO Bool
+foreign import ccall "blst_p1_in_g1" c_blst_p1_in_g1 :: Point1Ptr -> IO CBool
 
 foreign import ccall "blst_p1_generator" c_blst_p1_generator :: Point1Ptr
 
-foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: Point1Ptr -> Point1Ptr -> IO Bool
-foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: Point1Ptr -> IO Bool
+foreign import ccall "blst_p1_is_equal" c_blst_p1_is_equal :: Point1Ptr -> Point1Ptr -> IO CBool
+foreign import ccall "blst_p1_is_inf" c_blst_p1_is_inf :: Point1Ptr -> IO CBool
 
 foreign import ccall "blst_sk_to_pk_in_g1"
   c_blst_sk_to_pk_in_g1 :: Point1Ptr -> ScalarPtr -> IO ()
@@ -753,13 +752,13 @@ foreign import ccall "blst_p1s_mult_pippenger"
 
 ---- Raw Point2 functions
 
-foreign import ccall "blst_p2_on_curve" c_blst_p2_on_curve :: Point2Ptr -> IO Bool
+foreign import ccall "blst_p2_on_curve" c_blst_p2_on_curve :: Point2Ptr -> IO CBool
 
 foreign import ccall "blst_p2_add_or_double"
   c_blst_p2_add_or_double :: Point2Ptr -> Point2Ptr -> Point2Ptr -> IO ()
 foreign import ccall "blst_p2_mult"
   c_blst_p2_mult :: Point2Ptr -> Point2Ptr -> ScalarPtr -> CSize -> IO ()
-foreign import ccall "blst_p2_cneg" c_blst_p2_cneg :: Point2Ptr -> Bool -> IO ()
+foreign import ccall "blst_p2_cneg" c_blst_p2_cneg :: Point2Ptr -> CBool -> IO ()
 
 foreign import ccall "blst_hash_to_g2"
   c_blst_hash_to_g2 ::
@@ -770,12 +769,12 @@ foreign import ccall "blst_p2_uncompress" c_blst_p2_uncompress :: Affine2Ptr -> 
 foreign import ccall "blst_p2_deserialize"
   c_blst_p2_deserialize :: Affine2Ptr -> Ptr CChar -> IO CInt
 
-foreign import ccall "blst_p2_in_g2" c_blst_p2_in_g2 :: Point2Ptr -> IO Bool
+foreign import ccall "blst_p2_in_g2" c_blst_p2_in_g2 :: Point2Ptr -> IO CBool
 
 foreign import ccall "blst_p2_generator" c_blst_p2_generator :: Point2Ptr
 
-foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: Point2Ptr -> Point2Ptr -> IO Bool
-foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: Point2Ptr -> IO Bool
+foreign import ccall "blst_p2_is_equal" c_blst_p2_is_equal :: Point2Ptr -> Point2Ptr -> IO CBool
+foreign import ccall "blst_p2_is_inf" c_blst_p2_is_inf :: Point2Ptr -> IO CBool
 
 foreign import ccall "blst_sk_to_pk_in_g2"
   c_blst_sk_to_pk_in_g2 :: Point2Ptr -> ScalarPtr -> IO ()
@@ -801,14 +800,14 @@ foreign import ccall "blst_p1_from_affine"
 foreign import ccall "blst_p2_from_affine"
   c_blst_p2_from_affine :: PointPtr Curve2 -> AffinePtr Curve2 -> IO ()
 
-foreign import ccall "blst_p1_affine_in_g1" c_blst_p1_affine_in_g1 :: AffinePtr Curve1 -> IO Bool
-foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: AffinePtr Curve2 -> IO Bool
+foreign import ccall "blst_p1_affine_in_g1" c_blst_p1_affine_in_g1 :: AffinePtr Curve1 -> IO CBool
+foreign import ccall "blst_p2_affine_in_g2" c_blst_p2_affine_in_g2 :: AffinePtr Curve2 -> IO CBool
 
 ---- PT operations
 
 foreign import ccall "blst_fp12_mul" c_blst_fp12_mul :: PTPtr -> PTPtr -> PTPtr -> IO ()
-foreign import ccall "blst_fp12_is_equal" c_blst_fp12_is_equal :: PTPtr -> PTPtr -> IO Bool
-foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr -> PTPtr -> IO Bool
+foreign import ccall "blst_fp12_is_equal" c_blst_fp12_is_equal :: PTPtr -> PTPtr -> IO CBool
+foreign import ccall "blst_fp12_finalverify" c_blst_fp12_finalverify :: PTPtr -> PTPtr -> IO CBool
 
 ---- Pairing
 
@@ -821,7 +820,7 @@ foreign import ccall "blst_core_verify_pk_in_g1"
   c_blst_core_verify_pk_in_g1 ::
     Affine1Ptr ->
     Affine2Ptr ->
-    Bool ->
+    CBool ->
     Ptr CChar ->
     CSize ->
     Ptr CChar ->
@@ -834,7 +833,7 @@ foreign import ccall "blst_core_verify_pk_in_g2"
   c_blst_core_verify_pk_in_g2 ::
     Affine2Ptr ->
     Affine1Ptr ->
-    Bool ->
+    CBool ->
     Ptr CChar ->
     CSize ->
     Ptr CChar ->
@@ -1078,7 +1077,7 @@ scalarFromBS bs = unsafePerformIO $ do
       then do
         (success, scalar) <- withNewScalar $ \scalarPtr ->
           c_blst_scalar_from_be_bytes scalarPtr cstr (fromIntegral @Int @CSize l)
-        if success
+        if toBool success
           then return $ Right scalar
           else return $ Left BLST_BAD_SCALAR
       else return $ Left BLST_BAD_SCALAR
@@ -1096,7 +1095,7 @@ scalarToBS scalar = BSI.fromForeignPtr (castForeignPtr ptr) 0 sizeScalar
 scalarCanonical :: Scalar -> Bool
 scalarCanonical scalar =
   unsafePerformIO $
-    withScalar scalar c_blst_scalar_fr_check
+    toBool <$> withScalar scalar c_blst_scalar_fr_check
 
 ---- MSM operations
 
@@ -1184,14 +1183,14 @@ ptMult a b = unsafePerformIO $
 ptEq :: PT -> PT -> Bool
 ptEq a b = unsafePerformIO $
   withPT a $ \ap ->
-    withPT b $ \bp ->
-      c_blst_fp12_is_equal ap bp
+    withPT b $
+      fmap toBool . c_blst_fp12_is_equal ap
 
 ptFinalVerify :: PT -> PT -> Bool
 ptFinalVerify a b = unsafePerformIO $
   withPT a $ \ap ->
-    withPT b $ \bp ->
-      c_blst_fp12_finalverify ap bp
+    withPT b $
+      fmap toBool . c_blst_fp12_finalverify ap
 
 instance Eq PT where
   (==) = ptEq
