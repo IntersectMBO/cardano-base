@@ -447,7 +447,10 @@ instance
           -- through the size checks.
           Right mu1Point <- pure $ blsUncompress @(DualCurve curve) mu1Bs
           Right mu2Point <- pure $ blsUncompress @(DualCurve curve) mu2Bs
-          Just $ PossessionProofBLS12381 mu1Point mu2Point
+          -- Reject the zero point (point at infinity) for both mu1 and mu2
+          if blsIsInf @(DualCurve curve) mu1Point || blsIsInf @(DualCurve curve) mu2Point
+            then Nothing
+            else Just $ PossessionProofBLS12381 mu1Point mu2Point
 
 deriving stock instance
   BLS (DualCurve curve) =>
