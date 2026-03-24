@@ -2,6 +2,7 @@
 
 ## 2.3.2.0
 
+* Lift `TotalPeriodsKES` in `KESAlgorithm` to a type-level associated `Nat` and make `totalPeriodsKES` its default term-level reflection.
 * Add `psbToPackedBytes` to `Cardano.Crypto.PinnedSizedBytes`
 * Add `IncrementalHashAlgorithm` typeclass with `Blake2b_224` and `Blake2b_256` instances
 * Add `withHashContext` and `withHashContextST` for resource management when incremental hashing

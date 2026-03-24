@@ -162,6 +162,7 @@ instance
   , KnownNat (VerKeySizeKES (CompactSumKES h d))
   , KnownNat (SignKeySizeKES (CompactSumKES h d))
   , KnownNat (SigSizeKES (CompactSumKES h d))
+  , KnownNat (2 * TotalPeriodsKES d)
   ) =>
   KESAlgorithm (CompactSumKES h d)
   where
@@ -220,7 +221,7 @@ instance
 
   verifyKES = verifyOptimizedKES
 
-  totalPeriodsKES _ = 2 * totalPeriodsKES (Proxy :: Proxy d)
+  type TotalPeriodsKES (CompactSumKES h d) = 2 * TotalPeriodsKES d
 
   --
   -- raw serialise/deserialise
@@ -410,9 +411,7 @@ instance
   , SodiumHashAlgorithm h
   , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
-  , KnownNat (VerKeySizeKES (CompactSumKES h d))
-  , KnownNat (SignKeySizeKES (CompactSumKES h d))
-  , KnownNat (SigSizeKES (CompactSumKES h d))
+  , KESAlgorithm (CompactSumKES h d)
   ) =>
   ToCBOR (VerKeyKES (CompactSumKES h d))
   where
@@ -424,9 +423,7 @@ instance
   , SodiumHashAlgorithm h
   , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
-  , KnownNat (VerKeySizeKES (CompactSumKES h d))
-  , KnownNat (SignKeySizeKES (CompactSumKES h d))
-  , KnownNat (SigSizeKES (CompactSumKES h d))
+  , KESAlgorithm (CompactSumKES h d)
   ) =>
   FromCBOR (VerKeyKES (CompactSumKES h d))
   where
@@ -466,9 +463,7 @@ instance
   , SodiumHashAlgorithm h
   , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
-  , KnownNat (VerKeySizeKES (CompactSumKES h d))
-  , KnownNat (SignKeySizeKES (CompactSumKES h d))
-  , KnownNat (SigSizeKES (CompactSumKES h d))
+  , KESAlgorithm (CompactSumKES h d)
   ) =>
   ToCBOR (SigKES (CompactSumKES h d))
   where
@@ -480,9 +475,7 @@ instance
   , SodiumHashAlgorithm h
   , HashSize h ~ SeedSizeKES d
   , NoThunks (VerKeyKES (CompactSumKES h d))
-  , KnownNat (VerKeySizeKES (CompactSumKES h d))
-  , KnownNat (SignKeySizeKES (CompactSumKES h d))
-  , KnownNat (SigSizeKES (CompactSumKES h d))
+  , KESAlgorithm (CompactSumKES h d)
   ) =>
   FromCBOR (SigKES (CompactSumKES h d))
   where
@@ -601,9 +594,7 @@ instance
   , OptimizedKESAlgorithm d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
-  , KnownNat (VerKeySizeKES (CompactSumKES h d))
-  , KnownNat (SignKeySizeKES (CompactSumKES h d))
-  , KnownNat (SigSizeKES (CompactSumKES h d))
+  , KESAlgorithm (CompactSumKES h d)
   ) =>
   ToCBOR (UnsoundPureSignKeyKES (CompactSumKES h d))
   where
@@ -615,9 +606,7 @@ instance
   , OptimizedKESAlgorithm d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
-  , KnownNat (VerKeySizeKES (CompactSumKES h d))
-  , KnownNat (SignKeySizeKES (CompactSumKES h d))
-  , KnownNat (SigSizeKES (CompactSumKES h d))
+  , KESAlgorithm (CompactSumKES h d)
   ) =>
   FromCBOR (UnsoundPureSignKeyKES (CompactSumKES h d))
   where

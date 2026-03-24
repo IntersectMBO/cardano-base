@@ -103,7 +103,7 @@ instance
 
   algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
-  totalPeriodsKES _ = 1
+  type TotalPeriodsKES (CompactSingleKES d) = 1
 
   --
   -- Core algorithm operations

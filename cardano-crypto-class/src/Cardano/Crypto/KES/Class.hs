@@ -118,6 +118,7 @@ class
   , KnownNat (VerKeySizeKES v)
   , KnownNat (SignKeySizeKES v)
   , KnownNat (SigSizeKES v)
+  , KnownNat (TotalPeriodsKES v)
   ) =>
   KESAlgorithm v
   where
@@ -132,6 +133,7 @@ class
   type VerKeySizeKES v :: Nat
   type SignKeySizeKES v :: Nat
   type SigSizeKES v :: Nat
+  type TotalPeriodsKES v :: Nat
 
   type SizeVerKeyKES v :: Nat
   type SizeVerKeyKES v = VerKeySizeKES v
@@ -184,6 +186,8 @@ class
   -- periods (period 0 and 1) then there is only one evolution.
   totalPeriodsKES ::
     proxy v -> Word
+  totalPeriodsKES _ =
+    fromIntegral @Integer @Word $ natVal (Proxy @(TotalPeriodsKES v))
 
   --
   -- Serialisation/(de)serialisation in fixed-size raw format

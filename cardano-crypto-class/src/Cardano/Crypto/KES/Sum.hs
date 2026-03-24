@@ -125,6 +125,7 @@ instance
   , HashSize h ~ SeedSizeKES d -- can be relaxed
   , KnownNat ((SignKeySizeKES d + SeedSizeKES d) + (2 * VerKeySizeKES d))
   , KnownNat (SigSizeKES d + (VerKeySizeKES d * 2))
+  , KnownNat (2 * TotalPeriodsKES d)
   ) =>
   KESAlgorithm (SumKES h d)
   where
@@ -187,7 +188,7 @@ instance
     where
       _T = totalPeriodsKES (Proxy :: Proxy d)
 
-  totalPeriodsKES _ = 2 * totalPeriodsKES (Proxy :: Proxy d)
+  type TotalPeriodsKES (SumKES h d) = 2 * TotalPeriodsKES d
 
   --
   -- raw serialise/deserialise
@@ -514,9 +515,7 @@ instance
   ( HashSize h ~ SeedSizeKES d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
-  , KnownNat (VerKeySizeKES (SumKES h d))
-  , KnownNat (SignKeySizeKES (SumKES h d))
-  , KnownNat (SigSizeKES (SumKES h d))
+  , KESAlgorithm (SumKES h d)
   ) =>
   ToCBOR (UnsoundPureSignKeyKES (SumKES h d))
   where
@@ -527,9 +526,7 @@ instance
   ( HashSize h ~ SeedSizeKES d
   , UnsoundPureKESAlgorithm d
   , SodiumHashAlgorithm h
-  , KnownNat (VerKeySizeKES (SumKES h d))
-  , KnownNat (SignKeySizeKES (SumKES h d))
-  , KnownNat (SigSizeKES (SumKES h d))
+  , KESAlgorithm (SumKES h d)
   ) =>
   FromCBOR (UnsoundPureSignKeyKES (SumKES h d))
   where

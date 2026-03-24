@@ -87,7 +87,7 @@ instance DSIGNMAlgorithm d => KESAlgorithm (SingleKES d) where
 
   algorithmNameKES _ = algorithmNameDSIGN (Proxy :: Proxy d) ++ "_kes_2^0"
 
-  totalPeriodsKES _ = 1
+  type TotalPeriodsKES (SingleKES d) = 1
 
   verifyKES ctxt (VerKeySingleKES vk) t a (SigSingleKES sig) =
     assert (t == 0) $
