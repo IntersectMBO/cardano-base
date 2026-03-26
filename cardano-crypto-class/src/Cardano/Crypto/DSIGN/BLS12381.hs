@@ -90,7 +90,6 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsIsInf,
   blsMult,
   blsUncompress,
-  blsZero,
   c_blst_keygen,
   compressedSizePoint,
   finalVerifyPairs,
@@ -493,27 +492,35 @@ instance
     deriving anyclass (NFData)
 
   {-# INLINE uncheckedAggregateVerKeysDSIGN #-}
-  uncheckedAggregateVerKeysDSIGN verKeys = do
-    -- Sum the verification keys as curve points
-    let aggrPoint =
-          F.foldl' blsAddOrDouble (blsZero @curve) (map verKeyToPoint verKeys)
-    -- Unlikely case, but best to reject infinity as an aggregate verification
-    -- key. This happens if, for every secret/verification key pair, the inverse
-    -- of each secret key (and thus also the verification key) is also present
-    -- in the list.
-    if blsIsInf @curve aggrPoint
-      then Left "aggregateVerKeysDSIGN: aggregated verification key is infinity"
-      else Right $ VerKeyBLS12381 aggrPoint
+  uncheckedAggregateVerKeysDSIGN verKeys =
+    -- Reject any input verification key that is the infinity point
+    if any (blsIsInf @curve . verKeyToPoint) verKeys
+      then Left "uncheckedAggregateVerKeysDSIGN: input verification key is infinity"
+      else case map verKeyToPoint verKeys of
+        [] -> Left "uncheckedAggregateVerKeysDSIGN: empty list of verification keys"
+        (p : ps) ->
+          let aggrPoint = F.foldl' blsAddOrDouble p ps
+           in -- Unlikely case, but best to reject infinity as an aggregate verification
+              -- key. This happens if, for every secret/verification key pair, the inverse
+              -- of each secret key (and thus also the verification key) is also present
+              -- in the list.
+              if blsIsInf @curve aggrPoint
+                then Left "uncheckedAggregateVerKeysDSIGN: aggregated verification key is infinity"
+                else Right $ VerKeyBLS12381 aggrPoint
 
   {-# INLINE aggregateSigsDSIGN #-}
-  aggregateSigsDSIGN sigs = do
-    -- Sum the signatures as curve points
-    let aggrPoint =
-          F.foldl' blsAddOrDouble (blsZero @(DualCurve curve)) (map sigToPoint sigs)
-    -- Unlikely case, but best to reject infinity as an aggregate signature
-    if blsIsInf @(DualCurve curve) aggrPoint
-      then Left "aggregateSigsDSIGN: aggregated signature is infinity"
-      else Right $ SigBLS12381 aggrPoint
+  aggregateSigsDSIGN sigs =
+    -- Reject any input signature that is the infinity point
+    if any (blsIsInf @(DualCurve curve) . sigToPoint) sigs
+      then Left "aggregateSigsDSIGN: input signature is infinity"
+      else case map sigToPoint sigs of
+        [] -> Left "aggregateSigsDSIGN: empty list of signatures"
+        (p : ps) ->
+          let aggrPoint = F.foldl' blsAddOrDouble p ps
+           in -- Unlikely case, but best to reject infinity as an aggregate signature
+              if blsIsInf @(DualCurve curve) aggrPoint
+                then Left "aggregateSigsDSIGN: aggregated signature is infinity"
+                else Right $ SigBLS12381 aggrPoint
 
   {-# INLINE createPossessionProofDSIGN #-}
   createPossessionProofDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (SignKeyBLS12381 skScalar) =
