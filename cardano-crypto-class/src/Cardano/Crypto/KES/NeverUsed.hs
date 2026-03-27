@@ -40,7 +40,7 @@ instance KESAlgorithm NeverKES where
 
   verifyKES = error "KES not available"
 
-  totalPeriodsKES _ = 0
+  type TotalPeriodsKES NeverKES = 0
 
   type VerKeySizeKES NeverKES = 0
   type SignKeySizeKES NeverKES = 0

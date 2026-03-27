@@ -268,6 +268,8 @@ testKESAlgorithm lock n =
     prop "one update signkey" $ prop_oneUpdateSignKeyKES @v lock
     prop "all updates signkey" $ prop_allUpdatesSignKeyKES @v lock
     prop "total periods" $ prop_totalPeriodsKES @v lock
+    prop "total periods matches type-level nat" $
+      prop_totalPeriodsKES_matches_typelevel @v lock
     describe "NoThunks" $ do
       prop "VerKey" $
         ioPropertyWithSK @v lock $ \sk ->
@@ -547,6 +549,17 @@ prop_allUpdatesSignKeyKES ::
 prop_allUpdatesSignKeyKES lock seedPSB =
   ioProperty . withLock lock $ do
     void $ withAllUpdatesKES_ @v seedPSB $ const (return ())
+
+-- | The term-level 'totalPeriodsKES' agrees with the type-level
+-- 'TotalPeriodsKES' associated type.
+prop_totalPeriodsKES_matches_typelevel ::
+  forall v.
+  KESAlgorithm v =>
+  Lock ->
+  Property
+prop_totalPeriodsKES_matches_typelevel _lock =
+  totalPeriodsKES (Proxy @v)
+    === fromIntegral (natVal (Proxy @(TotalPeriodsKES v)))
 
 -- | If we start with a signing key, we can evolve it a number of times so that
 -- the total number of signing keys (including the initial one) equals the

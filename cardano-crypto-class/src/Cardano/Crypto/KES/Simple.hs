@@ -114,7 +114,7 @@ instance
 
   algorithmNameKES proxy = "simple_" ++ show (totalPeriodsKES proxy)
 
-  totalPeriodsKES _ = fromIntegral @Natural @Word (natVal (Proxy @t))
+  type TotalPeriodsKES (SimpleKES d t) = t
 
   --
   -- Core algorithm operations

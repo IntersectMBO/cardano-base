@@ -25,7 +25,7 @@ import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
 import Foreign.Ptr (castPtr)
 import GHC.Generics (Generic)
-import GHC.TypeNats (KnownNat, Nat, Natural, natVal)
+import GHC.TypeNats (KnownNat, Nat)
 import NoThunks.Class (NoThunks)
 
 import Control.DeepSeq (NFData)
@@ -110,7 +110,7 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
     | otherwise =
         Left "KES verification failed"
 
-  totalPeriodsKES _ = fromIntegral @Natural @Period (natVal (Proxy @t))
+  type TotalPeriodsKES (MockKES t) = t
 
   --
   -- raw serialise/deserialise
