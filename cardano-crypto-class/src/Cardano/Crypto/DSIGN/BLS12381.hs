@@ -382,7 +382,11 @@ instance
     -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
     case blsUncompress @curve bs of
       Left _ -> Nothing
-      Right vkPsb -> Just (VerKeyBLS12381 vkPsb)
+      Right vkPsb ->
+        -- Reject the identity (point at infinity) as a verification key
+        if blsIsInf @curve vkPsb
+          then Nothing
+          else Just (VerKeyBLS12381 vkPsb)
 
   {-# INLINE rawDeserialiseSignKeyDSIGN #-}
   rawDeserialiseSignKeyDSIGN bs =
@@ -392,7 +396,11 @@ instance
     -- they are valid Scalars, i.e., less than the curve order (255 bits).
     case scalarFromBS bs of
       Left _ -> Nothing
-      Right skScalar -> Just (SignKeyBLS12381 skScalar)
+      Right skScalar ->
+        -- Reject the zero scalar as a signing key
+        if BS.all (== 0) (scalarToBS skScalar)
+          then Nothing
+          else Just (SignKeyBLS12381 skScalar)
 
   {-# INLINE rawDeserialiseSigDSIGN #-}
   rawDeserialiseSigDSIGN bs =

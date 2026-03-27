@@ -250,6 +250,23 @@ tests lock =
         it "BLS12381MinSigDSIGN: mu1 non-zero, mu2 zero" $
           rawDeserialisePossessionProofDSIGN @(BLS12381DSIGN Curve2) (genC1 <> zeroC1)
             `shouldBe` Nothing
+      describe "VerKey and SignKey deserialisation rejects zero" $ do
+        let zeroC1 = blsCompress (blsZero @Curve1)
+            zeroC2 = blsCompress (blsZero @Curve2)
+            -- Scalar size is 32 bytes for both curve variants
+            zeroScalar = BS.replicate 32 0
+        it "BLS12381MinVerKeyDSIGN: zero verification key rejected" $
+          rawDeserialiseVerKeyDSIGN @(BLS12381DSIGN Curve1) zeroC1
+            `shouldBe` Nothing
+        it "BLS12381MinSigDSIGN: zero verification key rejected" $
+          rawDeserialiseVerKeyDSIGN @(BLS12381DSIGN Curve2) zeroC2
+            `shouldBe` Nothing
+        it "BLS12381MinVerKeyDSIGN: zero signing key rejected" $
+          rawDeserialiseSignKeyDSIGN @(BLS12381DSIGN Curve1) zeroScalar
+            `shouldBe` Nothing
+        it "BLS12381MinSigDSIGN: zero signing key rejected" $
+          rawDeserialiseSignKeyDSIGN @(BLS12381DSIGN Curve2) zeroScalar
+            `shouldBe` Nothing
 
 testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,
