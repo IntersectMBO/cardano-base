@@ -3,6 +3,7 @@
 ## 2.4.0.0
 
 * Add `Show` for `PackedBytes`
+* Add `Storable` instance for `PackedBytes` and `Hash`
 * Lift `TotalPeriodsKES` in `KESAlgorithm` to a type-level associated `Nat` and make `totalPeriodsKES` its default term-level reflection.
 * Add `psbToPackedBytes` to `Cardano.Crypto.PinnedSizedBytes`
 * Add `IncrementalHashAlgorithm` typeclass with `Blake2b_224` and `Blake2b_256` instances
