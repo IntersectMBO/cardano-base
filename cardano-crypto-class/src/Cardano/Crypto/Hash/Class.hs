@@ -73,6 +73,7 @@ import Data.MemPack (FailT (FailT), MemPack, StateT (StateT), Unpack (Unpack))
 import Data.Proxy (Proxy (..))
 import Data.Typeable (Typeable)
 import Data.Word (Word8)
+import Foreign.Storable (Storable)
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat, Nat, natVal)
@@ -128,6 +129,8 @@ newtype Hash h a = UnsafeHashRep (PackedBytes (HashSize h))
   deriving (Eq, Ord, Generic, NoThunks, NFData)
 
 deriving instance HashAlgorithm h => MemPack (Hash h a)
+
+deriving instance HashAlgorithm h => Storable (Hash h a)
 
 -- | This instance is meant to be used with @TemplateHaskell@
 --

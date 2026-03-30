@@ -3,6 +3,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -45,7 +46,7 @@ import Data.Primitive.PrimArray (PrimArray(..), imapPrimArray, indexPrimArray)
 import Data.Typeable
 import Foreign.ForeignPtr
 import Foreign.Ptr (castPtr)
-import Foreign.Storable (peekByteOff)
+import Foreign.Storable (Storable(..))
 import GHC.Exts
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr (unsafeWithForeignPtr)
@@ -153,6 +154,66 @@ instance KnownNat n => ToCBOR (PackedBytes n) where
 instance KnownNat n => FromCBOR (PackedBytes n) where
   fromCBOR = D.decodeBytes >>= packByteString
   {-# INLINE fromCBOR #-}
+
+instance KnownNat n => Storable (PackedBytes n) where
+  sizeOf _ = fromInteger @Int (natVal' (proxy# @n))
+  alignment a =
+    case sizeOf a of
+      8 -> 8
+      28 -> 32
+      32 -> 32
+      n -> error $ "TODO: Implement alognment for: " <> show n
+    -- initial buggy version:
+    -- let !numOfBits = finiteBitSize n
+    --     !trailingNumberOfZeros = countTrailingZeros n
+    --     !isOnlyOneBitSet = numOfBits == countLeadingZeros n + trailingNumberOfZeros + 1
+    -- in if isOnlyOneBitSet
+    --    then n
+    --    else setBit 0 (numOfBits - trailingNumberOfZeros + 1)
+
+  poke pbPtr = \case
+    PackedBytes8 w -> poke (castPtr pbPtr) w
+    PackedBytes28 w0 w1 w2 w3 ->
+      let ptr = castPtr pbPtr
+      in poke ptr w0 >>
+          pokeElemOff ptr 1 w1 >>
+          pokeElemOff ptr 2 w2 >>
+          pokeByteOff (castPtr pbPtr) (8 * 3) w3
+    PackedBytes32 w0 w1 w2 w3 ->
+      let ptr = castPtr pbPtr
+      in poke ptr w0 >>
+          pokeElemOff ptr 1 w1 >>
+          pokeElemOff ptr 2 w2 >>
+          pokeElemOff ptr 3 w3
+    PackedBytes# ba# -> do
+      copyByteArrayToAddr (castPtr pbPtr) (ByteArray ba#) 0 (fromInteger @Int (natVal' (proxy# @n)))
+
+  peek pbPtr =
+    let px = Proxy :: Proxy n
+     in case sameNat px (Proxy :: Proxy 8) of
+          Just Refl -> PackedBytes8 <$> peek (castPtr pbPtr)
+          Nothing -> case sameNat px (Proxy :: Proxy 28) of
+            Just Refl -> do
+              let ptr = castPtr pbPtr
+              w0 <- peek ptr
+              w1 <- peekElemOff ptr 1
+              w2 <- peekElemOff ptr 2
+              w3 <- peekByteOff (castPtr pbPtr) (8 * 3)
+              pure $ PackedBytes28 w0 w1 w2 w3
+            Nothing -> case sameNat px (Proxy :: Proxy 32) of
+              Just Refl -> do
+                let ptr = castPtr pbPtr
+                w0 <- peek ptr
+                w1 <- peekElemOff ptr 1
+                w2 <- peekElemOff ptr 2
+                w3 <- peekElemOff ptr 3
+                pure $ PackedBytes32 w0 w1 w2 w3
+              Nothing   -> do
+                let n = fromInteger @Int (natVal' (proxy# @n))
+                mba <- newByteArray n
+                copyPtrToMutableByteArray mba 0 (castPtr pbPtr :: Ptr Word8) n
+                ByteArray ba# <- unsafeFreezeByteArray mba
+                pure $ PackedBytes# ba#
 
 xorPackedBytes :: PackedBytes n -> PackedBytes n -> PackedBytes n
 xorPackedBytes (PackedBytes8 x) (PackedBytes8 y) = PackedBytes8 (x `xor` y)
