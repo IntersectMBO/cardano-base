@@ -117,7 +117,6 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   withNewAffine_,
   withNewAffine',
   withPointArray,
-  withAffineBlockArrayPtr,
   sizePT,
   withPT,
   withNewPT,
@@ -188,7 +187,6 @@ where
 
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes, psbCreate, psbCreateResult, psbUseAsCPtr)
 import Control.DeepSeq (NFData (..))
-import Control.Monad (forM_)
 import Data.Bits (shiftL, shiftR, (.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -224,7 +222,7 @@ type family DualCurve curve = dual | dual -> curve where
 -- | A pointer to a (projective) point one of the two elliptical curves
 newtype PointPtr curve = PointPtr (Ptr Word8)
 
--- | A pointer to a null-terminated array of pointers to points
+-- | A pointer to an array of pointers to points
 newtype PointArrayPtr curve = PointArrayPtr (Ptr Void)
 
 type Point1Ptr = PointPtr Curve1
@@ -239,7 +237,7 @@ newtype AffinePtr curve = AffinePtr (Ptr Word8)
 -- | A pointer to a contiguous array of affine points
 newtype AffineBlockPtr curve = AffineBlockPtr (Ptr Void)
 
--- | A pointer to a null-terminated array of pointers to affine points
+-- | A pointer to an array of pointers to affine points
 newtype AffineArrayPtr curve = AffineArrayPtr (Ptr Void)
 
 type Affine1Ptr = AffinePtr Curve1
@@ -385,36 +383,18 @@ withPointArray :: [Point curve] -> (Int -> PointArrayPtr curve -> IO a) -> IO a
 withPointArray points go = do
   let numPoints = length points
       sizeReference = sizeOf (nullPtr :: Ptr ())
-  -- Allocate space for the points and a null terminator
-  allocaBytes ((numPoints + 1) * sizeReference) $ \ptr ->
+  allocaBytes (numPoints * sizeReference) $ \ptr ->
     -- The accumulate function ensures that each `withPoint` call is properly nested.
     -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
     -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
     -- By nesting `withPoint` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
-    let accumulate curPtr [] = do
-          poke curPtr nullPtr
+    let accumulate _ [] =
           go numPoints (PointArrayPtr (castPtr ptr))
         accumulate curPtr (point : rest) =
           withPoint point $ \(PointPtr pPtr) -> do
             poke curPtr pPtr
             accumulate (curPtr `plusPtr` sizeReference) rest
      in accumulate ptr points
-
--- | Given a block of affine points and a count, produce a pointer array
-withAffineBlockArrayPtr ::
-  forall curve a.
-  BLS curve =>
-  Ptr Void ->
-  Int ->
-  (AffineArrayPtr curve -> IO a) ->
-  IO a
-withAffineBlockArrayPtr affinesBlockPtr numPoints go = do
-  allocaBytes (numPoints * sizeOf (nullPtr :: Ptr ())) $ \affineVectorPtr -> do
-    let ptrArray = castPtr affineVectorPtr :: Ptr (Ptr ())
-    forM_ [0 .. numPoints - 1] $ \i -> do
-      let ptr = affinesBlockPtr `plusPtr` (i * sizeAffine (Proxy @curve))
-      pokeElemOff ptrArray i ptr
-    go (AffineArrayPtr affineVectorPtr)
 
 withPT :: PT -> (PTPtr -> IO a) -> IO a
 withPT (PT psb) go = psbUseAsCPtr psb $ \ptr ->
@@ -617,14 +597,12 @@ withScalarArray :: [Scalar] -> (Int -> ScalarArrayPtr -> IO a) -> IO a
 withScalarArray scalars go = do
   let numScalars = length scalars
       sizeReference = sizeOf (undefined :: Ptr ())
-  -- Allocate space for the scalars and a null terminator
-  allocaBytes ((numScalars + 1) * sizeReference) $ \ptr ->
+  allocaBytes (numScalars * sizeReference) $ \ptr ->
     -- The accumulate function ensures that each `withScalar` call is properly nested.
     -- This guarantees that the foreign pointers remain valid while we populate `ptr`.
     -- If we instead used `zipWithM_` for example, the pointers could be finalized too early.
     -- By nesting `withScalar` calls in `accumulate`, we ensure they stay in scope until `go` is executed.
-    let accumulate curPtr [] = do
-          poke curPtr nullPtr
+    let accumulate _ [] =
           go numScalars (ScalarArrayPtr (castPtr ptr))
         accumulate curPtr (scalar : rest) =
           withScalar scalar $ \(ScalarPtr pPtr) -> do
@@ -715,8 +693,9 @@ scalarFromInteger n = do
 
 newtype ScalarPtr = ScalarPtr (Ptr Word8)
 
--- A pointer to a null-terminated array of pointers to scalars
+-- | A pointer to an array of pointers to scalars
 newtype ScalarArrayPtr = ScalarArrayPtr (Ptr Void)
+
 newtype FrPtr = FrPtr (Ptr Word8)
 newtype ScratchPtr = ScratchPtr (Ptr Void)
 
@@ -1173,7 +1152,17 @@ blsMSM ssAndps = unsafePerformIO $ do
                 scratchSize = fromIntegral @CSize @Int $ c_blst_scratch_sizeof (Proxy @curve) numPoints'
             allocaBytes (numPoints * sizeAffine (Proxy @curve)) $ \affinesBlockPtr -> do
               c_blst_to_affines (AffineBlockPtr affinesBlockPtr) pointArrayPtr numPoints'
-              withAffineBlockArrayPtr affinesBlockPtr numPoints $ \affineArrayPtr -> do
+              -- Mode 2: contiguous block — [ptr_to_block, null] is sufficient
+              -- The affinesBlockPtr is contiguous data, so we use the [block_start, null] calling
+              -- convention: the C function reads block_start on the first iteration,
+              -- then finds null on all subsequent iterations and walks forward via
+              -- point+1 through the contiguous block.
+              -- see: https://github.com/IntersectMBO/cardano-base/pull/635#issuecomment-4178160810
+              allocaBytes (2 * sizeOf (nullPtr :: Ptr ())) $ \affineVectorPtr -> do
+                let ptrArray = castPtr affineVectorPtr :: Ptr (Ptr ())
+                pokeElemOff ptrArray 0 (castPtr affinesBlockPtr)
+                pokeElemOff ptrArray 1 nullPtr
+                let affineArrayPtr = AffineArrayPtr affineVectorPtr
                 allocaBytes scratchSize $ \scratchPtr -> do
                   c_blst_mult_pippenger
                     resultPtr
