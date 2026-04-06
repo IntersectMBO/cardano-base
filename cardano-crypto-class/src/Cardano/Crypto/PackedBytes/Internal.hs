@@ -36,6 +36,8 @@ import Control.Monad.Reader (MonadReader(ask), MonadTrans(lift))
 import Control.Monad.State.Strict (MonadState(state))
 import Data.Bits
 import Data.ByteString as BS
+import qualified Data.ByteString.Base16 as Base16
+import Data.ByteString.Char8 as BS8
 import Data.ByteString.Internal as BS (accursedUnutterablePerformIO, toForeignPtr)
 import Data.ByteString.Short.Internal as SBS
 import Data.MemPack (guardAdvanceUnpack, st_, MemPack(..), Pack(Pack))
@@ -92,6 +94,14 @@ instance Ord (PackedBytes n) where
     compare x0 y0 <> compare x1 y1 <> compare x2 y2 <> compare x3 y3
   compare x1 x2 = compare (unpackBytes x1) (unpackBytes x2)
   {-# INLINE compare #-}
+
+instance KnownNat n => Show (PackedBytes n) where
+  show pb =
+    "(PackedBytes " <>
+    show (natVal (Proxy @n)) <>
+    " 0x" <>
+    BS8.unpack (Base16.encode (unpackPinnedBytes pb)) <>
+    ")"
 
 instance NFData (PackedBytes n) where
   rnf PackedBytes8  {} = ()
