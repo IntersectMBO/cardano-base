@@ -11,6 +11,11 @@
 * Add `psbCreateSizedAligned` and `psbCreateSizedResultAligned` to `Cardano.Crypto.PinnedSizedBytes`
 * Deprecate `CRYPTO_BLAKE2B_256_STATE_SIZE`; add `CRYPTO_BLAKE2B_STATE_SIZE` in its place
 
+### `testlib`
+
+* Add `Arbitrary` for `PackedBytes`
+* Add `AnyPackedBytes`
+
 ## 2.3.1.0
 
 * Added `NFData` instance to `VerKeyKES (MockKES t)`.
