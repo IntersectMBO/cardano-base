@@ -187,33 +187,47 @@ instance KnownNat n => Storable (PackedBytes n) where
           pokeElemOff ptr 3 w3
     PackedBytes# ba# -> do
       copyByteArrayToAddr (castPtr pbPtr) (ByteArray ba#) 0 (fromInteger @Int (natVal' (proxy# @n)))
-
+  {-# INLINE poke #-}
   peek pbPtr =
     let px = Proxy :: Proxy n
      in case sameNat px (Proxy :: Proxy 8) of
           Just Refl -> PackedBytes8 <$> peek (castPtr pbPtr)
           Nothing -> case sameNat px (Proxy :: Proxy 28) of
-            Just Refl -> do
-              let ptr = castPtr pbPtr
-              w0 <- peek ptr
-              w1 <- peekElemOff ptr 1
-              w2 <- peekElemOff ptr 2
-              w3 <- peekByteOff (castPtr pbPtr) (8 * 3)
-              pure $ PackedBytes28 w0 w1 w2 w3
+            Just Refl -> peek28 pbPtr
             Nothing -> case sameNat px (Proxy :: Proxy 32) of
-              Just Refl -> do
-                let ptr = castPtr pbPtr
-                w0 <- peek ptr
-                w1 <- peekElemOff ptr 1
-                w2 <- peekElemOff ptr 2
-                w3 <- peekElemOff ptr 3
-                pure $ PackedBytes32 w0 w1 w2 w3
-              Nothing   -> do
+              Just Refl -> peek32 pbPtr
+              Nothing -> do
                 let n = fromInteger @Int (natVal' (proxy# @n))
                 mba <- newByteArray n
                 copyPtrToMutableByteArray mba 0 (castPtr pbPtr :: Ptr Word8) n
                 ByteArray ba# <- unsafeFreezeByteArray mba
                 pure $ PackedBytes# ba#
+  {-# INLINE[1] peek #-}
+
+peek28 :: Ptr (PackedBytes 28) -> IO (PackedBytes 28)
+peek28 pbPtr = do
+  let ptr = castPtr pbPtr
+  w0 <- peek ptr
+  w1 <- peekElemOff ptr 1
+  w2 <- peekElemOff ptr 2
+  w3 <- peekByteOff (castPtr pbPtr) (8 * 3)
+  pure $ PackedBytes28 w0 w1 w2 w3
+{-# INLINE peek28 #-}
+
+peek32 :: Ptr (PackedBytes 32) -> IO (PackedBytes 32)
+peek32 pbPtr = do
+  let ptr = castPtr pbPtr
+  w0 <- peek ptr
+  w1 <- peekElemOff ptr 1
+  w2 <- peekElemOff ptr 2
+  w3 <- peekElemOff ptr 3
+  pure $ PackedBytes32 w0 w1 w2 w3
+{-# INLINE peek32 #-}
+
+{-# RULES
+"peek28" peek = peek28
+"peek32" peek = peek32
+  #-}
 
 xorPackedBytes :: PackedBytes n -> PackedBytes n -> PackedBytes n
 xorPackedBytes (PackedBytes8 x) (PackedBytes8 y) = PackedBytes8 (x `xor` y)
