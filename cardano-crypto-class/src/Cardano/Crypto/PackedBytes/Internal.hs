@@ -170,6 +170,7 @@ instance KnownNat n => Storable (PackedBytes n) where
   alignment a =
     -- First explicit values for specialized cases to make alignment dead obvious
     case sizeOf a of
+      0 -> 0
       8 -> 8
       28 -> 32
       32 -> 32

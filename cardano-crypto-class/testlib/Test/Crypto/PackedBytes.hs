@@ -26,6 +26,9 @@ genPackedBytes proxy =
 data AnyPackedBytes where
   AnyPackedBytes :: KnownNat n => PackedBytes n -> AnyPackedBytes
 
+instance Show AnyPackedBytes where
+  show (AnyPackedBytes pb) = show pb
+
 instance Arbitrary AnyPackedBytes where
   arbitrary = do
     NonNegative n <- arbitrary

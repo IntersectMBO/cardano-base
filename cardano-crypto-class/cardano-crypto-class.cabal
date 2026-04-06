@@ -234,9 +234,14 @@ test-suite tests
   autogen-modules: Paths_cardano_crypto_class
   main-is: Main.hs
   build-depends:
+    QuickCheck,
     base,
+    bytestring,
     cardano-crypto-class:{cardano-crypto-class, testlib},
     hspec,
+
+  other-modules:
+    Test.Cardano.Crypto.PackedBytes.Spec
 
   if flag(secp256k1-support)
     cpp-options: -DSECP256K1_ENABLED
