@@ -176,6 +176,7 @@ library testlib
     Test.Crypto.Hash
     Test.Crypto.Instances
     Test.Crypto.KES
+    Test.Crypto.PackedBytes
     Test.Crypto.Regressions
     Test.Crypto.RunIO
     Test.Crypto.Util
@@ -184,6 +185,7 @@ library testlib
   other-modules: Paths_cardano_crypto_class
   autogen-modules: Paths_cardano_crypto_class
   build-depends:
+    FailT,
     HUnit,
     QuickCheck,
     base,
