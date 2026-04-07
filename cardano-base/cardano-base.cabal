@@ -61,12 +61,14 @@ library testlib
   exposed-modules:
     Test.Cardano.Base.Arbitrary
     Test.Cardano.Base.Bytes
+    Test.Cardano.Base.Properties
     Test.Cardano.Base.TreeDiff
 
   build-depends:
     QuickCheck,
     bytestring,
     cardano-base,
+    hspec,
     mempack,
     random,
     tree-diff,
