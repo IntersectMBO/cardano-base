@@ -500,11 +500,12 @@ instance
     deriving anyclass (NFData)
 
   {-# INLINE uncheckedAggregateVerKeysDSIGN #-}
-  uncheckedAggregateVerKeysDSIGN verKeys =
+  uncheckedAggregateVerKeysDSIGN verKeys = do
+    let verKeyPoints = map verKeyToPoint verKeys
     -- Reject any input verification key that is the infinity point
-    if any (blsIsInf @curve . verKeyToPoint) verKeys
+    if any (blsIsInf @curve) verKeyPoints
       then Left "uncheckedAggregateVerKeysDSIGN: input verification key is infinity"
-      else case map verKeyToPoint verKeys of
+      else case verKeyPoints of
         [] -> Left "uncheckedAggregateVerKeysDSIGN: empty list of verification keys"
         (p : ps) ->
           let aggrPoint = F.foldl' blsAddOrDouble p ps
@@ -517,11 +518,12 @@ instance
                 else Right $ VerKeyBLS12381 aggrPoint
 
   {-# INLINE aggregateSigsDSIGN #-}
-  aggregateSigsDSIGN sigs =
+  aggregateSigsDSIGN sigs = do
+    let sigPoints = map sigToPoint sigs
     -- Reject any input signature that is the infinity point
-    if any (blsIsInf @(DualCurve curve) . sigToPoint) sigs
+    if any (blsIsInf @(DualCurve curve)) sigPoints
       then Left "aggregateSigsDSIGN: input signature is infinity"
-      else case map sigToPoint sigs of
+      else case sigPoints of
         [] -> Left "aggregateSigsDSIGN: empty list of signatures"
         (p : ps) ->
           let aggrPoint = F.foldl' blsAddOrDouble p ps
