@@ -1,8 +1,8 @@
 # Changelog for `cardano-base`
 
-## 0.1.2.1
+## 0.1.3.0
 
-*
+* Add `Cardano.Base.Aeson` module, containing a `fromJSONKeyText` utility
 
 ## 0.1.2.0
 
