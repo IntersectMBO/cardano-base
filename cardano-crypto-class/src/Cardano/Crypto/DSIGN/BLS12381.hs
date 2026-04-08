@@ -26,6 +26,8 @@ module Cardano.Crypto.DSIGN.BLS12381 (
   SigDSIGN (..),
   PossessionProofDSIGN (..),
   BLS12381SignContext (..),
+  minSigPoPDST,
+  minVerKeyPoPDST,
 ) where
 
 #include "blst_util.h"
@@ -130,16 +132,116 @@ data BLS12381DSIGN curve
 -- intended type safety:
 type role BLS12381DSIGN nominal
 
--- | Two versions of BLS12-381 DSIGN: one optimized for minimal verification key size,
--- the other for minimal signature size.
+-- | The BLS12-381 minimal verification key size variant
 type BLS12381MinVerKeyDSIGN = BLS12381DSIGN Curve1
 
+-- | The BLS12-381 minimal signature size variant
 type BLS12381MinSigDSIGN = BLS12381DSIGN Curve2
+
+-- | The BLS12381 signing context for the "PoP" based ciphersuite for the minimal signature size variant of bls signatures
+minSigPoPDST :: BLS12381SignContext
+minSigPoPDST = BLS12381SignContext (Just "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_") Nothing
+
+-- | The BLS12381 signing context for the "PoP" based ciphersuite for the minimal verification key size variant of bls signatures
+minVerKeyPoPDST :: BLS12381SignContext
+minVerKeyPoPDST = BLS12381SignContext (Just "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_") Nothing
 
 type family CurveVariant (c :: Type) :: Symbol where
   CurveVariant Curve1 = "BLS-Signature-Mininimal-Verification-Key-Size"
   CurveVariant Curve2 = "BLS-Signature-Mininimal-Signature-Size"
 
+-- | This module advicese to only the proof-of-possession (PoP) ciphersuite
+-- contexts:
+--
+-- * 'minSigPoPDST'
+-- * 'minVerKeyPoPDST'
+--
+-- even though the underlying signing and verification primitives can be used
+-- to realise the Basic (@NUL@) and message-augmentation (@AUG@) schemes as
+-- well.
+--
+-- == Why only the "PoP" ciphersuite is exported
+--
+-- The main reason is API clarity and safety.
+--
+-- The IETF BLS draft defines three schemes:
+--
+-- * __Basic__ (@NUL@): aggregation is safe only when all messages in an
+--   aggregate are distinct.
+--
+-- * __Message augmentation__ (@AUG@): aggregation is made safe by signing
+--   @PK || message@ instead of just @message@.
+--
+-- * __Proof of possession__ (@POP@): aggregation is made safe by requiring a
+--   separate proof that each public key owner knows the corresponding secret
+--   key.
+--
+-- In this module, the supported aggregation workflow is the PoP one:
+--
+-- * create a proof of possession with 'createPossessionProofDSIGN'
+-- * verify it with 'verifyPossessionProofDSIGN'
+-- * aggregate verification keys with 'uncheckedAggregateVerKeysDSIGN' only
+--   after the relevant proofs have been checked
+-- * aggregate signatures with 'aggregateSigsDSIGN'
+--
+-- By contrast, this module does /not/ provide the draft's general
+-- @AggregateVerify((PK_1, ..., PK_n), (message_1, ..., message_n), signature)@
+-- API for aggregation over different messages.  Exporting predefined Basic and
+-- AUG contexts would therefore suggest a broader aggregate-signature API than
+-- the module actually offers.
+--
+-- Restricting the public ciphersuite exports to PoP makes the intended usage
+-- explicit: this module supports ordinary BLS signing and verification, plus a
+-- PoP-based aggregation story.
+--
+-- == What the exported contexts mean
+--
+-- The exported values are standard BLS ciphersuite DSTs from
+-- draft-irtf-cfrg-bls-signature-06, Section 4.2:
+--
+-- * 'minSigPoPDST' selects the __minimal-signature-size__ variant:
+--   signatures live in G1 (48 bytes compressed), public keys in G2
+--   (96 bytes compressed).
+--
+-- * 'minVerKeyPoPDST' selects the __minimal-pubkey-size__ variant:
+--   public keys live in G1 (48 bytes compressed), signatures in G2
+--   (96 bytes compressed).
+--
+-- The draft recommends the minimal-pubkey-size variant for aggregation,
+-- because the size of @(PK_1, ..., PK_n, signature)@ is usually dominated by
+-- the public keys. Other protocols, like Leios, might favor minimal-signature-size.
+--
+-- == Example
+--
+-- A typical same-message aggregation workflow is:
+--
+-- @
+-- -- Minimal-pubkey-size PoP ciphersuite
+-- let ctx = minVerKeyPoPDST
+--
+-- -- Each participant has a signing key and derived verification key
+-- let vk1 = deriveVerKeyDSIGN sk1
+--     vk2 = deriveVerKeyDSIGN sk2
+--
+-- -- Each participant proves possession of its secret key
+-- let pop1 = createPossessionProofDSIGN ctx sk1
+--     pop2 = createPossessionProofDSIGN ctx sk2
+--
+-- verifyPossessionProofDSIGN ctx vk1 pop1
+-- verifyPossessionProofDSIGN ctx vk2 pop2
+--
+-- -- Once the proofs have been checked, it is safe to aggregate keys
+-- Right avk <- uncheckedAggregateVerKeysDSIGN [vk1, vk2]
+--
+-- -- Both participants sign the same message
+-- let sig1 = signDSIGN ctx msg sk1
+--     sig2 = signDSIGN ctx msg sk2
+--
+-- Right asig <- aggregateSigsDSIGN [sig1, sig2]
+--
+-- -- The aggregate signature can then be checked against the aggregate key
+-- verifyDSIGN ctx avk msg asig
+-- @
 data BLS12381SignContext = BLS12381SignContext
   { blsSignContextDst :: !(Maybe ByteString)
   , blsSignContextAug :: !(Maybe ByteString)
