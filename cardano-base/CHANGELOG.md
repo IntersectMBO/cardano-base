@@ -4,6 +4,10 @@
 
 * Add `Cardano.Base.Aeson` module, containing a `fromJSONKeyText` utility
 
+### `testlib`
+
+* Add `Test.Cardano.Base.Properties` module with `expectStorable`
+
 ## 0.1.2.0
 
 * Add `Cardano.Base.Bytes` containing:

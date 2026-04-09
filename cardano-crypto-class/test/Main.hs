@@ -3,6 +3,7 @@
 {- FOURMOLU_DISABLE -}
 module Main (main) where
 
+import qualified Test.Cardano.Crypto.PackedBytes.Spec as PackedBytes.Spec
 import qualified Test.Crypto.DSIGN
 import qualified Test.Crypto.Hash
 import qualified Test.Crypto.KES
@@ -42,3 +43,4 @@ tests mlockLock =
       Test.Crypto.Vector.Secp256k1DSIGN.tests
 #endif
       Test.Crypto.EllipticCurve.tests
+      PackedBytes.Spec.spec
