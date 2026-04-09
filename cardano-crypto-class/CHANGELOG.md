@@ -1,6 +1,6 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.3.2.0
+## 2.4.0.0
 
 * Lift `TotalPeriodsKES` in `KESAlgorithm` to a type-level associated `Nat` and make `totalPeriodsKES` its default term-level reflection.
 * Add `psbToPackedBytes` to `Cardano.Crypto.PinnedSizedBytes`
