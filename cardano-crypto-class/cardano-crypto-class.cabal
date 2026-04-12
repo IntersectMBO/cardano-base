@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-crypto-class
-version: 2.3.1.0
+version: 2.3.2.0
 synopsis:
   Type classes abstracting over cryptography primitives for Cardano
 
@@ -128,7 +128,7 @@ library
     cardano-binary >=1.7.3,
     cardano-strict-containers,
     cborg,
-    crypton,
+    crypton ^>=1.0,
     deepseq,
     heapwords,
     io-classes >=1.4.1,
@@ -195,7 +195,7 @@ library testlib
     cborg,
     containers,
     contra-tracer ==0.1.0.1 || ==0.1.0.2,
-    crypton,
+    crypton ^>=1.0,
     formatting,
     hspec,
     io-classes >=1.4.0,

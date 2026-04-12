@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.3.2.0
+
+* Add `Storable` instance for `PackedBytes` and `Hash`
+
 ## 2.3.1.0
 
 * Added `NFData` instance to `VerKeyKES (MockKES t)`.
