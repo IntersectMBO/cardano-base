@@ -1,5 +1,9 @@
 # Changelog for `cardano-binary`
 
+## 1.9.0.1
+
+*
+
 ## 1.9.0.0
 
 *
@@ -34,7 +38,7 @@
 
 ## 1.7.1.1
 
-* Drop GHC <= 9.4 support
+* Drop GHC \<= 9.4 support
 
 ## 1.7.1.0
 

@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.4.0.1
+
+*
+
 ## 2.4.0.0
 
 * Add `Show` for `PackedBytes`
@@ -96,8 +100,8 @@
 
 ## 2.2.3.0
 
-* Add `blsMSM` to the BLS12_381 interface
-* Drop GHC <= 9.4 support
+* Add `blsMSM` to the BLS12\_381 interface
+* Drop GHC \<= 9.4 support
 
 ## 2.2.2.1
 
