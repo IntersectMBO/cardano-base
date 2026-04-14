@@ -78,11 +78,12 @@ import Cardano.Crypto.DSIGN (
   BLS12381DSIGN,
 
   DSIGNAggregatable (..),
-  BLS12381SignContext (..),
+  BLS12381SignContext,
   possessionProofSizeDSIGN,
   encodePossessionProofDSIGN,
   decodePossessionProofDSIGN
   )
+import Cardano.Crypto.DSIGN.BLS12381.Internal (BLS12381SignContext (..))
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress, blsGenerator)
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
@@ -150,7 +151,7 @@ blsSignContextGen :: Gen BLS12381SignContext
 blsSignContextGen = do
   dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
   aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
-  pure BLS12381SignContext {blsSignContextAug = aug, blsSignContextDst = dst}
+  pure $ BLS12381SignContext dst aug
 
 
 #ifdef SECP256K1_ENABLED

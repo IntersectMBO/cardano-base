@@ -16,7 +16,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Cardano.Crypto.DSIGN.BLS12381 (
+module Cardano.Crypto.DSIGN.BLS12381.Internal (
   BLS12381DSIGN,
   BLS12381MinVerKeyDSIGN,
   BLS12381MinSigDSIGN,
