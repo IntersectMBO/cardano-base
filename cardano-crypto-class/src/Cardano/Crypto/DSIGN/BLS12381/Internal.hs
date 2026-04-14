@@ -149,7 +149,7 @@ type family CurveVariant (c :: Type) :: Symbol where
   CurveVariant Curve1 = "BLS-Signature-Mininimal-Verification-Key-Size"
   CurveVariant Curve2 = "BLS-Signature-Mininimal-Signature-Size"
 
--- | This module advicese to only the proof-of-possession (PoP) ciphersuite
+-- | This module provides support only for proof-of-possession (PoP) ciphersuite
 -- contexts:
 --
 -- * 'minSigPoPDST'
