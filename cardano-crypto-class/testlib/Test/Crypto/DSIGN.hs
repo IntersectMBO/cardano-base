@@ -30,7 +30,7 @@ import Test.QuickCheck (
   counterexample,
   withMaxSuccess,
   )
-import Test.Hspec (Spec, describe)
+import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.Hspec.QuickCheck (prop, modifyMaxSuccess)
 
 import qualified Data.ByteString as BS
@@ -78,13 +78,15 @@ import Cardano.Crypto.DSIGN (
   BLS12381DSIGN,
 
   DSIGNAggregatable (..),
-  BLS12381SignContext (..),
+  BLS12381SignContext,
   possessionProofSizeDSIGN,
   encodePossessionProofDSIGN,
   decodePossessionProofDSIGN
   )
+import Cardano.Crypto.DSIGN.BLS12381.Internal (BLS12381SignContext (..))
 import Cardano.Binary (FromCBOR, ToCBOR)
-import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2)
+import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress, blsGenerator)
+import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
 import Test.Crypto.Util (
@@ -149,7 +151,7 @@ blsSignContextGen :: Gen BLS12381SignContext
 blsSignContextGen = do
   dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
   aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
-  pure BLS12381SignContext {blsSignContextAug = aug, blsSignContextDst = dst}
+  pure $ BLS12381SignContext dst aug
 
 
 #ifdef SECP256K1_ENABLED
@@ -224,6 +226,48 @@ tests lock =
      describe "Aggregatable" $ do
       testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
       testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
+      describe "PoP deserialisation rejects zero points" $ do
+        -- DualCurve Curve1 = Curve2, so MinVerKeyDSIGN PoP points live on Curve2
+        -- DualCurve Curve2 = Curve1, so MinSigDSIGN    PoP points live on Curve1
+        let zeroC1 = blsCompress (blsZero @Curve1)
+            zeroC2 = blsCompress (blsZero @Curve2)
+            genC1  = blsCompress (blsGenerator @Curve1)
+            genC2  = blsCompress (blsGenerator @Curve2)
+        it "BLS12381MinVerKeyDSIGN: mu1 zero, mu2 zero" $
+          rawDeserialisePossessionProofDSIGN @(BLS12381DSIGN Curve1) (zeroC2 <> zeroC2)
+            `shouldBe` Nothing
+        it "BLS12381MinVerKeyDSIGN: mu1 zero, mu2 non-zero" $
+          rawDeserialisePossessionProofDSIGN @(BLS12381DSIGN Curve1) (zeroC2 <> genC2)
+            `shouldBe` Nothing
+        it "BLS12381MinVerKeyDSIGN: mu1 non-zero, mu2 zero" $
+          rawDeserialisePossessionProofDSIGN @(BLS12381DSIGN Curve1) (genC2 <> zeroC2)
+            `shouldBe` Nothing
+        it "BLS12381MinSigDSIGN: mu1 zero, mu2 zero" $
+          rawDeserialisePossessionProofDSIGN @(BLS12381DSIGN Curve2) (zeroC1 <> zeroC1)
+            `shouldBe` Nothing
+        it "BLS12381MinSigDSIGN: mu1 zero, mu2 non-zero" $
+          rawDeserialisePossessionProofDSIGN @(BLS12381DSIGN Curve2) (zeroC1 <> genC1)
+            `shouldBe` Nothing
+        it "BLS12381MinSigDSIGN: mu1 non-zero, mu2 zero" $
+          rawDeserialisePossessionProofDSIGN @(BLS12381DSIGN Curve2) (genC1 <> zeroC1)
+            `shouldBe` Nothing
+      describe "VerKey and SignKey deserialisation rejects zero" $ do
+        let zeroC1 = blsCompress (blsZero @Curve1)
+            zeroC2 = blsCompress (blsZero @Curve2)
+            -- Scalar size is 32 bytes for both curve variants
+            zeroScalar = BS.replicate 32 0
+        it "BLS12381MinVerKeyDSIGN: zero verification key rejected" $
+          rawDeserialiseVerKeyDSIGN @(BLS12381DSIGN Curve1) zeroC1
+            `shouldBe` Nothing
+        it "BLS12381MinSigDSIGN: zero verification key rejected" $
+          rawDeserialiseVerKeyDSIGN @(BLS12381DSIGN Curve2) zeroC2
+            `shouldBe` Nothing
+        it "BLS12381MinVerKeyDSIGN: zero signing key rejected" $
+          rawDeserialiseSignKeyDSIGN @(BLS12381DSIGN Curve1) zeroScalar
+            `shouldBe` Nothing
+        it "BLS12381MinSigDSIGN: zero signing key rejected" $
+          rawDeserialiseSignKeyDSIGN @(BLS12381DSIGN Curve2) zeroScalar
+            `shouldBe` Nothing
 
 testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,

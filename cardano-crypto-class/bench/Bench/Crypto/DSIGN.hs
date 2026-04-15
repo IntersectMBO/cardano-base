@@ -29,7 +29,7 @@ import Cardano.Crypto.Hash.Blake2b
 import Criterion
 
 import Bench.Crypto.BenchData
-import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381MinVerKeyDSIGN, BLS12381DSIGN, BLS12381SignContext (..))
+import Cardano.Crypto.DSIGN.BLS12381.Internal (BLS12381MinSigDSIGN, BLS12381MinVerKeyDSIGN, BLS12381DSIGN, BLS12381SignContext (..))
 
 benchmarks :: Benchmark
 benchmarks = bgroup "DSIGN"

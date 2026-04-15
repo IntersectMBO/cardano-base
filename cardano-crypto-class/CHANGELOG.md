@@ -1,8 +1,8 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.4.0.1
+## 2.5.0.0
 
-*
+* Remove constructors of `BLS12381SignContext` from export; use `minSigPoPDST` or `minVerKeyPoPDST` for the standard PoP ciphersuites.
 
 ## 2.4.0.0
 
