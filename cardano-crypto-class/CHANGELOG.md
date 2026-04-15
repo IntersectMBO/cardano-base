@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.4.0.1
+
+*
+
 ## 2.4.0.0
 
 * Add `Show` for `PackedBytes`
