@@ -11,6 +11,13 @@
 ### `testlib`
 
 * Add `Arbitrary` instances for `ByteArray`, `SlicedByteArray` and `Term` from `cborg`
+* Add TreeDiff utility functions from `cardano-ledger-binary:testlib`:
+  `ansiExpr`, `diffExpr`, `diffExprCompact`, `expectExprEqual`,
+  `requireExprEqualWithMessage`, `trimExprViaShow`, `tableDoc`
+* Add `ToExpr` orphan instances for `DecoderError` and `DeserialiseFailure`
+* Add re-exports from `ImpSpec`, `prettyprinter`, and `tree-diff` for convenience
+* Change `showHexBytesGrouped` to accept a configurable group size parameter
+* Change `showExpr` to use `prettyExpr` (plain text) instead of `ansiWlExpr` (ANSI colored)
 
 ## 1.8.0.0
 

@@ -73,6 +73,7 @@ library testlib
     Test.Cardano.Binary.TreeDiff
 
   build-depends:
+    ImpSpec,
     QuickCheck,
     base,
     base16-bytestring,
@@ -87,6 +88,8 @@ library testlib
     hedgehog,
     hspec,
     pretty-show,
+    prettyprinter,
+    prettyprinter-ansi-terminal,
     quickcheck-instances,
     text,
     tree-diff,
