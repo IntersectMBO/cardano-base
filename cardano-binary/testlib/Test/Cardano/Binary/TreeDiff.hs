@@ -49,7 +49,7 @@ module Test.Cardano.Binary.TreeDiff (
   srcLocToLocation,
 ) where
 
-import qualified Cardano.Binary as Plain
+import Cardano.Binary
 import Codec.CBOR.Read (DeserialiseFailure (..), deserialiseFromBytes)
 import qualified Codec.CBOR.Term as CBOR
 import Data.Bifunctor (bimap)
