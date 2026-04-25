@@ -30,23 +30,6 @@ module Test.Cardano.Binary.TreeDiff (
   CBORBytes (..),
   HexBytes (..),
 
-  -- * Re-exports from tree-diff
-  Expr (App, Rec, Lst),
-  defaultExprViaShow,
-  ediff,
-  ppEditExpr,
-
-  -- * Re-exports from prettyprinter
-  Pretty (..),
-  Doc,
-  AnsiStyle,
-  ansiWlPretty,
-
-  -- * Re-exports from ImpSpec
-  ansiDocToString,
-  assertColorFailure,
-  callStackToLocation,
-  srcLocToLocation,
 ) where
 
 import Cardano.Binary
