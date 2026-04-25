@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-base
-version: 0.1.2.0
+version: 0.1.3.0
 synopsis: Various utilities for Cardano
 description: Various utilities for Cardano.
 category:
@@ -39,6 +39,7 @@ library
   import: project-config
   hs-source-dirs: src
   exposed-modules:
+    Cardano.Base.Aeson
     Cardano.Base.Bytes
     Cardano.Base.FeatureFlags
     Cardano.Base.IP
@@ -60,12 +61,14 @@ library testlib
   exposed-modules:
     Test.Cardano.Base.Arbitrary
     Test.Cardano.Base.Bytes
+    Test.Cardano.Base.Properties
     Test.Cardano.Base.TreeDiff
 
   build-depends:
     QuickCheck,
     bytestring,
     cardano-base,
+    hspec,
     mempack,
     random,
     tree-diff,

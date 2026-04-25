@@ -1,13 +1,24 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.3.2.0
+## 2.5.0.0
 
+* Remove constructors of `BLS12381SignContext` from export; use `minSigPoPDST` or `minVerKeyPoPDST` for the standard PoP ciphersuites.
+
+## 2.4.0.0
+
+* Add `Show` for `PackedBytes`
+* Add `Storable` instance for `PackedBytes` and `Hash`
 * Lift `TotalPeriodsKES` in `KESAlgorithm` to a type-level associated `Nat` and make `totalPeriodsKES` its default term-level reflection.
 * Add `psbToPackedBytes` to `Cardano.Crypto.PinnedSizedBytes`
 * Add `IncrementalHashAlgorithm` typeclass with `Blake2b_224` and `Blake2b_256` instances
 * Add `withHashContext` and `withHashContextST` for resource management when incremental hashing
 * Add `psbCreateSizedAligned` and `psbCreateSizedResultAligned` to `Cardano.Crypto.PinnedSizedBytes`
 * Deprecate `CRYPTO_BLAKE2B_256_STATE_SIZE`; add `CRYPTO_BLAKE2B_STATE_SIZE` in its place
+
+### `testlib`
+
+* Add `Arbitrary` for `PackedBytes`
+* Add `AnyPackedBytes`
 
 ## 2.3.1.0
 
