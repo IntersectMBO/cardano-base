@@ -11,8 +11,8 @@ repository cardano-haskell-packages
 
 -- The index-states
 index-state:
-  , hackage.haskell.org 2026-03-07T07:19:41Z
-  , cardano-haskell-packages 2026-01-26T18:50:24Z
+  , hackage.haskell.org 2026-05-07T19:55:27Z
+  , cardano-haskell-packages 2026-05-05T04:28:05Z
 
 packages:
   base-deriving-via
