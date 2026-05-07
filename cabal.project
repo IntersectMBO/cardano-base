@@ -41,30 +41,18 @@ package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
 
--- cabal-allow-newer
+-- cabal-allow-newer begin
 if impl(ghc >=9.14)
   allow-newer:
-    , aeson:base
-    , aeson:bytestring
-    , aeson:containers
-    , aeson:deepseq
-    , aeson:ghc-prim
-    , aeson:template-haskell
-    , aeson:time
-    , binary-orphans:base
     , boring:base
+    , canonical-json:containers
     , cborg:base
-    , indexed-traversable:base
-    , indexed-traversable-instances:base
-    , microstache:base
-    , parsec:base
-    , quickcheck-instances:base
-    , quickcheck-instances:bytestring
-    , recursion-schemes:template-haskell
-    , semialign:base
+    , cborg:containers
     , serialise:base
-    , serialise:bytestring
-    , these:base
-    , time-compat:base
+    , serialise:containers
+    , serialise:time
+    , tree-diff:QuickCheck
     , tree-diff:base
-    , uuid-types:template-haskell
+    , tree-diff:containers
+    , tree-diff:time
+-- cabal-allow-newer end
