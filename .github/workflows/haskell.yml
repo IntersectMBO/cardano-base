@@ -97,7 +97,7 @@ jobs:
     # A dry run `build all` operation does *NOT* downlaod anything, it just looks at the package
     # indices to generate an install plan.
     - name: Build dry run
-      run: cabal build all --enable-tests --dry-run --minimize-conflict-set
+      run: cabal build all --dry-run --minimize-conflict-set
 
     # From the install plan we generate a dependency list.
     - name: Record dependencies
@@ -124,7 +124,7 @@ jobs:
     # this should be a no-op, but if the cache key was not found we need to build stuff so we can
     # cache it for the next step.
     - name: Install dependencies
-      run: cabal build all --enable-tests --only-dependencies -j --ghc-option=-j4
+      run: cabal build all --only-dependencies
 
     # Always store the cabal cache.
     # This may fail (benign failure) if the cache key is already populated.
@@ -149,14 +149,14 @@ jobs:
 
     # Now we build.
     - name: Build [testing]
-      run: cabal build all --enable-tests -j --ghc-option=-j4
+      run: cabal build all
 
     - name: Run tests
       env:
         # these two are msys2 env vars, they have no effect on non-msys2 installs.
         MSYS2_PATH_TYPE: inherit
         MSYSTEM: MINGW64
-      run: cabal test all --enable-tests --test-show-details=direct -j1
+      run: cabal test all --test-show-details=direct -j1
 
     - name: Run doctests
       if: runner.os == 'Linux'
