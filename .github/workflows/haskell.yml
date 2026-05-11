@@ -136,6 +136,17 @@ jobs:
           dist-newstyle
         key: cache-${{ env.CABAL_CACHE_VERSION }}-${{ runner.os }}-${{ matrix.ghc }}-${{ hashFiles('dependencies.txt') }}
 
+    # `doctest` needs to be present before building, to avoid `cabal repl` seeing a configuration
+    # change when `scripts/doctest.sh` runs it
+    - name: Install doctest
+      shell: bash
+      run: |
+        if [[ -z "$(type -t doctest)" ]]
+        then
+          cabal install doctest --ignore-project --overwrite-policy=always
+          cabal path --installdir >> $GITHUB_PATH
+        fi
+
     # Now we build.
     - name: Build [testing]
       run: cabal build all --enable-tests -j --ghc-option=-j4
