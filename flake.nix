@@ -103,21 +103,10 @@
 
             # and from nixpkgs or other inputs
             nativeBuildInputs = with nixpkgs;
-              [
+              with (import nix/doctest.nix { inherit config nixpkgs; }); [
                 haskellPackages.implicit-hie
-              ] ++
-              (let
-                doctest = haskell-nix.hackage-package {
-                  name = "doctest";
-                  version = "0.25.0";
-                  configureArgs = "-f cabal-doctest";
-                  inherit (config) compiler-nix-name;
-                };
-              in
-                [
-                  (doctest.getComponent "exe:cabal-doctest")
-                  (doctest.getComponent "exe:doctest")
-                ]);
+                doctest
+              ];
             # disable Hoogle until someone request it
             withHoogle = false;
             # Skip cross compilers for the shell
