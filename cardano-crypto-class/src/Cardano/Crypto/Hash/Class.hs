@@ -155,17 +155,10 @@ deriving instance HashAlgorithm h => Storable (Hash h a)
 -- >>> let hash = $$("deadbeef") :: Hash ShortHash ()
 -- ...
 --     • <Hash blake2b_prefix_8>: Expected in decoded form to be: 8 bytes, but got: 4
---     • In the Template Haskell splice $$("deadbeef")
---       In the expression: $$("deadbeef") :: Hash ShortHash ()
---       In an equation for ‘hash’:
---           hash = $$("deadbeef") :: Hash ShortHash ()
 -- ...
 -- >>> let hash = $$("123") :: Hash ShortHash ()
 -- ...
 --     • <Hash blake2b_prefix_8>: Malformed hex: invalid bytestring size
---     • In the Template Haskell splice $$("123")
---       In the expression: $$("123") :: Hash ShortHash ()
---       In an equation for ‘hash’: hash = $$("123") :: Hash ShortHash ()
 -- ...
 instance HashAlgorithm h => IsString (Q (TExp (Hash h a))) where
   fromString hexStr = do

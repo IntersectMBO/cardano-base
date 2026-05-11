@@ -167,17 +167,10 @@ instance KnownNat n => FromCBOR (PinnedSizedBytes n) where
 -- >>> let bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
 -- ...
 --     • <PinnedSizedBytes>: Expected in decoded form to be: 5 bytes, but got: 4
---     • In the Template Haskell splice $$("0xdeadbeef")
---       In the expression: $$("0xdeadbeef") :: PinnedSizedBytes 5
---       In an equation for ‘bsb’:
---           bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
 -- ...
 -- >>> let bsb = $$("nogood") :: PinnedSizedBytes 5
 -- ...
 --     • <PinnedSizedBytes>: Malformed hex: invalid character at offset: 0
---     • In the Template Haskell splice $$("nogood")
---       In the expression: $$("nogood") :: PinnedSizedBytes 5
---       In an equation for ‘bsb’: bsb = $$("nogood") :: PinnedSizedBytes 5
 -- ...
 instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
   fromString hexStr = do
