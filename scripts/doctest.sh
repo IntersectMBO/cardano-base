@@ -2,17 +2,6 @@
 
 set -euo pipefail
 
-# GHC 9.14's interactive linker does not pull in symbols from pkgconfig
-# C libraries when loading the doctest shared object, so doctests for
-# packages that FFI into libsodium fail with `undefined symbol: sodium_*`.
-# Preloading libsodium makes those symbols available to GHCi.
-# `--repl-options=--optimistic-linking` would also work, but doctest 0.25
-# passes that flag to the non-interactive GHC extraction stage which
-# rejects it as unknown.
-if [[ "$(uname -s)" == Linux ]] && libsodium_libdir=$(pkg-config --variable=libdir libsodium 2>/dev/null); then
-  export LD_PRELOAD="${libsodium_libdir}/libsodium.so${LD_PRELOAD:+:$LD_PRELOAD}"
-fi
-
 # Packages to run doctests for; defaults to all packages if none are specified
 PACKAGES=("$@")
 
