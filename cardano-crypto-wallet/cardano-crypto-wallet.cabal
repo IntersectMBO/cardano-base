@@ -1,0 +1,109 @@
+cabal-version: 3.0
+name: cardano-crypto-wallet
+version: 0.1.0.0
+synopsis: Authenticated v2 envelope for HD wallet keys
+description:
+  Provides authenticated encryption and key derivation for HD wallet keys,
+  using the v2 envelope format: Argon2id key derivation and XChaCha20-Poly1305
+  AEAD encryption via libsodium.
+  .
+  This package exposes @Cardano.Crypto.WalletHD.Encrypted@ with a pure v2
+  implementation.
+
+license: Apache-2.0
+license-files:
+  LICENSE
+  NOTICE
+
+author: IOHK
+maintainer: operations@iohk.io
+copyright: 2019-2025 IOHK
+category: Currency
+build-type: Simple
+extra-doc-files:
+  CHANGELOG.md
+
+extra-source-files:
+  cbits/ed25519/*.h
+
+common base
+  build-depends: base >=4.18 && <5
+
+common project-config
+  default-language: Haskell2010
+  ghc-options:
+    -Wall
+    -Wcompat
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wpartial-fields
+    -Wredundant-constraints
+    -Wunused-packages
+
+library
+  import: base, project-config
+  hs-source-dirs: src
+  ghc-options: -Wno-unused-packages
+  exposed-modules:
+    Cardano.Crypto.WalletHD.Encrypted
+
+  build-depends:
+    bytestring,
+    cborg,
+    deepseq,
+    memory,
+
+  pkgconfig-depends: libsodium
+  c-sources:
+    cbits/ed25519/ed25519.c
+    cbits/encrypted_sign.c
+
+  include-dirs:
+    cbits/ed25519
+
+library testlib
+  import: base, project-config
+  hs-source-dirs: testlib
+  visibility: public
+  exposed-modules:
+    Test.Cardano.Crypto.WalletHD.Instances
+
+  build-depends:
+    QuickCheck,
+    bytestring,
+    cardano-crypto-wallet,
+
+test-suite tests
+  import: base, project-config
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules:
+    Test.Cardano.Crypto.Wallet.RoundTripSpec
+    Test.Cardano.Crypto.Wallet.SignSpec
+    Test.Cardano.Crypto.Wallet.V2FormatSpec
+
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
+
+  build-depends:
+    QuickCheck,
+    bytestring,
+    cardano-crypto-class,
+    cardano-crypto-wallet:{cardano-crypto-wallet, testlib},
+    cborg,
+    hspec,
+
+benchmark bench
+  import: base, project-config
+  type: exitcode-stdio-1.0
+  hs-source-dirs: bench
+  main-is: Main.hs
+  ghc-options: -threaded
+  build-depends:
+    bytestring,
+    cardano-crypto-class,
+    cardano-crypto-wallet,
+    criterion,
