@@ -91,7 +91,7 @@
             # tools we want in our shell, from hackage
             tools =
               {
-                cabal = "3.14.1.0";
+                cabal = "3.16.1.0";
               }
               // lib.optionalAttrs (config.compiler-nix-name == defaultCompiler) {
                 # tools that work only with default compiler
@@ -109,7 +109,7 @@
               (let
                 doctest = haskell-nix.hackage-package {
                   name = "doctest";
-                  version = "0.24.0";
+                  version = "0.25.0";
                   configureArgs = "-f cabal-doctest";
                   inherit (config) compiler-nix-name;
                 };
@@ -125,10 +125,9 @@
           };
           flake = {
             # on linux, build/test other supported compilers
-            # TODO uncomment this to enable GHC 9.12 testing
-            # variants = lib.genAttrs ["ghc912"] (compiler-nix-name: {
-            #   inherit compiler-nix-name;
-            # });
+            variants = lib.genAttrs ["ghc9141"] (compiler-nix-name: {
+              inherit compiler-nix-name;
+            });
             # we also want cross compilation to windows.
             crossPlatforms = p: lib.optional (system == "x86_64-linux") p.ucrt64;
           };
