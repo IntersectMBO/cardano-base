@@ -149,10 +149,7 @@ jobs:
 
     - name: Run doctests
       if: runner.os == 'Linux'
-      run: |
-        cabal install doctest --flag cabal-doctest --ignore-project --overwrite-policy=always
-        PATH="$(cabal path --installdir):$PATH"
-        scripts/doctest.sh
+      run: scripts/doctest.sh
 
   fourmolu:
     runs-on: ubuntu-latest
