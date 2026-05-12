@@ -11,8 +11,8 @@ repository cardano-haskell-packages
 
 -- The index-states
 index-state:
-  , hackage.haskell.org 2026-03-07T07:19:41Z
-  , cardano-haskell-packages 2026-01-26T18:50:24Z
+  , hackage.haskell.org 2026-05-07T19:55:27Z
+  , cardano-haskell-packages 2026-05-05T04:28:05Z
 
 packages:
   base-deriving-via
@@ -41,30 +41,18 @@ package bitvec
   -- Workaround for windows cross-compilation
   flags: -simd
 
--- cabal-allow-newer
+-- cabal-allow-newer begin
 if impl(ghc >=9.14)
   allow-newer:
-    , aeson:base
-    , aeson:bytestring
-    , aeson:containers
-    , aeson:deepseq
-    , aeson:ghc-prim
-    , aeson:template-haskell
-    , aeson:time
-    , binary-orphans:base
     , boring:base
+    , canonical-json:containers
     , cborg:base
-    , indexed-traversable:base
-    , indexed-traversable-instances:base
-    , microstache:base
-    , parsec:base
-    , quickcheck-instances:base
-    , quickcheck-instances:bytestring
-    , recursion-schemes:template-haskell
-    , semialign:base
+    , cborg:containers
     , serialise:base
-    , serialise:bytestring
-    , these:base
-    , time-compat:base
+    , serialise:containers
+    , serialise:time
+    , tree-diff:QuickCheck
     , tree-diff:base
-    , uuid-types:template-haskell
+    , tree-diff:containers
+    , tree-diff:time
+-- cabal-allow-newer end

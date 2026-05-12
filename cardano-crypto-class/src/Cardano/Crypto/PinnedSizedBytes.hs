@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -164,6 +165,25 @@ instance KnownNat n => FromCBOR (PinnedSizedBytes n) where
 -- "deadbeef"
 -- >>> print ($$("deadbeef") :: PinnedSizedBytes 4)
 -- "deadbeef"
+#if __GLASGOW_HASKELL__ >= 914
+-- >>> let bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- ...
+--     • <PinnedSizedBytes>: Expected in decoded form to be: 5 bytes, but got: 4
+--     • In the typed Template Haskell splice: $$("0xdeadbeef")
+-- ...
+--       In the expression: $$("0xdeadbeef") :: PinnedSizedBytes 5
+--       In an equation for ‘bsb’:
+--           bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
+-- ...
+-- >>> let bsb = $$("nogood") :: PinnedSizedBytes 5
+-- ...
+--     • <PinnedSizedBytes>: Malformed hex: invalid character at offset: 0
+--     • In the typed Template Haskell splice: $$("nogood")
+-- ...
+--       In the expression: $$("nogood") :: PinnedSizedBytes 5
+--       In an equation for ‘bsb’: bsb = $$("nogood") :: PinnedSizedBytes 5
+-- ...
+#else
 -- >>> let bsb = $$("0xdeadbeef") :: PinnedSizedBytes 5
 -- ...
 --     • <PinnedSizedBytes>: Expected in decoded form to be: 5 bytes, but got: 4
@@ -179,6 +199,7 @@ instance KnownNat n => FromCBOR (PinnedSizedBytes n) where
 --       In the expression: $$("nogood") :: PinnedSizedBytes 5
 --       In an equation for ‘bsb’: bsb = $$("nogood") :: PinnedSizedBytes 5
 -- ...
+#endif
 instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
   fromString hexStr = do
     let n = fromInteger $ natVal (Proxy :: Proxy n)
