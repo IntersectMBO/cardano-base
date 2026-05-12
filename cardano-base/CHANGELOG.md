@@ -1,8 +1,9 @@
 # Changelog for `cardano-base`
 
-## 0.1.3.1
+## 0.1.4.0
 
-*
+* Add a workaround for QuickCheck >= 2.18 replacing `withMaxSuccess`
+  with `withNumTests` and deprecating the former.
 
 ## 0.1.3.0
 

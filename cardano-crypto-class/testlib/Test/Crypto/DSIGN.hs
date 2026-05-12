@@ -28,7 +28,6 @@ import Test.QuickCheck (
   forAllShow,
   ioProperty,
   counterexample,
-  withMaxSuccess,
   )
 import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.Hspec.QuickCheck (prop, modifyMaxSuccess)
@@ -89,6 +88,7 @@ import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress, blsG
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
+import Test.Cardano.Base.QuickCheck (withNumTests)
 import Test.Crypto.Util (
   BadInputFor,
   genBadInputFor,
@@ -827,14 +827,14 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
         forAllPoP $ prop_cbor_direct_vs_class encodePossessionProofDSIGN
   describe "aggregate" $ do
     prop "aggregate verify positive" $
-      withMaxSuccess 1000 .
+      withNumTests 1000 .
       forAllShow (genAggregateCase genContext genMsg) ppShow $
           \(ctx, msg, vksPops, sigs) -> (=== Right ()) $ do
             sig <- aggregateSigsDSIGN @v sigs
             aggVk <- aggregateVerKeysDSIGN ctx vksPops
             verifyDSIGN @v ctx aggVk msg sig
     prop "aggregate verify negative (wrong message)" $
-      withMaxSuccess 1000 .
+      withNumTests 1000 .
       forAllShow (genAggregateCase genContext genMsg) ppShow $ \(ctx, msg, vksPops, sigs) ->
           forAllShow arbitrary ppShow $ \msg' ->
             msg /= msg' ==> (=/= Right ()) $ do
