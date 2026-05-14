@@ -651,10 +651,10 @@ keyMaterialFromLegacyBytes :: ByteArrayAccess ba => ba -> Either XPrvError KeyMa
 keyMaterialFromLegacyBytes bs
   | B.length bs /= legacyTotalKeySize = Left XPrvDecodeError
   | otherwise =
-      let full = convert bs :: ByteString
-          secret = convert $ BS.take legacyKeySize full
-          pub = BS.take publicKeySize $ BS.drop legacyKeySize full
-          cc = BS.drop (legacyKeySize + publicKeySize) full
+      let full = convert bs :: ScrubbedBytes
+          secret = B.take legacyKeySize full
+          pub = convert $ B.take publicKeySize $ B.drop legacyKeySize full :: ByteString
+          cc = convert $ B.drop (legacyKeySize + publicKeySize) full :: ByteString
        in Right $ KeyMaterial secret pub cc
 
 legacyMaterialFromSecret ::
@@ -668,7 +668,7 @@ legacyMaterialFromSecret sec cc =
                  wallet_encrypted_from_secret (coerce psec) (coerce pcc) (coerce ekey)
            pure result
        ) ::
-         (CInt, ByteString) of
+         (CInt, ScrubbedBytes) of
     (0, raw) -> keyMaterialFromLegacyBytes raw
     _ -> Left XPrvInvalidSecretKey
 
@@ -681,7 +681,7 @@ legacyMaterialFromMasterKey sec =
                wallet_encrypted_new_from_mkg (coerce psec) (coerce ekey)
            pure result
        ) ::
-         (CInt, ByteString) of
+         (CInt, ScrubbedBytes) of
     (0, raw) -> keyMaterialFromLegacyBytes raw
     _ -> Left XPrvInvalidSecretKey
 
@@ -701,7 +701,7 @@ legacyDerivePrivate dscheme parent childIndex =
                   (coerce ekey)
                   (dschemeToC dscheme)
           ) ::
-            IO ((), ByteString)
+            IO ((), ScrubbedBytes)
         )
 
 -- | Check public-key consistency by calling 'wallet_encrypted_decrypt' with
