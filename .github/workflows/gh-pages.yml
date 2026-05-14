@@ -18,7 +18,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Install Haskell
       uses: input-output-hk/setup-haskell@v1
@@ -59,10 +59,10 @@ jobs:
       run: echo base.cardano.intersectmbo.org >haddocks/CNAME
 
     - name: Upload pages artifact
-      uses: actions/upload-pages-artifact@v4
+      uses: actions/upload-pages-artifact@v5
       with:
         path: haddocks
 
     - name: Deploy pages
       id: deployment
-      uses: actions/deploy-pages@v4
+      uses: actions/deploy-pages@v5

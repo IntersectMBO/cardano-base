@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Trailing whitespace check
       if: matrix.os != 'windows-latest'
@@ -82,7 +82,7 @@ jobs:
       with:
         use-sodium-vrf: false # default is true
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Cabal update
       run: cabal update
@@ -112,7 +112,7 @@ jobs:
     # We use the hash of `dependencies.txt` as part of the cache key because that will be stable
     # until the `index-state` values in the `cabal.project` file changes.
     - name: Restore cached dependencies
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       id: cache
       with:
         path: |
@@ -129,7 +129,7 @@ jobs:
     # Always store the cabal cache.
     # This may fail (benign failure) if the cache key is already populated.
     - name: Cache Cabal store
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           ${{ steps.setup-haskell.outputs.cabal-store }}
@@ -173,7 +173,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Install fourmolu
       run: |
@@ -197,7 +197,7 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: tfausak/cabal-gild-setup-action@v2
         with:
           version: 1.5.0.1
