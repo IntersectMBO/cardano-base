@@ -11,6 +11,7 @@ module Cardano.Crypto.VRF.NeverUsed (
 )
 where
 
+import Control.DeepSeq (NFData (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
@@ -21,6 +22,15 @@ import Cardano.Crypto.VRF.Class
 -- The type of keys and certificates is isomorphic to unit, but when actually
 -- trying to sign or verify something a runtime exception will be thrown.
 data NeverVRF
+
+instance NFData (VerKeyVRF NeverVRF) where
+  rnf x = x `seq` ()
+
+instance NFData (SignKeyVRF NeverVRF) where
+  rnf x = x `seq` ()
+
+instance NFData (CertVRF NeverVRF) where
+  rnf x = x `seq` ()
 
 instance VRFAlgorithm NeverVRF where
   data VerKeyVRF NeverVRF = NeverUsedVerKeyVRF

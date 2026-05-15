@@ -11,8 +11,6 @@ module Bench.Crypto.VRF (
 import Data.ByteString (ByteString)
 import Data.Proxy
 
-import Control.DeepSeq
-
 import Cardano.Crypto.VRF.Class
 import Cardano.Crypto.VRF.Praos hiding (Seed)
 import Cardano.Crypto.VRF.Simple
@@ -34,9 +32,6 @@ benchVRF ::
   ( VRFAlgorithm v
   , ContextVRF v ~ ()
   , Signable v ByteString
-  , NFData (CertVRF v)
-  , NFData (SignKeyVRF v)
-  , NFData (VerKeyVRF v)
   ) =>
   proxy v ->
   [Char] ->
