@@ -214,33 +214,51 @@ type family CurveVariant (c :: Type) :: Symbol where
 --
 -- A typical same-message aggregation workflow is:
 --
--- @
 -- -- Minimal-pubkey-size PoP ciphersuite
--- let ctx = minVerKeyPoPDST
---
 -- -- Each participant has a signing key and derived verification key
--- let vk1 = deriveVerKeyDSIGN sk1
---     vk2 = deriveVerKeyDSIGN sk2
---
 -- -- Each participant proves possession of its secret key
--- let pop1 = createPossessionProofDSIGN ctx sk1
---     pop2 = createPossessionProofDSIGN ctx sk2
+-- >>> :set -XTypeApplications
+-- >>> import Cardano.Crypto.Seed (mkSeedFromBytes)
 --
--- verifyPossessionProofDSIGN ctx vk1 pop1
--- verifyPossessionProofDSIGN ctx vk2 pop2
+-- >>> :{
+-- let ctx = minVerKeyPoPDST
+--     msg = BS.pack [0, 1, 2, 3]
+--     sk1 =
+--       genKeyDSIGNWithContext
+--         @BLS12381MinVerKeyDSIGN
+--         Nothing
+--         (mkSeedFromBytes (BS.replicate 32 1))
+--     sk2 =
+--       genKeyDSIGNWithContext
+--         @BLS12381MinVerKeyDSIGN
+--         Nothing
+--         (mkSeedFromBytes (BS.replicate 32 2))
+--     vk1 = deriveVerKeyDSIGN sk1
+--     vk2 = deriveVerKeyDSIGN sk2
+--     pop1 = createPossessionProofDSIGN ctx sk1
+--     pop2 = createPossessionProofDSIGN ctx sk2
+-- :}
+--
+-- >>> verifyPossessionProofDSIGN ctx vk1 pop1
+-- Right ()
+--
+-- >>> verifyPossessionProofDSIGN ctx vk2 pop2
+-- Right ()
 --
 -- -- Once the proofs have been checked, it is safe to aggregate keys
--- Right avk <- uncheckedAggregateVerKeysDSIGN [vk1, vk2]
+-- >>> Right avk = uncheckedAggregateVerKeysDSIGN [vk1, vk2]
 --
 -- -- Both participants sign the same message
--- let sig1 = signDSIGN ctx msg sk1
---     sig2 = signDSIGN ctx msg sk2
+-- >>> let sig1 = signDSIGN ctx msg sk1
+-- >>> let sig2 = signDSIGN ctx msg sk2
 --
--- Right asig <- aggregateSigsDSIGN [sig1, sig2]
+-- The signatures can be aggregated:
 --
--- -- The aggregate signature can then be checked against the aggregate key
--- verifyDSIGN ctx avk msg asig
--- @
+-- >>> Right asig = aggregateSigsDSIGN [sig1, sig2]
+--
+-- -- The aggregate signature can then be checked against the aggregate key:
+-- >>> verifyDSIGN ctx avk msg asig
+-- Right ()
 data BLS12381SignContext = BLS12381SignContext
   { blsSignContextDst :: !(Maybe ByteString)
   , blsSignContextAug :: !(Maybe ByteString)
