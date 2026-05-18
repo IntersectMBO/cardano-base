@@ -12,6 +12,7 @@ module Cardano.Crypto.VRF.Mock (
 )
 where
 
+import Control.DeepSeq (NFData)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
 import GHC.Generics (Generic)
@@ -33,13 +34,13 @@ instance VRFAlgorithm MockVRF where
   --
 
   newtype VerKeyVRF MockVRF = VerKeyMockVRF Word64
-    deriving (Show, Eq, Ord, Generic, NoThunks)
+    deriving (Show, Eq, Ord, Generic, NoThunks, NFData)
 
   newtype SignKeyVRF MockVRF = SignKeyMockVRF Word64
-    deriving (Show, Eq, Ord, Generic, NoThunks)
+    deriving (Show, Eq, Ord, Generic, NoThunks, NFData)
 
   newtype CertVRF MockVRF = CertMockVRF Word64
-    deriving (Show, Eq, Ord, Generic, NoThunks)
+    deriving (Show, Eq, Ord, Generic, NoThunks, NFData)
 
   --
   -- Metadata and basic key operations

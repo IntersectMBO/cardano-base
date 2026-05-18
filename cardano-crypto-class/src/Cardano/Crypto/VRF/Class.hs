@@ -80,9 +80,12 @@ class
   ( Typeable v
   , Show (VerKeyVRF v)
   , Eq (VerKeyVRF v)
+  , NFData (VerKeyVRF v)
   , Show (SignKeyVRF v)
+  , NFData (SignKeyVRF v)
   , Show (CertVRF v)
   , Eq (CertVRF v)
+  , NFData (CertVRF v)
   , NoThunks (CertVRF v)
   , NoThunks (VerKeyVRF v)
   , NoThunks (SignKeyVRF v)

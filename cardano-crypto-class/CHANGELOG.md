@@ -2,6 +2,8 @@
 
 ## 2.5.0.0
 
+* Add `NFData` superclass constraints for the `VerKeyVRF`, `SignKeyVRF`,
+  and `CertVRF` associated types in `VRFAlgorithm`.
 * Remove constructors of `BLS12381SignContext` from export; use `minSigPoPDST` or `minVerKeyPoPDST` for the standard PoP ciphersuites.
 
 ## 2.4.0.0

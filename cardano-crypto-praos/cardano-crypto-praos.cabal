@@ -153,6 +153,5 @@ benchmark bench
     cardano-crypto-class:{cardano-crypto-class, benchlib},
     cardano-crypto-praos,
     criterion,
-    deepseq,
 
   ghc-options: -threaded
