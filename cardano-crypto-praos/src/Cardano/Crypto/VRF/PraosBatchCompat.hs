@@ -77,6 +77,7 @@ import Control.Monad (void, (<$!>))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Coerce (coerce)
+import Data.Ord (comparing)
 import Data.Primitive.ByteArray (
   ByteArray,
   copyPtrToMutableByteArray,
@@ -314,6 +315,9 @@ instance Show Proof where
 instance Eq Proof where
   a == b = proofBytes a == proofBytes b
 
+instance Ord Proof where
+  compare = comparing proofBytes
+
 instance ToCBOR Proof where
   toCBOR = toCBOR . proofBytes
   encodedSizeExpr _ _ =
@@ -537,7 +541,7 @@ instance VRFAlgorithm PraosBatchCompatVRF where
     deriving newtype (NFData)
 
   newtype CertVRF PraosBatchCompatVRF = CertPraosBatchCompatVRF Proof
-    deriving stock (Show, Eq, Generic)
+    deriving stock (Show, Eq, Ord, Generic)
     deriving newtype (ToCBOR, FromCBOR)
     deriving (NoThunks) via OnlyCheckWhnfNamed "CertKeyVRF PraosBatchCompatVRF" Proof
     deriving newtype (NFData)
