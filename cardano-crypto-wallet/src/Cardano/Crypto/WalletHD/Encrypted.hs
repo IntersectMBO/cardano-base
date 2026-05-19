@@ -310,16 +310,16 @@ encryptedSign ::
 encryptedSign ekey pass msg = do
   material <- decryptKeyMaterial ekey pass
   legacy <- legacyClearBytes material
-  let (_, sig) =
+  let (status, sig) =
         unsafePerformIO
           ( ( B.allocRet signatureSize $ \out ->
                 withByteArray legacy $ \k ->
                   withByteArray msg $ \m ->
                     wallet_encrypted_sign (coerce k) m (fromIntegral $ B.length msg) (coerce out)
             ) ::
-              IO ((), ByteString)
+              IO (CInt, ByteString)
           )
-  Right $ Signature sig
+  if status /= 0 then Left XPrvInternalError else Right $ Signature sig
 
 encryptedDerivePrivate ::
   ByteArrayAccess passphrase =>
@@ -688,21 +688,20 @@ legacyMaterialFromMasterKey sec =
 legacyDerivePrivate ::
   ByteArrayAccess ba =>
   DerivationScheme -> ba -> DerivationIndex -> Either XPrvError KeyMaterial
-legacyDerivePrivate dscheme parent childIndex =
-  keyMaterialFromLegacyBytes raw
-  where
-    (_, raw) =
-      unsafePerformIO
-        ( ( B.allocRet legacyTotalKeySize $ \ekey ->
-              withByteArray parent $ \pparent ->
-                wallet_encrypted_derive_private
-                  (coerce pparent)
-                  childIndex
-                  (coerce ekey)
-                  (dschemeToC dscheme)
-          ) ::
-            IO ((), ScrubbedBytes)
-        )
+legacyDerivePrivate dscheme parent childIndex = do
+  let (status, raw) =
+        unsafePerformIO
+          ( ( B.allocRet legacyTotalKeySize $ \ekey ->
+                withByteArray parent $ \pparent ->
+                  wallet_encrypted_derive_private
+                    (coerce pparent)
+                    childIndex
+                    (coerce ekey)
+                    (dschemeToC dscheme)
+            ) ::
+              IO (CInt, ScrubbedBytes)
+          )
+  if status /= 0 then Left XPrvInternalError else keyMaterialFromLegacyBytes raw
 
 -- | Check public-key consistency by calling 'wallet_encrypted_decrypt' with
 -- an empty passphrase.  In the C implementation, a zero pass_len triggers a
@@ -814,7 +813,7 @@ foreign import ccall "cardano_wallet_encrypted_sign"
     Ptr Word8 ->
     Word32 ->
     SignaturePtr ->
-    IO ()
+    IO CInt
 
 foreign import ccall "cardano_wallet_encrypted_derive_private"
   wallet_encrypted_derive_private ::
@@ -822,7 +821,7 @@ foreign import ccall "cardano_wallet_encrypted_derive_private"
     DerivationIndex ->
     EncryptedKeyPtr ->
     CDerivationScheme ->
-    IO ()
+    IO CInt
 
 foreign import ccall "cardano_wallet_encrypted_derive_public"
   wallet_encrypted_derive_public ::

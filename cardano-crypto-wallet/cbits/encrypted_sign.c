@@ -54,8 +54,10 @@ int cardano_wallet_encrypted_from_secret
      encrypted_key *out)
 {
 	ed25519_secret_key secret_key;
-	if (cardano_crypto_ed25519_extend(seed, secret_key))
+	if (cardano_crypto_ed25519_extend(seed, secret_key)) {
+		secure_clear(secret_key, sizeof(secret_key));
 		return 1;
+	}
 	wallet_encrypted_initialize(secret_key, cc, out);
 	secure_clear(secret_key, sizeof(secret_key));
 	return 0;
@@ -97,7 +99,7 @@ int cardano_wallet_encrypted_decrypt
 	return 0;
 }
 
-void cardano_wallet_encrypted_sign
+int cardano_wallet_encrypted_sign
     (encrypted_key const *in,
      uint8_t const *data, uint32_t const data_len,
      ed25519_signature signature)
@@ -106,6 +108,7 @@ void cardano_wallet_encrypted_sign
 	cardano_crypto_ed25519_publickey(in->ekey, pub_key);
 	cardano_crypto_ed25519_sign(data, data_len, in->cc, CHAIN_CODE_SIZE, in->ekey, pub_key, signature);
 	secure_clear(pub_key, sizeof(pub_key));
+	return 0;
 }
 
 typedef enum {
@@ -243,7 +246,7 @@ static void add_left_public(uint8_t *out, uint8_t *z, uint8_t *in, derivation_sc
 	cardano_crypto_ed25519_point_add(pub_zl8, in, out);
 }
 
-void cardano_wallet_encrypted_derive_private
+int cardano_wallet_encrypted_derive_private
     (encrypted_key const *in,
      uint32_t index,
      encrypted_key *out,
@@ -295,6 +298,7 @@ void cardano_wallet_encrypted_derive_private
 	secure_clear(z, 64);
 	secure_clear(idxBuf, sizeof(idxBuf));
 	secure_clear(&hmac_ctx, sizeof(hmac_ctx));
+	return 0;
 }
 
 int cardano_wallet_encrypted_derive_public
