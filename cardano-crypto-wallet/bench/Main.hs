@@ -37,16 +37,17 @@ testMsg = BS.replicate 64 0xDE
 main :: IO ()
 main = do
   sodiumInit
-  key <- case encryptedCreate testSeed testPass testCC of
+  ekey <- encryptedCreate testSeed testPass testCC
+  key <- case ekey of
     Left err -> error $ "setup failed: " ++ show err
     Right k -> pure k
   defaultMain
     [ bench "create-v2 (encryptedCreate)" $
-        whnf (\_ -> encryptedCreate testSeed testPass testCC) ()
+        whnfIO (encryptedCreate testSeed testPass testCC)
     , bench "validate-v2 (encryptedValidatePassphrase)" $
-        whnf (encryptedValidatePassphrase key) testPass
+        whnfIO (encryptedValidatePassphrase key testPass)
     , bench "sign-v2 (encryptedSign)" $
-        whnf (encryptedSign key testPass) testMsg
+        whnfIO (encryptedSign key testPass testMsg)
     , bench "change-passphrase (encryptedChangePass)" $
-        whnf (encryptedChangePass testPass newPass) key
+        whnfIO (encryptedChangePass testPass newPass key)
     ]

@@ -6,11 +6,11 @@ import qualified Data.ByteString as BS
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
+import Test.QuickCheck.Monadic (monadicIO, run)
 
 import Cardano.Crypto.WalletHD.Encrypted
 import Test.Cardano.Crypto.WalletHD.Instances ()
 
--- | Empty passphrase — matches what 'Arbitrary EncryptedKey' uses.
 emptyPass :: BS.ByteString
 emptyPass = BS.empty
 
@@ -25,65 +25,76 @@ testCC = BS.replicate 32 0xAB
 
 tests :: Spec
 tests = describe "RoundTrip" $ do
-  it "encryptedCreate produces EnvelopeV2 format" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedCreate produces EnvelopeV2 format" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
       Right key -> encryptedKeyFormat key `shouldBe` EnvelopeV2
 
-  it "validateXPrvPassphrase succeeds with correct passphrase" $
-    case encryptedCreate testSeed testPass testCC of
+  it "validateXPrvPassphrase succeeds with correct passphrase" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> encryptedValidatePassphrase key testPass `shouldBe` Right ()
+      Right key -> do
+        r <- encryptedValidatePassphrase key testPass
+        r `shouldBe` Right ()
 
-  it "validateXPrvPassphrase fails with wrong passphrase" $
-    case encryptedCreate testSeed testPass testCC of
+  it "validateXPrvPassphrase fails with wrong passphrase" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
-        encryptedValidatePassphrase key (BS.replicate 32 0x00)
-          `shouldBe` Left XPrvAuthenticationFailed
+      Right key -> do
+        r <- encryptedValidatePassphrase key (BS.replicate 32 0x00)
+        r `shouldBe` Left XPrvAuthenticationFailed
 
-  it "encryptedChangePass preserves public key" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedChangePass preserves public key" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
+      Right key -> do
         let newPass = BS.replicate 32 0xFF
-         in case encryptedChangePass testPass newPass key of
-              Left err -> expectationFailure $ "changePass failed: " ++ show err
-              Right key' -> encryptedPublic key `shouldBe` encryptedPublic key'
+        res' <- encryptedChangePass testPass newPass key
+        case res' of
+          Left err -> expectationFailure $ "changePass failed: " ++ show err
+          Right key' -> encryptedPublic key `shouldBe` encryptedPublic key'
 
   prop "encryptedChangePass roundtrip preserves public key" $
-    \(key :: EncryptedKey) ->
+    \(key :: EncryptedKey) -> monadicIO $ do
       let newPass = BS.replicate 32 0xFF
-       in case encryptedChangePass emptyPass newPass key of
-            Left err -> counterexample ("changePass failed: " ++ show err) False
-            Right key' ->
-              case encryptedChangePass newPass emptyPass key' of
-                Left err -> counterexample ("change back failed: " ++ show err) False
-                Right key'' -> encryptedPublic key === encryptedPublic key''
+      res1 <- run $ encryptedChangePass emptyPass newPass key
+      case res1 of
+        Left err -> pure $ counterexample ("changePass failed: " ++ show err) False
+        Right key' -> do
+          res2 <- run $ encryptedChangePass newPass emptyPass key'
+          case res2 of
+            Left err -> pure $ counterexample ("change back failed: " ++ show err) False
+            Right key'' -> pure (encryptedPublic key === encryptedPublic key'')
 
-  it "encryptedDerivePrivate and encryptedDerivePublic are consistent" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedDerivePrivate and encryptedDerivePublic are consistent" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
+      Right key -> do
         let pub = encryptedPublic key
             cc = encryptedChainCode key
             idx = 0
-         in case encryptedDerivePrivate DerivationScheme2 key testPass idx of
-              Left err -> expectationFailure $ "derivePrivate failed: " ++ show err
-              Right child ->
-                let (derivedPub, _) = encryptedDerivePublic DerivationScheme2 (pub, cc) idx
-                 in encryptedPublic child `shouldBe` derivedPub
+        res' <- encryptedDerivePrivate DerivationScheme2 key testPass idx
+        case res' of
+          Left err -> expectationFailure $ "derivePrivate failed: " ++ show err
+          Right child ->
+            let (derivedPub, _) = encryptedDerivePublic DerivationScheme2 (pub, cc) idx
+             in encryptedPublic child `shouldBe` derivedPub
 
-  it "encryptedDerivePublic is consistent for both schemes" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedDerivePublic is consistent for both schemes" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
+      Right key -> do
         let pub = encryptedPublic key
             cc = encryptedChainCode key
             (pub1, _) = encryptedDerivePublic DerivationScheme1 (pub, cc) 0
             (pub2, _) = encryptedDerivePublic DerivationScheme2 (pub, cc) 0
-         in -- v1 and v2 derivation produce different child keys
-            pub1 `shouldNotBe` pub2
+        pub1 `shouldNotBe` pub2
 
   prop "encryptedKey . unEncryptedKey is identity" $
     \(key :: EncryptedKey) ->
@@ -91,10 +102,10 @@ tests = describe "RoundTrip" $ do
         Left err -> counterexample ("re-parse failed: " ++ show err) False
         Right key' -> unEncryptedKey key === unEncryptedKey key'
 
-  it "encryptedCreate with seed too short fails" $
-    encryptedCreate (BS.replicate 16 0x01) testPass testCC
-      `shouldBe` Left XPrvInvalidSecretKey
+  it "encryptedCreate with seed too short fails" $ do
+    res <- encryptedCreate (BS.replicate 16 0x01) testPass testCC
+    res `shouldBe` Left XPrvInvalidSecretKey
 
-  it "encryptedCreate with chain code wrong size fails" $
-    encryptedCreate testSeed testPass (BS.replicate 16 0xAB)
-      `shouldBe` Left XPrvInvalidChainCode
+  it "encryptedCreate with chain code wrong size fails" $ do
+    res <- encryptedCreate testSeed testPass (BS.replicate 16 0xAB)
+    res `shouldBe` Left XPrvInvalidChainCode

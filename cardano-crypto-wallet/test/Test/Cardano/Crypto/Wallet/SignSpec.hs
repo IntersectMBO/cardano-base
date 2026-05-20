@@ -10,14 +10,12 @@ import Test.Hspec
 
 import Cardano.Crypto.WalletHD.Encrypted
 
--- Verify a Cardano ed25519 signature (chain-code-salted nonce variant).
--- Uses the matching sign_open from the vendored ed25519 C code.
 foreign import ccall "cardano_crypto_ed25519_sign_open"
   c_ed25519_sign_open ::
-    Ptr a -> -- message
-    CSize -> -- message length
-    Ptr a -> -- public key (32 bytes)
-    Ptr a -> -- signature (64 bytes)
+    Ptr a ->
+    CSize ->
+    Ptr a ->
+    Ptr a ->
     IO CInt
 
 verifySignature :: BS.ByteString -> BS.ByteString -> Signature -> Bool
@@ -46,51 +44,61 @@ testMsg = "cardano transaction body hash"
 
 tests :: Spec
 tests = describe "Sign" $ do
-  it "encryptedSign produces a verifiable signature" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedSign produces a verifiable signature" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
-        case encryptedSign key testPass testMsg of
+      Right key -> do
+        res' <- encryptedSign key testPass testMsg
+        case res' of
           Left err -> expectationFailure $ "encryptedSign failed: " ++ show err
           Right sig -> verifySignature (encryptedPublic key) testMsg sig `shouldBe` True
 
-  it "encryptedSign fails with wrong passphrase" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedSign fails with wrong passphrase" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
-        encryptedSign key (BS.replicate 32 0x00) testMsg
-          `shouldBe` Left XPrvAuthenticationFailed
+      Right key -> do
+        r <- encryptedSign key (BS.replicate 32 0x00) testMsg
+        r `shouldBe` Left XPrvAuthenticationFailed
 
-  it "encryptedSign produces a 64-byte signature" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedSign produces a 64-byte signature" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
-        case encryptedSign key testPass testMsg of
+      Right key -> do
+        res' <- encryptedSign key testPass testMsg
+        case res' of
           Left err -> expectationFailure $ "encryptedSign failed: " ++ show err
           Right (Signature s) -> BS.length s `shouldBe` 64
 
-  it "encryptedSign after passphrase change produces a verifiable signature" $
-    case encryptedCreate testSeed testPass testCC of
+  it "encryptedSign after passphrase change produces a verifiable signature" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
+      Right key -> do
         let newPass = BS.replicate 32 0xFF
-         in case encryptedChangePass testPass newPass key of
+        res' <- encryptedChangePass testPass newPass key
+        case res' of
+          Left err -> expectationFailure $ "encryptedChangePass failed: " ++ show err
+          Right key' -> do
+            res'' <- encryptedSign key' newPass testMsg
+            case res'' of
+              Left err -> expectationFailure $ "encryptedSign after changePass failed: " ++ show err
+              Right sig -> verifySignature (encryptedPublic key') testMsg sig `shouldBe` True
+
+  it "signature from original key verifies against public key preserved by passphrase change" $ do
+    res <- encryptedCreate testSeed testPass testCC
+    case res of
+      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
+      Right key -> do
+        res' <- encryptedSign key testPass testMsg
+        case res' of
+          Left err -> expectationFailure $ "encryptedSign failed: " ++ show err
+          Right sig -> do
+            let newPass = BS.replicate 32 0xFF
+            res'' <- encryptedChangePass testPass newPass key
+            case res'' of
               Left err -> expectationFailure $ "encryptedChangePass failed: " ++ show err
               Right key' ->
-                case encryptedSign key' newPass testMsg of
-                  Left err -> expectationFailure $ "encryptedSign after changePass failed: " ++ show err
-                  Right sig -> verifySignature (encryptedPublic key') testMsg sig `shouldBe` True
-
-  it "signature from original key verifies against public key preserved by passphrase change" $
-    case encryptedCreate testSeed testPass testCC of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
-        case encryptedSign key testPass testMsg of
-          Left err -> expectationFailure $ "encryptedSign failed: " ++ show err
-          Right sig ->
-            let newPass = BS.replicate 32 0xFF
-             in case encryptedChangePass testPass newPass key of
-                  Left err -> expectationFailure $ "encryptedChangePass failed: " ++ show err
-                  Right key' ->
-                    -- public key is preserved across passphrase change
-                    verifySignature (encryptedPublic key') testMsg sig `shouldBe` True
+                verifySignature (encryptedPublic key') testMsg sig `shouldBe` True

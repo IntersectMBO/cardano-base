@@ -49,6 +49,7 @@ library
 
   build-depends:
     bytestring,
+    cardano-crypto-class,
     cborg,
     deepseq,
     memory,

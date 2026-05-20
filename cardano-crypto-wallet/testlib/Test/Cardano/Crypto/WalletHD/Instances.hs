@@ -9,6 +9,7 @@ module Test.Cardano.Crypto.WalletHD.Instances () where
 
 import Control.Monad (replicateM)
 import qualified Data.ByteString as BS
+import System.IO.Unsafe (unsafePerformIO)
 import Test.QuickCheck
 
 import Cardano.Crypto.WalletHD.Encrypted
@@ -22,6 +23,6 @@ instance Arbitrary EncryptedKey where
   arbitrary = do
     seed <- BS.pack <$> replicateM 32 arbitrary
     cc <- BS.pack <$> replicateM 32 arbitrary
-    case encryptedCreate seed (BS.empty :: BS.ByteString) cc of
+    case unsafePerformIO (encryptedCreate seed (BS.empty :: BS.ByteString) cc) of
       Right k -> pure k
       Left _ -> arbitrary
