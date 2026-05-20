@@ -68,6 +68,10 @@ instance ToCBOR Point where
 instance FromCBOR Point where
   fromCBOR = Point . pointFromMaybe <$> fromCBOR
 
+-- This isn't mathematically meaningful, but we want to be able to store Points in a Set
+instance Ord Point where
+  compare (Point p) (Point r) = compare (pointToMaybe p) (pointToMaybe r)
+
 instance Semigroup Point where
   Point p <> Point r = Point $ C.pointAdd curve p r
 
@@ -118,7 +122,7 @@ instance VRFAlgorithm SimpleVRF where
     , certC :: !Natural -- md5 hash, so 16 bytes
     , certS :: !Integer -- at most q, so 15 bytes, round up to 16
     }
-    deriving stock (Show, Eq, Generic)
+    deriving stock (Show, Eq, Ord, Generic)
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
 

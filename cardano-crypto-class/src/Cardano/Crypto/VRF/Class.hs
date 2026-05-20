@@ -84,7 +84,7 @@ class
   , Show (SignKeyVRF v)
   , NFData (SignKeyVRF v)
   , Show (CertVRF v)
-  , Eq (CertVRF v)
+  , Ord (CertVRF v)
   , NFData (CertVRF v)
   , NoThunks (CertVRF v)
   , NoThunks (VerKeyVRF v)
@@ -321,8 +321,9 @@ data CertifiedVRF v a = CertifiedVRF
   }
   deriving (Generic)
 
-deriving instance VRFAlgorithm v => Show (CertifiedVRF v a)
 deriving instance VRFAlgorithm v => Eq (CertifiedVRF v a)
+deriving instance VRFAlgorithm v => Ord (CertifiedVRF v a)
+deriving instance VRFAlgorithm v => Show (CertifiedVRF v a)
 
 instance VRFAlgorithm v => NoThunks (CertifiedVRF v a)
 

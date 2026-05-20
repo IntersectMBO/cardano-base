@@ -71,6 +71,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BS
 import Data.Coerce (coerce)
+import Data.Ord (comparing)
 import Data.Primitive.ByteArray (
   ByteArray,
   copyPtrToMutableByteArray,
@@ -291,6 +292,9 @@ instance Show Proof where
 
 instance Eq Proof where
   a == b = proofBytes a == proofBytes b
+
+instance Ord Proof where
+  compare = comparing proofBytes
 
 instance ToCBOR Proof where
   toCBOR = toCBOR . proofBytes
@@ -526,7 +530,7 @@ instance VRFAlgorithm PraosVRF where
     deriving newtype (NFData)
 
   newtype CertVRF PraosVRF = CertPraosVRF Proof
-    deriving stock (Show, Eq, Generic)
+    deriving stock (Show, Eq, Ord, Generic)
     deriving newtype (ToCBOR, FromCBOR)
     deriving (NoThunks) via OnlyCheckWhnfNamed "CertKeyVRF PraosVRF" Proof
     deriving newtype (NFData)

@@ -2,6 +2,9 @@
 
 ## 2.5.0.0
 
+* Add `Ord` superclass constraint for the `CertVRF` associated type in `VRFAlgorithm`
+* Add `Ord` instances for `CertVRF {SimpleVRF,PraosVRF,PraosBatchCompatVRF}`
+* Add `Ord` instances for `Cardano.Crypto.VRF.Praos{,BatchCompat}.Proof`
 * Add `NFData` superclass constraints for the `VerKeyVRF`, `SignKeyVRF`,
   and `CertVRF` associated types in `VRFAlgorithm`.
 * Remove constructors of `BLS12381SignContext` from export; use `minSigPoPDST` or `minVerKeyPoPDST` for the standard PoP ciphersuites.
