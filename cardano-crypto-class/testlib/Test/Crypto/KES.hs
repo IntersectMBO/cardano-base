@@ -205,7 +205,7 @@ testKESAlloc _p n =
       it "genKey" $ testMLockGenKeyKES _p
 
 eventTracer :: IORef [event] -> Tracer IO event
-eventTracer logVar = Tracer (\ev -> liftIO $ atomicModifyIORef' logVar (\acc -> (acc ++ [ev], ())))
+eventTracer logVar = mkTracer (\ev -> liftIO $ atomicModifyIORef' logVar (\acc -> (acc ++ [ev], ())))
 
 matchAllocLog :: [AllocEvent] -> Set WordPtr
 matchAllocLog = F.foldl' (flip go) Set.empty
