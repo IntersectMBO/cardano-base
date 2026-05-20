@@ -2,6 +2,7 @@
 
 ## 0.1.4.0
 
+* Add `Cardano.Base.Typeable` module with type `TypeName a` and its `IsString` and `Show` instances.
 * Add a workaround for QuickCheck >= 2.18 replacing `withMaxSuccess`
   with `withNumTests` and deprecating the former.
 

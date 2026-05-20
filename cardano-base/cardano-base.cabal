@@ -44,6 +44,7 @@ library
     Cardano.Base.FeatureFlags
     Cardano.Base.IP
     Cardano.Base.Proxy
+    Cardano.Base.Typeable
 
   build-depends:
     aeson,
