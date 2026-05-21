@@ -10,6 +10,10 @@
   and `CertVRF` associated types in `VRFAlgorithm`.
 * Remove constructors of `BLS12381SignContext` from export; use `minSigPoPDST` or `minVerKeyPoPDST` for the standard PoP ciphersuites.
 
+### `testlib`
+
+* Bump `contra-tracer` to `^>=0.2.1`
+
 ## 2.4.0.0
 
 * Add `Show` for `PackedBytes`
