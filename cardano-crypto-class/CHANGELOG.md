@@ -2,6 +2,7 @@
 
 ## 2.5.0.0
 
+* Drop mu2 from `PossessionProofDSIGN`
 * Add `Ord` superclass constraint for the `CertVRF` associated type in `VRFAlgorithm`
 * Add `Ord` instances for `CertVRF {SimpleVRF,PraosVRF,PraosBatchCompatVRF}`
 * Add `Ord` instances for `Cardano.Crypto.VRF.Praos{,BatchCompat}.Proof`
