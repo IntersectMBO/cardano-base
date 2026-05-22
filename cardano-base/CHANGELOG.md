@@ -1,5 +1,9 @@
 # Changelog for `cardano-base`
 
+## 0.1.4.1
+
+*
+
 ## 0.1.4.0
 
 * Add `Cardano.Base.Typeable` module with type `TypeName a` and its `IsString` and `Show` instances.
