@@ -1,8 +1,8 @@
 # Changelog for `cardano-base`
 
-## 0.1.4.1
+## 0.1.5.0
 
-*
+* Generalize type signature for `withNumTests` by making it polymorphic.
 
 ## 0.1.4.0
 

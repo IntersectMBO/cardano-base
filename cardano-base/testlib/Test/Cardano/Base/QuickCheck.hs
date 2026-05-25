@@ -16,11 +16,12 @@ import Test.QuickCheck (withNumTests)
 #else
 import Test.QuickCheck (
     Property,
+    Testable,
     withMaxSuccess,
   )
 #endif
 
 #if !MIN_VERSION_QuickCheck(2, 18, 0)
-withNumTests :: Int -> Property -> Property
+withNumTests :: Testable prop => Int -> prop -> Property
 withNumTests = withMaxSuccess
 #endif
