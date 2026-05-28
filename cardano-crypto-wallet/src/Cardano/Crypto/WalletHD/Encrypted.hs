@@ -715,11 +715,11 @@ withEncryptedKeyOutput onFailure action =
     if r /= 0
       then pure (Left onFailure)
       else mlsbUseAsCPtr outMlsb $ \base -> do
-             sk <- (mlsbNewZero :: IO (MLockedSizedBytes 64))
-             mlsbUseAsCPtr sk $ \skPtr -> copyBytes skPtr base 64
-             pub <- BS.packCStringLen (castPtr (base `plusPtr` 64), 32)
-             cc <- BS.packCStringLen (castPtr (base `plusPtr` 96), 32)
-             pure (Right (KeyMaterial sk pub cc))
+        sk <- (mlsbNewZero :: IO (MLockedSizedBytes 64))
+        mlsbUseAsCPtr sk $ \skPtr -> copyBytes skPtr base 64
+        pub <- BS.packCStringLen (castPtr (base `plusPtr` 64), 32)
+        cc <- BS.packCStringLen (castPtr (base `plusPtr` 96), 32)
+        pure (Right (KeyMaterial sk pub cc))
 
 -- ---------------------------------------------------------------------------
 -- Internal: key-material construction (using C/ed25519)
