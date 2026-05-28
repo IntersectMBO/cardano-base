@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-praos`
 
+## 2.2.3.1
+
+*
+
 ## 2.2.3.0
 
 * Add `Ord` instances for `CertVRF PraosVRF` and `CertVRF PraosBatchCompatVRF`
