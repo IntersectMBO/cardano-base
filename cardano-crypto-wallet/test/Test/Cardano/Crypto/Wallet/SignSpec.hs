@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Cardano.Crypto.Wallet.SignSpec (tests) where
 
@@ -26,7 +27,7 @@ verifySignature pub msg (Signature sig) = unsafePerformIO $
         (== 0)
           <$> c_ed25519_sign_open
             (castPtr mp)
-            (fromIntegral ml)
+            (fromIntegral @Int @CSize ml)
             (castPtr pkp)
             (castPtr sigp)
 

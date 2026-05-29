@@ -17,7 +17,7 @@ license-files:
 
 author: IOHK
 maintainer: operations@iohk.io
-copyright: 2019-2025 IOHK
+copyright: 2019-2026 IOHK
 category: Currency
 build-type: Simple
 extra-doc-files:
@@ -67,11 +67,12 @@ library testlib
   hs-source-dirs: testlib
   visibility: public
   exposed-modules:
-    Test.Cardano.Crypto.WalletHD.Instances
+    Test.Cardano.Crypto.WalletHD.Arbitrary
 
   build-depends:
     QuickCheck,
     bytestring,
+    cardano-base:testlib,
     cardano-crypto-wallet,
 
 test-suite tests

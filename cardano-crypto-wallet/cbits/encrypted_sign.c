@@ -342,22 +342,22 @@ int cardano_wallet_encrypted_derive_public
 	return 0;
 }
 
-int wallet_sodium_randombytes(uint8_t *out, uint32_t out_len)
+int wallet_sodium_randombytes(void * const out, size_t const out_len)
 {
 	if (ensure_sodium() != 0) {
 		return 1;
 	}
-	randombytes_buf(out, (size_t) out_len);
+	randombytes_buf(out, out_len);
 	return 0;
 }
 
 int wallet_sodium_argon2id(uint8_t *out,
-	uint32_t out_len,
+	unsigned long long out_len,
 	uint8_t const *pass,
-	uint32_t pass_len,
+	unsigned long long pass_len,
 	uint8_t const salt[crypto_pwhash_SALTBYTES],
-	uint32_t opslimit,
-	uint64_t memlimit)
+	unsigned long long opslimit,
+	size_t memlimit)
 {
 	if (ensure_sodium() != 0) {
 		return 1;
@@ -366,12 +366,12 @@ int wallet_sodium_argon2id(uint8_t *out,
 		return 1;
 	}
 	return crypto_pwhash(out,
-		(unsigned long long) out_len,
+		out_len,
 		(const char *) pass,
-		(unsigned long long) pass_len,
+		pass_len,
 		salt,
-		(unsigned long long) opslimit,
-		(size_t) memlimit,
+		opslimit,
+		memlimit,
 		crypto_pwhash_ALG_ARGON2ID13);
 }
 
@@ -379,9 +379,9 @@ int wallet_sodium_xchacha20poly1305_encrypt(
 	uint8_t *ciphertext,
 	uint8_t tag[crypto_aead_xchacha20poly1305_ietf_ABYTES],
 	uint8_t const *plaintext,
-	uint32_t plaintext_len,
+	unsigned long long plaintext_len,
 	uint8_t const *aad,
-	uint32_t aad_len,
+	unsigned long long aad_len,
 	uint8_t const nonce[crypto_aead_xchacha20poly1305_ietf_NPUBBYTES],
 	uint8_t const key[crypto_aead_xchacha20poly1305_ietf_KEYBYTES])
 {
@@ -398,16 +398,16 @@ int wallet_sodium_xchacha20poly1305_encrypt(
 		combined,
 		&clen,
 		plaintext,
-		(unsigned long long) plaintext_len,
+		plaintext_len,
 		aad,
-		(unsigned long long) aad_len,
+		aad_len,
 		NULL,
 		nonce,
 		key) != 0) {
 		secure_clear(combined, sizeof(combined));
 		return 1;
 	}
-	memcpy(ciphertext, combined, plaintext_len);
+	memcpy(ciphertext, combined, (size_t) plaintext_len);
 	memcpy(tag, combined + plaintext_len, crypto_aead_xchacha20poly1305_ietf_ABYTES);
 	secure_clear(combined, sizeof(combined));
 	return 0;
@@ -416,10 +416,10 @@ int wallet_sodium_xchacha20poly1305_encrypt(
 int wallet_sodium_xchacha20poly1305_decrypt(
 	uint8_t *plaintext,
 	uint8_t const *ciphertext,
-	uint32_t ciphertext_len,
+	unsigned long long ciphertext_len,
 	uint8_t const tag[crypto_aead_xchacha20poly1305_ietf_ABYTES],
 	uint8_t const *aad,
-	uint32_t aad_len,
+	unsigned long long aad_len,
 	uint8_t const nonce[crypto_aead_xchacha20poly1305_ietf_NPUBBYTES],
 	uint8_t const key[crypto_aead_xchacha20poly1305_ietf_KEYBYTES])
 {
@@ -432,16 +432,16 @@ int wallet_sodium_xchacha20poly1305_decrypt(
 	if (ciphertext_len != ENCRYPTED_KEY_SIZE) {
 		return 1;
 	}
-	memcpy(combined, ciphertext, ciphertext_len);
+	memcpy(combined, ciphertext, (size_t) ciphertext_len);
 	memcpy(combined + ciphertext_len, tag, crypto_aead_xchacha20poly1305_ietf_ABYTES);
 	if (crypto_aead_xchacha20poly1305_ietf_decrypt(
 		plaintext,
 		&plen,
 		NULL,
 		combined,
-		(unsigned long long) (ciphertext_len + crypto_aead_xchacha20poly1305_ietf_ABYTES),
+		ciphertext_len + crypto_aead_xchacha20poly1305_ietf_ABYTES,
 		aad,
-		(unsigned long long) aad_len,
+		aad_len,
 		nonce,
 		key) != 0) {
 		secure_clear(combined, sizeof(combined));

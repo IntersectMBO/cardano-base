@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- |
 -- Module      : Cardano.Crypto.WalletHD.Encrypted
@@ -51,7 +52,8 @@ module Cardano.Crypto.WalletHD.Encrypted (
 ) where
 
 import Control.DeepSeq
-import Control.Exception (bracket, finally, onException)
+import Control.Exception (bracket, finally, mask, onException)
+import Control.Monad (when)
 import Data.Bits (shiftR)
 import Data.ByteArray (ByteArrayAccess, withByteArray)
 import qualified Data.ByteArray as B
@@ -256,6 +258,7 @@ data KeyMaterial = KeyMaterial
 
 -- FFI pointer newtypes
 newtype SecretKeyPtr = SecretKeyPtr (Ptr Word8)
+newtype MasterKeyPtr = MasterKeyPtr (Ptr Word8)
 newtype PublicKeyPtr = PublicKeyPtr (Ptr Word8)
 newtype ChainCodePtr = ChainCodePtr (Ptr Word8)
 newtype EncryptedKeyPtr = EncryptedKeyPtr (Ptr Word8)
@@ -325,34 +328,36 @@ encryptedValidatePassphrase ekey pass = do
 encryptedChangePass ::
   (ByteArrayAccess oldPassPhrase, ByteArrayAccess newPassPhrase) =>
   oldPassPhrase -> newPassPhrase -> EncryptedKey -> IO (Either XPrvError EncryptedKey)
-encryptedChangePass oldPass newPass ekey = do
-  emat <- decryptKeyMaterial ekey oldPass
-  case emat of
-    Left err -> pure (Left err)
-    Right mat ->
-      finally (wrapKeyMaterial newPass mat) (mlsbFinalize (kmSecretKey mat))
+encryptedChangePass oldPass newPass ekey =
+  mask $ \restore -> do
+    emat <- restore (decryptKeyMaterial ekey oldPass)
+    case emat of
+      Left err -> pure (Left err)
+      Right mat ->
+        restore (wrapKeyMaterial newPass mat) `finally` mlsbFinalize (kmSecretKey mat)
 
 encryptedSign ::
   (ByteArrayAccess passphrase, ByteArrayAccess msg) =>
   EncryptedKey -> passphrase -> msg -> IO (Either XPrvError Signature)
-encryptedSign ekey pass msg = do
-  emat <- decryptKeyMaterial ekey pass
-  case emat of
-    Left err -> pure (Left err)
-    Right mat ->
-      finally
-        ( withLegacyStruct mat $ \legPtr -> do
-            (status, sig) <-
-              B.allocRet signatureSize $ \outSig ->
-                withByteArray msg $ \msgPtr ->
-                  wallet_encrypted_sign
-                    (coerce legPtr)
-                    msgPtr
-                    (fromIntegral $ B.length msg)
-                    (coerce outSig)
-            pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
-        )
-        (mlsbFinalize (kmSecretKey mat))
+encryptedSign ekey pass msg =
+  mask $ \restore -> do
+    emat <- restore (decryptKeyMaterial ekey pass)
+    case emat of
+      Left err -> pure (Left err)
+      Right mat ->
+        restore
+          ( withLegacyStruct mat $ \legPtr -> do
+              (status, sig) <-
+                B.allocRet signatureSize $ \outSig ->
+                  withByteArray msg $ \msgPtr ->
+                    wallet_encrypted_sign
+                      (coerce legPtr)
+                      msgPtr
+                      (fromIntegral $ B.length msg)
+                      (coerce outSig)
+              pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
+          )
+          `finally` mlsbFinalize (kmSecretKey mat)
 
 encryptedDerivePrivate ::
   ByteArrayAccess passphrase =>
@@ -361,20 +366,20 @@ encryptedDerivePrivate ::
   passphrase ->
   DerivationIndex ->
   IO (Either XPrvError EncryptedKey)
-encryptedDerivePrivate dscheme ekey pass childIndex = do
-  emat <- decryptKeyMaterial ekey pass
-  case emat of
-    Left err -> pure (Left err)
-    Right parentMat ->
-      finally
+encryptedDerivePrivate dscheme ekey pass childIndex =
+  mask $ \restore -> do
+    emat <- restore (decryptKeyMaterial ekey pass)
+    case emat of
+      Left err -> pure (Left err)
+      Right parentMat ->
         ( do
-            echildMat <- legacyDerivePrivate dscheme parentMat childIndex
+            echildMat <- restore (legacyDerivePrivate dscheme parentMat childIndex)
             case echildMat of
               Left err -> pure (Left err)
               Right childMat ->
-                finally (wrapKeyMaterial pass childMat) (mlsbFinalize (kmSecretKey childMat))
+                restore (wrapKeyMaterial pass childMat) `finally` mlsbFinalize (kmSecretKey childMat)
         )
-        (mlsbFinalize (kmSecretKey parentMat))
+          `finally` mlsbFinalize (kmSecretKey parentMat)
 
 encryptedDerivePublic ::
   DerivationScheme ->
@@ -445,45 +450,42 @@ validateSerializedKey bs
 -- ---------------------------------------------------------------------------
 
 decodeV2Envelope :: ByteString -> Either XPrvError V2Envelope
-decodeV2Envelope bs = do
-  (rest, envelope) <-
-    either (const $ Left XPrvDecodeError) Right $
-      CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict bs)
-  if BL.null rest then pure envelope else Left XPrvDecodeError
+decodeV2Envelope bs =
+  case CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict bs) of
+    Right (rest, envelope)
+      | BL.null rest -> Right envelope
+    _ -> Left XPrvDecodeError
 
 decodeEnvelope :: Decoder s V2Envelope
 decodeEnvelope = do
   decodeListLenOf 9
   version <- decodeWord
-  if version /= v2Version then failDecoder XPrvUnsupportedVersion else pure ()
+  when (version /= v2Version) (failDecoder XPrvUnsupportedVersion)
   kdfId <- decodeWord
-  if kdfId /= argon2idId then failDecoder XPrvUnsupportedKdf else pure ()
+  when (kdfId /= argon2idId) (failDecoder XPrvUnsupportedKdf)
   decodeListLenOf 4
   memoryKiB <- decodeWord
   timeCost <- decodeWord
   parallelism <- decodeWord
   outputLength <- decodeWord
-  if (memoryKiB, timeCost, parallelism, outputLength)
-    /= ( productionArgonMemoryKiB
-       , productionArgonTimeCost
-       , productionArgonParallelism
-       , productionArgonOutputLength
-       )
-    then failDecoder XPrvInvalidKdfParams
-    else pure ()
+  when
+    ( memoryKiB /= productionArgonMemoryKiB
+        || timeCost /= productionArgonTimeCost
+        || parallelism /= productionArgonParallelism
+        || outputLength /= productionArgonOutputLength
+    )
+    (failDecoder XPrvInvalidKdfParams)
   salt <- decodeBytes
-  if BS.length salt /= saltSize then failDecoder XPrvInvalidSaltLength else pure ()
+  when (BS.length salt /= saltSize) (failDecoder XPrvInvalidSaltLength)
   cipherId <- decodeWord
-  if cipherId /= xchacha20poly1305Id then failDecoder XPrvUnsupportedCipher else pure ()
+  when (cipherId /= xchacha20poly1305Id) (failDecoder XPrvUnsupportedCipher)
   nonce <- decodeBytes
-  if BS.length nonce /= nonceSize then failDecoder XPrvInvalidNonceLength else pure ()
+  when (BS.length nonce /= nonceSize) (failDecoder XPrvInvalidNonceLength)
   aad <- decodeBytes
   ciphertext <- decodeBytes
-  if BS.length ciphertext /= legacyKeySize
-    then failDecoder XPrvInvalidCiphertextLength
-    else pure ()
+  when (BS.length ciphertext /= legacyKeySize) (failDecoder XPrvInvalidCiphertextLength)
   tag <- decodeBytes
-  if BS.length tag /= tagSize then failDecoder XPrvInvalidTagLength else pure ()
+  when (BS.length tag /= tagSize) (failDecoder XPrvInvalidTagLength)
   (pub, cc) <- either failDecoder pure $ decodeAad aad
   pure $
     V2Envelope
@@ -537,43 +539,39 @@ encodeAad pub cc =
 decodeAad :: AadContext -> Either XPrvError (PublicKey, ChainCode)
 decodeAad bs =
   case CBOR.deserialiseFromBytes decodeAadFields (BL.fromStrict bs) of
-    Left _ -> Left XPrvDecodeError
     Right (rest, result)
       | BL.null rest -> Right result
-      | otherwise -> Left XPrvDecodeError
+    _ -> Left XPrvDecodeError
 
 decodeAadFields :: Decoder s (PublicKey, ChainCode)
 decodeAadFields = do
   decodeListLenOf 8
   version <- decodeWord
-  if version /= v2Version then failDecoder XPrvUnsupportedVersion else pure ()
+  when (version /= v2Version) (failDecoder XPrvUnsupportedVersion)
   kdfId <- decodeWord
-  if kdfId /= argon2idId then failDecoder XPrvUnsupportedKdf else pure ()
+  when (kdfId /= argon2idId) (failDecoder XPrvUnsupportedKdf)
   decodeListLenOf 4
   memoryKiB <- decodeWord
   timeCost <- decodeWord
   parallelism <- decodeWord
   outputLength <- decodeWord
-  if (memoryKiB, timeCost, parallelism, outputLength)
-    /= ( productionArgonMemoryKiB
-       , productionArgonTimeCost
-       , productionArgonParallelism
-       , productionArgonOutputLength
-       )
-    then failDecoder XPrvInvalidKdfParams
-    else pure ()
+  when
+    ( memoryKiB /= productionArgonMemoryKiB
+        || timeCost /= productionArgonTimeCost
+        || parallelism /= productionArgonParallelism
+        || outputLength /= productionArgonOutputLength
+    )
+    (failDecoder XPrvInvalidKdfParams)
   cipherId <- decodeWord
-  if cipherId /= xchacha20poly1305Id then failDecoder XPrvUnsupportedCipher else pure ()
+  when (cipherId /= xchacha20poly1305Id) (failDecoder XPrvUnsupportedCipher)
   payloadKind <- decodeWord
-  if payloadKind /= 1 then failDecoder XPrvDecodeError else pure ()
+  when (payloadKind /= 1) (failDecoder XPrvDecodeError)
   payloadLen <- decodeWord
-  if payloadLen /= fromIntegral legacyKeySize
-    then failDecoder XPrvInvalidCiphertextLength
-    else pure ()
+  when (payloadLen /= fromIntegral legacyKeySize) (failDecoder XPrvInvalidCiphertextLength)
   pub <- decodeBytes
   cc <- decodeBytes
-  if BS.length pub /= publicKeySize then failDecoder XPrvInvalidPublicKey else pure ()
-  if BS.length cc /= ccSize then failDecoder XPrvInvalidChainCode else pure ()
+  when (BS.length pub /= publicKeySize) (failDecoder XPrvInvalidPublicKey)
+  when (BS.length cc /= ccSize) (failDecoder XPrvInvalidChainCode)
   pure (pub, cc)
 
 -- ---------------------------------------------------------------------------
@@ -611,10 +609,10 @@ v2Decrypt (EncryptedKey bs) pass =
                         wallet_sodium_xchacha20poly1305_decrypt
                           (coerce ptextPtr)
                           (coerce ct)
-                          (fromIntegral $ BS.length (v2Ciphertext envelope))
+                          (fromIntegral @Int @CULLong $ BS.length (v2Ciphertext envelope))
                           (coerce tg)
                           ad
-                          (fromIntegral $ BS.length aad)
+                          (fromIntegral @Int @CULLong $ BS.length aad)
                           (coerce np)
                           (coerce kp)
           if status /= 0
@@ -659,9 +657,9 @@ wrapKeyMaterial pass material = do
                               (coerce outCipher)
                               (coerce outTag)
                               (coerce skPtr)
-                              (fromIntegral legacyKeySize)
+                              (fromIntegral @Int @CULLong legacyKeySize)
                               ad
-                              (fromIntegral $ BS.length aad)
+                              (fromIntegral @Int @CULLong $ BS.length aad)
                               (coerce np)
                               (coerce kp)
                 if status /= 0
@@ -739,7 +737,7 @@ legacyMaterialFromMasterKey ::
 legacyMaterialFromMasterKey sec =
   withEncryptedKeyOutput XPrvInvalidSecretKey $ \outPtr ->
     withByteArray sec $ \psec ->
-      wallet_encrypted_new_from_mkg (coerce psec) (coerce outPtr)
+      wallet_encrypted_new_from_mkg (MasterKeyPtr psec) (coerce outPtr)
 
 legacyDerivePrivate ::
   DerivationScheme -> KeyMaterial -> DerivationIndex -> IO (Either XPrvError KeyMaterial)
@@ -771,12 +769,12 @@ deriveWrappingKey pass salt
             withByteArray salt $ \psalt ->
               wallet_sodium_argon2id
                 (coerce out)
-                (fromIntegral outputLen)
+                (fromIntegral @Int @CULLong outputLen)
                 (coerce ppass)
-                (fromIntegral $ B.length pass)
+                (fromIntegral @Int @CULLong $ B.length pass)
                 (coerce psalt)
-                (fromIntegral $ kdfTimeCost params)
-                memBytes
+                (fromIntegral @Word @CULLong $ kdfTimeCost params)
+                (fromIntegral @Word64 @CSize memBytes)
       pure (if status == 0 then Right key else Left XPrvInternalError)
 
 randomBytesIO :: Int -> IO (Either XPrvError ByteString)
@@ -785,7 +783,7 @@ randomBytesIO len = do
   case mode of
     SystemRandom -> do
       (status, bytes) <- B.allocRet len $ \out ->
-        wallet_sodium_randombytes out (fromIntegral len)
+        wallet_sodium_randombytes out (fromIntegral @Int @CSize len)
       pure $ if status == 0 then Right bytes else Left XPrvInternalError
     DeterministicRandom counter -> do
       let bytes = deterministicBytes len counter
@@ -834,7 +832,7 @@ foreign import ccall "cardano_wallet_encrypted_from_secret"
 
 foreign import ccall "cardano_wallet_encrypted_new_from_mkg"
   wallet_encrypted_new_from_mkg ::
-    SecretKeyPtr ->
+    MasterKeyPtr ->
     EncryptedKeyPtr ->
     IO CInt
 
@@ -871,17 +869,17 @@ foreign import ccall "cardano_wallet_encrypted_derive_public"
     IO CInt
 
 foreign import ccall "wallet_sodium_randombytes"
-  wallet_sodium_randombytes :: Ptr Word8 -> Word32 -> IO CInt
+  wallet_sodium_randombytes :: Ptr a -> CSize -> IO CInt
 
 foreign import ccall "wallet_sodium_argon2id"
   wallet_sodium_argon2id ::
     WrappingKeyPtr ->
-    Word32 ->
+    CULLong ->
     PassPhrasePtr ->
-    Word32 ->
+    CULLong ->
     SaltPtr ->
-    Word32 ->
-    Word64 ->
+    CULLong ->
+    CSize ->
     IO CInt
 
 foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
@@ -889,9 +887,9 @@ foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
     CiphertextPtr ->
     TagPtr ->
     SecretKeyPtr ->
-    Word32 ->
+    CULLong ->
     Ptr Word8 ->
-    Word32 ->
+    CULLong ->
     NoncePtr ->
     WrappingKeyPtr ->
     IO CInt
@@ -900,10 +898,10 @@ foreign import ccall "wallet_sodium_xchacha20poly1305_decrypt"
   wallet_sodium_xchacha20poly1305_decrypt ::
     SecretKeyPtr ->
     CiphertextPtr ->
-    Word32 ->
+    CULLong ->
     TagPtr ->
     Ptr Word8 ->
-    Word32 ->
+    CULLong ->
     NoncePtr ->
     WrappingKeyPtr ->
     IO CInt

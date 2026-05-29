@@ -9,7 +9,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic (monadicIO, run)
 
 import Cardano.Crypto.WalletHD.Encrypted
-import Test.Cardano.Crypto.WalletHD.Instances ()
+import Test.Cardano.Crypto.WalletHD.Arbitrary ()
 
 emptyPass :: BS.ByteString
 emptyPass = BS.empty

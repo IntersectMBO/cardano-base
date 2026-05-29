@@ -13,9 +13,10 @@ import qualified Test.Cardano.Crypto.Wallet.V2FormatSpec as V2Format
 
 main :: IO ()
 main = do
-  sodiumInit
-  withFastKdfForTesting . withDeterministicRandomnessForTesting $
-    hspec $ do
-      RoundTrip.tests
-      V2Format.tests
-      Sign.tests
+  let withInit runTests = do
+        sodiumInit
+        withFastKdfForTesting $ withDeterministicRandomnessForTesting runTests
+  hspec $ aroundAll_ withInit $ do
+    RoundTrip.tests
+    V2Format.tests
+    Sign.tests

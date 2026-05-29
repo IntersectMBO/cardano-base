@@ -5,12 +5,13 @@
 -- 'Arbitrary' 'EncryptedKey' always produces v2 envelopes wrapped with the
 -- empty passphrase so that tests can call passphrase-dependent operations
 -- without tracking a per-key passphrase.
-module Test.Cardano.Crypto.WalletHD.Instances () where
+module Test.Cardano.Crypto.WalletHD.Arbitrary () where
 
-import Control.Monad (replicateM)
 import qualified Data.ByteString as BS
 import System.IO.Unsafe (unsafePerformIO)
 import Test.QuickCheck
+
+import Test.Cardano.Base.Bytes (genByteString)
 
 import Cardano.Crypto.WalletHD.Encrypted
 
@@ -21,8 +22,11 @@ instance Arbitrary DerivationScheme where
 -- chain code, always encrypted with the empty passphrase.
 instance Arbitrary EncryptedKey where
   arbitrary = do
-    seed <- BS.pack <$> replicateM 32 arbitrary
-    cc <- BS.pack <$> replicateM 32 arbitrary
+    seed <- genByteString 32
+    cc <- genByteString 32
     case unsafePerformIO (encryptedCreate seed (BS.empty :: BS.ByteString) cc) of
       Right k -> pure k
+      -- Approximately 50% of the time `encryptedCreate` will fail due to
+      -- an invalid `cc`, since it is generated uniformly.
+      -- It is OK to retry half the time.
       Left _ -> arbitrary
