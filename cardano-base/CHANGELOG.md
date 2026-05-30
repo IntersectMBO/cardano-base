@@ -3,6 +3,7 @@
 ## 0.1.6.0
 
 * Re-export `byteArrayFromShortByteString`, `byteArrayToShortByteString`.
+* Deprecate `byteStringToByteArray` in favor of newly added `byteArrayFromByteString`
 
 ## 0.1.5.0
 
