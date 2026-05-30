@@ -2,6 +2,7 @@ module Test.Cardano.Crypto.Wallet.V2FormatSpec (tests) where
 
 import qualified Codec.CBOR.Decoding as CBOR
 import qualified Codec.CBOR.Read as CBOR
+import Control.Monad.Trans.Fail.String (errorFail)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Test.Hspec
@@ -28,42 +29,44 @@ wrongPass = BS.replicate 32 0x00
 -- If this changes, the key derivation C code has silently changed.
 -- ---------------------------------------------------------------------------
 
-expectedPublicKey :: BS.ByteString
+expectedPublicKey :: PublicKey
 expectedPublicKey =
-  BS.pack
-    [ 129
-    , 57
-    , 119
-    , 14
-    , 168
-    , 125
-    , 23
-    , 95
-    , 86
-    , 163
-    , 84
-    , 102
-    , 195
-    , 76
-    , 126
-    , 204
-    , 203
-    , 141
-    , 138
-    , 145
-    , 180
-    , 238
-    , 55
-    , 162
-    , 93
-    , 246
-    , 15
-    , 91
-    , 143
-    , 201
-    , 179
-    , 148
-    ]
+  errorFail $
+    mkPublicKey $
+      BS.pack
+        [ 129
+        , 57
+        , 119
+        , 14
+        , 168
+        , 125
+        , 23
+        , 95
+        , 86
+        , 163
+        , 84
+        , 102
+        , 195
+        , 76
+        , 126
+        , 204
+        , 203
+        , 141
+        , 138
+        , 145
+        , 180
+        , 238
+        , 55
+        , 162
+        , 93
+        , 246
+        , 15
+        , 91
+        , 143
+        , 201
+        , 179
+        , 148
+        ]
 
 tests :: Spec
 tests = describe "V2Format" $ do

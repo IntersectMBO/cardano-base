@@ -49,9 +49,11 @@ library
 
   build-depends:
     bytestring,
+    cardano-binary,
     cardano-crypto-class,
     cborg,
     deepseq,
+    FailT,
     memory,
 
   pkgconfig-depends: libsodium
@@ -97,6 +99,7 @@ test-suite tests
     cardano-crypto-wallet:{cardano-crypto-wallet, testlib},
     cborg,
     hspec,
+    FailT,
 
 benchmark bench
   import: base, project-config
