@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-crypto-class
-version: 2.5.0.0
+version: 2.5.0.1
 synopsis:
   Type classes abstracting over cryptography primitives for Cardano
 
@@ -125,7 +125,7 @@ library
     aeson,
     base16-bytestring >=1,
     bytestring,
-    cardano-base >=0.1.2,
+    cardano-base >=0.1.6,
     cardano-binary >=1.7.3,
     cardano-strict-containers,
     cborg,

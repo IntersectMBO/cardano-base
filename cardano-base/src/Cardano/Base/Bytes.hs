@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Cardano.Base.Bytes (
+  byteArrayFromByteString,
   byteArrayToByteString,
   byteStringToByteArray,
   byteArrayFromShortByteString,
@@ -24,9 +25,14 @@ byteArrayToByteString :: ByteArray -> ByteString
 byteArrayToByteString = SBS.fromShort . byteArrayToShortByteString
 {-# INLINE byteArrayToByteString #-}
 
+byteArrayFromByteString :: ByteString -> ByteArray
+byteArrayFromByteString = byteArrayFromShortByteString . SBS.toShort
+{-# INLINE byteArrayFromByteString #-}
+
 byteStringToByteArray :: ByteString -> ByteArray
 byteStringToByteArray = byteArrayFromShortByteString . SBS.toShort
 {-# INLINE byteStringToByteArray #-}
+{-# DEPRECATED byteStringToByteArray "In favor of more consistently named `byteArrayFromByteString`" #-}
 
 slice :: Word -> Word -> ByteString -> ByteString
 slice offset size =
