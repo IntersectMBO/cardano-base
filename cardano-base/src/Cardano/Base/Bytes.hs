@@ -4,6 +4,8 @@
 module Cardano.Base.Bytes (
   byteArrayToByteString,
   byteStringToByteArray,
+  byteArrayFromShortByteString,
+  byteArrayToShortByteString,
   slice,
   splitsAt,
 )
