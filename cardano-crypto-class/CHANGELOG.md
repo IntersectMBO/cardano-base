@@ -3,6 +3,7 @@
 ## 2.5.1.0
 
 * Add `psbToByteArray`
+* Add `psbFromByteStringM`
 
 ## 2.5.0.0
 

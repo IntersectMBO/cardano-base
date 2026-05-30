@@ -22,6 +22,7 @@ module Cardano.Crypto.PinnedSizedBytes (
   psbToBytes,
   psbToByteArray,
   psbFromByteString,
+  psbFromByteStringM,
   psbFromByteStringCheck,
   psbToByteString,
 
@@ -232,16 +233,28 @@ psbFromByteString bs =
     Just psb -> psb
 
 psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
-psbFromByteStringCheck bs
-  | BS.length bs == size = Just $
+psbFromByteStringCheck = psbFromByteStringM
+
+psbFromByteStringM ::
+  forall n m.
+  (KnownNat n, MonadFail m) =>
+  BS.ByteString -> m (PinnedSizedBytes n)
+psbFromByteStringM bs
+  | n == size = pure $
       unsafeDupablePerformIO $
         BS.useAsCStringLen bs $ \(Ptr addr#, _) -> do
           marr@(MutableByteArray marr#) <- newPinnedByteArray size
           primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
           arr <- unsafeFreezeByteArray marr
           return (PSB arr)
-  | otherwise = Nothing
+  | otherwise =
+      fail $
+        "Supplied ByteString with size: "
+          <> show n
+          <> " did not match the expected number of bytes: "
+          <> show size
   where
+    n = BS.length bs
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
 
