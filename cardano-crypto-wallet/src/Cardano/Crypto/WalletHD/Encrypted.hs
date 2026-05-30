@@ -67,10 +67,12 @@ import Data.IORef (
   readIORef,
   writeIORef,
  )
+import Data.Proxy (Proxy (..))
 import Data.Word
 import Foreign.C.Types
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr
+import GHC.TypeLits (natVal)
 import System.IO.Unsafe (unsafePerformIO)
 
 import Codec.CBOR.Decoding (
@@ -112,6 +114,18 @@ legacyKeySize = 64
 publicKeySize = 32
 ccSize = 32
 signatureSize = 64
+
+type SECRET_KEY_SIZE = 64
+
+secretKeySize :: Int
+secretKeySize = fromInteger (natVal (Proxy @SECRET_KEY_SIZE))
+
+newtype SecretKey = SecretKey {unSecretKey :: MLockedSizedBytes SECRET_KEY_SIZE}
+
+withSecretKeyPtr :: SecretKey -> (SecretKeyPtr -> IO a) -> IO a
+withSecretKeyPtr (SecretKey secretKey) action =
+  mlsbUseAsCPtr secretKey (action . SecretKeyPtr)
+{-# INLINE withSecretKeyPtr #-}
 
 type PublicKey = ByteString
 type ChainCode = ByteString
@@ -251,7 +265,7 @@ data V2Envelope = V2Envelope
 -- The caller who receives a 'KeyMaterial' from a 'decryptKeyMaterial'-style
 -- call is responsible for calling 'mlsbFinalize' on 'kmSecretKey' when done.
 data KeyMaterial = KeyMaterial
-  { kmSecretKey :: !(MLockedSizedBytes 64)
+  { kmSecretKey :: !SecretKey
   , kmPublicKey :: !PublicKey
   , kmChainCode :: !ChainCode
   }
@@ -298,7 +312,7 @@ encryptedCreate sec pass cc
       case emat of
         Left err -> pure (Left err)
         Right mat ->
-          finally (wrapKeyMaterial pass mat) (mlsbFinalize (kmSecretKey mat))
+          finally (wrapKeyMaterial pass mat) (mlsbFinalize (unSecretKey (kmSecretKey mat)))
 {-# NOINLINE encryptedCreate #-}
 
 encryptedCreateDirectWithTweak ::
@@ -311,7 +325,7 @@ encryptedCreateDirectWithTweak sec pass
       case emat of
         Left err -> pure (Left err)
         Right mat ->
-          finally (wrapKeyMaterial pass mat) (mlsbFinalize (kmSecretKey mat))
+          finally (wrapKeyMaterial pass mat) (mlsbFinalize (unSecretKey (kmSecretKey mat)))
 {-# NOINLINE encryptedCreateDirectWithTweak #-}
 
 encryptedValidatePassphrase ::
@@ -322,7 +336,7 @@ encryptedValidatePassphrase ekey pass = do
   case emat of
     Left err -> pure (Left err)
     Right mat -> do
-      mlsbFinalize (kmSecretKey mat)
+      mlsbFinalize (unSecretKey (kmSecretKey mat))
       pure (Right ())
 
 encryptedChangePass ::
@@ -334,7 +348,7 @@ encryptedChangePass oldPass newPass ekey =
     case emat of
       Left err -> pure (Left err)
       Right mat ->
-        restore (wrapKeyMaterial newPass mat) `finally` mlsbFinalize (kmSecretKey mat)
+        restore (wrapKeyMaterial newPass mat) `finally` mlsbFinalize (unSecretKey (kmSecretKey mat))
 
 encryptedSign ::
   (ByteArrayAccess passphrase, ByteArrayAccess msg) =>
@@ -357,7 +371,7 @@ encryptedSign ekey pass msg =
                       (coerce outSig)
               pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
           )
-          `finally` mlsbFinalize (kmSecretKey mat)
+          `finally` mlsbFinalize (unSecretKey (kmSecretKey mat))
 
 encryptedDerivePrivate ::
   ByteArrayAccess passphrase =>
@@ -377,9 +391,10 @@ encryptedDerivePrivate dscheme ekey pass childIndex =
             case echildMat of
               Left err -> pure (Left err)
               Right childMat ->
-                restore (wrapKeyMaterial pass childMat) `finally` mlsbFinalize (kmSecretKey childMat)
+                restore (wrapKeyMaterial pass childMat)
+                  `finally` mlsbFinalize (unSecretKey (kmSecretKey childMat))
         )
-          `finally` mlsbFinalize (kmSecretKey parentMat)
+          `finally` mlsbFinalize (unSecretKey (kmSecretKey parentMat))
 
 encryptedDerivePublic ::
   DerivationScheme ->
@@ -429,7 +444,7 @@ encryptedChainCode (EncryptedKey ekey) =
 -- done with it.
 encryptedKeyMaterial ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError (MLockedSizedBytes 64))
+  EncryptedKey -> passphrase -> IO (Either XPrvError SecretKey)
 encryptedKeyMaterial ekey pass = do
   emat <- decryptKeyMaterial ekey pass
   case emat of
@@ -598,16 +613,16 @@ v2Decrypt (EncryptedKey bs) pass =
         Left err -> pure (Left err)
         Right wrappingKey -> do
           let aad = encodeAad (v2PublicKey envelope) (v2ChainCode envelope)
-          ptextMlsb <- (mlsbNewZero :: IO (MLockedSizedBytes 64))
+          secretKey <- SecretKey <$> mlsbNewZero
           status <-
-            mlsbUseAsCPtr ptextMlsb $ \ptextPtr ->
+            withSecretKeyPtr secretKey $ \secretKeyPtr ->
               withByteArray (v2Ciphertext envelope) $ \ct ->
                 withByteArray (v2Tag envelope) $ \tg ->
                   withByteArray aad $ \ad ->
                     withByteArray (v2Nonce envelope) $ \np ->
                       withByteArray wrappingKey $ \kp ->
                         wallet_sodium_xchacha20poly1305_decrypt
-                          (coerce ptextPtr)
+                          secretKeyPtr
                           (coerce ct)
                           (fromIntegral @Int @CULLong $ BS.length (v2Ciphertext envelope))
                           (coerce tg)
@@ -617,14 +632,14 @@ v2Decrypt (EncryptedKey bs) pass =
                           (coerce kp)
           if status /= 0
             then do
-              mlsbFinalize ptextMlsb
+              mlsbFinalize (unSecretKey secretKey)
               pure (Left XPrvAuthenticationFailed)
             else do
-              let mat = KeyMaterial ptextMlsb (v2PublicKey envelope) (v2ChainCode envelope)
-              eVal <- validateKeyMaterial mat `onException` mlsbFinalize ptextMlsb
+              let mat = KeyMaterial secretKey (v2PublicKey envelope) (v2ChainCode envelope)
+              eVal <- validateKeyMaterial mat `onException` mlsbFinalize (unSecretKey secretKey)
               case eVal of
                 Left err -> do
-                  mlsbFinalize ptextMlsb
+                  mlsbFinalize (unSecretKey secretKey)
                   pure (Left err)
                 Right () -> pure (Right mat)
 
@@ -646,7 +661,7 @@ wrapKeyMaterial pass material = do
             Left err -> pure (Left err)
             Right wrappingKey -> do
               let aad = encodeAad (kmPublicKey material) (kmChainCode material)
-              mlsbUseAsCPtr (kmSecretKey material) $ \skPtr -> do
+              withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
                 ((status, tag), ciphertext) <-
                   B.allocRet legacyKeySize $ \outCipher ->
                     B.allocRet tagSize $ \outTag ->
@@ -656,7 +671,7 @@ wrapKeyMaterial pass material = do
                             wallet_sodium_xchacha20poly1305_encrypt
                               (coerce outCipher)
                               (coerce outTag)
-                              (coerce skPtr)
+                              skPtr
                               (fromIntegral @Int @CULLong legacyKeySize)
                               ad
                               (fromIntegral @Int @CULLong $ BS.length aad)
@@ -691,12 +706,12 @@ withLegacyStruct :: KeyMaterial -> (Ptr Word8 -> IO r) -> IO r
 withLegacyStruct mat action =
   bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \mlsb ->
     mlsbUseAsCPtr mlsb $ \base -> do
-      mlsbUseAsCPtr (kmSecretKey mat) $ \skPtr ->
-        copyBytes base skPtr 64
+      withSecretKeyPtr (kmSecretKey mat) $ \(SecretKeyPtr skPtr) ->
+        copyBytes base skPtr secretKeySize
       BS.useAsCStringLen (kmPublicKey mat) $ \(pkPtr, _) ->
-        copyBytes (base `plusPtr` 64) (castPtr pkPtr) 32
+        copyBytes (base `plusPtr` secretKeySize) (castPtr pkPtr) publicKeySize
       BS.useAsCStringLen (kmChainCode mat) $ \(ccPtr, _) ->
-        copyBytes (base `plusPtr` 96) (castPtr ccPtr) 32
+        copyBytes (base `plusPtr` (secretKeySize + publicKeySize)) (castPtr ccPtr) ccSize
       action base
 
 -- | Call a C function that writes a 128-byte @encrypted_key@ struct to the
@@ -709,15 +724,21 @@ withEncryptedKeyOutput ::
   IO (Either XPrvError KeyMaterial)
 withEncryptedKeyOutput onFailure action =
   bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \outMlsb -> do
-    r <- mlsbUseAsCPtr outMlsb $ \ptr -> action ptr
+    r <- mlsbUseAsCPtr outMlsb action
     if r /= 0
       then pure (Left onFailure)
       else mlsbUseAsCPtr outMlsb $ \base -> do
-        sk <- (mlsbNewZero :: IO (MLockedSizedBytes 64))
-        mlsbUseAsCPtr sk $ \skPtr -> copyBytes skPtr base 64
-        pub <- BS.packCStringLen (castPtr (base `plusPtr` 64), 32)
-        cc <- BS.packCStringLen (castPtr (base `plusPtr` 96), 32)
-        pure (Right (KeyMaterial sk pub cc))
+        secretKey <- mlsbNewZero
+        mlsbUseAsCPtr secretKey $ \skPtr -> copyBytes skPtr base secretKeySize
+        publicKey <- BS.packCStringLen (castPtr (base `plusPtr` secretKeySize), 32)
+        cc <- BS.packCStringLen (castPtr (base `plusPtr` (secretKeySize + publicKeySize)), 32)
+        pure $
+          Right $
+            KeyMaterial
+              { kmSecretKey = SecretKey secretKey
+              , kmPublicKey = publicKey
+              , kmChainCode = cc
+              }
 
 -- ---------------------------------------------------------------------------
 -- Internal: key-material construction (using C/ed25519)
