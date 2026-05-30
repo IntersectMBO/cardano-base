@@ -20,6 +20,7 @@ module Cardano.Crypto.PinnedSizedBytes (
   -- * Conversions
   psbFromBytes,
   psbToBytes,
+  psbToByteArray,
   psbFromByteString,
   psbFromByteStringCheck,
   psbToByteString,
@@ -76,6 +77,7 @@ import GHC.Exts (Int (..), copyAddrToByteArray#)
 import GHC.Ptr (Ptr (..))
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 import qualified Data.Primitive as Prim
 
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
@@ -186,8 +188,11 @@ instance KnownNat n => IsString (Code Q (PinnedSizedBytes n)) where
 psbToBytes :: PinnedSizedBytes n -> [Word8]
 psbToBytes (PSB ba) = foldrByteArray (:) [] ba
 
+psbToByteArray :: PinnedSizedBytes n -> ByteArray
+psbToByteArray (PSB ba) = ba
+
 psbToByteString :: PinnedSizedBytes n -> BS.ByteString
-psbToByteString = BS.pack . psbToBytes
+psbToByteString = SBS.fromShort . byteArrayToShortByteString . psbToByteArray
 
 psbToPackedBytes :: KnownNat n => PinnedSizedBytes n -> PackedBytes n
 psbToPackedBytes (PSB ba) = packBytes (byteArrayToShortByteString ba) 0
