@@ -38,6 +38,12 @@ module Cardano.Crypto.WalletHD.Encrypted (
   publicKeyByteArray,
   publicKeyByteString,
 
+  -- ** Encrypted SecretKey
+  EncSecretKey,
+  mkEncSecretKey,
+  encSecretKeyByteArray,
+  encSecretKeyByteString,
+
   -- ** ChainCode
   ChainCode,
   chainCodeSize,
@@ -182,13 +188,46 @@ type SECRET_KEY_SIZE = 64
 secretKeySize :: Int
 secretKeySize = fromInteger (natVal (Proxy @SECRET_KEY_SIZE))
 
+-- | Plaintext version of the secret key used for creating signatures
 newtype SecretKey = SecretKey {_unSecretKey :: MLockedSizedBytes SECRET_KEY_SIZE}
+
 newtype SecretKeyPtr = SecretKeyPtr (Ptr Word8)
 
 withSecretKeyPtr :: SecretKey -> (SecretKeyPtr -> IO a) -> IO a
 withSecretKeyPtr (SecretKey secretKey) action =
   mlsbUseAsCPtr secretKey (action . SecretKeyPtr)
 {-# INLINE withSecretKeyPtr #-}
+
+-- Encrypted version (same size as decrypted)
+
+-- | Encrypted version of `SecretKey`
+newtype EncSecretKey = EncSecretKey {unEncSecretKey :: PinnedSizedBytes SECRET_KEY_SIZE}
+  deriving (Eq, Show)
+newtype EncSecretKeyPtr = EncSecretKeyPtr (Ptr Word8)
+
+withEncSecretKeyPtr :: EncSecretKey -> (EncSecretKeyPtr -> IO a) -> IO a
+withEncSecretKeyPtr (EncSecretKey encSecretKey) action =
+  psbUseAsCPtr encSecretKey (action . EncSecretKeyPtr)
+{-# INLINE withEncSecretKeyPtr #-}
+
+mkEncSecretKey :: MonadFail f => ByteString -> f EncSecretKey
+mkEncSecretKey bs = EncSecretKey <$> psbFromByteStringM bs
+
+encSecretKeyByteArray :: EncSecretKey -> ByteArray
+encSecretKeyByteArray = psbToByteArray . unEncSecretKey
+
+encSecretKeyByteString :: EncSecretKey -> ByteString
+encSecretKeyByteString = psbToByteString . unEncSecretKey
+
+encodeEncSecretKey :: EncSecretKey -> Encoding
+encodeEncSecretKey = toCBOR . psbToByteArray . unEncSecretKey
+
+decodeEncSecretKey :: Decoder s EncSecretKey
+decodeEncSecretKey = do
+  saltBytes <- decodeBytes
+  case mkEncSecretKey saltBytes of
+    Nothing -> failDecoder XPrvInvalidCiphertextLength
+    Just salt -> pure salt
 
 ------------------------------------------------------------------------------
 -- PUBLIC_KEY
@@ -276,7 +315,6 @@ allocaKeyMaterialBuffer action =
   mlsbCreate KeyMaterialBuffer $ \(KeyMaterialBuffer keyMaterialBuffer) ->
     mlsbUseAsCPtr keyMaterialBuffer (action . KeyMaterialPtr)
 
-type Ciphertext = ByteString
 type AadContext = ByteString
 
 -- ---------------------------------------------------------------------------
@@ -503,7 +541,7 @@ data V2Envelope = V2Envelope
   , v2Nonce :: !Nonce
   , v2PublicKey :: !PublicKey
   , v2ChainCode :: !ChainCode
-  , v2Ciphertext :: !Ciphertext
+  , v2EncSecretKey :: !EncSecretKey
   , v2Tag :: !Tag
   }
   deriving (Eq, Show)
@@ -512,7 +550,6 @@ data V2Envelope = V2Envelope
 newtype MasterKeyPtr = MasterKeyPtr (Ptr Word8)
 newtype SignaturePtr = SignaturePtr (Ptr Word8)
 newtype PassPhrasePtr = PassPhrasePtr (Ptr Word8)
-newtype CiphertextPtr = CiphertextPtr (Ptr Word8)
 newtype WrappingKeyPtr = WrappingKeyPtr (Ptr Word8)
 
 type CDerivationScheme = CInt
@@ -679,8 +716,7 @@ decodeEnvelope = do
   when (cipherId /= xchacha20poly1305Id) (failDecoder XPrvUnsupportedCipher)
   nonce <- decodeNonce
   aad <- decodeBytes
-  ciphertext <- decodeBytes
-  when (BS.length ciphertext /= secretKeySize) (failDecoder XPrvInvalidCiphertextLength)
+  encSecretKey <- decodeEncSecretKey
   tag <- decodeTag
   (pub, cc) <- either failDecoder pure $ decodeAad aad
   pure $
@@ -689,7 +725,7 @@ decodeEnvelope = do
       , v2Nonce = nonce
       , v2PublicKey = pub
       , v2ChainCode = cc
-      , v2Ciphertext = ciphertext
+      , v2EncSecretKey = encSecretKey
       , v2Tag = tag
       }
 
@@ -709,7 +745,7 @@ encodeV2Envelope envelope =
       , encodeWord xchacha20poly1305Id
       , encodeNonce (v2Nonce envelope)
       , encodeBytes (encodeAad (v2PublicKey envelope) (v2ChainCode envelope))
-      , encodeBytes (v2Ciphertext envelope)
+      , encodeEncSecretKey (v2EncSecretKey envelope)
       , encodeTag (v2Tag envelope)
       ]
 
@@ -813,15 +849,15 @@ decryptKeyMaterialV2 secretKey eKey pass =
           let aad = encodeAad (v2PublicKey envelope) (v2ChainCode envelope)
           status <-
             withSecretKeyPtr secretKey $ \secretKeyPtr ->
-              withByteArray (v2Ciphertext envelope) $ \ct ->
+              withEncSecretKeyPtr (v2EncSecretKey envelope) $ \encSecretKeyPtr ->
                 withTagPtr (v2Tag envelope) $ \tagPtr ->
                   withByteArray aad $ \ad ->
                     withNoncePtr (v2Nonce envelope) $ \noncePtr ->
                       withByteArray wrappingKey $ \kp ->
                         wallet_sodium_xchacha20poly1305_decrypt
                           secretKeyPtr
-                          (coerce ct)
-                          (fromIntegral @Int @CULLong $ BS.length (v2Ciphertext envelope))
+                          encSecretKeyPtr
+                          (fromIntegral @Int @CULLong $ secretKeySize)
                           tagPtr
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
@@ -854,17 +890,16 @@ wrapKeyMaterial pass material = do
         Right wrappingKey -> do
           let aad = encodeAad (kmPublicKey material) (kmChainCode material)
           withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
-            ((tag, status), ciphertext) <-
-              B.allocRet secretKeySize $ \outCipher ->
+            (encSecretKey, (tag, status)) <-
+              fmap (first EncSecretKey) $ psbCreateResult $ \outEncSecretKey ->
                 fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
                   withByteArray aad $ \ad ->
                     withNoncePtr nonce $ \noncePtr ->
                       withByteArray wrappingKey $ \kp ->
                         wallet_sodium_xchacha20poly1305_encrypt
-                          (coerce outCipher)
+                          (coerce outEncSecretKey)
                           (TagPtr outTagPtr)
                           skPtr
-                          (fromIntegral @Int @CULLong secretKeySize)
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
                           noncePtr
@@ -876,7 +911,7 @@ wrapKeyMaterial pass material = do
                   Right $
                     EncryptedKey $
                       encodeV2Envelope $
-                        V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) ciphertext tag
+                        V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) encSecretKey tag
 
 -- | Verify that associated public key matches the secret key in the `KeyMaterial`
 validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
@@ -1116,10 +1151,9 @@ foreign import ccall "wallet_sodium_argon2id"
 
 foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
   wallet_sodium_xchacha20poly1305_encrypt ::
-    CiphertextPtr ->
+    EncSecretKeyPtr ->
     TagPtr ->
     SecretKeyPtr ->
-    CULLong ->
     Ptr Word8 ->
     CULLong ->
     NoncePtr ->
@@ -1129,7 +1163,7 @@ foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
 foreign import ccall "wallet_sodium_xchacha20poly1305_decrypt"
   wallet_sodium_xchacha20poly1305_decrypt ::
     SecretKeyPtr ->
-    CiphertextPtr ->
+    EncSecretKeyPtr ->
     CULLong ->
     TagPtr ->
     Ptr Word8 ->
