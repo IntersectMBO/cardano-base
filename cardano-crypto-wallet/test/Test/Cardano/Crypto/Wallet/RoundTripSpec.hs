@@ -96,9 +96,9 @@ tests = describe "RoundTrip" $ do
             (pub2, _) = encryptedDerivePublic DerivationScheme2 (pub, cc) 0
         pub1 `shouldNotBe` pub2
 
-  prop "encryptedKey . unEncryptedKey is identity" $
+  prop "mkEncryptedKey . unEncryptedKey is identity" $
     \(key :: EncryptedKey) ->
-      case encryptedKey (unEncryptedKey key) of
+      case mkEncryptedKey (unEncryptedKey key) of
         Left err -> counterexample ("re-parse failed: " ++ show err) False
         Right key' -> unEncryptedKey key === unEncryptedKey key'
 
