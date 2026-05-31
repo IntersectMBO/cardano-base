@@ -59,6 +59,13 @@ module Cardano.Crypto.WalletHD.Encrypted (
   nonceByteArray,
   nonceByteString,
 
+  -- ** Tag
+  Tag,
+  tagSize,
+  mkTag,
+  tagByteArray,
+  tagByteString,
+
   -- * Construction & validation
   encryptedCreate,
   encryptedCreateDirectWithTweak,
@@ -270,7 +277,6 @@ allocaKeyMaterialBuffer action =
     mlsbUseAsCPtr keyMaterialBuffer (action . KeyMaterialPtr)
 
 type Ciphertext = ByteString
-type AuthenticationTag = ByteString
 type AadContext = ByteString
 
 -- ---------------------------------------------------------------------------
@@ -310,9 +316,6 @@ productionArgonMemoryKiB = kdfMemoryKiB productionKdfParams
 productionArgonTimeCost = kdfTimeCost productionKdfParams
 productionArgonParallelism = kdfParallelism productionKdfParams
 productionArgonOutputLength = kdfOutputLength productionKdfParams
-
-tagSize :: Int
-tagSize = 16
 
 -- ---------------------------------------------------------------------------
 -- Random-mode override (for testing)
@@ -458,13 +461,50 @@ decodeNonce = do
     Nothing -> failDecoder XPrvInvalidNonceLength
     Just nonce -> pure nonce
 
+------------------------------------------------------------------------------
+-- TAG
+------------------------------------------------------------------------------
+
+type TAG_SIZE = 16
+
+tagSize :: Int
+tagSize = fromInteger (natVal (Proxy @TAG_SIZE))
+
+newtype Tag = Tag {unTag :: PinnedSizedBytes TAG_SIZE}
+  deriving (Eq, Show)
+newtype TagPtr = TagPtr (Ptr Word8)
+
+withTagPtr :: Tag -> (TagPtr -> IO a) -> IO a
+withTagPtr (Tag publicKey) action =
+  psbUseAsCPtr publicKey (action . TagPtr)
+{-# INLINE withTagPtr #-}
+
+mkTag :: MonadFail f => ByteString -> f Tag
+mkTag bs = Tag <$> psbFromByteStringM bs
+
+tagByteArray :: Tag -> ByteArray
+tagByteArray = psbToByteArray . unTag
+
+tagByteString :: Tag -> ByteString
+tagByteString = psbToByteString . unTag
+
+encodeTag :: Tag -> Encoding
+encodeTag = toCBOR . psbToByteArray . unTag
+
+decodeTag :: Decoder s Tag
+decodeTag = do
+  tagBytes <- decodeBytes
+  case mkTag tagBytes of
+    Nothing -> failDecoder XPrvInvalidTagLength
+    Just tag -> pure tag
+
 data V2Envelope = V2Envelope
   { v2Salt :: !Salt
   , v2Nonce :: !Nonce
   , v2PublicKey :: !PublicKey
   , v2ChainCode :: !ChainCode
   , v2Ciphertext :: !Ciphertext
-  , v2Tag :: !AuthenticationTag
+  , v2Tag :: !Tag
   }
   deriving (Eq, Show)
 
@@ -472,7 +512,6 @@ data V2Envelope = V2Envelope
 newtype MasterKeyPtr = MasterKeyPtr (Ptr Word8)
 newtype SignaturePtr = SignaturePtr (Ptr Word8)
 newtype PassPhrasePtr = PassPhrasePtr (Ptr Word8)
-newtype TagPtr = TagPtr (Ptr Word8)
 newtype CiphertextPtr = CiphertextPtr (Ptr Word8)
 newtype WrappingKeyPtr = WrappingKeyPtr (Ptr Word8)
 
@@ -642,8 +681,7 @@ decodeEnvelope = do
   aad <- decodeBytes
   ciphertext <- decodeBytes
   when (BS.length ciphertext /= secretKeySize) (failDecoder XPrvInvalidCiphertextLength)
-  tag <- decodeBytes
-  when (BS.length tag /= tagSize) (failDecoder XPrvInvalidTagLength)
+  tag <- decodeTag
   (pub, cc) <- either failDecoder pure $ decodeAad aad
   pure $
     V2Envelope
@@ -672,7 +710,7 @@ encodeV2Envelope envelope =
       , encodeNonce (v2Nonce envelope)
       , encodeBytes (encodeAad (v2PublicKey envelope) (v2ChainCode envelope))
       , encodeBytes (v2Ciphertext envelope)
-      , encodeBytes (v2Tag envelope)
+      , encodeTag (v2Tag envelope)
       ]
 
 encodeAad :: PublicKey -> ChainCode -> AadContext
@@ -776,7 +814,7 @@ decryptKeyMaterialV2 secretKey eKey pass =
           status <-
             withSecretKeyPtr secretKey $ \secretKeyPtr ->
               withByteArray (v2Ciphertext envelope) $ \ct ->
-                withByteArray (v2Tag envelope) $ \tg ->
+                withTagPtr (v2Tag envelope) $ \tagPtr ->
                   withByteArray aad $ \ad ->
                     withNoncePtr (v2Nonce envelope) $ \noncePtr ->
                       withByteArray wrappingKey $ \kp ->
@@ -784,7 +822,7 @@ decryptKeyMaterialV2 secretKey eKey pass =
                           secretKeyPtr
                           (coerce ct)
                           (fromIntegral @Int @CULLong $ BS.length (v2Ciphertext envelope))
-                          (coerce tg)
+                          tagPtr
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
                           noncePtr
@@ -816,15 +854,15 @@ wrapKeyMaterial pass material = do
         Right wrappingKey -> do
           let aad = encodeAad (kmPublicKey material) (kmChainCode material)
           withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
-            ((status, tag), ciphertext) <-
+            ((tag, status), ciphertext) <-
               B.allocRet secretKeySize $ \outCipher ->
-                B.allocRet tagSize $ \outTag ->
+                fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
                   withByteArray aad $ \ad ->
                     withNoncePtr nonce $ \noncePtr ->
                       withByteArray wrappingKey $ \kp ->
                         wallet_sodium_xchacha20poly1305_encrypt
                           (coerce outCipher)
-                          (coerce outTag)
+                          (TagPtr outTagPtr)
                           skPtr
                           (fromIntegral @Int @CULLong secretKeySize)
                           ad
