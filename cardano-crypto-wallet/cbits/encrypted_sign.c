@@ -405,7 +405,7 @@ int wallet_sodium_xchacha20poly1305_encrypt(
 }
 
 int wallet_sodium_xchacha20poly1305_decrypt(
-	uint8_t *plaintext,
+	uint8_t *secret_to_decrypt,
 	uint8_t const *ciphertext,
 	unsigned long long ciphertext_len,
 	uint8_t const tag[crypto_aead_xchacha20poly1305_ietf_ABYTES],
@@ -426,7 +426,7 @@ int wallet_sodium_xchacha20poly1305_decrypt(
 	memcpy(combined, ciphertext, (size_t) ciphertext_len);
 	memcpy(combined + ciphertext_len, tag, crypto_aead_xchacha20poly1305_ietf_ABYTES);
 	if (crypto_aead_xchacha20poly1305_ietf_decrypt(
-		plaintext,
+		secret_to_decrypt,
 		&plen,
 		NULL,
 		combined,
