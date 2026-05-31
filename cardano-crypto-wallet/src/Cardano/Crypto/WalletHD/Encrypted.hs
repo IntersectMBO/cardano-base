@@ -33,15 +33,31 @@ module Cardano.Crypto.WalletHD.Encrypted (
 
   -- ** PublicKey
   PublicKey,
+  publicKeySize,
   mkPublicKey,
   publicKeyByteArray,
   publicKeyByteString,
 
   -- ** ChainCode
   ChainCode,
+  chainCodeSize,
   mkChainCode,
   chainCodeByteArray,
   chainCodeByteString,
+
+  -- ** Salt
+  Salt,
+  saltSize,
+  mkSalt,
+  saltByteArray,
+  saltByteString,
+
+  -- ** Nonce
+  Nonce,
+  nonceSize,
+  mkNonce,
+  nonceByteArray,
+  nonceByteString,
 
   -- * Construction & validation
   encryptedCreate,
@@ -73,11 +89,14 @@ import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
   psbCreate,
   psbCreateResult,
+  psbCreateResultLen,
+  psbFromByteString,
   psbFromByteStringM,
   psbToByteArray,
   psbToByteString,
   psbUseAsCPtr,
  )
+import Control.Arrow (first)
 import Control.DeepSeq
 import Control.Exception (bracket)
 import Control.Monad (when)
@@ -250,8 +269,6 @@ allocaKeyMaterialBuffer action =
   mlsbCreate KeyMaterialBuffer $ \(KeyMaterialBuffer keyMaterialBuffer) ->
     mlsbUseAsCPtr keyMaterialBuffer (action . KeyMaterialPtr)
 
-type Salt = ByteString
-type Nonce = ByteString
 type Ciphertext = ByteString
 type AuthenticationTag = ByteString
 type AadContext = ByteString
@@ -294,9 +311,7 @@ productionArgonTimeCost = kdfTimeCost productionKdfParams
 productionArgonParallelism = kdfParallelism productionKdfParams
 productionArgonOutputLength = kdfOutputLength productionKdfParams
 
-saltSize, nonceSize, tagSize :: Int
-saltSize = 32
-nonceSize = 24
+tagSize :: Int
 tagSize = 16
 
 -- ---------------------------------------------------------------------------
@@ -369,6 +384,80 @@ newtype EncryptedKey = EncryptedKey ByteString
 -- V2 envelope data
 -- ---------------------------------------------------------------------------
 
+------------------------------------------------------------------------------
+-- SALT
+------------------------------------------------------------------------------
+
+type SALT_SIZE = 32
+
+saltSize :: Int
+saltSize = fromInteger (natVal (Proxy @SALT_SIZE))
+
+newtype Salt = Salt {unSalt :: PinnedSizedBytes SALT_SIZE}
+  deriving (Eq, Show)
+newtype SaltPtr = SaltPtr (Ptr Word8)
+
+withSaltPtr :: Salt -> (SaltPtr -> IO a) -> IO a
+withSaltPtr (Salt publicKey) action =
+  psbUseAsCPtr publicKey (action . SaltPtr)
+{-# INLINE withSaltPtr #-}
+
+mkSalt :: MonadFail f => ByteString -> f Salt
+mkSalt bs = Salt <$> psbFromByteStringM bs
+
+saltByteArray :: Salt -> ByteArray
+saltByteArray = psbToByteArray . unSalt
+
+saltByteString :: Salt -> ByteString
+saltByteString = psbToByteString . unSalt
+
+encodeSalt :: Salt -> Encoding
+encodeSalt = toCBOR . psbToByteArray . unSalt
+
+decodeSalt :: Decoder s Salt
+decodeSalt = do
+  saltBytes <- decodeBytes
+  case mkSalt saltBytes of
+    Nothing -> failDecoder XPrvInvalidSaltLength
+    Just salt -> pure salt
+
+------------------------------------------------------------------------------
+-- NONCE
+------------------------------------------------------------------------------
+
+type NONCE_SIZE = 24
+
+nonceSize :: Int
+nonceSize = fromInteger (natVal (Proxy @NONCE_SIZE))
+
+newtype Nonce = Nonce {unNonce :: PinnedSizedBytes NONCE_SIZE}
+  deriving (Eq, Show)
+newtype NoncePtr = NoncePtr (Ptr Word8)
+
+withNoncePtr :: Nonce -> (NoncePtr -> IO a) -> IO a
+withNoncePtr (Nonce publicKey) action =
+  psbUseAsCPtr publicKey (action . NoncePtr)
+{-# INLINE withNoncePtr #-}
+
+mkNonce :: MonadFail f => ByteString -> f Nonce
+mkNonce bs = Nonce <$> psbFromByteStringM bs
+
+nonceByteArray :: Nonce -> ByteArray
+nonceByteArray = psbToByteArray . unNonce
+
+nonceByteString :: Nonce -> ByteString
+nonceByteString = psbToByteString . unNonce
+
+encodeNonce :: Nonce -> Encoding
+encodeNonce = toCBOR . psbToByteArray . unNonce
+
+decodeNonce :: Decoder s Nonce
+decodeNonce = do
+  nonceBytes <- decodeBytes
+  case mkNonce nonceBytes of
+    Nothing -> failDecoder XPrvInvalidNonceLength
+    Just nonce -> pure nonce
+
 data V2Envelope = V2Envelope
   { v2Salt :: !Salt
   , v2Nonce :: !Nonce
@@ -383,8 +472,6 @@ data V2Envelope = V2Envelope
 newtype MasterKeyPtr = MasterKeyPtr (Ptr Word8)
 newtype SignaturePtr = SignaturePtr (Ptr Word8)
 newtype PassPhrasePtr = PassPhrasePtr (Ptr Word8)
-newtype SaltPtr = SaltPtr (Ptr Word8)
-newtype NoncePtr = NoncePtr (Ptr Word8)
 newtype TagPtr = TagPtr (Ptr Word8)
 newtype CiphertextPtr = CiphertextPtr (Ptr Word8)
 newtype WrappingKeyPtr = WrappingKeyPtr (Ptr Word8)
@@ -485,23 +572,21 @@ encryptedDerivePublic dscheme (publicKey, cc) childIndex
   | childIndex >= 0x80000000 =
       error "encryptedDerivePublic: cannot derive hardened key from public key"
   | otherwise = unsafePerformIO $ do
-      (newPublicKey, newChainCode) <-
-        psbCreateResult $ \publicKeyPtrOut ->
-          psbCreate $ \ccOutPtr ->
-            withPublicKeyPtr publicKey $ \publicKeyPtr ->
-              withChainCodePtr cc $ \chainCodePtr -> do
-                r <-
-                  wallet_derive_public
-                    publicKeyPtr
-                    chainCodePtr
-                    childIndex
-                    (PublicKeyPtr publicKeyPtrOut)
-                    (ChainCodePtr ccOutPtr)
-                    (dschemeToC dscheme)
-                if r /= 0
-                  then error "encryptedDerivePublic: hardened index check failed"
-                  else pure ()
-      pure (PublicKey newPublicKey, ChainCode newChainCode)
+      fmap (first PublicKey) $ psbCreateResult $ \publicKeyPtrOut ->
+        fmap ChainCode $ psbCreate $ \ccOutPtr ->
+          withPublicKeyPtr publicKey $ \publicKeyPtr ->
+            withChainCodePtr cc $ \chainCodePtr -> do
+              r <-
+                wallet_derive_public
+                  publicKeyPtr
+                  chainCodePtr
+                  childIndex
+                  (PublicKeyPtr publicKeyPtrOut)
+                  (ChainCodePtr ccOutPtr)
+                  (dschemeToC dscheme)
+              if r /= 0
+                then error "encryptedDerivePublic: hardened index check failed"
+                else pure ()
 
 encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
 encryptedPublic eKey@(EncryptedKey eKeyBytes) =
@@ -550,12 +635,10 @@ decodeEnvelope = do
         || outputLength /= productionArgonOutputLength
     )
     (failDecoder XPrvInvalidKdfParams)
-  salt <- decodeBytes
-  when (BS.length salt /= saltSize) (failDecoder XPrvInvalidSaltLength)
+  salt <- decodeSalt
   cipherId <- decodeWord
   when (cipherId /= xchacha20poly1305Id) (failDecoder XPrvUnsupportedCipher)
-  nonce <- decodeBytes
-  when (BS.length nonce /= nonceSize) (failDecoder XPrvInvalidNonceLength)
+  nonce <- decodeNonce
   aad <- decodeBytes
   ciphertext <- decodeBytes
   when (BS.length ciphertext /= secretKeySize) (failDecoder XPrvInvalidCiphertextLength)
@@ -584,9 +667,9 @@ encodeV2Envelope envelope =
       , encodeWord productionArgonTimeCost
       , encodeWord productionArgonParallelism
       , encodeWord productionArgonOutputLength
-      , encodeBytes (v2Salt envelope)
+      , encodeSalt (v2Salt envelope)
       , encodeWord xchacha20poly1305Id
-      , encodeBytes (v2Nonce envelope)
+      , encodeNonce (v2Nonce envelope)
       , encodeBytes (encodeAad (v2PublicKey envelope) (v2ChainCode envelope))
       , encodeBytes (v2Ciphertext envelope)
       , encodeBytes (v2Tag envelope)
@@ -676,7 +759,7 @@ withDecryptedKeyMaterial ekey pass action =
 
 decryptKeyMaterialV2 ::
   ByteArrayAccess passphrase =>
-  -- | SecretKey that will be populated from EncryptedKey
+  -- | Empty SecretKey that will be populated from EncryptedKey
   SecretKey ->
   EncryptedKey ->
   passphrase ->
@@ -695,7 +778,7 @@ decryptKeyMaterialV2 secretKey eKey pass =
               withByteArray (v2Ciphertext envelope) $ \ct ->
                 withByteArray (v2Tag envelope) $ \tg ->
                   withByteArray aad $ \ad ->
-                    withByteArray (v2Nonce envelope) $ \np ->
+                    withNoncePtr (v2Nonce envelope) $ \noncePtr ->
                       withByteArray wrappingKey $ \kp ->
                         wallet_sodium_xchacha20poly1305_decrypt
                           secretKeyPtr
@@ -704,7 +787,7 @@ decryptKeyMaterialV2 secretKey eKey pass =
                           (coerce tg)
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
-                          (coerce np)
+                          noncePtr
                           (coerce kp)
           if status /= 0
             then
@@ -722,8 +805,8 @@ wrapKeyMaterial ::
   ByteArrayAccess passphrase =>
   passphrase -> KeyMaterial Validated -> IO (Either XPrvError EncryptedKey)
 wrapKeyMaterial pass material = do
-  eSalt <- randomBytesIO saltSize
-  eNonce <- randomBytesIO nonceSize
+  eSalt <- fmap Salt <$> randomBytesIO
+  eNonce <- fmap Nonce <$> randomBytesIO
   case (,) <$> eSalt <*> eNonce of
     Left err -> pure (Left err)
     Right (salt, nonce) -> do
@@ -737,7 +820,7 @@ wrapKeyMaterial pass material = do
               B.allocRet secretKeySize $ \outCipher ->
                 B.allocRet tagSize $ \outTag ->
                   withByteArray aad $ \ad ->
-                    withByteArray nonce $ \np ->
+                    withNoncePtr nonce $ \noncePtr ->
                       withByteArray wrappingKey $ \kp ->
                         wallet_sodium_xchacha20poly1305_encrypt
                           (coerce outCipher)
@@ -746,7 +829,7 @@ wrapKeyMaterial pass material = do
                           (fromIntegral @Int @CULLong secretKeySize)
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
-                          (coerce np)
+                          noncePtr
                           (coerce kp)
             if status /= 0
               then pure (Left XPrvInternalError)
@@ -868,37 +951,36 @@ legacyDerivePrivate dscheme parent childIndex action =
 
 deriveWrappingKey ::
   ByteArrayAccess passphrase =>
-  passphrase -> ByteString -> IO (Either XPrvError B.ScrubbedBytes)
-deriveWrappingKey pass salt
-  | BS.length salt /= saltSize = pure (Left XPrvInvalidSaltLength)
-  | otherwise = do
-      params <- readRuntimeKdfParams
-      let outputLen = fromIntegral (kdfOutputLength params)
-          memBytes = fromIntegral (kdfMemoryKiB params) * 1024 :: Word64
-      (status, key) <-
-        B.allocRet outputLen $ \out ->
-          withByteArray pass $ \ppass ->
-            withByteArray salt $ \psalt ->
-              wallet_sodium_argon2id
-                (coerce out)
-                (fromIntegral @Int @CULLong outputLen)
-                (coerce ppass)
-                (fromIntegral @Int @CULLong $ B.length pass)
-                (coerce psalt)
-                (fromIntegral @Word @CULLong $ kdfTimeCost params)
-                (fromIntegral @Word64 @CSize memBytes)
-      pure (if status == 0 then Right key else Left XPrvInternalError)
+  passphrase -> Salt -> IO (Either XPrvError B.ScrubbedBytes)
+deriveWrappingKey pass salt = do
+  params <- readRuntimeKdfParams
+  let outputLen = fromIntegral (kdfOutputLength params)
+      memBytes = fromIntegral (kdfMemoryKiB params) * 1024 :: Word64
+  (status, key) <-
+    B.allocRet outputLen $ \out ->
+      withByteArray pass $ \ppass ->
+        withSaltPtr salt $ \saltPtr ->
+          wallet_sodium_argon2id
+            (coerce out)
+            (fromIntegral @Int @CULLong outputLen)
+            (coerce ppass)
+            (fromIntegral @Int @CULLong $ B.length pass)
+            saltPtr
+            (fromIntegral @Word @CULLong $ kdfTimeCost params)
+            (fromIntegral @Word64 @CSize memBytes)
+  pure (if status == 0 then Right key else Left XPrvInternalError)
 
-randomBytesIO :: Int -> IO (Either XPrvError ByteString)
-randomBytesIO len = do
+randomBytesIO :: KnownNat n => IO (Either XPrvError (PinnedSizedBytes n))
+randomBytesIO = do
   mode <- readIORef randomModeRef
   case mode of
     SystemRandom -> do
-      (status, bytes) <- B.allocRet len $ \out ->
-        wallet_sodium_randombytes out (fromIntegral @Int @CSize len)
+      (bytes, status) <- psbCreateResultLen wallet_sodium_randombytes
       pure $ if status == 0 then Right bytes else Left XPrvInternalError
     DeterministicRandom counter -> do
-      let bytes = deterministicBytes len counter
+      let
+        len = fromInteger (natVal bytes)
+        bytes = psbFromByteString (deterministicBytes len counter)
       writeIORef randomModeRef (DeterministicRandom (counter + 1))
       pure (Right bytes)
 
