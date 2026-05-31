@@ -743,17 +743,15 @@ wrapKeyMaterial pass material = do
                       encodeV2Envelope $
                         V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) ciphertext tag
 
+-- | Verify that associated public key matches the secret key in the `KeyMaterial`
 validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
 validateKeyMaterial keyMaterial@KeyMaterial {..} =
-  withLegacyStruct keyMaterial $ \inPtr ->
-    bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \outMlsb -> do
-      r <-
-        mlsbUseAsCPtr outMlsb $ \outPtr ->
-          wallet_encrypted_decrypt (coerce inPtr) (coerce outPtr)
-      pure $
-        if r /= 0
-          then Left XPrvPublicKeyMismatch
-          else Right (KeyMaterial {..})
+  withLegacyStruct keyMaterial $ \inPtr -> do
+    r <- wallet_validate (coerce inPtr)
+    pure $
+      if r /= 0
+        then Left XPrvPublicKeyMismatch
+        else Right (KeyMaterial {..})
 
 -- ---------------------------------------------------------------------------
 -- Internal: locked memory helpers
@@ -935,9 +933,8 @@ foreign import ccall "cardano_wallet_encrypted_new_from_mkg"
     EncryptedKeyPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_decrypt"
-  wallet_encrypted_decrypt ::
-    EncryptedKeyPtr ->
+foreign import ccall "cardano_wallet_validate"
+  wallet_validate ::
     EncryptedKeyPtr ->
     IO CInt
 
