@@ -407,7 +407,6 @@ int wallet_sodium_xchacha20poly1305_encrypt(
 int wallet_sodium_xchacha20poly1305_decrypt(
 	uint8_t *secret_to_decrypt,
 	uint8_t const *ciphertext,
-	unsigned long long ciphertext_len,
 	uint8_t const tag[crypto_aead_xchacha20poly1305_ietf_ABYTES],
 	uint8_t const *aad,
 	unsigned long long aad_len,
@@ -420,17 +419,14 @@ int wallet_sodium_xchacha20poly1305_decrypt(
 	if (ensure_sodium() != 0) {
 		return 1;
 	}
-	if (ciphertext_len != UNENCRYPTED_KEY_SIZE) {
-		return 1;
-	}
-	memcpy(combined, ciphertext, (size_t) ciphertext_len);
-	memcpy(combined + ciphertext_len, tag, crypto_aead_xchacha20poly1305_ietf_ABYTES);
+	memcpy(combined, ciphertext, (size_t) UNENCRYPTED_KEY_SIZE);
+	memcpy(combined + UNENCRYPTED_KEY_SIZE, tag, crypto_aead_xchacha20poly1305_ietf_ABYTES);
 	if (crypto_aead_xchacha20poly1305_ietf_decrypt(
 		secret_to_decrypt,
 		&plen,
 		NULL,
 		combined,
-		ciphertext_len + crypto_aead_xchacha20poly1305_ietf_ABYTES,
+		UNENCRYPTED_KEY_SIZE + crypto_aead_xchacha20poly1305_ietf_ABYTES,
 		aad,
 		aad_len,
 		nonce,
@@ -439,5 +435,5 @@ int wallet_sodium_xchacha20poly1305_decrypt(
 		return 1;
 	}
 	secure_clear(combined, sizeof(combined));
-	return (plen == ciphertext_len) ? 0 : 1;
+	return (plen == UNENCRYPTED_KEY_SIZE) ? 0 : 1;
 }

@@ -857,7 +857,6 @@ decryptKeyMaterialV2 secretKey eKey pass =
                         wallet_sodium_xchacha20poly1305_decrypt
                           secretKeyPtr
                           encSecretKeyPtr
-                          (fromIntegral @Int @CULLong $ secretKeySize)
                           tagPtr
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
@@ -1164,7 +1163,6 @@ foreign import ccall "wallet_sodium_xchacha20poly1305_decrypt"
   wallet_sodium_xchacha20poly1305_decrypt ::
     SecretKeyPtr ->
     EncSecretKeyPtr ->
-    CULLong ->
     TagPtr ->
     Ptr Word8 ->
     CULLong ->
