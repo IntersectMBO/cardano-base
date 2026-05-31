@@ -67,7 +67,7 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbUseAsCPtr,
  )
 import Control.DeepSeq
-import Control.Exception (bracket, finally)
+import Control.Exception (bracket)
 import Control.Monad (when)
 import Control.Monad.Trans.Fail.String (errorFail)
 import Data.Bits (shiftR)
@@ -357,12 +357,7 @@ encryptedCreate ::
 encryptedCreate sec pass cc
   | B.length sec /= 32 = pure (Left XPrvInvalidSecretKey)
   | B.length cc /= ccSize = pure (Left XPrvInvalidChainCode)
-  | otherwise = do
-      emat <- legacyMaterialFromSecret sec cc
-      case emat of
-        Left err -> pure (Left err)
-        Right mat ->
-          finally (wrapKeyMaterial pass mat) (mlsbFinalize (unSecretKey (kmSecretKey mat)))
+  | otherwise = legacyMaterialFromSecret sec cc (wrapKeyMaterial pass)
 {-# NOINLINE encryptedCreate #-}
 
 encryptedCreateDirectWithTweak ::
@@ -370,12 +365,7 @@ encryptedCreateDirectWithTweak ::
   secret -> passphrase -> IO (Either XPrvError EncryptedKey)
 encryptedCreateDirectWithTweak sec pass
   | B.length sec /= 96 = pure (Left XPrvInvalidSecretKey)
-  | otherwise = do
-      emat <- legacyMaterialFromMasterKey sec
-      case emat of
-        Left err -> pure (Left err)
-        Right mat ->
-          finally (wrapKeyMaterial pass mat) (mlsbFinalize (unSecretKey (kmSecretKey mat)))
+  | otherwise = legacyMaterialFromMasterKey sec (wrapKeyMaterial pass)
 {-# NOINLINE encryptedCreateDirectWithTweak #-}
 
 encryptedValidatePassphrase ::
@@ -414,13 +404,8 @@ encryptedDerivePrivate ::
   DerivationIndex ->
   IO (Either XPrvError EncryptedKey)
 encryptedDerivePrivate dScheme eKey pass childIndex =
-  withDecryptedKeyMaterial eKey pass $ \parentKeyMaterial -> do
-    echildMat <- legacyDerivePrivate dScheme parentKeyMaterial childIndex
-    case echildMat of
-      Left err -> pure (Left err)
-      Right childMat ->
-        wrapKeyMaterial pass childMat
-          `finally` mlsbFinalize (unSecretKey (kmSecretKey childMat))
+  withDecryptedKeyMaterial eKey pass $ \parentKeyMaterial ->
+    legacyDerivePrivate dScheme parentKeyMaterial childIndex (wrapKeyMaterial pass)
 
 encryptedDerivePublic ::
   DerivationScheme ->
@@ -738,22 +723,22 @@ withLegacyStruct mat action =
 -- 'MLockedSizedBytes 64' in the returned 'KeyMaterial' and must finalize it.
 withEncryptedKeyOutput ::
   XPrvError ->
+  (KeyMaterial -> IO (Either XPrvError a)) ->
   (Ptr Word8 -> IO CInt) ->
-  IO (Either XPrvError KeyMaterial)
-withEncryptedKeyOutput onFailure action =
+  IO (Either XPrvError a)
+withEncryptedKeyOutput onFailure keyMaterialAction structPtrAction =
   bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \tmpMlsb -> do
-    r <- mlsbUseAsCPtr tmpMlsb action
+    r <- mlsbUseAsCPtr tmpMlsb structPtrAction
     if r /= 0
       then pure (Left onFailure)
       else mlsbUseAsCPtr tmpMlsb $ \tmpPtr -> do
-        secretKey <- mlsbNewZero
-        mlsbUseAsCPtr secretKey $ \skPtr -> copyBytes skPtr tmpPtr secretKeySize
-        publicKey <-
-          psbCreate $ \pkPtr ->
-            copyBytes pkPtr (tmpPtr `plusPtr` secretKeySize) publicKeySize
-        cc <- BS.packCStringLen (castPtr (tmpPtr `plusPtr` (secretKeySize + publicKeySize)), 32)
-        pure $
-          Right $
+        bracket mlsbNewZero mlsbFinalize $ \secretKey -> do
+          mlsbUseAsCPtr secretKey $ \skPtr -> copyBytes skPtr tmpPtr secretKeySize
+          publicKey <-
+            psbCreate $ \pkPtr ->
+              copyBytes pkPtr (tmpPtr `plusPtr` secretKeySize) publicKeySize
+          cc <- BS.packCStringLen (castPtr (tmpPtr `plusPtr` (secretKeySize + publicKeySize)), 32)
+          keyMaterialAction $
             KeyMaterial
               { kmSecretKey = SecretKey secretKey
               , kmPublicKey = PublicKey publicKey
@@ -766,25 +751,35 @@ withEncryptedKeyOutput onFailure action =
 
 legacyMaterialFromSecret ::
   (ByteArrayAccess secret, ByteArrayAccess cc) =>
-  secret -> cc -> IO (Either XPrvError KeyMaterial)
-legacyMaterialFromSecret sec cc =
-  withEncryptedKeyOutput XPrvInvalidSecretKey $ \outPtr ->
+  secret ->
+  cc ->
+  (KeyMaterial -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+legacyMaterialFromSecret sec cc action =
+  withEncryptedKeyOutput XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
       withByteArray cc $ \pcc ->
         wallet_encrypted_from_secret (coerce psec) (coerce pcc) (coerce outPtr)
 
 legacyMaterialFromMasterKey ::
-  ByteArrayAccess secret => secret -> IO (Either XPrvError KeyMaterial)
-legacyMaterialFromMasterKey sec =
-  withEncryptedKeyOutput XPrvInvalidSecretKey $ \outPtr ->
+  ByteArrayAccess secret =>
+  secret ->
+  (KeyMaterial -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+legacyMaterialFromMasterKey sec action =
+  withEncryptedKeyOutput XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
       wallet_encrypted_new_from_mkg (MasterKeyPtr psec) (coerce outPtr)
 
 legacyDerivePrivate ::
-  DerivationScheme -> KeyMaterial -> DerivationIndex -> IO (Either XPrvError KeyMaterial)
-legacyDerivePrivate dscheme parent childIndex =
+  DerivationScheme ->
+  KeyMaterial ->
+  DerivationIndex ->
+  (KeyMaterial -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+legacyDerivePrivate dscheme parent childIndex action =
   withLegacyStruct parent $ \inPtr ->
-    withEncryptedKeyOutput XPrvInternalError $ \outPtr ->
+    withEncryptedKeyOutput XPrvInternalError action $ \outPtr ->
       wallet_encrypted_derive_private
         (coerce inPtr)
         childIndex
