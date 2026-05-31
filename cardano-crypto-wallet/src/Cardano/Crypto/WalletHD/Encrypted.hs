@@ -454,12 +454,12 @@ encryptedSign ::
   EncryptedKey -> passphrase -> msg -> IO (Either XPrvError Signature)
 encryptedSign eKey pass msg =
   withDecryptedKeyMaterial eKey pass $ \keyMaterial ->
-    withKeyMaterialPtr keyMaterial $ \cKeyMaterialPtr -> do
+    withKeyMaterialPtr keyMaterial $ \keyMaterialPtr -> do
       (status, sig) <-
         B.allocRet signatureSize $ \outSig ->
           withByteArray msg $ \msgPtr ->
             wallet_encrypted_sign
-              cKeyMaterialPtr
+              keyMaterialPtr
               msgPtr
               (fromIntegral $ B.length msg)
               (coerce outSig)
@@ -759,13 +759,14 @@ wrapKeyMaterial pass material = do
 
 -- | Verify that associated public key matches the secret key in the `KeyMaterial`
 validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
-validateKeyMaterial keyMaterial@KeyMaterial {..} =
-  withKeyMaterialPtr keyMaterial $ \cKeyMaterialPtr -> do
-    r <- wallet_validate cKeyMaterialPtr
-    pure $
-      if r /= 0
-        then Left XPrvPublicKeyMismatch
-        else Right (KeyMaterial {..})
+validateKeyMaterial KeyMaterial {..} =
+  withSecretKeyPtr kmSecretKey $ \secretKeyPtr -> do
+    withPublicKeyPtr kmPublicKey $ \publicKeyPtr -> do
+      r <- wallet_validate secretKeyPtr publicKeyPtr
+      pure $
+        if r /= 0
+          then Left XPrvPublicKeyMismatch
+          else Right (KeyMaterial {..})
 
 -- ---------------------------------------------------------------------------
 -- Internal: locked memory helpers
@@ -776,13 +777,13 @@ validateKeyMaterial keyMaterial@KeyMaterial {..} =
 -- and freed when the action returns (normally or via exception).
 withKeyMaterialPtr :: KeyMaterial v -> (KeyMaterialPtr -> IO r) -> IO r
 withKeyMaterialPtr KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} action =
-  allocaKeyMaterialBuffer $ \ptr@(KeyMaterialPtr cKeyMaterialPtr) -> do
+  allocaKeyMaterialBuffer $ \ptr@(KeyMaterialPtr keyMaterialPtr) -> do
     withSecretKeyPtr kmSecretKey $ \(SecretKeyPtr skPtr) ->
-      copyBytes cKeyMaterialPtr skPtr secretKeySize
+      copyBytes keyMaterialPtr skPtr secretKeySize
     withPublicKeyPtr kmPublicKey $ \(PublicKeyPtr pkPtr) ->
-      copyBytes (cKeyMaterialPtr `plusPtr` secretKeySize) (castPtr pkPtr) publicKeySize
+      copyBytes (keyMaterialPtr `plusPtr` secretKeySize) pkPtr publicKeySize
     withChainCodePtr kmChainCode $ \(ChainCodePtr ccPtr) ->
-      copyBytes (cKeyMaterialPtr `plusPtr` (secretKeySize + publicKeySize)) (castPtr ccPtr) chainCodeSize
+      copyBytes (keyMaterialPtr `plusPtr` (secretKeySize + publicKeySize)) ccPtr chainCodeSize
     action ptr
 
 -- | Call a C function that writes a 128-byte @encrypted_key@ struct to the
@@ -797,8 +798,8 @@ withNewKeyMaterial ::
   (KeyMaterialPtr -> IO CInt) ->
   IO (Either XPrvError a)
 withNewKeyMaterial onFailure keyMaterialAction fillKeyMaterialPtrAction =
-  allocaKeyMaterialBuffer $ \cKeyMaterialPtr@(KeyMaterialPtr inPtr) -> do
-    r <- fillKeyMaterialPtrAction cKeyMaterialPtr
+  allocaKeyMaterialBuffer $ \keyMaterialPtr@(KeyMaterialPtr inPtr) -> do
+    r <- fillKeyMaterialPtrAction keyMaterialPtr
     if r /= 0
       then pure (Left onFailure)
       else mlsbCreate SecretKey $ \secretKey -> do
@@ -949,7 +950,8 @@ foreign import ccall "cardano_wallet_encrypted_new_from_mkg"
 
 foreign import ccall "cardano_wallet_validate"
   wallet_validate ::
-    KeyMaterialPtr ->
+    SecretKeyPtr ->
+    PublicKeyPtr ->
     IO CInt
 
 foreign import ccall "cardano_wallet_encrypted_sign"
