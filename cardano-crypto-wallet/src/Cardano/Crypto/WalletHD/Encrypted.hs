@@ -361,9 +361,6 @@ data KeyMaterial (v :: Validity) = KeyMaterial
   , kmChainCode :: !ChainCode
   }
 
-finalizeKeyMaterial :: KeyMaterial v -> IO ()
-finalizeKeyMaterial = finalizeSecretKey . kmSecretKey
-
 -- FFI pointer newtypes
 newtype SecretKeyPtr = SecretKeyPtr (Ptr Word8)
 newtype MasterKeyPtr = MasterKeyPtr (Ptr Word8)
@@ -655,19 +652,22 @@ withDecryptedKeyMaterial ekey pass action =
   case encryptedKeyFormat ekey of
     LegacyV1 -> pure (Left XPrvDecodeError)
     EnvelopeV2 ->
-      bracket (decryptKeyMaterialV2 ekey pass) (mapM_ finalizeKeyMaterial) $ \case
-        Left err -> pure $ Left err
-        Right uncheckedKeyMaterial ->
-          validateKeyMaterial uncheckedKeyMaterial >>= \case
-            Left err -> pure $ Left err
-            Right keyMaterial -> action keyMaterial
+      bracket (SecretKey <$> mlsbNewZero) finalizeSecretKey $ \secretKey ->
+        decryptKeyMaterialV2 secretKey ekey pass >>= \case
+          Left err -> pure $ Left err
+          Right uncheckedKeyMaterial ->
+            validateKeyMaterial uncheckedKeyMaterial >>= \case
+              Left err -> pure $ Left err
+              Right keyMaterial -> action keyMaterial
 
--- | This function is unsafe and should not be exported. Whenver used it must have async exceptions
--- masked and resulting `KeyMaterial` must be finalized after the result served its use.
 decryptKeyMaterialV2 ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError (KeyMaterial Unchecked))
-decryptKeyMaterialV2 eKey pass =
+  -- | SecretKey that will be populated from EncryptedKey
+  SecretKey ->
+  EncryptedKey ->
+  passphrase ->
+  IO (Either XPrvError (KeyMaterial Unchecked))
+decryptKeyMaterialV2 secretKey eKey pass =
   case decodeV2Envelope eKey of
     Left err -> pure (Left err)
     Right envelope -> do
@@ -676,7 +676,6 @@ decryptKeyMaterialV2 eKey pass =
         Left err -> pure (Left err)
         Right wrappingKey -> do
           let aad = encodeAad (v2PublicKey envelope) (v2ChainCode envelope)
-          secretKey <- SecretKey <$> mlsbNewZero
           status <-
             withSecretKeyPtr secretKey $ \secretKeyPtr ->
               withByteArray (v2Ciphertext envelope) $ \ct ->
@@ -694,8 +693,7 @@ decryptKeyMaterialV2 eKey pass =
                           (coerce np)
                           (coerce kp)
           if status /= 0
-            then do
-              mlsbFinalize (unSecretKey secretKey)
+            then
               pure $ Left XPrvAuthenticationFailed
             else
               pure $
