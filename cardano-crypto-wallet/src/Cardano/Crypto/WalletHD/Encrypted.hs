@@ -37,6 +37,7 @@ module Cardano.Crypto.WalletHD.Encrypted (
   -- * Construction & validation
   encryptedCreate,
   encryptedCreateDirectWithTweak,
+  mkEncryptedKey,
   encryptedKey,
   unEncryptedKey,
   encryptedKeyFormat,
@@ -345,8 +346,22 @@ type CDerivationScheme = CInt
 -- Public API
 -- ---------------------------------------------------------------------------
 
+-- | Construct `EncryptedKey` from bytes.
+mkEncryptedKey :: ByteString -> Either XPrvError EncryptedKey
+mkEncryptedKey bs =
+  let eKey = EncryptedKey bs
+   in eKey <$ validateSerializedKey eKey
+
+-- | In order to promote smoother migration from @cardano-crypto@. Use `mkEncryptedKey` instead
 encryptedKey :: ByteString -> Either XPrvError EncryptedKey
-encryptedKey bs = EncryptedKey bs <$ validateSerializedKey bs
+encryptedKey = mkEncryptedKey
+{-# DEPRECATED encryptedKey "In favor of `mkEncryptedKey`" #-}
+
+validateSerializedKey :: EncryptedKey -> Either XPrvError ()
+validateSerializedKey eKey =
+  case encryptedKeyFormat eKey of
+    LegacyV1 -> Right ()
+    EnvelopeV2 -> () <$ decodeV2Envelope eKey
 
 encryptedKeyFormat :: EncryptedKey -> XPrvFormat
 encryptedKeyFormat (EncryptedKey bs)
@@ -440,37 +455,28 @@ encryptedDerivePublic dscheme (publicKey, cc) childIndex
       pure (PublicKey newPublicKey, newCC)
 
 encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
-encryptedPublic (EncryptedKey ekey) =
-  case encryptedKeyFormat (EncryptedKey ekey) of
-    LegacyV1 -> errorFail $ mkPublicKey $ sub legacyKeySize publicKeySize ekey
-    EnvelopeV2 -> either (const badEnvelope) v2PublicKey (decodeV2Envelope ekey)
+encryptedPublic eKey@(EncryptedKey eKeyBytes) =
+  case encryptedKeyFormat eKey of
+    LegacyV1 -> errorFail $ mkPublicKey $ sub legacyKeySize publicKeySize eKeyBytes
+    EnvelopeV2 -> either (const badEnvelope) v2PublicKey (decodeV2Envelope eKey)
   where
     badEnvelope = error "encryptedPublic: invalid v2 envelope"
 
 encryptedChainCode :: EncryptedKey -> ByteString
-encryptedChainCode (EncryptedKey ekey) =
-  case encryptedKeyFormat (EncryptedKey ekey) of
-    LegacyV1 -> sub (legacyKeySize + publicKeySize) ccSize ekey
-    EnvelopeV2 -> either (const badEnvelope) v2ChainCode (decodeV2Envelope ekey)
+encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
+  case encryptedKeyFormat eKey of
+    LegacyV1 -> sub (legacyKeySize + publicKeySize) ccSize eKeyBytes
+    EnvelopeV2 -> either (const badEnvelope) v2ChainCode (decodeV2Envelope eKey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
-
--- ---------------------------------------------------------------------------
--- Internal: serialization validation
--- ---------------------------------------------------------------------------
-
-validateSerializedKey :: ByteString -> Either XPrvError ()
-validateSerializedKey bs
-  | BS.length bs == legacyTotalKeySize = Right ()
-  | otherwise = decodeV2Envelope bs >> pure ()
 
 -- ---------------------------------------------------------------------------
 -- Internal: CBOR V2 envelope codec
 -- ---------------------------------------------------------------------------
 
-decodeV2Envelope :: ByteString -> Either XPrvError V2Envelope
-decodeV2Envelope bs =
-  case CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict bs) of
+decodeV2Envelope :: EncryptedKey -> Either XPrvError V2Envelope
+decodeV2Envelope (EncryptedKey eKeyBytes) =
+  case CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict eKeyBytes) of
     Right (rest, envelope)
       | BL.null rest -> Right envelope
     _ -> Left XPrvDecodeError
@@ -621,8 +627,8 @@ withDecryptedKeyMaterial ekey pass action =
 decryptKeyMaterialV2 ::
   ByteArrayAccess passphrase =>
   EncryptedKey -> passphrase -> IO (Either XPrvError (KeyMaterial Unchecked))
-decryptKeyMaterialV2 (EncryptedKey bs) pass =
-  case decodeV2Envelope bs of
+decryptKeyMaterialV2 eKey pass =
+  case decodeV2Envelope eKey of
     Left err -> pure (Left err)
     Right envelope -> do
       eWrappingKey <- deriveWrappingKey pass (v2Salt envelope)

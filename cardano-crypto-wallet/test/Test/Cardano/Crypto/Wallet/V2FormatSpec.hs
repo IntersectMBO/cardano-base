@@ -112,7 +112,7 @@ tests = describe "V2Format" $ do
       Right key -> do
         let pub = encryptedPublic key
             cc = encryptedChainCode key
-        case encryptedKey (unEncryptedKey key) of
+        case mkEncryptedKey (unEncryptedKey key) of
           Left err -> expectationFailure $ "re-parse failed: " ++ show err
           Right key' -> do
             encryptedPublic key' `shouldBe` pub
@@ -120,8 +120,8 @@ tests = describe "V2Format" $ do
 
   it "presenting a v1 raw blob returns Left XPrvDecodeError" $ do
     let v1blob = BS.replicate 128 0x00
-    case encryptedKey v1blob of
-      Left err -> expectationFailure $ "encryptedKey rejected v1 blob: " ++ show err
+    case mkEncryptedKey v1blob of
+      Left err -> expectationFailure $ "mkEncryptedKey rejected v1 blob: " ++ show err
       Right key -> do
         r <- encryptedValidatePassphrase key testPass
         r `shouldBe` Left XPrvDecodeError
@@ -131,7 +131,7 @@ tests = describe "V2Format" $ do
     case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
       Right key ->
-        encryptedKey (BS.take 10 (unEncryptedKey key))
+        mkEncryptedKey (BS.take 10 (unEncryptedKey key))
           `shouldBe` Left XPrvDecodeError
 
   it "encryptedChangePassphrase re-randomizes envelope (different bytes, same public key)" $ do
