@@ -79,22 +79,16 @@ int cardano_wallet_encrypted_new_from_mkg
 
 /* Validate that the public key in the struct matches the secret key.
  * Returns 0 on success (keys consistent), 1 on mismatch. */
-int cardano_wallet_encrypted_decrypt
-    (encrypted_key const *in,
-     encrypted_key *out)
+int cardano_wallet_validate
+    (encrypted_key const *in)
 {
 	ed25519_public_key pub_key;
 
 	cardano_crypto_ed25519_publickey(in->skey, pub_key);
 	if (sodium_memcmp(pub_key, in->pkey, PUBLIC_KEY_SIZE) != 0) {
-		secure_clear(pub_key, sizeof(pub_key));
+    secure_clear(pub_key, sizeof(pub_key));
 		return 1;
 	}
-
-	memcpy(out->skey, in->skey, UNENCRYPTED_KEY_SIZE);
-	memcpy(out->pkey, in->pkey, PUBLIC_KEY_SIZE);
-	memcpy(out->cc, in->cc, CHAIN_CODE_SIZE);
-
 	secure_clear(pub_key, sizeof(pub_key));
 	return 0;
 }
