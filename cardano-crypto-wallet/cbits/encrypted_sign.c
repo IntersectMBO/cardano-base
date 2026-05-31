@@ -36,7 +36,7 @@ typedef struct {
 /* Store a plaintext (unencrypted) secret key as an key_material struct.
  * The skey field holds the raw secret bytes; callers unwrap with v2 Argon2id
  * + XChaCha20-Poly1305 at the Haskell layer, not here. */
-static void wallet_encrypted_initialize
+static void wallet_initialize
     (const ed25519_secret_key secret_key,
      const uint8_t cc[CHAIN_CODE_SIZE],
      key_material *out)
@@ -48,7 +48,7 @@ static void wallet_encrypted_initialize
 	memcpy(out->cc, cc, CHAIN_CODE_SIZE);
 }
 
-int cardano_wallet_encrypted_from_secret
+int cardano_wallet_from_secret
     (const uint8_t seed[SECRET_KEY_SEED_SIZE],
      const uint8_t cc[CHAIN_CODE_SIZE],
      key_material *out)
@@ -58,12 +58,12 @@ int cardano_wallet_encrypted_from_secret
 		secure_clear(secret_key, sizeof(secret_key));
 		return 1;
 	}
-	wallet_encrypted_initialize(secret_key, cc, out);
+	wallet_initialize(secret_key, cc, out);
 	secure_clear(secret_key, sizeof(secret_key));
 	return 0;
 }
 
-int cardano_wallet_encrypted_new_from_mkg
+int cardano_wallet_new_from_mkg
     (const uint8_t master_key[96],
      key_material *out)
 {
@@ -72,7 +72,7 @@ int cardano_wallet_encrypted_new_from_mkg
 	secret_key[0] &= 248;   /* clears the bottom 3 bits */
 	secret_key[31] &= 0x1F; /* clears the 3 highest bits */
 	secret_key[31] |= 64;   /* set the 2nd highest bit */
-	wallet_encrypted_initialize(secret_key, master_key + 64, out);
+	wallet_initialize(secret_key, master_key + 64, out);
 	secure_clear(secret_key, sizeof(secret_key));
 	return 0;
 }
@@ -94,7 +94,7 @@ int cardano_wallet_validate
 	return 0;
 }
 
-int cardano_wallet_encrypted_sign
+int cardano_wallet_sign
     (key_material const *in,
      uint8_t const *data, uint32_t const data_len,
      ed25519_signature signature)
@@ -241,7 +241,7 @@ static void add_left_public(uint8_t *out, uint8_t *z, uint8_t *in, derivation_sc
 	cardano_crypto_ed25519_point_add(pub_zl8, in, out);
 }
 
-int cardano_wallet_encrypted_derive_private
+int cardano_wallet_derive_private
     (key_material const *in,
      uint32_t index,
      key_material *out,
@@ -285,7 +285,7 @@ int cardano_wallet_encrypted_derive_private
 	crypto_auth_hmacsha512_update(&hmac_ctx, idxBuf, 4);
 	crypto_auth_hmacsha512_final(&hmac_ctx, hmac_out);
 
-	wallet_encrypted_initialize(res_key, hmac_out + 32, out);
+	wallet_initialize(res_key, hmac_out + 32, out);
 
 	secure_clear(priv_key, UNENCRYPTED_KEY_SIZE);
 	secure_clear(res_key, UNENCRYPTED_KEY_SIZE);
@@ -296,7 +296,7 @@ int cardano_wallet_encrypted_derive_private
 	return 0;
 }
 
-int cardano_wallet_encrypted_derive_public
+int cardano_wallet_derive_public
     (uint8_t *pub_in,
      uint8_t *cc_in,
      uint32_t index,
