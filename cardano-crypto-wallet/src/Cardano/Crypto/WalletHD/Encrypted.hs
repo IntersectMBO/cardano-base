@@ -458,7 +458,7 @@ encryptedSign eKey pass msg =
       (status, sig) <-
         B.allocRet signatureSize $ \outSig ->
           withByteArray msg $ \msgPtr ->
-            wallet_encrypted_sign
+            wallet_sign
               keyMaterialPtr
               msgPtr
               (fromIntegral $ B.length msg)
@@ -491,7 +491,7 @@ encryptedDerivePublic dscheme (publicKey, cc) childIndex
             withPublicKeyPtr publicKey $ \publicKeyPtr ->
               withChainCodePtr cc $ \chainCodePtr -> do
                 r <-
-                  wallet_encrypted_derive_public
+                  wallet_derive_public
                     publicKeyPtr
                     chainCodePtr
                     childIndex
@@ -835,7 +835,7 @@ legacyMaterialFromSecret sec cc action =
   withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
       withByteArray cc $ \pcc ->
-        wallet_encrypted_from_secret (coerce psec) (coerce pcc) (coerce outPtr)
+        wallet_from_secret (coerce psec) (coerce pcc) (coerce outPtr)
 
 legacyMaterialFromMasterKey ::
   ByteArrayAccess secret =>
@@ -845,7 +845,7 @@ legacyMaterialFromMasterKey ::
 legacyMaterialFromMasterKey sec action =
   withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
-      wallet_encrypted_new_from_mkg (MasterKeyPtr psec) (coerce outPtr)
+      wallet_new_from_mkg (MasterKeyPtr psec) (coerce outPtr)
 
 legacyDerivePrivate ::
   DerivationScheme ->
@@ -856,7 +856,7 @@ legacyDerivePrivate ::
 legacyDerivePrivate dscheme parent childIndex action =
   withKeyMaterialPtr parent $ \inPtr ->
     withNewKeyMaterial XPrvInternalError action $ \outPtr ->
-      wallet_encrypted_derive_private
+      wallet_derive_private
         inPtr
         childIndex
         (coerce outPtr)
@@ -935,15 +935,15 @@ failDecoder = fail . show
 -- FFI declarations
 -- ---------------------------------------------------------------------------
 
-foreign import ccall "cardano_wallet_encrypted_from_secret"
-  wallet_encrypted_from_secret ::
+foreign import ccall "cardano_wallet_from_secret"
+  wallet_from_secret ::
     SecretKeyPtr ->
     ChainCodePtr ->
     KeyMaterialPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_new_from_mkg"
-  wallet_encrypted_new_from_mkg ::
+foreign import ccall "cardano_wallet_new_from_mkg"
+  wallet_new_from_mkg ::
     MasterKeyPtr ->
     KeyMaterialPtr ->
     IO CInt
@@ -954,24 +954,24 @@ foreign import ccall "cardano_wallet_validate"
     PublicKeyPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_sign"
-  wallet_encrypted_sign ::
+foreign import ccall "cardano_wallet_sign"
+  wallet_sign ::
     KeyMaterialPtr ->
     Ptr Word8 ->
     Word32 ->
     SignaturePtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_derive_private"
-  wallet_encrypted_derive_private ::
+foreign import ccall "cardano_wallet_derive_private"
+  wallet_derive_private ::
     KeyMaterialPtr ->
     DerivationIndex ->
     KeyMaterialPtr ->
     CDerivationScheme ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_derive_public"
-  wallet_encrypted_derive_public ::
+foreign import ccall "cardano_wallet_derive_public"
+  wallet_derive_public ::
     PublicKeyPtr ->
     ChainCodePtr ->
     DerivationIndex ->
