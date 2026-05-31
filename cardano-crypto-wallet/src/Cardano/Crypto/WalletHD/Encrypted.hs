@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 
 -- |
@@ -39,7 +40,7 @@ module Cardano.Crypto.WalletHD.Encrypted (
 
   -- * Passphrase operations
   encryptedValidatePassphrase,
-  encryptedChangePass,
+  encryptedChangePassphrase,
 
   -- * Signing & derivation
   encryptedSign,
@@ -49,7 +50,6 @@ module Cardano.Crypto.WalletHD.Encrypted (
   -- * Accessors
   encryptedPublic,
   encryptedChainCode,
-  encryptedKeyMaterial,
 
   -- * Test helpers
   withFastKdfForTesting,
@@ -67,7 +67,7 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbUseAsCPtr,
  )
 import Control.DeepSeq
-import Control.Exception (bracket, finally, mask, onException)
+import Control.Exception (bracket, finally)
 import Control.Monad (when)
 import Control.Monad.Trans.Fail.String (errorFail)
 import Data.Bits (shiftR)
@@ -147,6 +147,9 @@ withSecretKeyPtr :: SecretKey -> (SecretKeyPtr -> IO a) -> IO a
 withSecretKeyPtr (SecretKey secretKey) action =
   mlsbUseAsCPtr secretKey (action . SecretKeyPtr)
 {-# INLINE withSecretKeyPtr #-}
+
+finalizeSecretKey :: SecretKey -> IO ()
+finalizeSecretKey = mlsbFinalize . unSecretKey
 
 ------------------------------------------------------------------------------
 -- PUBLIC_KEY
@@ -308,13 +311,14 @@ data V2Envelope = V2Envelope
   deriving (Eq, Show)
 
 -- | Key material with the secret key in @sodium_malloc@'d locked memory.
--- The caller who receives a 'KeyMaterial' from a 'decryptKeyMaterial'-style
--- call is responsible for calling 'mlsbFinalize' on 'kmSecretKey' when done.
 data KeyMaterial = KeyMaterial
   { kmSecretKey :: !SecretKey
   , kmPublicKey :: !PublicKey
   , kmChainCode :: !ChainCode
   }
+
+finalizeKeyMaterial :: KeyMaterial -> IO ()
+finalizeKeyMaterial = finalizeSecretKey . kmSecretKey
 
 -- FFI pointer newtypes
 newtype SecretKeyPtr = SecretKeyPtr (Ptr Word8)
@@ -377,47 +381,30 @@ encryptedCreateDirectWithTweak sec pass
 encryptedValidatePassphrase ::
   ByteArrayAccess passphrase =>
   EncryptedKey -> passphrase -> IO (Either XPrvError ())
-encryptedValidatePassphrase ekey pass = do
-  emat <- decryptKeyMaterial ekey pass
-  case emat of
-    Left err -> pure (Left err)
-    Right mat -> do
-      mlsbFinalize (unSecretKey (kmSecretKey mat))
-      pure (Right ())
+encryptedValidatePassphrase eKey pass =
+  withDecryptedKeyMaterial eKey pass (\_ -> pure $ Right ())
 
-encryptedChangePass ::
+encryptedChangePassphrase ::
   (ByteArrayAccess oldPassPhrase, ByteArrayAccess newPassPhrase) =>
   oldPassPhrase -> newPassPhrase -> EncryptedKey -> IO (Either XPrvError EncryptedKey)
-encryptedChangePass oldPass newPass ekey =
-  mask $ \restore -> do
-    emat <- restore (decryptKeyMaterial ekey oldPass)
-    case emat of
-      Left err -> pure (Left err)
-      Right mat ->
-        restore (wrapKeyMaterial newPass mat) `finally` mlsbFinalize (unSecretKey (kmSecretKey mat))
+encryptedChangePassphrase oldPass newPass eKey =
+  withDecryptedKeyMaterial eKey oldPass (wrapKeyMaterial newPass)
 
 encryptedSign ::
   (ByteArrayAccess passphrase, ByteArrayAccess msg) =>
   EncryptedKey -> passphrase -> msg -> IO (Either XPrvError Signature)
-encryptedSign ekey pass msg =
-  mask $ \restore -> do
-    emat <- restore (decryptKeyMaterial ekey pass)
-    case emat of
-      Left err -> pure (Left err)
-      Right mat ->
-        restore
-          ( withLegacyStruct mat $ \legPtr -> do
-              (status, sig) <-
-                B.allocRet signatureSize $ \outSig ->
-                  withByteArray msg $ \msgPtr ->
-                    wallet_encrypted_sign
-                      (coerce legPtr)
-                      msgPtr
-                      (fromIntegral $ B.length msg)
-                      (coerce outSig)
-              pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
-          )
-          `finally` mlsbFinalize (unSecretKey (kmSecretKey mat))
+encryptedSign eKey pass msg =
+  withDecryptedKeyMaterial eKey pass $ \keyMaterial ->
+    withLegacyStruct keyMaterial $ \legacyStructPtr -> do
+      (status, sig) <-
+        B.allocRet signatureSize $ \outSig ->
+          withByteArray msg $ \msgPtr ->
+            wallet_encrypted_sign
+              (coerce legacyStructPtr)
+              msgPtr
+              (fromIntegral $ B.length msg)
+              (coerce outSig)
+      pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
 
 encryptedDerivePrivate ::
   ByteArrayAccess passphrase =>
@@ -426,21 +413,14 @@ encryptedDerivePrivate ::
   passphrase ->
   DerivationIndex ->
   IO (Either XPrvError EncryptedKey)
-encryptedDerivePrivate dscheme ekey pass childIndex =
-  mask $ \restore -> do
-    emat <- restore (decryptKeyMaterial ekey pass)
-    case emat of
+encryptedDerivePrivate dScheme eKey pass childIndex =
+  withDecryptedKeyMaterial eKey pass $ \parentKeyMaterial -> do
+    echildMat <- legacyDerivePrivate dScheme parentKeyMaterial childIndex
+    case echildMat of
       Left err -> pure (Left err)
-      Right parentMat ->
-        ( do
-            echildMat <- restore (legacyDerivePrivate dscheme parentMat childIndex)
-            case echildMat of
-              Left err -> pure (Left err)
-              Right childMat ->
-                restore (wrapKeyMaterial pass childMat)
-                  `finally` mlsbFinalize (unSecretKey (kmSecretKey childMat))
-        )
-          `finally` mlsbFinalize (unSecretKey (kmSecretKey parentMat))
+      Right childMat ->
+        wrapKeyMaterial pass childMat
+          `finally` mlsbFinalize (unSecretKey (kmSecretKey childMat))
 
 encryptedDerivePublic ::
   DerivationScheme ->
@@ -484,18 +464,6 @@ encryptedChainCode (EncryptedKey ekey) =
     EnvelopeV2 -> either (const badEnvelope) v2ChainCode (decodeV2Envelope ekey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
-
--- | Decrypt a v2 'EncryptedKey' and return the 64-byte extended ed25519
--- scalar in locked memory.  The caller must 'mlsbFinalize' the result when
--- done with it.
-encryptedKeyMaterial ::
-  ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError SecretKey)
-encryptedKeyMaterial ekey pass = do
-  emat <- decryptKeyMaterial ekey pass
-  case emat of
-    Left err -> pure (Left err)
-    Right mat -> pure (Right (kmSecretKey mat))
 
 -- ---------------------------------------------------------------------------
 -- Internal: serialization validation
@@ -641,18 +609,26 @@ decodeAadFields = do
 -- Internal: v2 encrypt / decrypt
 -- ---------------------------------------------------------------------------
 
-decryptKeyMaterial ::
+withDecryptedKeyMaterial ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError KeyMaterial)
-decryptKeyMaterial ekey pass =
+  EncryptedKey -> passphrase -> (KeyMaterial -> IO (Either XPrvError a)) -> IO (Either XPrvError a)
+withDecryptedKeyMaterial ekey pass action =
   case encryptedKeyFormat ekey of
     LegacyV1 -> pure (Left XPrvDecodeError)
-    EnvelopeV2 -> v2Decrypt ekey pass
+    EnvelopeV2 ->
+      bracket (decryptKeyMaterialV2 ekey pass) (mapM_ finalizeKeyMaterial) $ \case
+        Left err -> pure $ Left err
+        Right keyMaterial ->
+          validateKeyMaterial keyMaterial >>= \case
+            Left err -> pure $ Left err
+            Right () -> action keyMaterial
 
-v2Decrypt ::
+-- | This function is unsafe and should not be exported. Whenver used it must have async exceptions
+-- masked and resulting `KeyMaterial` must be finalized after the result served its use.
+decryptKeyMaterialV2 ::
   ByteArrayAccess passphrase =>
   EncryptedKey -> passphrase -> IO (Either XPrvError KeyMaterial)
-v2Decrypt (EncryptedKey bs) pass =
+decryptKeyMaterialV2 (EncryptedKey bs) pass =
   case decodeV2Envelope bs of
     Left err -> pure (Left err)
     Right envelope -> do
@@ -681,15 +657,9 @@ v2Decrypt (EncryptedKey bs) pass =
           if status /= 0
             then do
               mlsbFinalize (unSecretKey secretKey)
-              pure (Left XPrvAuthenticationFailed)
+              pure $ Left XPrvAuthenticationFailed
             else do
-              let mat = KeyMaterial secretKey (v2PublicKey envelope) (v2ChainCode envelope)
-              eVal <- validateKeyMaterial mat `onException` mlsbFinalize (unSecretKey secretKey)
-              case eVal of
-                Left err -> do
-                  mlsbFinalize (unSecretKey secretKey)
-                  pure (Left err)
-                Right () -> pure (Right mat)
+              pure $ Right $ KeyMaterial secretKey (v2PublicKey envelope) (v2ChainCode envelope)
 
 wrapKeyMaterial ::
   ByteArrayAccess passphrase =>
