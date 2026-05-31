@@ -559,13 +559,13 @@ withWrappingKeyPtr (WrappingKey wrappingKey) action =
   mlsbUseAsCPtr wrappingKey (action . WrappingKeyPtr)
 {-# INLINE withWrappingKeyPtr #-}
 
-data V2Envelope = V2Envelope
-  { v2Salt :: !Salt
-  , v2Nonce :: !Nonce
-  , v2PublicKey :: !PublicKey
-  , v2ChainCode :: !ChainCode
-  , v2EncSecretKey :: !EncSecretKey
-  , v2Tag :: !Tag
+data Envelope = Envelope
+  { eSalt :: !Salt
+  , eNonce :: !Nonce
+  , ePublicKey :: !PublicKey
+  , eChainCode :: !ChainCode
+  , eEncSecretKey :: !EncSecretKey
+  , eTag :: !Tag
   }
   deriving (Eq, Show)
 
@@ -595,7 +595,7 @@ validateSerializedKey :: EncryptedKey -> Either XPrvError ()
 validateSerializedKey eKey =
   case encryptedKeyFormat eKey of
     LegacyV1 -> Right ()
-    EnvelopeV2 -> () <$ decodeV2Envelope eKey
+    EnvelopeV2 -> () <$ decodeEncryptedKeyV2 eKey
 
 encryptedKeyFormat :: EncryptedKey -> XPrvFormat
 encryptedKeyFormat (EncryptedKey bs)
@@ -690,7 +690,7 @@ encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
 encryptedPublic eKey@(EncryptedKey eKeyBytes) =
   case encryptedKeyFormat eKey of
     LegacyV1 -> errorFail $ mkPublicKey $ sub secretKeySize publicKeySize eKeyBytes
-    EnvelopeV2 -> either (const badEnvelope) v2PublicKey (decodeV2Envelope eKey)
+    EnvelopeV2 -> either (const badEnvelope) ePublicKey (decodeEncryptedKeyV2 eKey)
   where
     badEnvelope = error "encryptedPublic: invalid v2 envelope"
 
@@ -699,7 +699,7 @@ encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
   case encryptedKeyFormat eKey of
     LegacyV1 ->
       errorFail $ mkChainCode $ sub (secretKeySize + publicKeySize) chainCodeSize eKeyBytes
-    EnvelopeV2 -> either (const badEnvelope) v2ChainCode (decodeV2Envelope eKey)
+    EnvelopeV2 -> either (const badEnvelope) eChainCode (decodeEncryptedKeyV2 eKey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
 
@@ -707,14 +707,14 @@ encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
 -- Internal: CBOR V2 envelope codec
 -- ---------------------------------------------------------------------------
 
-decodeV2Envelope :: EncryptedKey -> Either XPrvError V2Envelope
-decodeV2Envelope (EncryptedKey eKeyBytes) =
+decodeEncryptedKeyV2 :: EncryptedKey -> Either XPrvError Envelope
+decodeEncryptedKeyV2 (EncryptedKey eKeyBytes) =
   case CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict eKeyBytes) of
     Right (rest, envelope)
       | BL.null rest -> Right envelope
     _ -> Left XPrvDecodeError
 
-decodeEnvelope :: Decoder s V2Envelope
+decodeEnvelope :: Decoder s Envelope
 decodeEnvelope = do
   decodeListLenOf 9
   version <- decodeWord
@@ -742,17 +742,17 @@ decodeEnvelope = do
   tag <- decodeTag
   (pub, cc) <- either failDecoder pure $ decodeAad aad
   pure $
-    V2Envelope
-      { v2Salt = salt
-      , v2Nonce = nonce
-      , v2PublicKey = pub
-      , v2ChainCode = cc
-      , v2EncSecretKey = encSecretKey
-      , v2Tag = tag
+    Envelope
+      { eSalt = salt
+      , eNonce = nonce
+      , ePublicKey = pub
+      , eChainCode = cc
+      , eEncSecretKey = encSecretKey
+      , eTag = tag
       }
 
-encodeV2Envelope :: V2Envelope -> ByteString
-encodeV2Envelope envelope =
+encodeEnvelope :: Envelope -> ByteString
+encodeEnvelope envelope =
   CBOR.toStrictByteString $
     mconcat
       [ encodeListLen 9
@@ -763,12 +763,12 @@ encodeV2Envelope envelope =
       , encodeWord productionArgonTimeCost
       , encodeWord productionArgonParallelism
       , encodeWord productionArgonOutputLength
-      , encodeSalt (v2Salt envelope)
+      , encodeSalt (eSalt envelope)
       , encodeWord xchacha20poly1305Id
-      , encodeNonce (v2Nonce envelope)
-      , encodeBytes (encodeAad (v2PublicKey envelope) (v2ChainCode envelope))
-      , encodeEncSecretKey (v2EncSecretKey envelope)
-      , encodeTag (v2Tag envelope)
+      , encodeNonce (eNonce envelope)
+      , encodeBytes (encodeAad (ePublicKey envelope) (eChainCode envelope))
+      , encodeEncSecretKey (eEncSecretKey envelope)
+      , encodeTag (eTag envelope)
       ]
 
 encodeAad :: PublicKey -> ChainCode -> AadContext
@@ -861,17 +861,17 @@ decryptKeyMaterialV2 ::
   passphrase ->
   IO (Either XPrvError (KeyMaterial Unchecked))
 decryptKeyMaterialV2 secretKey eKey pass =
-  case decodeV2Envelope eKey of
+  case decodeEncryptedKeyV2 eKey of
     Left err -> pure (Left err)
     Right envelope -> do
-      withWrappingKey pass (v2Salt envelope) $ \wrappingKey -> do
-        let aad = encodeAad (v2PublicKey envelope) (v2ChainCode envelope)
+      withWrappingKey pass (eSalt envelope) $ \wrappingKey -> do
+        let aad = encodeAad (ePublicKey envelope) (eChainCode envelope)
         status <-
           withSecretKeyPtr secretKey $ \secretKeyPtr ->
-            withEncSecretKeyPtr (v2EncSecretKey envelope) $ \encSecretKeyPtr ->
-              withTagPtr (v2Tag envelope) $ \tagPtr ->
+            withEncSecretKeyPtr (eEncSecretKey envelope) $ \encSecretKeyPtr ->
+              withTagPtr (eTag envelope) $ \tagPtr ->
                 withByteArray aad $ \ad ->
-                  withNoncePtr (v2Nonce envelope) $ \noncePtr ->
+                  withNoncePtr (eNonce envelope) $ \noncePtr ->
                     withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr ->
                       wallet_sodium_xchacha20poly1305_decrypt
                         secretKeyPtr
@@ -889,22 +889,22 @@ decryptKeyMaterialV2 secretKey eKey pass =
               Right $
                 KeyMaterial
                   { kmSecretKey = secretKey
-                  , kmPublicKey = v2PublicKey envelope
-                  , kmChainCode = v2ChainCode envelope
+                  , kmPublicKey = ePublicKey envelope
+                  , kmChainCode = eChainCode envelope
                   }
 
 wrapKeyMaterial ::
   ByteArrayAccess passphrase =>
   passphrase -> KeyMaterial Validated -> IO (Either XPrvError EncryptedKey)
-wrapKeyMaterial pass material = do
+wrapKeyMaterial pass KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} = do
   eSalt <- fmap Salt <$> randomBytesIO
   eNonce <- fmap Nonce <$> randomBytesIO
   case (,) <$> eSalt <*> eNonce of
     Left err -> pure (Left err)
     Right (salt, nonce) -> do
       withWrappingKey pass salt $ \wrappingKey -> do
-        let aad = encodeAad (kmPublicKey material) (kmChainCode material)
-        withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
+        let aad = encodeAad kmPublicKey kmChainCode
+        withSecretKeyPtr kmSecretKey $ \skPtr -> do
           (encSecretKey, (tag, status)) <-
             fmap (first EncSecretKey) $ psbCreateResult $ \outEncSecretKey ->
               fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
@@ -925,8 +925,15 @@ wrapKeyMaterial pass material = do
               pure $
                 Right $
                   EncryptedKey $
-                    encodeV2Envelope $
-                      V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) encSecretKey tag
+                    encodeEnvelope $
+                      Envelope
+                        { eSalt = salt
+                        , eNonce = nonce
+                        , ePublicKey = kmPublicKey
+                        , eChainCode = kmChainCode
+                        , eEncSecretKey = encSecretKey
+                        , eTag = tag
+                        }
 
 -- | Verify that associated public key matches the secret key in the `KeyMaterial`
 validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
@@ -1006,7 +1013,7 @@ legacyMaterialFromSecret sec cc action =
   withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
       withByteArray cc $ \pcc ->
-        wallet_from_secret (coerce psec) (coerce pcc) (coerce outPtr)
+        wallet_from_secret (coerce psec) (coerce pcc) outPtr
 
 legacyMaterialFromMasterKey ::
   ByteArrayAccess secret =>
@@ -1016,7 +1023,7 @@ legacyMaterialFromMasterKey ::
 legacyMaterialFromMasterKey sec action =
   withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
-      wallet_new_from_mkg (MasterKeyPtr psec) (coerce outPtr)
+      wallet_new_from_mkg (MasterKeyPtr psec) outPtr
 
 legacyDerivePrivate ::
   DerivationScheme ->
@@ -1027,11 +1034,7 @@ legacyDerivePrivate ::
 legacyDerivePrivate dscheme parent childIndex action =
   withKeyMaterialPtr parent $ \inPtr ->
     withNewKeyMaterial XPrvInternalError action $ \outPtr ->
-      wallet_derive_private
-        inPtr
-        childIndex
-        (coerce outPtr)
-        (dschemeToC dscheme)
+      wallet_derive_private inPtr childIndex outPtr (dschemeToC dscheme)
 
 -- ---------------------------------------------------------------------------
 -- Internal: KDF and random bytes
