@@ -22,7 +22,7 @@ foreign import ccall "cardano_crypto_ed25519_sign_open"
 verifySignature :: PublicKey -> BS.ByteString -> Signature -> Bool
 verifySignature publicKey msg (Signature sig) = unsafePerformIO $
   BS.useAsCStringLen msg $ \(mp, ml) ->
-    BS.useAsCString pub $ \pkp ->
+    BS.useAsCString (publicKeyByteString publicKey) $ \pkp ->
       BS.useAsCString sig $ \sigp ->
         (== 0)
           <$> c_ed25519_sign_open
@@ -30,8 +30,6 @@ verifySignature publicKey msg (Signature sig) = unsafePerformIO $
             (fromIntegral @Int @CSize ml)
             (castPtr pkp)
             (castPtr sigp)
-  where
-    pub = fromPublicKey publicKey
 
 testSeed :: BS.ByteString
 testSeed = BS.replicate 32 0x02
