@@ -183,6 +183,7 @@ mlsbCreate mkType action = bracket mlsbNewZero mlsbFinalize (action . mkType)
 -- SECRET_KEY
 ------------------------------------------------------------------------------
 
+-- TODO: Derive from: `UNENCRYPTED_KEY_SIZE`
 type SECRET_KEY_SIZE = 64
 
 secretKeySize :: Int
@@ -203,6 +204,7 @@ withSecretKeyPtr (SecretKey secretKey) action =
 -- | Encrypted version of `SecretKey`
 newtype EncSecretKey = EncSecretKey {unEncSecretKey :: PinnedSizedBytes SECRET_KEY_SIZE}
   deriving (Eq, Show)
+
 newtype EncSecretKeyPtr = EncSecretKeyPtr (Ptr Word8)
 
 withEncSecretKeyPtr :: EncSecretKey -> (EncSecretKeyPtr -> IO a) -> IO a
@@ -334,12 +336,11 @@ data KdfParams = KdfParams
   { kdfMemoryKiB :: !Word
   , kdfTimeCost :: !Word
   , kdfParallelism :: !Word
-  , kdfOutputLength :: !Word
   }
 
 productionKdfParams, fastTestKdfParams :: KdfParams
-productionKdfParams = KdfParams 131072 3 4 32
-fastTestKdfParams = KdfParams 4096 1 1 32
+productionKdfParams = KdfParams 131072 3 4
+fastTestKdfParams = KdfParams 4096 1 1
 
 runtimeKdfParamsRef :: IORef KdfParams
 runtimeKdfParamsRef = unsafePerformIO (newIORef productionKdfParams)
@@ -353,7 +354,7 @@ productionArgonMemoryKiB
 productionArgonMemoryKiB = kdfMemoryKiB productionKdfParams
 productionArgonTimeCost = kdfTimeCost productionKdfParams
 productionArgonParallelism = kdfParallelism productionKdfParams
-productionArgonOutputLength = kdfOutputLength productionKdfParams
+productionArgonOutputLength = fromIntegral @Int @Word wrappingKeySize
 
 -- ---------------------------------------------------------------------------
 -- Random-mode override (for testing)
@@ -466,6 +467,7 @@ decodeSalt = do
 -- NONCE
 ------------------------------------------------------------------------------
 
+-- TODO: Derive from `crypto_aead_xchacha20poly1305_ietf_NPUBBYTES`
 type NONCE_SIZE = 24
 
 nonceSize :: Int
@@ -503,6 +505,7 @@ decodeNonce = do
 -- TAG
 ------------------------------------------------------------------------------
 
+-- TODO: Derive from: `crypto_aead_xchacha20poly1305_ietf_ABYTES`
 type TAG_SIZE = 16
 
 tagSize :: Int
@@ -536,6 +539,26 @@ decodeTag = do
     Nothing -> failDecoder XPrvInvalidTagLength
     Just tag -> pure tag
 
+------------------------------------------------------------------------------
+-- WRAPPING_KEY
+------------------------------------------------------------------------------
+
+-- TODO: Derive from: `crypto_aead_xchacha20poly1305_ietf_KEYBYTES`
+type WRAPPING_KEY_SIZE = 32
+
+-- | Plaintext version of the wrapping key used for creating signatures
+newtype WrappingKey = WrappingKey {_unWrappingKey :: MLockedSizedBytes WRAPPING_KEY_SIZE}
+
+newtype WrappingKeyPtr = WrappingKeyPtr (Ptr Word8)
+
+wrappingKeySize :: Int
+wrappingKeySize = fromInteger (natVal (Proxy @WRAPPING_KEY_SIZE))
+
+withWrappingKeyPtr :: WrappingKey -> (WrappingKeyPtr -> IO a) -> IO a
+withWrappingKeyPtr (WrappingKey wrappingKey) action =
+  mlsbUseAsCPtr wrappingKey (action . WrappingKeyPtr)
+{-# INLINE withWrappingKeyPtr #-}
+
 data V2Envelope = V2Envelope
   { v2Salt :: !Salt
   , v2Nonce :: !Nonce
@@ -550,7 +573,6 @@ data V2Envelope = V2Envelope
 newtype MasterKeyPtr = MasterKeyPtr (Ptr Word8)
 newtype SignaturePtr = SignaturePtr (Ptr Word8)
 newtype PassPhrasePtr = PassPhrasePtr (Ptr Word8)
-newtype WrappingKeyPtr = WrappingKeyPtr (Ptr Word8)
 
 type CDerivationScheme = CInt
 
@@ -842,37 +864,34 @@ decryptKeyMaterialV2 secretKey eKey pass =
   case decodeV2Envelope eKey of
     Left err -> pure (Left err)
     Right envelope -> do
-      eWrappingKey <- deriveWrappingKey pass (v2Salt envelope)
-      case eWrappingKey of
-        Left err -> pure (Left err)
-        Right wrappingKey -> do
-          let aad = encodeAad (v2PublicKey envelope) (v2ChainCode envelope)
-          status <-
-            withSecretKeyPtr secretKey $ \secretKeyPtr ->
-              withEncSecretKeyPtr (v2EncSecretKey envelope) $ \encSecretKeyPtr ->
-                withTagPtr (v2Tag envelope) $ \tagPtr ->
-                  withByteArray aad $ \ad ->
-                    withNoncePtr (v2Nonce envelope) $ \noncePtr ->
-                      withByteArray wrappingKey $ \kp ->
-                        wallet_sodium_xchacha20poly1305_decrypt
-                          secretKeyPtr
-                          encSecretKeyPtr
-                          tagPtr
-                          ad
-                          (fromIntegral @Int @CULLong $ BS.length aad)
-                          noncePtr
-                          (coerce kp)
-          if status /= 0
-            then
-              pure $ Left XPrvAuthenticationFailed
-            else
-              pure $
-                Right $
-                  KeyMaterial
-                    { kmSecretKey = secretKey
-                    , kmPublicKey = v2PublicKey envelope
-                    , kmChainCode = v2ChainCode envelope
-                    }
+      withWrappingKey pass (v2Salt envelope) $ \wrappingKey -> do
+        let aad = encodeAad (v2PublicKey envelope) (v2ChainCode envelope)
+        status <-
+          withSecretKeyPtr secretKey $ \secretKeyPtr ->
+            withEncSecretKeyPtr (v2EncSecretKey envelope) $ \encSecretKeyPtr ->
+              withTagPtr (v2Tag envelope) $ \tagPtr ->
+                withByteArray aad $ \ad ->
+                  withNoncePtr (v2Nonce envelope) $ \noncePtr ->
+                    withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr ->
+                      wallet_sodium_xchacha20poly1305_decrypt
+                        secretKeyPtr
+                        encSecretKeyPtr
+                        tagPtr
+                        ad
+                        (fromIntegral @Int @CULLong $ BS.length aad)
+                        noncePtr
+                        wrappingKeyPtr
+        if status /= 0
+          then
+            pure $ Left XPrvAuthenticationFailed
+          else
+            pure $
+              Right $
+                KeyMaterial
+                  { kmSecretKey = secretKey
+                  , kmPublicKey = v2PublicKey envelope
+                  , kmChainCode = v2ChainCode envelope
+                  }
 
 wrapKeyMaterial ::
   ByteArrayAccess passphrase =>
@@ -883,34 +902,31 @@ wrapKeyMaterial pass material = do
   case (,) <$> eSalt <*> eNonce of
     Left err -> pure (Left err)
     Right (salt, nonce) -> do
-      eWrappingKey <- deriveWrappingKey pass salt
-      case eWrappingKey of
-        Left err -> pure (Left err)
-        Right wrappingKey -> do
-          let aad = encodeAad (kmPublicKey material) (kmChainCode material)
-          withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
-            (encSecretKey, (tag, status)) <-
-              fmap (first EncSecretKey) $ psbCreateResult $ \outEncSecretKey ->
-                fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
-                  withByteArray aad $ \ad ->
-                    withNoncePtr nonce $ \noncePtr ->
-                      withByteArray wrappingKey $ \kp ->
-                        wallet_sodium_xchacha20poly1305_encrypt
-                          (coerce outEncSecretKey)
-                          (TagPtr outTagPtr)
-                          skPtr
-                          ad
-                          (fromIntegral @Int @CULLong $ BS.length aad)
-                          noncePtr
-                          (coerce kp)
-            if status /= 0
-              then pure (Left XPrvInternalError)
-              else
-                pure $
-                  Right $
-                    EncryptedKey $
-                      encodeV2Envelope $
-                        V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) encSecretKey tag
+      withWrappingKey pass salt $ \wrappingKey -> do
+        let aad = encodeAad (kmPublicKey material) (kmChainCode material)
+        withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
+          (encSecretKey, (tag, status)) <-
+            fmap (first EncSecretKey) $ psbCreateResult $ \outEncSecretKey ->
+              fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
+                withByteArray aad $ \ad ->
+                  withNoncePtr nonce $ \noncePtr ->
+                    withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr ->
+                      wallet_sodium_xchacha20poly1305_encrypt
+                        (EncSecretKeyPtr outEncSecretKey)
+                        (TagPtr outTagPtr)
+                        skPtr
+                        ad
+                        (fromIntegral @Int @CULLong $ BS.length aad)
+                        noncePtr
+                        wrappingKeyPtr
+          if status /= 0
+            then pure (Left XPrvInternalError)
+            else
+              pure $
+                Right $
+                  EncryptedKey $
+                    encodeV2Envelope $
+                      V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) encSecretKey tag
 
 -- | Verify that associated public key matches the secret key in the `KeyMaterial`
 validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
@@ -1021,26 +1037,29 @@ legacyDerivePrivate dscheme parent childIndex action =
 -- Internal: KDF and random bytes
 -- ---------------------------------------------------------------------------
 
-deriveWrappingKey ::
+withWrappingKey ::
   ByteArrayAccess passphrase =>
-  passphrase -> Salt -> IO (Either XPrvError B.ScrubbedBytes)
-deriveWrappingKey pass salt = do
+  passphrase -> Salt -> (WrappingKey -> IO (Either XPrvError a)) -> IO (Either XPrvError a)
+withWrappingKey pass salt action = do
   params <- readRuntimeKdfParams
-  let outputLen = fromIntegral (kdfOutputLength params)
-      memBytes = fromIntegral (kdfMemoryKiB params) * 1024 :: Word64
-  (status, key) <-
-    B.allocRet outputLen $ \out ->
+  let memBytes = fromIntegral (kdfMemoryKiB params) * 1024 :: Word64
+  mlsbCreate WrappingKey $ \wrappingKey ->
+    withWrappingKeyPtr wrappingKey $ \outWrappingKeyPtr ->
       withByteArray pass $ \ppass ->
-        withSaltPtr salt $ \saltPtr ->
-          wallet_sodium_argon2id
-            (coerce out)
-            (fromIntegral @Int @CULLong outputLen)
-            (coerce ppass)
-            (fromIntegral @Int @CULLong $ B.length pass)
-            saltPtr
-            (fromIntegral @Word @CULLong $ kdfTimeCost params)
-            (fromIntegral @Word64 @CSize memBytes)
-  pure (if status == 0 then Right key else Left XPrvInternalError)
+        withSaltPtr salt $ \saltPtr -> do
+          status <-
+            wallet_sodium_argon2id
+              outWrappingKeyPtr
+              (coerce ppass)
+              (fromIntegral @Int @CULLong $ B.length pass)
+              saltPtr
+              (fromIntegral @Word @CULLong $ kdfTimeCost params)
+              (fromIntegral @Word64 @CSize memBytes)
+          if status == 0
+            then
+              action wrappingKey
+            else
+              pure $ Left XPrvInternalError
 
 randomBytesIO :: KnownNat n => IO (Either XPrvError (PinnedSizedBytes n))
 randomBytesIO = do
@@ -1140,7 +1159,6 @@ foreign import ccall "wallet_sodium_randombytes"
 foreign import ccall "wallet_sodium_argon2id"
   wallet_sodium_argon2id ::
     WrappingKeyPtr ->
-    CULLong ->
     PassPhrasePtr ->
     CULLong ->
     SaltPtr ->
