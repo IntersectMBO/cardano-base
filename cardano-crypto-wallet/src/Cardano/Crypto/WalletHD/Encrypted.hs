@@ -1,7 +1,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeData #-}
 
 -- |
 -- Module      : Cardano.Crypto.WalletHD.Encrypted
@@ -310,14 +313,16 @@ data V2Envelope = V2Envelope
   }
   deriving (Eq, Show)
 
+type data Validity = Validated | Unchecked
+
 -- | Key material with the secret key in @sodium_malloc@'d locked memory.
-data KeyMaterial = KeyMaterial
+data KeyMaterial (v :: Validity) = KeyMaterial
   { kmSecretKey :: !SecretKey
   , kmPublicKey :: !PublicKey
   , kmChainCode :: !ChainCode
   }
 
-finalizeKeyMaterial :: KeyMaterial -> IO ()
+finalizeKeyMaterial :: KeyMaterial v -> IO ()
 finalizeKeyMaterial = finalizeSecretKey . kmSecretKey
 
 -- FFI pointer newtypes
@@ -596,23 +601,26 @@ decodeAadFields = do
 
 withDecryptedKeyMaterial ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> (KeyMaterial -> IO (Either XPrvError a)) -> IO (Either XPrvError a)
+  EncryptedKey ->
+  passphrase ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
 withDecryptedKeyMaterial ekey pass action =
   case encryptedKeyFormat ekey of
     LegacyV1 -> pure (Left XPrvDecodeError)
     EnvelopeV2 ->
       bracket (decryptKeyMaterialV2 ekey pass) (mapM_ finalizeKeyMaterial) $ \case
         Left err -> pure $ Left err
-        Right keyMaterial ->
-          validateKeyMaterial keyMaterial >>= \case
+        Right uncheckedKeyMaterial ->
+          validateKeyMaterial uncheckedKeyMaterial >>= \case
             Left err -> pure $ Left err
-            Right () -> action keyMaterial
+            Right keyMaterial -> action keyMaterial
 
 -- | This function is unsafe and should not be exported. Whenver used it must have async exceptions
 -- masked and resulting `KeyMaterial` must be finalized after the result served its use.
 decryptKeyMaterialV2 ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError KeyMaterial)
+  EncryptedKey -> passphrase -> IO (Either XPrvError (KeyMaterial Unchecked))
 decryptKeyMaterialV2 (EncryptedKey bs) pass =
   case decodeV2Envelope bs of
     Left err -> pure (Left err)
@@ -643,60 +651,65 @@ decryptKeyMaterialV2 (EncryptedKey bs) pass =
             then do
               mlsbFinalize (unSecretKey secretKey)
               pure $ Left XPrvAuthenticationFailed
-            else do
-              pure $ Right $ KeyMaterial secretKey (v2PublicKey envelope) (v2ChainCode envelope)
+            else
+              pure $
+                Right $
+                  KeyMaterial
+                    { kmSecretKey = secretKey
+                    , kmPublicKey = v2PublicKey envelope
+                    , kmChainCode = v2ChainCode envelope
+                    }
 
 wrapKeyMaterial ::
   ByteArrayAccess passphrase =>
-  passphrase -> KeyMaterial -> IO (Either XPrvError EncryptedKey)
+  passphrase -> KeyMaterial Validated -> IO (Either XPrvError EncryptedKey)
 wrapKeyMaterial pass material = do
-  eVal <- validateKeyMaterial material
-  case eVal of
+  eSalt <- randomBytesIO saltSize
+  eNonce <- randomBytesIO nonceSize
+  case (,) <$> eSalt <*> eNonce of
     Left err -> pure (Left err)
-    Right () -> do
-      eSalt <- randomBytesIO saltSize
-      eNonce <- randomBytesIO nonceSize
-      case (,) <$> eSalt <*> eNonce of
+    Right (salt, nonce) -> do
+      eWrappingKey <- deriveWrappingKey pass salt
+      case eWrappingKey of
         Left err -> pure (Left err)
-        Right (salt, nonce) -> do
-          eWrappingKey <- deriveWrappingKey pass salt
-          case eWrappingKey of
-            Left err -> pure (Left err)
-            Right wrappingKey -> do
-              let aad = encodeAad (kmPublicKey material) (kmChainCode material)
-              withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
-                ((status, tag), ciphertext) <-
-                  B.allocRet legacyKeySize $ \outCipher ->
-                    B.allocRet tagSize $ \outTag ->
-                      withByteArray aad $ \ad ->
-                        withByteArray nonce $ \np ->
-                          withByteArray wrappingKey $ \kp ->
-                            wallet_sodium_xchacha20poly1305_encrypt
-                              (coerce outCipher)
-                              (coerce outTag)
-                              skPtr
-                              (fromIntegral @Int @CULLong legacyKeySize)
-                              ad
-                              (fromIntegral @Int @CULLong $ BS.length aad)
-                              (coerce np)
-                              (coerce kp)
-                if status /= 0
-                  then pure (Left XPrvInternalError)
-                  else
-                    pure $
-                      Right $
-                        EncryptedKey $
-                          encodeV2Envelope $
-                            V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) ciphertext tag
+        Right wrappingKey -> do
+          let aad = encodeAad (kmPublicKey material) (kmChainCode material)
+          withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
+            ((status, tag), ciphertext) <-
+              B.allocRet legacyKeySize $ \outCipher ->
+                B.allocRet tagSize $ \outTag ->
+                  withByteArray aad $ \ad ->
+                    withByteArray nonce $ \np ->
+                      withByteArray wrappingKey $ \kp ->
+                        wallet_sodium_xchacha20poly1305_encrypt
+                          (coerce outCipher)
+                          (coerce outTag)
+                          skPtr
+                          (fromIntegral @Int @CULLong legacyKeySize)
+                          ad
+                          (fromIntegral @Int @CULLong $ BS.length aad)
+                          (coerce np)
+                          (coerce kp)
+            if status /= 0
+              then pure (Left XPrvInternalError)
+              else
+                pure $
+                  Right $
+                    EncryptedKey $
+                      encodeV2Envelope $
+                        V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) ciphertext tag
 
-validateKeyMaterial :: KeyMaterial -> IO (Either XPrvError ())
-validateKeyMaterial mat =
-  withLegacyStruct mat $ \inPtr ->
+validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
+validateKeyMaterial keyMaterial@KeyMaterial {..} =
+  withLegacyStruct keyMaterial $ \inPtr ->
     bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \outMlsb -> do
       r <-
         mlsbUseAsCPtr outMlsb $ \outPtr ->
           wallet_encrypted_decrypt (coerce inPtr) (coerce outPtr)
-      pure (if r /= 0 then Left XPrvPublicKeyMismatch else Right ())
+      pure $
+        if r /= 0
+          then Left XPrvPublicKeyMismatch
+          else Right (KeyMaterial {..})
 
 -- ---------------------------------------------------------------------------
 -- Internal: locked memory helpers
@@ -705,7 +718,7 @@ validateKeyMaterial mat =
 -- | Build a temporary 128-byte locked buffer (ekey || pkey || cc) from
 -- 'KeyMaterial' and pass a pointer to it to the action.  The buffer is zeroed
 -- and freed when the action returns (normally or via exception).
-withLegacyStruct :: KeyMaterial -> (Ptr Word8 -> IO r) -> IO r
+withLegacyStruct :: KeyMaterial v -> (Ptr Word8 -> IO r) -> IO r
 withLegacyStruct mat action =
   bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \mlsb ->
     mlsbUseAsCPtr mlsb $ \base -> do
@@ -723,7 +736,7 @@ withLegacyStruct mat action =
 -- 'MLockedSizedBytes 64' in the returned 'KeyMaterial' and must finalize it.
 withEncryptedKeyOutput ::
   XPrvError ->
-  (KeyMaterial -> IO (Either XPrvError a)) ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
   (Ptr Word8 -> IO CInt) ->
   IO (Either XPrvError a)
 withEncryptedKeyOutput onFailure keyMaterialAction structPtrAction =
@@ -738,12 +751,16 @@ withEncryptedKeyOutput onFailure keyMaterialAction structPtrAction =
             psbCreate $ \pkPtr ->
               copyBytes pkPtr (tmpPtr `plusPtr` secretKeySize) publicKeySize
           cc <- BS.packCStringLen (castPtr (tmpPtr `plusPtr` (secretKeySize + publicKeySize)), 32)
-          keyMaterialAction $
-            KeyMaterial
-              { kmSecretKey = SecretKey secretKey
-              , kmPublicKey = PublicKey publicKey
-              , kmChainCode = cc
-              }
+          eKeyMaterial <-
+            validateKeyMaterial $
+              KeyMaterial
+                { kmSecretKey = SecretKey secretKey
+                , kmPublicKey = PublicKey publicKey
+                , kmChainCode = cc
+                }
+          case eKeyMaterial of
+            Left err -> pure $ Left err
+            Right keyMaterial -> keyMaterialAction keyMaterial
 
 -- ---------------------------------------------------------------------------
 -- Internal: key-material construction (using C/ed25519)
@@ -753,7 +770,7 @@ legacyMaterialFromSecret ::
   (ByteArrayAccess secret, ByteArrayAccess cc) =>
   secret ->
   cc ->
-  (KeyMaterial -> IO (Either XPrvError a)) ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 legacyMaterialFromSecret sec cc action =
   withEncryptedKeyOutput XPrvInvalidSecretKey action $ \outPtr ->
@@ -764,7 +781,7 @@ legacyMaterialFromSecret sec cc action =
 legacyMaterialFromMasterKey ::
   ByteArrayAccess secret =>
   secret ->
-  (KeyMaterial -> IO (Either XPrvError a)) ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 legacyMaterialFromMasterKey sec action =
   withEncryptedKeyOutput XPrvInvalidSecretKey action $ \outPtr ->
@@ -773,9 +790,9 @@ legacyMaterialFromMasterKey sec action =
 
 legacyDerivePrivate ::
   DerivationScheme ->
-  KeyMaterial ->
+  KeyMaterial Validated ->
   DerivationIndex ->
-  (KeyMaterial -> IO (Either XPrvError a)) ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 legacyDerivePrivate dscheme parent childIndex action =
   withLegacyStruct parent $ \inPtr ->
