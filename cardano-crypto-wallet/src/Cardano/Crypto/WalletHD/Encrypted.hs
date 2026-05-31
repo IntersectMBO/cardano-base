@@ -864,7 +864,6 @@ wrapKeyMaterial pass material = do
                           (coerce outCipher)
                           (TagPtr outTagPtr)
                           skPtr
-                          (fromIntegral @Int @CULLong secretKeySize)
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
                           noncePtr
@@ -1119,7 +1118,6 @@ foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
     CiphertextPtr ->
     TagPtr ->
     SecretKeyPtr ->
-    CULLong ->
     Ptr Word8 ->
     CULLong ->
     NoncePtr ->
