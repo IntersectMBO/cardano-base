@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeData #-}
@@ -32,7 +33,14 @@ module Cardano.Crypto.WalletHD.Encrypted (
   -- ** PublicKey
   PublicKey,
   mkPublicKey,
-  fromPublicKey,
+  publicKeyByteArray,
+  publicKeyByteString,
+
+  -- ** ChainCode
+  ChainCode,
+  mkChainCode,
+  chainCodeByteArray,
+  chainCodeByteString,
 
   -- * Construction & validation
   encryptedCreate,
@@ -64,7 +72,6 @@ import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
   psbCreate,
   psbCreateResult,
-  psbFromByteStringCheck,
   psbFromByteStringM,
   psbToByteArray,
   psbToByteString,
@@ -74,6 +81,7 @@ import Control.DeepSeq
 import Control.Exception (bracket)
 import Control.Monad (when)
 import Control.Monad.Trans.Fail.String (errorFail)
+import Data.Array.Byte (ByteArray)
 import Data.Bits (shiftR)
 import Data.ByteArray (ByteArrayAccess, withByteArray)
 import qualified Data.ByteArray as B
@@ -131,9 +139,8 @@ data DerivationScheme = DerivationScheme1 | DerivationScheme2
 -- Size constants
 -- ---------------------------------------------------------------------------
 
-legacyKeySize, ccSize, signatureSize :: Int
+legacyKeySize, signatureSize :: Int
 legacyKeySize = 64
-ccSize = 32
 signatureSize = 64
 
 ------------------------------------------------------------------------------
@@ -175,13 +182,44 @@ withPublicKeyPtr (PublicKey publicKey) action =
 mkPublicKey :: MonadFail f => ByteString -> f PublicKey
 mkPublicKey bs = PublicKey <$> psbFromByteStringM bs
 
-fromPublicKey :: PublicKey -> ByteString
-fromPublicKey = psbToByteString . unPublicKey
+publicKeyByteArray :: PublicKey -> ByteArray
+publicKeyByteArray = psbToByteArray . unPublicKey
+
+publicKeyByteString :: PublicKey -> ByteString
+publicKeyByteString = psbToByteString . unPublicKey
 
 encodePublicKey :: PublicKey -> Encoding
 encodePublicKey = toCBOR . psbToByteArray . unPublicKey
 
-type ChainCode = ByteString
+------------------------------------------------------------------------------
+-- CHAIN_CODE
+------------------------------------------------------------------------------
+
+type CHAIN_CODE_SIZE = 32
+
+chainCodeSize :: Int
+chainCodeSize = fromInteger (natVal (Proxy @CHAIN_CODE_SIZE))
+
+newtype ChainCode = ChainCode {unChainCode :: PinnedSizedBytes CHAIN_CODE_SIZE}
+  deriving (Eq, Show)
+
+withChainCodePtr :: ChainCode -> (ChainCodePtr -> IO a) -> IO a
+withChainCodePtr (ChainCode publicKey) action =
+  psbUseAsCPtr publicKey (action . ChainCodePtr)
+{-# INLINE withChainCodePtr #-}
+
+mkChainCode :: MonadFail f => ByteString -> f ChainCode
+mkChainCode bs = ChainCode <$> psbFromByteStringM bs
+
+chainCodeByteArray :: ChainCode -> ByteArray
+chainCodeByteArray = psbToByteArray . unChainCode
+
+chainCodeByteString :: ChainCode -> ByteString
+chainCodeByteString = psbToByteString . unChainCode
+
+encodeChainCode :: ChainCode -> Encoding
+encodeChainCode = toCBOR . psbToByteArray . unChainCode
+
 type Salt = ByteString
 type Nonce = ByteString
 type Ciphertext = ByteString
@@ -189,7 +227,7 @@ type AuthenticationTag = ByteString
 type AadContext = ByteString
 
 legacyTotalKeySize :: Int
-legacyTotalKeySize = legacyKeySize + publicKeySize + ccSize
+legacyTotalKeySize = legacyKeySize + publicKeySize + chainCodeSize
 
 -- ---------------------------------------------------------------------------
 -- V2 envelope constants
@@ -376,7 +414,7 @@ encryptedCreate ::
   secret -> passphrase -> cc -> IO (Either XPrvError EncryptedKey)
 encryptedCreate sec pass cc
   | B.length sec /= 32 = pure (Left XPrvInvalidSecretKey)
-  | B.length cc /= ccSize = pure (Left XPrvInvalidChainCode)
+  | B.length cc /= chainCodeSize = pure (Left XPrvInvalidChainCode)
   | otherwise = legacyMaterialFromSecret sec cc (wrapKeyMaterial pass)
 {-# NOINLINE encryptedCreate #-}
 
@@ -436,23 +474,23 @@ encryptedDerivePublic dscheme (publicKey, cc) childIndex
   | childIndex >= 0x80000000 =
       error "encryptedDerivePublic: cannot derive hardened key from public key"
   | otherwise = unsafePerformIO $ do
-      (newPublicKey, newCC) <-
+      (newPublicKey, newChainCode) <-
         psbCreateResult $ \publicKeyPtrOut ->
-          B.alloc ccSize $ \outCc ->
+          psbCreate $ \ccOutPtr ->
             withPublicKeyPtr publicKey $ \publicKeyPtr ->
-              withByteArray cc $ \pcc -> do
+              withChainCodePtr cc $ \chainCodePtr -> do
                 r <-
                   wallet_encrypted_derive_public
                     publicKeyPtr
-                    (coerce pcc)
+                    chainCodePtr
                     childIndex
                     (PublicKeyPtr publicKeyPtrOut)
-                    (coerce outCc)
+                    (ChainCodePtr ccOutPtr)
                     (dschemeToC dscheme)
                 if r /= 0
                   then error "encryptedDerivePublic: hardened index check failed"
                   else pure ()
-      pure (PublicKey newPublicKey, newCC)
+      pure (PublicKey newPublicKey, ChainCode newChainCode)
 
 encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
 encryptedPublic eKey@(EncryptedKey eKeyBytes) =
@@ -462,10 +500,11 @@ encryptedPublic eKey@(EncryptedKey eKeyBytes) =
   where
     badEnvelope = error "encryptedPublic: invalid v2 envelope"
 
-encryptedChainCode :: EncryptedKey -> ByteString
+encryptedChainCode :: HasCallStack => EncryptedKey -> ChainCode
 encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
   case encryptedKeyFormat eKey of
-    LegacyV1 -> sub (legacyKeySize + publicKeySize) ccSize eKeyBytes
+    LegacyV1 ->
+      errorFail $ mkChainCode $ sub (legacyKeySize + publicKeySize) chainCodeSize eKeyBytes
     EnvelopeV2 -> either (const badEnvelope) v2ChainCode (decodeV2Envelope eKey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
@@ -558,7 +597,7 @@ encodeAad publicKey cc =
       , encodeWord 1
       , encodeWord (fromIntegral legacyKeySize)
       , encodePublicKey publicKey
-      , encodeBytes cc
+      , encodeChainCode cc
       ]
 
 decodeAad :: AadContext -> Either XPrvError (PublicKey, ChainCode)
@@ -594,12 +633,13 @@ decodeAadFields = do
   payloadLen <- decodeWord
   when (payloadLen /= fromIntegral legacyKeySize) (failDecoder XPrvInvalidCiphertextLength)
   pubKeyBytes <- decodeBytes
-  cc <- decodeBytes
-  publicKey <- case psbFromByteStringCheck pubKeyBytes of
+  chainCodeBytes <- decodeBytes
+  case mkPublicKey pubKeyBytes of
     Nothing -> failDecoder XPrvInvalidPublicKey
-    Just pubKey -> pure $ PublicKey pubKey
-  when (BS.length cc /= ccSize) (failDecoder XPrvInvalidChainCode)
-  pure (publicKey, cc)
+    Just publicKey ->
+      case mkChainCode chainCodeBytes of
+        Nothing -> failDecoder XPrvInvalidChainCode
+        Just chainCode -> pure (publicKey, chainCode)
 
 -- ---------------------------------------------------------------------------
 -- Internal: v2 encrypt / decrypt
@@ -725,15 +765,15 @@ validateKeyMaterial keyMaterial@KeyMaterial {..} =
 -- 'KeyMaterial' and pass a pointer to it to the action.  The buffer is zeroed
 -- and freed when the action returns (normally or via exception).
 withLegacyStruct :: KeyMaterial v -> (Ptr Word8 -> IO r) -> IO r
-withLegacyStruct mat action =
+withLegacyStruct KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} action =
   bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \mlsb ->
     mlsbUseAsCPtr mlsb $ \base -> do
-      withSecretKeyPtr (kmSecretKey mat) $ \(SecretKeyPtr skPtr) ->
+      withSecretKeyPtr kmSecretKey $ \(SecretKeyPtr skPtr) ->
         copyBytes base skPtr secretKeySize
-      withPublicKeyPtr (kmPublicKey mat) $ \(PublicKeyPtr pkPtr) ->
+      withPublicKeyPtr kmPublicKey $ \(PublicKeyPtr pkPtr) ->
         copyBytes (base `plusPtr` secretKeySize) (castPtr pkPtr) publicKeySize
-      BS.useAsCStringLen (kmChainCode mat) $ \(ccPtr, _) ->
-        copyBytes (base `plusPtr` (secretKeySize + publicKeySize)) (castPtr ccPtr) ccSize
+      withChainCodePtr kmChainCode $ \(ChainCodePtr ccPtr) ->
+        copyBytes (base `plusPtr` (secretKeySize + publicKeySize)) (castPtr ccPtr) chainCodeSize
       action base
 
 -- | Call a C function that writes a 128-byte @encrypted_key@ struct to the
@@ -756,13 +796,15 @@ withEncryptedKeyOutput onFailure keyMaterialAction structPtrAction =
           publicKey <-
             psbCreate $ \pkPtr ->
               copyBytes pkPtr (tmpPtr `plusPtr` secretKeySize) publicKeySize
-          cc <- BS.packCStringLen (castPtr (tmpPtr `plusPtr` (secretKeySize + publicKeySize)), 32)
+          chainCode <-
+            psbCreate $ \ccPtr ->
+              copyBytes ccPtr (tmpPtr `plusPtr` (secretKeySize + publicKeySize)) chainCodeSize
           eKeyMaterial <-
             validateKeyMaterial $
               KeyMaterial
                 { kmSecretKey = SecretKey secretKey
                 , kmPublicKey = PublicKey publicKey
-                , kmChainCode = cc
+                , kmChainCode = ChainCode chainCode
                 }
           case eKeyMaterial of
             Left err -> pure $ Left err
