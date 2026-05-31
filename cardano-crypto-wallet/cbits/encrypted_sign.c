@@ -16,14 +16,14 @@ static int ensure_sodium(void)
 }
 
 #define SECRET_KEY_SEED_SIZE 32
-#define ENCRYPTED_KEY_SIZE   64
+#define UNENCRYPTED_KEY_SIZE 64
 #define PUBLIC_KEY_SIZE      32
 #define CHAIN_CODE_SIZE      32
 
-#define FULL_KEY_SIZE (ENCRYPTED_KEY_SIZE + PUBLIC_KEY_SIZE + CHAIN_CODE_SIZE)
+#define FULL_KEY_SIZE (UNENCRYPTED_KEY_SIZE + PUBLIC_KEY_SIZE + CHAIN_CODE_SIZE)
 
 typedef struct {
-	uint8_t ekey[ENCRYPTED_KEY_SIZE];
+	uint8_t skey[UNENCRYPTED_KEY_SIZE];
 	uint8_t pkey[PUBLIC_KEY_SIZE];
 	uint8_t cc[CHAIN_CODE_SIZE];
 } encrypted_key;
@@ -34,7 +34,7 @@ typedef struct {
 } public_key;
 
 /* Store a plaintext (unencrypted) secret key as an encrypted_key struct.
- * The ekey field holds the raw secret bytes; callers unwrap with v2 Argon2id
+ * The skey field holds the raw secret bytes; callers unwrap with v2 Argon2id
  * + XChaCha20-Poly1305 at the Haskell layer, not here. */
 static void wallet_encrypted_initialize
     (const ed25519_secret_key secret_key,
@@ -43,7 +43,7 @@ static void wallet_encrypted_initialize
 {
 	ed25519_public_key pub_key;
 	cardano_crypto_ed25519_publickey(secret_key, pub_key);
-	memcpy(out->ekey, secret_key, ENCRYPTED_KEY_SIZE);
+	memcpy(out->skey, secret_key, UNENCRYPTED_KEY_SIZE);
 	memcpy(out->pkey, pub_key, PUBLIC_KEY_SIZE);
 	memcpy(out->cc, cc, CHAIN_CODE_SIZE);
 }
@@ -85,13 +85,13 @@ int cardano_wallet_encrypted_decrypt
 {
 	ed25519_public_key pub_key;
 
-	cardano_crypto_ed25519_publickey(in->ekey, pub_key);
+	cardano_crypto_ed25519_publickey(in->skey, pub_key);
 	if (sodium_memcmp(pub_key, in->pkey, PUBLIC_KEY_SIZE) != 0) {
 		secure_clear(pub_key, sizeof(pub_key));
 		return 1;
 	}
 
-	memcpy(out->ekey, in->ekey, ENCRYPTED_KEY_SIZE);
+	memcpy(out->skey, in->skey, UNENCRYPTED_KEY_SIZE);
 	memcpy(out->pkey, in->pkey, PUBLIC_KEY_SIZE);
 	memcpy(out->cc, in->cc, CHAIN_CODE_SIZE);
 
@@ -105,8 +105,8 @@ int cardano_wallet_encrypted_sign
      ed25519_signature signature)
 {
 	ed25519_public_key pub_key;
-	cardano_crypto_ed25519_publickey(in->ekey, pub_key);
-	cardano_crypto_ed25519_sign(data, data_len, in->cc, CHAIN_CODE_SIZE, in->ekey, pub_key, signature);
+	cardano_crypto_ed25519_publickey(in->skey, pub_key);
+	cardano_crypto_ed25519_sign(data, data_len, in->cc, CHAIN_CODE_SIZE, in->skey, pub_key, signature);
 	secure_clear(pub_key, sizeof(pub_key));
 	return 0;
 }
@@ -259,7 +259,7 @@ int cardano_wallet_encrypted_derive_private
 	uint8_t z[64];
 	uint8_t hmac_out[64];
 
-	memcpy(priv_key, in->ekey, ENCRYPTED_KEY_SIZE);
+	memcpy(priv_key, in->skey, UNENCRYPTED_KEY_SIZE);
 
 	serialize_index32(idxBuf, index, mode);
 
@@ -267,7 +267,7 @@ int cardano_wallet_encrypted_derive_private
 	crypto_auth_hmacsha512_init(&hmac_ctx, in->cc, CHAIN_CODE_SIZE);
 	if (index_is_hardened(index)) {
 		crypto_auth_hmacsha512_update(&hmac_ctx, TAG_DERIVE_Z_HARDENED, 1);
-		crypto_auth_hmacsha512_update(&hmac_ctx, in->ekey, ENCRYPTED_KEY_SIZE);
+		crypto_auth_hmacsha512_update(&hmac_ctx, in->skey, UNENCRYPTED_KEY_SIZE);
 	} else {
 		crypto_auth_hmacsha512_update(&hmac_ctx, TAG_DERIVE_Z_NORMAL, 1);
 		crypto_auth_hmacsha512_update(&hmac_ctx, in->pkey, PUBLIC_KEY_SIZE);
@@ -282,7 +282,7 @@ int cardano_wallet_encrypted_derive_private
 	crypto_auth_hmacsha512_init(&hmac_ctx, in->cc, CHAIN_CODE_SIZE);
 	if (index_is_hardened(index)) {
 		crypto_auth_hmacsha512_update(&hmac_ctx, TAG_DERIVE_CC_HARDENED, 1);
-		crypto_auth_hmacsha512_update(&hmac_ctx, in->ekey, ENCRYPTED_KEY_SIZE);
+		crypto_auth_hmacsha512_update(&hmac_ctx, in->skey, UNENCRYPTED_KEY_SIZE);
 	} else {
 		crypto_auth_hmacsha512_update(&hmac_ctx, TAG_DERIVE_CC_NORMAL, 1);
 		crypto_auth_hmacsha512_update(&hmac_ctx, in->pkey, PUBLIC_KEY_SIZE);
@@ -292,8 +292,8 @@ int cardano_wallet_encrypted_derive_private
 
 	wallet_encrypted_initialize(res_key, hmac_out + 32, out);
 
-	secure_clear(priv_key, ENCRYPTED_KEY_SIZE);
-	secure_clear(res_key, ENCRYPTED_KEY_SIZE);
+	secure_clear(priv_key, UNENCRYPTED_KEY_SIZE);
+	secure_clear(res_key, UNENCRYPTED_KEY_SIZE);
 	secure_clear(hmac_out, 64);
 	secure_clear(z, 64);
 	secure_clear(idxBuf, sizeof(idxBuf));
@@ -386,12 +386,12 @@ int wallet_sodium_xchacha20poly1305_encrypt(
 	uint8_t const key[crypto_aead_xchacha20poly1305_ietf_KEYBYTES])
 {
 	unsigned long long clen = 0;
-	uint8_t combined[crypto_aead_xchacha20poly1305_ietf_ABYTES + ENCRYPTED_KEY_SIZE];
+	uint8_t combined[crypto_aead_xchacha20poly1305_ietf_ABYTES + UNENCRYPTED_KEY_SIZE];
 
 	if (ensure_sodium() != 0) {
 		return 1;
 	}
-	if (plaintext_len != ENCRYPTED_KEY_SIZE) {
+	if (plaintext_len != UNENCRYPTED_KEY_SIZE) {
 		return 1;
 	}
 	if (crypto_aead_xchacha20poly1305_ietf_encrypt(
@@ -424,12 +424,12 @@ int wallet_sodium_xchacha20poly1305_decrypt(
 	uint8_t const key[crypto_aead_xchacha20poly1305_ietf_KEYBYTES])
 {
 	unsigned long long plen = 0;
-	uint8_t combined[crypto_aead_xchacha20poly1305_ietf_ABYTES + ENCRYPTED_KEY_SIZE];
+	uint8_t combined[crypto_aead_xchacha20poly1305_ietf_ABYTES + UNENCRYPTED_KEY_SIZE];
 
 	if (ensure_sodium() != 0) {
 		return 1;
 	}
-	if (ciphertext_len != ENCRYPTED_KEY_SIZE) {
+	if (ciphertext_len != UNENCRYPTED_KEY_SIZE) {
 		return 1;
 	}
 	memcpy(combined, ciphertext, (size_t) ciphertext_len);
