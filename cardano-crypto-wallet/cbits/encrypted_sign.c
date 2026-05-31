@@ -347,7 +347,6 @@ int wallet_sodium_randombytes(void * const out, size_t const out_len)
 }
 
 int wallet_sodium_argon2id(uint8_t *out,
-	unsigned long long out_len,
 	uint8_t const *pass,
 	unsigned long long pass_len,
 	uint8_t const salt[crypto_pwhash_SALTBYTES],
@@ -357,11 +356,8 @@ int wallet_sodium_argon2id(uint8_t *out,
 	if (ensure_sodium() != 0) {
 		return 1;
 	}
-	if (out_len != 32) {
-		return 1;
-	}
 	return crypto_pwhash(out,
-		out_len,
+		crypto_aead_xchacha20poly1305_ietf_KEYBYTES,
 		(const char *) pass,
 		pass_len,
 		salt,
