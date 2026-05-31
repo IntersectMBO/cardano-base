@@ -26,20 +26,20 @@ typedef struct {
 	uint8_t skey[UNENCRYPTED_KEY_SIZE];
 	uint8_t pkey[PUBLIC_KEY_SIZE];
 	uint8_t cc[CHAIN_CODE_SIZE];
-} encrypted_key;
+} key_material;
 
 typedef struct {
 	uint8_t pkey[PUBLIC_KEY_SIZE];
 	uint8_t cc[CHAIN_CODE_SIZE];
 } public_key;
 
-/* Store a plaintext (unencrypted) secret key as an encrypted_key struct.
+/* Store a plaintext (unencrypted) secret key as an key_material struct.
  * The skey field holds the raw secret bytes; callers unwrap with v2 Argon2id
  * + XChaCha20-Poly1305 at the Haskell layer, not here. */
 static void wallet_encrypted_initialize
     (const ed25519_secret_key secret_key,
      const uint8_t cc[CHAIN_CODE_SIZE],
-     encrypted_key *out)
+     key_material *out)
 {
 	ed25519_public_key pub_key;
 	cardano_crypto_ed25519_publickey(secret_key, pub_key);
@@ -51,7 +51,7 @@ static void wallet_encrypted_initialize
 int cardano_wallet_encrypted_from_secret
     (const uint8_t seed[SECRET_KEY_SEED_SIZE],
      const uint8_t cc[CHAIN_CODE_SIZE],
-     encrypted_key *out)
+     key_material *out)
 {
 	ed25519_secret_key secret_key;
 	if (cardano_crypto_ed25519_extend(seed, secret_key)) {
@@ -65,7 +65,7 @@ int cardano_wallet_encrypted_from_secret
 
 int cardano_wallet_encrypted_new_from_mkg
     (const uint8_t master_key[96],
-     encrypted_key *out)
+     key_material *out)
 {
 	ed25519_secret_key secret_key;
 	memcpy(secret_key, master_key, 64);
@@ -80,7 +80,7 @@ int cardano_wallet_encrypted_new_from_mkg
 /* Validate that the public key in the struct matches the secret key.
  * Returns 0 on success (keys consistent), 1 on mismatch. */
 int cardano_wallet_validate
-    (encrypted_key const *in)
+    (key_material const *in)
 {
 	ed25519_public_key pub_key;
 
@@ -94,7 +94,7 @@ int cardano_wallet_validate
 }
 
 int cardano_wallet_encrypted_sign
-    (encrypted_key const *in,
+    (key_material const *in,
      uint8_t const *data, uint32_t const data_len,
      ed25519_signature signature)
 {
@@ -241,9 +241,9 @@ static void add_left_public(uint8_t *out, uint8_t *z, uint8_t *in, derivation_sc
 }
 
 int cardano_wallet_encrypted_derive_private
-    (encrypted_key const *in,
+    (key_material const *in,
      uint32_t index,
-     encrypted_key *out,
+     key_material *out,
      derivation_scheme_mode mode)
 {
 	ed25519_secret_key priv_key;
