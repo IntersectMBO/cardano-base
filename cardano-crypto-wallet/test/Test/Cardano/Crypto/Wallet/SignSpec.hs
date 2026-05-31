@@ -81,9 +81,9 @@ tests = describe "Sign" $ do
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
       Right key -> do
         let newPass = BS.replicate 32 0xFF
-        res' <- encryptedChangePass testPass newPass key
+        res' <- encryptedChangePassphrase testPass newPass key
         case res' of
-          Left err -> expectationFailure $ "encryptedChangePass failed: " ++ show err
+          Left err -> expectationFailure $ "encryptedChangePassphrase failed: " ++ show err
           Right key' -> do
             res'' <- encryptedSign key' newPass testMsg
             case res'' of
@@ -100,8 +100,8 @@ tests = describe "Sign" $ do
           Left err -> expectationFailure $ "encryptedSign failed: " ++ show err
           Right sig -> do
             let newPass = BS.replicate 32 0xFF
-            res'' <- encryptedChangePass testPass newPass key
+            res'' <- encryptedChangePassphrase testPass newPass key
             case res'' of
-              Left err -> expectationFailure $ "encryptedChangePass failed: " ++ show err
+              Left err -> expectationFailure $ "encryptedChangePassphrase failed: " ++ show err
               Right key' ->
                 verifySignature (encryptedPublic key') testMsg sig `shouldBe` True

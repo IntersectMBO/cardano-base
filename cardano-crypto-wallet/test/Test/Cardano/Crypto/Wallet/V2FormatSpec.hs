@@ -134,12 +134,12 @@ tests = describe "V2Format" $ do
         encryptedKey (BS.take 10 (unEncryptedKey key))
           `shouldBe` Left XPrvDecodeError
 
-  it "encryptedChangePass re-randomizes envelope (different bytes, same public key)" $ do
+  it "encryptedChangePassphrase re-randomizes envelope (different bytes, same public key)" $ do
     res <- encryptedCreate testSeed testPass testCC
     case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
       Right key -> do
-        res' <- encryptedChangePass testPass testPass key
+        res' <- encryptedChangePassphrase testPass testPass key
         case res' of
           Left err -> expectationFailure $ "changePass failed: " ++ show err
           Right key' -> do
