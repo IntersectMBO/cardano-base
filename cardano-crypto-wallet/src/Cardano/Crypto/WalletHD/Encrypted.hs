@@ -121,6 +121,7 @@ import Codec.CBOR.Decoding (
 import Codec.CBOR.Encoding (
   Encoding,
   encodeBytes,
+  encodeInt,
   encodeListLen,
   encodeWord,
  )
@@ -140,8 +141,7 @@ data DerivationScheme = DerivationScheme1 | DerivationScheme2
 -- Size constants
 -- ---------------------------------------------------------------------------
 
-legacyKeySize, signatureSize :: Int
-legacyKeySize = 64
+signatureSize :: Int
 signatureSize = 64
 
 mlsbCreate :: KnownNat n => (MLockedSizedBytes n -> b) -> (b -> IO c) -> IO c
@@ -506,7 +506,7 @@ encryptedDerivePublic dscheme (publicKey, cc) childIndex
 encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
 encryptedPublic eKey@(EncryptedKey eKeyBytes) =
   case encryptedKeyFormat eKey of
-    LegacyV1 -> errorFail $ mkPublicKey $ sub legacyKeySize publicKeySize eKeyBytes
+    LegacyV1 -> errorFail $ mkPublicKey $ sub secretKeySize publicKeySize eKeyBytes
     EnvelopeV2 -> either (const badEnvelope) v2PublicKey (decodeV2Envelope eKey)
   where
     badEnvelope = error "encryptedPublic: invalid v2 envelope"
@@ -515,7 +515,7 @@ encryptedChainCode :: HasCallStack => EncryptedKey -> ChainCode
 encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
   case encryptedKeyFormat eKey of
     LegacyV1 ->
-      errorFail $ mkChainCode $ sub (legacyKeySize + publicKeySize) chainCodeSize eKeyBytes
+      errorFail $ mkChainCode $ sub (secretKeySize + publicKeySize) chainCodeSize eKeyBytes
     EnvelopeV2 -> either (const badEnvelope) v2ChainCode (decodeV2Envelope eKey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
@@ -558,7 +558,7 @@ decodeEnvelope = do
   when (BS.length nonce /= nonceSize) (failDecoder XPrvInvalidNonceLength)
   aad <- decodeBytes
   ciphertext <- decodeBytes
-  when (BS.length ciphertext /= legacyKeySize) (failDecoder XPrvInvalidCiphertextLength)
+  when (BS.length ciphertext /= secretKeySize) (failDecoder XPrvInvalidCiphertextLength)
   tag <- decodeBytes
   when (BS.length tag /= tagSize) (failDecoder XPrvInvalidTagLength)
   (pub, cc) <- either failDecoder pure $ decodeAad aad
@@ -606,7 +606,7 @@ encodeAad publicKey cc =
       , encodeWord productionArgonOutputLength
       , encodeWord xchacha20poly1305Id
       , encodeWord 1
-      , encodeWord (fromIntegral legacyKeySize)
+      , encodeInt secretKeySize
       , encodePublicKey publicKey
       , encodeChainCode cc
       ]
@@ -642,7 +642,7 @@ decodeAadFields = do
   payloadKind <- decodeWord
   when (payloadKind /= 1) (failDecoder XPrvDecodeError)
   payloadLen <- decodeWord
-  when (payloadLen /= fromIntegral legacyKeySize) (failDecoder XPrvInvalidCiphertextLength)
+  when (payloadLen /= fromIntegral secretKeySize) (failDecoder XPrvInvalidCiphertextLength)
   pubKeyBytes <- decodeBytes
   chainCodeBytes <- decodeBytes
   case mkPublicKey pubKeyBytes of
@@ -734,7 +734,7 @@ wrapKeyMaterial pass material = do
           let aad = encodeAad (kmPublicKey material) (kmChainCode material)
           withSecretKeyPtr (kmSecretKey material) $ \skPtr -> do
             ((status, tag), ciphertext) <-
-              B.allocRet legacyKeySize $ \outCipher ->
+              B.allocRet secretKeySize $ \outCipher ->
                 B.allocRet tagSize $ \outTag ->
                   withByteArray aad $ \ad ->
                     withByteArray nonce $ \np ->
@@ -743,7 +743,7 @@ wrapKeyMaterial pass material = do
                           (coerce outCipher)
                           (coerce outTag)
                           skPtr
-                          (fromIntegral @Int @CULLong legacyKeySize)
+                          (fromIntegral @Int @CULLong secretKeySize)
                           ad
                           (fromIntegral @Int @CULLong $ BS.length aad)
                           (coerce np)
