@@ -18,6 +18,9 @@
 module Cardano.Crypto.VRF.Class (
   -- * VRF algorithm class
   VRFAlgorithm (..),
+  sizeVerKeyVRF,
+  sizeSignKeyVRF,
+  sizeCertVRF,
 
   -- ** VRF output
   OutputVRF (..),
@@ -72,7 +75,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
-import GHC.TypeLits (ErrorMessage (..), TypeError)
+import GHC.TypeLits (ErrorMessage (..), KnownNat, Nat, TypeError, natVal)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import Numeric.Natural (Natural)
 
@@ -89,6 +92,9 @@ class
   , NoThunks (CertVRF v)
   , NoThunks (VerKeyVRF v)
   , NoThunks (SignKeyVRF v)
+  , KnownNat (VerKeySizeVRF v)
+  , KnownNat (SignKeySizeVRF v)
+  , KnownNat (CertSizeVRF v)
   ) =>
   VRFAlgorithm v
   where
@@ -99,6 +105,10 @@ class
   data VerKeyVRF v :: Type
   data SignKeyVRF v :: Type
   data CertVRF v :: Type
+
+  type VerKeySizeVRF v :: Nat
+  type SignKeySizeVRF v :: Nat
+  type CertSizeVRF v :: Nat
 
   --
   -- Metadata and basic key operations
@@ -161,9 +171,6 @@ class
   -- Serialisation/(de)serialisation in fixed-size raw format
   --
 
-  sizeVerKeyVRF :: proxy v -> Word
-  sizeSignKeyVRF :: proxy v -> Word
-  sizeCertVRF :: proxy v -> Word
   sizeOutputVRF :: proxy v -> Word
 
   rawSerialiseVerKeyVRF :: VerKeyVRF v -> ByteString
@@ -187,11 +194,17 @@ class
     , rawDeserialiseVerKeyVRF
     , rawDeserialiseSignKeyVRF
     , rawDeserialiseCertVRF
-    , sizeVerKeyVRF
-    , sizeSignKeyVRF
-    , sizeCertVRF
     , sizeOutputVRF
     #-}
+
+sizeVerKeyVRF :: forall v proxy. KnownNat (VerKeySizeVRF v) => proxy v -> Word
+sizeVerKeyVRF _ = fromInteger @Word . natVal $ Proxy @(VerKeySizeVRF v)
+
+sizeSignKeyVRF :: forall v proxy. KnownNat (SignKeySizeVRF v) => proxy v -> Word
+sizeSignKeyVRF _ = fromInteger @Word . natVal $ Proxy @(SignKeySizeVRF v)
+
+sizeCertVRF :: forall v proxy. KnownNat (CertSizeVRF v) => proxy v -> Word
+sizeCertVRF _ = fromInteger @Word . natVal $ Proxy @(CertSizeVRF v)
 
 --
 -- Do not provide Ord instances for keys, see #38

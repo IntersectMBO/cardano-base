@@ -126,6 +126,10 @@ instance VRFAlgorithm SimpleVRF where
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
 
+  type VerKeySizeVRF SimpleVRF = 32
+  type SignKeySizeVRF SimpleVRF = 16
+  type CertSizeVRF SimpleVRF = 64
+
   --
   -- Metadata and basic key operations
   --
@@ -134,10 +138,6 @@ instance VRFAlgorithm SimpleVRF where
 
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
-
-  sizeVerKeyVRF _ = 32
-  sizeSignKeyVRF _ = 16
-  sizeCertVRF _ = 64
 
   --
   -- Core algorithm operations

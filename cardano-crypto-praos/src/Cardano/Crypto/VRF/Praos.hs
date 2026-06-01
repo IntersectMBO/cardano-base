@@ -537,6 +537,10 @@ instance VRFAlgorithm PraosVRF where
 
   type Signable PraosVRF = SignableRepresentation
 
+  type VerKeySizeVRF PraosVRF = 32
+  type SignKeySizeVRF PraosVRF = 64
+  type CertSizeVRF PraosVRF = 80
+
   algorithmNameVRF = const "PraosVRF"
 
   deriveVerKeyVRF = coerce skToVerKey
@@ -568,7 +572,3 @@ instance VRFAlgorithm PraosVRF where
   rawDeserialiseSignKeyVRF = fmap SignKeyPraosVRF . skFromBytes
   rawDeserialiseCertVRF = fmap CertPraosVRF . proofFromBytes
   {-# INLINE rawDeserialiseCertVRF #-}
-
-  sizeVerKeyVRF _ = fromIntegral @Int @Word verKeySizeVRF
-  sizeSignKeyVRF _ = fromIntegral @Int @Word signKeySizeVRF
-  sizeCertVRF _ = fromIntegral @Int @Word certSizeVRF

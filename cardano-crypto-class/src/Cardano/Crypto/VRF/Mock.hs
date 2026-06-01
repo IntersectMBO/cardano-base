@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -42,6 +43,10 @@ instance VRFAlgorithm MockVRF where
   newtype CertVRF MockVRF = CertMockVRF Word64
     deriving (Show, Eq, Ord, Generic, NoThunks, NFData)
 
+  type VerKeySizeVRF MockVRF = 8
+  type SignKeySizeVRF MockVRF = 8
+  type CertSizeVRF MockVRF = 8
+
   --
   -- Metadata and basic key operations
   --
@@ -78,10 +83,6 @@ instance VRFAlgorithm MockVRF where
   --
   -- raw serialise/deserialise
   --
-
-  sizeVerKeyVRF _ = 8
-  sizeSignKeyVRF _ = 8
-  sizeCertVRF _ = 8
 
   rawSerialiseVerKeyVRF (VerKeyMockVRF k) = writeBinaryWord64 k
   rawSerialiseSignKeyVRF (SignKeyMockVRF k) = writeBinaryWord64 k
