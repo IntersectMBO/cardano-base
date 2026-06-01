@@ -72,12 +72,17 @@ module Cardano.Crypto.WalletHD.Encrypted (
   tagByteArray,
   tagByteString,
 
+  -- ** Envelope
+  Envelope (eSalt, eNonce, ePublicKey, eChainCode),
+  encodeEnvelope,
+  decodeEnvelope,
+
   -- * Construction & validation
   encryptedCreate,
   encryptedCreateDirectWithTweak,
   mkEncryptedKey,
-  encryptedKey,
   unEncryptedKey,
+  encryptedKey,
   encryptedKeyFormat,
 
   -- * Passphrase operations
@@ -316,8 +321,6 @@ allocaKeyMaterialBuffer :: (KeyMaterialPtr -> IO c) -> IO c
 allocaKeyMaterialBuffer action =
   mlsbCreate KeyMaterialBuffer $ \(KeyMaterialBuffer keyMaterialBuffer) ->
     mlsbUseAsCPtr keyMaterialBuffer (action . KeyMaterialPtr)
-
-type AadContext = ByteString
 
 -- ---------------------------------------------------------------------------
 -- V2 envelope constants
@@ -612,7 +615,6 @@ encryptedCreate sec pass cc
   | B.length sec /= 32 = pure (Left XPrvInvalidSecretKey)
   | B.length cc /= chainCodeSize = pure (Left XPrvInvalidChainCode)
   | otherwise = legacyMaterialFromSecret sec cc (wrapKeyMaterial pass)
-{-# NOINLINE encryptedCreate #-}
 
 encryptedCreateDirectWithTweak ::
   (ByteArrayAccess passphrase, ByteArrayAccess secret) =>
@@ -620,7 +622,6 @@ encryptedCreateDirectWithTweak ::
 encryptedCreateDirectWithTweak sec pass
   | B.length sec /= 96 = pure (Left XPrvInvalidSecretKey)
   | otherwise = legacyMaterialFromMasterKey sec (wrapKeyMaterial pass)
-{-# NOINLINE encryptedCreateDirectWithTweak #-}
 
 encryptedValidatePassphrase ::
   ByteArrayAccess passphrase =>
@@ -771,7 +772,7 @@ encodeEnvelope envelope =
       , encodeTag (eTag envelope)
       ]
 
-encodeAad :: PublicKey -> ChainCode -> AadContext
+encodeAad :: PublicKey -> ChainCode -> ByteString
 encodeAad publicKey cc =
   CBOR.toStrictByteString $
     mconcat
@@ -790,7 +791,7 @@ encodeAad publicKey cc =
       , encodeChainCode cc
       ]
 
-decodeAad :: AadContext -> Either XPrvError (PublicKey, ChainCode)
+decodeAad :: ByteString -> Either XPrvError (PublicKey, ChainCode)
 decodeAad bs =
   case CBOR.deserialiseFromBytes decodeAadFields (BL.fromStrict bs) of
     Right (rest, result)
