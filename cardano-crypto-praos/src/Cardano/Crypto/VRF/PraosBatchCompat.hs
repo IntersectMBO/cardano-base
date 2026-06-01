@@ -548,6 +548,10 @@ instance VRFAlgorithm PraosBatchCompatVRF where
 
   type Signable PraosBatchCompatVRF = SignableRepresentation
 
+  type VerKeySizeVRF PraosBatchCompatVRF = 32
+  type SignKeySizeVRF PraosBatchCompatVRF = 64
+  type CertSizeVRF PraosBatchCompatVRF = 128
+
   algorithmNameVRF = const "PraosBatchCompatVRF"
 
   deriveVerKeyVRF = coerce skToVerKey
@@ -578,10 +582,6 @@ instance VRFAlgorithm PraosBatchCompatVRF where
   rawDeserialiseVerKeyVRF = fmap (VerKeyPraosBatchCompatVRF . vkFromBytes) . assertLength verKeySizeVRF
   rawDeserialiseSignKeyVRF = fmap (SignKeyPraosBatchCompatVRF . skFromBytes) . assertLength signKeySizeVRF
   rawDeserialiseCertVRF = fmap (CertPraosBatchCompatVRF . proofFromBytes) . assertLength certSizeVRF
-
-  sizeVerKeyVRF _ = fromIntegral @Int @Word verKeySizeVRF
-  sizeSignKeyVRF _ = fromIntegral @Int @Word signKeySizeVRF
-  sizeCertVRF _ = fromIntegral @Int @Word certSizeVRF
 
 assertLength :: Int -> ByteString -> Maybe ByteString
 assertLength l bs

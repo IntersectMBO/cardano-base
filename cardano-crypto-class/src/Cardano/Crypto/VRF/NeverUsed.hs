@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -42,6 +43,10 @@ instance VRFAlgorithm NeverVRF where
   data CertVRF NeverVRF = NeverUsedCertVRF
     deriving (Show, Eq, Ord, Generic, NoThunks)
 
+  type VerKeySizeVRF NeverVRF = 0
+  type SignKeySizeVRF NeverVRF = 0
+  type CertSizeVRF NeverVRF = 0
+
   algorithmNameVRF _ = "never"
 
   deriveVerKeyVRF _ = NeverUsedVerKeyVRF
@@ -54,10 +59,6 @@ instance VRFAlgorithm NeverVRF where
 
   genKeyVRF _ = NeverUsedSignKeyVRF
   seedSizeVRF _ = 0
-
-  sizeVerKeyVRF _ = 0
-  sizeSignKeyVRF _ = 0
-  sizeCertVRF _ = 0
 
   rawSerialiseVerKeyVRF _ = mempty
   rawSerialiseSignKeyVRF _ = mempty
