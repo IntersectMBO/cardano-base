@@ -395,7 +395,7 @@ int CCW_FN (xchacha20poly1305_encrypt) (
 		return 1;
 	}
 	memcpy(ciphertext, combined, (size_t) UNENCRYPTED_KEY_SIZE);
-	memcpy(tag, combined + UNENCRYPTED_KEY_SIZE, crypto_aead_xchacha20poly1305_ietf_ABYTES);
+	memcpy(tag, combined + UNENCRYPTED_KEY_SIZE, clen - UNENCRYPTED_KEY_SIZE);
 	secure_clear(combined, sizeof(combined));
 	return 0;
 }
