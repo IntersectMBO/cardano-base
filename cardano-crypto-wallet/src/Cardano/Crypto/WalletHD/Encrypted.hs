@@ -147,7 +147,7 @@ import Cardano.Binary (toCBOR)
 import Cardano.Crypto.Libsodium.MLockedBytes (
   MLockedSizedBytes,
   mlsbFinalize,
-  mlsbNewZero,
+  mlsbNew,
   mlsbUseAsCPtr,
  )
 import Codec.CBOR.Decoding (
@@ -183,7 +183,7 @@ signatureSize :: Int
 signatureSize = 64
 
 mlsbCreate :: KnownNat n => (MLockedSizedBytes n -> b) -> (b -> IO c) -> IO c
-mlsbCreate mkType action = bracket mlsbNewZero mlsbFinalize (action . mkType)
+mlsbCreate mkType action = bracket mlsbNew mlsbFinalize (action . mkType)
 
 ------------------------------------------------------------------------------
 -- SECRET_KEY
