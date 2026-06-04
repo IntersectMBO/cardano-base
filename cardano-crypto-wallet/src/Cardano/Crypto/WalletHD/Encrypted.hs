@@ -103,6 +103,7 @@ module Cardano.Crypto.WalletHD.Encrypted (
   withDeterministicRandomnessForTesting,
 ) where
 
+import Cardano.Crypto.Libsodium.Memory (zeroMem)
 import Cardano.Crypto.PinnedSizedBytes (
   PinnedSizedBytes,
   psbCreate,
@@ -911,7 +912,8 @@ wrapKeyMaterial pass KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} = do
               fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
                 withByteArray aad $ \ad ->
                   withNoncePtr nonce $ \noncePtr ->
-                    withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr ->
+                    withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr -> do
+                      zeroMem outTagPtr (fromIntegral @Int @CSize tagSize)
                       wallet_xchacha20poly1305_encrypt
                         (EncSecretKeyPtr outEncSecretKey)
                         (TagPtr outTagPtr)
