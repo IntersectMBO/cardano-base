@@ -11,8 +11,8 @@ import Test.Hspec
 
 import Cardano.Crypto.WalletHD.Encrypted
 
-foreign import ccall "cardano_crypto_ed25519_sign_open"
-  c_ed25519_sign_open ::
+foreign import ccall "cardano_crypto_wallet_ed25519_sign_open"
+  wallet_ed25519_sign_open ::
     Ptr a ->
     CSize ->
     Ptr a ->
@@ -25,7 +25,7 @@ verifySignature publicKey msg (Signature sig) = unsafePerformIO $
     BS.useAsCString (publicKeyByteString publicKey) $ \pkp ->
       BS.useAsCString sig $ \sigp ->
         (== 0)
-          <$> c_ed25519_sign_open
+          <$> wallet_ed25519_sign_open
             (castPtr mp)
             (fromIntegral @Int @CSize ml)
             (castPtr pkp)

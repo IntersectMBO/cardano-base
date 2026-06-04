@@ -874,7 +874,7 @@ decryptKeyMaterialV2 secretKey eKey pass =
                 withByteArray aad $ \ad ->
                   withNoncePtr (eNonce envelope) $ \noncePtr ->
                     withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr ->
-                      wallet_sodium_xchacha20poly1305_decrypt
+                      wallet_xchacha20poly1305_decrypt
                         secretKeyPtr
                         encSecretKeyPtr
                         tagPtr
@@ -912,7 +912,7 @@ wrapKeyMaterial pass KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} = do
                 withByteArray aad $ \ad ->
                   withNoncePtr nonce $ \noncePtr ->
                     withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr ->
-                      wallet_sodium_xchacha20poly1305_encrypt
+                      wallet_xchacha20poly1305_encrypt
                         (EncSecretKeyPtr outEncSecretKey)
                         (TagPtr outTagPtr)
                         skPtr
@@ -1052,7 +1052,7 @@ withWrappingKey pass salt action = do
       withByteArray pass $ \ppass ->
         withSaltPtr salt $ \saltPtr -> do
           status <-
-            wallet_sodium_argon2id
+            wallet_argon2id
               outWrappingKeyPtr
               (coerce ppass)
               (fromIntegral @Int @CULLong $ B.length pass)
@@ -1070,7 +1070,7 @@ randomBytesIO = do
   mode <- readIORef randomModeRef
   case mode of
     SystemRandom -> do
-      (bytes, status) <- psbCreateResultLen wallet_sodium_randombytes
+      (bytes, status) <- psbCreateResultLen wallet_randombytes
       pure $ if status == 0 then Right bytes else Left XPrvInternalError
     DeterministicRandom counter -> do
       let
@@ -1112,26 +1112,26 @@ failDecoder = fail . show
 -- FFI declarations
 -- ---------------------------------------------------------------------------
 
-foreign import ccall "cardano_wallet_from_secret"
+foreign import ccall "cardano_crypto_wallet_from_secret"
   wallet_from_secret ::
     SecretKeyPtr ->
     ChainCodePtr ->
     KeyMaterialPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_new_from_mkg"
+foreign import ccall "cardano_crypto_wallet_new_from_mkg"
   wallet_new_from_mkg ::
     MasterKeyPtr ->
     KeyMaterialPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_validate"
+foreign import ccall "cardano_crypto_wallet_validate"
   wallet_validate ::
     SecretKeyPtr ->
     PublicKeyPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_sign"
+foreign import ccall "cardano_crypto_wallet_sign"
   wallet_sign ::
     KeyMaterialPtr ->
     Ptr Word8 ->
@@ -1139,7 +1139,7 @@ foreign import ccall "cardano_wallet_sign"
     SignaturePtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_derive_private"
+foreign import ccall "cardano_crypto_wallet_derive_private"
   wallet_derive_private ::
     KeyMaterialPtr ->
     DerivationIndex ->
@@ -1147,7 +1147,7 @@ foreign import ccall "cardano_wallet_derive_private"
     CDerivationScheme ->
     IO CInt
 
-foreign import ccall "cardano_wallet_derive_public"
+foreign import ccall "cardano_crypto_wallet_derive_public"
   wallet_derive_public ::
     PublicKeyPtr ->
     ChainCodePtr ->
@@ -1157,11 +1157,11 @@ foreign import ccall "cardano_wallet_derive_public"
     CDerivationScheme ->
     IO CInt
 
-foreign import ccall "wallet_sodium_randombytes"
-  wallet_sodium_randombytes :: Ptr a -> CSize -> IO CInt
+foreign import ccall "cardano_crypto_wallet_randombytes"
+  wallet_randombytes :: Ptr a -> CSize -> IO CInt
 
-foreign import ccall "wallet_sodium_argon2id"
-  wallet_sodium_argon2id ::
+foreign import ccall "cardano_crypto_wallet_argon2id"
+  wallet_argon2id ::
     WrappingKeyPtr ->
     PassPhrasePtr ->
     CULLong ->
@@ -1170,8 +1170,8 @@ foreign import ccall "wallet_sodium_argon2id"
     CSize ->
     IO CInt
 
-foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
-  wallet_sodium_xchacha20poly1305_encrypt ::
+foreign import ccall "cardano_crypto_wallet_xchacha20poly1305_encrypt"
+  wallet_xchacha20poly1305_encrypt ::
     EncSecretKeyPtr ->
     TagPtr ->
     SecretKeyPtr ->
@@ -1181,8 +1181,8 @@ foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
     WrappingKeyPtr ->
     IO CInt
 
-foreign import ccall "wallet_sodium_xchacha20poly1305_decrypt"
-  wallet_sodium_xchacha20poly1305_decrypt ::
+foreign import ccall "cardano_crypto_wallet_xchacha20poly1305_decrypt"
+  wallet_xchacha20poly1305_decrypt ::
     SecretKeyPtr ->
     EncSecretKeyPtr ->
     TagPtr ->
