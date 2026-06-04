@@ -5,7 +5,7 @@
 */
 
 
-#define ED25519_FN(fn)         cardano_crypto_##fn
+#define ED25519_FN(fn)         cardano_crypto_wallet_##fn
 
 #include "ed25519-donna.h"
 #include "ed25519.h"
