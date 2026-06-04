@@ -202,7 +202,7 @@ ge25519_is_neutral_vartime(const ge25519 *p) {
 }
 
 int
-ED25519_FN(ed25519_sign_open_batch) (const unsigned char **m, size_t *mlen, const unsigned char **pk, const unsigned char **RS, size_t num, int *valid) {
+CCW_FN(ed25519_sign_open_batch) (const unsigned char **m, size_t *mlen, const unsigned char **pk, const unsigned char **RS, size_t num, int *valid) {
 	batch_heap ALIGN(16) batch;
 	ge25519 ALIGN(16) p;
 	bignum256modm *r_scalars;
@@ -217,7 +217,7 @@ ED25519_FN(ed25519_sign_open_batch) (const unsigned char **m, size_t *mlen, cons
 		batchsize = (num > max_batch_size) ? max_batch_size : num;
 
 		/* generate r (scalars[batchsize+1]..scalars[2*batchsize] */
-		ED25519_FN(ed25519_randombytes_unsafe) (batch.r, batchsize * 16);
+		CCW_FN(ed25519_randombytes_unsafe) (batch.r, batchsize * 16);
 		r_scalars = &batch.scalars[batchsize + 1];
 		for (i = 0; i < batchsize; i++)
 			expand256_modm(r_scalars[i], batch.r[i], 16);
@@ -252,7 +252,7 @@ ED25519_FN(ed25519_sign_open_batch) (const unsigned char **m, size_t *mlen, cons
 
 			fallback:
 			for (i = 0; i < batchsize; i++) {
-				valid[i] = ED25519_FN(ed25519_sign_open) (m[i], mlen[i], pk[i], RS[i]) ? 0 : 1;
+				valid[i] = CCW_FN(ed25519_sign_open) (m[i], mlen[i], pk[i], RS[i]) ? 0 : 1;
 				ret |= (valid[i] ^ 1);
 			}
 		}
@@ -266,7 +266,7 @@ ED25519_FN(ed25519_sign_open_batch) (const unsigned char **m, size_t *mlen, cons
 	}
 
 	for (i = 0; i < num; i++) {
-		valid[i] = ED25519_FN(ed25519_sign_open) (m[i], mlen[i], pk[i], RS[i]) ? 0 : 1;
+		valid[i] = CCW_FN(ed25519_sign_open) (m[i], mlen[i], pk[i], RS[i]) ? 0 : 1;
 		ret |= (valid[i] ^ 1);
 	}
 
