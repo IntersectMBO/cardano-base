@@ -23,8 +23,8 @@ wrongPass = BS.replicate 32 0x00
 -- ---------------------------------------------------------------------------
 -- Public-key golden vector
 --
--- This is the ed25519 public key derived from testSeed via cardano_crypto_ed25519_extend
--- + cardano_crypto_ed25519_publickey.  It is fully deterministic (no randomness).
+-- This is the ed25519 public key derived from testSeed via ccw_ed25519_extend
+-- + ccw_ed25519_publickey.  It is fully deterministic (no randomness).
 -- If this changes, the key derivation C code has silently changed.
 -- ---------------------------------------------------------------------------
 
