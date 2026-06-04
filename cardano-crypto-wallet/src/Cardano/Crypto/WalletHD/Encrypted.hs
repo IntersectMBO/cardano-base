@@ -40,6 +40,7 @@ module Cardano.Crypto.WalletHD.Encrypted (
 
   -- ** Encrypted SecretKey
   EncSecretKey,
+  encSecretKeySize,
   mkEncSecretKey,
   encSecretKeyByteArray,
   encSecretKeyByteString,
@@ -206,12 +207,16 @@ withSecretKeyPtr (SecretKey secretKey) action =
 {-# INLINE withSecretKeyPtr #-}
 
 -- Encrypted version (same size as decrypted)
+type ENC_SECRET_KEY_SIZE = SECRET_KEY_SIZE
 
 -- | Encrypted version of `SecretKey`
-newtype EncSecretKey = EncSecretKey {unEncSecretKey :: PinnedSizedBytes SECRET_KEY_SIZE}
+newtype EncSecretKey = EncSecretKey {unEncSecretKey :: PinnedSizedBytes ENC_SECRET_KEY_SIZE}
   deriving (Eq, Show)
 
 newtype EncSecretKeyPtr = EncSecretKeyPtr (Ptr Word8)
+
+encSecretKeySize :: Int
+encSecretKeySize = fromInteger (natVal (Proxy @ENC_SECRET_KEY_SIZE))
 
 withEncSecretKeyPtr :: EncSecretKey -> (EncSecretKeyPtr -> IO a) -> IO a
 withEncSecretKeyPtr (EncSecretKey encSecretKey) action =
@@ -648,8 +653,8 @@ encryptedSign eKey pass msg =
             wallet_sign
               keyMaterialPtr
               msgPtr
-              (fromIntegral $ B.length msg)
-              (coerce outSig)
+              (fromIntegral @Int @CSize $ B.length msg)
+              (SignaturePtr outSig)
       pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
 
 encryptedDerivePrivate ::
@@ -823,7 +828,8 @@ decodeAadFields = do
   payloadKind <- decodeWord
   when (payloadKind /= 1) (failDecoder XPrvDecodeError)
   payloadLen <- decodeWord
-  when (payloadLen /= fromIntegral secretKeySize) (failDecoder XPrvInvalidCiphertextLength)
+  when (payloadLen /= fromIntegral @Int @Word encSecretKeySize) $
+    failDecoder XPrvInvalidCiphertextLength
   pubKeyBytes <- decodeBytes
   chainCodeBytes <- decodeBytes
   case mkPublicKey pubKeyBytes of
@@ -1048,19 +1054,15 @@ withWrappingKey ::
   passphrase -> Salt -> (WrappingKey -> IO (Either XPrvError a)) -> IO (Either XPrvError a)
 withWrappingKey pass salt action = do
   params <- readRuntimeKdfParams
-  let memBytes = fromIntegral (kdfMemoryKiB params) * 1024 :: Word64
+  let memBytes = (fromIntegral @Word @CSize (kdfMemoryKiB params)) * 1024
+      passLen = fromIntegral @Int @CULLong (B.length pass)
+      timeCost = fromIntegral @Word @CULLong (kdfTimeCost params)
   mlsbCreate WrappingKey $ \wrappingKey ->
     withWrappingKeyPtr wrappingKey $ \outWrappingKeyPtr ->
-      withByteArray pass $ \ppass ->
+      withByteArray pass $ \passPtr ->
         withSaltPtr salt $ \saltPtr -> do
           status <-
-            wallet_argon2id
-              outWrappingKeyPtr
-              (coerce ppass)
-              (fromIntegral @Int @CULLong $ B.length pass)
-              saltPtr
-              (fromIntegral @Word @CULLong $ kdfTimeCost params)
-              (fromIntegral @Word64 @CSize memBytes)
+            wallet_argon2id outWrappingKeyPtr (PassPhrasePtr passPtr) passLen saltPtr timeCost memBytes
           if status == 0
             then
               action wrappingKey
@@ -1086,14 +1088,14 @@ deterministicBytes len counter =
   BS.pack $
     take len $
       cycle
-        [ fromIntegral counter
-        , fromIntegral (counter `shiftR` 8)
-        , fromIntegral (counter `shiftR` 16)
-        , fromIntegral (counter `shiftR` 24)
-        , fromIntegral (counter `shiftR` 32)
-        , fromIntegral (counter `shiftR` 40)
-        , fromIntegral (counter `shiftR` 48)
-        , fromIntegral (counter `shiftR` 56)
+        [ fromIntegral @Word64 @Word8 counter
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 8)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 16)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 24)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 32)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 40)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 48)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 56)
         ]
 
 -- ---------------------------------------------------------------------------
@@ -1137,7 +1139,7 @@ foreign import ccall "cardano_crypto_wallet_sign"
   wallet_sign ::
     KeyMaterialPtr ->
     Ptr Word8 ->
-    Word32 ->
+    CSize ->
     SignaturePtr ->
     IO CInt
 
