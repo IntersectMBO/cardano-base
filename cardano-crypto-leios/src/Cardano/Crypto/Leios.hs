@@ -1,10 +1,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -18,40 +16,7 @@
 -- uses BLS12-381 MinSig as its signature scheme and defines a 'LeiosCert' that
 -- can be included into blocks. This module deliberately not includes a
 -- 'LeiosVote' because the vote itself is not an artifact that is on-chain.
-module Cardano.Crypto.Leios (
-  -- * Cryptographic primitives
-  LeiosDSIGN,
-  LeiosSigningKey,
-  LeiosVerificationKey,
-  LeiosSignature,
-  leiosSignContext,
-
-  -- * Voting committee
-  Committee (..),
-  Weight,
-  committeeSize,
-  VoterId (..),
-
-  -- * Certificates
-  LeiosCert (..),
-  encodeLeiosCert,
-  decodeLeiosCert,
-
-  -- ** Construction
-  aggregateLeiosCert,
-  AggregationError (..),
-
-  -- ** Verification
-  verifyLeiosCert,
-  VerificationError (..),
-
-  -- * Internal
-  --
-  -- $internal
-  BitField (..),
-  bitFieldFromBytes,
-  bitFieldToBytes,
-) where
+module Cardano.Crypto.Leios where
 
 import Cardano.Binary (enforceSize)
 import Cardano.Crypto.DSIGN (
