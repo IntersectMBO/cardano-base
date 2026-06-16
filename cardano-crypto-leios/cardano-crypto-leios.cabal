@@ -46,6 +46,18 @@ library
     nothunks,
     vector,
 
+library testlib
+  import: base, project-config
+  visibility: public
+  hs-source-dirs: testlib
+  exposed-modules:
+    Test.Cardano.Crypto.Leios.Gen
+
+  build-depends:
+    cardano-crypto-class,
+    cardano-crypto-leios,
+    hedgehog,
+
 test-suite tests
   import: base, project-config
   type: exitcode-stdio-1.0
@@ -58,7 +70,7 @@ test-suite tests
     bytestring,
     cardano-binary:{cardano-binary, testlib},
     cardano-crypto-class,
-    cardano-crypto-leios,
+    cardano-crypto-leios:{cardano-crypto-leios, testlib},
     cardano-prelude-test,
     containers,
     hedgehog,

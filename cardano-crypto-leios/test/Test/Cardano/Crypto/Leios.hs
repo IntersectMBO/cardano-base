@@ -55,6 +55,7 @@ import Hedgehog (
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Test.Cardano.Binary.Helpers.GoldenRoundTrip (goldenTestCBORExplicit)
+import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
 
 tests :: IO Bool
 tests =
@@ -74,23 +75,6 @@ tests =
       ]
 
 -- * CBOR roundtrip / golden
-
--- | A 'LeiosCert' with a real (deterministically-derived) BLS aggregated
--- signature and a 'signers' bitfield whose length walks the CBOR uint
--- width boundaries (1 / 2 / 3-byte length headers).
-genLeiosCert :: Gen LeiosCert
-genLeiosCert = do
-  let seedLen = fromIntegral (seedSizeDSIGN (Proxy @LeiosDSIGN))
-  seedBytes <- Gen.bytes (Range.singleton seedLen)
-  msg <- Gen.bytes (Range.linear 0 256)
-  signersLen <- Gen.element [0, 1, 23, 24, 255, 256]
-  signersBytes <- Gen.bytes (Range.singleton signersLen)
-  let sk = genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes seedBytes)
-  pure
-    LeiosCert
-      { signers = bitFieldFromBytes signersBytes
-      , aggregatedSignature = signDSIGN leiosSignContext msg sk
-      }
 
 prop_roundtrip_LeiosCert :: Property
 prop_roundtrip_LeiosCert = property $ do
