@@ -242,10 +242,10 @@ verifyLeiosCert ::
 verifyLeiosCert committee required msg cert = do
   let voters = committeeVoters committee
       n = V.length voters
-  signers <-
+  signerSet <-
     maybe (Left MalformedSigners) Right $
       bitFieldMembers n cert.signers
-  let idxs = [fromIntegral (voterIndex v) | v <- Set.toAscList signers]
+  let idxs = [fromIntegral (voterIndex v) | v <- Set.toAscList signerSet]
   (got, vks) <- foldlM (accumSigner voters) (0, []) idxs
   when (got < required) $
     Left InsufficientWeight {got, required}
