@@ -13,6 +13,7 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.Leios (
   AggregationError (..),
+  BitField,
   Committee (..),
   LeiosCert (..),
   LeiosDSIGN,
@@ -21,6 +22,8 @@ import Cardano.Crypto.Leios (
   VerificationError (..),
   VoterId (..),
   aggregateLeiosCert,
+  bitFieldFromBytes,
+  bitFieldToBytes,
   decodeLeiosCert,
   encodeLeiosCert,
   leiosSignContext,
@@ -83,7 +86,7 @@ genLeiosCert = do
   let sk = genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes seedBytes)
   pure
     LeiosCert
-      { signers = signersBytes
+      { signers = bitFieldFromBytes signersBytes
       , aggregatedSignature = signDSIGN leiosSignContext msg sk
       }
 
@@ -107,7 +110,7 @@ prop_golden_LeiosCert =
 exampleCert :: LeiosCert
 exampleCert =
   LeiosCert
-    { signers = BS.pack [0xF0]
+    { signers = bitFieldFromBytes (BS.pack [0xF0])
     , aggregatedSignature = signDSIGN leiosSignContext exampleMessage exampleSigningKey
     }
   where
@@ -151,6 +154,11 @@ aggregateOrFail ::
 aggregateOrFail committee contributions = case aggregateLeiosCert committee contributions of
   Right c -> pure c
   Left e -> do annotateShow e; failure
+
+-- | Apply a byte-level transform to a 'BitField', for adversarial test cases
+-- that need to mutate the wire form directly.
+withSignerBytes :: (ByteString -> ByteString) -> BitField -> BitField
+withSignerBytes f = bitFieldFromBytes . f . bitFieldToBytes
 
 -- | All committee members sign the same message; the resulting cert verifies
 -- against that committee, threshold and message, and reports full weight.
@@ -212,7 +220,7 @@ prop_verifyLeiosCert_rejects_oversized_signers = property $ do
       msg = "leios-malformed-test" :: ByteString
       contributions = signContribs msg (zip [0 :: Int ..] sks)
   cert <- aggregateOrFail committee contributions
-  let oversized = cert {signers = BS.snoc (signers cert) 0x00}
+  let oversized = cert {signers = withSignerBytes (`BS.snoc` 0x00) (signers cert)}
   verifyLeiosCert committee 1 msg oversized === Left MalformedSigners
 
 -- | Flipping on a non-signer's bit in the bitfield must be rejected with
@@ -229,9 +237,9 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
       msg = "leios-tamper-test" :: ByteString
       contributions = signContribs msg [(0, head sks)]
   cert <- aggregateOrFail committee contributions
-  let raw = signers cert
+  let raw = bitFieldToBytes (signers cert)
       tamperedByte0 = BS.head raw `Bits.setBit` 6
-      tamperedSigners = BS.cons tamperedByte0 (BS.tail raw)
+      tamperedSigners = bitFieldFromBytes (BS.cons tamperedByte0 (BS.tail raw))
       tampered = cert {signers = tamperedSigners}
   -- Threshold is below the tampered weight 2/n so we exercise the BLS
   -- pairing failure, not the short-circuit.

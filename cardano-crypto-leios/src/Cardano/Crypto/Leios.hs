@@ -1,7 +1,11 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -40,6 +44,13 @@ module Cardano.Crypto.Leios (
   -- ** Verification
   verifyLeiosCert,
   VerificationError (..),
+
+  -- * Internal
+  --
+  -- $internal
+  BitField (..),
+  bitFieldFromBytes,
+  bitFieldToBytes,
 ) where
 
 import Cardano.Binary (enforceSize)
@@ -58,19 +69,22 @@ import Codec.CBOR.Decoding (Decoder, decodeBytes)
 import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen)
 import Control.DeepSeq (NFData)
 import Control.Monad (when)
+import Data.Array.Byte (ByteArray (ByteArray))
 import Data.Bits (setBit, testBit)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.ByteString.Short (ShortByteString (SBS))
+import qualified Data.ByteString.Short as SBS
 import Data.Foldable (foldlM)
 import Data.List (foldl')
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word (Word16, Word8)
 import GHC.Generics (Generic)
-import NoThunks.Class (NoThunks)
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 -- * Cryptographic primitives
 
@@ -146,7 +160,7 @@ committeeSize = V.length . committeeVoters
 -- consumers verify them via 'verifyLeiosCert'; the bitfield layout is an
 -- implementation detail of the wire format.
 data LeiosCert = LeiosCert
-  { signers :: !ByteString
+  { signers :: !BitField
   , aggregatedSignature :: !LeiosSignature
   }
   deriving stock (Show, Eq, Generic)
@@ -156,7 +170,7 @@ data LeiosCert = LeiosCert
 encodeLeiosCert :: LeiosCert -> Encoding
 encodeLeiosCert cert =
   encodeListLen 2
-    <> encodeBytes cert.signers
+    <> encodeBytes (bitFieldToBytes cert.signers)
     <> encodeSigDSIGN cert.aggregatedSignature
 
 -- | Plain CBOR decoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
@@ -164,7 +178,7 @@ decodeLeiosCert :: Decoder s LeiosCert
 decodeLeiosCert = do
   enforceSize "LeiosCert" 2
   LeiosCert
-    <$> decodeBytes
+    <$> (bitFieldFromBytes <$> decodeBytes)
     <*> decodeSigDSIGN
 
 -- ** Construction
@@ -211,7 +225,7 @@ aggregateLeiosCert committee contributions = do
       Right s -> Right s
   pure
     LeiosCert
-      { signers = encodeSignersBitfield n [fromIntegral (voterIndex v) | (v, _) <- entries]
+      { signers = mkBitField n (Map.keysSet contributions)
       , aggregatedSignature = aggSig
       }
 
@@ -263,9 +277,10 @@ verifyLeiosCert ::
 verifyLeiosCert committee required msg cert = do
   let voters = committeeVoters committee
       n = V.length voters
-  idxs <-
+  signers <-
     maybe (Left MalformedSigners) Right $
-      decodeSignersBitfield n cert.signers
+      bitFieldMembers n cert.signers
+  let idxs = [fromIntegral (voterIndex v) | v <- Set.toAscList signers]
   (got, vks) <- foldlM (accumSigner voters) (0, []) idxs
   when (got < required) $
     Left InsufficientWeight {got, required}
@@ -283,36 +298,73 @@ verifyLeiosCert committee required msg cert = do
       Nothing -> Left MalformedSigners
       Just (w', vk) -> Right (w + w', vk : ks)
 
--- * Internal bitfield codec
+-- * Internal
 
+-- $internal
 --
--- Not exported: producers go through 'aggregateLeiosCert' and consumers
--- through 'verifyLeiosCert'.
+-- These definitions back the wire-format @signers@ field of 'LeiosCert' and
+-- are exported only as an escape hatch for debugging, tooling, and
+-- adversarial testing. Production code should not need to touch them
+-- directly: producers go through 'aggregateLeiosCert' and consumers through
+-- 'verifyLeiosCert', and the CBOR codecs handle on-wire transport.
 
--- | Encode the @⌈N\/8⌉@-byte MSB-first bitfield over a committee of size @N@.
--- Indices outside the committee bound are silently dropped.
-encodeSignersBitfield :: Int -> [Int] -> ByteString
-encodeSignersBitfield n idxs = BS.pack [byteFor b | b <- [0 .. expectedBytes - 1]]
+-- | The @signers@ bitfield of a 'LeiosCert': a @⌈committeeSize\/8⌉@-byte
+-- MSB-first packed-bits representation of which committee voters contributed
+-- to the aggregate signature.
+--
+-- A 'newtype' wrapper around 'ByteArray' so type signatures throughout the
+-- aggregate / verify path say what they're working on, and so the on-wire
+-- form cannot be accidentally confused with arbitrary @bytes@.
+newtype BitField = BitField {bitFieldBytes :: ByteArray}
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (NFData)
+  deriving (NoThunks) via OnlyCheckWhnfNamed "BitField" BitField
+
+-- | Project the raw byte payload of a 'BitField' as a strict 'BS.ByteString'.
+-- O(1) — the underlying 'ByteArray' is reinterpreted via 'ShortByteString'.
+bitFieldToBytes :: BitField -> BS.ByteString
+bitFieldToBytes (BitField (ByteArray ba#)) = SBS.fromShort (SBS ba#)
+
+-- | Wrap a strict 'BS.ByteString' as a 'BitField'. O(1) on the wire-level
+-- byte payload (no copy beyond 'ShortByteString' construction).
+bitFieldFromBytes :: BS.ByteString -> BitField
+bitFieldFromBytes bs = case SBS.toShort bs of
+  SBS ba# -> BitField (ByteArray ba#)
+
+-- | Build the @⌈n\/8⌉@-byte MSB-first 'BitField' for a committee of size @n@.
+-- Members at or past the committee bound are silently dropped (the producer
+-- should never pass any; 'aggregateLeiosCert' range-checks separately and
+-- raises 'VoterIdOutOfBounds').
+mkBitField :: Int -> Set VoterId -> BitField
+mkBitField n members =
+  bitFieldFromBytes $ BS.pack [byteFor b | b <- [0 .. expectedBytes - 1]]
   where
     expectedBytes = (n + 7) `div` 8
-    marked = Set.fromList [i | i <- idxs, i >= 0, i < n]
+    isSet b bitIx =
+      Set.member (VoterId (fromIntegral (b * 8 + bitIx))) members
+        && b * 8 + bitIx < n
     byteFor b =
       foldl'
-        (\acc bitIx -> if Set.member (b * 8 + bitIx) marked then setBit acc (7 - bitIx) else acc)
+        (\acc bitIx -> if isSet b bitIx then setBit acc (7 - bitIx) else acc)
         (0 :: Word8)
         [0 .. 7]
 
--- | Decode an MSB-first bitfield to its set-bit indices in ascending order.
--- Returns 'Nothing' if the bitfield is longer than @⌈N\/8⌉@ bytes (malformed
--- certificate); a shorter bitfield is accepted as if it were right-padded
--- with zero bytes.
-decodeSignersBitfield :: Int -> ByteString -> Maybe [Int]
-decodeSignersBitfield n bs
+-- | The voter ids whose bit is set in the 'BitField', interpreting it against
+-- a committee of size @n@. Returns 'Nothing' if the underlying byte payload
+-- is strictly longer than @⌈n\/8⌉@ bytes (malformed certificate); a shorter
+-- payload is accepted as if right-padded with zero bytes.
+bitFieldMembers :: Int -> BitField -> Maybe (Set VoterId)
+bitFieldMembers n bf
   | BS.length bs > expectedBytes = Nothing
-  | otherwise = Just $ do
-      (byteIx, byte) <- zip [0 ..] (BS.unpack bs)
-      bitIx <- [0 .. 7]
-      let globalIx = byteIx * 8 + bitIx
-      [globalIx | globalIx < n, testBit byte (7 - bitIx)]
+  | otherwise = Just $ Set.fromList members
   where
+    bs = bitFieldToBytes bf
     expectedBytes = (n + 7) `div` 8
+    members =
+      [ VoterId (fromIntegral globalIx)
+      | (byteIx, byte) <- zip [0 ..] (BS.unpack bs)
+      , bitIx <- [0 .. 7]
+      , let globalIx = byteIx * 8 + bitIx
+      , globalIx < n
+      , testBit byte (7 - bitIx)
+      ]
