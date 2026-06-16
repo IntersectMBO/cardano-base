@@ -43,3 +43,23 @@ library
     cborg,
     deepseq,
     nothunks,
+
+test-suite tests
+  import: base, project-config
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules:
+    Test.Cardano.Crypto.Leios
+
+  build-depends:
+    bytestring,
+    cardano-binary:{cardano-binary, testlib},
+    cardano-crypto-class,
+    cardano-crypto-leios,
+    cardano-prelude-test,
+    hedgehog,
+
+  ghc-options:
+    -threaded
+    -rtsopts

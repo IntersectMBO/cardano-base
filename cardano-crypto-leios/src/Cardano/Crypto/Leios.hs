@@ -62,14 +62,14 @@ data LeiosCert = LeiosCert
 -- | Plain CBOR encoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
 encodeLeiosCert :: LeiosCert -> Encoding
 encodeLeiosCert cert =
-  encodeListLen 4
+  encodeListLen 2
     <> encodeBytes cert.signers
     <> encodeSigDSIGN cert.aggregatedSignature
 
 -- | Plain CBOR decoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
 decodeLeiosCert :: Decoder s LeiosCert
 decodeLeiosCert = do
-  enforceSize "LeiosCert" 4
+  enforceSize "LeiosCert" 2
   LeiosCert
     <$> decodeBytes
     <*> decodeSigDSIGN
