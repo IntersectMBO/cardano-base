@@ -16,6 +16,7 @@ import Cardano.Crypto.Leios (
   Committee (..),
   LeiosCert (..),
   LeiosDSIGN,
+  LeiosSignature,
   LeiosSigningKey,
   VerificationError (..),
   VoterId (..),
@@ -26,20 +27,24 @@ import Cardano.Crypto.Leios (
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
+import qualified Data.Bits as Bits
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Vector as V
 import Hedgehog (
   Gen,
   Group (..),
+  MonadTest,
   Property,
   annotateShow,
   checkParallel,
+  failure,
   forAll,
   property,
   tripping,
-  withTests,
   (===),
  )
 import qualified Hedgehog.Gen as Gen
@@ -54,9 +59,13 @@ tests =
       [ ("prop_roundtrip_LeiosCert", prop_roundtrip_LeiosCert)
       , ("prop_golden_LeiosCert", prop_golden_LeiosCert)
       , ("prop_verifyLeiosCert_accepts_aggregated", prop_verifyLeiosCert_accepts_aggregated)
+      , ("prop_verifyLeiosCert_accepts_subset", prop_verifyLeiosCert_accepts_subset)
       , ("prop_verifyLeiosCert_rejects_wrong_message", prop_verifyLeiosCert_rejects_wrong_message)
       , ("prop_verifyLeiosCert_rejects_below_threshold", prop_verifyLeiosCert_rejects_below_threshold)
+      , ("prop_verifyLeiosCert_rejects_oversized_signers", prop_verifyLeiosCert_rejects_oversized_signers)
+      , ("prop_verifyLeiosCert_rejects_tampered_bitfield", prop_verifyLeiosCert_rejects_tampered_bitfield)
       , ("prop_aggregateLeiosCert_rejects_out_of_range", prop_aggregateLeiosCert_rejects_out_of_range)
+      , ("prop_aggregateLeiosCert_rejects_empty", prop_aggregateLeiosCert_rejects_empty)
       ]
 
 -- * CBOR roundtrip / golden
@@ -123,58 +132,129 @@ fixedCommittee n =
       | i <- [1 .. n]
       ]
 
+-- | Default committee size range exercised by the verify/aggregate properties.
+-- 1 ≤ n ≤ 16 covers single-voter (n=1), single-byte bitfield (n ≤ 8) and the
+-- two-byte boundary (n=9..16).
+genN :: Gen Int
+genN = Gen.int (Range.linear 1 16)
+
+-- | Sign @msg@ with each of the given keys and pack them into a 'Map' keyed
+-- by 'VoterId', matching the input shape of 'aggregateLeiosCert'.
+signContribs :: ByteString -> [(Int, LeiosSigningKey)] -> Map VoterId LeiosSignature
+signContribs msg pairs =
+  Map.fromList
+    [(VoterId (fromIntegral i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
+
+-- | Aggregate or fail the test with the error.
+aggregateOrFail ::
+  MonadTest m => Committee -> Map VoterId LeiosSignature -> m LeiosCert
+aggregateOrFail committee contributions = case aggregateLeiosCert committee contributions of
+  Right c -> pure c
+  Left e -> do annotateShow e; failure
+
 -- | All committee members sign the same message; the resulting cert verifies
 -- against that committee, threshold and message, and reports full weight.
 prop_verifyLeiosCert_accepts_aggregated :: Property
-prop_verifyLeiosCert_accepts_aggregated = withTests 20 $ property $ do
-  n <- forAll (Gen.int (Range.linear 1 16))
+prop_verifyLeiosCert_accepts_aggregated = property $ do
+  n <- forAll genN
   msg <- forAll (Gen.bytes (Range.linear 0 64))
   let (sks, committee) = fixedCommittee n
-      contributions =
-        Map.fromList
-          [ (VoterId (fromIntegral i), signDSIGN leiosSignContext msg sk)
-          | (i, sk) <- zip [0 :: Int ..] sks
-          ]
-  cert <- case aggregateLeiosCert committee contributions of
-    Right c -> pure c
-    Left e -> do annotateShow e; fail "aggregateLeiosCert failed"
+      contributions = signContribs msg (zip [0 :: Int ..] sks)
+  cert <- aggregateOrFail committee contributions
   verifyLeiosCert committee 1 msg cert === Right 1
+
+-- | An arbitrary subset of @k@ committee members signs the same message.
+-- The cert must verify against any threshold @≤ k/n@ and report weight
+-- @k/n@. Catches bugs where the verifier doesn't actually sum the correct
+-- subset of weights.
+prop_verifyLeiosCert_accepts_subset :: Property
+prop_verifyLeiosCert_accepts_subset = property $ do
+  n <- forAll genN
+  k <- forAll (Gen.int (Range.linear 1 n))
+  msg <- forAll (Gen.bytes (Range.linear 0 64))
+  let (sks, committee) = fixedCommittee n
+      contributions = signContribs msg (take k (zip [0 :: Int ..] sks))
+      expectedWeight = fromIntegral k / fromIntegral n
+  cert <- aggregateOrFail committee contributions
+  verifyLeiosCert committee expectedWeight msg cert === Right expectedWeight
 
 -- | A cert built over message @m1@ must not verify against message @m2@.
 prop_verifyLeiosCert_rejects_wrong_message :: Property
-prop_verifyLeiosCert_rejects_wrong_message = withTests 20 $ property $ do
-  let n = 4
-      (sks, committee) = fixedCommittee n
-      m1 = "leios-message-one" :: BS.ByteString
-      m2 = "leios-message-two" :: BS.ByteString
-      contributions =
-        Map.fromList
-          [ (VoterId (fromIntegral i), signDSIGN leiosSignContext m1 sk)
-          | (i, sk) <- zip [0 :: Int ..] sks
-          ]
-  cert <- case aggregateLeiosCert committee contributions of
-    Right c -> pure c
-    Left e -> do annotateShow e; fail "aggregateLeiosCert failed"
+prop_verifyLeiosCert_rejects_wrong_message = property $ do
+  n <- forAll genN
+  let (sks, committee) = fixedCommittee n
+      m1 = "leios-message-one" :: ByteString
+      m2 = "leios-message-two" :: ByteString
+      contributions = signContribs m1 (zip [0 :: Int ..] sks)
+  cert <- aggregateOrFail committee contributions
   verifyLeiosCert committee 1 m2 cert === Left InvalidSignature
 
 -- | A cert whose signers' summed weight is below the threshold must be
 -- rejected with 'InsufficientWeight', without ever performing the BLS
--- pairing.
+-- pairing. Uses n ≥ 2 so a single signer's weight @1/n@ is strictly less
+-- than the full-weight threshold.
 prop_verifyLeiosCert_rejects_below_threshold :: Property
-prop_verifyLeiosCert_rejects_below_threshold = withTests 1 $ property $ do
-  let n = 4 -- four equal-weight voters; one signer ⇒ weight = 1/4
-      (sks, committee) = fixedCommittee n
-      msg = "leios-quorum-test" :: BS.ByteString
-      contributions = Map.singleton (VoterId 0) (signDSIGN leiosSignContext msg (head sks))
-  cert <- case aggregateLeiosCert committee contributions of
-    Right c -> pure c
-    Left e -> do annotateShow e; fail "aggregateLeiosCert failed"
-  verifyLeiosCert committee (3 / 4) msg cert
-    === Left InsufficientWeight {got = 1 / 4, required = 3 / 4}
+prop_verifyLeiosCert_rejects_below_threshold = property $ do
+  n <- forAll (Gen.int (Range.linear 2 16))
+  let (sks, committee) = fixedCommittee n
+      msg = "leios-quorum-test" :: ByteString
+      contributions = signContribs msg [(0, head sks)]
+  cert <- aggregateOrFail committee contributions
+  verifyLeiosCert committee 1 msg cert
+    === Left InsufficientWeight {got = 1 / fromIntegral n, required = 1}
 
+-- | A 'signers' bitfield strictly longer than @⌈n/8⌉@ bytes must be
+-- rejected as 'MalformedSigners' before any signature work is done.
+prop_verifyLeiosCert_rejects_oversized_signers :: Property
+prop_verifyLeiosCert_rejects_oversized_signers = property $ do
+  n <- forAll genN
+  let (sks, committee) = fixedCommittee n
+      msg = "leios-malformed-test" :: ByteString
+      contributions = signContribs msg (zip [0 :: Int ..] sks)
+  cert <- aggregateOrFail committee contributions
+  let oversized = cert {signers = BS.snoc (signers cert) 0x00}
+  verifyLeiosCert committee 1 msg oversized === Left MalformedSigners
+
+-- | Flipping on a non-signer's bit in the bitfield must be rejected with
+-- 'InvalidSignature': the aggregate verification key recomputed by the
+-- verifier no longer matches the aggregate signature the producer built.
+--
+-- Uses n ≥ 2 so there's at least one non-signer to tamper with. The signer
+-- is voter 0; the tampered bit is voter 1's, which lives in bit 6 of byte 0
+-- of the MSB-first bitfield.
+prop_verifyLeiosCert_rejects_tampered_bitfield :: Property
+prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
+  n <- forAll (Gen.int (Range.linear 2 16))
+  let (sks, committee) = fixedCommittee n
+      msg = "leios-tamper-test" :: ByteString
+      contributions = signContribs msg [(0, head sks)]
+  cert <- aggregateOrFail committee contributions
+  let raw = signers cert
+      tamperedByte0 = BS.head raw `Bits.setBit` 6
+      tamperedSigners = BS.cons tamperedByte0 (BS.tail raw)
+      tampered = cert {signers = tamperedSigners}
+  -- Threshold is below the tampered weight 2/n so we exercise the BLS
+  -- pairing failure, not the short-circuit.
+  verifyLeiosCert committee (1 / fromIntegral n) msg tampered === Left InvalidSignature
+
+-- | A 'VoterId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
-prop_aggregateLeiosCert_rejects_out_of_range = withTests 1 $ property $ do
-  let (sks, committee) = fixedCommittee 4
-      msg = "x" :: BS.ByteString
-      contributions = Map.singleton (VoterId 7) (signDSIGN leiosSignContext msg (head sks))
-  aggregateLeiosCert committee contributions === Left (VoterIdOutOfBounds (VoterId 7))
+prop_aggregateLeiosCert_rejects_out_of_range = property $ do
+  n <- forAll genN
+  badIdx <- forAll (Gen.int (Range.linear n (n + 100)))
+  let (sks, committee) = fixedCommittee n
+      msg = "x" :: ByteString
+      bad = VoterId (fromIntegral badIdx)
+      contributions = Map.singleton bad (signDSIGN leiosSignContext msg (head sks))
+  aggregateLeiosCert committee contributions === Left (VoterIdOutOfBounds bad)
+
+-- | Aggregating an empty contribution set must fail: the underlying BLS
+-- 'aggregateSigsDSIGN' rejects the empty input, which surfaces as
+-- 'BLSAggregationFailed'. We don't pin the exact message string.
+prop_aggregateLeiosCert_rejects_empty :: Property
+prop_aggregateLeiosCert_rejects_empty = property $ do
+  n <- forAll genN
+  let (_, committee) = fixedCommittee n
+  case aggregateLeiosCert committee Map.empty of
+    Left BLSAggregationFailed {} -> pure ()
+    other -> do annotateShow other; failure
