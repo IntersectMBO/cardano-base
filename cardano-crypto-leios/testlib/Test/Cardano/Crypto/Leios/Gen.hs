@@ -13,6 +13,7 @@ module Test.Cardano.Crypto.Leios.Gen (
   genLeiosCert,
   genLeiosSignature,
   genLeiosSigningKey,
+  generateWith,
 ) where
 
 import Cardano.Crypto.DSIGN (genKeyDSIGN, seedSizeDSIGN, signDSIGN)
@@ -26,8 +27,12 @@ import Cardano.Crypto.Leios (
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import Data.Proxy (Proxy (Proxy))
-import Hedgehog (Gen)
+import Data.Word (Word64)
+import Hedgehog (Gen, Size (..))
 import qualified Hedgehog.Gen as Gen
+import Hedgehog.Internal.Gen (evalGen)
+import qualified Hedgehog.Internal.Seed as Seed
+import Hedgehog.Internal.Tree (treeValue)
 import qualified Hedgehog.Range as Range
 
 -- | Generate a 'LeiosSigningKey' from a uniformly random seed of the
@@ -65,3 +70,12 @@ genLeiosCert = do
       { signers = bitFieldFromBytes signersBytes
       , aggregatedSignature = sig
       }
+
+-- | Deterministically evaluate a Hedgehog 'Gen' at a fixed seed without needing
+-- to 'sample' in 'MonadIO'. Useful for pinning a single value (e.g. for golden
+-- tests). Errors if the generator discards at this seed.
+generateWith :: Gen a -> Word64 -> a
+generateWith gen seed =
+  case evalGen (Size 30) (Seed.from seed) gen of
+    Just tree -> treeValue tree
+    Nothing -> error "generateWith: generator discarded at this seed"
