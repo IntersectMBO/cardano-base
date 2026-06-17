@@ -33,7 +33,7 @@ module Cardano.Crypto.Util (
 )
 where
 
-import Cardano.Base.Bytes (byteStringToByteArray)
+import Cardano.Base.Bytes (byteArrayFromByteString)
 import Control.Monad (unless)
 import Data.Array.Byte (ByteArray (..))
 import Data.Bifunctor (first)
@@ -120,7 +120,7 @@ naturalToBytes = writeBinaryNatural
 -- | The inverse of 'bytesToNatural'. Note that this is a naive implementation
 -- and only suitable for tests.
 naturalToByteArray :: Int -> Natural -> ByteArray
-naturalToByteArray numBytes = byteStringToByteArray . writeBinaryNatural numBytes
+naturalToByteArray numBytes = byteArrayFromByteString . writeBinaryNatural numBytes
 
 -- | Create a 'Integer' out of a 'ByteString', in big endian.
 bytesToInteger :: ByteString -> Integer

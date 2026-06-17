@@ -20,7 +20,9 @@ module Cardano.Crypto.PinnedSizedBytes (
   -- * Conversions
   psbFromBytes,
   psbToBytes,
+  psbToByteArray,
   psbFromByteString,
+  psbFromByteStringM,
   psbFromByteStringCheck,
   psbToByteString,
 
@@ -76,6 +78,7 @@ import GHC.Exts (Int (..), copyAddrToByteArray#)
 import GHC.Ptr (Ptr (..))
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 import qualified Data.Primitive as Prim
 
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
@@ -186,8 +189,11 @@ instance KnownNat n => IsString (Code Q (PinnedSizedBytes n)) where
 psbToBytes :: PinnedSizedBytes n -> [Word8]
 psbToBytes (PSB ba) = foldrByteArray (:) [] ba
 
+psbToByteArray :: PinnedSizedBytes n -> ByteArray
+psbToByteArray (PSB ba) = ba
+
 psbToByteString :: PinnedSizedBytes n -> BS.ByteString
-psbToByteString = BS.pack . psbToBytes
+psbToByteString = SBS.fromShort . byteArrayToShortByteString . psbToByteArray
 
 psbToPackedBytes :: KnownNat n => PinnedSizedBytes n -> PackedBytes n
 psbToPackedBytes (PSB ba) = packBytes (byteArrayToShortByteString ba) 0
@@ -227,16 +233,28 @@ psbFromByteString bs =
     Just psb -> psb
 
 psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
-psbFromByteStringCheck bs
-  | BS.length bs == size = Just $
+psbFromByteStringCheck = psbFromByteStringM
+
+psbFromByteStringM ::
+  forall n m.
+  (KnownNat n, MonadFail m) =>
+  BS.ByteString -> m (PinnedSizedBytes n)
+psbFromByteStringM bs
+  | n == size = pure $
       unsafeDupablePerformIO $
         BS.useAsCStringLen bs $ \(Ptr addr#, _) -> do
           marr@(MutableByteArray marr#) <- newPinnedByteArray size
           primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
           arr <- unsafeFreezeByteArray marr
           return (PSB arr)
-  | otherwise = Nothing
+  | otherwise =
+      fail $
+        "Supplied ByteString with size: "
+          <> show n
+          <> " did not match the expected number of bytes: "
+          <> show size
   where
+    n = BS.length bs
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
 
