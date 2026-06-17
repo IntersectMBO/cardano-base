@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 
 -- | Hedgehog generators for 'Cardano.Crypto.Leios' types, intended for
@@ -12,6 +11,7 @@
 -- AST-shape tests, not for protocol-level acceptance tests.
 module Test.Cardano.Crypto.Leios.Gen (
   genLeiosCert,
+  genLeiosSignature,
   genLeiosSigningKey,
 ) where
 
@@ -19,6 +19,7 @@ import Cardano.Crypto.DSIGN (genKeyDSIGN, seedSizeDSIGN, signDSIGN)
 import Cardano.Crypto.Leios (
   LeiosCert (..),
   LeiosDSIGN,
+  LeiosSignature,
   LeiosSigningKey,
   bitFieldFromBytes,
   leiosSignContext,
@@ -37,6 +38,17 @@ genLeiosSigningKey = do
   seedBytes <- Gen.bytes (Range.singleton seedLen)
   pure $ genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes seedBytes)
 
+-- | Generate a real BLS 'LeiosSignature' by signing a random message with a
+-- freshly-generated signing key. Suitable as a byte-generator source for
+-- CDDL specs that need on-wire bytes which round-trip through
+-- 'Cardano.Crypto.DSIGN.rawDeserialiseSigDSIGN' — uniformly random 48-byte
+-- strings do /not/ decode to valid BLS G1 points and will crash there.
+genLeiosSignature :: Gen LeiosSignature
+genLeiosSignature = do
+  sk <- genLeiosSigningKey
+  msg <- Gen.bytes (Range.linear 0 256)
+  pure $ signDSIGN leiosSignContext msg sk
+
 -- | Generate a 'LeiosCert' whose @signers@ bitfield length walks the CBOR
 -- uint width boundaries (1 / 2 / 3-byte length headers) and whose
 -- aggregated signature is a real BLS signature over a random message — but
@@ -45,12 +57,11 @@ genLeiosSigningKey = do
 -- tests, not for verifier-acceptance tests.
 genLeiosCert :: Gen LeiosCert
 genLeiosCert = do
-  sk <- genLeiosSigningKey
-  msg <- Gen.bytes (Range.linear 0 256)
   signersLen <- Gen.element [0, 1, 23, 24, 255, 256]
   signersBytes <- Gen.bytes (Range.singleton signersLen)
+  sig <- genLeiosSignature
   pure
     LeiosCert
       { signers = bitFieldFromBytes signersBytes
-      , aggregatedSignature = signDSIGN leiosSignContext msg sk
+      , aggregatedSignature = sig
       }

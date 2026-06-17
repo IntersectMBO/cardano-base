@@ -7,6 +7,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 -- Named fields on the 'InsufficientWeight' variant of 'VerificationError'
 -- are wanted at the call site; the project-wide @-Wpartial-fields@ would
 -- otherwise reject record syntax on a single sum-type alternative.
@@ -21,6 +22,7 @@ module Cardano.Crypto.Leios where
 import Cardano.Binary (enforceSize)
 import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (aggregateSigsDSIGN, uncheckedAggregateVerKeysDSIGN),
+  DSIGNAlgorithm (rawSerialiseSigDSIGN),
   SigDSIGN,
   SignKeyDSIGN,
   VerKeyDSIGN,
@@ -29,6 +31,7 @@ import Cardano.Crypto.DSIGN (
   verifyDSIGN,
  )
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
+import Cardano.Crypto.DSIGN.Class (sigSizeDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
 import Codec.CBOR.Decoding (Decoder, decodeBytes)
 import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen)
@@ -36,9 +39,11 @@ import Control.DeepSeq (NFData)
 import Control.Monad (when)
 import Data.Array.Byte (ByteArray (ByteArray))
 import Data.Bits (setBit, testBit)
+import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Short (ShortByteString (SBS))
 import qualified Data.ByteString.Short as SBS
+import Data.Data (Proxy (..))
 import Data.Foldable (foldlM)
 import Data.List (foldl')
 import Data.Map.Strict (Map)
@@ -65,6 +70,14 @@ type LeiosSignature = SigDSIGN LeiosDSIGN
 -- per CIP-164. Pass this as the 'ContextDSIGN' to 'signDSIGN' / 'verifyDSIGN'.
 leiosSignContext :: BLS12381SignContext
 leiosSignContext = minSigPoPDST
+
+-- | Size of a Leios signature in the chosen signature scheme.
+leiosSignatureSize :: Word
+leiosSignatureSize = sigSizeDSIGN (Proxy @LeiosDSIGN)
+
+-- | Get the bytes of a Leios signature.
+leiosSignatureToBytes :: LeiosSignature -> ByteString
+leiosSignatureToBytes = rawSerialiseSigDSIGN
 
 -- * Voting committee
 
