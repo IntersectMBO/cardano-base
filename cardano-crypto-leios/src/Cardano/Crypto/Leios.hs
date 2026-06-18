@@ -45,7 +45,7 @@ import Data.ByteString.Short (ShortByteString (SBS))
 import qualified Data.ByteString.Short as SBS
 import Data.Data (Proxy (..))
 import Data.Foldable (foldlM)
-import Data.List (foldl')
+import qualified Data.Foldable as F (foldl')
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -322,7 +322,7 @@ mkBitField n members =
       Set.member (VoterId (fromIntegral (b * 8 + bitIx))) members
         && b * 8 + bitIx < n
     byteFor b =
-      foldl'
+      F.foldl'
         (\acc bitIx -> if isSet b bitIx then setBit acc (7 - bitIx) else acc)
         (0 :: Word8)
         [0 .. 7]
