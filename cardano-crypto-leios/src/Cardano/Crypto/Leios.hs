@@ -16,7 +16,7 @@
 module Cardano.Crypto.Leios where
 
 import Cardano.Base.Bytes (byteArrayFromByteString, byteArrayToByteString)
-import Cardano.Binary (enforceSize)
+import Cardano.Binary (matchSize)
 import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (aggregateSigsDSIGN, uncheckedAggregateVerKeysDSIGN),
   DSIGNAlgorithm (rawSerialiseSigDSIGN),
@@ -30,7 +30,7 @@ import Cardano.Crypto.DSIGN (
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
 import Cardano.Crypto.DSIGN.Class (sigSizeDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
-import Codec.CBOR.Decoding (Decoder, decodeBytes)
+import Codec.CBOR.Decoding (Decoder, decodeBreakOr, decodeBytes, decodeListLenOrIndef)
 import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen)
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, unless, when)
@@ -172,12 +172,23 @@ encodeLeiosCert cert =
     <> encodeSigDSIGN cert.aggregatedSignature
 
 -- | Plain CBOR decoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
+-- Accepts both definite-length and indefinite-length encodings of the
+-- outer 2-element array.
 decodeLeiosCert :: Decoder s LeiosCert
 decodeLeiosCert = do
-  enforceSize "LeiosCert" 2
-  LeiosCert
-    <$> (bitFieldFromBytes <$> decodeBytes)
-    <*> decodeSigDSIGN
+  isIndef <-
+    decodeListLenOrIndef >>= \case
+      Just n -> False <$ matchSize "LeiosCert" 2 n
+      Nothing -> pure True
+  cert <-
+    LeiosCert
+      <$> (bitFieldFromBytes <$> decodeBytes)
+      <*> decodeSigDSIGN
+  when isIndef $ do
+    isBreak <- decodeBreakOr
+    unless isBreak $
+      fail "LeiosCert: expected break after 2 elements of indefinite-length list"
+  pure cert
 
 -- ** Construction
 

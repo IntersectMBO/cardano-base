@@ -7,10 +7,12 @@ module Test.Cardano.Crypto.Leios (spec, exampleCert) where
 import qualified Cardano.Binary as CBOR
 import Cardano.Crypto.DSIGN (
   DSIGNAlgorithm (deriveVerKeyDSIGN),
+  encodeSigDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
   signDSIGN,
  )
+import qualified Codec.CBOR.Encoding as CBOR.E
 import Cardano.Crypto.Leios (
   AggregationError (..),
   BitField,
@@ -57,6 +59,7 @@ import qualified Test.QuickCheck as QC
 spec :: Spec
 spec = describe "Test.Cardano.Crypto.Leios" $ do
   prop "roundtrip_LeiosCert" prop_roundtrip_LeiosCert
+  prop "decode_indefinite_LeiosCert" prop_decode_indefinite_LeiosCert
   it "golden_LeiosCert" prop_golden_LeiosCert
   prop "verifyLeiosCert_accepts_aggregated" prop_verifyLeiosCert_accepts_aggregated
   prop "verifyLeiosCert_accepts_subset" prop_verifyLeiosCert_accepts_subset
@@ -73,6 +76,18 @@ prop_roundtrip_LeiosCert :: Property
 prop_roundtrip_LeiosCert = forAll genLeiosCert $ \cert ->
   let bs = CBOR.serialize (encodeLeiosCert cert)
    in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert bs === Right cert
+
+-- | The decoder must accept indefinite-length encodings of the outer
+-- 2-element array, not just the canonical definite-length form.
+prop_decode_indefinite_LeiosCert :: Property
+prop_decode_indefinite_LeiosCert = forAll genLeiosCert $ \cert ->
+  let indef =
+        CBOR.E.encodeListLenIndef
+          <> CBOR.E.encodeBytes (bitFieldToBytes (signers cert))
+          <> encodeSigDSIGN (aggregatedSignature cert)
+          <> CBOR.E.encodeBreak
+   in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (CBOR.serialize indef)
+        === Right cert
 
 -- | Locks the on-wire encoding of 'LeiosCert' against accidental drift.
 -- Inputs are fixed (constant seed, fixed message, fixed bitfield) so the

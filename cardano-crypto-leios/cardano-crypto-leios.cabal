@@ -76,6 +76,7 @@ test-suite tests
     cardano-binary,
     cardano-crypto-class,
     cardano-crypto-leios:{cardano-crypto-leios, testlib},
+    cborg,
     containers,
     hspec,
     vector,
