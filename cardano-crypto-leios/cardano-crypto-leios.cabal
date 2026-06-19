@@ -38,12 +38,14 @@ library
 
   build-depends:
     bytestring,
+    cardano-base,
     cardano-binary,
     cardano-crypto-class,
     cborg,
     containers,
     deepseq,
     nothunks,
+    primitive,
     text,
     vector,
 

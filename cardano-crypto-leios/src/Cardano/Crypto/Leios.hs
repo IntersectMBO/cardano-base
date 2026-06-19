@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -15,6 +15,7 @@
 -- 'LeiosVote' because the vote itself is not an artifact that is on-chain.
 module Cardano.Crypto.Leios where
 
+import Cardano.Base.Bytes (byteArrayFromByteString, byteArrayToByteString)
 import Cardano.Binary (enforceSize)
 import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (aggregateSigsDSIGN, uncheckedAggregateVerKeysDSIGN),
@@ -32,18 +33,24 @@ import Cardano.Crypto.Util (SignableRepresentation)
 import Codec.CBOR.Decoding (Decoder, decodeBytes)
 import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen)
 import Control.DeepSeq (NFData)
-import Control.Monad (when)
-import Data.Array.Byte (ByteArray (ByteArray))
-import Data.Bits (setBit, testBit)
+import Control.Monad (forM_, unless, when)
+import Data.Array.Byte (ByteArray)
+import Data.Bits (setBit, shiftR, testBit, (.&.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import Data.ByteString.Short (ShortByteString (SBS))
-import qualified Data.ByteString.Short as SBS
 import Data.Data (Proxy (..))
 import Data.Foldable (foldlM)
-import qualified Data.Foldable as F (foldl')
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Primitive.ByteArray (
+  fillByteArray,
+  indexByteArray,
+  newByteArray,
+  readByteArray,
+  runByteArray,
+  sizeofByteArray,
+  writeByteArray,
+ )
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
@@ -322,50 +329,57 @@ newtype BitField = BitField {bitFieldBytes :: ByteArray}
   deriving (NoThunks) via OnlyCheckWhnfNamed "BitField" BitField
 
 -- | Project the raw byte payload of a 'BitField' as a strict 'BS.ByteString'.
--- O(1) — the underlying 'ByteArray' is reinterpreted via 'ShortByteString'.
 bitFieldToBytes :: BitField -> BS.ByteString
-bitFieldToBytes (BitField (ByteArray ba#)) = SBS.fromShort (SBS ba#)
+bitFieldToBytes BitField {bitFieldBytes} =
+  byteArrayToByteString bitFieldBytes
 
--- | Wrap a strict 'BS.ByteString' as a 'BitField'. O(1) on the wire-level
--- byte payload (no copy beyond 'ShortByteString' construction).
+-- | Use a strict 'BS.ByteString' as a 'BitField'.
 bitFieldFromBytes :: BS.ByteString -> BitField
-bitFieldFromBytes bs = case SBS.toShort bs of
-  SBS ba# -> BitField (ByteArray ba#)
+bitFieldFromBytes =
+  BitField . byteArrayFromByteString
 
--- | Build the @⌈n\/8⌉@-byte MSB-first 'BitField' for a committee of size @n@.
+-- | Build the @⌈n\/8⌉@-byte 'BitField' for a committee of size @n@.
 -- Members at or past the committee bound are silently dropped (the producer
 -- should never pass any; 'aggregateLeiosCert' range-checks separately and
 -- raises 'VoterIdOutOfBounds').
+--
+-- Builds directly into a mutable 'ByteArray' — one allocation, no list
+-- intermediate — and writes one bit per member of the input set.
 mkBitField :: Int -> Set VoterId -> BitField
-mkBitField n members =
-  bitFieldFromBytes $ BS.pack [byteFor b | b <- [0 .. expectedBytes - 1]]
+mkBitField n members = BitField $ runByteArray $ do
+  mba <- newByteArray len
+  fillByteArray mba 0 len 0
+  forM_ (Set.toAscList members) $ \(VoterId i) -> do
+    let idx = fromIntegral @Word16 @Int i
+    when (idx < n) $ do
+      let byteIx = idx `shiftR` 3
+          bitPos = 7 - (idx .&. 7)
+      b <- readByteArray mba byteIx
+      writeByteArray mba byteIx ((b :: Word8) `setBit` bitPos)
+  pure mba
   where
-    expectedBytes = (n + 7) `div` 8
-    isSet b bitIx =
-      Set.member (VoterId (fromIntegral (b * 8 + bitIx))) members
-        && b * 8 + bitIx < n
-    byteFor b =
-      F.foldl'
-        (\acc bitIx -> if isSet b bitIx then setBit acc (7 - bitIx) else acc)
-        (0 :: Word8)
-        [0 .. 7]
+    len = (n + 7) `div` 8
 
 -- | The voter ids whose bit is set in the 'BitField', interpreting it against
 -- a committee of size @n@. Returns 'Nothing' if the underlying byte payload
 -- is strictly longer than @⌈n\/8⌉@ bytes (malformed certificate); a shorter
 -- payload is accepted as if right-padded with zero bytes.
+--
+-- Indexes the 'ByteArray' directly (no 'BS.unpack' intermediate); the
+-- per-byte inner loop is over @[0..7]@ and fuses away.
 bitFieldMembers :: Int -> BitField -> Maybe (Set VoterId)
-bitFieldMembers n bf
-  | BS.length bs > expectedBytes = Nothing
-  | otherwise = Just $ Set.fromList members
+bitFieldMembers n (BitField ba)
+  | actualBytes > len = Nothing
+  | otherwise =
+      Just . Set.fromAscList $
+        [ VoterId (fromIntegral globalIx)
+        | byteIx <- [0 .. actualBytes - 1]
+        , let byte = indexByteArray ba byteIx :: Word8
+        , bitIx <- [0 .. 7]
+        , let globalIx = byteIx * 8 + bitIx
+        , globalIx < n
+        , testBit byte (7 - bitIx)
+        ]
   where
-    bs = bitFieldToBytes bf
-    expectedBytes = (n + 7) `div` 8
-    members =
-      [ VoterId (fromIntegral globalIx)
-      | (byteIx, byte) <- zip [0 ..] (BS.unpack bs)
-      , bitIx <- [0 .. 7]
-      , let globalIx = byteIx * 8 + bitIx
-      , globalIx < n
-      , testBit byte (7 - bitIx)
-      ]
+    len = (n + 7) `div` 8
+    actualBytes = sizeofByteArray ba
