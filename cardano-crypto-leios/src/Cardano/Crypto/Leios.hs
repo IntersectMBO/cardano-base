@@ -13,7 +13,42 @@
 -- uses BLS12-381 MinSig as its signature scheme and defines a 'LeiosCert' that
 -- can be included into blocks. This module deliberately not includes a
 -- 'LeiosVote' because the vote itself is not an artifact that is on-chain.
-module Cardano.Crypto.Leios where
+module Cardano.Crypto.Leios (
+  -- * Cryptographic primitives
+  LeiosDSIGN,
+  LeiosSigningKey,
+  LeiosVerificationKey,
+  LeiosSignature,
+  leiosSignContext,
+  leiosSignatureSize,
+  leiosSignatureToBytes,
+
+  -- * Voting committee
+  Weight,
+  VoterId (..),
+  LeiosVoter (..),
+  Committee (..),
+  committeeSize,
+
+  -- * Leios certificates
+  LeiosCert (..),
+  encodeLeiosCert,
+  decodeLeiosCert,
+
+  -- ** Construction
+  AggregationError (..),
+  aggregateLeiosCert,
+
+  -- ** Verification
+  WeightMismatch (..),
+  VerificationError (..),
+  verifyLeiosCert,
+
+  -- * Bitfield wire-format helpers
+  BitField,
+  bitFieldToBytes,
+  bitFieldFromBytes,
+) where
 
 import Cardano.Base.Bytes (byteArrayFromByteString, byteArrayToByteString)
 import Cardano.Binary (matchSize)
@@ -61,8 +96,6 @@ import Data.Word (Word16, Word8)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
--- * Cryptographic primitives
-
 type LeiosDSIGN = BLS12381MinSigDSIGN
 
 type LeiosSigningKey = SignKeyDSIGN LeiosDSIGN
@@ -83,8 +116,6 @@ leiosSignatureSize = sigSizeDSIGN (Proxy @LeiosDSIGN)
 -- | Get the bytes of a Leios signature.
 leiosSignatureToBytes :: LeiosSignature -> ByteString
 leiosSignatureToBytes = rawSerialiseSigDSIGN
-
--- * Voting committee
 
 -- | A weight assigned to a committee voter, normalised so the total over a
 -- committee sums to @1@. Threshold checks in 'verifyLeiosCert' are against
@@ -137,8 +168,6 @@ newtype Committee = Committee {committeeVoters :: Vector LeiosVoter}
 committeeSize :: Committee -> Int
 committeeSize Committee {committeeVoters} = V.length committeeVoters
 
--- * Leios certificates
-
 -- | A Leios certificate over an endorser block, as specified in CIP-164:
 --
 -- @
@@ -190,8 +219,6 @@ decodeLeiosCert = do
       fail "LeiosCert: expected break after 2 elements of indefinite-length list"
   pure cert
 
--- ** Construction
-
 data AggregationError
   = -- | A voter index in the contributions is past the committee bound.
     VoterIdOutOfBounds !VoterId
@@ -237,8 +264,6 @@ aggregateLeiosCert committee contributions = do
       { signers = mkBitField n (Map.keysSet contributions)
       , aggregatedSignature = aggSig
       }
-
--- ** Verification
 
 data VerificationError
   = -- | 'signers' bitfield is longer than @⌈committeeSize/8⌉@ bytes.
@@ -316,16 +341,6 @@ verifyLeiosCert committee required msg cert = do
     accumSigner voters (!w, !ks) i = case voters V.!? i of
       Nothing -> Left MalformedSigners
       Just (LeiosVoter w' vk) -> Right (w + w', vk : ks)
-
--- * Internal
-
--- $internal
---
--- These definitions back the wire-format @signers@ field of 'LeiosCert' and
--- are exported only as an escape hatch for debugging, tooling, and
--- adversarial testing. Production code should not need to touch them
--- directly: producers go through 'aggregateLeiosCert' and consumers through
--- 'verifyLeiosCert', and the CBOR codecs handle on-wire transport.
 
 -- | The @signers@ bitfield of a 'LeiosCert': a @⌈committeeSize\/8⌉@-byte
 -- MSB-first packed-bits representation of which committee voters contributed
