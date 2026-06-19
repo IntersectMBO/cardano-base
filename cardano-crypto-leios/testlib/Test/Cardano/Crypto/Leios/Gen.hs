@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 
--- | Hedgehog generators for 'Cardano.Crypto.Leios' types, intended for
+-- | QuickCheck generators for 'Cardano.Crypto.Leios' types, intended for
 -- downstream test suites (e.g. @cardano-ledger@) that want a real
 -- structurally-valid 'LeiosCert' without depending on the BLS plumbing.
 --
@@ -26,21 +26,19 @@ import Cardano.Crypto.Leios (
   leiosSignContext,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
+import qualified Data.ByteString as BS
 import Data.Proxy (Proxy (Proxy))
 import Data.Word (Word64)
-import Hedgehog (Gen, Size (..))
-import qualified Hedgehog.Gen as Gen
-import Hedgehog.Internal.Gen (evalGen)
-import qualified Hedgehog.Internal.Seed as Seed
-import Hedgehog.Internal.Tree (treeValue)
-import qualified Hedgehog.Range as Range
+import Test.QuickCheck (Gen, arbitrary, choose, elements, vectorOf)
+import Test.QuickCheck.Gen (unGen)
+import Test.QuickCheck.Random (mkQCGen)
 
 -- | Generate a 'LeiosSigningKey' from a uniformly random seed of the
 -- algorithm's expected size.
 genLeiosSigningKey :: Gen LeiosSigningKey
 genLeiosSigningKey = do
-  let seedLen = fromIntegral (seedSizeDSIGN (Proxy @LeiosDSIGN))
-  seedBytes <- Gen.bytes (Range.singleton seedLen)
+  let seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
+  seedBytes <- BS.pack <$> vectorOf seedLen arbitrary
   pure $ genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes seedBytes)
 
 -- | Generate a real BLS 'LeiosSignature' by signing a random message with a
@@ -51,7 +49,8 @@ genLeiosSigningKey = do
 genLeiosSignature :: Gen LeiosSignature
 genLeiosSignature = do
   sk <- genLeiosSigningKey
-  msg <- Gen.bytes (Range.linear 0 256)
+  msgLen <- choose (0, 256)
+  msg <- BS.pack <$> vectorOf msgLen arbitrary
   pure $ signDSIGN leiosSignContext msg sk
 
 -- | Generate a 'LeiosCert' whose @signers@ bitfield length walks the CBOR
@@ -62,8 +61,8 @@ genLeiosSignature = do
 -- tests, not for verifier-acceptance tests.
 genLeiosCert :: Gen LeiosCert
 genLeiosCert = do
-  signersLen <- Gen.element [0, 1, 23, 24, 255, 256]
-  signersBytes <- Gen.bytes (Range.singleton signersLen)
+  signersLen <- elements [0, 1, 23, 24, 255, 256]
+  signersBytes <- BS.pack <$> vectorOf signersLen arbitrary
   sig <- genLeiosSignature
   pure
     LeiosCert
@@ -71,11 +70,8 @@ genLeiosCert = do
       , aggregatedSignature = sig
       }
 
--- | Deterministically evaluate a Hedgehog 'Gen' at a fixed seed without needing
--- to 'sample' in 'MonadIO'. Useful for pinning a single value (e.g. for golden
--- tests). Errors if the generator discards at this seed.
+-- | Deterministically evaluate a QuickCheck 'Gen' at a fixed seed. Useful for
+-- pinning a single value (e.g. for golden tests) without going through
+-- 'Test.QuickCheck.generate' in 'IO'.
 generateWith :: Gen a -> Word64 -> a
-generateWith gen seed =
-  case evalGen (Size 30) (Seed.from seed) gen of
-    Just tree -> treeValue tree
-    Nothing -> error "generateWith: generator discarded at this seed"
+generateWith gen seed = unGen gen (mkQCGen (fromIntegral seed)) 30

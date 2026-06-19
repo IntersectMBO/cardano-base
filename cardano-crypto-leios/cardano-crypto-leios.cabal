@@ -54,9 +54,10 @@ library testlib
     Test.Cardano.Crypto.Leios.Gen
 
   build-depends:
+    QuickCheck,
+    bytestring,
     cardano-crypto-class,
     cardano-crypto-leios,
-    hedgehog,
 
 test-suite tests
   import: base, project-config
@@ -67,13 +68,14 @@ test-suite tests
     Test.Cardano.Crypto.Leios
 
   build-depends:
+    QuickCheck,
+    base16-bytestring,
     bytestring,
-    cardano-binary:{cardano-binary, testlib},
+    cardano-binary,
     cardano-crypto-class,
     cardano-crypto-leios:{cardano-crypto-leios, testlib},
-    cardano-prelude-test,
     containers,
-    hedgehog,
+    hspec,
     vector,
 
   ghc-options:

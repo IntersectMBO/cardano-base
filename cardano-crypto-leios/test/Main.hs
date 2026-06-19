@@ -1,11 +1,8 @@
 module Main (main) where
 
 import qualified Test.Cardano.Crypto.Leios
-import Test.Cardano.Prelude (runTests)
+import Test.Hspec (hspec)
 import Prelude
 
 main :: IO ()
-main =
-  runTests
-    [ Test.Cardano.Crypto.Leios.tests
-    ]
+main = hspec Test.Cardano.Crypto.Leios.spec

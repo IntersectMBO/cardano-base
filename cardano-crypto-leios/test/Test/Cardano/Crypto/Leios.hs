@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Test.Cardano.Crypto.Leios (tests, exampleCert) where
+module Test.Cardano.Crypto.Leios (spec, exampleCert) where
 
 import qualified Cardano.Binary as CBOR
 import Cardano.Crypto.DSIGN (
@@ -31,67 +31,91 @@ import Cardano.Crypto.Leios (
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import qualified Data.Bits as Bits
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Char8 as BSC
+import qualified Data.ByteString.Lazy as BSL
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Vector as V
-import Hedgehog (
-  Gen,
-  Group (..),
-  MonadTest,
+import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
+import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
+import Test.Hspec.QuickCheck (prop)
+import Test.QuickCheck (
   Property,
-  annotateShow,
-  checkParallel,
-  failure,
+  chooseInt,
+  counterexample,
   forAll,
-  property,
-  tripping,
   (===),
  )
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
-import Test.Cardano.Binary.Helpers.GoldenRoundTrip (goldenTestCBORExplicit)
-import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
+import qualified Test.QuickCheck as QC
 
-tests :: IO Bool
-tests =
-  checkParallel $
-    Group
-      "Test.Cardano.Crypto.Leios"
-      [ ("prop_roundtrip_LeiosCert", prop_roundtrip_LeiosCert)
-      , ("prop_golden_LeiosCert", prop_golden_LeiosCert)
-      , ("prop_verifyLeiosCert_accepts_aggregated", prop_verifyLeiosCert_accepts_aggregated)
-      , ("prop_verifyLeiosCert_accepts_subset", prop_verifyLeiosCert_accepts_subset)
-      , ("prop_verifyLeiosCert_rejects_wrong_message", prop_verifyLeiosCert_rejects_wrong_message)
-      , ("prop_verifyLeiosCert_rejects_below_threshold", prop_verifyLeiosCert_rejects_below_threshold)
-      , ("prop_verifyLeiosCert_rejects_oversized_signers", prop_verifyLeiosCert_rejects_oversized_signers)
-      , ("prop_verifyLeiosCert_rejects_tampered_bitfield", prop_verifyLeiosCert_rejects_tampered_bitfield)
-      , ("prop_aggregateLeiosCert_rejects_out_of_range", prop_aggregateLeiosCert_rejects_out_of_range)
-      , ("prop_aggregateLeiosCert_rejects_empty", prop_aggregateLeiosCert_rejects_empty)
-      ]
+spec :: Spec
+spec = describe "Test.Cardano.Crypto.Leios" $ do
+  prop "roundtrip_LeiosCert" prop_roundtrip_LeiosCert
+  it "golden_LeiosCert" prop_golden_LeiosCert
+  prop "verifyLeiosCert_accepts_aggregated" prop_verifyLeiosCert_accepts_aggregated
+  prop "verifyLeiosCert_accepts_subset" prop_verifyLeiosCert_accepts_subset
+  prop "verifyLeiosCert_rejects_wrong_message" prop_verifyLeiosCert_rejects_wrong_message
+  prop "verifyLeiosCert_rejects_below_threshold" prop_verifyLeiosCert_rejects_below_threshold
+  prop "verifyLeiosCert_rejects_oversized_signers" prop_verifyLeiosCert_rejects_oversized_signers
+  prop "verifyLeiosCert_rejects_tampered_bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
+  prop "aggregateLeiosCert_rejects_out_of_range" prop_aggregateLeiosCert_rejects_out_of_range
+  prop "aggregateLeiosCert_rejects_empty" prop_aggregateLeiosCert_rejects_empty
 
 -- * CBOR roundtrip / golden
 
 prop_roundtrip_LeiosCert :: Property
-prop_roundtrip_LeiosCert = property $ do
-  cert <- forAll genLeiosCert
-  tripping
-    cert
-    (CBOR.serialize . encodeLeiosCert)
-    (CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert)
+prop_roundtrip_LeiosCert = forAll genLeiosCert $ \cert ->
+  let bs = CBOR.serialize (encodeLeiosCert cert)
+   in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert bs === Right cert
 
 -- | Locks the on-wire encoding of 'LeiosCert' against accidental drift.
 -- Inputs are fixed (constant seed, fixed message, fixed bitfield) so the
 -- byte-for-byte golden is reproducible.
-prop_golden_LeiosCert :: Property
-prop_golden_LeiosCert =
-  goldenTestCBORExplicit "LeiosCert" encodeLeiosCert decodeLeiosCert exampleCert path
+prop_golden_LeiosCert :: IO ()
+prop_golden_LeiosCert = do
+  let actual = BSL.toStrict (CBOR.serialize (encodeLeiosCert exampleCert))
+      actualHex = formatIndexedHex actual
+  expectedHex <- BS.readFile path
+  actualHex `shouldBe` expectedHex
+  case decodeIndexedHex expectedHex of
+    Left e -> expectationFailure ("golden file is not valid hex: " <> e)
+    Right raw ->
+      CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (BSL.fromStrict raw)
+        `shouldBe` Right exampleCert
   where
     path = "test/golden/LeiosCert"
+
+-- | Format a strict 'ByteString' as 16-byte-per-line hex with a 2-hex-digit
+-- offset prefix, matching the on-disk shape of the golden file.
+formatIndexedHex :: BS.ByteString -> BS.ByteString
+formatIndexedHex bs =
+  BS.concat
+    [ BSC.pack (twoHex offset) <> ": " <> Base16.encode chunk <> "\n"
+    | (offset, chunk) <- zip [0, 16 ..] (chunksOf 16 bs)
+    ]
+  where
+    twoHex n = case showHex2 n of
+      [c] -> ['0', c]
+      cs -> cs
+    showHex2 n
+      | n < 16 = [hexDigit n]
+      | otherwise = showHex2 (n `div` 16) <> [hexDigit (n `mod` 16)]
+    hexDigit d
+      | d < 10 = toEnum (fromEnum '0' + d)
+      | otherwise = toEnum (fromEnum 'a' + d - 10)
+    chunksOf n s
+      | BS.null s = []
+      | otherwise = let (h, t) = BS.splitAt n s in h : chunksOf n t
+
+-- | Parse the indexed-hex format back to its raw bytes; offsets are dropped.
+decodeIndexedHex :: BS.ByteString -> Either String BS.ByteString
+decodeIndexedHex =
+  Base16.decode . BS.concat . map (BS.drop 4) . BSC.lines
 
 exampleCert :: LeiosCert
 exampleCert =
@@ -100,7 +124,7 @@ exampleCert =
     , aggregatedSignature = signDSIGN leiosSignContext exampleMessage exampleSigningKey
     }
   where
-    seedLen = fromIntegral (seedSizeDSIGN (Proxy @LeiosDSIGN))
+    seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
     exampleSigningKey = genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen 0x01))
     exampleMessage = "leios-golden-message" :: BS.ByteString
 
@@ -117,7 +141,7 @@ fixedCommittee n =
       (V.fromList [(1 / fromIntegral n, deriveVerKeyDSIGN sk) | sk <- NE.toList sks])
   )
   where
-    seedLen = fromIntegral (seedSizeDSIGN (Proxy @LeiosDSIGN))
+    seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
     sks =
       NE.fromList
         [ genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen (fromIntegral i)))
@@ -127,90 +151,92 @@ fixedCommittee n =
 -- | Default committee size range exercised by the verify/aggregate properties.
 -- 1 ≤ n ≤ 16 covers single-voter (n=1), single-byte bitfield (n ≤ 8) and the
 -- two-byte boundary (n=9..16).
-genN :: Gen Int
-genN = Gen.int (Range.linear 1 16)
+genN :: QC.Gen Int
+genN = chooseInt (1, 16)
+
+genMsg :: QC.Gen BS.ByteString
+genMsg = do
+  len <- chooseInt (0, 64)
+  BS.pack <$> QC.vectorOf len QC.arbitrary
 
 -- | Sign @msg@ with each of the given keys and pack them into a 'Map' keyed
 -- by 'VoterId', matching the input shape of 'aggregateLeiosCert'.
-signContribs :: ByteString -> [(Int, LeiosSigningKey)] -> Map VoterId LeiosSignature
+signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map VoterId LeiosSignature
 signContribs msg pairs =
   Map.fromList
     [(VoterId (fromIntegral i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
 
--- | Aggregate or fail the test with the error.
+-- | Aggregate or fail the property with the error.
 aggregateOrFail ::
-  MonadTest m => Committee -> Map VoterId LeiosSignature -> m LeiosCert
-aggregateOrFail committee contributions = case aggregateLeiosCert committee contributions of
-  Right c -> pure c
-  Left e -> do annotateShow e; failure
+  Committee ->
+  Map VoterId LeiosSignature ->
+  (LeiosCert -> Property) ->
+  Property
+aggregateOrFail committee contributions k = case aggregateLeiosCert committee contributions of
+  Right c -> k c
+  Left e -> counterexample (show e) (QC.property False)
 
 -- | Apply a byte-level transform to a 'BitField', for adversarial test cases
 -- that need to mutate the wire form directly.
-withSignerBytes :: (ByteString -> ByteString) -> BitField -> BitField
+withSignerBytes :: (BS.ByteString -> BS.ByteString) -> BitField -> BitField
 withSignerBytes f = bitFieldFromBytes . f . bitFieldToBytes
 
 -- | All committee members sign the same message; the resulting cert verifies
 -- against that committee, threshold and message, and reports full weight.
 prop_verifyLeiosCert_accepts_aggregated :: Property
-prop_verifyLeiosCert_accepts_aggregated = property $ do
-  n <- forAll genN
-  msg <- forAll (Gen.bytes (Range.linear 0 64))
+prop_verifyLeiosCert_accepts_aggregated = forAll genN $ \n -> forAll genMsg $ \msg ->
   let (sks, committee) = fixedCommittee n
       contributions = signContribs msg (zip [0 :: Int ..] (NE.toList sks))
-  cert <- aggregateOrFail committee contributions
-  verifyLeiosCert committee 1 msg cert === Right 1
+   in aggregateOrFail committee contributions $ \cert ->
+        verifyLeiosCert committee 1 msg cert === Right 1
 
 -- | An arbitrary subset of @k@ committee members signs the same message.
 -- The cert must verify against any threshold @≤ k/n@ and report weight
 -- @k/n@. Catches bugs where the verifier doesn't actually sum the correct
 -- subset of weights.
 prop_verifyLeiosCert_accepts_subset :: Property
-prop_verifyLeiosCert_accepts_subset = property $ do
-  n <- forAll genN
-  k <- forAll (Gen.int (Range.linear 1 n))
-  msg <- forAll (Gen.bytes (Range.linear 0 64))
-  let (sks, committee) = fixedCommittee n
-      contributions = signContribs msg (take k (zip [0 :: Int ..] (NE.toList sks)))
-      expectedWeight = fromIntegral k / fromIntegral n
-  cert <- aggregateOrFail committee contributions
-  verifyLeiosCert committee expectedWeight msg cert === Right expectedWeight
+prop_verifyLeiosCert_accepts_subset = forAll genN $ \n ->
+  forAll (chooseInt (1, n)) $ \k ->
+    forAll genMsg $ \msg ->
+      let (sks, committee) = fixedCommittee n
+          contributions = signContribs msg (take k (zip [0 :: Int ..] (NE.toList sks)))
+          expectedWeight = fromIntegral k / fromIntegral n
+       in aggregateOrFail committee contributions $ \cert ->
+            verifyLeiosCert committee expectedWeight msg cert === Right expectedWeight
 
 -- | A cert built over message @m1@ must not verify against message @m2@.
 prop_verifyLeiosCert_rejects_wrong_message :: Property
-prop_verifyLeiosCert_rejects_wrong_message = property $ do
-  n <- forAll genN
+prop_verifyLeiosCert_rejects_wrong_message = forAll genN $ \n ->
   let (sks, committee) = fixedCommittee n
-      m1 = "leios-message-one" :: ByteString
-      m2 = "leios-message-two" :: ByteString
+      m1 = "leios-message-one" :: BS.ByteString
+      m2 = "leios-message-two" :: BS.ByteString
       contributions = signContribs m1 (zip [0 :: Int ..] (NE.toList sks))
-  cert <- aggregateOrFail committee contributions
-  verifyLeiosCert committee 1 m2 cert === Left InvalidSignature
+   in aggregateOrFail committee contributions $ \cert ->
+        verifyLeiosCert committee 1 m2 cert === Left InvalidSignature
 
 -- | A cert whose signers' summed weight is below the threshold must be
 -- rejected with 'InsufficientWeight', without ever performing the BLS
 -- pairing. Uses n ≥ 2 so a single signer's weight @1/n@ is strictly less
 -- than the full-weight threshold.
 prop_verifyLeiosCert_rejects_below_threshold :: Property
-prop_verifyLeiosCert_rejects_below_threshold = property $ do
-  n <- forAll (Gen.int (Range.linear 2 16))
+prop_verifyLeiosCert_rejects_below_threshold = forAll (chooseInt (2, 16)) $ \n ->
   let (sks, committee) = fixedCommittee n
-      msg = "leios-quorum-test" :: ByteString
+      msg = "leios-quorum-test" :: BS.ByteString
       contributions = signContribs msg [(0, NE.head sks)]
-  cert <- aggregateOrFail committee contributions
-  verifyLeiosCert committee 1 msg cert
-    === Left InsufficientWeight {got = 1 / fromIntegral n, required = 1}
+   in aggregateOrFail committee contributions $ \cert ->
+        verifyLeiosCert committee 1 msg cert
+          === Left InsufficientWeight {got = 1 / fromIntegral n, required = 1}
 
 -- | A 'signers' bitfield strictly longer than @⌈n/8⌉@ bytes must be
 -- rejected as 'MalformedSigners' before any signature work is done.
 prop_verifyLeiosCert_rejects_oversized_signers :: Property
-prop_verifyLeiosCert_rejects_oversized_signers = property $ do
-  n <- forAll genN
+prop_verifyLeiosCert_rejects_oversized_signers = forAll genN $ \n ->
   let (sks, committee) = fixedCommittee n
-      msg = "leios-malformed-test" :: ByteString
+      msg = "leios-malformed-test" :: BS.ByteString
       contributions = signContribs msg (zip [0 :: Int ..] (NE.toList sks))
-  cert <- aggregateOrFail committee contributions
-  let oversized = cert {signers = withSignerBytes (`BS.snoc` 0x00) (signers cert)}
-  verifyLeiosCert committee 1 msg oversized === Left MalformedSigners
+   in aggregateOrFail committee contributions $ \cert ->
+        let oversized = cert {signers = withSignerBytes (`BS.snoc` 0x00) (signers cert)}
+         in verifyLeiosCert committee 1 msg oversized === Left MalformedSigners
 
 -- | Flipping on a non-signer's bit in the bitfield must be rejected with
 -- 'InvalidSignature': the aggregate verification key recomputed by the
@@ -220,38 +246,35 @@ prop_verifyLeiosCert_rejects_oversized_signers = property $ do
 -- is voter 0; the tampered bit is voter 1's, which lives in bit 6 of byte 0
 -- of the MSB-first bitfield.
 prop_verifyLeiosCert_rejects_tampered_bitfield :: Property
-prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
-  n <- forAll (Gen.int (Range.linear 2 16))
+prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n ->
   let (sks, committee) = fixedCommittee n
-      msg = "leios-tamper-test" :: ByteString
+      msg = "leios-tamper-test" :: BS.ByteString
       contributions = signContribs msg [(0, NE.head sks)]
-  cert <- aggregateOrFail committee contributions
-  let raw = bitFieldToBytes (signers cert)
-      tamperedByte0 = BS.head raw `Bits.setBit` 6
-      tamperedSigners = bitFieldFromBytes (BS.cons tamperedByte0 (BS.tail raw))
-      tampered = cert {signers = tamperedSigners}
-  -- Threshold is below the tampered weight 2/n so we exercise the BLS
-  -- pairing failure, not the short-circuit.
-  verifyLeiosCert committee (1 / fromIntegral n) msg tampered === Left InvalidSignature
+   in aggregateOrFail committee contributions $ \cert ->
+        let raw = bitFieldToBytes (signers cert)
+            tamperedByte0 = BS.head raw `Bits.setBit` 6
+            tamperedSigners = bitFieldFromBytes (BS.cons tamperedByte0 (BS.tail raw))
+            tampered = cert {signers = tamperedSigners}
+         in -- Threshold is below the tampered weight 2/n so we exercise the BLS
+            -- pairing failure, not the short-circuit.
+            verifyLeiosCert committee (1 / fromIntegral n) msg tampered === Left InvalidSignature
 
 -- | A 'VoterId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
-prop_aggregateLeiosCert_rejects_out_of_range = property $ do
-  n <- forAll genN
-  badIdx <- forAll (Gen.int (Range.linear n (n + 100)))
-  let (sks, committee) = fixedCommittee n
-      msg = "x" :: ByteString
-      bad = VoterId (fromIntegral badIdx)
-      contributions = Map.singleton bad (signDSIGN leiosSignContext msg (NE.head sks))
-  aggregateLeiosCert committee contributions === Left (VoterIdOutOfBounds bad)
+prop_aggregateLeiosCert_rejects_out_of_range = forAll genN $ \n ->
+  forAll (chooseInt (n, n + 100)) $ \badIdx ->
+    let (sks, committee) = fixedCommittee n
+        msg = "x" :: BS.ByteString
+        bad = VoterId (fromIntegral badIdx)
+        contributions = Map.singleton bad (signDSIGN leiosSignContext msg (NE.head sks))
+     in aggregateLeiosCert committee contributions === Left (VoterIdOutOfBounds bad)
 
 -- | Aggregating an empty contribution set must fail: the underlying BLS
 -- 'aggregateSigsDSIGN' rejects the empty input, which surfaces as
 -- 'BLSAggregationFailed'. We don't pin the exact message string.
 prop_aggregateLeiosCert_rejects_empty :: Property
-prop_aggregateLeiosCert_rejects_empty = property $ do
-  n <- forAll genN
+prop_aggregateLeiosCert_rejects_empty = forAll genN $ \n ->
   let (_, committee) = fixedCommittee n
-  case aggregateLeiosCert committee Map.empty of
-    Left BLSAggregationFailed {} -> pure ()
-    other -> do annotateShow other; failure
+   in case aggregateLeiosCert committee Map.empty of
+        Left BLSAggregationFailed {} -> QC.property True
+        other -> counterexample (show other) (QC.property False)
