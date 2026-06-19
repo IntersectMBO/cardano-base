@@ -4,8 +4,3 @@
 
 nix/.stack.nix/*.nix linguist-generated=true
 nix/sources.nix linguist-generated=true
-
-# Golden test files are byte-exact hex dumps compared verbatim against the
-# encoder output. Without this, Windows checkouts translate LF -> CRLF and
-# the comparison fails (see cardano-crypto-leios:test:tests on Windows CI).
-cardano-crypto-leios/test/golden/** text eol=lf

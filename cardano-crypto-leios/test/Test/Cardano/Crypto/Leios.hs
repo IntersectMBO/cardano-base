@@ -19,8 +19,10 @@ import Cardano.Crypto.Leios (
   LeiosDSIGN,
   LeiosSignature,
   LeiosSigningKey,
+  LeiosVoter (..),
   VerificationError (..),
   VoterId (..),
+  WeightMismatch (..),
   aggregateLeiosCert,
   bitFieldFromBytes,
   bitFieldToBytes,
@@ -32,17 +34,16 @@ import Cardano.Crypto.Leios (
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Char8 as BSC
 import qualified Data.ByteString.Lazy as BSL
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (Proxy))
-import qualified Data.Vector as V
+import qualified Data.Vector.Strict as V
+import Data.Word (Word16, Word8)
 import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
-import Test.Hspec (Spec, describe, expectationFailure, it, shouldBe)
+import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (
   Property,
@@ -79,43 +80,12 @@ prop_roundtrip_LeiosCert = forAll genLeiosCert $ \cert ->
 prop_golden_LeiosCert :: IO ()
 prop_golden_LeiosCert = do
   let actual = BSL.toStrict (CBOR.serialize (encodeLeiosCert exampleCert))
-      actualHex = formatIndexedHex actual
-  expectedHex <- BS.readFile path
-  actualHex `shouldBe` expectedHex
-  case decodeIndexedHex expectedHex of
-    Left e -> expectationFailure ("golden file is not valid hex: " <> e)
-    Right raw ->
-      CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (BSL.fromStrict raw)
-        `shouldBe` Right exampleCert
+  expected <- BS.readFile path
+  actual `shouldBe` expected
+  CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (BSL.fromStrict expected)
+    `shouldBe` Right exampleCert
   where
     path = "test/golden/LeiosCert"
-
--- | Format a strict 'ByteString' as 16-byte-per-line hex with a 2-hex-digit
--- offset prefix, matching the on-disk shape of the golden file.
-formatIndexedHex :: BS.ByteString -> BS.ByteString
-formatIndexedHex bs =
-  BS.concat
-    [ BSC.pack (twoHex offset) <> ": " <> Base16.encode chunk <> "\n"
-    | (offset, chunk) <- zip [0, 16 ..] (chunksOf 16 bs)
-    ]
-  where
-    twoHex n = case showHex2 n of
-      [c] -> ['0', c]
-      cs -> cs
-    showHex2 n
-      | n < 16 = [hexDigit n]
-      | otherwise = showHex2 (n `div` 16) <> [hexDigit (n `mod` 16)]
-    hexDigit d
-      | d < 10 = toEnum (fromEnum '0' + d)
-      | otherwise = toEnum (fromEnum 'a' + d - 10)
-    chunksOf n s
-      | BS.null s = []
-      | otherwise = let (h, t) = BS.splitAt n s in h : chunksOf n t
-
--- | Parse the indexed-hex format back to its raw bytes; offsets are dropped.
-decodeIndexedHex :: BS.ByteString -> Either String BS.ByteString
-decodeIndexedHex =
-  Base16.decode . BS.concat . map (BS.drop 4) . BSC.lines
 
 exampleCert :: LeiosCert
 exampleCert =
@@ -138,7 +108,9 @@ fixedCommittee :: Int -> (NonEmpty LeiosSigningKey, Committee)
 fixedCommittee n =
   ( sks
   , Committee
-      (V.fromList [(1 / fromIntegral n, deriveVerKeyDSIGN sk) | sk <- NE.toList sks])
+      ( V.fromList
+          [LeiosVoter (1 / fromIntegral n) (deriveVerKeyDSIGN sk) | sk <- NE.toList sks]
+      )
   )
   where
     seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
@@ -225,7 +197,7 @@ prop_verifyLeiosCert_rejects_below_threshold = forAll (chooseInt (2, 16)) $ \n -
       contributions = signContribs msg [(0, NE.head sks)]
    in aggregateOrFail committee contributions $ \cert ->
         verifyLeiosCert committee 1 msg cert
-          === Left InsufficientWeight {got = 1 / fromIntegral n, required = 1}
+          === Left (InsufficientWeight WeightMismatch {got = 1 / fromIntegral n, required = 1})
 
 -- | A 'signers' bitfield strictly longer than @⌈n/8⌉@ bytes must be
 -- rejected as 'MalformedSigners' before any signature work is done.

@@ -44,6 +44,7 @@ library
     containers,
     deepseq,
     nothunks,
+    text,
     vector,
 
 library testlib
@@ -69,7 +70,6 @@ test-suite tests
 
   build-depends:
     QuickCheck,
-    base16-bytestring,
     bytestring,
     cardano-binary,
     cardano-crypto-class,

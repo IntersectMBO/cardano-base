@@ -1,17 +1,13 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
--- Named fields on the 'InsufficientWeight' variant of 'VerificationError'
--- are wanted at the call site; the project-wide @-Wpartial-fields@ would
--- otherwise reject record syntax on a single sum-type alternative.
-{-# OPTIONS_GHC -Wno-partial-fields #-}
 
 -- | Cryptographic data types and operations used in Leios per CIP-164. Leios
 -- uses BLS12-381 MinSig as its signature scheme and defines a 'LeiosCert' that
@@ -50,8 +46,10 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Vector (Vector)
-import qualified Data.Vector as V
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Vector.Strict (Vector)
+import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -94,8 +92,17 @@ newtype VoterId = VoterId {voterIndex :: Word16}
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (NFData, NoThunks)
 
+-- | A single seat in a 'Committee': a voter's normalised weight paired with
+-- its BLS verification key.
+data LeiosVoter = LeiosVoter
+  { voterWeight :: !Weight
+  , voterVKey :: !LeiosVerificationKey
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (NFData, NoThunks)
+
 -- | The voting committee for a Leios epoch: an ordered vector of
--- @(weight, verification-key)@ pairs.
+-- 'LeiosVoter' seats.
 --
 -- Position determines the voter's 'VoterId' and its bit in the certificate's
 -- bitfield, so callers must keep the order stable between construction and
@@ -109,13 +116,19 @@ newtype VoterId = VoterId {voterIndex :: Word16}
 -- skip per-key PoP checks (they use 'uncheckedAggregateVerKeysDSIGN' /
 -- 'aggregateSigsDSIGN' under the hood). Passing in unchecked keys defeats
 -- the security of the aggregate signature.
-newtype Committee = Committee {committeeVoters :: Vector (Weight, LeiosVerificationKey)}
+newtype Committee = Committee {committeeVoters :: Vector LeiosVoter}
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (NFData, NoThunks)
+  deriving anyclass (NFData)
+  -- 'nothunks' ships no instance for 'Data.Vector.Strict.Vector' and we don't
+  -- want to add an orphan. A WHNF-only check on the wrapper is sufficient here:
+  -- the strict 'Vector' forces every cell to WHNF, and a WHNF 'LeiosVoter'
+  -- forces both of its strict fields, so "Committee in WHNF" structurally
+  -- implies no thunks anywhere inside.
+  deriving (NoThunks) via OnlyCheckWhnfNamed "Committee" Committee
 
 -- | Number of seats in the committee.
 committeeSize :: Committee -> Int
-committeeSize = V.length . committeeVoters
+committeeSize Committee {committeeVoters} = V.length committeeVoters
 
 -- * Leios certificates
 
@@ -165,7 +178,7 @@ data AggregationError
   = -- | A voter index in the contributions is past the committee bound.
     VoterIdOutOfBounds !VoterId
   | -- | BLS signature aggregation failed (e.g. malformed input signature).
-    BLSAggregationFailed !String
+    BLSAggregationFailed !Text
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -194,12 +207,12 @@ aggregateLeiosCert ::
 aggregateLeiosCert committee contributions = do
   let n = committeeSize committee
       entries = Map.toAscList contributions
-  case [v | (v, _) <- entries, fromIntegral (voterIndex v) >= n] of
+  case [v | (v, _) <- entries, fromIntegral v.voterIndex >= n] of
     v : _ -> Left (VoterIdOutOfBounds v)
     [] -> pure ()
   aggSig <-
     case aggregateSigsDSIGN (map snd entries) of
-      Left e -> Left (BLSAggregationFailed e)
+      Left e -> Left (BLSAggregationFailed (T.pack e))
       Right s -> Right s
   pure
     LeiosCert
@@ -216,7 +229,17 @@ data VerificationError
     -- signature, or a bitfield/aggregate mismatch).
     InvalidSignature
   | -- | Sum of signers' weights is below the required threshold.
-    InsufficientWeight {got :: !Weight, required :: !Weight}
+    InsufficientWeight !WeightMismatch
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | The mismatch between the actual contributing weight and the minimum
+-- threshold a 'LeiosCert' is required to meet. Carried by
+-- 'InsufficientWeight'.
+data WeightMismatch = WeightMismatch
+  { got :: !Weight
+  , required :: !Weight
+  }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -253,15 +276,15 @@ verifyLeiosCert ::
   -- | Total weight of the contributing signers on success.
   Either VerificationError Weight
 verifyLeiosCert committee required msg cert = do
-  let voters = committeeVoters committee
+  let voters = committee.committeeVoters
       n = V.length voters
   signerSet <-
     maybe (Left MalformedSigners) Right $
       bitFieldMembers n cert.signers
-  let idxs = [fromIntegral (voterIndex v) | v <- Set.toAscList signerSet]
+  let idxs = [fromIntegral v.voterIndex | v <- Set.toAscList signerSet]
   (got, vks) <- foldlM (accumSigner voters) (0, []) idxs
   when (got < required) $
-    Left InsufficientWeight {got, required}
+    Left (InsufficientWeight WeightMismatch {got, required})
   aggVk <-
     case uncheckedAggregateVerKeysDSIGN (reverse vks) of
       Left _ -> Left InvalidSignature
@@ -272,9 +295,9 @@ verifyLeiosCert committee required msg cert = do
   where
     -- The bitfield decoder already enforced @i < n@; if the committee is
     -- shorter than the decoder's idea of @n@ we treat it as a malformed cert.
-    accumSigner voters (w, ks) i = case voters V.!? i of
+    accumSigner voters (!w, !ks) i = case voters V.!? i of
       Nothing -> Left MalformedSigners
-      Just (w', vk) -> Right (w + w', vk : ks)
+      Just (LeiosVoter w' vk) -> Right (w + w', vk : ks)
 
 -- * Internal
 
