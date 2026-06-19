@@ -1,0 +1,114 @@
+cabal-version: 3.0
+name: cardano-config
+version: 0.1.0.0
+synopsis: Cardano-node configuration parsing
+description:
+  Datatypes and parsers for optparse-applicative and from YAML/JSON for the @cardano-node@ configuration.
+
+license: Apache-2.0
+license-file: LICENSE
+author: Javier Sagredo
+maintainer: javier.sagredo@iohk.io
+copyright:
+  INTERSECT 2026
+
+category: Data
+build-type: Simple
+extra-doc-files:
+  CHANGELOG.md
+
+data-files:
+  examples/*.json
+
+common warnings
+  ghc-options:
+    -Wall
+    -Wunused-packages
+
+library
+  import: warnings
+  exposed-modules:
+    Cardano.Configuration
+    Cardano.Configuration.Basics
+    Cardano.Configuration.CliArgs
+    Cardano.Configuration.Common
+    Cardano.Configuration.File
+    Cardano.Configuration.File.Consensus
+    Cardano.Configuration.File.Mempool
+    Cardano.Configuration.File.Network
+    Cardano.Configuration.File.Protocol
+    Cardano.Configuration.File.Storage
+    Cardano.Configuration.File.Testing
+    Cardano.Configuration.File.Tracing
+    Cardano.Configuration.Schema
+
+  build-depends:
+    aeson,
+    autodocodec,
+    autodocodec-schema,
+    base,
+    bytestring,
+    cardano-crypto-class,
+    data-default,
+    directory,
+    filepath,
+    iproute,
+    network,
+    optparse-applicative,
+    text,
+    time,
+    yaml,
+
+  hs-source-dirs: src
+  default-language: Haskell2010
+  default-extensions:
+    DataKinds
+    DeriveGeneric
+    DerivingStrategies
+    DerivingVia
+    FlexibleContexts
+    FlexibleInstances
+    GeneralizedNewtypeDeriving
+    KindSignatures
+    LambdaCase
+    MultiParamTypeClasses
+    NamedFieldPuns
+    OverloadedStrings
+    PolyKinds
+    ScopedTypeVariables
+    StandaloneDeriving
+    StrictData
+    TupleSections
+    TypeApplications
+
+executable cardano-config-schema
+  import: warnings
+  main-is: Main.hs
+  hs-source-dirs: app
+  build-depends:
+    aeson,
+    aeson-pretty,
+    base,
+    bytestring,
+    cardano-config,
+    text,
+
+  default-language: Haskell2010
+  default-extensions:
+    LambdaCase
+    OverloadedStrings
+
+test-suite cardano-config-test
+  import: warnings
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  hs-source-dirs: test
+  build-depends:
+    aeson,
+    base,
+    cardano-config,
+
+  default-language: Haskell2010
+  default-extensions:
+    LambdaCase
+    ScopedTypeVariables

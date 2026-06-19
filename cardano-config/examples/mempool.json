@@ -1,0 +1,4 @@
+{
+    "MempoolCapacityBytesOverride": 1000000,
+    "MempoolTimeoutSoft": 7
+}

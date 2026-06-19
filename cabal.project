@@ -18,6 +18,7 @@ packages:
   base-deriving-via
   cardano-base
   cardano-binary
+  cardano-config
   cardano-crypto-class
   cardano-crypto-peras
   cardano-crypto-praos
