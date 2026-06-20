@@ -39,7 +39,7 @@ import Cardano.Crypto.Leios (
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
-import Codec.CBOR.Encoding (Encoding)
+import Codec.CBOR.Encoding (Encoding, encodeBreak, encodeBytes, encodeListLenIndef)
 import qualified Codec.CBOR.Encoding as CBOR.E
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as BS
@@ -54,7 +54,7 @@ import Data.Proxy (Proxy (Proxy))
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
-import Test.Hspec (Spec, describe, it)
+import Test.Hspec (Spec, context, describe, it)
 import Test.Hspec.Golden (Golden (..))
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (
@@ -67,24 +67,35 @@ import Test.QuickCheck (
 import qualified Test.QuickCheck as QC
 
 spec :: Spec
-spec = describe "Test.Cardano.Crypto.Leios" $ do
-  prop "roundtrip_LeiosCert" prop_roundtrip_LeiosCert
-  prop "decode_indefinite_LeiosCert" prop_decode_indefinite_LeiosCert
-  it "golden_LeiosCert" $
-    goldenEncoding "test/golden/LeiosCert" encodeLeiosCert exampleCert
-  prop "roundtrip_VoterId" prop_roundtrip_VoterId
-  it "golden_VoterId" $
-    goldenEncoding "test/golden/VoterId" encodeVoterId exampleVoterId
-  prop "resolveVoter_getVoterId_inverse" prop_resolveVoter_getVoterId_inverse
-  prop "getVoterId_returns_first_index" prop_getVoterId_returns_first_index
-  prop "verifyLeiosCert_accepts_aggregated" prop_verifyLeiosCert_accepts_aggregated
-  prop "verifyLeiosCert_accepts_subset" prop_verifyLeiosCert_accepts_subset
-  prop "verifyLeiosCert_rejects_wrong_message" prop_verifyLeiosCert_rejects_wrong_message
-  prop "verifyLeiosCert_rejects_below_threshold" prop_verifyLeiosCert_rejects_below_threshold
-  prop "verifyLeiosCert_rejects_oversized_signers" prop_verifyLeiosCert_rejects_oversized_signers
-  prop "verifyLeiosCert_rejects_tampered_bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
-  prop "aggregateLeiosCert_rejects_out_of_range" prop_aggregateLeiosCert_rejects_out_of_range
-  prop "aggregateLeiosCert_rejects_empty" prop_aggregateLeiosCert_rejects_empty
+spec = do
+  describe "LeiosCert" $ do
+    prop "round-trips through CBOR" prop_roundtrip_LeiosCert
+    prop "decodes indefinite-length encoding" prop_decode_indefinite_LeiosCert
+    it "matches golden encoding" $
+      goldenEncoding "test/golden/LeiosCert" encodeLeiosCert exampleCert
+
+    describe "aggregateLeiosCert" $ do
+      prop "rejects an out-of-range VoterId" prop_aggregateLeiosCert_rejects_out_of_range
+      prop "rejects empty contributions" prop_aggregateLeiosCert_rejects_empty
+
+    describe "verifyLeiosCert" $ do
+      context "with a valid certificate" $ do
+        prop "accepts a full-committee aggregation" prop_verifyLeiosCert_accepts_aggregated
+        prop "accepts a subset of signers above threshold" prop_verifyLeiosCert_accepts_subset
+      context "with an invalid certificate" $ do
+        prop "rejects a wrong message" prop_verifyLeiosCert_rejects_wrong_message
+        prop "rejects when total weight is below threshold" prop_verifyLeiosCert_rejects_below_threshold
+        prop "rejects a bitfield wider than the committee" prop_verifyLeiosCert_rejects_oversized_signers
+        prop "rejects a tampered bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
+
+  describe "VoterId" $ do
+    prop "round-trips through CBOR" prop_roundtrip_VoterId
+    it "matches golden encoding" $
+      goldenEncoding "test/golden/VoterId" encodeVoterId exampleVoterId
+
+  describe "Committee" $ do
+    prop "getVoterId and resolveVoter agree on verification keys" prop_resolveVoter_getVoterId_inverse
+    prop "getVoterId returns the first matching index" prop_getVoterId_returns_first_index
 
 -- * CBOR roundtrip / golden
 
@@ -98,10 +109,10 @@ prop_roundtrip_LeiosCert = forAll genLeiosCert $ \cert ->
 prop_decode_indefinite_LeiosCert :: Property
 prop_decode_indefinite_LeiosCert = forAll genLeiosCert $ \cert ->
   let indef =
-        CBOR.E.encodeListLenIndef
-          <> CBOR.E.encodeBytes (bitFieldToBytes (signers cert))
+        encodeListLenIndef
+          <> encodeBytes (bitFieldToBytes (signers cert))
           <> encodeSigDSIGN (aggregatedSignature cert)
-          <> CBOR.E.encodeBreak
+          <> encodeBreak
    in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (CBOR.serialize indef)
         === Right cert
 
