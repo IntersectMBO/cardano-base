@@ -26,9 +26,13 @@ module Cardano.Crypto.Leios (
   -- * Voting committee
   Weight,
   VoterId (..),
+  encodeVoterId,
+  decodeVoterId,
   LeiosVoter (..),
   Committee (..),
   committeeSize,
+  resolveVoter,
+  getVoterId,
 
   -- * Leios certificates
   LeiosCert (..),
@@ -46,6 +50,8 @@ module Cardano.Crypto.Leios (
 
   -- * Bitfield wire-format helpers
   BitField,
+  encodeBitField,
+  decodeBitField,
   bitFieldToBytes,
   bitFieldFromBytes,
 ) where
@@ -65,8 +71,8 @@ import Cardano.Crypto.DSIGN (
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
 import Cardano.Crypto.DSIGN.Class (sigSizeDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
-import Codec.CBOR.Decoding (Decoder, decodeBreakOr, decodeBytes, decodeListLenOrIndef)
-import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen)
+import Codec.CBOR.Decoding (Decoder, decodeBreakOr, decodeBytes, decodeListLenOrIndef, decodeWord16)
+import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen, encodeWord16)
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, unless, when)
 import Data.Array.Byte (ByteArray)
@@ -130,6 +136,14 @@ newtype VoterId = VoterId {voterIndex :: Word16}
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (NFData, NoThunks)
 
+-- | Plain CBOR encoder for 'VoterId'.
+encodeVoterId :: VoterId -> Encoding
+encodeVoterId (VoterId idx) = encodeWord16 idx
+
+-- | Plain CBOR decoder for 'VoterId'.
+decodeVoterId :: Decoder s VoterId
+decodeVoterId = VoterId <$> decodeWord16
+
 -- | A single seat in a 'Committee': a voter's normalised weight paired with
 -- its BLS verification key.
 data LeiosVoter = LeiosVoter
@@ -168,6 +182,23 @@ newtype Committee = Committee {committeeVoters :: Vector LeiosVoter}
 committeeSize :: Committee -> Int
 committeeSize Committee {committeeVoters} = V.length committeeVoters
 
+-- | Resolve a 'VoterId' to its 'LeiosVoter' on the 'Committee', or 'Nothing'
+-- if the index is past the committee bound.
+resolveVoter :: Committee -> VoterId -> Maybe LeiosVoter
+resolveVoter committee (VoterId idx) =
+  committee.committeeVoters V.!? fromIntegral idx
+
+-- | Find a voter's 'VoterId' on the 'Committee' by its
+-- 'LeiosVerificationKey', or 'Nothing' if the key is not on the committee.
+--
+-- If the committee carries duplicate verification keys, returns the smallest
+-- index matching @vk@ (committee selection is expected to deduplicate, but
+-- this module does not enforce it).
+getVoterId :: LeiosVerificationKey -> Committee -> Maybe VoterId
+getVoterId vk committee =
+  VoterId . fromIntegral
+    <$> V.findIndex ((== vk) . voterVKey) committee.committeeVoters
+
 -- | A Leios certificate over an endorser block, as specified in CIP-164:
 --
 -- @
@@ -186,6 +217,10 @@ committeeSize Committee {committeeVoters} = V.length committeeVoters
 -- Producers should build 'LeiosCert' values via 'aggregateLeiosCert' and
 -- consumers verify them via 'verifyLeiosCert'; the bitfield layout is an
 -- implementation detail of the wire format.
+--
+-- XXX: This says it's over an EB, but this modules does not specify the
+-- "message" that is signed anymore and only it's usage within a block will add
+-- these semantics.
 data LeiosCert = LeiosCert
   { signers :: !BitField
   , aggregatedSignature :: !LeiosSignature
@@ -197,7 +232,7 @@ data LeiosCert = LeiosCert
 encodeLeiosCert :: LeiosCert -> Encoding
 encodeLeiosCert cert =
   encodeListLen 2
-    <> encodeBytes (bitFieldToBytes cert.signers)
+    <> encodeBitField cert.signers
     <> encodeSigDSIGN cert.aggregatedSignature
 
 -- | Plain CBOR decoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
@@ -211,7 +246,7 @@ decodeLeiosCert = do
       Nothing -> pure True
   cert <-
     LeiosCert
-      <$> (bitFieldFromBytes <$> decodeBytes)
+      <$> decodeBitField
       <*> decodeSigDSIGN
   when isIndef $ do
     isBreak <- decodeBreakOr
@@ -362,6 +397,14 @@ bitFieldToBytes BitField {bitFieldBytes} =
 bitFieldFromBytes :: BS.ByteString -> BitField
 bitFieldFromBytes =
   BitField . byteArrayFromByteString
+
+-- | Encode a 'BitField' to CBOR bytes.
+encodeBitField :: BitField -> Encoding
+encodeBitField = encodeBytes . bitFieldToBytes
+
+-- | Decode a 'BitField' from CBOR bytes.
+decodeBitField :: Decoder s BitField
+decodeBitField = bitFieldFromBytes <$> decodeBytes
 
 -- | Build the @⌈n\/8⌉@-byte 'BitField' for a committee of size @n@.
 -- Members at or past the committee bound are silently dropped (the producer

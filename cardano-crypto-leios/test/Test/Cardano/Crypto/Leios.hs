@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -29,14 +30,21 @@ import Cardano.Crypto.Leios (
   bitFieldFromBytes,
   bitFieldToBytes,
   decodeLeiosCert,
+  decodeVoterId,
   encodeLeiosCert,
+  encodeVoterId,
+  getVoterId,
   leiosSignContext,
+  resolveVoter,
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
+import Codec.CBOR.Encoding (Encoding)
 import qualified Codec.CBOR.Encoding as CBOR.E
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as BS16
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as BSL
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -46,7 +54,8 @@ import Data.Proxy (Proxy (Proxy))
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
-import Test.Hspec (Spec, describe, it, shouldBe)
+import Test.Hspec (Spec, describe, it)
+import Test.Hspec.Golden (Golden (..))
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (
   Property,
@@ -61,7 +70,13 @@ spec :: Spec
 spec = describe "Test.Cardano.Crypto.Leios" $ do
   prop "roundtrip_LeiosCert" prop_roundtrip_LeiosCert
   prop "decode_indefinite_LeiosCert" prop_decode_indefinite_LeiosCert
-  it "golden_LeiosCert" prop_golden_LeiosCert
+  it "golden_LeiosCert" $
+    goldenEncoding "test/golden/LeiosCert" encodeLeiosCert exampleCert
+  prop "roundtrip_VoterId" prop_roundtrip_VoterId
+  it "golden_VoterId" $
+    goldenEncoding "test/golden/VoterId" encodeVoterId exampleVoterId
+  prop "resolveVoter_getVoterId_inverse" prop_resolveVoter_getVoterId_inverse
+  prop "getVoterId_returns_first_index" prop_getVoterId_returns_first_index
   prop "verifyLeiosCert_accepts_aggregated" prop_verifyLeiosCert_accepts_aggregated
   prop "verifyLeiosCert_accepts_subset" prop_verifyLeiosCert_accepts_subset
   prop "verifyLeiosCert_rejects_wrong_message" prop_verifyLeiosCert_rejects_wrong_message
@@ -90,18 +105,21 @@ prop_decode_indefinite_LeiosCert = forAll genLeiosCert $ \cert ->
    in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (CBOR.serialize indef)
         === Right cert
 
--- | Locks the on-wire encoding of 'LeiosCert' against accidental drift.
--- Inputs are fixed (constant seed, fixed message, fixed bitfield) so the
--- byte-for-byte golden is reproducible.
-prop_golden_LeiosCert :: IO ()
-prop_golden_LeiosCert = do
-  let actual = BSL.toStrict (CBOR.serialize (encodeLeiosCert exampleCert))
-  expected <- BS.readFile path
-  actual `shouldBe` expected
-  CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (BSL.fromStrict expected)
-    `shouldBe` Right exampleCert
-  where
-    path = "test/golden/LeiosCert"
+-- | Pin the byte-for-byte CBOR encoding of a value to a golden file using
+-- 'hspec-golden'. Failure diffs are rendered as base16 hex. Decode
+-- round-trip of arbitrary values is covered by the matching @roundtrip_@
+-- property; this only locks the encoding shape.
+goldenEncoding :: FilePath -> (a -> Encoding) -> a -> Golden BSL.ByteString
+goldenEncoding path enc value =
+  Golden
+    { output = CBOR.serialize (enc value)
+    , encodePretty = BS8.unpack . BS16.encode . BSL.toStrict
+    , writeToFile = BSL.writeFile
+    , readFromFile = BSL.readFile
+    , goldenFile = path
+    , actualFile = Nothing
+    , failFirstTime = False
+    }
 
 exampleCert :: LeiosCert
 exampleCert =
@@ -113,6 +131,53 @@ exampleCert =
     seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
     exampleSigningKey = genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen 0x01))
     exampleMessage = "leios-golden-message" :: BS.ByteString
+
+-- * VoterId CBOR / committee lookup
+
+prop_roundtrip_VoterId :: Property
+prop_roundtrip_VoterId = forAll (VoterId <$> QC.arbitrary) $ \vid ->
+  let bs = CBOR.serialize (encodeVoterId vid)
+   in CBOR.decodeFullDecoder "VoterId" decodeVoterId bs === Right vid
+
+exampleVoterId :: VoterId
+exampleVoterId = VoterId 0xABCD
+
+-- | 'getVoterId' and 'resolveVoter' are mutual inverses on the verification
+-- key projection: for any voter in the committee, looking up its 'VoterId'
+-- via its key and resolving back to a 'LeiosVoter' yields the same key.
+prop_resolveVoter_getVoterId_inverse :: Property
+prop_resolveVoter_getVoterId_inverse =
+  forAll genN $ \n ->
+    let (_, committee) = fixedCommittee n
+        voters = V.toList committee.committeeVoters
+     in QC.conjoin
+          [ counterexample ("voter index " <> show i) $
+              case getVoterId (voterVKey voter) committee of
+                Nothing -> QC.property False
+                Just vid ->
+                  case resolveVoter committee vid of
+                    Nothing -> QC.property False
+                    Just voter' -> voterVKey voter' === voterVKey voter
+          | (i :: Int, voter) <- zip [0 ..] voters
+          ]
+
+-- | When the committee carries duplicate verification keys, 'getVoterId'
+-- returns the smallest matching index. We don't deduplicate committees
+-- internally; downstream selection is expected to.
+prop_getVoterId_returns_first_index :: Property
+prop_getVoterId_returns_first_index =
+  forAll genN $ \n ->
+    let (_, committee) = fixedCommittee n
+        voters = V.toList committee.committeeVoters
+     in QC.conjoin
+          [ counterexample ("first occurrence at " <> show i) $
+              getVoterId (voterVKey voter) duped
+                === Just (VoterId (fromIntegral i))
+          | let duped =
+                  Committee
+                    (committee.committeeVoters <> committee.committeeVoters)
+          , (i :: Int, voter) <- zip [0 ..] voters
+          ]
 
 -- * aggregate / verify
 
