@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Trailing whitespace check
       if: matrix.os != 'windows-latest'
@@ -82,7 +82,7 @@ jobs:
       with:
         use-sodium-vrf: false # default is true
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Cabal update
       run: cabal update
@@ -173,7 +173,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Install fourmolu
       run: |
@@ -197,7 +197,7 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: tfausak/cabal-gild-setup-action@v2
         with:
           version: 1.5.0.1
