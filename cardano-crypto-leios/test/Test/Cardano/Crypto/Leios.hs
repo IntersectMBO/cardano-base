@@ -12,7 +12,6 @@ import Cardano.Crypto.DSIGN (
   seedSizeDSIGN,
   signDSIGN,
  )
-import qualified Codec.CBOR.Encoding as CBOR.E
 import Cardano.Crypto.Leios (
   AggregationError (..),
   BitField,
@@ -24,6 +23,7 @@ import Cardano.Crypto.Leios (
   LeiosVoter (..),
   VerificationError (..),
   VoterId (..),
+  Weight,
   WeightMismatch (..),
   aggregateLeiosCert,
   bitFieldFromBytes,
@@ -34,6 +34,7 @@ import Cardano.Crypto.Leios (
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
+import qualified Codec.CBOR.Encoding as CBOR.E
 import qualified Data.Bits as Bits
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -124,14 +125,14 @@ fixedCommittee n =
   ( sks
   , Committee
       ( V.fromList
-          [LeiosVoter (1 / fromIntegral n) (deriveVerKeyDSIGN sk) | sk <- NE.toList sks]
+          [LeiosVoter (1 / fromIntegral @Int @Weight n) (deriveVerKeyDSIGN sk) | sk <- NE.toList sks]
       )
   )
   where
     seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
     sks =
       NE.fromList
-        [ genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen (fromIntegral i)))
+        [ genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen (fromIntegral @Int @Word8 i)))
         | i <- [1 .. max 1 n]
         ]
 
@@ -151,7 +152,7 @@ genMsg = do
 signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map VoterId LeiosSignature
 signContribs msg pairs =
   Map.fromList
-    [(VoterId (fromIntegral i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
+    [(VoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
 
 -- | Aggregate or fail the property with the error.
 aggregateOrFail ::
@@ -187,7 +188,7 @@ prop_verifyLeiosCert_accepts_subset = forAll genN $ \n ->
     forAll genMsg $ \msg ->
       let (sks, committee) = fixedCommittee n
           contributions = signContribs msg (take k (zip [0 :: Int ..] (NE.toList sks)))
-          expectedWeight = fromIntegral k / fromIntegral n
+          expectedWeight = fromIntegral @Int @Weight k / fromIntegral @Int @Weight n
        in aggregateOrFail committee contributions $ \cert ->
             verifyLeiosCert committee expectedWeight msg cert === Right expectedWeight
 
@@ -212,7 +213,7 @@ prop_verifyLeiosCert_rejects_below_threshold = forAll (chooseInt (2, 16)) $ \n -
       contributions = signContribs msg [(0, NE.head sks)]
    in aggregateOrFail committee contributions $ \cert ->
         verifyLeiosCert committee 1 msg cert
-          === Left (InsufficientWeight WeightMismatch {got = 1 / fromIntegral n, required = 1})
+          === Left (InsufficientWeight WeightMismatch {got = 1 / fromIntegral @Int @Weight n, required = 1})
 
 -- | A 'signers' bitfield strictly longer than @⌈n/8⌉@ bytes must be
 -- rejected as 'MalformedSigners' before any signature work is done.
@@ -244,7 +245,7 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n
             tampered = cert {signers = tamperedSigners}
          in -- Threshold is below the tampered weight 2/n so we exercise the BLS
             -- pairing failure, not the short-circuit.
-            verifyLeiosCert committee (1 / fromIntegral n) msg tampered === Left InvalidSignature
+            verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered === Left InvalidSignature
 
 -- | A 'VoterId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
@@ -252,7 +253,7 @@ prop_aggregateLeiosCert_rejects_out_of_range = forAll genN $ \n ->
   forAll (chooseInt (n, n + 100)) $ \badIdx ->
     let (sks, committee) = fixedCommittee n
         msg = "x" :: BS.ByteString
-        bad = VoterId (fromIntegral badIdx)
+        bad = VoterId (fromIntegral @Int @Word16 badIdx)
         contributions = Map.singleton bad (signDSIGN leiosSignContext msg (NE.head sks))
      in aggregateLeiosCert committee contributions === Left (VoterIdOutOfBounds bad)
 

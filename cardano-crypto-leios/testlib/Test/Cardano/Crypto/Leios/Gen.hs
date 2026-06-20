@@ -74,4 +74,4 @@ genLeiosCert = do
 -- pinning a single value (e.g. for golden tests) without going through
 -- 'Test.QuickCheck.generate' in 'IO'.
 generateWith :: Gen a -> Word64 -> a
-generateWith gen seed = unGen gen (mkQCGen (fromIntegral seed)) 30
+generateWith gen seed = unGen gen (mkQCGen (fromIntegral @Word64 @Int seed)) 30

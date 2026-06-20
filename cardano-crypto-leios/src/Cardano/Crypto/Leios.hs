@@ -251,12 +251,11 @@ aggregateLeiosCert ::
   Either AggregationError LeiosCert
 aggregateLeiosCert committee contributions = do
   let n = committeeSize committee
-      entries = Map.toAscList contributions
-  case [v | (v, _) <- entries, fromIntegral v.voterIndex >= n] of
+  case [v | v <- Map.keys contributions, fromIntegral @Word16 @Int v.voterIndex >= n] of
     v : _ -> Left (VoterIdOutOfBounds v)
     [] -> pure ()
   aggSig <-
-    case aggregateSigsDSIGN (map snd entries) of
+    case aggregateSigsDSIGN (Map.elems contributions) of
       Left e -> Left (BLSAggregationFailed (T.pack e))
       Right s -> Right s
   pure
@@ -324,7 +323,7 @@ verifyLeiosCert committee required msg cert = do
   signerSet <-
     maybe (Left MalformedSigners) Right $
       bitFieldMembers n cert.signers
-  let idxs = [fromIntegral v.voterIndex | v <- Set.toAscList signerSet]
+  let idxs = [fromIntegral @Word16 @Int v.voterIndex | v <- Set.toAscList signerSet]
   (got, vks) <- foldlM (accumSigner voters) (0, []) idxs
   when (got < required) $
     Left (InsufficientWeight WeightMismatch {got, required})
@@ -398,7 +397,7 @@ bitFieldMembers n (BitField ba)
   | actualBytes > len = Nothing
   | otherwise =
       Just . Set.fromAscList $
-        [ VoterId (fromIntegral globalIx)
+        [ VoterId (fromIntegral @Int @Word16 globalIx)
         | byteIx <- [0 .. actualBytes - 1]
         , let byte = indexByteArray ba byteIx :: Word8
         , bitIx <- [0 .. 7]
