@@ -15,7 +15,6 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.Leios (
   AggregationError (..),
-  BitField,
   Committee (..),
   LeiosCert (..),
   LeiosDSIGN,
@@ -27,10 +26,9 @@ import Cardano.Crypto.Leios (
   Weight,
   WeightMismatch (..),
   aggregateLeiosCert,
-  bitFieldFromBytes,
-  bitFieldToBytes,
   decodeLeiosCert,
   decodeVoterId,
+  encodeBitField,
   encodeLeiosCert,
   encodeVoterId,
   getVoterId,
@@ -39,9 +37,7 @@ import Cardano.Crypto.Leios (
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
-import Codec.CBOR.Encoding (Encoding, encodeBreak, encodeBytes, encodeListLenIndef)
-import qualified Codec.CBOR.Encoding as CBOR.E
-import qualified Data.Bits as Bits
+import Codec.CBOR.Encoding (Encoding, encodeBreak, encodeListLenIndef)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Char8 as BS8
@@ -110,7 +106,7 @@ prop_decode_indefinite_LeiosCert :: Property
 prop_decode_indefinite_LeiosCert = forAll genLeiosCert $ \cert ->
   let indef =
         encodeListLenIndef
-          <> encodeBytes (bitFieldToBytes (signers cert))
+          <> encodeBitField (signers cert)
           <> encodeSigDSIGN (aggregatedSignature cert)
           <> encodeBreak
    in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (CBOR.serialize indef)
@@ -133,15 +129,13 @@ goldenEncoding path enc value =
     }
 
 exampleCert :: LeiosCert
-exampleCert =
-  LeiosCert
-    { signers = bitFieldFromBytes (BS.pack [0xF0])
-    , aggregatedSignature = signDSIGN leiosSignContext exampleMessage exampleSigningKey
-    }
+exampleCert = case aggregateLeiosCert committee contributions of
+  Right c -> c
+  Left e -> error ("exampleCert: aggregation failed: " <> show e)
   where
-    seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
-    exampleSigningKey = genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen 0x01))
-    exampleMessage = "leios-golden-message" :: BS.ByteString
+    (sks, committee) = fixedCommittee 4
+    msg = "leios-golden-message" :: BS.ByteString
+    contributions = signContribs msg (zip [0 ..] (NE.toList sks))
 
 -- * VoterId CBOR / committee lookup
 
@@ -240,11 +234,6 @@ aggregateOrFail committee contributions k = case aggregateLeiosCert committee co
   Right c -> k c
   Left e -> counterexample (show e) (QC.property False)
 
--- | Apply a byte-level transform to a 'BitField', for adversarial test cases
--- that need to mutate the wire form directly.
-withSignerBytes :: (BS.ByteString -> BS.ByteString) -> BitField -> BitField
-withSignerBytes f = bitFieldFromBytes . f . bitFieldToBytes
-
 -- | All committee members sign the same message; the resulting cert verifies
 -- against that committee, threshold and message, and reports full weight.
 prop_verifyLeiosCert_accepts_aggregated :: Property
@@ -291,37 +280,41 @@ prop_verifyLeiosCert_rejects_below_threshold = forAll (chooseInt (2, 16)) $ \n -
         verifyLeiosCert committee 1 msg cert
           === Left (InsufficientWeight WeightMismatch {got = 1 / fromIntegral @Int @Weight n, required = 1})
 
--- | A 'signers' bitfield strictly longer than @⌈n/8⌉@ bytes must be
--- rejected as 'MalformedSigners' before any signature work is done.
+-- | A 'signers' bitfield whose byte length differs from @⌈n/8⌉@ must be
+-- rejected as 'MalformedSigners' before any signature work is done. We
+-- build a cert against committee A and verify against committee B whose
+-- size sits in the next byte bucket (A's bitfield is one byte short of
+-- what B expects).
 prop_verifyLeiosCert_rejects_oversized_signers :: Property
 prop_verifyLeiosCert_rejects_oversized_signers = forAll genN $ \n ->
-  let (sks, committee) = fixedCommittee n
+  let (sks, committeeA) = fixedCommittee n
+      (_, committeeB) = fixedCommittee (n + 8)
       msg = "leios-malformed-test" :: BS.ByteString
       contributions = signContribs msg (zip [0 :: Int ..] (NE.toList sks))
-   in aggregateOrFail committee contributions $ \cert ->
-        let oversized = cert {signers = withSignerBytes (`BS.snoc` 0x00) (signers cert)}
-         in verifyLeiosCert committee 1 msg oversized === Left MalformedSigners
+   in aggregateOrFail committeeA contributions $ \cert ->
+        verifyLeiosCert committeeB 1 msg cert === Left MalformedSigners
 
--- | Flipping on a non-signer's bit in the bitfield must be rejected with
--- 'InvalidSignature': the aggregate verification key recomputed by the
--- verifier no longer matches the aggregate signature the producer built.
---
--- Uses n ≥ 2 so there's at least one non-signer to tamper with. The signer
--- is voter 0; the tampered bit is voter 1's, which lives in bit 6 of byte 0
--- of the MSB-first bitfield.
+-- | A cert whose 'signers' bitfield disagrees with its 'aggregatedSignature'
+-- must be rejected with 'InvalidSignature'. We construct two real certs
+-- against the same committee (voter 0 alone, then voters 0+1), then splice
+-- certA's signature with certB's bitfield. The bitfield claims voter 1 also
+-- signed but the aggregate doesn't include voter 1's signature, so the BLS
+-- pairing fails. Uses n ≥ 2 so there are at least two voters to splice.
 prop_verifyLeiosCert_rejects_tampered_bitfield :: Property
 prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n ->
   let (sks, committee) = fixedCommittee n
       msg = "leios-tamper-test" :: BS.ByteString
-      contributions = signContribs msg [(0, NE.head sks)]
-   in aggregateOrFail committee contributions $ \cert ->
-        let raw = bitFieldToBytes (signers cert)
-            tamperedByte0 = BS.head raw `Bits.setBit` 6
-            tamperedSigners = bitFieldFromBytes (BS.cons tamperedByte0 (BS.tail raw))
-            tampered = cert {signers = tamperedSigners}
-         in -- Threshold is below the tampered weight 2/n so we exercise the BLS
-            -- pairing failure, not the short-circuit.
-            verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered === Left InvalidSignature
+      sks0 = NE.head sks
+      sks1 = NE.toList sks !! 1
+      contribsAlone = signContribs msg [(0, sks0)]
+      contribsPair = signContribs msg [(0, sks0), (1, sks1)]
+   in aggregateOrFail committee contribsAlone $ \certA ->
+        aggregateOrFail committee contribsPair $ \certB ->
+          let tampered = certA {signers = certB.signers}
+           in -- Threshold is below the tampered weight 2/n so we exercise the BLS
+              -- pairing failure, not the short-circuit.
+              verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
+                === Left InvalidSignature
 
 -- | A 'VoterId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property

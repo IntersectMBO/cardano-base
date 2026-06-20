@@ -16,20 +16,30 @@ module Test.Cardano.Crypto.Leios.Gen (
   generateWith,
 ) where
 
-import Cardano.Crypto.DSIGN (genKeyDSIGN, seedSizeDSIGN, signDSIGN)
+import Cardano.Crypto.DSIGN (
+  DSIGNAlgorithm (deriveVerKeyDSIGN),
+  genKeyDSIGN,
+  seedSizeDSIGN,
+  signDSIGN,
+ )
 import Cardano.Crypto.Leios (
-  LeiosCert (..),
+  Committee (..),
+  LeiosCert,
   LeiosDSIGN,
   LeiosSignature,
   LeiosSigningKey,
-  bitFieldFromBytes,
+  LeiosVoter (..),
+  VoterId (..),
+  aggregateLeiosCert,
   leiosSignContext,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import qualified Data.ByteString as BS
+import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (Proxy))
-import Data.Word (Word64)
-import Test.QuickCheck (Gen, arbitrary, choose, elements, vectorOf)
+import qualified Data.Vector.Strict as V
+import Data.Word (Word16, Word64)
+import Test.QuickCheck (Gen, arbitrary, choose, chooseInt, elements, shuffle, vectorOf)
 import Test.QuickCheck.Gen (unGen)
 import Test.QuickCheck.Random (mkQCGen)
 
@@ -53,22 +63,35 @@ genLeiosSignature = do
   msg <- BS.pack <$> vectorOf msgLen arbitrary
   pure $ signDSIGN leiosSignContext msg sk
 
--- | Generate a 'LeiosCert' whose @signers@ bitfield length walks the CBOR
--- uint width boundaries (1 / 2 / 3-byte length headers) and whose
--- aggregated signature is a real BLS signature over a random message — but
--- whose bitfield is /not/ correlated with the signers of that signature, so
--- the cert will not pass 'verifyLeiosCert'. Use this for CBOR / AST-shape
--- tests, not for verifier-acceptance tests.
+-- | Generate a real, canonical 'LeiosCert' by building a fresh committee
+-- and aggregating a non-empty subset of its members' signatures over a
+-- random message. The cert is structurally valid (bitfield length matches
+-- the committee, aggregate signature is well-formed) but the committee is
+-- not returned — suitable for CBOR / AST-shape tests, not for
+-- protocol-acceptance tests in downstream packages.
+--
+-- Coverage of bitfield byte-length boundaries (CBOR uint widths > 256
+-- bytes) is not exercised here; that belongs in this package's own test
+-- suite, not in the shared testlib.
 genLeiosCert :: Gen LeiosCert
 genLeiosCert = do
-  signersLen <- elements [0, 1, 23, 24, 255, 256]
-  signersBytes <- BS.pack <$> vectorOf signersLen arbitrary
-  sig <- genLeiosSignature
-  pure
-    LeiosCert
-      { signers = bitFieldFromBytes signersBytes
-      , aggregatedSignature = sig
-      }
+  n <- elements [1, 8, 9, 16, 17, 24]
+  sks <- vectorOf n genLeiosSigningKey
+  let committee =
+        Committee . V.fromList $
+          [LeiosVoter (1 / fromIntegral n) (deriveVerKeyDSIGN sk) | sk <- sks]
+  k <- chooseInt (1, n)
+  signerIxs <- take k <$> shuffle [0 .. n - 1]
+  msgLen <- choose (0, 64)
+  msg <- BS.pack <$> vectorOf msgLen arbitrary
+  let sigs =
+        Map.fromList
+          [ (VoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg (sks !! i))
+          | i <- signerIxs
+          ]
+  case aggregateLeiosCert committee sigs of
+    Right cert -> pure cert
+    Left e -> error ("genLeiosCert: aggregation failed: " <> show e)
 
 -- | Deterministically evaluate a QuickCheck 'Gen' at a fixed seed. Useful for
 -- pinning a single value (e.g. for golden tests) without going through

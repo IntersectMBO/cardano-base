@@ -52,8 +52,6 @@ module Cardano.Crypto.Leios (
   BitField,
   encodeBitField,
   decodeBitField,
-  bitFieldToBytes,
-  bitFieldFromBytes,
 ) where
 
 import Cardano.Base.Bytes (byteArrayFromByteString, byteArrayToByteString)
@@ -76,13 +74,15 @@ import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen, encodeWord16)
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, unless, when)
 import Data.Array.Byte (ByteArray)
+import Data.Bifunctor (first)
 import Data.Bits (setBit, shiftR, testBit, (.&.))
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import Data.Data (Proxy (..))
 import Data.Foldable (foldlM)
+import Data.Function ((&))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (isNothing)
 import Data.Primitive.ByteArray (
   fillByteArray,
   indexByteArray,
@@ -92,8 +92,6 @@ import Data.Primitive.ByteArray (
   sizeofByteArray,
   writeByteArray,
  )
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Vector.Strict (Vector)
@@ -156,7 +154,7 @@ data LeiosVoter = LeiosVoter
 -- | The voting committee for a Leios epoch: an ordered vector of
 -- 'LeiosVoter' seats.
 --
--- Position determines the voter's 'VoterId' and its bit in the certificate's
+-- Ixition determines the voter's 'VoterId' and its bit in the certificate's
 -- bitfield, so callers must keep the order stable between construction and
 -- verification of any cert.
 --
@@ -180,13 +178,15 @@ newtype Committee = Committee {committeeVoters :: Vector LeiosVoter}
 
 -- | Number of seats in the committee.
 committeeSize :: Committee -> Int
-committeeSize Committee {committeeVoters} = V.length committeeVoters
+committeeSize Committee {committeeVoters} = length committeeVoters
 
 -- | Resolve a 'VoterId' to its 'LeiosVoter' on the 'Committee', or 'Nothing'
 -- if the index is past the committee bound.
 resolveVoter :: Committee -> VoterId -> Maybe LeiosVoter
-resolveVoter committee (VoterId idx) =
-  committee.committeeVoters V.!? fromIntegral idx
+resolveVoter committee voterId =
+  committee.committeeVoters V.!? idx
+  where
+    idx = fromIntegral @Word16 @Int voterId.voterIndex
 
 -- | Find a voter's 'VoterId' on the 'Committee' by its
 -- 'LeiosVerificationKey', or 'Nothing' if the key is not on the committee.
@@ -196,7 +196,7 @@ resolveVoter committee (VoterId idx) =
 -- this module does not enforce it).
 getVoterId :: LeiosVerificationKey -> Committee -> Maybe VoterId
 getVoterId vk committee =
-  VoterId . fromIntegral
+  VoterId . fromIntegral @Int @Word16
     <$> V.findIndex ((== vk) . voterVKey) committee.committeeVoters
 
 -- | A Leios certificate over an endorser block, as specified in CIP-164:
@@ -255,14 +255,14 @@ decodeLeiosCert = do
   pure cert
 
 data AggregationError
-  = -- | A voter index in the contributions is past the committee bound.
+  = -- | A voter index in the sigs is past the committee bound.
     VoterIdOutOfBounds !VoterId
   | -- | BLS signature aggregation failed (e.g. malformed input signature).
     BLSAggregationFailed !Text
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
--- | Build a 'LeiosCert' from the contributions of committee members.
+-- | Build a 'LeiosCert' from the sigs of committee members.
 --
 -- == Caller obligations
 --
@@ -284,20 +284,34 @@ aggregateLeiosCert ::
   Committee ->
   Map VoterId LeiosSignature ->
   Either AggregationError LeiosCert
-aggregateLeiosCert committee contributions = do
-  let n = committeeSize committee
-  case [v | v <- Map.keys contributions, fromIntegral @Word16 @Int v.voterIndex >= n] of
+aggregateLeiosCert committee sigs = do
+  case outOfBoundsVoterIds of
     v : _ -> Left (VoterIdOutOfBounds v)
     [] -> pure ()
-  aggSig <-
-    case aggregateSigsDSIGN (Map.elems contributions) of
-      Left e -> Left (BLSAggregationFailed (T.pack e))
-      Right s -> Right s
-  pure
-    LeiosCert
-      { signers = mkBitField n (Map.keysSet contributions)
-      , aggregatedSignature = aggSig
-      }
+  aggregatedSignature <-
+    first (BLSAggregationFailed . T.pack) $
+      aggregateSigsDSIGN (Map.elems sigs)
+  pure LeiosCert {signers, aggregatedSignature}
+  where
+    outOfBoundsVoterIds =
+      [vid | vid <- Map.keys sigs, isNothing $ resolveVoter committee vid]
+
+    -- Builds directly into a mutable 'ByteArray' via a single allocation and
+    -- writes one bit per member of the input set.
+    signers = BitField $ runByteArray $ do
+      let len = (n + 7) `div` 8
+      mba <- newByteArray len
+      fillByteArray mba 0 len 0
+      forM_ (Map.keys sigs) $ \(VoterId i) -> do
+        let idx = fromIntegral @Word16 @Int i
+        when (idx < n) $ do
+          let byteIx = idx `shiftR` 3
+              bitIx = 7 - (idx .&. 7)
+          b <- readByteArray @Word8 mba byteIx
+          writeByteArray mba byteIx (b `setBit` bitIx)
+      pure mba
+
+    n = committeeSize committee
 
 data VerificationError
   = -- | 'signers' bitfield is longer than @⌈committeeSize/8⌉@ bytes.
@@ -333,14 +347,13 @@ data WeightMismatch = WeightMismatch
 -- == What this function does
 --
 --   1. Decodes the 'signers' bitfield to the list of contributing voter
---      indices, rejecting an oversized bitfield with
---      'MalformedSigners'.
+--      indices, rejecting too small or big bitfield with 'MalformedSigners'.
+--
 --   2. Sums those voters' weights from the committee; short-circuits with
---      'InsufficientWeight' if the sum is below the threshold,
---      which avoids the BLS pairing when the bitfield can't reach quorum on
---      its own.
+--      'InsufficientWeight' if the sum is below the threshold.
+--
 --   3. Aggregates the contributing verification keys and verifies the
---      certificate's 'aggregatedSignature' against that aggregate key over
+--      certificate's 'aggregatedSignature' against the aggregate key over
 --      @msg@.
 verifyLeiosCert ::
   SignableRepresentation msg =>
@@ -353,28 +366,37 @@ verifyLeiosCert ::
   -- | Total weight of the contributing signers on success.
   Either VerificationError Weight
 verifyLeiosCert committee required msg cert = do
-  let voters = committee.committeeVoters
-      n = V.length voters
-  signerSet <-
-    maybe (Left MalformedSigners) Right $
-      bitFieldMembers n cert.signers
-  let idxs = [fromIntegral @Word16 @Int v.voterIndex | v <- Set.toAscList signerSet]
-  (got, vks) <- foldlM (accumSigner voters) (0, []) idxs
+  -- The bitfield must be exactly the canonical 'committee-many bits, padded
+  -- to a whole byte' length. Trailing bytes (zero-padded or otherwise) are
+  -- not accepted; the wire form is fixed for a given committee size.
+  when (sizeofByteArray (bitFieldBytes cert.signers) /= (n + 7) `div` 8) $
+    Left MalformedSigners
+  (got, vks) <- foldlM accumSigner (0, []) $ bitFieldMembers cert.signers
   when (got < required) $
     Left (InsufficientWeight WeightMismatch {got, required})
   aggVk <-
-    case uncheckedAggregateVerKeysDSIGN (reverse vks) of
-      Left _ -> Left InvalidSignature
-      Right k -> Right k
-  case verifyDSIGN leiosSignContext aggVk msg cert.aggregatedSignature of
-    Left _ -> Left InvalidSignature
-    Right () -> Right got
+    uncheckedAggregateVerKeysDSIGN (reverse vks) -- REVIEW: reverse needed?
+      & first (const InvalidSignature)
+  verifyDSIGN leiosSignContext aggVk msg cert.aggregatedSignature
+    & first (const InvalidSignature)
+  pure got
   where
-    -- The bitfield decoder already enforced @i < n@; if the committee is
-    -- shorter than the decoder's idea of @n@ we treat it as a malformed cert.
-    accumSigner voters (!w, !ks) i = case voters V.!? i of
-      Nothing -> Left MalformedSigners
-      Just (LeiosVoter w' vk) -> Right (w + w', vk : ks)
+    n = committeeSize committee
+
+    accumSigner (!w, !ks) vid =
+      case resolveVoter committee vid of
+        Nothing -> Left MalformedSigners
+        Just (LeiosVoter w' vk) -> Right (w + w', vk : ks)
+
+    bitFieldMembers (BitField ba) =
+      [ VoterId (fromIntegral @Int @Word16 globalIx)
+      | byteIx <- [0 .. sizeofByteArray ba - 1]
+      , let byte = indexByteArray ba byteIx :: Word8
+      , bitIx <- [0 .. 7]
+      , let globalIx = byteIx * 8 + bitIx
+      , globalIx < n
+      , testBit byte (7 - bitIx)
+      ]
 
 -- | The @signers@ bitfield of a 'LeiosCert': a @⌈committeeSize\/8⌉@-byte
 -- MSB-first packed-bits representation of which committee voters contributed
@@ -388,66 +410,10 @@ newtype BitField = BitField {bitFieldBytes :: ByteArray}
   deriving anyclass (NFData)
   deriving (NoThunks) via OnlyCheckWhnfNamed "BitField" BitField
 
--- | Project the raw byte payload of a 'BitField' as a strict 'BS.ByteString'.
-bitFieldToBytes :: BitField -> BS.ByteString
-bitFieldToBytes BitField {bitFieldBytes} =
-  byteArrayToByteString bitFieldBytes
-
--- | Use a strict 'BS.ByteString' as a 'BitField'.
-bitFieldFromBytes :: BS.ByteString -> BitField
-bitFieldFromBytes =
-  BitField . byteArrayFromByteString
-
 -- | Encode a 'BitField' to CBOR bytes.
 encodeBitField :: BitField -> Encoding
-encodeBitField = encodeBytes . bitFieldToBytes
+encodeBitField = encodeBytes . byteArrayToByteString . bitFieldBytes
 
 -- | Decode a 'BitField' from CBOR bytes.
 decodeBitField :: Decoder s BitField
-decodeBitField = bitFieldFromBytes <$> decodeBytes
-
--- | Build the @⌈n\/8⌉@-byte 'BitField' for a committee of size @n@.
--- Members at or past the committee bound are silently dropped (the producer
--- should never pass any; 'aggregateLeiosCert' range-checks separately and
--- raises 'VoterIdOutOfBounds').
---
--- Builds directly into a mutable 'ByteArray' — one allocation, no list
--- intermediate — and writes one bit per member of the input set.
-mkBitField :: Int -> Set VoterId -> BitField
-mkBitField n members = BitField $ runByteArray $ do
-  mba <- newByteArray len
-  fillByteArray mba 0 len 0
-  forM_ (Set.toAscList members) $ \(VoterId i) -> do
-    let idx = fromIntegral @Word16 @Int i
-    when (idx < n) $ do
-      let byteIx = idx `shiftR` 3
-          bitPos = 7 - (idx .&. 7)
-      b <- readByteArray mba byteIx
-      writeByteArray mba byteIx ((b :: Word8) `setBit` bitPos)
-  pure mba
-  where
-    len = (n + 7) `div` 8
-
--- | The voter ids whose bit is set in the 'BitField', interpreting it against
--- a committee of size @n@. Returns 'Nothing' if the underlying byte payload
--- is strictly longer than @⌈n\/8⌉@ bytes (malformed certificate); a shorter
--- payload is accepted as if right-padded with zero bytes.
---
--- Indexes the 'ByteArray' directly (no 'BS.unpack' intermediate); the
--- per-byte inner loop is over @[0..7]@ and fuses away.
-bitFieldMembers :: Int -> BitField -> Maybe (Set VoterId)
-bitFieldMembers n (BitField ba)
-  | actualBytes > len = Nothing
-  | otherwise =
-      Just . Set.fromAscList $
-        [ VoterId (fromIntegral @Int @Word16 globalIx)
-        | byteIx <- [0 .. actualBytes - 1]
-        , let byte = indexByteArray ba byteIx :: Word8
-        , bitIx <- [0 .. 7]
-        , let globalIx = byteIx * 8 + bitIx
-        , globalIx < n
-        , testBit byte (7 - bitIx)
-        ]
-  where
-    len = (n + 7) `div` 8
-    actualBytes = sizeofByteArray ba
+decodeBitField = BitField . byteArrayFromByteString <$> decodeBytes

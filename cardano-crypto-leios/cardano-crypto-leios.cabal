@@ -61,6 +61,8 @@ library testlib
     bytestring,
     cardano-crypto-class,
     cardano-crypto-leios,
+    containers,
+    vector,
 
 test-suite tests
   import: base, project-config
