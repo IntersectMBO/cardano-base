@@ -46,15 +46,10 @@ package bitvec
 -- cabal-allow-newer begin
 if impl(ghc >=9.14)
   allow-newer:
-    , boring:base
     , canonical-json:containers
     , cborg:base
     , cborg:containers
     , serialise:base
     , serialise:containers
     , serialise:time
-    , tree-diff:QuickCheck
-    , tree-diff:base
-    , tree-diff:containers
-    , tree-diff:time
 -- cabal-allow-newer end
