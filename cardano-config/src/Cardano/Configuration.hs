@@ -112,9 +112,9 @@ resolveConfiguration cli file =
     , localConnectionsConfig =
         let lcc = runIdentity $ File.localConnectionsConfig file
          in File.LocalConnectionsConfig
-              (CLI.socketPath cli <|> File.pncSocketPath lcc)
-              (CLI.enableRpcCLI cli <|> File.pncEnableRpc lcc)
-              (CLI.rpcSocketPathCLI cli <|> File.pncRpcSocketPath lcc)
+              (CLI.socketPath cli <|> File.socketPath lcc)
+              (CLI.enableRpcCLI cli <|> File.enableRpc lcc)
+              (CLI.rpcSocketPathCLI cli <|> File.rpcSocketPath lcc)
     , testingConfiguration = runIdentity $ File.testingConfiguration file
     , mempoolConfiguration = runIdentity $ File.mempoolConfiguration file
     , configFilePath = CLI.configFilePath cli
