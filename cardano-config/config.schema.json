@@ -56,7 +56,14 @@
         },
         "ConsensusMode": {
             "description": "Which consensus mode to run (PraosMode or GenesisMode)",
-            "type": "string"
+            "oneOf": [
+                {
+                    "const": "PraosMode"
+                },
+                {
+                    "const": "GenesisMode"
+                }
+            ]
         },
         "ConwayGenesisFile": {
             "description": "Path to the file",
@@ -66,8 +73,7 @@
             "description": "Hash of the file\nBlake2b_256 hash"
         },
         "DatabasePath": {
-            "description": "Directory (or split directories) where the state is stored",
-            "oneOf": [
+            "anyOf": [
                 {
                     "type": "string"
                 },
@@ -89,11 +95,19 @@
                     ],
                     "type": "object"
                 }
-            ]
+            ],
+            "description": "Directory (or split directories) where the state is stored"
         },
         "DiffusionMode": {
             "description": "Initiator-only or initiator-and-responder",
-            "type": "string"
+            "oneOf": [
+                {
+                    "const": "InitiatorOnly"
+                },
+                {
+                    "const": "InitiatorAndResponder"
+                }
+            ]
         },
         "DijkstraGenesisFile": {
             "description": "Path to the file",
@@ -119,13 +133,8 @@
             "type": "boolean"
         },
         "HermodTracing": {
-            "anyOf": [
-                {
-                    "type": "string"
-                },
-                {}
-            ],
-            "description": "Tracing configuration as an inline object, or a path to a separate file holding it. Consumed by the node tracing system (trace-dispatcher), not parsed or validated by cardano-config."
+            "description": "Tracing configuration as a path to a separate file holding it. Consumed by the node tracing system (trace-dispatcher), not parsed or validated by cardano-config.",
+            "type": "string"
         },
         "LastKnownBlockVersion-Alt": {
             "description": "Last known block version, alt",
@@ -156,6 +165,10 @@
                     "description": "Custom path to the LSM database (V2LSM only)",
                     "type": "string"
                 },
+                "LSMExportPath": {
+                    "description": "Directory into which the LSM backend exports snapshots (V2LSM only)",
+                    "type": "string"
+                },
                 "QueryBatchSize": {
                     "description": "Chunk size for large backend reads",
                     "maximum": 1.8446744073709551615e19,
@@ -163,8 +176,7 @@
                     "type": "integer"
                 },
                 "Snapshots": {
-                    "description": "Snapshot policy: \"Mithril\" or an object of snapshot options",
-                    "oneOf": [
+                    "anyOf": [
                         {
                             "type": "string"
                         },
@@ -210,7 +222,8 @@
                             },
                             "type": "object"
                         }
-                    ]
+                    ],
+                    "description": "Snapshot policy: \"Mithril\" or an object of snapshot options"
                 }
             },
             "type": "object"
@@ -311,7 +324,14 @@
         },
         "RequiresNetworkMagic": {
             "description": "Whether network magic is required",
-            "type": "string"
+            "oneOf": [
+                {
+                    "const": "RequiresNoMagic"
+                },
+                {
+                    "const": "RequiresMagic"
+                }
+            ]
         },
         "ResponderCoreAffinityPolicy": {
             "description": "Whether responders are pinned to a core",

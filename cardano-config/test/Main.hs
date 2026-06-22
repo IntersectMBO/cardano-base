@@ -8,8 +8,9 @@
 module Main (main) where
 
 import Cardano.Configuration.File
+import Cardano.Configuration.Schema (wholeConfigSchema)
 import Control.Exception (SomeException, evaluate, try)
-import Data.Aeson (eitherDecodeFileStrict')
+import Data.Aeson (Value, eitherDecodeFileStrict')
 import System.Exit (exitFailure)
 
 main :: IO ()
@@ -38,6 +39,7 @@ main = do
       , parseCase "examples/fullconfig.json"
       , parseCase "examples/split.json"
       , parseCase "examples/split-all.json"
+      , schemaCase
       ]
   let failed = length (filter not results)
   if failed == 0
@@ -63,6 +65,24 @@ parseCase fp = do
   report fp $ case res of
     Left (e :: SomeException) -> Just (show e)
     Right _ -> Nothing
+
+-- | The committed @config.schema.json@ must match the schema derived from the
+-- codecs, so the documented schema cannot drift from the parsers. Regenerate it
+-- with @cabal run cardano-config-schema > config.schema.json@.
+schemaCase :: IO Bool
+schemaCase = do
+  let label = "config.schema.json (matches codecs)"
+  res <- eitherDecodeFileStrict' "config.schema.json" :: IO (Either String Value)
+  case res of
+    Left err -> report label (Just ("could not read config.schema.json: " <> err))
+    Right committed
+      | committed == wholeConfigSchema -> report label Nothing
+      | otherwise ->
+          report
+            label
+            ( Just
+                "committed config.schema.json is out of date; regenerate with: cabal run cardano-config-schema > config.schema.json"
+            )
 
 report :: String -> Maybe String -> IO Bool
 report label = \case
