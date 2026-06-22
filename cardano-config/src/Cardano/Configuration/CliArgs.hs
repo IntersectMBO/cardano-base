@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module Cardano.Configuration.CliArgs (
   -- * CLI Arguments
   CliArgs (..),
@@ -13,17 +11,43 @@ module Cardano.Configuration.CliArgs (
   -- * Credentials
   Credentials (..),
   KESSource (..),
+
+  -- * Individual option parsers
+  -- $reuse
+
+  -- These are exported so that other tools (e.g. @cardano-cli@) can reuse the
+  -- exact same flags, metavars and help text as @cardano-node@.
+  parseConfigFile,
+  parseTopologyFile,
+  parseSocketPath,
+  parseValidateDB,
+  parseEnableRpc,
+  parseRpcSocketPath,
+  parseCredentials,
+  parseKESSource,
+  parseHostIPv4Addr,
+  parseHostIPv6Addr,
+  parsePort,
+  parseTracerSocketMode,
+  parseShutdownIPC,
+  parseShutdownOn,
+
+  -- ** Argument readers
+  parseNodeAddress,
+  parseHostPort,
+  parseNodeHostIPv4Address,
+  parseNodeHostIPv6Address,
 ) where
 
 import Cardano.Configuration.Common
 import Control.Monad (when)
 import Data.Bifunctor (second)
-import Data.Char (isDigit)
 import Data.IP (IPv4, IPv6)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Word (Word64)
 import Network.Socket (PortNumber)
+import Network.URI (URI (..), URIAuth (..), parseURIReference)
 import Options.Applicative
 import System.Posix.Types (Fd (..))
 import Text.Read (readEither, readMaybe)
@@ -298,20 +322,30 @@ parseVrfKeyFilePath =
 parseNodeAddress :: ReadM (Host, PortNumber)
 parseNodeAddress = eitherReader parseHostPort
 
+-- | Parse a @HOST:PORT@ pair. IPv6 addresses must be bracketed
+-- (@[2001:db8::1]:3001@) to disambiguate the address colons from the
+-- host/port separator, matching URI authority syntax; IPv4 addresses and
+-- hostnames are written bare (@127.0.0.1:3001@).
 parseHostPort :: String -> Either String (Host, PortNumber)
-parseHostPort s
-  | (portRev, ':' : hostRev) <- break (== ':') (reverse s) =
-      if
-        | null hostRev -> Left "parseHostPort: Empty host."
-        | null portRev -> Left "parseHostPort: Empty port."
-        | all isDigit portRev
-        , Just p <- readMaybe @PortNumber (reverse portRev) ->
-            if
-              | 0 <= p, p <= 65535 -> Right (Text.pack (reverse hostRev), p)
-              | otherwise -> Left ("parseHostPort: Numeric port '" ++ show p ++ "' out of range: 0 - 65535)")
-        | otherwise -> Left "parseHostPort: Non-numeric port."
-  | otherwise =
-      Left "parseHostPort: No colon found."
+parseHostPort s = do
+  -- Parse as the authority component of a URI reference ("//host:port"), which
+  -- handles bracketed IPv6, IPv4 and hostnames uniformly.
+  uri <-
+    maybe (Left ("parseHostPort: could not parse HOST:PORT from " ++ show s)) Right $
+      parseURIReference ("//" ++ s)
+  auth <- maybe (Left "parseHostPort: missing host and port.") Right (uriAuthority uri)
+  let host = stripBrackets (uriRegName auth)
+  when (null host) $ Left "parseHostPort: empty host."
+  portStr <- case uriPort auth of
+    ':' : p -> Right p
+    _ -> Left "parseHostPort: missing port."
+  p <- maybe (Left ("parseHostPort: non-numeric port " ++ show portStr)) Right (readMaybe @Integer portStr)
+  if 0 <= p && p <= 65535
+    then Right (Text.pack host, fromInteger p)
+    else Left ("parseHostPort: port " ++ show p ++ " out of range: 0 - 65535.")
+  where
+    stripBrackets ('[' : rest) | not (null rest) && last rest == ']' = init rest
+    stripBrackets other = other
 
 parseTracerSocketMode :: Parser TracerConnection
 parseTracerSocketMode =

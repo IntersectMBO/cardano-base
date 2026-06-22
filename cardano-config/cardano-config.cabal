@@ -54,6 +54,7 @@ library
     filepath,
     iproute,
     network,
+    network-uri,
     optparse-applicative,
     text,
     time,

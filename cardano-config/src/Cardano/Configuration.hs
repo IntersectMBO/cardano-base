@@ -44,6 +44,24 @@ module Cardano.Configuration (
   CLI.CliArgs,
   CLI.parseCliArgs,
 
+  -- ** Reusable option parsers
+  CLI.parseConfigFile,
+  CLI.parseTopologyFile,
+  CLI.parseSocketPath,
+  CLI.parseValidateDB,
+  CLI.parseEnableRpc,
+  CLI.parseRpcSocketPath,
+  CLI.parseCredentials,
+  CLI.parseKESSource,
+  CLI.parseHostIPv4Addr,
+  CLI.parseHostIPv6Addr,
+  CLI.parsePort,
+  CLI.parseTracerSocketMode,
+  CLI.parseShutdownIPC,
+  CLI.parseShutdownOn,
+  CLI.parseNodeAddress,
+  CLI.parseHostPort,
+
   -- * Configuration file
   File.NodeConfigurationFromFile,
   File.parseConfigurationFiles,
