@@ -324,8 +324,14 @@ parseNodeAddress = eitherReader parseHostPort
 
 -- | Parse a @HOST:PORT@ pair. IPv6 addresses must be bracketed
 -- (@[2001:db8::1]:3001@) to disambiguate the address colons from the
--- host/port separator, matching URI authority syntax; IPv4 addresses and
--- hostnames are written bare (@127.0.0.1:3001@).
+-- host/port separator; IPv4 addresses and hostnames are written bare
+-- (@127.0.0.1:3001@).
+--
+-- This follows the URI authority syntax of RFC 3986 (§3.2.2), where an IPv6
+-- literal is wrapped in brackets, which is what 'parseURIReference' implements.
+-- The address inside the brackets is any representation accepted there (see
+-- RFC 5952 for the recommended IPv6 text form). Note this is /not/ the SMTP
+-- address-literal form of RFC 5321 (@[IPv6:...]@), which is a different syntax.
 parseHostPort :: String -> Either String (Host, PortNumber)
 parseHostPort s = do
   -- Parse as the authority component of a URI reference ("//host:port"), which
