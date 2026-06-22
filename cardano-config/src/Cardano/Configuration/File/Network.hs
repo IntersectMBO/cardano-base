@@ -4,11 +4,14 @@ module Cardano.Configuration.File.Network (
   DiffusionMode (..),
   AcceptedConnectionsLimit (..),
   LocalConnectionsConfig (..),
+  finalizeNetwork,
+  finalizeLocalConnections,
 ) where
 
 import Autodocodec
-import Cardano.Configuration.Basic (diffTimeCodec)
+import Cardano.Configuration.Basic (diffTimeCodec, requireField)
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Functor.Identity (Identity (..))
 import Data.Time.Clock (DiffTime)
 import Data.Word
 import GHC.Generics (Generic)
@@ -41,18 +44,19 @@ instance HasCodec AcceptedConnectionsLimit where
         <*> requiredFieldWith "delay" diffTimeCodec "Delay, in seconds, applied once the soft limit is reached"
           .= (\(AcceptedConnectionsLimit _ _ d) -> d)
 
--- | Options related to Networking configuration. Most of the fields are
--- @Maybe@ such that the networking layer can then set the appropriate
--- defaults.
-data NetworkConfiguration = NetworkConfiguration
-  { diffusionMode :: DiffusionMode
-  , maxConcurrencyBulkSync :: Maybe Word
-  , maxConcurrencyDeadline :: Maybe Word
-  , protocolIdleTimeout :: Maybe DiffTime
-  , timeWaitTimeout :: Maybe DiffTime
-  , egressPollInterval :: Maybe DiffTime
-  , chainSyncIdleTimeout :: Maybe DiffTime
-  , acceptedConnectionsLimit :: Maybe AcceptedConnectionsLimit
+-- | Options related to networking. Fields that have an always-applied default
+-- (see @defaults\/Network.json@) carry the @f@ parameter; the deadline peer
+-- targets and @PeerSharing@ only have defaults in the opt-in role variants and
+-- so stay @Maybe@.
+data NetworkConfiguration f = NetworkConfiguration
+  { diffusionMode :: f DiffusionMode
+  , maxConcurrencyBulkSync :: f Word
+  , maxConcurrencyDeadline :: f Word
+  , protocolIdleTimeout :: f DiffTime
+  , timeWaitTimeout :: f DiffTime
+  , egressPollInterval :: f DiffTime
+  , chainSyncIdleTimeout :: f DiffTime
+  , acceptedConnectionsLimit :: f AcceptedConnectionsLimit
   , deadlineTargetOfRootPeers :: Maybe Int
   , deadlineTargetOfKnownPeers :: Maybe Int
   , deadlineTargetOfEstablishedPeers :: Maybe Int
@@ -60,31 +64,40 @@ data NetworkConfiguration = NetworkConfiguration
   , deadlineTargetOfKnownBigLedgerPeers :: Maybe Int
   , deadlineTargetOfEstablishedBigLedgerPeers :: Maybe Int
   , deadlineTargetOfActiveBigLedgerPeers :: Maybe Int
-  , syncTargetOfRootPeers :: Maybe Int
-  , syncTargetOfKnownPeers :: Maybe Int
-  , syncTargetOfEstablishedPeers :: Maybe Int
-  , syncTargetOfActivePeers :: Maybe Int
-  , syncTargetOfKnownBigLedgerPeers :: Maybe Int
-  , syncTargetOfEstablishedBigLedgerPeers :: Maybe Int
-  , syncTargetOfActiveBigLedgerPeers :: Maybe Int
-  , minBigLedgerPeersForTrustedState :: Maybe Int
+  , syncTargetOfRootPeers :: f Int
+  , syncTargetOfKnownPeers :: f Int
+  , syncTargetOfEstablishedPeers :: f Int
+  , syncTargetOfActivePeers :: f Int
+  , syncTargetOfKnownBigLedgerPeers :: f Int
+  , syncTargetOfEstablishedBigLedgerPeers :: f Int
+  , syncTargetOfActiveBigLedgerPeers :: f Int
+  , minBigLedgerPeersForTrustedState :: f Int
   , peerSharing :: Maybe Bool
-  , responderCoreAffinityPolicy :: Maybe String
-  , experimentalProtocolsEnabled :: Maybe Bool
-  , txSubmissionLogicVersion :: Maybe String
-  , txSubmissionInitDelay :: Maybe DiffTime
+  , responderCoreAffinityPolicy :: f String
+  , experimentalProtocolsEnabled :: f Bool
+  , txSubmissionLogicVersion :: f String
+  , txSubmissionInitDelay :: f DiffTime
   }
-  deriving (Generic, Show)
-  deriving (FromJSON, ToJSON) via (Autodocodec NetworkConfiguration)
+  deriving (Generic)
 
-instance HasCodec NetworkConfiguration where
+deriving instance Show (NetworkConfiguration Maybe)
+deriving instance Show (NetworkConfiguration Identity)
+
+deriving via
+  (Autodocodec (NetworkConfiguration Maybe))
+  instance
+    FromJSON (NetworkConfiguration Maybe)
+
+deriving via
+  (Autodocodec (NetworkConfiguration Maybe))
+  instance
+    ToJSON (NetworkConfiguration Maybe)
+
+instance HasCodec (NetworkConfiguration Maybe) where
   codec =
     object "NetworkConfiguration" $
       NetworkConfiguration
-        <$> optionalFieldWithDefault
-          "DiffusionMode"
-          InitiatorAndResponder
-          "Initiator-only or initiator-and-responder"
+        <$> optionalField "DiffusionMode" "Initiator-only or initiator-and-responder"
           .= diffusionMode
         <*> optionalField "MaxConcurrencyBulkSync" "Bulk-sync block-fetch concurrency"
           .= maxConcurrencyBulkSync
@@ -143,19 +156,96 @@ instance HasCodec NetworkConfiguration where
         <*> optionalFieldWith "TxSubmissionInitDelay" diffTimeCodec "Tx-submission initial delay, in seconds"
           .= txSubmissionInitDelay
 
--- | Connections for local clients
-data LocalConnectionsConfig = LocalConnectionsConfig
+-- | Resolve a partial network configuration, taking the defaulted fields from
+-- the (always-applied) base defaults.
+finalizeNetwork :: NetworkConfiguration Maybe -> Either String (NetworkConfiguration Identity)
+finalizeNetwork c = do
+  diffusionMode' <- requireField "DiffusionMode" (diffusionMode c)
+  maxBulk <- requireField "MaxConcurrencyBulkSync" (maxConcurrencyBulkSync c)
+  maxDeadline <- requireField "MaxConcurrencyDeadline" (maxConcurrencyDeadline c)
+  protocolIdle <- requireField "ProtocolIdleTimeout" (protocolIdleTimeout c)
+  timeWait <- requireField "TimeWaitTimeout" (timeWaitTimeout c)
+  egress <- requireField "EgressPollInterval" (egressPollInterval c)
+  chainSyncIdle <- requireField "ChainSyncIdleTimeout" (chainSyncIdleTimeout c)
+  acceptedLimit <- requireField "AcceptedConnectionsLimit" (acceptedConnectionsLimit c)
+  syncRoot <- requireField "SyncTargetNumberOfRootPeers" (syncTargetOfRootPeers c)
+  syncKnown <- requireField "SyncTargetNumberOfKnownPeers" (syncTargetOfKnownPeers c)
+  syncEstablished <- requireField "SyncTargetNumberOfEstablishedPeers" (syncTargetOfEstablishedPeers c)
+  syncActive <- requireField "SyncTargetNumberOfActivePeers" (syncTargetOfActivePeers c)
+  syncKnownBig <- requireField "SyncTargetNumberOfKnownBigLedgerPeers" (syncTargetOfKnownBigLedgerPeers c)
+  syncEstBig <-
+    requireField "SyncTargetNumberOfEstablishedBigLedgerPeers" (syncTargetOfEstablishedBigLedgerPeers c)
+  syncActiveBig <- requireField "SyncTargetNumberOfActiveBigLedgerPeers" (syncTargetOfActiveBigLedgerPeers c)
+  minBigTrusted <- requireField "MinBigLedgerPeersForTrustedState" (minBigLedgerPeersForTrustedState c)
+  responderCore <- requireField "ResponderCoreAffinityPolicy" (responderCoreAffinityPolicy c)
+  experimental <- requireField "ExperimentalProtocolsEnabled" (experimentalProtocolsEnabled c)
+  txLogic <- requireField "TxSubmissionLogicVersion" (txSubmissionLogicVersion c)
+  txInitDelay <- requireField "TxSubmissionInitDelay" (txSubmissionInitDelay c)
+  pure $
+    NetworkConfiguration
+      diffusionMode'
+      maxBulk
+      maxDeadline
+      protocolIdle
+      timeWait
+      egress
+      chainSyncIdle
+      acceptedLimit
+      (deadlineTargetOfRootPeers c)
+      (deadlineTargetOfKnownPeers c)
+      (deadlineTargetOfEstablishedPeers c)
+      (deadlineTargetOfActivePeers c)
+      (deadlineTargetOfKnownBigLedgerPeers c)
+      (deadlineTargetOfEstablishedBigLedgerPeers c)
+      (deadlineTargetOfActiveBigLedgerPeers c)
+      syncRoot
+      syncKnown
+      syncEstablished
+      syncActive
+      syncKnownBig
+      syncEstBig
+      syncActiveBig
+      minBigTrusted
+      (peerSharing c)
+      responderCore
+      experimental
+      txLogic
+      txInitDelay
+
+-- | Connections for local clients. @EnableRpc@ has a default; the socket paths
+-- are optional.
+data LocalConnectionsConfig f = LocalConnectionsConfig
   { socketPath :: Maybe FilePath
-  , enableRpc :: Maybe Bool
+  , enableRpc :: f Bool
   , rpcSocketPath :: Maybe FilePath
   }
-  deriving (Generic, Show)
-  deriving (FromJSON, ToJSON) via (Autodocodec LocalConnectionsConfig)
+  deriving (Generic)
 
-instance HasCodec LocalConnectionsConfig where
+deriving instance Show (LocalConnectionsConfig Maybe)
+deriving instance Show (LocalConnectionsConfig Identity)
+
+deriving via
+  (Autodocodec (LocalConnectionsConfig Maybe))
+  instance
+    FromJSON (LocalConnectionsConfig Maybe)
+
+deriving via
+  (Autodocodec (LocalConnectionsConfig Maybe))
+  instance
+    ToJSON (LocalConnectionsConfig Maybe)
+
+instance HasCodec (LocalConnectionsConfig Maybe) where
   codec =
     object "LocalConnectionsConfig" $
       LocalConnectionsConfig
         <$> optionalField "SocketPath" "Path of the socket for local clients" .= socketPath
         <*> optionalField "EnableRpc" "Whether to enable the gRPC server" .= enableRpc
         <*> optionalField "RpcSocketPath" "Path of the gRPC server socket" .= rpcSocketPath
+
+-- | Resolve a partial local-connections configuration, taking @EnableRpc@ from
+-- the (always-applied) defaults.
+finalizeLocalConnections ::
+  LocalConnectionsConfig Maybe -> Either String (LocalConnectionsConfig Identity)
+finalizeLocalConnections c = do
+  rpc <- requireField "EnableRpc" (enableRpc c)
+  pure $ LocalConnectionsConfig (socketPath c) rpc (rpcSocketPath c)

@@ -22,10 +22,10 @@ are:
 
 | Group | Flag(s) | Metavar | Notes |
 | --- | --- | --- | --- |
-| | `--config` | `FILEPATH` | Main configuration file (defaults to the mainnet config). |
-| | `--topology` | `FILEPATH` | Topology file (defaults to the mainnet topology). |
+| | `--config` | `FILEPATH` | Main configuration file (defaults to `./configuration/cardano/mainnet-config.yaml`). |
+| | `--topology` | `FILEPATH` | Topology file (defaults to the mainnet `./configuration/cardano/mainnet-topology.yaml`). |
 | | `--socket-path` | `FILEPATH` | Socket for local clients; overrides `LocalConnections.SocketPath`. |
-| | `--grpc-enable` | | [EXPERIMENTAL] Enable the gRPC endpoint; overrides `LocalConnections.EnableRpc`. Absent means *unset* (falls back to the file), not `False`. |
+| | `--grpc-enable` | | [EXPERIMENTAL] Enable the gRPC endpoint; overrides `LocalConnections.EnableRpc`. Absent means *unset* (falls back to the config file), not `False`. |
 | | `--grpc-socket-path` | `FILEPATH` | [EXPERIMENTAL] gRPC socket path; overrides `LocalConnections.RpcSocketPath`. Defaults to `rpc.sock` next to the node socket. |
 | Storage | `--database-path`, `--volatile-database-path`, `--immutable-database-path` | `FILEPATH` | Overrides `Storage.DatabasePath`. |
 | Storage | `--validate-db` | | Validate all on-disk database files. |
@@ -67,15 +67,18 @@ The recognised keys are grouped into the following components. Unless noted
 otherwise, every key is optional and, when omitted, the node falls back to its
 own default.
 
-| Component | Top-level keys | Sub-file? |
-| --- | --- | --- |
-| **Storage** | `DatabasePath`, `LedgerDB` (`Snapshots`, `QueryBatchSize`, `Backend` = `V2InMemory`/`V2LSM`, `LSMDatabasePath`, `LSMExportPath`) | yes |
-| **Consensus** | `ConsensusMode` (`PraosMode`/`GenesisMode`), `LowLevelGenesisOptions` (`EnableCSJ`, `EnableLoEAndGDD`, `EnableLoP`, `BlockFetchGracePeriod`, `BucketCapacity`, `BucketRate`, `CSJJumpSize`, `GDDRateLimit`) — Genesis mode only | yes |
-| **Protocol** | `ByronGenesisFile`/`ByronGenesisHash`, `RequiresNetworkMagic`, `PBftSignatureThreshold`, `LastKnownBlockVersion-Major`/`-Minor`/`-Alt`, `ShelleyGenesisFile`/`Hash`, `AlonzoGenesisFile`/`Hash`, `ConwayGenesisFile`/`Hash`, `StartAsNonProducingNode`, `CheckpointsFile`/`CheckpointsFileHash` | yes |
-| **Network** | `DiffusionMode`, `MaxConcurrencyBulkSync`, `MaxConcurrencyDeadline`, `ProtocolIdleTimeout`, `TimeWaitTimeout`, `EgressPollInterval`, `ChainSyncIdleTimeout`, `AcceptedConnectionsLimit`, the `TargetNumberOf*`/`SyncTargetNumberOf*` peer targets, `MinBigLedgerPeersForTrustedState`, `PeerSharing`, `ResponderCoreAffinityPolicy`, `ExperimentalProtocolsEnabled`, `TxSubmissionLogicVersion`, `TxSubmissionInitDelay` | yes |
-| **LocalConnections** | `SocketPath`, `EnableRpc`, `RpcSocketPath` | no |
-| **Mempool** | `MempoolCapacityBytesOverride`, `MempoolTimeoutSoft`, `MempoolTimeoutHard`, `MempoolTimeoutCapacity` | no |
-| **Testing** | `ExperimentalHardForksEnabled`, the `Test<Era>HardForkAtEpoch`/`Test<Era>HardForkAtVersion` knobs (Shelley … Dijkstra), `DijkstraGenesisFile`/`DijkstraGenesisHash` | no |
+Every component may be given inline, as a sub-file path, or as a list of sources
+(see [Single-file and split forms](#single-file-and-split-forms)).
+
+| Component | Top-level keys |
+| --- | --- |
+| **Storage** | `DatabasePath`, `LedgerDB` (`Snapshots`, `QueryBatchSize`, `Backend` = `V2InMemory`/`V2LSM`, `LSMDatabasePath`, `LSMExportPath`) |
+| **Consensus** | `ConsensusMode` (`PraosMode`/`GenesisMode`), `LowLevelGenesisOptions` (`EnableCSJ`, `EnableLoEAndGDD`, `EnableLoP`, `BlockFetchGracePeriod`, `BucketCapacity`, `BucketRate`, `CSJJumpSize`, `GDDRateLimit`) — Genesis mode only |
+| **Protocol** | `ByronGenesisFile`/`ByronGenesisHash`, `RequiresNetworkMagic`, `PBftSignatureThreshold`, `LastKnownBlockVersion-Major`/`-Minor`/`-Alt`, `ShelleyGenesisFile`/`Hash`, `AlonzoGenesisFile`/`Hash`, `ConwayGenesisFile`/`Hash`, `StartAsNonProducingNode`, `CheckpointsFile`/`CheckpointsFileHash` |
+| **Network** | `DiffusionMode`, `MaxConcurrencyBulkSync`, `MaxConcurrencyDeadline`, `ProtocolIdleTimeout`, `TimeWaitTimeout`, `EgressPollInterval`, `ChainSyncIdleTimeout`, `AcceptedConnectionsLimit`, the `TargetNumberOf*`/`SyncTargetNumberOf*` peer targets, `MinBigLedgerPeersForTrustedState`, `PeerSharing`, `ResponderCoreAffinityPolicy`, `ExperimentalProtocolsEnabled`, `TxSubmissionLogicVersion`, `TxSubmissionInitDelay` |
+| **LocalConnections** | `SocketPath`, `EnableRpc`, `RpcSocketPath` |
+| **Mempool** | `MempoolCapacityBytesOverride`, `MempoolTimeoutSoft`, `MempoolTimeoutHard`, `MempoolTimeoutCapacity` |
+| **Testing** | `ExperimentalHardForksEnabled`, the `Test<Era>HardForkAtEpoch`/`Test<Era>HardForkAtVersion` knobs (Shelley … Dijkstra), `DijkstraGenesisFile`/`DijkstraGenesisHash` |
 
 ### Mandatory vs optional keys
 
@@ -133,7 +136,13 @@ $ cat config.json
 Alternatively, any component (`Storage`, `Consensus`, `Protocol`, `Network`,
 `LocalConnections`, `Mempool`, `Testing`) may be **split into a sub-file**: give
 the component key a string path (relative to the main config file) instead of an
-inline object. The tracing keys are always read from the main file's top level.
+inline object.
+
+Tracing is handled the same way but by the node's tracing system, not this
+library: set `HermodTracing` to a path (relative to the config file) of a
+separate file holding all the tracing options. That is the recommended form; an
+inline object is also accepted. Either way the contents are passed through
+opaquely (see ["Tracing is *not* parsed"](#tracing-is-not-parsed)).
 
 ```console
 $ cat config.json
@@ -169,7 +178,7 @@ The configuration may optionally be wrapped in an envelope so the format can
 evolve:
 
 ```json
-{ "ConfigurationVersion": 1, "Config": { ... } }
+{ "Version": 1, "Configuration": { ... } }
 ```
 
 A document without an envelope is read as version 1 (the keys live at the top

@@ -7,11 +7,14 @@
 -- paths resolve.
 module Main (main) where
 
+import Cardano.Configuration (resolveConfiguration)
+import Cardano.Configuration.CliArgs (parseCliArgs)
 import Cardano.Configuration.File
 import Cardano.Configuration.Schema (wholeConfigSchema)
 import Control.Exception (SomeException, evaluate, try)
 import Data.Aeson (Value, eitherDecodeFileStrict')
 import Data.Functor.Identity (runIdentity)
+import Options.Applicative (defaultPrefs, execParserPure, getParseResult, info)
 import System.Exit (exitFailure)
 
 main :: IO ()
@@ -31,16 +34,17 @@ main = do
           (eitherDecodeFileStrict' "examples/protocol.json" :: IO (Either String (ProtocolConfiguration Maybe)))
       , decodeCase
           "examples/network.json"
-          (eitherDecodeFileStrict' "examples/network.json" :: IO (Either String NetworkConfiguration))
+          (eitherDecodeFileStrict' "examples/network.json" :: IO (Either String (NetworkConfiguration Maybe)))
       , decodeCase
           "examples/localconnections.json"
           ( eitherDecodeFileStrict' "examples/localconnections.json" ::
-              IO (Either String LocalConnectionsConfig)
+              IO (Either String (LocalConnectionsConfig Maybe))
           )
       , parseCase "examples/fullconfig.json"
       , parseCase "examples/split.json"
       , parseCase "examples/split-all.json"
       , listMergeCase
+      , resolveCase
       , schemaCase
       ]
   let failed = length (filter not results)
@@ -83,6 +87,19 @@ listMergeCase = do
        in if active == Just 99
             then report label Nothing
             else report label (Just ("expected TargetNumberOfActivePeers = 99, got " <> show active))
+
+-- | Resolving a parsed configuration with default CLI arguments must succeed and
+-- produce a complete (@Identity@) configuration, which exercises that the base
+-- defaults populate every resolved field.
+resolveCase :: IO Bool
+resolveCase = do
+  let label = "resolveConfiguration examples/fullconfig.json"
+  cfg <- parseConfigurationFiles "examples/fullconfig.json"
+  case getParseResult (execParserPure defaultPrefs (info parseCliArgs mempty) []) of
+    Nothing -> report label (Just "could not build default CLI arguments")
+    Just cli -> case resolveConfiguration cli cfg of
+      Left err -> report label (Just (show err))
+      Right nc -> evaluate (length (show nc)) >> report label Nothing
 
 -- | The committed @config.schema.json@ must match the schema derived from the
 -- codecs, so the documented schema cannot drift from the parsers. Regenerate it

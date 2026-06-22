@@ -22,6 +22,12 @@ module Cardano.Configuration.File (
   TestingConfiguration (..),
   MempoolConfiguration (..),
   TracingConfiguration (..),
+
+  -- * Resolving components
+  finalizeNetwork,
+  finalizeLocalConnections,
+  finalizeMempool,
+  finalizeTesting,
 ) where
 
 import Cardano.Configuration.File.Consensus
@@ -60,10 +66,10 @@ data NodeConfigurationFromFileF f
   { storageConfiguration :: f (StorageConfiguration Maybe)
   , consensusConfiguration :: f (ConsensusConfiguration Maybe)
   , protocolConfiguration :: f (ProtocolConfiguration Maybe)
-  , networkConfiguration :: f NetworkConfiguration
-  , localConnectionsConfig :: f LocalConnectionsConfig
-  , testingConfiguration :: f TestingConfiguration
-  , mempoolConfiguration :: f MempoolConfiguration
+  , networkConfiguration :: f (NetworkConfiguration Maybe)
+  , localConnectionsConfig :: f (LocalConnectionsConfig Maybe)
+  , testingConfiguration :: f (TestingConfiguration Maybe)
+  , mempoolConfiguration :: f (MempoolConfiguration Maybe)
   , tracingConfiguration :: TracingConfiguration
   -- ^ Tracing keys, captured opaquely; see 'TracingConfiguration'. Unlike the
   -- other components this is never read from a sub-file: the node's tracing
@@ -220,22 +226,22 @@ parseSection root configValue section = do
   user <- sectionUserLayer root configValue section
   runCodec Nothing section (maybe user (`mergeValues` user) base)
 
--- | Split the optional configuration envelope @{ \"ConfigurationVersion\": N,
--- \"Config\": {..} }@ into the version and the configuration object. A document
--- that is not wrapped in an envelope is treated as the legacy version-1 format,
--- in which the configuration keys sit at the top level (and an optional flat
--- @ConfigurationVersion@ key may select the version).
+-- | Split the optional configuration envelope @{ \"Version\": N,
+-- \"Configuration\": {..} }@ into the version and the configuration object. A
+-- document that is not wrapped in an envelope is treated as the legacy version-1
+-- format, in which the configuration keys sit at the top level (and an optional
+-- flat @Version@ key may select the version).
 splitEnvelope :: Value -> IO (Int, Value)
 splitEnvelope value =
   case value of
     Object o
-      | Just config <- KM.lookup "Config" o -> pure (lookupVersion o, config)
+      | Just config <- KM.lookup "Configuration" o -> pure (lookupVersion o, config)
       | otherwise -> pure (lookupVersion o, value)
     _ ->
       throwIO $
         ConfigurationParsingError Nothing Nothing [] "expected the configuration to be a JSON/YAML object"
   where
-    lookupVersion o = case KM.lookup "ConfigurationVersion" o of
+    lookupVersion o = case KM.lookup "Version" o of
       Just (Number n) -> round n
       _ -> 1
 
@@ -272,7 +278,7 @@ parseConfigurationFilesWith policy cfgFile = do
         ConfigurationParsingError
           (Just cfgFile)
           Nothing
-          [Key "ConfigurationVersion"]
+          [Key "Version"]
           ("unsupported configuration version: " <> show n)
 
 -- | Check the top-level configuration keys against the recognised ones, warning

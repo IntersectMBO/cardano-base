@@ -99,10 +99,10 @@ data NodeConfiguration = NodeConfiguration
   { storageConfiguration :: File.StorageConfiguration Identity
   , consensusConfiguration :: File.ConsensusConfiguration Identity
   , protocolConfiguration :: File.ProtocolConfiguration Identity
-  , networkConfiguration :: File.NetworkConfiguration
-  , localConnectionsConfig :: File.LocalConnectionsConfig
-  , testingConfiguration :: File.TestingConfiguration
-  , mempoolConfiguration :: File.MempoolConfiguration
+  , networkConfiguration :: File.NetworkConfiguration Identity
+  , localConnectionsConfig :: File.LocalConnectionsConfig Identity
+  , testingConfiguration :: File.TestingConfiguration Identity
+  , mempoolConfiguration :: File.MempoolConfiguration Identity
   , configFilePath :: FilePath
   , topologyFile :: FilePath
   , validateDatabase :: Bool
@@ -147,7 +147,7 @@ defaultConfigChecks =
       ( \nc ->
           let lcc = localConnectionsConfig nc
            in not
-                ( File.enableRpc lcc == Just True
+                ( runIdentity (File.enableRpc lcc)
                     && isNothing (File.rpcSocketPath lcc)
                     && isNothing (File.socketPath lcc)
                 )
@@ -187,7 +187,21 @@ resolveConfigurationWith ::
   CLI.CliArgs ->
   File.NodeConfigurationFromFile ->
   Either ConfigResolutionError NodeConfiguration
-resolveConfigurationWith checks cli file =
+resolveConfigurationWith checks cli file = do
+  -- Components with an always-applied defaults layer are finalized to their
+  -- complete 'Identity' form; a missing default surfaces as a resolution error.
+  network <- finalize $ File.finalizeNetwork (runIdentity (File.networkConfiguration file))
+  testing <- finalize $ File.finalizeTesting (runIdentity (File.testingConfiguration file))
+  mempool <- finalize $ File.finalizeMempool (runIdentity (File.mempoolConfiguration file))
+  -- Local connections additionally take CLI overrides before being finalized.
+  let lcc = runIdentity $ File.localConnectionsConfig file
+      lccWithCli =
+        lcc
+          { File.socketPath = CLI.socketPath cli <|> File.socketPath lcc
+          , File.enableRpc = CLI.enableRpcCLI cli <|> File.enableRpc lcc
+          , File.rpcSocketPath = CLI.rpcSocketPathCLI cli <|> File.rpcSocketPath lcc
+          }
+  localConnections <- finalize $ File.finalizeLocalConnections lccWithCli
   runConfigChecks checks $
     NodeConfiguration
       { storageConfiguration =
@@ -208,15 +222,10 @@ resolveConfigurationWith checks cli file =
                       fromMaybe False $
                         CLI.startAsNonProducingNode cli <|> File.startAsNonProducingNode pc
                 }
-      , networkConfiguration = runIdentity $ File.networkConfiguration file
-      , localConnectionsConfig =
-          let lcc = runIdentity $ File.localConnectionsConfig file
-           in File.LocalConnectionsConfig
-                (CLI.socketPath cli <|> File.socketPath lcc)
-                (CLI.enableRpcCLI cli <|> File.enableRpc lcc)
-                (CLI.rpcSocketPathCLI cli <|> File.rpcSocketPath lcc)
-      , testingConfiguration = runIdentity $ File.testingConfiguration file
-      , mempoolConfiguration = runIdentity $ File.mempoolConfiguration file
+      , networkConfiguration = network
+      , localConnectionsConfig = localConnections
+      , testingConfiguration = testing
+      , mempoolConfiguration = mempool
       , configFilePath = CLI.configFilePath cli
       , topologyFile = CLI.topologyFile cli
       , validateDatabase = CLI.validateDatabase cli
@@ -228,3 +237,5 @@ resolveConfigurationWith checks cli file =
       , shutdownIPC = CLI.shutdownIPC cli
       , shutdownOnTarget = CLI.shutdownOnTarget cli
       }
+  where
+    finalize = either (\m -> Left (ConfigResolutionError (m :| []))) Right

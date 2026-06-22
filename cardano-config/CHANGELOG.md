@@ -10,7 +10,7 @@
 * Configuration sources are layered with a deep merge: an always-applied
   per-component default (`defaults/`), then the configuration file (a value, a
   sub-file path, or a list of them), then CLI flags.
-* Optional `{ ConfigurationVersion, Config }` envelope for forward-compatibility.
+* Optional `{ Version, Configuration }` envelope for forward-compatibility.
 * Structured parse errors (`ConfigurationParsingError`) and resolution-time
   cross-field checks (`ConfigCheck` / `ConfigResolutionError`).
 * Unrecognised top-level keys warn by default; `RejectUnknownKeys` makes them an

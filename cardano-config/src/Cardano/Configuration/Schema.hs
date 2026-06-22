@@ -76,10 +76,10 @@ rawLocalConnectionsSchema, rawMempoolSchema, rawTestingSchema, rawTracingSchema 
 rawStorageSchema = toJSON (jsonSchemaViaCodec @(StorageConfiguration Maybe))
 rawConsensusSchema = toJSON (jsonSchemaViaCodec @(ConsensusConfiguration Maybe))
 rawProtocolSchema = toJSON (jsonSchemaViaCodec @(ProtocolConfiguration Maybe))
-rawNetworkSchema = toJSON (jsonSchemaViaCodec @NetworkConfiguration)
-rawLocalConnectionsSchema = toJSON (jsonSchemaViaCodec @LocalConnectionsConfig)
-rawMempoolSchema = toJSON (jsonSchemaViaCodec @MempoolConfiguration)
-rawTestingSchema = toJSON (jsonSchemaViaCodec @TestingConfiguration)
+rawNetworkSchema = toJSON (jsonSchemaViaCodec @(NetworkConfiguration Maybe))
+rawLocalConnectionsSchema = toJSON (jsonSchemaViaCodec @(LocalConnectionsConfig Maybe))
+rawMempoolSchema = toJSON (jsonSchemaViaCodec @(MempoolConfiguration Maybe))
+rawTestingSchema = toJSON (jsonSchemaViaCodec @(TestingConfiguration Maybe))
 rawTracingSchema = toJSON (jsonSchemaViaCodec @TracingConfiguration)
 
 rawComponentSchemas :: [(Text, Value)]
@@ -131,7 +131,7 @@ recognisedKeys =
   nub $
     envelopeKeys <> sectionKeys <> concatMap (propertyNames . snd) rawComponentSchemas
   where
-    envelopeKeys = ["ConfigurationVersion", "Config"]
+    envelopeKeys = ["Version", "Configuration"]
     sectionKeys = map fst rawComponentSchemas
     propertyNames (Object o)
       | Just (Object p) <- KM.lookup "properties" o = map K.toText (KM.keys p)

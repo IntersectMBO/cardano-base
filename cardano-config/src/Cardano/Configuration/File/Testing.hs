@@ -1,18 +1,22 @@
 -- | Values related to testing, which are unused by a real node
 module Cardano.Configuration.File.Testing (
   TestingConfiguration (..),
+  finalizeTesting,
 ) where
 
 import Autodocodec
+import Cardano.Configuration.Basic (requireField)
 import Cardano.Configuration.File.Protocol
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Functor.Identity (Identity (..))
 import Data.Word
 import GHC.Generics (Generic)
 
 -- | The testing configuration: knobs for forcing era transitions at specific
--- epochs/versions and for enabling the experimental era.
-data TestingConfiguration = TestingConfiguration
-  { experimentalHardForksEnabled :: Bool
+-- epochs/versions and for enabling the experimental era. Only
+-- @ExperimentalHardForksEnabled@ has a default; the rest are optional by nature.
+data TestingConfiguration f = TestingConfiguration
+  { experimentalHardForksEnabled :: f Bool
   , testShelleyHardForkAtEpoch :: Maybe Word64
   , testShelleyHardForkAtVersion :: Maybe Word
   , testAllegraHardForkAtEpoch :: Maybe Word64
@@ -29,14 +33,26 @@ data TestingConfiguration = TestingConfiguration
   , testDijkstraHardForkAtVersion :: Maybe Word
   , experimentalGenesis :: Maybe (Hashed FilePath)
   }
-  deriving (Generic, Show)
-  deriving (FromJSON, ToJSON) via (Autodocodec TestingConfiguration)
+  deriving (Generic)
 
-instance HasCodec TestingConfiguration where
+deriving instance Show (TestingConfiguration Maybe)
+deriving instance Show (TestingConfiguration Identity)
+
+deriving via
+  (Autodocodec (TestingConfiguration Maybe))
+  instance
+    FromJSON (TestingConfiguration Maybe)
+
+deriving via
+  (Autodocodec (TestingConfiguration Maybe))
+  instance
+    ToJSON (TestingConfiguration Maybe)
+
+instance HasCodec (TestingConfiguration Maybe) where
   codec =
     object "TestingConfiguration" $
       TestingConfiguration
-        <$> optionalFieldWithDefault "ExperimentalHardForksEnabled" False "Enable the experimental eras"
+        <$> optionalField "ExperimentalHardForksEnabled" "Enable the experimental eras"
           .= experimentalHardForksEnabled
         <*> optionalField "TestShelleyHardForkAtEpoch" "Force the Shelley hard fork at this epoch"
           .= testShelleyHardForkAtEpoch
@@ -69,3 +85,27 @@ instance HasCodec TestingConfiguration where
           "Force the Dijkstra hard fork at this protocol version"
           .= testDijkstraHardForkAtVersion
         <*> optionalHashedFileObjectCodec "DijkstraGenesisFile" "DijkstraGenesisHash" .= experimentalGenesis
+
+-- | Resolve a partial testing configuration, taking @ExperimentalHardForksEnabled@
+-- from the (always-applied) defaults.
+finalizeTesting :: TestingConfiguration Maybe -> Either String (TestingConfiguration Identity)
+finalizeTesting c = do
+  enabled <- requireField "ExperimentalHardForksEnabled" (experimentalHardForksEnabled c)
+  pure $
+    TestingConfiguration
+      enabled
+      (testShelleyHardForkAtEpoch c)
+      (testShelleyHardForkAtVersion c)
+      (testAllegraHardForkAtEpoch c)
+      (testAllegraHardForkAtVersion c)
+      (testMaryHardForkAtEpoch c)
+      (testMaryHardForkAtVersion c)
+      (testAlonzoHardForkAtEpoch c)
+      (testAlonzoHardForkAtVersion c)
+      (testBabbageHardForkAtEpoch c)
+      (testBabbageHardForkAtVersion c)
+      (testConwayHardForkAtEpoch c)
+      (testConwayHardForkAtVersion c)
+      (testDijkstraHardForkAtEpoch c)
+      (testDijkstraHardForkAtVersion c)
+      (experimentalGenesis c)
