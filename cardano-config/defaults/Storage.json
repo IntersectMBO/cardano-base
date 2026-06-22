@@ -1,0 +1,6 @@
+{
+    "DatabasePath": "mainnet/db",
+    "LedgerDB": {
+        "Backend": "V2InMemory"
+    }
+}
