@@ -6,7 +6,7 @@ module Cardano.Configuration.File.Consensus (
 ) where
 
 import Autodocodec
-import Cardano.Configuration.Basics (diffTimeCodec)
+import Cardano.Configuration.Basic (diffTimeCodec)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Default
 import Data.Functor.Identity (Identity)

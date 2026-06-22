@@ -29,7 +29,7 @@ library
   import: warnings
   exposed-modules:
     Cardano.Configuration
-    Cardano.Configuration.Basics
+    Cardano.Configuration.Basic
     Cardano.Configuration.CliArgs
     Cardano.Configuration.Common
     Cardano.Configuration.File

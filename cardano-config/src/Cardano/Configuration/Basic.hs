@@ -1,5 +1,5 @@
 -- | Basic types for configuration
-module Cardano.Configuration.Basics (
+module Cardano.Configuration.Basic (
   -- * Codecs
   diffTimeCodec,
 ) where
