@@ -157,12 +157,12 @@ prop_resolveVoter_getVoterId_inverse =
         voters = V.toList committee.committeeVoters
      in QC.conjoin
           [ counterexample ("voter index " <> show i) $
-            case getVoterId (voterVKey voter) committee of
-              Nothing -> QC.property False
-              Just vid ->
-                case resolveVoter committee vid of
-                  Nothing -> QC.property False
-                  Just voter' -> voterVKey voter' === voterVKey voter
+              case getVoterId (voterVKey voter) committee of
+                Nothing -> QC.property False
+                Just vid ->
+                  case resolveVoter committee vid of
+                    Nothing -> QC.property False
+                    Just voter' -> voterVKey voter' === voterVKey voter
           | (i :: Int, voter) <- zip [0 ..] voters
           ]
 
@@ -176,8 +176,8 @@ prop_getVoterId_returns_first_index =
         voters = V.toList committee.committeeVoters
      in QC.conjoin
           [ counterexample ("first occurrence at " <> show i) $
-            getVoterId (voterVKey voter) duped
-              === Just (VoterId (fromIntegral i))
+              getVoterId (voterVKey voter) duped
+                === Just (VoterId (fromIntegral i))
           | let duped =
                   Committee
                     (committee.committeeVoters <> committee.committeeVoters)
