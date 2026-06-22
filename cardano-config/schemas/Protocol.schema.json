@@ -1,0 +1,86 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "ProtocolConfiguration",
+    "properties": {
+        "AlonzoGenesisFile": {
+            "description": "Path to the file",
+            "type": "string"
+        },
+        "AlonzoGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash"
+        },
+        "ByronGenesisFile": {
+            "description": "Path to the file",
+            "type": "string"
+        },
+        "ByronGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash"
+        },
+        "CheckpointsFile": {
+            "description": "Path to the file",
+            "type": "string"
+        },
+        "CheckpointsFileHash": {
+            "description": "Hash of the file\nBlake2b_256 hash"
+        },
+        "ConwayGenesisFile": {
+            "description": "Path to the file",
+            "type": "string"
+        },
+        "ConwayGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash"
+        },
+        "LastKnownBlockVersion-Alt": {
+            "description": "Last known block version, alt",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "LastKnownBlockVersion-Major": {
+            "description": "Last known block version, major",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "LastKnownBlockVersion-Minor": {
+            "description": "Last known block version, minor",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "PBftSignatureThreshold": {
+            "description": "Byron PBFT signature threshold\nDouble"
+        },
+        "RequiresNetworkMagic": {
+            "description": "Whether network magic is required",
+            "oneOf": [
+                {
+                    "const": "RequiresNoMagic"
+                },
+                {
+                    "const": "RequiresMagic"
+                }
+            ]
+        },
+        "ShelleyGenesisFile": {
+            "description": "Path to the file",
+            "type": "string"
+        },
+        "ShelleyGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash"
+        },
+        "StartAsNonProducingNode": {
+            "description": "Start without producing blocks",
+            "type": "boolean"
+        }
+    },
+    "required": [
+        "ConwayGenesisFile",
+        "AlonzoGenesisFile",
+        "ShelleyGenesisFile",
+        "LastKnownBlockVersion-Minor",
+        "LastKnownBlockVersion-Major",
+        "ByronGenesisFile"
+    ],
+    "type": "object"
+}

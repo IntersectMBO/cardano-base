@@ -1,0 +1,19 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "LocalConnectionsConfig",
+    "properties": {
+        "EnableRpc": {
+            "description": "Whether to enable the gRPC server",
+            "type": "boolean"
+        },
+        "RpcSocketPath": {
+            "description": "Path of the gRPC server socket",
+            "type": "string"
+        },
+        "SocketPath": {
+            "description": "Path of the socket for local clients",
+            "type": "string"
+        }
+    },
+    "type": "object"
+}

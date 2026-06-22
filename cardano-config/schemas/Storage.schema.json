@@ -1,0 +1,107 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "StorageConfiguration",
+    "properties": {
+        "DatabasePath": {
+            "anyOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "description": "SplitDB",
+                    "properties": {
+                        "ImmutablePath": {
+                            "description": "Directory for the immutable database",
+                            "type": "string"
+                        },
+                        "VolatilePath": {
+                            "description": "Directory for the volatile database",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "VolatilePath",
+                        "ImmutablePath"
+                    ],
+                    "type": "object"
+                }
+            ],
+            "description": "Directory (or split directories) where the state is stored"
+        },
+        "LedgerDB": {
+            "description": "The LedgerDB configuration\nLedgerDB",
+            "properties": {
+                "Backend": {
+                    "description": "Which LedgerDB backend to use (V2InMemory or V2LSM)",
+                    "type": "string"
+                },
+                "LSMDatabasePath": {
+                    "description": "Custom path to the LSM database (V2LSM only)",
+                    "type": "string"
+                },
+                "LSMExportPath": {
+                    "description": "Directory into which the LSM backend exports snapshots (V2LSM only)",
+                    "type": "string"
+                },
+                "QueryBatchSize": {
+                    "description": "Chunk size for large backend reads",
+                    "maximum": 1.8446744073709551615e19,
+                    "minimum": 0,
+                    "type": "integer"
+                },
+                "Snapshots": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "description": "SnapshotOptions",
+                            "properties": {
+                                "MaxDelay": {
+                                    "description": "Upper bound (seconds) of the random snapshot delay",
+                                    "maximum": 1.8446744073709551615e19,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                },
+                                "MinDelay": {
+                                    "description": "Lower bound (seconds) of the random snapshot delay",
+                                    "maximum": 1.8446744073709551615e19,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                },
+                                "NumOfDiskSnapshots": {
+                                    "description": "How many snapshots to keep on disk",
+                                    "maximum": 1.8446744073709551615e19,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                },
+                                "RateLimit": {
+                                    "description": "Minimum seconds between snapshots",
+                                    "maximum": 1.8446744073709551615e19,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                },
+                                "SlotOffset": {
+                                    "description": "Slot at which the snapshot schedule is anchored",
+                                    "maximum": 1.8446744073709551615e19,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                },
+                                "SnapshotInterval": {
+                                    "description": "Slots between snapshots (non-zero)",
+                                    "maximum": 1.8446744073709551615e19,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Snapshot policy: \"Mithril\" or an object of snapshot options"
+                }
+            },
+            "type": "object"
+        }
+    },
+    "type": "object"
+}

@@ -10,10 +10,11 @@ module Main (main) where
 import Cardano.Configuration (resolveConfiguration)
 import Cardano.Configuration.CliArgs (parseCliArgs)
 import Cardano.Configuration.File
-import Cardano.Configuration.Schema (wholeConfigSchema)
+import Cardano.Configuration.Schema (configurationSchemas, wholeConfigSchema)
 import Control.Exception (SomeException, evaluate, try)
 import Data.Aeson (Value, eitherDecodeFileStrict')
 import Data.Functor.Identity (runIdentity)
+import qualified Data.Text as T
 import Options.Applicative (defaultPrefs, execParserPure, getParseResult, info)
 import System.Exit (exitFailure)
 
@@ -45,9 +46,9 @@ main = do
       , parseCase "examples/split-all.json"
       , listMergeCase
       , resolveCase
-      , schemaCase
       ]
-  let failed = length (filter not results)
+  schemaResults <- schemaCases
+  let failed = length (filter not (results <> schemaResults))
   if failed == 0
     then putStrLn "All checks passed"
     else do
@@ -101,23 +102,27 @@ resolveCase = do
       Left err -> report label (Just (show err))
       Right nc -> evaluate (length (show nc)) >> report label Nothing
 
--- | The committed @config.schema.json@ must match the schema derived from the
--- codecs, so the documented schema cannot drift from the parsers. Regenerate it
--- with @cabal run cardano-config-schema > config.schema.json@.
-schemaCase :: IO Bool
-schemaCase = do
-  let label = "config.schema.json (matches codecs)"
-  res <- eitherDecodeFileStrict' "config.schema.json" :: IO (Either String Value)
+-- | The committed schemas under @schemas/@ (the whole configuration and one per
+-- component) must match the schema derived from the codecs, so the documented
+-- schema cannot drift from the parsers. Regenerate them with @scripts/gen-schemas.sh@.
+schemaCases :: IO [Bool]
+schemaCases =
+  sequence $
+    schemaFile "schemas/config.schema.json" wholeConfigSchema
+      : [ schemaFile ("schemas/" <> T.unpack name <> ".schema.json") schema
+        | (name, schema) <- configurationSchemas
+        ]
+
+-- | Assert that a committed schema file equals the given derived schema.
+schemaFile :: FilePath -> Value -> IO Bool
+schemaFile path expected = do
+  let label = path <> " (matches codecs)"
+  res <- eitherDecodeFileStrict' path :: IO (Either String Value)
   case res of
-    Left err -> report label (Just ("could not read config.schema.json: " <> err))
+    Left err -> report label (Just ("could not read " <> path <> ": " <> err))
     Right committed
-      | committed == wholeConfigSchema -> report label Nothing
-      | otherwise ->
-          report
-            label
-            ( Just
-                "committed config.schema.json is out of date; regenerate with: cabal run cardano-config-schema > config.schema.json"
-            )
+      | committed == expected -> report label Nothing
+      | otherwise -> report label (Just (path <> " is out of date; regenerate with scripts/gen-schemas.sh"))
 
 report :: String -> Maybe String -> IO Bool
 report label = \case

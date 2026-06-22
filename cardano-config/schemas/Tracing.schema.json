@@ -1,0 +1,11 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "TracingConfiguration",
+    "properties": {
+        "HermodTracing": {
+            "description": "Tracing configuration as a path to a separate file holding it. Consumed by the node tracing system (trace-dispatcher), not parsed or validated by cardano-config.",
+            "type": "string"
+        }
+    },
+    "type": "object"
+}

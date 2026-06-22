@@ -48,8 +48,8 @@ printHelp h = do
       , ""
       , "The schema is printed to stdout as JSON. To validate a configuration file"
       , "against it, write it to a file and use a JSON Schema validator, e.g.:"
-      , "  " <> prog <> " > config.schema.json"
-      , "  check-jsonschema --schemafile config.schema.json my-config.json"
+      , "  " <> prog <> " > schemas/config.schema.json"
+      , "  check-jsonschema --schemafile schemas/config.schema.json my-config.json"
       ]
 
 -- | Print a schema with sorted keys for stable output.

@@ -1,0 +1,102 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "TestingConfiguration",
+    "properties": {
+        "DijkstraGenesisFile": {
+            "description": "Path to the file",
+            "type": "string"
+        },
+        "DijkstraGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash"
+        },
+        "ExperimentalHardForksEnabled": {
+            "description": "Enable the experimental eras",
+            "type": "boolean"
+        },
+        "TestAllegraHardForkAtEpoch": {
+            "description": "Force the Allegra hard fork at this epoch",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestAllegraHardForkAtVersion": {
+            "description": "Force the Allegra hard fork at this protocol version",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestAlonzoHardForkAtEpoch": {
+            "description": "Force the Alonzo hard fork at this epoch",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestAlonzoHardForkAtVersion": {
+            "description": "Force the Alonzo hard fork at this protocol version",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestBabbageHardForkAtEpoch": {
+            "description": "Force the Babbage hard fork at this epoch",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestBabbageHardForkAtVersion": {
+            "description": "Force the Babbage hard fork at this protocol version",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestConwayHardForkAtEpoch": {
+            "description": "Force the Conway hard fork at this epoch",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestConwayHardForkAtVersion": {
+            "description": "Force the Conway hard fork at this protocol version",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestDijkstraHardForkAtEpoch": {
+            "description": "Force the Dijkstra hard fork at this epoch",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestDijkstraHardForkAtVersion": {
+            "description": "Force the Dijkstra hard fork at this protocol version",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestMaryHardForkAtEpoch": {
+            "description": "Force the Mary hard fork at this epoch",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestMaryHardForkAtVersion": {
+            "description": "Force the Mary hard fork at this protocol version",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestShelleyHardForkAtEpoch": {
+            "description": "Force the Shelley hard fork at this epoch",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "TestShelleyHardForkAtVersion": {
+            "description": "Force the Shelley hard fork at this protocol version",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        }
+    },
+    "type": "object"
+}

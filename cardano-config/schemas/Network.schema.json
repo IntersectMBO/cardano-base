@@ -1,0 +1,183 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "NetworkConfiguration",
+    "properties": {
+        "AcceptedConnectionsLimit": {
+            "description": "Limits on accepted connections\nAcceptedConnectionsLimit",
+            "properties": {
+                "delay": {
+                    "description": "Delay, in seconds, applied once the soft limit is reached",
+                    "type": "number"
+                },
+                "hardLimit": {
+                    "description": "Hard limit on the number of connections",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer"
+                },
+                "softLimit": {
+                    "description": "Soft limit on the number of connections",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "delay",
+                "softLimit",
+                "hardLimit"
+            ],
+            "type": "object"
+        },
+        "ChainSyncIdleTimeout": {
+            "description": "ChainSync idle timeout, in seconds",
+            "type": "number"
+        },
+        "DiffusionMode": {
+            "description": "Initiator-only or initiator-and-responder",
+            "oneOf": [
+                {
+                    "const": "InitiatorOnly"
+                },
+                {
+                    "const": "InitiatorAndResponder"
+                }
+            ]
+        },
+        "EgressPollInterval": {
+            "description": "Egress poll interval, in seconds",
+            "type": "number"
+        },
+        "ExperimentalProtocolsEnabled": {
+            "description": "Enable experimental network protocols",
+            "type": "boolean"
+        },
+        "MaxConcurrencyBulkSync": {
+            "description": "Bulk-sync block-fetch concurrency",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "MaxConcurrencyDeadline": {
+            "description": "Deadline block-fetch concurrency",
+            "maximum": 1.8446744073709551615e19,
+            "minimum": 0,
+            "type": "integer"
+        },
+        "MinBigLedgerPeersForTrustedState": {
+            "description": "Minimum big ledger peers for trusted state",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "PeerSharing": {
+            "description": "Whether to enable peer sharing",
+            "type": "boolean"
+        },
+        "ProtocolIdleTimeout": {
+            "description": "Protocol idle timeout, in seconds",
+            "type": "number"
+        },
+        "ResponderCoreAffinityPolicy": {
+            "description": "Whether responders are pinned to a core",
+            "type": "string"
+        },
+        "SyncTargetNumberOfActiveBigLedgerPeers": {
+            "description": "Sync target of active big ledger peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "SyncTargetNumberOfActivePeers": {
+            "description": "Sync target of active peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "SyncTargetNumberOfEstablishedBigLedgerPeers": {
+            "description": "Sync target of established big ledger peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "SyncTargetNumberOfEstablishedPeers": {
+            "description": "Sync target of established peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "SyncTargetNumberOfKnownBigLedgerPeers": {
+            "description": "Sync target of known big ledger peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "SyncTargetNumberOfKnownPeers": {
+            "description": "Sync target of known peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "SyncTargetNumberOfRootPeers": {
+            "description": "Sync target of root peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TargetNumberOfActiveBigLedgerPeers": {
+            "description": "Deadline target of active big ledger peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TargetNumberOfActivePeers": {
+            "description": "Deadline target of active peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TargetNumberOfEstablishedBigLedgerPeers": {
+            "description": "Deadline target of established big ledger peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TargetNumberOfEstablishedPeers": {
+            "description": "Deadline target of established peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TargetNumberOfKnownBigLedgerPeers": {
+            "description": "Deadline target of known big ledger peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TargetNumberOfKnownPeers": {
+            "description": "Deadline target of known peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TargetNumberOfRootPeers": {
+            "description": "Deadline target of root peers",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+        },
+        "TimeWaitTimeout": {
+            "description": "TIME-WAIT timeout, in seconds",
+            "type": "number"
+        },
+        "TxSubmissionInitDelay": {
+            "description": "Tx-submission initial delay, in seconds",
+            "type": "number"
+        },
+        "TxSubmissionLogicVersion": {
+            "description": "Which tx-submission inbound logic to run",
+            "type": "string"
+        }
+    },
+    "type": "object"
+}

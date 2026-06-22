@@ -59,6 +59,11 @@ $ cardano-config-schema --list   # the available components
 $ cardano-config-schema Storage  # one component
 ```
 
+The generated schemas are also committed under [`schemas/`](schemas/) — the whole
+configuration (`schemas/config.schema.json`) and one per component
+(`schemas/<Component>.schema.json`). The test-suite asserts they match the codecs
+(so they cannot drift); regenerate them with `scripts/gen-schemas.sh`.
+
 Keys that none of the parsers below recognise produce a **warning** by default
 (so typos are noticed); `parseConfigurationFilesWith RejectUnknownKeys` turns
 them into a hard error instead.
