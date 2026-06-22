@@ -14,6 +14,7 @@
 module Cardano.Configuration.Schema (
   -- * Whole configuration
   wholeConfigSchema,
+  recognisedKeys,
 
   -- * Individual components
   configurationSchemas,
@@ -36,8 +37,10 @@ import Cardano.Configuration.File.Storage (StorageConfiguration)
 import Cardano.Configuration.File.Testing (TestingConfiguration)
 import Cardano.Configuration.File.Tracing (TracingConfiguration)
 import Data.Aeson (Value (..), object, toJSON, (.=))
+import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
 import Data.Foldable (toList)
+import Data.List (nub)
 import Data.Text (Text)
 
 storageSchema :: Value
@@ -118,6 +121,21 @@ wholeConfigSchema =
     properties _ = KM.empty
     required (Object o) | Just (Array a) <- KM.lookup "required" o = toList a
     required _ = []
+
+-- | Every top-level configuration key the parsers recognise: the keys of all
+-- components (read at the top level in the single-file form), the section keys
+-- used to reference split sub-files, and the envelope keys. Used to detect
+-- unrecognised (e.g. misspelled) keys.
+recognisedKeys :: [Text]
+recognisedKeys =
+  nub $
+    envelopeKeys <> sectionKeys <> concatMap (propertyNames . snd) rawComponentSchemas
+  where
+    envelopeKeys = ["ConfigurationVersion", "Config"]
+    sectionKeys = map fst rawComponentSchemas
+    propertyNames (Object o)
+      | Just (Object p) <- KM.lookup "properties" o = map K.toText (KM.keys p)
+    propertyNames _ = []
 
 -- | The JSON Schema draft these schemas target. autodocodec-schema emits
 -- draft-07-compatible schemas (only @oneOf@/@anyOf@/@const@/@properties@/

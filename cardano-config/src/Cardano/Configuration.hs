@@ -65,6 +65,9 @@ module Cardano.Configuration (
   -- * Configuration file
   File.NodeConfigurationFromFile,
   File.parseConfigurationFiles,
+  File.parseConfigurationFilesWith,
+  File.UnknownKeyPolicy (..),
+  File.ConfigurationParsingError (..),
 ) where
 
 import qualified Cardano.Configuration.CliArgs as CLI

@@ -6,6 +6,8 @@ module Cardano.Configuration.File (
   NodeConfigurationFromFile,
   NodeConfigurationFromFileF (..),
   parseConfigurationFiles,
+  parseConfigurationFilesWith,
+  UnknownKeyPolicy (..),
 
   -- * Errors
   ConfigurationParsingError (..),
@@ -29,18 +31,22 @@ import Cardano.Configuration.File.Protocol
 import Cardano.Configuration.File.Storage
 import Cardano.Configuration.File.Testing
 import Cardano.Configuration.File.Tracing
+import Cardano.Configuration.Schema (recognisedKeys)
 import Control.Exception
+import Control.Monad (unless)
 import Data.Aeson (FromJSON, Value (..), parseJSON)
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types (JSONPath, JSONPathElement (..), formatError, iparseEither)
 import Data.Functor.Identity (Identity (..))
+import Data.List (intercalate)
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import GHC.Generics (Generic)
 import GHC.Stack
 import System.Directory (doesFileExist)
 import System.FilePath (takeDirectory, (</>))
+import System.IO (hPutStrLn, stderr)
 
 -- | The configuration from the files, parsed with 'parseConfigurationFiles'
 type NodeConfigurationFromFile = NodeConfigurationFromFileF Identity
@@ -190,15 +196,32 @@ splitEnvelope value =
       Just (Number n) -> round n
       _ -> 1
 
+-- | What to do when the configuration contains keys that none of the parsers
+-- recognise (typically a typo).
+data UnknownKeyPolicy
+  = -- | Emit a warning to @stderr@ and carry on (the default).
+    WarnUnknownKeys
+  | -- | Reject the configuration with a 'ConfigurationParsingError'.
+    RejectUnknownKeys
+  deriving (Eq, Show)
+
 -- | Parse the configuration file and any sub-files referenced from it.
 --
 -- The configuration may be given in JSON or YAML. Errors are reported as
 -- 'ConfigurationParsingError', identifying the offending file, section and
--- location.
+-- location. Unrecognised top-level keys produce a warning; use
+-- 'parseConfigurationFilesWith' to reject them instead.
 parseConfigurationFiles :: HasCallStack => FilePath -> IO NodeConfigurationFromFile
-parseConfigurationFiles cfgFile = do
+parseConfigurationFiles = parseConfigurationFilesWith WarnUnknownKeys
+
+-- | As 'parseConfigurationFiles', but with control over how unrecognised
+-- top-level keys are handled.
+parseConfigurationFilesWith ::
+  HasCallStack => UnknownKeyPolicy -> FilePath -> IO NodeConfigurationFromFile
+parseConfigurationFilesWith policy cfgFile = do
   mainValue <- decodeValueFile Nothing cfgFile
   (version, configValue) <- splitEnvelope mainValue
+  checkUnknownKeys policy cfgFile configValue
   case version of
     1 -> parseConfigurationVersion1 (takeDirectory cfgFile) configValue
     n ->
@@ -208,6 +231,20 @@ parseConfigurationFiles cfgFile = do
           Nothing
           [Key "ConfigurationVersion"]
           ("unsupported configuration version: " <> show n)
+
+-- | Check the top-level configuration keys against the recognised ones, warning
+-- on (or, under 'RejectUnknownKeys', rejecting) any that are unrecognised.
+checkUnknownKeys :: UnknownKeyPolicy -> FilePath -> Value -> IO ()
+checkUnknownKeys policy cfgFile value =
+  case value of
+    Object o -> do
+      let unknown = [k | k <- map K.toText (KM.keys o), k `notElem` recognisedKeys]
+      unless (null unknown) $ do
+        let msg = "unrecognised configuration key(s): " <> intercalate ", " (map T.unpack unknown)
+        case policy of
+          RejectUnknownKeys -> throwIO $ ConfigurationParsingError (Just cfgFile) Nothing [] msg
+          WarnUnknownKeys -> hPutStrLn stderr ("Warning: " <> msg <> " (ignored)")
+    _ -> pure ()
 
 -- | Parse a version-1 configuration object, reading each component either
 -- inline or from its referenced sub-file.
