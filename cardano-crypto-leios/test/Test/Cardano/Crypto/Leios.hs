@@ -133,7 +133,7 @@ exampleCert = case aggregateLeiosCert committee contributions of
   Right c -> c
   Left e -> error ("exampleCert: aggregation failed: " <> show e)
   where
-    (sks, committee) = fixedCommittee 4
+    (sks, committee) = fixedCommittee 1000
     msg = "leios-golden-message" :: BS.ByteString
     contributions = signContribs msg (zip [0 ..] (NE.toList sks))
 
@@ -157,12 +157,12 @@ prop_resolveVoter_getVoterId_inverse =
         voters = V.toList committee.committeeVoters
      in QC.conjoin
           [ counterexample ("voter index " <> show i) $
-              case getVoterId (voterVKey voter) committee of
-                Nothing -> QC.property False
-                Just vid ->
-                  case resolveVoter committee vid of
-                    Nothing -> QC.property False
-                    Just voter' -> voterVKey voter' === voterVKey voter
+            case getVoterId (voterVKey voter) committee of
+              Nothing -> QC.property False
+              Just vid ->
+                case resolveVoter committee vid of
+                  Nothing -> QC.property False
+                  Just voter' -> voterVKey voter' === voterVKey voter
           | (i :: Int, voter) <- zip [0 ..] voters
           ]
 
@@ -176,8 +176,8 @@ prop_getVoterId_returns_first_index =
         voters = V.toList committee.committeeVoters
      in QC.conjoin
           [ counterexample ("first occurrence at " <> show i) $
-              getVoterId (voterVKey voter) duped
-                === Just (VoterId (fromIntegral i))
+            getVoterId (voterVKey voter) duped
+              === Just (VoterId (fromIntegral i))
           | let duped =
                   Committee
                     (committee.committeeVoters <> committee.committeeVoters)
