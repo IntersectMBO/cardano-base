@@ -1,0 +1,4 @@
+{
+    "DiffusionMode": "InitiatorAndResponder",
+    "TargetNumberOfActivePeers": 10
+}

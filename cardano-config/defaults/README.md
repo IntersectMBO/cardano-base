@@ -7,16 +7,24 @@ file and the CLI arguments, so that a resolved `NodeConfiguration` is complete.
 
 ## File naming
 
-- `<Component>.json` — the component's role- and network-agnostic defaults.
-- `<Component>.<variant>.json` — overrides for a particular **network** or node
-  **role**, layered on top of the base file. Present variants:
-  - `Protocol.mainnet.json`, `Protocol.preview.json`, `Protocol.preprod.json`
-    — the network-specific genesis files/hashes, `RequiresNetworkMagic` and
+- `<Component>.json` — the component's role- and network-agnostic defaults. This
+  base file is **always** read as the bottom layer during resolution.
+- `<Component>.variants/<Component>.<variant>.json` — overrides for a particular
+  **network** or node **role**, kept in a `.variants/` subdirectory to make clear
+  they are opt-in overlays. A configuration selects one (or several) by
+  referencing them, and they are deep-merged on top of the base file. Present
+  variants:
+  - `Protocol.variants/Protocol.{mainnet,preview,preprod}.json` — the
+    network-specific genesis files/hashes, `RequiresNetworkMagic` and
     `LastKnownBlockVersion-*` (these legitimately differ per network, so they
     are not in the base `Protocol.json`).
-  - `Network.relay.json`, `Network.blockproducer.json` — the deadline peer
+  - `Network.variants/Network.{relay,blockproducer}.json` — the deadline peer
     targets and `PeerSharing`, which differ between a relay and a
     block-producing node (`defaultDeadlineTargets` / `defaultPeerSharing`).
+
+A configuration can layer them with the list form, e.g.
+`"Network": ["Network.variants/Network.relay.json"]`, which is merged on top of
+the always-read base `Network.json`.
 
 Genesis files are network-specific and only ever appear in a `Protocol.<network>`
 variant, never in the base: defaulting them to mainnet would silently

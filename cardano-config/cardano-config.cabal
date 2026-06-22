@@ -19,6 +19,7 @@ extra-doc-files:
 
 data-files:
   defaults/*.json
+  defaults/*.variants/*.json
   examples/*.json
 
 common warnings
@@ -42,6 +43,12 @@ library
     Cardano.Configuration.File.Testing
     Cardano.Configuration.File.Tracing
     Cardano.Configuration.Schema
+
+  autogen-modules:
+    Paths_cardano_config
+
+  other-modules:
+    Paths_cardano_config
 
   build-depends:
     aeson,

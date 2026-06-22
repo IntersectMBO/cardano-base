@@ -11,6 +11,7 @@ import Cardano.Configuration.File
 import Cardano.Configuration.Schema (wholeConfigSchema)
 import Control.Exception (SomeException, evaluate, try)
 import Data.Aeson (Value, eitherDecodeFileStrict')
+import Data.Functor.Identity (runIdentity)
 import System.Exit (exitFailure)
 
 main :: IO ()
@@ -39,6 +40,7 @@ main = do
       , parseCase "examples/fullconfig.json"
       , parseCase "examples/split.json"
       , parseCase "examples/split-all.json"
+      , listMergeCase
       , schemaCase
       ]
   let failed = length (filter not results)
@@ -65,6 +67,22 @@ parseCase fp = do
   report fp $ case res of
     Left (e :: SomeException) -> Just (show e)
     Right _ -> Nothing
+
+-- | A section given as a list of sources is deep-merged in order, with later
+-- entries overriding earlier ones (and the always-read base default beneath).
+-- @network-b.json@ sets @TargetNumberOfActivePeers@ to 99, overriding the 10 in
+-- @network-a.json@.
+listMergeCase :: IO Bool
+listMergeCase = do
+  let label = "examples/split-list.json (list merge, later overrides)"
+  res <- try (parseConfigurationFiles "examples/split-list.json")
+  case res of
+    Left (e :: SomeException) -> report label (Just (show e))
+    Right c ->
+      let active = deadlineTargetOfActivePeers (runIdentity (networkConfiguration c))
+       in if active == Just 99
+            then report label Nothing
+            else report label (Just ("expected TargetNumberOfActivePeers = 99, got " <> show active))
 
 -- | The committed @config.schema.json@ must match the schema derived from the
 -- codecs, so the documented schema cannot drift from the parsers. Regenerate it

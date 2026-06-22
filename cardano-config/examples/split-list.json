@@ -1,0 +1,9 @@
+{
+    "Network": ["network-a.json", "network-b.json"],
+    "ByronGenesisFile": "mainnet-byron-genesis.json",
+    "ShelleyGenesisFile": "mainnet-shelley-genesis.json",
+    "AlonzoGenesisFile": "mainnet-alonzo-genesis.json",
+    "ConwayGenesisFile": "mainnet-conway-genesis.json",
+    "LastKnownBlockVersion-Major": 3,
+    "LastKnownBlockVersion-Minor": 0
+}

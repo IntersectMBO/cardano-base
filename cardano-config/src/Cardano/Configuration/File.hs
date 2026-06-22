@@ -38,12 +38,14 @@ import Data.Aeson (FromJSON, Value (..), parseJSON)
 import qualified Data.Aeson.Key as K
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types (JSONPath, JSONPathElement (..), formatError, iparseEither)
+import Data.Foldable (toList)
 import Data.Functor.Identity (Identity (..))
 import Data.List (intercalate)
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import GHC.Generics (Generic)
 import GHC.Stack
+import Paths_cardano_config (getDataFileName)
 import System.Directory (doesFileExist)
 import System.FilePath (takeDirectory, (</>))
 import System.IO (hPutStrLn, stderr)
@@ -130,11 +132,79 @@ runCodec mFile section value =
     Left (path, msg) -> throwIO $ ConfigurationParsingError mFile (Just section) path msg
     Right a -> pure a
 
--- | Parse a single component. A section is read inline from the main file when
--- the section key is absent (its keys live at the top level), from an inline
--- object when the key holds one, or from a referenced sub-file when the key
--- holds a path. Unlike a previous version, a path to a missing file is an
--- explicit error rather than a silent fall back to inline parsing.
+-- | Deep, right-biased merge of two JSON values: two objects are merged key by
+-- key (a key present in both is merged recursively), and for anything else the
+-- second (later) value wins. Used to layer configuration sources so that a later
+-- file in a list overrides an earlier one.
+mergeValues :: Value -> Value -> Value
+mergeValues (Object earlier) (Object later) = Object (KM.unionWith mergeValues earlier later)
+mergeValues _ later = later
+
+-- | Resolve a single section source — a path to a sub-file (a string) or an
+-- inline object — to its 'Value'.
+loadSectionSource :: FilePath -> String -> Value -> IO Value
+loadSectionSource root section src =
+  case src of
+    String path -> do
+      let fp = root </> T.unpack path
+      exists <- doesFileExist fp
+      if exists
+        then decodeValueFile (Just section) fp
+        else
+          throwIO $
+            ConfigurationParsingError
+              (Just fp)
+              (Just section)
+              [Key (K.fromString section)]
+              "the referenced configuration file does not exist"
+    Object _ -> pure src
+    _ ->
+      throwIO $
+        ConfigurationParsingError
+          Nothing
+          (Just section)
+          [Key (K.fromString section)]
+          "expected a path to a configuration file (a string) or an inline object"
+
+-- | The always-applied base default for a section, read from the package data
+-- files (@defaults\/\<Section\>.json@), if one ships for it.
+loadBaseDefault :: String -> IO (Maybe Value)
+loadBaseDefault section = do
+  fp <- getDataFileName ("defaults/" <> section <> ".json")
+  exists <- doesFileExist fp
+  if exists
+    then Just <$> decodeValueFile (Just section) fp
+    else pure Nothing
+
+-- | The configuration layer the user supplied for a section: the top-level
+-- object when the section key is absent (its keys live there), an inline object,
+-- a referenced sub-file, or a list of paths\/objects deep-merged in order (a
+-- later entry overrides an earlier one, e.g.
+-- @[\"Network.variants\/Network.relay.json\"]@).
+sectionUserLayer :: FilePath -> Value -> String -> IO Value
+sectionUserLayer root configValue section =
+  case configValue of
+    Object o ->
+      case KM.lookup (K.fromString section) o of
+        Nothing -> pure configValue
+        Just (Array elems) ->
+          case toList elems of
+            [] ->
+              throwIO $
+                ConfigurationParsingError
+                  Nothing
+                  (Just section)
+                  [Key (K.fromString section)]
+                  "expected a non-empty list of configuration files or objects"
+            sources -> foldl1 mergeValues <$> mapM (loadSectionSource root section) sources
+        Just source -> loadSectionSource root section source
+    _ ->
+      throwIO $
+        ConfigurationParsingError Nothing Nothing [] "expected the configuration to be a JSON/YAML object"
+
+-- | Parse a single component. The package's base default for the section is
+-- always read as the bottom layer; the user's layer (see 'sectionUserLayer') is
+-- deep-merged on top. A path to a missing file is an explicit error.
 parseSection ::
   FromJSON a =>
   -- | The directory the main file lives in, against which sub-file paths are
@@ -145,37 +215,10 @@ parseSection ::
   -- | The section name.
   String ->
   IO a
-parseSection root configValue section =
-  case configValue of
-    Object o ->
-      case KM.lookup (K.fromString section) o of
-        -- No dedicated key: the section's keys live at the top level.
-        Nothing -> runCodec Nothing section configValue
-        -- A path to a sub-file.
-        Just (String path) -> do
-          let fp = root </> T.unpack path
-          exists <- doesFileExist fp
-          if exists
-            then decodeValueFile (Just section) fp >>= runCodec (Just fp) section
-            else
-              throwIO $
-                ConfigurationParsingError
-                  (Just fp)
-                  (Just section)
-                  [Key (K.fromString section)]
-                  "the referenced configuration file does not exist"
-        -- An inline object.
-        Just inline@(Object _) -> runCodec Nothing section inline
-        Just _ ->
-          throwIO $
-            ConfigurationParsingError
-              Nothing
-              (Just section)
-              [Key (K.fromString section)]
-              "expected either a path to a configuration file (a string) or an inline object"
-    _ ->
-      throwIO $
-        ConfigurationParsingError Nothing Nothing [] "expected the configuration to be a JSON/YAML object"
+parseSection root configValue section = do
+  base <- loadBaseDefault section
+  user <- sectionUserLayer root configValue section
+  runCodec Nothing section (maybe user (`mergeValues` user) base)
 
 -- | Split the optional configuration envelope @{ \"ConfigurationVersion\": N,
 -- \"Config\": {..} }@ into the version and the configuration object. A document
