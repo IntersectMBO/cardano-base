@@ -43,10 +43,13 @@ Within a resolved component, a field is one of:
   has a value after resolution. Most fields.
 - **Optional (`Maybe`)** — "unset" is a real, intended state, so it stays
   `Maybe` and its default simply *is* "none": the `*GenesisHash` fields,
-  `PBftSignatureThreshold`, `CheckpointsFile`/`Hash`, `LedgerDB.Snapshots`,
-  `LedgerDB.QueryBatchSize`, `SocketPath`, `RpcSocketPath`,
-  `MempoolCapacityBytesOverride` (`NoOverride`), and the Testing
+  `PBftSignatureThreshold`, `CheckpointsFile`/`Hash`, `SocketPath`,
+  `RpcSocketPath`, `MempoolCapacityBytesOverride` (`NoOverride`), the three
+  mempool timeouts (the node's default is no timeout), and the Testing
   `Test<Era>HardForkAt*` / `DijkstraGenesis*` knobs.
+
+`LedgerDB.Snapshots` (default `Mithril`) and `LedgerDB.QueryBatchSize` (default
+100000) *do* have defaults and are resolved.
 
 ## Provenance / TODO
 
@@ -65,4 +68,6 @@ best-effort so the type can be fully resolved; JSON cannot carry comments):
   `TxSubmissionInitDelay` (0), `MinBigLedgerPeersForTrustedState` (0),
   `TxSubmissionLogicVersion` (`"V1"`), `ResponderCoreAffinityPolicy`
   (`"Disabled"`).
-- `Mempool.json`: the three timeouts are left unset pending confirmation.
+
+The mempool timeouts are intentionally absent: the node's default is to apply no
+mempool timeout (`Maybe MempoolTimeoutConfig` = `Nothing`).

@@ -1,6 +1,8 @@
 {
     "DatabasePath": "mainnet/db",
     "LedgerDB": {
-        "Backend": "V2InMemory"
+        "Backend": "V2InMemory",
+        "Snapshots": "Mithril",
+        "QueryBatchSize": 100000
     }
 }
