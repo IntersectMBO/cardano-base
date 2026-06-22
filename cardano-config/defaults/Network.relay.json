@@ -1,0 +1,10 @@
+{
+    "TargetNumberOfRootPeers": 60,
+    "TargetNumberOfKnownPeers": 150,
+    "TargetNumberOfEstablishedPeers": 30,
+    "TargetNumberOfActivePeers": 20,
+    "TargetNumberOfKnownBigLedgerPeers": 15,
+    "TargetNumberOfEstablishedBigLedgerPeers": 10,
+    "TargetNumberOfActiveBigLedgerPeers": 5,
+    "PeerSharing": true
+}

@@ -9,13 +9,6 @@
         "softLimit": 384,
         "delay": 5
     },
-    "TargetNumberOfRootPeers": 60,
-    "TargetNumberOfKnownPeers": 150,
-    "TargetNumberOfEstablishedPeers": 30,
-    "TargetNumberOfActivePeers": 20,
-    "TargetNumberOfKnownBigLedgerPeers": 15,
-    "TargetNumberOfEstablishedBigLedgerPeers": 10,
-    "TargetNumberOfActiveBigLedgerPeers": 5,
     "SyncTargetNumberOfRootPeers": 0,
     "SyncTargetNumberOfKnownPeers": 150,
     "SyncTargetNumberOfEstablishedPeers": 10,
@@ -23,5 +16,11 @@
     "SyncTargetNumberOfKnownBigLedgerPeers": 100,
     "SyncTargetNumberOfEstablishedBigLedgerPeers": 40,
     "SyncTargetNumberOfActiveBigLedgerPeers": 30,
-    "ExperimentalProtocolsEnabled": false
+    "ExperimentalProtocolsEnabled": false,
+    "ProtocolIdleTimeout": 5,
+    "TimeWaitTimeout": 60,
+    "TxSubmissionInitDelay": 0,
+    "MinBigLedgerPeersForTrustedState": 0,
+    "TxSubmissionLogicVersion": "V1",
+    "ResponderCoreAffinityPolicy": "Disabled"
 }
