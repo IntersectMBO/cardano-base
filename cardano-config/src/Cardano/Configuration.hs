@@ -20,12 +20,14 @@ module Cardano.Configuration (
   -- ** Protocol
   File.ProtocolConfiguration (..),
   File.ByronGenesisConfiguration (..),
+  File.RequiresNetworkMagic (..),
   File.Hashed (..),
   CLI.Credentials (..),
   CLI.KESSource (..),
 
   -- ** Network
   File.NetworkConfiguration (..),
+  File.DiffusionMode (..),
   File.LocalConnectionsConfig (..),
 
   -- ** Testing

@@ -9,6 +9,7 @@ module Cardano.Configuration.File.Protocol (
 
   -- * Particular eras
   ByronGenesisConfiguration (..),
+  RequiresNetworkMagic (..),
 ) where
 
 import Autodocodec
@@ -52,10 +53,21 @@ optionalHashedFileObjectCodec fileKey hashKey =
     fromG Nothing = (Nothing, Nothing)
     fromG (Just (Hashed f mh)) = (Just f, mh)
 
+-- | Whether the Byron network magic is required. Enumerated so the schema lists
+-- the valid values and typos are caught at parse time.
+data RequiresNetworkMagic
+  = RequiresNoMagic
+  | RequiresMagic
+  deriving (Generic, Show, Eq, Enum, Bounded)
+  deriving (FromJSON, ToJSON) via (Autodocodec RequiresNetworkMagic)
+
+instance HasCodec RequiresNetworkMagic where
+  codec = shownBoundedEnumCodec
+
 -- | Configuration for byron era
 data ByronGenesisConfiguration = ByronGenesisConfiguration
   { byronGenesisFile :: !(Hashed FilePath)
-  , byronReqNetworkMagic :: !String
+  , byronReqNetworkMagic :: !RequiresNetworkMagic
   , byronPbftSignatureThresh :: !(Maybe Double)
   , byronSupportedProtocolVersionMajor :: !Word16
   , byronSupportedProtocolVersionMinor :: !Word16
@@ -69,7 +81,7 @@ byronGenesisObjectCodec =
     <$> hashedFileObjectCodec "ByronGenesisFile" "ByronGenesisHash" .= byronGenesisFile
     <*> optionalFieldWithDefault
       "RequiresNetworkMagic"
-      "RequiresNoMagic"
+      RequiresNoMagic
       "Whether network magic is required"
       .= byronReqNetworkMagic
     <*> optionalFieldWith "PBftSignatureThreshold" (codecViaAeson "Double") "Byron PBFT signature threshold"

@@ -1,6 +1,7 @@
 -- | Configuration options related to networking
 module Cardano.Configuration.File.Network (
   NetworkConfiguration (..),
+  DiffusionMode (..),
   AcceptedConnectionsLimit (..),
   LocalConnectionsConfig (..),
 ) where
@@ -11,6 +12,18 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.Time.Clock (DiffTime)
 import Data.Word
 import GHC.Generics (Generic)
+
+-- | Whether the node runs as an initiator only, or as both an initiator and a
+-- responder. Enumerated so the schema lists the valid values and typos are
+-- caught at parse time.
+data DiffusionMode
+  = InitiatorOnly
+  | InitiatorAndResponder
+  deriving (Generic, Show, Eq, Enum, Bounded)
+  deriving (FromJSON, ToJSON) via (Autodocodec DiffusionMode)
+
+instance HasCodec DiffusionMode where
+  codec = shownBoundedEnumCodec
 
 -- | Limits on the number of accepted connections.
 data AcceptedConnectionsLimit = AcceptedConnectionsLimit Word32 Word32 DiffTime
@@ -32,7 +45,7 @@ instance HasCodec AcceptedConnectionsLimit where
 -- @Maybe@ such that the networking layer can then set the appropriate
 -- defaults.
 data NetworkConfiguration = NetworkConfiguration
-  { diffusionMode :: String
+  { diffusionMode :: DiffusionMode
   , maxConcurrencyBulkSync :: Maybe Word
   , maxConcurrencyDeadline :: Maybe Word
   , protocolIdleTimeout :: Maybe DiffTime
@@ -70,7 +83,7 @@ instance HasCodec NetworkConfiguration where
       NetworkConfiguration
         <$> optionalFieldWithDefault
           "DiffusionMode"
-          "InitiatorAndResponder"
+          InitiatorAndResponder
           "Initiator-only or initiator-and-responder"
           .= diffusionMode
         <*> optionalField "MaxConcurrencyBulkSync" "Bulk-sync block-fetch concurrency"

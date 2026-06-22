@@ -13,6 +13,7 @@ module Cardano.Configuration.File (
   ConsensusConfiguration (..),
   ProtocolConfiguration (..),
   NetworkConfiguration (..),
+  DiffusionMode (..),
   LocalConnectionsConfig (..),
   TestingConfiguration (..),
   MempoolConfiguration (..),

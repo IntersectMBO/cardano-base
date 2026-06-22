@@ -25,20 +25,24 @@ data NodeDatabasePaths
 instance Default NodeDatabasePaths where
   def = SingleDB "mainnet/db"
 
+-- | A single database is a JSON string (a path); a split database is a JSON
+-- object. We dispatch on that shape so a malformed split-database object reports
+-- its own failure rather than alongside the irrelevant "expected String" failure
+-- of the single-path branch.
 instance HasCodec NodeDatabasePaths where
   codec =
-    dimapCodec toNDP fromNDP $
-      disjointEitherCodec
-        (codec @FilePath)
-        ( object "SplitDB" $
-            (,)
-              <$> requiredField "ImmutablePath" "Directory for the immutable database" .= fst
-              <*> requiredField "VolatilePath" "Directory for the volatile database" .= snd
-        )
+    matchChoiceCodec
+      (dimapCodec SingleDB id (codec @FilePath))
+      (dimapCodec (uncurry SplitDB) id splitDbCodec)
+      selector
     where
-      toNDP = either SingleDB (\(i, v) -> SplitDB i v)
-      fromNDP (SingleDB fp) = Left fp
-      fromNDP (SplitDB i v) = Right (i, v)
+      splitDbCodec =
+        object "SplitDB" $
+          (,)
+            <$> requiredField "ImmutablePath" "Directory for the immutable database" .= fst
+            <*> requiredField "VolatilePath" "Directory for the volatile database" .= snd
+      selector (SingleDB fp) = Left fp
+      selector (SplitDB i v) = Right (i, v)
 
 deriving via (Autodocodec NodeDatabasePaths) instance FromJSON NodeDatabasePaths
 

@@ -77,14 +77,19 @@ data SnapshotPolicy
   | CustomSnapshotPolicy SnapshotOptions
   deriving (Generic, Show)
 
+-- | A named policy is a JSON string; a custom policy is a JSON object. We
+-- dispatch on that shape so that, when an object is supplied, a validation
+-- failure inside 'SnapshotOptions' is reported on its own rather than alongside
+-- the irrelevant "expected String" failure of the other branch.
 instance HasCodec SnapshotPolicy where
   codec =
-    dimapCodec toPolicy fromPolicy $
-      disjointEitherCodec (codec @String) (codec @SnapshotOptions)
+    matchChoiceCodec
+      (dimapCodec NamedSnapshotPolicy id (codec @String))
+      (dimapCodec CustomSnapshotPolicy id (codec @SnapshotOptions))
+      selector
     where
-      toPolicy = either NamedSnapshotPolicy CustomSnapshotPolicy
-      fromPolicy (NamedSnapshotPolicy n) = Left n
-      fromPolicy (CustomSnapshotPolicy o) = Right o
+      selector (NamedSnapshotPolicy n) = Left n
+      selector (CustomSnapshotPolicy o) = Right o
 
 -- | Selector for the backend that keeps track of differences in the UTxO set.
 data LedgerDbBackendSelector

@@ -10,9 +10,8 @@ import Cardano.Configuration.Basic (diffTimeCodec)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Default
 import Data.Functor.Identity (Identity)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
-import qualified Data.Text as T
 import Data.Time.Clock (DiffTime)
 import Data.Word
 import GHC.Generics (Generic)
@@ -41,25 +40,43 @@ deriving via
   instance
     ToJSON (ConsensusConfiguration Maybe)
 
+-- | The @ConsensusMode@ discriminator. Kept separate from 'ConsensusMode'
+-- (which also carries the Genesis flags) so that the codec can enumerate the
+-- valid string values in the schema and reject typos at parse time.
+data ConsensusModeName = PraosModeName | GenesisModeName
+  deriving (Eq)
+
+consensusModeNameCodec :: JSONCodec ConsensusModeName
+consensusModeNameCodec =
+  stringConstCodec ((PraosModeName, "PraosMode") :| [(GenesisModeName, "GenesisMode")])
+
 -- | The consensus mode is selected by the @ConsensusMode@ key; the Genesis
--- flags only apply in Genesis mode, so they are read (from the
--- @LowLevelGenesisOptions@ key) only then.
+-- flags (the @LowLevelGenesisOptions@ key) only apply in Genesis mode. Supplying
+-- them in any other case is rejected rather than silently dropped.
 instance HasCodec (ConsensusConfiguration Maybe) where
   codec =
     bimapCodec toConfig fromConfig $
       object "ConsensusConfiguration" $
         (,)
-          <$> optionalField "ConsensusMode" "Which consensus mode to run (PraosMode or GenesisMode)" .= fst
+          <$> optionalFieldWith
+            "ConsensusMode"
+            consensusModeNameCodec
+            "Which consensus mode to run (PraosMode or GenesisMode)"
+            .= fst
           <*> optionalField "LowLevelGenesisOptions" "Low-level Genesis tuning (GenesisMode only)" .= snd
     where
-      toConfig :: (Maybe Text, Maybe GenesisConfigFlags) -> Either String (ConsensusConfiguration Maybe)
-      toConfig (Nothing, _) = Right (ConsensusConfiguration Nothing)
-      toConfig (Just "PraosMode", _) = Right (ConsensusConfiguration (Just PraosMode))
-      toConfig (Just "GenesisMode", mflags) = Right (ConsensusConfiguration (Just (GenesisMode (fromMaybe def mflags))))
-      toConfig (Just other, _) = Left $ "Unknown consensus mode: " <> T.unpack other
+      toConfig ::
+        (Maybe ConsensusModeName, Maybe GenesisConfigFlags) ->
+        Either String (ConsensusConfiguration Maybe)
+      toConfig (Just GenesisModeName, mflags) =
+        Right (ConsensusConfiguration (Just (GenesisMode (fromMaybe def mflags))))
+      toConfig (_, Just _) =
+        Left "LowLevelGenesisOptions is only valid when ConsensusMode is GenesisMode"
+      toConfig (Nothing, Nothing) = Right (ConsensusConfiguration Nothing)
+      toConfig (Just PraosModeName, Nothing) = Right (ConsensusConfiguration (Just PraosMode))
       fromConfig (ConsensusConfiguration Nothing) = (Nothing, Nothing)
-      fromConfig (ConsensusConfiguration (Just PraosMode)) = (Just "PraosMode", Nothing)
-      fromConfig (ConsensusConfiguration (Just (GenesisMode flags))) = (Just "GenesisMode", Just flags)
+      fromConfig (ConsensusConfiguration (Just PraosMode)) = (Just PraosModeName, Nothing)
+      fromConfig (ConsensusConfiguration (Just (GenesisMode flags))) = (Just GenesisModeName, Just flags)
 
 -- | Configuration options for Genesis parameters
 data GenesisConfigFlags = GenesisConfigFlags
