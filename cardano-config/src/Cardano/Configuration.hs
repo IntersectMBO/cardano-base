@@ -7,6 +7,11 @@ module Cardano.Configuration (
   -- * Configuration
   NodeConfiguration (..),
   resolveConfiguration,
+  resolveConfigurationWith,
+
+  -- ** Consistency checks
+  ConfigCheck (..),
+  defaultConfigChecks,
   ConfigResolutionError (..),
 
   -- ** Storage
@@ -83,6 +88,7 @@ import Control.Exception (Exception)
 import Data.Default
 import Data.Functor.Identity
 import Data.IP
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 import Network.Socket
 import System.Posix.Types
@@ -110,24 +116,79 @@ data NodeConfiguration = NodeConfiguration
   }
   deriving (Show)
 
--- | An error detected while resolving the configuration, i.e. a combination of
--- CLI arguments and file values that is individually well-formed but
--- inconsistent as a whole.
-data ConfigResolutionError
-  = -- | The gRPC endpoint was enabled but there is neither an explicit gRPC
-    -- socket path nor a node socket path to derive one from.
-    RpcEnabledWithoutSocketPath
+-- | A single consistency check over a resolved 'NodeConfiguration': an
+-- invariant that must hold, together with a description used when it fails.
+-- Consumers can define their own and pass them to 'resolveConfigurationWith'.
+data ConfigCheck = ConfigCheck
+  { checkDescription :: String
+  -- ^ A description of the invariant, phrased as what must hold (used in the
+  -- error message when it does not).
+  , checkHolds :: NodeConfiguration -> Bool
+  -- ^ The invariant. 'True' means the configuration satisfies it.
+  }
+
+-- | An error detected while resolving the configuration: one or more
+-- consistency checks failed on a configuration whose individual values were
+-- each well-formed. Carries the descriptions of the violated checks.
+newtype ConfigResolutionError = ConfigResolutionError
+  { violatedChecks :: NonEmpty String
+  }
   deriving (Eq, Show)
 
 instance Exception ConfigResolutionError
 
+-- | The built-in consistency checks applied by 'resolveConfiguration'. Exported
+-- so consumers can extend them, e.g.
+-- @'resolveConfigurationWith' (defaultConfigChecks <> myChecks)@.
+defaultConfigChecks :: [ConfigCheck]
+defaultConfigChecks =
+  [ ConfigCheck
+      "enabling the gRPC endpoint requires a gRPC socket path, or a node socket path to derive one from"
+      ( \nc ->
+          let lcc = localConnectionsConfig nc
+           in not
+                ( File.enableRpc lcc == Just True
+                    && isNothing (File.rpcSocketPath lcc)
+                    && isNothing (File.socketPath lcc)
+                )
+      )
+  , ConfigCheck
+      "the Mithril snapshot policy requires the V2LSM backend with an LSMExportPath, or the V2InMemory backend"
+      ( \nc ->
+          let ldb = runIdentity (File.ledgerDbConfiguration (storageConfiguration nc))
+           in case File.snapshots ldb of
+                Just (File.NamedSnapshotPolicy "Mithril") ->
+                  case File.backendSelector ldb of
+                    File.V2InMemory -> True
+                    File.V2LSM _ exportPath -> isJust exportPath
+                _ -> True
+      )
+  ]
+
+-- | Run a set of consistency checks over a resolved configuration, collecting
+-- the descriptions of every check that fails.
+runConfigChecks :: [ConfigCheck] -> NodeConfiguration -> Either ConfigResolutionError NodeConfiguration
+runConfigChecks checks nc =
+  case [checkDescription c | c <- checks, not (checkHolds c nc)] of
+    [] -> Right nc
+    (violation : violations) -> Left (ConfigResolutionError (violation :| violations))
+
 -- | Combine the cli arguments and configuration file values into a full
--- configuration, then check it for cross-field consistency. CLI values take
+-- configuration, then check it with 'defaultConfigChecks'. CLI values take
 -- precedence over file values.
 resolveConfiguration ::
   CLI.CliArgs -> File.NodeConfigurationFromFile -> Either ConfigResolutionError NodeConfiguration
-resolveConfiguration cli file =
-  validateConfiguration $
+resolveConfiguration = resolveConfigurationWith defaultConfigChecks
+
+-- | As 'resolveConfiguration', but with an explicit set of consistency checks,
+-- so consumers can add their own (typically @'defaultConfigChecks' <> myChecks@).
+resolveConfigurationWith ::
+  [ConfigCheck] ->
+  CLI.CliArgs ->
+  File.NodeConfigurationFromFile ->
+  Either ConfigResolutionError NodeConfiguration
+resolveConfigurationWith checks cli file =
+  runConfigChecks checks $
     NodeConfiguration
       { storageConfiguration =
           let sc = runIdentity $ File.storageConfiguration file
@@ -167,20 +228,3 @@ resolveConfiguration cli file =
       , shutdownIPC = CLI.shutdownIPC cli
       , shutdownOnTarget = CLI.shutdownOnTarget cli
       }
-
--- | Cross-field validation of a resolved configuration. This is the place for
--- consistency checks that span CLI and file values or multiple components;
--- structural validation of individual values lives in the codecs.
-validateConfiguration :: NodeConfiguration -> Either ConfigResolutionError NodeConfiguration
-validateConfiguration nc = nc <$ rpcSocketCheck
-  where
-    lcc = localConnectionsConfig nc
-    -- With the gRPC endpoint enabled, the gRPC socket path defaults to a file
-    -- next to the node socket; if neither path is known, there is nothing to
-    -- derive it from.
-    rpcSocketCheck
-      | File.enableRpc lcc == Just True
-      , isNothing (File.rpcSocketPath lcc)
-      , isNothing (File.socketPath lcc) =
-          Left RpcEnabledWithoutSocketPath
-      | otherwise = Right ()
