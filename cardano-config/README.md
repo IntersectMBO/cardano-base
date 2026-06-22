@@ -59,8 +59,9 @@ $ cardano-config-schema --list   # the available components
 $ cardano-config-schema Storage  # one component
 ```
 
-Keys that none of the parsers below recognise are **ignored** (parsing neither
-fails nor preserves them).
+Keys that none of the parsers below recognise produce a **warning** by default
+(so typos are noticed); `parseConfigurationFilesWith RejectUnknownKeys` turns
+them into a hard error instead.
 
 The recognised keys are grouped into the following components. Unless noted
 otherwise, every key is optional and, when omitted, the node falls back to its
@@ -76,11 +77,27 @@ own default.
 | **Mempool** | `MempoolCapacityBytesOverride`, `MempoolTimeoutSoft`, `MempoolTimeoutHard`, `MempoolTimeoutCapacity` | no |
 | **Testing** | `ExperimentalHardForksEnabled`, the `Test<Era>HardForkAtEpoch`/`Test<Era>HardForkAtVersion` knobs (Shelley … Dijkstra), `DijkstraGenesisFile`/`DijkstraGenesisHash` | no |
 
-The genesis files for the established eras — `ByronGenesisFile`,
-`ShelleyGenesisFile`, `AlonzoGenesisFile`, `ConwayGenesisFile` — and the
-`LastKnownBlockVersion-Major` / `-Minor` keys are required; everything else
-(including the `*Hash` keys, the experimental `DijkstraGenesisFile` and
-`CheckpointsFile`) is optional.
+### Mandatory vs optional keys
+
+Only **six** keys are mandatory — they have no default and parsing fails if they
+are absent:
+
+- `ByronGenesisFile`, `ShelleyGenesisFile`, `AlonzoGenesisFile`,
+  `ConwayGenesisFile` (the established-era genesis files), and
+- `LastKnownBlockVersion-Major`, `LastKnownBlockVersion-Minor`.
+
+These are network-specific, so they are deliberately *not* in the base defaults;
+supply them either directly in your configuration or by referencing a
+`Protocol.variants/Protocol.<network>.json` file (which provides them for that
+network).
+
+**Every other key is optional**: it either has a default (applied from the
+`defaults/` layer — see [Defaults and layering](#defaults-and-layering)) or is
+optional by nature, meaning "unset" is a valid state (the `*Hash` keys,
+`PBftSignatureThreshold`, `CheckpointsFile`, `LedgerDB.Snapshots`,
+`SocketPath`/`RpcSocketPath`, `MempoolCapacityBytesOverride`, the mempool
+timeouts, the experimental `DijkstraGenesisFile`, and the `Test<Era>HardForkAt*`
+knobs).
 
 ### Tracing is *not* parsed
 
@@ -113,11 +130,10 @@ $ cat config.json
 }
 ```
 
-Alternatively, the `Storage`, `Consensus`, `Protocol` and `Network` components
-may each be **split into a sub-file**: give the component key a string path
-(relative to the main config file) instead of an inline object. The remaining
-components (`LocalConnections`, `Mempool`, `Testing`) and the tracing keys are
-always read from the main file's top level.
+Alternatively, any component (`Storage`, `Consensus`, `Protocol`, `Network`,
+`LocalConnections`, `Mempool`, `Testing`) may be **split into a sub-file**: give
+the component key a string path (relative to the main config file) instead of an
+inline object. The tracing keys are always read from the main file's top level.
 
 ```console
 $ cat config.json
@@ -135,3 +151,61 @@ $ cat storage.json
     }
 }
 ```
+
+A component key may also hold a **list** of sources (paths and/or inline
+objects), which are deep-merged in order — a later entry overrides an earlier one,
+and nested objects merge recursively:
+
+```console
+$ cat config.json
+{
+    "Network": ["Network.variants/Network.relay.json", { "PeerSharing": false }]
+}
+```
+
+## Versioning
+
+The configuration may optionally be wrapped in an envelope so the format can
+evolve:
+
+```json
+{ "ConfigurationVersion": 1, "Config": { ... } }
+```
+
+A document without an envelope is read as version 1 (the keys live at the top
+level), so existing configurations keep working.
+
+## Defaults and layering
+
+Every component ships a **default file** under
+[`defaults/`](defaults/) (see [`defaults/README.md`](defaults/README.md)). For
+each component the layering, from lowest to highest precedence, is:
+
+1. the package's base default (`defaults/<Component>.json`), always applied;
+2. the component's value in the configuration file (an inline object, a sub-file
+   path, or a list of them merged in order — including the opt-in
+   `defaults/<Component>.variants/*` overlays the configuration chooses to
+   reference);
+3. the matching CLI flag, where one exists.
+
+`cardano-config` is the *origin* of these default files, but each is ultimately
+owned by the layer that implements the component (networking, consensus, …); a CI
+check keeps the copies here aligned with upstream.
+
+## Design principles
+
+To keep new fields from each making an ad-hoc choice:
+
+- **Where defaults live.** A field that has a real default carries it in the
+  `defaults/` files (so the schema only enumerates keys and types, and defaults
+  are applied by layering, not baked into the codecs). A field whose "unset"
+  state is meaningful (an override, a hash, a feature toggle) stays `Maybe` and
+  its default simply *is* "none".
+- **Where validation lives.** Structural validation of a single value lives in
+  its codec (and thus in the schema). Cross-field validation — constraints that
+  span CLI and file values or several components — lives in `resolveConfiguration`
+  as a list of `ConfigCheck`s; consumers can add their own with
+  `resolveConfigurationWith`.
+- **Errors.** File/JSON failures are reported as `ConfigurationParsingError`,
+  which records the offending file, section and JSON path. Resolution failures
+  are reported as `ConfigResolutionError`, listing the violated checks.
