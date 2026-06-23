@@ -17,10 +17,14 @@ module Cardano.Configuration (
   -- ** Storage
   File.StorageConfiguration (..),
   File.LedgerDbConfiguration (..),
+  File.SnapshotPolicy (..),
+  File.SnapshotOptions (..),
+  File.LedgerDbBackendSelector (..),
   File.NodeDatabasePaths (..),
 
   -- ** Consensus
   File.ConsensusConfiguration (..),
+  File.ConsensusMode (..),
   File.GenesisConfigFlags (..),
 
   -- ** Protocol
@@ -34,6 +38,7 @@ module Cardano.Configuration (
   -- ** Network
   File.NetworkConfiguration (..),
   File.DiffusionMode (..),
+  File.AcceptedConnectionsLimit (..),
   File.LocalConnectionsConfig (..),
 
   -- ** Testing
@@ -70,6 +75,7 @@ module Cardano.Configuration (
 
   -- * Configuration file
   File.NodeConfigurationFromFile,
+  File.TracingConfiguration (..),
   File.parseConfigurationFiles,
   File.parseConfigurationFilesWith,
   File.UnknownKeyPolicy (..),

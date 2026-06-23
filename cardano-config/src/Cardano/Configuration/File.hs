@@ -18,6 +18,7 @@ module Cardano.Configuration.File (
   ProtocolConfiguration (..),
   NetworkConfiguration (..),
   DiffusionMode (..),
+  AcceptedConnectionsLimit (..),
   LocalConnectionsConfig (..),
   TestingConfiguration (..),
   MempoolConfiguration (..),
