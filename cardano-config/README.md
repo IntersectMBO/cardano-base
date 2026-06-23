@@ -68,12 +68,9 @@ Keys that none of the parsers below recognise produce a **warning** by default
 (so typos are noticed); `parseConfigurationFilesWith RejectUnknownKeys` turns
 them into a hard error instead.
 
-The recognised keys are grouped into the following components. Unless noted
-otherwise, every key is optional and, when omitted, the node falls back to its
-own default.
-
-Every component may be given inline, as a sub-file path, or as a list of sources
-(see [Single-file and split forms](#single-file-and-split-forms)).
+The recognised keys are grouped into the following components. Every component
+may be given inline, as a sub-file path, or as a list of sources (see
+[Single-file and split forms](#single-file-and-split-forms)).
 
 | Component | Top-level keys |
 | --- | --- |
@@ -90,9 +87,12 @@ Every component may be given inline, as a sub-file path, or as a list of sources
 Only **six** keys are mandatory — they have no default and parsing fails if they
 are absent:
 
-- `ByronGenesisFile`, `ShelleyGenesisFile`, `AlonzoGenesisFile`,
-  `ConwayGenesisFile` (the established-era genesis files), and
-- `LastKnownBlockVersion-Major`, `LastKnownBlockVersion-Minor`.
+- `ByronGenesisFile`
+- `ShelleyGenesisFile`
+- `AlonzoGenesisFile`
+- `ConwayGenesisFile`
+- `LastKnownBlockVersion-Major`
+- `LastKnownBlockVersion-Minor`.
 
 These are network-specific, so they are deliberately *not* in the base defaults;
 supply them either directly in your configuration or by referencing a
@@ -114,9 +114,12 @@ by this library. It is given under a single `HermodTracing` key, whose value is
 either an inline object or a path (a string) to a separate file holding it. The
 key is recognised and captured **opaquely**: it appears in the schema so that
 users can see it exists, but its contents are neither interpreted nor validated
-here. The authoritative schema for them lives in `trace-dispatcher`.
+here. The authoritative schema for them lives in
+[`hermod-tracing`](https://github.com/IntersectMBO/hermod-tracing).
 
 ## Single-file and split forms
+
+### Single-file
 
 In the **single-file form**, all of the keys above live directly at the top level
 of one object:
@@ -138,16 +141,12 @@ $ cat config.json
 }
 ```
 
+### Split form
+
 Alternatively, any component (`Storage`, `Consensus`, `Protocol`, `Network`,
 `LocalConnections`, `Mempool`, `Testing`) may be **split into a sub-file**: give
 the component key a string path (relative to the main config file) instead of an
 inline object.
-
-Tracing is handled the same way but by the node's tracing system, not this
-library: set `HermodTracing` to a path (relative to the config file) of a
-separate file holding all the tracing options. That is the recommended form; an
-inline object is also accepted. Either way the contents are passed through
-opaquely (see ["Tracing is *not* parsed"](#tracing-is-not-parsed)).
 
 ```console
 $ cat config.json
@@ -191,9 +190,9 @@ level), so existing configurations keep working.
 
 ## Defaults and layering
 
-Every component ships a **default file** under
-[`defaults/`](defaults/) (see [`defaults/README.md`](defaults/README.md)). For
-each component the layering, from lowest to highest precedence, is:
+Every component ships a **default file** under [`defaults/`](defaults/) (see
+[`defaults/README.md`](defaults/README.md)). For each component the layering,
+from lowest to highest precedence, is:
 
 1. the package's base default (`defaults/<Component>.json`), always applied;
 2. the component's value in the configuration file (an inline object, a sub-file

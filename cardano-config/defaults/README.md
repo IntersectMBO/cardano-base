@@ -31,10 +31,20 @@ file and the CLI arguments, so that a resolved `NodeConfiguration` is complete.
     targets and `PeerSharing`, which differ between a relay and a
     block-producing node (`defaultDeadlineTargets` / `defaultPeerSharing`).
 
-Because divergence spans several components, selecting a network means referencing
-its variant in *each* affected section (e.g. preview pulls in
-`Protocol.variants/Protocol.preview.json`, `Consensus.variants/Consensus.preview.json`
-and `Testing.variants/Testing.preview.json`).
+Because divergence spans several components, selecting a network means
+referencing its variant in *each* affected section (e.g. preview pulls in
+`Protocol.variants/Protocol.preview.json`,
+`Consensus.variants/Consensus.preview.json` and
+`Testing.variants/Testing.preview.json`). The base configuration for preview
+would look as follows:
+
+```json
+{
+  "Protocol": "Protocol.variants/Protocol.preview.json",
+  "Consensus": "Consensus.variants/Consensus.preview.json",
+  "Testing": "Testing.variants/Testing.preview.json"
+}
+```
 
 ## Divergence coverage
 
@@ -80,32 +90,25 @@ Within a resolved component, a field is one of:
 - **Resolved (`Identity`)** — has a default here (base or variant), so it always
   has a value after resolution. Most fields.
 - **Optional (`Maybe`)** — "unset" is a real, intended state, so it stays
-  `Maybe` and its default simply *is* "none": the `*GenesisHash` fields,
-  `PBftSignatureThreshold`, `CheckpointsFile`/`Hash`, `SocketPath`,
-  `RpcSocketPath`, `MempoolCapacityBytesOverride` (`NoOverride`), the three
-  mempool timeouts (the node's default is no timeout), and the Testing
-  `Test<Era>HardForkAt*` / `DijkstraGenesis*` knobs.
-
-`LedgerDB.Snapshots` (default `Mithril`) and `LedgerDB.QueryBatchSize` (default
-100000) *do* have defaults and are resolved.
+  `Maybe` and its default simply *is* "none":
+  - the `*GenesisHash` fields
+  - `PBftSignatureThreshold`
+  - `CheckpointsFile`/`Hash`
+  - `SocketPath`
+  - `RpcSocketPath`
+  - `MempoolCapacityBytesOverride` (`NoOverride`)
+  - the three mempool timeouts (the node's default is no timeout),
+  - the Testing `Test<Era>HardForkAt*` / `DijkstraGenesis*` knobs.
 
 ## Provenance / TODO
-
-Confirmed from source (`ouroboros-network`
-`Ouroboros/Network/Diffusion/Configuration.hs` and `cardano-diffusion`
-`Cardano/Network/Diffusion/Configuration.hs`): the peer targets,
-`AcceptedConnectionsLimit`, `ChainSyncIdleTimeout = 3373`,
-`EgressPollInterval = 0`, `MaxConcurrency{BulkSync,Deadline} = 1`,
-`PeerSharing` per role. Genesis values from the published `mainnet`, `preview`
-and `preprod` configs.
 
 **Placeholder values to be confirmed by the owning layer** (currently
 best-effort so the type can be fully resolved; JSON cannot carry comments):
 
-- `Network.json`: `ProtocolIdleTimeout` (5), `TimeWaitTimeout` (60),
-  `TxSubmissionInitDelay` (0), `MinBigLedgerPeersForTrustedState` (0),
-  `TxSubmissionLogicVersion` (`"V1"`), `ResponderCoreAffinityPolicy`
-  (`"Disabled"`).
-
-The mempool timeouts are intentionally absent: the node's default is to apply no
-mempool timeout (`Maybe MempoolTimeoutConfig` = `Nothing`).
+- `Network.json`:
+  - `ProtocolIdleTimeout` (5),
+  - `TimeWaitTimeout` (60),
+  - `TxSubmissionInitDelay` (0),
+  - `MinBigLedgerPeersForTrustedState` (0),
+  - `TxSubmissionLogicVersion` (`"V1"`),
+  - `ResponderCoreAffinityPolicy` (`"Disabled"`).
