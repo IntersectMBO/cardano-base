@@ -28,6 +28,7 @@ import qualified Data.Text as T
 import Data.Yaml.Pretty (encodePretty, setConfCompare, setConfDropNull)
 import qualified Data.Yaml.Pretty as Yaml
 import Options.Applicative
+import Options.Applicative.Help.Pretty (Doc, pretty, vsep)
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 
@@ -73,9 +74,28 @@ commandParser =
           "schema"
           ( info
               (Schema <$> schemaParser)
-              (progDesc "Print the cardano-node configuration JSON Schema.")
+              ( progDesc "Print the cardano-node configuration JSON Schema."
+                  <> footerDoc (Just schemaValidationHelp)
+              )
           )
     )
+
+-- | How to validate a configuration against the schema, shown under
+-- @cardano-config schema --help@.
+schemaValidationHelp :: Doc
+schemaValidationHelp = vsep (map pretty ls)
+  where
+    ls :: [String]
+    ls =
+      [ "Validate a configuration against the schema with ajv-cli (https://ajv.js.org):"
+      , ""
+      , "  cardano-config schema > config.schema.json"
+      , "  ajv validate --strict=false -s config.schema.json -d my-config.json"
+      , ""
+      , "ajv reads JSON, so convert a YAML configuration to JSON first (e.g. with yq)."
+      , "--strict=false lets ajv ignore the informational \"path\" format."
+      ]
+
 
 -- | Parser for the @schema@ subcommand options.
 schemaParser :: Parser SchemaCmd
