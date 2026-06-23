@@ -45,7 +45,7 @@ need access to the configuration file of the node, such as [`cardano-cli`](https
 ### ... see what my current configuration resolves to, with defaults
 
 ```console
-$ cabal run cardano-config-resolve -- --config <your-config.json> --<other node CLI options>
+$ cardano-config resolve --config <your-config.json> --<other node CLI options>
 Consensus:
   ConsensusMode: PraosMode
 LocalConnections:
@@ -64,7 +64,7 @@ Network:
 ### ... see the schema for a component (e.g. Network)
 
 ```console
-$ cabal run cardano-config-schema -- Network
+$ cardano-config schema Network
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "description": "NetworkConfiguration",
@@ -76,12 +76,24 @@ $ cabal run cardano-config-schema -- Network
 ### ... see the schema for the whole config (deprecated, please use sub-files)
 
 ```console
-$ cabal run cardano-config-schema
+$ cardano-config schema
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "description": "The cardano-node configuration (single-file form)",
     "properties": {
         "AcceptedConnectionsLimit": {
+...
+```
+
+### ... modify my configuration and check that it is well-formed
+
+```console
+$ cat <your-config.json> | jq '...' > <your-updated-config.json>
+$ cardano-config resolve --config <your-config.json> --<other node CLI options>
+Consensus:
+  ConsensusMode: PraosMode
+LocalConnections:
+  EnableRpc: false
 ...
 ```
 
@@ -123,12 +135,12 @@ The configuration is a single JSON/YAML object. The parsers are derived from
 [`autodocodec`](https://hackage.haskell.org/package/autodocodec) codecs, and the
 **authoritative, always-up-to-date key listing** (including nested fields,
 defaults and validation) is the JSON Schema derived from those very codecs. Dump
-it with the bundled executable:
+it with the bundled `cardano-config` executable's `schema` subcommand:
 
 ```console
-$ cardano-config-schema          # the whole configuration
-$ cardano-config-schema --list   # the available components
-$ cardano-config-schema Storage  # one component
+$ cardano-config schema          # the whole configuration
+$ cardano-config schema --list   # the available components
+$ cardano-config schema Storage  # one component
 ```
 
 The generated schemas are also committed under [`schemas/`](schemas/) — the whole
@@ -139,13 +151,13 @@ configuration (`schemas/config.schema.json`) and one per component
 To see the *resolved* configuration for a given file — the per-component
 defaults, the configuration file (including any [`Custom`](#the-custom-override-layer)
 override) and the CLI flags, all merged and resolved exactly as the node does it
-— use the `cardano-config-resolve` executable. It accepts the same flags as the
-node (`--config` selects the file) and prints the result as YAML, using the same
-documented keys as the input (each component under its name, with the CLI-only
-operational arguments grouped under `Runtime`):
+— use the `cardano-config` executable's `resolve` subcommand. It accepts the same
+flags as the node (`--config` selects the file) and prints the result as YAML,
+using the same documented keys as the input (each component under its name, with
+the CLI-only operational arguments grouped under `Runtime`):
 
 ```console
-$ cardano-config-resolve --config mainnet-config.yaml
+$ cardano-config resolve --config mainnet-config.yaml
 ```
 
 (The library exposes this rendering as `nodeConfigurationToJSON` in

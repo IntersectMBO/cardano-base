@@ -90,7 +90,7 @@ library
     TupleSections
     TypeApplications
 
-executable cardano-config-schema
+executable cardano-config
   import: warnings
   main-is: Main.hs
   hs-source-dirs: app
@@ -100,25 +100,14 @@ executable cardano-config-schema
     base,
     bytestring,
     cardano-config,
+    optparse-applicative,
     text,
+    yaml,
 
   default-language: Haskell2010
   default-extensions:
     LambdaCase
     OverloadedStrings
-
-executable cardano-config-resolve
-  import: warnings
-  main-is: Main.hs
-  hs-source-dirs: resolve
-  build-depends:
-    base,
-    bytestring,
-    cardano-config,
-    optparse-applicative,
-    yaml,
-
-  default-language: Haskell2010
 
 test-suite cardano-config-test
   import: warnings

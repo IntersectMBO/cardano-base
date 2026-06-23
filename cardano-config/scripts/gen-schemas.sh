@@ -7,7 +7,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-run() { cabal run -v0 cardano-config-schema -- "$@"; }
+run() { cabal run -v0 cardano-config -- schema "$@"; }
 
 mkdir -p schemas
 run > schemas/config.schema.json
