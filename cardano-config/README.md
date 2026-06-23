@@ -140,11 +140,16 @@ To see the *resolved* configuration for a given file — the per-component
 defaults, the configuration file (including any [`Custom`](#the-custom-override-layer)
 override) and the CLI flags, all merged and resolved exactly as the node does it
 — use the `cardano-config-resolve` executable. It accepts the same flags as the
-node (`--config` selects the file):
+node (`--config` selects the file) and prints the result as YAML, using the same
+documented keys as the input (each component under its name, with the CLI-only
+operational arguments grouped under `Runtime`):
 
 ```console
 $ cardano-config-resolve --config mainnet-config.yaml
 ```
+
+(The library exposes this rendering as `nodeConfigurationToJSON` in
+`Cardano.Configuration.Render`.)
 
 Keys that none of the parsers below recognise produce a **warning** by default
 (so typos are noticed); `parseConfigurationFilesWith RejectUnknownKeys` turns

@@ -8,7 +8,9 @@
   `cardano-node` configuration, with an `autodocodec`-derived JSON Schema
   (`cardano-config-schema`).
 * `cardano-config-resolve` executable: resolves a configuration (defaults +
-  file + `Custom` override + CLI flags) and pretty-prints the complete result.
+  file + `Custom` override + CLI flags) and prints the complete result as YAML,
+  using the documented configuration keys (`Cardano.Configuration.Render`
+  exposes this as `nodeConfigurationToJSON`).
 * Configuration sources are layered with a deep merge: an always-applied
   per-component default (`defaults/`), then the configuration file (a value, a
   sub-file path, or a list of them), then the optional top-level `Custom`
