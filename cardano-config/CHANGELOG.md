@@ -8,7 +8,14 @@
   `cardano-node` configuration, with an `autodocodec`-derived JSON Schema.
 * `cardano-config` executable with two subcommands:
   * `cardano-config schema` dumps the `autodocodec`-derived JSON Schema (the
-    whole configuration or a single component).
+    whole configuration or a single component). The schemas declare a `type` for
+    every scalar field (string enumerations use `enum`), flag filesystem paths
+    with `"format": "path"`, and carry `title`/`$id` so documentation generators
+    (e.g. `jsonschema2md`) render names rather than `Untitled`/`undefined`. Each
+    key's `default` is filled in from the `defaults/` files (the single source of
+    truth for defaults), so the documented default matches the applied one. The
+    whole-configuration schema covers both the single-file and split-file forms,
+    the version envelope and the `Custom` layer.
   * `cardano-config resolve` resolves a configuration (defaults + file +
     `Custom` override + CLI flags) and prints the complete result as YAML,
     using the documented configuration keys (`Cardano.Configuration.Render`
@@ -26,3 +33,6 @@
   cross-field checks (`ConfigCheck` / `ConfigResolutionError`).
 * Unrecognised top-level keys warn by default; `RejectUnknownKeys` makes them an
   error.
+* Shadowed top-level keys (a component supplied as its own section while one of
+  its keys also appears at the top level, where it is then ignored) warn by
+  default and are rejected under `RejectUnknownKeys`.

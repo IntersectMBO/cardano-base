@@ -1,4 +1,5 @@
 {
     "LastKnownBlockVersion-Alt": 0,
+    "RequiresNetworkMagic": "RequiresNoMagic",
     "StartAsNonProducingNode": false
 }

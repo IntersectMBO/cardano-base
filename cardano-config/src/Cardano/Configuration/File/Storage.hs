@@ -70,25 +70,28 @@ instance HasCodec SnapshotOptions where
         | otherwise = Right so
       validateDelays so = Right so
 
--- | The snapshot policy: either a named, predefined policy (e.g. @"Mithril"@)
--- or an explicit set of options.
+-- | The snapshot policy: either the predefined @"Mithril"@ policy (the only
+-- named policy currently accepted) or an explicit set of options.
 data SnapshotPolicy
-  = NamedSnapshotPolicy String
+  = MithrilSnapshotPolicy
   | CustomSnapshotPolicy SnapshotOptions
   deriving (Generic, Show)
 
--- | A named policy is a JSON string; a custom policy is a JSON object. We
--- dispatch on that shape so that, when an object is supplied, a validation
--- failure inside 'SnapshotOptions' is reported on its own rather than alongside
--- the irrelevant "expected String" failure of the other branch.
+-- | The Mithril policy is the JSON string @"Mithril"@ (and nothing else); a
+-- custom policy is a JSON object. We dispatch on that shape so that, when an
+-- object is supplied, a validation failure inside 'SnapshotOptions' is reported
+-- on its own rather than alongside the irrelevant other-branch failure. Using a
+-- literal @"Mithril"@ codec (rather than an arbitrary string) means any other
+-- string is rejected at parse time, and the schema lists @"Mithril"@ as the only
+-- accepted value.
 instance HasCodec SnapshotPolicy where
   codec =
     matchChoiceCodec
-      (dimapCodec NamedSnapshotPolicy id (codec @String))
+      (literalTextValueCodec MithrilSnapshotPolicy "Mithril")
       (dimapCodec CustomSnapshotPolicy id (codec @SnapshotOptions))
       selector
     where
-      selector (NamedSnapshotPolicy n) = Left n
+      selector MithrilSnapshotPolicy = Left MithrilSnapshotPolicy
       selector (CustomSnapshotPolicy o) = Right o
 
 -- | Selector for the backend that keeps track of differences in the UTxO set.
@@ -107,31 +110,33 @@ instance Default LedgerDbBackendSelector where
   def = V2InMemory
 
 -- | The @Backend@, @LSMDatabasePath@ and @LSMExportPath@ keys, parsed together
--- as they describe a single choice of backend.
-backendCodec :: JSONObjectCodec LedgerDbBackendSelector
+-- as they describe a single choice of backend. @Backend@ is optional here (its
+-- default, @V2InMemory@, comes from @defaults/Storage.json@, not the codec), so
+-- the result is 'Nothing' when the key is absent.
+backendCodec :: JSONObjectCodec (Maybe LedgerDbBackendSelector)
 backendCodec =
   bimapCodec toSelector fromSelector $
     (,,)
-      <$> optionalFieldWithDefault
-        "Backend"
-        ("V2InMemory" :: Text)
-        "Which LedgerDB backend to use (V2InMemory or V2LSM)"
+      <$> optionalFieldWith "Backend" (codec @Text) "Which LedgerDB backend to use (V2InMemory or V2LSM)"
         .= (\(b, _, _) -> b)
-      <*> optionalField "LSMDatabasePath" "Custom path to the LSM database (V2LSM only)" .= (\(_, p, _) -> p)
-      <*> optionalField "LSMExportPath" "Directory into which the LSM backend exports snapshots (V2LSM only)"
+      <*> optionalFieldWith "LSMDatabasePath" filePathCodec "Custom path to the LSM database (V2LSM only)"
+        .= (\(_, p, _) -> p)
+      <*> optionalFieldWith "LSMExportPath" filePathCodec "Directory into which the LSM backend exports snapshots (V2LSM only)"
         .= (\(_, _, e) -> e)
   where
-    toSelector ("V2InMemory", _, _) = Right V2InMemory
-    toSelector ("V2LSM", p, e) = Right (V2LSM p e)
-    toSelector (other, _, _) = Left $ "Malformed LedgerDB Backend: " <> T.unpack other
-    fromSelector V2InMemory = ("V2InMemory", Nothing, Nothing)
-    fromSelector (V2LSM p e) = ("V2LSM", p, e)
+    toSelector (Nothing, _, _) = Right Nothing
+    toSelector (Just "V2InMemory", _, _) = Right (Just V2InMemory)
+    toSelector (Just "V2LSM", p, e) = Right (Just (V2LSM p e))
+    toSelector (Just other, _, _) = Left $ "Malformed LedgerDB Backend: " <> T.unpack other
+    fromSelector Nothing = (Nothing, Nothing, Nothing)
+    fromSelector (Just V2InMemory) = (Just "V2InMemory", Nothing, Nothing)
+    fromSelector (Just (V2LSM p e)) = (Just "V2LSM", p, e)
 
 -- | The Ledger DB configuration
 data LedgerDbConfiguration = LedgerDbConfiguration
   { snapshots :: Maybe SnapshotPolicy
   , queryBatchSize :: Maybe Word64
-  , backendSelector :: LedgerDbBackendSelector
+  , backendSelector :: Maybe LedgerDbBackendSelector
   }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec LedgerDbConfiguration)
@@ -146,7 +151,7 @@ instance HasCodec LedgerDbConfiguration where
         <*> backendCodec .= backendSelector
 
 instance Default LedgerDbConfiguration where
-  def = LedgerDbConfiguration Nothing Nothing def
+  def = LedgerDbConfiguration Nothing Nothing Nothing
 
 -- | Finally resolve the storage configuration with a final 'NodeDatabasePaths'.
 adjustDbPath :: StorageConfiguration Maybe -> NodeDatabasePaths -> StorageConfiguration Identity

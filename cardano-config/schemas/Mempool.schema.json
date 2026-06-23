@@ -1,4 +1,5 @@
 {
+    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/Mempool.schema.json",
     "$schema": "http://json-schema.org/draft-07/schema#",
     "description": "MempoolConfiguration",
     "properties": {
@@ -7,26 +8,35 @@
                 {
                     "maximum": 1.8446744073709551615e19,
                     "minimum": 0,
+                    "title": "Integer",
                     "type": "integer"
                 },
                 {
-                    "const": "NoOverride"
+                    "const": "NoOverride",
+                    "title": "NoOverride",
+                    "type": "string"
                 }
             ],
-            "description": "Override for the maximum mempool size in bytes, or the string \"NoOverride\""
+            "default": "NoOverride",
+            "description": "Override for the maximum mempool size in bytes, or the string \"NoOverride\"",
+            "title": "MempoolCapacityBytesOverride"
         },
         "MempoolTimeoutCapacity": {
             "description": "Capacity mempool timeout, in seconds",
+            "title": "MempoolTimeoutCapacity",
             "type": "number"
         },
         "MempoolTimeoutHard": {
             "description": "Hard mempool timeout, in seconds",
+            "title": "MempoolTimeoutHard",
             "type": "number"
         },
         "MempoolTimeoutSoft": {
             "description": "Soft mempool timeout, in seconds",
+            "title": "MempoolTimeoutSoft",
             "type": "number"
         }
     },
+    "title": "Mempool",
     "type": "object"
 }

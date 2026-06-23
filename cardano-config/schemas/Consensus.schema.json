@@ -1,58 +1,68 @@
 {
+    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/Consensus.schema.json",
     "$schema": "http://json-schema.org/draft-07/schema#",
     "description": "ConsensusConfiguration",
     "properties": {
         "ConsensusMode": {
+            "default": "PraosMode",
             "description": "Which consensus mode to run (PraosMode or GenesisMode)",
-            "oneOf": [
-                {
-                    "const": "PraosMode"
-                },
-                {
-                    "const": "GenesisMode"
-                }
-            ]
+            "enum": [
+                "PraosMode",
+                "GenesisMode"
+            ],
+            "title": "ConsensusMode",
+            "type": "string"
         },
         "LowLevelGenesisOptions": {
             "description": "Low-level Genesis tuning (GenesisMode only)\nGenesisConfigFlags",
             "properties": {
                 "BlockFetchGracePeriod": {
                     "description": "Grace period, in seconds, for BlockFetch",
+                    "title": "BlockFetchGracePeriod",
                     "type": "number"
                 },
                 "BucketCapacity": {
                     "description": "Token bucket capacity for the LoP",
+                    "title": "BucketCapacity",
                     "type": "integer"
                 },
                 "BucketRate": {
                     "description": "Token bucket refill rate for the LoP",
+                    "title": "BucketRate",
                     "type": "integer"
                 },
                 "CSJJumpSize": {
                     "description": "Size, in slots, of ChainSync jumps",
                     "maximum": 1.8446744073709551615e19,
                     "minimum": 0,
+                    "title": "CSJJumpSize",
                     "type": "integer"
                 },
                 "EnableCSJ": {
                     "description": "Enable ChainSync Jumping",
+                    "title": "EnableCSJ",
                     "type": "boolean"
                 },
                 "EnableLoEAndGDD": {
                     "description": "Enable the Limit on Eagerness and the Genesis Density Disconnection",
+                    "title": "EnableLoEAndGDD",
                     "type": "boolean"
                 },
                 "EnableLoP": {
                     "description": "Enable the Limit on Patience",
+                    "title": "EnableLoP",
                     "type": "boolean"
                 },
                 "GDDRateLimit": {
                     "description": "Rate limit, in seconds, for the GDD",
+                    "title": "GDDRateLimit",
                     "type": "number"
                 }
             },
+            "title": "LowLevelGenesisOptions",
             "type": "object"
         }
     },
+    "title": "Consensus",
     "type": "object"
 }

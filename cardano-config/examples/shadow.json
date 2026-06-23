@@ -1,0 +1,10 @@
+{
+    "Storage": "storage.json",
+    "Consensus": "consensus.json",
+    "Protocol": "protocol.json",
+    "Network": "network.json",
+    "LocalConnections": "localconnections.json",
+    "Testing": "testing.json",
+    "Mempool": "mempool.json",
+    "DijkstraGenesisFile": "dijkstra-genesis.json"
+}

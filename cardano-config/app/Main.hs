@@ -11,8 +11,13 @@ module Main (main) where
 
 import Cardano.Configuration (parseConfigurationFiles, resolveConfiguration)
 import Cardano.Configuration.CliArgs (CliArgs, configFilePath, parseCliArgs)
+import Cardano.Configuration.File (componentDefaults)
 import Cardano.Configuration.Render (nodeConfigurationToJSON)
-import Cardano.Configuration.Schema (configurationSchemas, wholeConfigSchema)
+import Cardano.Configuration.Schema (
+  configurationSchemas,
+  configurationSchemasWithDefaults,
+  wholeConfigSchemaWithDefaults,
+ )
 import Control.Exception (SomeException, displayException, try)
 import Data.Aeson (Value)
 import Data.Aeson.Encode.Pretty (Config (..), defConfig, encodePretty')
@@ -108,9 +113,12 @@ runResolve cli = do
 -- | Print a JSON Schema, or list the component names.
 runSchema :: SchemaCmd -> IO ()
 runSchema SchemaList = mapM_ (putStrLn . T.unpack . fst) configurationSchemas
-runSchema (SchemaComponent Nothing) = dump wholeConfigSchema
-runSchema (SchemaComponent (Just name)) =
-  case lookup (T.pack name) configurationSchemas of
+runSchema (SchemaComponent Nothing) = do
+  defs <- componentDefaults
+  dump (wholeConfigSchemaWithDefaults defs)
+runSchema (SchemaComponent (Just name)) = do
+  defs <- componentDefaults
+  case lookup (T.pack name) (configurationSchemasWithDefaults defs) of
     Just s -> dump s
     Nothing ->
       die $

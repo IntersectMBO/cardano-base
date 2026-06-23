@@ -3,13 +3,34 @@ module Cardano.Configuration.Common (
   NodeDatabasePaths (..),
   parseNodeDatabasePaths,
   parseStartAsNonProducingNode,
+
+  -- * File paths
+  filePathCodec,
+  filePathFormatMarker,
 ) where
 
 import Autodocodec
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Default
+import Data.Text (Text)
 import GHC.Generics
 import Options.Applicative
+
+--------------------------------------------------------------------------------
+
+-- | A JSON string codec for a filesystem path. It encodes exactly like the
+-- plain 'FilePath' codec, but carries a sentinel comment ('filePathFormatMarker')
+-- that the schema post-processing (in "Cardano.Configuration.Schema") lifts into
+-- a @"format": "path"@ annotation, so tooling and editors can tell the value is
+-- a path rather than an arbitrary string.
+filePathCodec :: JSONCodec FilePath
+filePathCodec = codec @FilePath <?> filePathFormatMarker
+
+-- | The sentinel comment that marks a string as a filesystem path. The schema
+-- post-processing recognises it, turns it into @"format": "path"@ and strips it
+-- from the description. See 'filePathCodec'.
+filePathFormatMarker :: Text
+filePathFormatMarker = "format:path"
 
 --------------------------------------------------------------------------------
 
@@ -32,15 +53,15 @@ instance Default NodeDatabasePaths where
 instance HasCodec NodeDatabasePaths where
   codec =
     matchChoiceCodec
-      (dimapCodec SingleDB id (codec @FilePath))
+      (dimapCodec SingleDB id filePathCodec)
       (dimapCodec (uncurry SplitDB) id splitDbCodec)
       selector
     where
       splitDbCodec =
         object "SplitDB" $
           (,)
-            <$> requiredField "ImmutablePath" "Directory for the immutable database" .= fst
-            <*> requiredField "VolatilePath" "Directory for the volatile database" .= snd
+            <$> requiredFieldWith "ImmutablePath" filePathCodec "Directory for the immutable database" .= fst
+            <*> requiredFieldWith "VolatilePath" filePathCodec "Directory for the volatile database" .= snd
       selector (SingleDB fp) = Left fp
       selector (SplitDB i v) = Right (i, v)
 

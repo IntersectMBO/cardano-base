@@ -10,7 +10,7 @@ module Main (main) where
 import Cardano.Configuration (resolveConfiguration)
 import Cardano.Configuration.CliArgs (parseCliArgs)
 import Cardano.Configuration.File
-import Cardano.Configuration.Schema (configurationSchemas, wholeConfigSchema)
+import Cardano.Configuration.Schema (configurationSchemasWithDefaults, wholeConfigSchemaWithDefaults)
 import Control.Exception (SomeException, evaluate, try)
 import Data.Aeson (Value, eitherDecodeFileStrict')
 import Data.Functor.Identity (runIdentity)
@@ -48,6 +48,8 @@ main = do
       , listMergeCase
       , customCase "examples/custom.json (inline override)" "examples/custom.json"
       , customCase "examples/custom-split.json (override from file)" "examples/custom-split.json"
+      , shadowWarnCase
+      , shadowRejectCase
       , resolveCase
       ]
   schemaResults <- schemaCases
@@ -114,6 +116,29 @@ customCase label fp = do
             then report label Nothing
             else report label (Just ("missing " <> show missing <> " in " <> shown))
 
+-- | A top-level key belonging to a component that is also supplied as its own
+-- section (here a top-level @DijkstraGenesisFile@ alongside a @Testing@ section)
+-- is shadowed. Under the default policy this only warns, so parsing succeeds.
+shadowWarnCase :: IO Bool
+shadowWarnCase = do
+  let label = "examples/shadow.json (shadowed top-level key warns, still parses)"
+  res <- try (parseConfigurationFiles "examples/shadow.json" >>= \c -> evaluate (length (show c)))
+  report label $ case res of
+    Left (e :: SomeException) -> Just (show e)
+    Right _ -> Nothing
+
+-- | The same shadowed key is a hard error under 'RejectUnknownKeys', and the
+-- error names the offending key.
+shadowRejectCase :: IO Bool
+shadowRejectCase = do
+  let label = "examples/shadow.json (shadowed top-level key rejected under strict policy)"
+  res <- try (parseConfigurationFilesWith RejectUnknownKeys "examples/shadow.json")
+  case res of
+    Left (e :: SomeException)
+      | "DijkstraGenesisFile" `isInfixOf` show e -> report label Nothing
+      | otherwise -> report label (Just ("rejected, but with an unexpected error: " <> show e))
+    Right _ -> report label (Just "expected rejection under RejectUnknownKeys, but parsing succeeded")
+
 -- | Resolving a parsed configuration with default CLI arguments must succeed and
 -- produce a complete (@Identity@) configuration, which exercises that the base
 -- defaults populate every resolved field.
@@ -131,11 +156,12 @@ resolveCase = do
 -- component) must match the schema derived from the codecs, so the documented
 -- schema cannot drift from the parsers. Regenerate them with @scripts/gen-schemas.sh@.
 schemaCases :: IO [Bool]
-schemaCases =
+schemaCases = do
+  defs <- componentDefaults
   sequence $
-    schemaFile "schemas/config.schema.json" wholeConfigSchema
+    schemaFile "schemas/config.schema.json" (wholeConfigSchemaWithDefaults defs)
       : [ schemaFile ("schemas/" <> T.unpack name <> ".schema.json") schema
-        | (name, schema) <- configurationSchemas
+        | (name, schema) <- configurationSchemasWithDefaults defs
         ]
 
 -- | Assert that a committed schema file equals the given derived schema.

@@ -10,6 +10,7 @@ module Cardano.Configuration.File.Network (
 
 import Autodocodec
 import Cardano.Configuration.Basic (diffTimeCodec, requireField)
+import Cardano.Configuration.Common (filePathCodec)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Functor.Identity (Identity (..))
 import Data.Time.Clock (DiffTime)
@@ -242,9 +243,9 @@ instance HasCodec (LocalConnectionsConfig Maybe) where
   codec =
     object "LocalConnectionsConfig" $
       LocalConnectionsConfig
-        <$> optionalField "SocketPath" "Path of the socket for local clients" .= socketPath
+        <$> optionalFieldWith "SocketPath" filePathCodec "Path of the socket for local clients" .= socketPath
         <*> optionalField "EnableRpc" "Whether to enable the gRPC server" .= enableRpc
-        <*> optionalField "RpcSocketPath" "Path of the gRPC server socket" .= rpcSocketPath
+        <*> optionalFieldWith "RpcSocketPath" filePathCodec "Path of the gRPC server socket" .= rpcSocketPath
 
 -- | Resolve a partial local-connections configuration, taking @EnableRpc@ from
 -- the (always-applied) defaults.

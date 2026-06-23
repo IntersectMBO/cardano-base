@@ -163,10 +163,11 @@ defaultConfigChecks =
       ( \nc ->
           let ldb = runIdentity (File.ledgerDbConfiguration (storageConfiguration nc))
            in case File.snapshots ldb of
-                Just (File.NamedSnapshotPolicy "Mithril") ->
+                Just File.MithrilSnapshotPolicy ->
                   case File.backendSelector ldb of
-                    File.V2InMemory -> True
-                    File.V2LSM _ exportPath -> isJust exportPath
+                    Nothing -> True -- defaults to V2InMemory, which satisfies Mithril
+                    Just File.V2InMemory -> True
+                    Just (File.V2LSM _ exportPath) -> isJust exportPath
                 _ -> True
       )
   ]

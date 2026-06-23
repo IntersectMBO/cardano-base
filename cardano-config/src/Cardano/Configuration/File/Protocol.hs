@@ -13,7 +13,8 @@ module Cardano.Configuration.File.Protocol (
 ) where
 
 import Autodocodec
-import Cardano.Crypto.Hash (Blake2b_256, Hash)
+import Cardano.Configuration.Common (filePathCodec)
+import Cardano.Crypto.Hash (Blake2b_256, Hash, hashFromTextAsHex, hashToTextAsHex)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.ByteString (ByteString)
 import Data.Functor.Identity (Identity)
@@ -28,16 +29,27 @@ data Hashed a = Hashed
   }
   deriving (Generic, Show)
 
--- | A codec for a Blake2b-256 hash, reusing its aeson instances (a hex string).
+-- | A 'Double' codec via 'scientificCodec', so the schema declares
+-- @"type": "number"@ (autodocodec ships no 'HasCodec' instance for 'Double').
+doubleCodec :: JSONCodec Double
+doubleCodec = dimapCodec realToFrac realToFrac scientificCodec
+
+-- | A codec for a Blake2b-256 hash: a hex string. We bimap over the string codec
+-- (rather than 'codecViaAeson') so the schema declares @"type": "string"@.
 hashCodec :: JSONCodec (Hash Blake2b_256 ByteString)
-hashCodec = codecViaAeson "Blake2b_256 hash"
+hashCodec =
+  bimapCodec
+    (maybe (Left "invalid Blake2b_256 hash (expected a hex string)") Right . hashFromTextAsHex)
+    hashToTextAsHex
+    (codec @Text)
+    <?> "Blake2b_256 hash"
 
 -- | An object-codec fragment reading a file path and its optional hash from two
 -- sibling keys of the enclosing object.
 hashedFileObjectCodec :: Text -> Text -> JSONObjectCodec (Hashed FilePath)
 hashedFileObjectCodec fileKey hashKey =
   Hashed
-    <$> requiredField fileKey "Path to the file" .= hashed
+    <$> requiredFieldWith fileKey filePathCodec "Path to the file" .= hashed
     <*> optionalFieldWith hashKey hashCodec "Hash of the file" .= hash
 
 -- | An optional hashed file: 'Nothing' when the file key is absent.
@@ -45,7 +57,7 @@ optionalHashedFileObjectCodec :: Text -> Text -> JSONObjectCodec (Maybe (Hashed 
 optionalHashedFileObjectCodec fileKey hashKey =
   dimapCodec toG fromG $
     (,)
-      <$> optionalField fileKey "Path to the file" .= fst
+      <$> optionalFieldWith fileKey filePathCodec "Path to the file" .= fst
       <*> optionalFieldWith hashKey hashCodec "Hash of the file" .= snd
   where
     toG (Nothing, _) = Nothing
@@ -67,11 +79,11 @@ instance HasCodec RequiresNetworkMagic where
 -- | Configuration for byron era
 data ByronGenesisConfiguration = ByronGenesisConfiguration
   { byronGenesisFile :: !(Hashed FilePath)
-  , byronReqNetworkMagic :: !RequiresNetworkMagic
+  , byronReqNetworkMagic :: !(Maybe RequiresNetworkMagic)
   , byronPbftSignatureThresh :: !(Maybe Double)
   , byronSupportedProtocolVersionMajor :: !Word16
   , byronSupportedProtocolVersionMinor :: !Word16
-  , byronSupportedProtocolVersionAlt :: !Word8
+  , byronSupportedProtocolVersionAlt :: !(Maybe Word8)
   }
   deriving (Generic, Show)
 
@@ -79,18 +91,15 @@ byronGenesisObjectCodec :: JSONObjectCodec ByronGenesisConfiguration
 byronGenesisObjectCodec =
   ByronGenesisConfiguration
     <$> hashedFileObjectCodec "ByronGenesisFile" "ByronGenesisHash" .= byronGenesisFile
-    <*> optionalFieldWithDefault
-      "RequiresNetworkMagic"
-      RequiresNoMagic
-      "Whether network magic is required"
+    <*> optionalField "RequiresNetworkMagic" "Whether network magic is required"
       .= byronReqNetworkMagic
-    <*> optionalFieldWith "PBftSignatureThreshold" (codecViaAeson "Double") "Byron PBFT signature threshold"
+    <*> optionalFieldWith "PBftSignatureThreshold" doubleCodec "Byron PBFT signature threshold"
       .= byronPbftSignatureThresh
     <*> requiredField "LastKnownBlockVersion-Major" "Last known block version, major"
       .= byronSupportedProtocolVersionMajor
     <*> requiredField "LastKnownBlockVersion-Minor" "Last known block version, minor"
       .= byronSupportedProtocolVersionMinor
-    <*> optionalFieldWithDefault "LastKnownBlockVersion-Alt" 0 "Last known block version, alt"
+    <*> optionalField "LastKnownBlockVersion-Alt" "Last known block version, alt"
       .= byronSupportedProtocolVersionAlt
 
 -- | The genesis file (and optional hash) for the checkpoints.

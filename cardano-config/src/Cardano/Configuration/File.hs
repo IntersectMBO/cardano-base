@@ -9,6 +9,9 @@ module Cardano.Configuration.File (
   parseConfigurationFilesWith,
   UnknownKeyPolicy (..),
 
+  -- * Defaults
+  componentDefaults,
+
   -- * Errors
   ConfigurationParsingError (..),
 
@@ -38,7 +41,8 @@ import Cardano.Configuration.File.Protocol
 import Cardano.Configuration.File.Storage
 import Cardano.Configuration.File.Testing
 import Cardano.Configuration.File.Tracing
-import Cardano.Configuration.Schema (recognisedKeys)
+import Cardano.Configuration.Schema (componentPropertyNames, recognisedKeys)
+import Data.Maybe (catMaybes)
 import Control.Exception
 import Control.Monad (unless)
 import Data.Aeson (FromJSON, Value (..), parseJSON)
@@ -183,6 +187,17 @@ loadBaseDefault section = do
     then Just <$> decodeValueFile (Just section) fp
     else pure Nothing
 
+-- | The per-component base defaults (@defaults\/<Component>.json@), for schema
+-- generation. Keyed by component name; components without a defaults file are
+-- omitted. These are the same files the resolver merges as the base layer, so
+-- the documented defaults match the applied ones.
+componentDefaults :: IO [(T.Text, Value)]
+componentDefaults =
+  catMaybes
+    <$> mapM
+      (\name -> fmap (name,) <$> loadBaseDefault (T.unpack name))
+      (map fst componentPropertyNames)
+
 -- | The configuration layer the user supplied for a section: the top-level
 -- object when the section key is absent (its keys live there), an inline object,
 -- a referenced sub-file, or a list of paths\/objects deep-merged in order (a
@@ -278,6 +293,7 @@ parseConfigurationFilesWith policy cfgFile = do
   mainValue <- decodeValueFile Nothing cfgFile
   (version, configValue) <- splitEnvelope mainValue
   checkUnknownKeys policy cfgFile configValue
+  checkShadowedKeys policy cfgFile configValue
   let root = takeDirectory cfgFile
   case version of
     1 -> do
@@ -308,6 +324,7 @@ loadCustomLayer policy cfgFile root configValue =
       | Just src <- KM.lookup "Custom" o -> do
           custom <- loadSectionSource root "Custom" src
           checkUnknownKeys policy cfgFile custom
+          checkShadowedKeys policy cfgFile custom
           pure (Just custom)
     _ -> pure Nothing
 
@@ -320,6 +337,37 @@ checkUnknownKeys policy cfgFile value =
       let unknown = [k | k <- map K.toText (KM.keys o), k `notElem` recognisedKeys]
       unless (null unknown) $ do
         let msg = "unrecognised configuration key(s): " <> intercalate ", " (map T.unpack unknown)
+        case policy of
+          RejectUnknownKeys -> throwIO $ ConfigurationParsingError (Just cfgFile) Nothing [] msg
+          WarnUnknownKeys -> hPutStrLn stderr ("Warning: " <> msg <> " (ignored)")
+    _ -> pure ()
+
+-- | Detect top-level keys shadowed by a component supplied as its own section:
+-- when a section key (e.g. @Testing@) is present, that component's keys are read
+-- from the section, so any sibling top-level key belonging to the same component
+-- (e.g. a top-level @DijkstraGenesisFile@) is silently ignored. Such a key is
+-- almost certainly a mistake, so warn (or, under 'RejectUnknownKeys', reject).
+--
+-- This looks only at the keys the user wrote in this object; the per-component
+-- base defaults are merged separately inside 'parseSection' and never appear
+-- here, so they cannot trigger it.
+checkShadowedKeys :: UnknownKeyPolicy -> FilePath -> Value -> IO ()
+checkShadowedKeys policy cfgFile value =
+  case value of
+    Object o -> do
+      let present = map K.toText (KM.keys o)
+          shadowed =
+            [ (section, key)
+            | (section, keys) <- componentPropertyNames
+            , section `elem` present
+            , key <- keys
+            , key `elem` present
+            ]
+      unless (null shadowed) $ do
+        let describe (section, key) = T.unpack key <> " (shadowed by the " <> T.unpack section <> " section)"
+            msg =
+              "top-level configuration key(s) ignored because their component is given as a separate section: "
+                <> intercalate ", " (map describe shadowed)
         case policy of
           RejectUnknownKeys -> throwIO $ ConfigurationParsingError (Just cfgFile) Nothing [] msg
           WarnUnknownKeys -> hPutStrLn stderr ("Warning: " <> msg <> " (ignored)")

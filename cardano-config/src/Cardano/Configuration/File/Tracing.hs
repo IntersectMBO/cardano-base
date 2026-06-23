@@ -13,6 +13,7 @@ module Cardano.Configuration.File.Tracing (
 ) where
 
 import Autodocodec
+import Cardano.Configuration.Common (filePathFormatMarker)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Text (Text)
 import GHC.Generics (Generic)
@@ -33,7 +34,7 @@ instance HasCodec TracingConfiguration where
       TracingConfiguration
         <$> optionalFieldWith
           "HermodTracing"
-          (codec @Text)
+          (codec @Text <?> filePathFormatMarker)
           ( "Tracing configuration as a path to a separate file holding it. "
               <> "Consumed by the node tracing system (trace-dispatcher), not parsed or validated by cardano-config."
           )

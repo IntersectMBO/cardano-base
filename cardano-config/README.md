@@ -66,6 +66,7 @@ Network:
 ```console
 $ cardano-config schema Network
 {
+    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/Network.schema.json",
     "$schema": "http://json-schema.org/draft-07/schema#",
     "description": "NetworkConfiguration",
     "properties": {
@@ -78,8 +79,9 @@ $ cardano-config schema Network
 ```console
 $ cardano-config schema
 {
+    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/config.schema.json",
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "description": "The cardano-node configuration (single-file form)",
+    "description": "The cardano-node configuration. Each component's keys may be given directly at the top level (single-file form) or, per component, under that component's section key ... (split-file form); ...",
     "properties": {
         "AcceptedConnectionsLimit": {
 ...
@@ -148,6 +150,21 @@ configuration (`schemas/config.schema.json`) and one per component
 (`schemas/<Component>.schema.json`). The test-suite asserts they match the codecs
 (so they cannot drift); regenerate them with `scripts/gen-schemas.sh`.
 
+The schemas are draft-07 and post-processed to be as useful as possible:
+
+- every scalar field declares a `type`; string enumerations use `enum`;
+- a field that is a filesystem path keeps `"type": "string"` but adds
+  `"format": "path"` (JSON Schema has no dedicated path type, so `format` is the
+  standard way to flag one), so tooling can treat paths specially;
+- every schema and property carries a `title`, and every document an `$id`, so
+  documentation generators such as
+  [`jsonschema2md`](https://github.com/adobe/jsonschema2md) render names instead
+  of `Untitled`/`undefined` (both keywords are standard draft-07, not extensions);
+- `config.schema.json` covers **both** the single-file form (all keys at the top
+  level) and the split-file form (a component given under its section key as a
+  sub-file path, an inline object, or a list of them), plus the
+  `{ Version, Configuration }` envelope and the `Custom` layer.
+
 To see the *resolved* configuration for a given file — the per-component
 defaults, the configuration file (including any [`Custom`](#the-custom-override-layer)
 override) and the CLI flags, all merged and resolved exactly as the node does it
@@ -166,6 +183,14 @@ $ cardano-config resolve --config mainnet-config.yaml
 Keys that none of the parsers below recognise produce a **warning** by default
 (so typos are noticed); `parseConfigurationFilesWith RejectUnknownKeys` turns
 them into a hard error instead.
+
+The same policy governs **shadowed keys**: if a component is given as its own
+section (e.g. a `Testing` section key) *and* one of that component's keys also
+appears at the top level (e.g. a top-level `DijkstraGenesisFile`), the top-level
+value is ignored — the section wins. That is almost always a mistake, so it
+warns by default and is rejected under `RejectUnknownKeys`. (This concerns only
+the keys you write; the per-component defaults are merged separately and never
+trigger it.)
 
 The recognised keys are grouped into the following components. Every component
 may be given inline, as a sub-file path, or as a list of sources (see
@@ -342,10 +367,14 @@ check keeps the copies here aligned with upstream.
 To keep new fields from each making an ad-hoc choice:
 
 - **Where defaults live.** A field that has a real default carries it in the
-  `defaults/` files (so the schema only enumerates keys and types, and defaults
-  are applied by layering, not baked into the codecs). A field whose "unset"
-  state is meaningful (an override, a hash, a feature toggle) stays `Maybe` and
-  its default simply *is* "none".
+  `defaults/` files, not in the codecs; defaults are applied by layering. The
+  schema's `default` keywords are filled in from those same files, so the
+  documented default is exactly the one the resolver applies. A field whose
+  "unset" state is meaningful (an override, a hash, a feature toggle) stays
+  `Maybe` and its default simply *is* "none". The sole exception is the
+  `LowLevelGenesisOptions` toggles (`EnableCSJ`, …): they only apply in
+  `GenesisMode` (the default mode is `PraosMode`), so they cannot live in the
+  base files and keep their defaults in the codec.
 - **Where validation lives.** Structural validation of a single value lives in
   its codec (and thus in the schema). Cross-field validation — constraints that
   span CLI and file values or several components — lives in `resolveConfiguration`
