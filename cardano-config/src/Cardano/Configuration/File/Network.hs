@@ -170,13 +170,17 @@ finalizeNetwork c = do
   acceptedLimit <- requireField "AcceptedConnectionsLimit" (acceptedConnectionsLimit c)
   syncRoot <- requireField "SyncTargetNumberOfRootPeers" (syncTargetOfRootPeers c)
   syncKnown <- requireField "SyncTargetNumberOfKnownPeers" (syncTargetOfKnownPeers c)
-  syncEstablished <- requireField "SyncTargetNumberOfEstablishedPeers" (syncTargetOfEstablishedPeers c)
+  syncEstablished <-
+    requireField "SyncTargetNumberOfEstablishedPeers" (syncTargetOfEstablishedPeers c)
   syncActive <- requireField "SyncTargetNumberOfActivePeers" (syncTargetOfActivePeers c)
-  syncKnownBig <- requireField "SyncTargetNumberOfKnownBigLedgerPeers" (syncTargetOfKnownBigLedgerPeers c)
+  syncKnownBig <-
+    requireField "SyncTargetNumberOfKnownBigLedgerPeers" (syncTargetOfKnownBigLedgerPeers c)
   syncEstBig <-
     requireField "SyncTargetNumberOfEstablishedBigLedgerPeers" (syncTargetOfEstablishedBigLedgerPeers c)
-  syncActiveBig <- requireField "SyncTargetNumberOfActiveBigLedgerPeers" (syncTargetOfActiveBigLedgerPeers c)
-  minBigTrusted <- requireField "MinBigLedgerPeersForTrustedState" (minBigLedgerPeersForTrustedState c)
+  syncActiveBig <-
+    requireField "SyncTargetNumberOfActiveBigLedgerPeers" (syncTargetOfActiveBigLedgerPeers c)
+  minBigTrusted <-
+    requireField "MinBigLedgerPeersForTrustedState" (minBigLedgerPeersForTrustedState c)
   responderCore <- requireField "ResponderCoreAffinityPolicy" (responderCoreAffinityPolicy c)
   experimental <- requireField "ExperimentalProtocolsEnabled" (experimentalProtocolsEnabled c)
   txLogic <- requireField "TxSubmissionLogicVersion" (txSubmissionLogicVersion c)

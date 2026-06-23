@@ -122,7 +122,8 @@ schemaFile path expected = do
     Left err -> report label (Just ("could not read " <> path <> ": " <> err))
     Right committed
       | committed == expected -> report label Nothing
-      | otherwise -> report label (Just (path <> " is out of date; regenerate with scripts/gen-schemas.sh"))
+      | otherwise ->
+          report label (Just (path <> " is out of date; regenerate with scripts/gen-schemas.sh"))
 
 report :: String -> Maybe String -> IO Bool
 report label = \case

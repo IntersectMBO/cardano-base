@@ -13,7 +13,6 @@ module Cardano.Configuration.CliArgs (
   KESSource (..),
 
   -- * Individual option parsers
-  -- $reuse
 
   -- These are exported so that other tools (e.g. @cardano-cli@) can reuse the
   -- exact same flags, metavars and help text as @cardano-node@.
@@ -345,7 +344,8 @@ parseHostPort s = do
   portStr <- case uriPort auth of
     ':' : p -> Right p
     _ -> Left "parseHostPort: missing port."
-  p <- maybe (Left ("parseHostPort: non-numeric port " ++ show portStr)) Right (readMaybe @Integer portStr)
+  p <-
+    maybe (Left ("parseHostPort: non-numeric port " ++ show portStr)) Right (readMaybe @Integer portStr)
   if 0 <= p && p <= 65535
     then Right (Text.pack host, fromInteger p)
     else Left ("parseHostPort: port " ++ show p ++ " out of range: 0 - 65535.")

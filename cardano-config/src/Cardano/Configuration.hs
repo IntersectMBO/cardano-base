@@ -167,7 +167,8 @@ defaultConfigChecks =
 
 -- | Run a set of consistency checks over a resolved configuration, collecting
 -- the descriptions of every check that fails.
-runConfigChecks :: [ConfigCheck] -> NodeConfiguration -> Either ConfigResolutionError NodeConfiguration
+runConfigChecks ::
+  [ConfigCheck] -> NodeConfiguration -> Either ConfigResolutionError NodeConfiguration
 runConfigChecks checks nc =
   case [checkDescription c | c <- checks, not (checkHolds c nc)] of
     [] -> Right nc
