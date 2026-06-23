@@ -3,8 +3,10 @@
 -- reliable validation we have, since the parser shares its codec with the
 -- schema.
 --
--- Run from the package directory (as @cabal test@ does), so the @examples/@
--- paths resolve.
+-- The @examples/@ and @schemas/@ fixtures are resolved through
+-- 'getDataFileName' (they are packaged as @data-files@), so the tests do not
+-- depend on the current working directory and work under @cabal test@, Nix and
+-- a source distribution alike.
 module Main (main) where
 
 import Cardano.Configuration (resolveConfiguration)
@@ -12,11 +14,12 @@ import Cardano.Configuration.CliArgs (parseCliArgs)
 import Cardano.Configuration.File
 import Cardano.Configuration.Schema (configurationSchemasWithDefaults, wholeConfigSchemaWithDefaults)
 import Control.Exception (SomeException, evaluate, try)
-import Data.Aeson (Value, eitherDecodeFileStrict')
+import Data.Aeson (FromJSON, Value, eitherDecodeFileStrict')
 import Data.Functor.Identity (runIdentity)
 import Data.List (isInfixOf)
 import qualified Data.Text as T
 import Options.Applicative (defaultPrefs, execParserPure, getParseResult, info)
+import Paths_cardano_config (getDataFileName)
 import System.Exit (exitFailure)
 
 main :: IO ()
@@ -25,23 +28,19 @@ main = do
     sequence
       [ decodeCase
           "examples/storage.json"
-          (eitherDecodeFileStrict' "examples/storage.json" :: IO (Either String (StorageConfiguration Maybe)))
+          (decodeData "examples/storage.json" :: IO (Either String (StorageConfiguration Maybe)))
       , decodeCase
           "examples/consensus.json"
-          ( eitherDecodeFileStrict' "examples/consensus.json" ::
-              IO (Either String (ConsensusConfiguration Maybe))
-          )
+          (decodeData "examples/consensus.json" :: IO (Either String (ConsensusConfiguration Maybe)))
       , decodeCase
           "examples/protocol.json"
-          (eitherDecodeFileStrict' "examples/protocol.json" :: IO (Either String (ProtocolConfiguration Maybe)))
+          (decodeData "examples/protocol.json" :: IO (Either String (ProtocolConfiguration Maybe)))
       , decodeCase
           "examples/network.json"
-          (eitherDecodeFileStrict' "examples/network.json" :: IO (Either String (NetworkConfiguration Maybe)))
+          (decodeData "examples/network.json" :: IO (Either String (NetworkConfiguration Maybe)))
       , decodeCase
           "examples/localconnections.json"
-          ( eitherDecodeFileStrict' "examples/localconnections.json" ::
-              IO (Either String (LocalConnectionsConfig Maybe))
-          )
+          (decodeData "examples/localconnections.json" :: IO (Either String (LocalConnectionsConfig Maybe)))
       , parseCase "examples/fullconfig.json"
       , parseCase "examples/split.json"
       , parseCase "examples/split-all.json"
@@ -58,6 +57,11 @@ main = do
       putStrLn $ show failed <> " check(s) failed"
       exitFailure
 
+-- | Decode a packaged data file (resolved via 'getDataFileName') through its
+-- 'FromJSON' instance.
+decodeData :: FromJSON a => FilePath -> IO (Either String a)
+decodeData p = getDataFileName p >>= eitherDecodeFileStrict'
+
 -- | Decode a single example via its 'FromJSON' instance, forcing the result.
 decodeCase :: Show a => String -> IO (Either String a) -> IO Bool
 decodeCase label act = do
@@ -71,7 +75,8 @@ decodeCase label act = do
 -- | Parse a full configuration file (exercising sub-files).
 parseCase :: FilePath -> IO Bool
 parseCase fp = do
-  res <- try (parseConfigurationFiles fp >>= \c -> evaluate (length (show c)))
+  path <- getDataFileName fp
+  res <- try (parseConfigurationFiles path >>= \c -> evaluate (length (show c)))
   report fp $ case res of
     Left (e :: SomeException) -> Just (show e)
     Right _ -> Nothing
@@ -83,7 +88,8 @@ parseCase fp = do
 listMergeCase :: IO Bool
 listMergeCase = do
   let label = "examples/split-list.json (list merge, later overrides)"
-  res <- try (parseConfigurationFiles "examples/split-list.json")
+  path <- getDataFileName "examples/split-list.json"
+  res <- try (parseConfigurationFiles path)
   case res of
     Left (e :: SomeException) -> report label (Just (show e))
     Right c ->
@@ -93,12 +99,14 @@ listMergeCase = do
             else report label (Just ("expected TargetNumberOfActivePeers = 99, got " <> show active))
 
 -- | A top-level key belonging to a component that is also supplied as its own
--- section (here a top-level @DijkstraGenesisFile@ alongside a @Testing@ section)
--- is shadowed. Under the default policy this only warns, so parsing succeeds.
+-- section (here a top-level @DijkstraGenesisFile@ alongside a @TestingConfig@
+-- section) is shadowed. Under the default policy this only warns, so parsing
+-- succeeds.
 shadowWarnCase :: IO Bool
 shadowWarnCase = do
   let label = "examples/shadow.json (shadowed top-level key warns, still parses)"
-  res <- try (parseConfigurationFiles "examples/shadow.json" >>= \c -> evaluate (length (show c)))
+  path <- getDataFileName "examples/shadow.json"
+  res <- try (parseConfigurationFiles path >>= \c -> evaluate (length (show c)))
   report label $ case res of
     Left (e :: SomeException) -> Just (show e)
     Right _ -> Nothing
@@ -108,7 +116,8 @@ shadowWarnCase = do
 shadowRejectCase :: IO Bool
 shadowRejectCase = do
   let label = "examples/shadow.json (shadowed top-level key rejected under strict policy)"
-  res <- try (parseConfigurationFilesWith RejectUnknownKeys "examples/shadow.json")
+  path <- getDataFileName "examples/shadow.json"
+  res <- try (parseConfigurationFilesWith RejectUnknownKeys path)
   case res of
     Left (e :: SomeException)
       | "DijkstraGenesisFile" `isInfixOf` show e -> report label Nothing
@@ -121,7 +130,8 @@ shadowRejectCase = do
 resolveCase :: IO Bool
 resolveCase = do
   let label = "resolveConfiguration examples/fullconfig.json"
-  cfg <- parseConfigurationFiles "examples/fullconfig.json"
+  path <- getDataFileName "examples/fullconfig.json"
+  cfg <- parseConfigurationFiles path
   case getParseResult (execParserPure defaultPrefs (info parseCliArgs mempty) []) of
     Nothing -> report label (Just "could not build default CLI arguments")
     Just cli -> case resolveConfiguration cli cfg of
@@ -144,7 +154,8 @@ schemaCases = do
 schemaFile :: FilePath -> Value -> IO Bool
 schemaFile path expected = do
   let label = path <> " (matches codecs)"
-  res <- eitherDecodeFileStrict' path :: IO (Either String Value)
+  full <- getDataFileName path
+  res <- eitherDecodeFileStrict' full :: IO (Either String Value)
   case res of
     Left err -> report label (Just ("could not read " <> path <> ": " <> err))
     Right committed

@@ -116,6 +116,12 @@ test-suite cardano-config-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   hs-source-dirs: test
+  autogen-modules:
+    Paths_cardano_config
+
+  other-modules:
+    Paths_cardano_config
+
   build-depends:
     aeson,
     base,
