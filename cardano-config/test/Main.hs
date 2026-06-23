@@ -14,6 +14,7 @@ import Cardano.Configuration.Schema (configurationSchemas, wholeConfigSchema)
 import Control.Exception (SomeException, evaluate, try)
 import Data.Aeson (Value, eitherDecodeFileStrict')
 import Data.Functor.Identity (runIdentity)
+import Data.List (isInfixOf)
 import qualified Data.Text as T
 import Options.Applicative (defaultPrefs, execParserPure, getParseResult, info)
 import System.Exit (exitFailure)
@@ -45,6 +46,8 @@ main = do
       , parseCase "examples/split.json"
       , parseCase "examples/split-all.json"
       , listMergeCase
+      , customCase "examples/custom.json (inline override)" "examples/custom.json"
+      , customCase "examples/custom-split.json (override from file)" "examples/custom-split.json"
       , resolveCase
       ]
   schemaResults <- schemaCases
@@ -88,6 +91,28 @@ listMergeCase = do
        in if active == Just 99
             then report label Nothing
             else report label (Just ("expected TargetNumberOfActivePeers = 99, got " <> show active))
+
+-- | The top-level @Custom@ layer (inline or read from a file) is deep-merged on
+-- top of the rest of the configuration, so it overrides individual keys while
+-- leaving its siblings intact. Both example files set @DatabasePath@ to
+-- @base/db@ and @LedgerDB.QueryBatchSize@ to @100000@, then override only those
+-- two via @Custom@ — @LedgerDB.Backend@ (@V2LSM@) must survive the merge.
+customCase :: String -> FilePath -> IO Bool
+customCase label fp = do
+  res <- try (parseConfigurationFiles fp)
+  case res of
+    Left (e :: SomeException) -> report label (Just (show e))
+    Right c ->
+      let shown = show (runIdentity (storageConfiguration c))
+          expected =
+            [ "custom/db" -- DatabasePath overridden by Custom
+            , "queryBatchSize = Just 42" -- QueryBatchSize overridden by Custom
+            , "V2LSM" -- sibling key preserved by the deep merge
+            ]
+          missing = filter (not . (`isInfixOf` shown)) expected
+       in if null missing
+            then report label Nothing
+            else report label (Just ("missing " <> show missing <> " in " <> shown))
 
 -- | Resolving a parsed configuration with default CLI arguments must succeed and
 -- produce a complete (@Identity@) configuration, which exercises that the base

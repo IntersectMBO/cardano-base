@@ -1,0 +1,16 @@
+{
+  "AlonzoGenesisFile": "mainnet-alonzo-genesis.json",
+  "ByronGenesisFile": "mainnet-byron-genesis.json",
+  "ConwayGenesisFile": "mainnet-conway-genesis.json",
+  "ShelleyGenesisFile": "mainnet-shelley-genesis.json",
+  "LastKnownBlockVersion-Major": 3,
+  "LastKnownBlockVersion-Minor": 0,
+  "DatabasePath": "base/db",
+  "LedgerDB": {
+    "Backend": "V2LSM",
+    "LSMDatabasePath": "lsm",
+    "LSMExportPath": "lsm-export",
+    "QueryBatchSize": 100000
+  },
+  "Custom": "custom-override.json"
+}

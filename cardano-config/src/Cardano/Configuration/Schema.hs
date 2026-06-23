@@ -131,7 +131,7 @@ recognisedKeys =
   nub $
     envelopeKeys <> sectionKeys <> concatMap (propertyNames . snd) rawComponentSchemas
   where
-    envelopeKeys = ["Version", "Configuration"]
+    envelopeKeys = ["Version", "Configuration", "Custom"]
     sectionKeys = map fst rawComponentSchemas
     propertyNames (Object o)
       | Just (Object p) <- KM.lookup "properties" o = map K.toText (KM.keys p)

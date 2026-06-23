@@ -1,0 +1,6 @@
+{
+  "DatabasePath": "custom/db",
+  "LedgerDB": {
+    "QueryBatchSize": 42
+  }
+}
