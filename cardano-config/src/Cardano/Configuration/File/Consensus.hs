@@ -21,9 +21,6 @@ data ConsensusMode
   | GenesisMode GenesisConfigFlags
   deriving (Generic, Show)
 
-instance Default ConsensusMode where
-  def = PraosMode
-
 -- | In which mode should the node run.
 newtype ConsensusConfiguration f = ConsensusConfiguration {getConsensusConfiguration :: f ConsensusMode}
 

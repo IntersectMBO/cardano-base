@@ -106,9 +106,6 @@ data LedgerDbBackendSelector
     V2LSM (Maybe FilePath) (Maybe FilePath)
   deriving (Generic, Show)
 
-instance Default LedgerDbBackendSelector where
-  def = V2InMemory
-
 -- | The @Backend@, @LSMDatabasePath@ and @LSMExportPath@ keys, parsed together
 -- as they describe a single choice of backend. @Backend@ is optional here (its
 -- default, @V2InMemory@, comes from @defaults/Storage.json@, not the codec), so

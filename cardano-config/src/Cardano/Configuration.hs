@@ -91,7 +91,6 @@ import qualified Cardano.Configuration.File.Protocol as File
 import qualified Cardano.Configuration.File.Storage as File
 import Control.Applicative ((<|>))
 import Control.Exception (Exception)
-import Data.Default
 import Data.Functor.Identity
 import Data.IP
 import Data.List.NonEmpty (NonEmpty (..))
@@ -210,26 +209,24 @@ resolveConfigurationWith checks cli file = do
           , File.rpcSocketPath = CLI.rpcSocketPathCLI cli <|> File.rpcSocketPath lcc
           }
   localConnections <- finalize $ File.finalizeLocalConnections lccWithCli
+  -- Storage, consensus and the non-producing flag take their value from the CLI
+  -- or the file (whose always-applied base-default layer supplies the default).
+  -- A missing value is a resolution error, not a hard-coded fallback, so the
+  -- defaults live solely in the defaults/ files.
+  let sc = runIdentity $ File.storageConfiguration file
+      pc = runIdentity $ File.protocolConfiguration file
+  dbPath <- finalize $ require "DatabasePath" (CLI.databasePathCLI cli <|> File.databasePath sc)
+  consensusMode <-
+    finalize $
+      require "ConsensusMode" (getConsensusConfiguration (runIdentity (File.consensusConfiguration file)))
+  startNonProducing <-
+    finalize $
+      require "StartAsNonProducingNode" (CLI.startAsNonProducingNode cli <|> File.startAsNonProducingNode pc)
   runConfigChecks checks $
     NodeConfiguration
-      { storageConfiguration =
-          let sc = runIdentity $ File.storageConfiguration file
-           in File.adjustDbPath
-                sc
-                (fromMaybe def $ CLI.databasePathCLI cli <|> File.databasePath sc)
-      , consensusConfiguration =
-          ConsensusConfiguration $
-            Identity $
-              fromMaybe def $
-                getConsensusConfiguration (runIdentity (File.consensusConfiguration file))
-      , protocolConfiguration =
-          let pc = runIdentity $ File.protocolConfiguration file
-           in pc
-                { File.startAsNonProducingNode =
-                    Identity $
-                      fromMaybe False $
-                        CLI.startAsNonProducingNode cli <|> File.startAsNonProducingNode pc
-                }
+      { storageConfiguration = File.adjustDbPath sc dbPath
+      , consensusConfiguration = ConsensusConfiguration (Identity consensusMode)
+      , protocolConfiguration = pc {File.startAsNonProducingNode = Identity startNonProducing}
       , networkConfiguration = network
       , localConnectionsConfig = localConnections
       , testingConfiguration = testing
@@ -247,3 +244,4 @@ resolveConfigurationWith checks cli file = do
       }
   where
     finalize = either (\m -> Left (ConfigResolutionError (m :| []))) Right
+    require name = maybe (Left (name <> " has no value and no base default")) Right

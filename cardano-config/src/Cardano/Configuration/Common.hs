@@ -11,7 +11,6 @@ module Cardano.Configuration.Common (
 
 import Autodocodec
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Default
 import Data.Text (Text)
 import GHC.Generics
 import Options.Applicative
@@ -42,9 +41,6 @@ data NodeDatabasePaths
     -- volatile data in a different (possible faster) directory
     SplitDB FilePath FilePath
   deriving (Generic, Show)
-
-instance Default NodeDatabasePaths where
-  def = SingleDB "mainnet/db"
 
 -- | A single database is a JSON string (a path); a split database is a JSON
 -- object. We dispatch on that shape so a malformed split-database object reports
