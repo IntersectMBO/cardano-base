@@ -64,6 +64,16 @@ configuration (`schemas/config.schema.json`) and one per component
 (`schemas/<Component>.schema.json`). The test-suite asserts they match the codecs
 (so they cannot drift); regenerate them with `scripts/gen-schemas.sh`.
 
+To see the *resolved* configuration for a given file — the per-component
+defaults, the configuration file (including any [`Custom`](#the-custom-override-layer)
+override) and the CLI flags, all merged and resolved exactly as the node does it
+— use the `cardano-config-resolve` executable. It accepts the same flags as the
+node (`--config` selects the file):
+
+```console
+$ cardano-config-resolve --config mainnet-config.yaml
+```
+
 Keys that none of the parsers below recognise produce a **warning** by default
 (so typos are noticed); `parseConfigurationFilesWith RejectUnknownKeys` turns
 them into a hard error instead.

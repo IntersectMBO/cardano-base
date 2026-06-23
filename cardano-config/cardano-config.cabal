@@ -106,6 +106,17 @@ executable cardano-config-schema
     LambdaCase
     OverloadedStrings
 
+executable cardano-config-resolve
+  import: warnings
+  main-is: Main.hs
+  hs-source-dirs: resolve
+  build-depends:
+    base,
+    cardano-config,
+    optparse-applicative,
+
+  default-language: Haskell2010
+
 test-suite cardano-config-test
   import: warnings
   type: exitcode-stdio-1.0
