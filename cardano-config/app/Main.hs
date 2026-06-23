@@ -1,9 +1,9 @@
 -- | The @cardano-config@ command-line tool. It exposes two subcommands:
 --
 --   * @cardano-config resolve@ resolves a @cardano-node@ configuration
---     (per-component defaults, the configuration file including any @Custom@
---     override, and the CLI flags), merging and resolving it exactly as a node
---     would, and prints the complete result as YAML.
+--     (per-component defaults, the configuration file and the CLI flags),
+--     merging and resolving it exactly as a node would, and prints the complete
+--     result as YAML.
 --
 --   * @cardano-config schema@ dumps the configuration JSON Schema (for the
 --     whole configuration or a single component), derived from the same codecs.
@@ -64,8 +64,8 @@ commandParser =
         ( info
             (Resolve <$> parseCliArgs)
             ( progDesc
-                ( "Resolve a cardano-node configuration (defaults + configuration file, "
-                    <> "including any Custom override, + CLI flags) and print the complete result as YAML."
+                ( "Resolve a cardano-node configuration (defaults + configuration file + CLI flags) "
+                    <> "and print the complete result as YAML."
                 )
             )
         )

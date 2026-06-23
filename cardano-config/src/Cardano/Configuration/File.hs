@@ -234,19 +234,14 @@ parseSection ::
   FilePath ->
   -- | The (unwrapped) configuration object.
   Value ->
-  -- | The resolved top-level @Custom@ override layer, if any. Deep-merged on top
-  -- of the base defaults and the user's layer, so it overrides both.
-  Maybe Value ->
   -- | The section name.
   String ->
   IO a
-parseSection root configValue custom section = do
+parseSection root configValue section = do
   base <- loadBaseDefault section
   user <- sectionUserLayer root configValue section
-  override <- traverse (\c -> sectionUserLayer root c section) custom
   let withBase = maybe user (`mergeValues` user) base
-      withCustom = maybe withBase (mergeValues withBase) override
-  runCodec Nothing section withCustom
+  runCodec Nothing section withBase
 
 -- | Split the optional configuration envelope @{ \"Version\": N,
 -- \"Configuration\": {..} }@ into the version and the configuration object. A
@@ -296,9 +291,7 @@ parseConfigurationFilesWith policy cfgFile = do
   checkShadowedKeys policy cfgFile configValue
   let root = takeDirectory cfgFile
   case version of
-    1 -> do
-      custom <- loadCustomLayer policy cfgFile root configValue
-      parseConfigurationVersion1 root (dropKey "Custom" configValue) custom
+    1 -> parseConfigurationVersion1 root configValue
     n ->
       throwIO $
         ConfigurationParsingError
@@ -306,27 +299,6 @@ parseConfigurationFilesWith policy cfgFile = do
           Nothing
           [Key "Version"]
           ("unsupported configuration version: " <> show n)
-
--- | Drop a top-level key from a configuration object (a no-op for non-objects).
-dropKey :: String -> Value -> Value
-dropKey k (Object o) = Object (KM.delete (K.fromString k) o)
-dropKey _ v = v
-
--- | Resolve the optional top-level @Custom@ override layer. Its value is an
--- inline object or a path to a JSON\/YAML file holding one; either way it is a
--- whole-configuration object (the single-file form) that is deep-merged on top
--- of every other file layer, so it overrides them. CLI arguments still take
--- precedence over it. Returns 'Nothing' when no @Custom@ key is present.
-loadCustomLayer :: UnknownKeyPolicy -> FilePath -> FilePath -> Value -> IO (Maybe Value)
-loadCustomLayer policy cfgFile root configValue =
-  case configValue of
-    Object o
-      | Just src <- KM.lookup "Custom" o -> do
-          custom <- loadSectionSource root "Custom" src
-          checkUnknownKeys policy cfgFile custom
-          checkShadowedKeys policy cfgFile custom
-          pure (Just custom)
-    _ -> pure Nothing
 
 -- | Check the top-level configuration keys against the recognised ones, warning
 -- on (or, under 'RejectUnknownKeys', rejecting) any that are unrecognised.
@@ -378,20 +350,16 @@ checkShadowedKeys policy cfgFile value =
 parseConfigurationVersion1 ::
   -- | The directory sub-file paths are resolved against.
   FilePath ->
-  -- | The configuration object (with the @Custom@ key removed).
+  -- | The configuration object.
   Value ->
-  -- | The resolved top-level @Custom@ override layer, if any (see
-  -- 'loadCustomLayer'). Deep-merged on top of every section so it overrides the
-  -- rest of the file.
-  Maybe Value ->
   IO NodeConfigurationFromFile
-parseConfigurationVersion1 root configValue custom =
+parseConfigurationVersion1 root configValue =
   NodeConfigurationFromFileV1
-    <$> (Identity <$> parseSection root configValue custom "Storage")
-    <*> (Identity <$> parseSection root configValue custom "Consensus")
-    <*> (Identity <$> parseSection root configValue custom "Protocol")
-    <*> (Identity <$> parseSection root configValue custom "Network")
-    <*> (Identity <$> parseSection root configValue custom "LocalConnections")
-    <*> (Identity <$> parseSection root configValue custom "Testing")
-    <*> (Identity <$> parseSection root configValue custom "Mempool")
-    <*> runCodec Nothing "Tracing" (maybe configValue (mergeValues configValue) custom)
+    <$> (Identity <$> parseSection root configValue "Storage")
+    <*> (Identity <$> parseSection root configValue "Consensus")
+    <*> (Identity <$> parseSection root configValue "Protocol")
+    <*> (Identity <$> parseSection root configValue "Network")
+    <*> (Identity <$> parseSection root configValue "LocalConnections")
+    <*> (Identity <$> parseSection root configValue "Testing")
+    <*> (Identity <$> parseSection root configValue "Mempool")
+    <*> runCodec Nothing "Tracing" configValue

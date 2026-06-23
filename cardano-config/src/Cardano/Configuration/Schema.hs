@@ -127,10 +127,9 @@ configurationSchemas = [(name, component name s) | (name, s) <- rawComponentSche
 --     a non-empty list of paths\/objects deep-merged in order.
 --
 -- The whole document may additionally be wrapped in a @{ Version, Configuration
--- }@ envelope, and a top-level @Custom@ override layer may be supplied. Because
--- a mandatory key may be provided through any of these routes, the top-level
--- schema marks nothing as required (the mandatory keys are listed in its
--- description, and the inline section forms keep their own @required@).
+-- }@ envelope. Because a mandatory key may be provided through either form, the
+-- top-level schema marks nothing as required (the mandatory keys are listed in
+-- its description, and the inline section forms keep their own @required@).
 --
 -- Note: the tracing keys appear only as an opaque placeholder (resolved by the
 -- node's tracing system; see the module header).
@@ -148,12 +147,11 @@ wholeConfigSchema =
     -- The split-file form: each component also reachable under its section key.
     sectionRefProps =
       KM.fromList [(K.fromText name, sectionRef name raw) | (name, raw) <- rawComponentSchemas]
-    -- The envelope and override keys.
+    -- The envelope keys.
     envelopeProps =
       KM.fromList
         [ ("Version", versionRef)
         , ("Configuration", configurationRef)
-        , ("Custom", customRef)
         ]
 
 wholeDescription :: Text
@@ -164,8 +162,7 @@ wholeDescription =
     , "or, per component, under that component's section key as a path to a sub-file,"
     , "an inline object, or a non-empty list of paths/objects deep-merged in order"
     , "(split-file form); the two forms may be mixed."
-    , "The whole document may also be wrapped in a { Version, Configuration } envelope,"
-    , "and a top-level Custom layer may override individual keys."
+    , "The whole document may also be wrapped in a { Version, Configuration } envelope."
     , "Mandatory keys (in the single-file form): ByronGenesisFile, ShelleyGenesisFile,"
     , "AlonzoGenesisFile, ConwayGenesisFile, LastKnownBlockVersion-Major and"
     , "LastKnownBlockVersion-Minor."
@@ -232,20 +229,6 @@ configurationRef =
            )
     ]
 
-customRef :: Value
-customRef =
-  object
-    [ "$comment"
-        .= ( "A whole-configuration override layer: an inline object (single-file form) or a path to a"
-              <> " file holding one. Deep-merged on top of every other file layer; CLI flags still take precedence." ::
-              Text
-           )
-    , "anyOf"
-        .= [ pathRef "Path to a file holding the Custom override"
-           , object ["type" .= ("object" :: Text), "title" .= ("Custom override (inline)" :: Text)]
-           ]
-    ]
-
 -- | Every top-level configuration key the parsers recognise: the keys of all
 -- components (read at the top level in the single-file form), the section keys
 -- used to reference split sub-files, and the envelope keys. Used to detect
@@ -255,7 +238,7 @@ recognisedKeys =
   nub $
     envelopeKeys <> sectionKeys <> concatMap snd componentPropertyNames
   where
-    envelopeKeys = ["Version", "Configuration", "Custom"]
+    envelopeKeys = ["Version", "Configuration"]
     sectionKeys = map fst componentPropertyNames
 
 -- | The property names of each component (the keys it reads at the top level in

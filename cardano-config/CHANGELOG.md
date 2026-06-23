@@ -14,20 +14,15 @@
     (e.g. `jsonschema2md`) render names rather than `Untitled`/`undefined`. Each
     key's `default` is filled in from the `defaults/` files (the single source of
     truth for defaults), so the documented default matches the applied one. The
-    whole-configuration schema covers both the single-file and split-file forms,
-    the version envelope and the `Custom` layer.
-  * `cardano-config resolve` resolves a configuration (defaults + file +
-    `Custom` override + CLI flags) and prints the complete result as YAML,
-    using the documented configuration keys (`Cardano.Configuration.Render`
-    exposes this as `nodeConfigurationToJSON`).
+    whole-configuration schema covers both the single-file and split-file forms
+    and the version envelope.
+  * `cardano-config resolve` resolves a configuration (defaults + file + CLI
+    flags) and prints the complete result as YAML, using the documented
+    configuration keys (`Cardano.Configuration.Render` exposes this as
+    `nodeConfigurationToJSON`).
 * Configuration sources are layered with a deep merge: an always-applied
   per-component default (`defaults/`), then the configuration file (a value, a
-  sub-file path, or a list of them), then the optional top-level `Custom`
-  override layer (an inline object or a sub-file path), then CLI flags.
-* Top-level `Custom` key: a whole-configuration object (given inline or as a
-  path to a JSON/YAML file) deep-merged on top of every other file layer, so it
-  overrides individual keys while leaving their siblings intact. CLI arguments
-  still take precedence.
+  sub-file path, or a list of them), then CLI flags.
 * Optional `{ Version, Configuration }` envelope for forward-compatibility.
 * Structured parse errors (`ConfigurationParsingError`) and resolution-time
   cross-field checks (`ConfigCheck` / `ConfigResolutionError`).

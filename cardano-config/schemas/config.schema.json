@@ -1,7 +1,7 @@
 {
     "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/config.schema.json",
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "description": "The cardano-node configuration. Each component's keys may be given directly at the top level (single-file form) or, per component, under that component's section key as a path to a sub-file, an inline object, or a non-empty list of paths/objects deep-merged in order (split-file form); the two forms may be mixed. The whole document may also be wrapped in a { Version, Configuration } envelope, and a top-level Custom layer may override individual keys. Mandatory keys (in the single-file form): ByronGenesisFile, ShelleyGenesisFile, AlonzoGenesisFile, ConwayGenesisFile, LastKnownBlockVersion-Major and LastKnownBlockVersion-Minor.",
+    "description": "The cardano-node configuration. Each component's keys may be given directly at the top level (single-file form) or, per component, under that component's section key as a path to a sub-file, an inline object, or a non-empty list of paths/objects deep-merged in order (split-file form); the two forms may be mixed. The whole document may also be wrapped in a { Version, Configuration } envelope. Mandatory keys (in the single-file form): ByronGenesisFile, ShelleyGenesisFile, AlonzoGenesisFile, ConwayGenesisFile, LastKnownBlockVersion-Major and LastKnownBlockVersion-Minor.",
     "properties": {
         "AcceptedConnectionsLimit": {
             "description": "Limits on accepted connections\nAcceptedConnectionsLimit",
@@ -259,22 +259,6 @@
             "description": "Hash of the file\nBlake2b_256 hash",
             "title": "ConwayGenesisHash",
             "type": "string"
-        },
-        "Custom": {
-            "anyOf": [
-                {
-                    "description": "Path to a file holding the Custom override",
-                    "format": "path",
-                    "title": "File path",
-                    "type": "string"
-                },
-                {
-                    "title": "Custom override (inline)",
-                    "type": "object"
-                }
-            ],
-            "description": "A whole-configuration override layer: an inline object (single-file form) or a path to a file holding one. Deep-merged on top of every other file layer; CLI flags still take precedence.",
-            "title": "Custom"
         },
         "DatabasePath": {
             "anyOf": [

@@ -163,11 +163,11 @@ The schemas are draft-07 and post-processed to be as useful as possible:
 - `config.schema.json` covers **both** the single-file form (all keys at the top
   level) and the split-file form (a component given under its section key as a
   sub-file path, an inline object, or a list of them), plus the
-  `{ Version, Configuration }` envelope and the `Custom` layer.
+  `{ Version, Configuration }` envelope.
 
 To see the *resolved* configuration for a given file — the per-component
-defaults, the configuration file (including any [`Custom`](#the-custom-override-layer)
-override) and the CLI flags, all merged and resolved exactly as the node does it
+defaults and the configuration file, plus the CLI flags, all merged and resolved
+exactly as the node does it
 — use the `cardano-config` executable's `resolve` subcommand. It accepts the same
 flags as the node (`--config` selects the file) and prints the result as YAML,
 using the same documented keys as the input (each component under its name, with
@@ -323,40 +323,7 @@ from lowest to highest precedence, is:
    path, or a list of them merged in order — including the opt-in
    `defaults/<Component>.variants/*` overlays the configuration chooses to
    reference);
-3. the top-level `Custom` override layer, if present (see below);
-4. the matching CLI flag, where one exists.
-
-### The `Custom` override layer
-
-A top-level `Custom` key lets a configuration keep a full, shared base and then
-override just a few specific options on top of it. Its value is a
-whole-configuration object — either inline or a path to a JSON/YAML file holding
-one — and it is **deep-merged on top of everything else from the file(s)**, so
-it overrides individual keys while leaving their siblings intact. (CLI arguments
-still take precedence over it.)
-
-```json
-{
-  "Storage": "mainnet/storage.json",
-  "LedgerDB": { "Backend": "V2LSM", "QueryBatchSize": 100000 },
-
-  "Custom": {
-    "DatabasePath": "/fast/disk/db",
-    "LedgerDB": { "QueryBatchSize": 42 }
-  }
-}
-```
-
-Here `DatabasePath` and `LedgerDB.QueryBatchSize` are overridden while
-`LedgerDB.Backend` survives the merge. The same effect with the override kept in
-its own file:
-
-```json
-{ "...": "...", "Custom": "custom-overrides.json" }
-```
-
-See [`examples/custom.json`](examples/custom.json) (inline) and
-[`examples/custom-split.json`](examples/custom-split.json) (from a file).
+3. the matching CLI flag, where one exists.
 
 `cardano-config` is the *origin* of these default files, but each is ultimately
 owned by the layer that implements the component (networking, consensus, …); a CI
