@@ -1,0 +1,12 @@
+{
+    "LedgerDB": {
+        "Snapshots": {
+            "SnapshotInterval": 4320,
+            "SlotOffset": 0,
+            "RateLimit": 600,
+            "MinDelay": 300,
+            "MaxDelay": 600,
+            "NumOfDiskSnapshots": 2
+        }
+    }
+}

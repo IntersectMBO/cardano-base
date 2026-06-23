@@ -21,6 +21,10 @@ file and the CLI arguments, so that a resolved `NodeConfiguration` is complete.
   - `Consensus.variants/Consensus.{preview,preprod}.json` — `ConsensusMode`,
     which is `GenesisMode` on the test networks but `PraosMode` (the base
     default) on mainnet.
+  - `Storage.variants/Storage.{preview,preprod}.json` — `LedgerDB.Snapshots` as
+    an explicit options object (overriding the base `Mithril` policy): mainnet
+    keeps `Mithril`, while the test networks pin the snapshot interval (preview
+    864, preprod 4320) and the rest of the snapshot options.
   - `Testing.variants/Testing.preview.json` — preview forces the Shelley…Alonzo
     hard forks at epoch 0 (it launched with those eras already active).
   - `Network.variants/Network.{relay,blockproducer}.json` — the deadline peer
@@ -37,11 +41,6 @@ and `Testing.variants/Testing.preview.json`).
 Comparing the published mainnet/preview/preprod configs, the variants above cover
 all the differences this library parses, **except**:
 
-- `LedgerDB.SnapshotInterval` differs (mainnet/preprod 4320, preview 864). It is
-  not yet captured as a `Storage` variant because the base default uses the
-  `Mithril` snapshot policy rather than an explicit interval; whether the
-  per-network interval still applies under `Mithril` needs confirming before
-  adding a `Storage.variants/Storage.preview.json`.
 - `MaxKnownMajorProtocolVersion` (present in mainnet/testnet config files) is
   intentionally **not parsed**. The node's own parser
   (`Cardano.Node.Configuration.POM`) does not read this key either — it only
