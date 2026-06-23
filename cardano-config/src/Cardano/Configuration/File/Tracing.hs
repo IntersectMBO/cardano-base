@@ -23,7 +23,7 @@ import GHC.Generics (Generic)
 -- is captured opaquely; see the module documentation.
 newtype TracingConfiguration = TracingConfiguration
   { hermodTracing :: Maybe Text
-  -- ^ A path to a file holding the tracing configuration .
+  -- ^ A path to a file holding the tracing configuration.
   }
   deriving (Generic, Show)
   deriving (FromJSON, ToJSON) via (Autodocodec TracingConfiguration)

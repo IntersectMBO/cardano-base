@@ -108,8 +108,8 @@ are:
 
 | Group | Flag(s) | Metavar | Notes |
 | --- | --- | --- | --- |
-| | `--config` | `FILEPATH` | Main configuration file (defaults to `./configuration/cardano/mainnet-config.yaml`). |
-| | `--topology` | `FILEPATH` | Topology file (defaults to the mainnet `./configuration/cardano/mainnet-topology.yaml`). |
+| | `--config` | `FILEPATH` | Main configuration file (defaults to `./configuration/cardano/mainnet-config.json`). |
+| | `--topology` | `FILEPATH` | Topology file (defaults to the mainnet `./configuration/cardano/mainnet-topology.json`). |
 | | `--socket-path` | `FILEPATH` | Socket for local clients; overrides `LocalConnectionsConfig.SocketPath`. |
 | | `--grpc-enable` | | [EXPERIMENTAL] Enable the gRPC endpoint; overrides `LocalConnectionsConfig.EnableRpc`. Absent means *unset* (falls back to the config file), not `False`. |
 | | `--grpc-socket-path` | `FILEPATH` | [EXPERIMENTAL] gRPC socket path; overrides `LocalConnectionsConfig.RpcSocketPath`. Defaults to `rpc.sock` next to the node socket. |

@@ -20,6 +20,7 @@ extra-doc-files:
 data-files:
   defaults/**/*.json
   examples/*.json
+  schemas/*.json
 
 common warnings
   ghc-options:
@@ -64,6 +65,7 @@ library
     network,
     network-uri,
     optparse-applicative,
+    scientific,
     text,
     time,
     yaml,

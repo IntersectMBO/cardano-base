@@ -42,7 +42,8 @@ import Cardano.Configuration.File.Storage
 import Cardano.Configuration.File.Testing
 import Cardano.Configuration.File.Tracing
 import Cardano.Configuration.Schema (componentPropertyNames, recognisedKeys)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
+import Data.Scientific (toBoundedInteger)
 import Control.Exception
 import Control.Monad (unless)
 import Data.Aeson (FromJSON, Value (..), parseJSON)
@@ -251,16 +252,22 @@ parseSection root configValue section = do
 splitEnvelope :: Value -> IO (Int, Value)
 splitEnvelope value =
   case value of
-    Object o
-      | Just config <- KM.lookup "Configuration" o -> pure (lookupVersion o, config)
-      | otherwise -> pure (lookupVersion o, value)
+    Object o -> do
+      version <- lookupVersion o
+      pure (version, fromMaybe value (KM.lookup "Configuration" o))
     _ ->
       throwIO $
         ConfigurationParsingError Nothing Nothing [] "expected the configuration to be a JSON/YAML object"
   where
+    -- A missing @Version@ is the legacy version 1. A present one must be an
+    -- integer in range (not e.g. 1.4 or a huge scientific literal): the schema
+    -- declares it as an integer, so anything else is a hard error.
     lookupVersion o = case KM.lookup "Version" o of
-      Just (Number n) -> round n
-      _ -> 1
+      Nothing -> pure 1
+      Just (Number n) ->
+        maybe (throwIO (badVersion ("expected an integer, got " <> show n))) pure (toBoundedInteger n)
+      Just _ -> throwIO (badVersion "expected an integer")
+    badVersion msg = ConfigurationParsingError Nothing Nothing [Key "Version"] ("invalid Version: " <> msg)
 
 -- | What to do when the configuration contains keys that none of the parsers
 -- recognise (typically a typo).
