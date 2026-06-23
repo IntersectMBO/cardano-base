@@ -1,9 +1,9 @@
 {
-    "Storage": "storage.json",
-    "Consensus": "consensus.json",
-    "Protocol": "protocol.json",
-    "Network": "network.json",
-    "LocalConnections": "localconnections.json",
-    "Testing": "testing.json",
-    "Mempool": "mempool.json"
+    "StorageConfig": "storage.json",
+    "ConsensusConfig": "consensus.json",
+    "ProtocolConfig": "protocol.json",
+    "NetworkConfig": "network.json",
+    "LocalConnectionsConfig": "localconnections.json",
+    "TestingConfig": "testing.json",
+    "MempoolConfig": "mempool.json"
 }

@@ -1,5 +1,5 @@
 {
-    "Network": ["network-a.json", "network-b.json"],
+    "NetworkConfig": ["network-a.json", "network-b.json"],
     "ByronGenesisFile": "mainnet-byron-genesis.json",
     "ShelleyGenesisFile": "mainnet-shelley-genesis.json",
     "AlonzoGenesisFile": "mainnet-alonzo-genesis.json",

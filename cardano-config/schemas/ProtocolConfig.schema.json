@@ -1,0 +1,115 @@
+{
+    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/ProtocolConfig.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "ProtocolConfiguration",
+    "properties": {
+        "AlonzoGenesisFile": {
+            "description": "Path to the file",
+            "format": "path",
+            "title": "AlonzoGenesisFile",
+            "type": "string"
+        },
+        "AlonzoGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash",
+            "title": "AlonzoGenesisHash",
+            "type": "string"
+        },
+        "ByronGenesisFile": {
+            "description": "Path to the file",
+            "format": "path",
+            "title": "ByronGenesisFile",
+            "type": "string"
+        },
+        "ByronGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash",
+            "title": "ByronGenesisHash",
+            "type": "string"
+        },
+        "CheckpointsFile": {
+            "description": "Path to the file",
+            "format": "path",
+            "title": "CheckpointsFile",
+            "type": "string"
+        },
+        "CheckpointsFileHash": {
+            "description": "Hash of the file\nBlake2b_256 hash",
+            "title": "CheckpointsFileHash",
+            "type": "string"
+        },
+        "ConwayGenesisFile": {
+            "description": "Path to the file",
+            "format": "path",
+            "title": "ConwayGenesisFile",
+            "type": "string"
+        },
+        "ConwayGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash",
+            "title": "ConwayGenesisHash",
+            "type": "string"
+        },
+        "LastKnownBlockVersion-Alt": {
+            "default": 0,
+            "description": "Last known block version, alt",
+            "maximum": 255,
+            "minimum": 0,
+            "title": "LastKnownBlockVersion-Alt",
+            "type": "integer"
+        },
+        "LastKnownBlockVersion-Major": {
+            "description": "Last known block version, major",
+            "maximum": 65535,
+            "minimum": 0,
+            "title": "LastKnownBlockVersion-Major",
+            "type": "integer"
+        },
+        "LastKnownBlockVersion-Minor": {
+            "description": "Last known block version, minor",
+            "maximum": 65535,
+            "minimum": 0,
+            "title": "LastKnownBlockVersion-Minor",
+            "type": "integer"
+        },
+        "PBftSignatureThreshold": {
+            "description": "Byron PBFT signature threshold",
+            "title": "PBftSignatureThreshold",
+            "type": "number"
+        },
+        "RequiresNetworkMagic": {
+            "default": "RequiresNoMagic",
+            "description": "Whether network magic is required",
+            "enum": [
+                "RequiresNoMagic",
+                "RequiresMagic"
+            ],
+            "title": "RequiresNetworkMagic",
+            "type": "string"
+        },
+        "ShelleyGenesisFile": {
+            "description": "Path to the file",
+            "format": "path",
+            "title": "ShelleyGenesisFile",
+            "type": "string"
+        },
+        "ShelleyGenesisHash": {
+            "description": "Hash of the file\nBlake2b_256 hash",
+            "title": "ShelleyGenesisHash",
+            "type": "string"
+        },
+        "StartAsNonProducingNode": {
+            "default": false,
+            "description": "Start without producing blocks",
+            "title": "StartAsNonProducingNode",
+            "type": "boolean"
+        }
+    },
+    "required": [
+        "ConwayGenesisFile",
+        "AlonzoGenesisFile",
+        "ShelleyGenesisFile",
+        "LastKnownBlockVersion-Minor",
+        "LastKnownBlockVersion-Major",
+        "ByronGenesisFile"
+    ],
+    "title": "ProtocolConfig",
+    "type": "object"
+}

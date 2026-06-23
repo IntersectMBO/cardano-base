@@ -25,13 +25,13 @@ import Data.Maybe (catMaybes)
 nodeConfigurationToJSON :: NodeConfiguration -> Value
 nodeConfigurationToJSON nc =
   object
-    [ "Storage" .= toJSON (weakenStorage (storageConfiguration nc))
-    , "Consensus" .= toJSON (weakenConsensus (consensusConfiguration nc))
-    , "Protocol" .= toJSON (weakenProtocol (protocolConfiguration nc))
-    , "Network" .= toJSON (weakenNetwork (networkConfiguration nc))
-    , "LocalConnections" .= toJSON (weakenLocalConnections (localConnectionsConfig nc))
-    , "Mempool" .= toJSON (weakenMempool (mempoolConfiguration nc))
-    , "Testing" .= toJSON (weakenTesting (testingConfiguration nc))
+    [ "StorageConfig" .= toJSON (weakenStorage (storageConfiguration nc))
+    , "ConsensusConfig" .= toJSON (weakenConsensus (consensusConfiguration nc))
+    , "ProtocolConfig" .= toJSON (weakenProtocol (protocolConfiguration nc))
+    , "NetworkConfig" .= toJSON (weakenNetwork (networkConfiguration nc))
+    , "LocalConnectionsConfig" .= toJSON (weakenLocalConnections (localConnectionsConfig nc))
+    , "MempoolConfig" .= toJSON (weakenMempool (mempoolConfiguration nc))
+    , "TestingConfig" .= toJSON (weakenTesting (testingConfiguration nc))
     , "Runtime" .= runtimeValue nc
     ]
 

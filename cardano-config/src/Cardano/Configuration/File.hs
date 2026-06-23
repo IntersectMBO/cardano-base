@@ -91,7 +91,7 @@ data ConfigurationParsingError = ConfigurationParsingError
   -- ^ The referenced sub-file the failure occurred in, if any (otherwise the
   -- failure was in the main configuration file).
   , errSection :: Maybe String
-  -- ^ The top-level configuration section being parsed (e.g. @"Storage"@).
+  -- ^ The top-level configuration section being parsed (e.g. @"StorageConfig"@).
   , errPath :: JSONPath
   -- ^ The path to the offending value within the JSON\/YAML document.
   , errMessage :: String
@@ -355,11 +355,11 @@ parseConfigurationVersion1 ::
   IO NodeConfigurationFromFile
 parseConfigurationVersion1 root configValue =
   NodeConfigurationFromFileV1
-    <$> (Identity <$> parseSection root configValue "Storage")
-    <*> (Identity <$> parseSection root configValue "Consensus")
-    <*> (Identity <$> parseSection root configValue "Protocol")
-    <*> (Identity <$> parseSection root configValue "Network")
-    <*> (Identity <$> parseSection root configValue "LocalConnections")
-    <*> (Identity <$> parseSection root configValue "Testing")
-    <*> (Identity <$> parseSection root configValue "Mempool")
+    <$> (Identity <$> parseSection root configValue "StorageConfig")
+    <*> (Identity <$> parseSection root configValue "ConsensusConfig")
+    <*> (Identity <$> parseSection root configValue "ProtocolConfig")
+    <*> (Identity <$> parseSection root configValue "NetworkConfig")
+    <*> (Identity <$> parseSection root configValue "LocalConnectionsConfig")
+    <*> (Identity <$> parseSection root configValue "TestingConfig")
+    <*> (Identity <$> parseSection root configValue "MempoolConfig")
     <*> runCodec Nothing "Tracing" configValue

@@ -23,6 +23,10 @@
 * Configuration sources are layered with a deep merge: an always-applied
   per-component default (`defaults/`), then the configuration file (a value, a
   sub-file path, or a list of them), then CLI flags.
+* The per-component section keys are suffixed `Config` (`ProtocolConfig`,
+  `ConsensusConfig`, …) to avoid clashing with the node's vestigial top-level
+  `Protocol` scalar (only ever `"Cardano"`), which this library does not parse
+  (documented alongside `MaxKnownMajorProtocolVersion`).
 * Optional `{ Version, Configuration }` envelope for forward-compatibility.
 * Structured parse errors (`ConfigurationParsingError`) and resolution-time
   cross-field checks (`ConfigCheck` / `ConfigResolutionError`).

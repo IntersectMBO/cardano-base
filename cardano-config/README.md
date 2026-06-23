@@ -19,8 +19,8 @@ need access to the configuration file of the node, such as [`cardano-cli`](https
 
 ```json
 {
-  "Protocol": "Protocol.variants/Protocol.mainnet.json",
-  "Network": "Network.variants/Network.relay.json"
+  "ProtocolConfig": "ProtocolConfig.variants/ProtocolConfig.mainnet.json",
+  "NetworkConfig": "NetworkConfig.variants/NetworkConfig.relay.json"
 }
 ```
 
@@ -28,8 +28,8 @@ need access to the configuration file of the node, such as [`cardano-cli`](https
 
 ```json
 {
-  "Protocol": "Protocol.variants/Protocol.mainnet.json",
-  "Network": ["Network.variants/Network.relay.json", { "TargetNumberOfRootPeers": 100 } ]
+  "ProtocolConfig": "ProtocolConfig.variants/ProtocolConfig.mainnet.json",
+  "NetworkConfig": ["NetworkConfig.variants/NetworkConfig.relay.json", { "TargetNumberOfRootPeers": 100 } ]
 }
 ```
 
@@ -37,8 +37,8 @@ need access to the configuration file of the node, such as [`cardano-cli`](https
 
 ```json
 {
-  "Protocol": "Protocol.variants/Protocol.mainnet.json",
-  "Network": ["Network.variants/Network.relay.json", "my-custom-networking-options.json" ]
+  "ProtocolConfig": "ProtocolConfig.variants/ProtocolConfig.mainnet.json",
+  "NetworkConfig": ["NetworkConfig.variants/NetworkConfig.relay.json", "my-custom-networking-options.json" ]
 }
 ```
 
@@ -46,13 +46,13 @@ need access to the configuration file of the node, such as [`cardano-cli`](https
 
 ```console
 $ cardano-config resolve --config <your-config.json> --<other node CLI options>
-Consensus:
+ConsensusConfig:
   ConsensusMode: PraosMode
-LocalConnections:
+LocalConnectionsConfig:
   EnableRpc: false
-Mempool:
+MempoolConfig:
   MempoolCapacityBytesOverride: NoOverride
-Network:
+NetworkConfig:
   AcceptedConnectionsLimit:
     delay: 5
     hardLimit: 512
@@ -61,12 +61,12 @@ Network:
 ...
 ```
 
-### ... see the schema for a component (e.g. Network)
+### ... see the schema for a component (e.g. NetworkConfig)
 
 ```console
-$ cardano-config schema Network
+$ cardano-config schema NetworkConfig
 {
-    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/Network.schema.json",
+    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/NetworkConfig.schema.json",
     "$schema": "http://json-schema.org/draft-07/schema#",
     "description": "NetworkConfiguration",
     "properties": {
@@ -92,9 +92,9 @@ $ cardano-config schema
 ```console
 $ cat <your-config.json> | jq '...' > <your-updated-config.json>
 $ cardano-config resolve --config <your-config.json> --<other node CLI options>
-Consensus:
+ConsensusConfig:
   ConsensusMode: PraosMode
-LocalConnections:
+LocalConnectionsConfig:
   EnableRpc: false
 ...
 ```
@@ -110,10 +110,10 @@ are:
 | --- | --- | --- | --- |
 | | `--config` | `FILEPATH` | Main configuration file (defaults to `./configuration/cardano/mainnet-config.yaml`). |
 | | `--topology` | `FILEPATH` | Topology file (defaults to the mainnet `./configuration/cardano/mainnet-topology.yaml`). |
-| | `--socket-path` | `FILEPATH` | Socket for local clients; overrides `LocalConnections.SocketPath`. |
-| | `--grpc-enable` | | [EXPERIMENTAL] Enable the gRPC endpoint; overrides `LocalConnections.EnableRpc`. Absent means *unset* (falls back to the config file), not `False`. |
-| | `--grpc-socket-path` | `FILEPATH` | [EXPERIMENTAL] gRPC socket path; overrides `LocalConnections.RpcSocketPath`. Defaults to `rpc.sock` next to the node socket. |
-| Storage | `--database-path`, `--volatile-database-path`, `--immutable-database-path` | `FILEPATH` | Overrides `Storage.DatabasePath`. |
+| | `--socket-path` | `FILEPATH` | Socket for local clients; overrides `LocalConnectionsConfig.SocketPath`. |
+| | `--grpc-enable` | | [EXPERIMENTAL] Enable the gRPC endpoint; overrides `LocalConnectionsConfig.EnableRpc`. Absent means *unset* (falls back to the config file), not `False`. |
+| | `--grpc-socket-path` | `FILEPATH` | [EXPERIMENTAL] gRPC socket path; overrides `LocalConnectionsConfig.RpcSocketPath`. Defaults to `rpc.sock` next to the node socket. |
+| Storage | `--database-path`, `--volatile-database-path`, `--immutable-database-path` | `FILEPATH` | Overrides `StorageConfig.DatabasePath`. |
 | Storage | `--validate-db` | | Validate all on-disk database files. |
 | Credentials | `--byron-delegation-certificate`, `--byron-signing-key` | `FILEPATH` | Byron operational credentials. |
 | Credentials | `--shelley-kes-key` *or* `--shelley-kes-agent-socket` | `FILEPATH` / `SOCKET_FILEPATH` | KES key source — a key file path **or** a KES Agent socket. Mutually exclusive. |
@@ -142,7 +142,7 @@ it with the bundled `cardano-config` executable's `schema` subcommand:
 ```console
 $ cardano-config schema          # the whole configuration
 $ cardano-config schema --list   # the available components
-$ cardano-config schema Storage  # one component
+$ cardano-config schema StorageConfig  # one component
 ```
 
 The generated schemas are also committed under [`schemas/`](schemas/) — the whole
@@ -185,7 +185,7 @@ Keys that none of the parsers below recognise produce a **warning** by default
 them into a hard error instead.
 
 The same policy governs **shadowed keys**: if a component is given as its own
-section (e.g. a `Testing` section key) *and* one of that component's keys also
+section (e.g. a `TestingConfig` section key) *and* one of that component's keys also
 appears at the top level (e.g. a top-level `DijkstraGenesisFile`), the top-level
 value is ignored — the section wins. That is almost always a mistake, so it
 warns by default and is rejected under `RejectUnknownKeys`. (This concerns only
@@ -202,13 +202,13 @@ may be given inline, as a sub-file path, or as a list of sources (see
 
 | Component | Top-level keys |
 | --- | --- |
-| **Storage** | `DatabasePath`, `LedgerDB` (`Snapshots`, `QueryBatchSize`, `Backend` = `V2InMemory`/`V2LSM`, `LSMDatabasePath`, `LSMExportPath`) |
-| **Consensus** | `ConsensusMode` (`PraosMode`/`GenesisMode`), `LowLevelGenesisOptions` (`EnableCSJ`, `EnableLoEAndGDD`, `EnableLoP`, `BlockFetchGracePeriod`, `BucketCapacity`, `BucketRate`, `CSJJumpSize`, `GDDRateLimit`) — Genesis mode only |
-| **Protocol** | `ByronGenesisFile`/`ByronGenesisHash`, `RequiresNetworkMagic`, `PBftSignatureThreshold`, `LastKnownBlockVersion-Major`/`-Minor`/`-Alt`, `ShelleyGenesisFile`/`Hash`, `AlonzoGenesisFile`/`Hash`, `ConwayGenesisFile`/`Hash`, `StartAsNonProducingNode`, `CheckpointsFile`/`CheckpointsFileHash` |
-| **Network** | `DiffusionMode`, `MaxConcurrencyBulkSync`, `MaxConcurrencyDeadline`, `ProtocolIdleTimeout`, `TimeWaitTimeout`, `EgressPollInterval`, `ChainSyncIdleTimeout`, `AcceptedConnectionsLimit`, the `TargetNumberOf*`/`SyncTargetNumberOf*` peer targets, `MinBigLedgerPeersForTrustedState`, `PeerSharing`, `ResponderCoreAffinityPolicy`, `ExperimentalProtocolsEnabled`, `TxSubmissionLogicVersion`, `TxSubmissionInitDelay` |
-| **LocalConnections** | `SocketPath`, `EnableRpc`, `RpcSocketPath` |
-| **Mempool** | `MempoolCapacityBytesOverride`, `MempoolTimeoutSoft`, `MempoolTimeoutHard`, `MempoolTimeoutCapacity` |
-| **Testing** | `ExperimentalHardForksEnabled`, the `Test<Era>HardForkAtEpoch`/`Test<Era>HardForkAtVersion` knobs (Shelley … Dijkstra), `DijkstraGenesisFile`/`DijkstraGenesisHash` |
+| **StorageConfig** | `DatabasePath`, `LedgerDB` (`Snapshots`, `QueryBatchSize`, `Backend` = `V2InMemory`/`V2LSM`, `LSMDatabasePath`, `LSMExportPath`) |
+| **ConsensusConfig** | `ConsensusMode` (`PraosMode`/`GenesisMode`), `LowLevelGenesisOptions` (`EnableCSJ`, `EnableLoEAndGDD`, `EnableLoP`, `BlockFetchGracePeriod`, `BucketCapacity`, `BucketRate`, `CSJJumpSize`, `GDDRateLimit`) — Genesis mode only |
+| **ProtocolConfig** | `ByronGenesisFile`/`ByronGenesisHash`, `RequiresNetworkMagic`, `PBftSignatureThreshold`, `LastKnownBlockVersion-Major`/`-Minor`/`-Alt`, `ShelleyGenesisFile`/`Hash`, `AlonzoGenesisFile`/`Hash`, `ConwayGenesisFile`/`Hash`, `StartAsNonProducingNode`, `CheckpointsFile`/`CheckpointsFileHash` |
+| **NetworkConfig** | `DiffusionMode`, `MaxConcurrencyBulkSync`, `MaxConcurrencyDeadline`, `ProtocolIdleTimeout`, `TimeWaitTimeout`, `EgressPollInterval`, `ChainSyncIdleTimeout`, `AcceptedConnectionsLimit`, the `TargetNumberOf*`/`SyncTargetNumberOf*` peer targets, `MinBigLedgerPeersForTrustedState`, `PeerSharing`, `ResponderCoreAffinityPolicy`, `ExperimentalProtocolsEnabled`, `TxSubmissionLogicVersion`, `TxSubmissionInitDelay` |
+| **LocalConnectionsConfig** | `SocketPath`, `EnableRpc`, `RpcSocketPath` |
+| **MempoolConfig** | `MempoolCapacityBytesOverride`, `MempoolTimeoutSoft`, `MempoolTimeoutHard`, `MempoolTimeoutCapacity` |
+| **TestingConfig** | `ExperimentalHardForksEnabled`, the `Test<Era>HardForkAtEpoch`/`Test<Era>HardForkAtVersion` knobs (Shelley … Dijkstra), `DijkstraGenesisFile`/`DijkstraGenesisHash` |
 
 ### Mandatory vs optional keys
 
@@ -224,7 +224,7 @@ are absent:
 
 These are network-specific, so they are deliberately *not* in the base defaults;
 supply them either directly in your configuration or by referencing a
-`Protocol.variants/Protocol.<network>.json` file (which provides them for that
+`ProtocolConfig.variants/ProtocolConfig.<network>.json` file (which provides them for that
 network).
 
 **Every other key is optional**: it either has a default (applied from the
@@ -271,16 +271,22 @@ $ cat config.json
 
 ### Split form
 
-Alternatively, any component (`Storage`, `Consensus`, `Protocol`, `Network`,
-`LocalConnections`, `Mempool`, `Testing`) may be **split into a sub-file**: give
+Alternatively, any component (`StorageConfig`, `ConsensusConfig`, `ProtocolConfig`, `NetworkConfig`,
+`LocalConnectionsConfig`, `MempoolConfig`, `TestingConfig`) may be **split into a sub-file**: give
 the component key a string path (relative to the main config file) instead of an
 inline object.
+
+> The section keys are suffixed `Config` (`ProtocolConfig`, not `Protocol`) on
+> purpose: the node has a vestigial top-level `Protocol` scalar (only ever
+> `"Cardano"`), so a bare `Protocol` section key would clash with it. See
+> [`defaults/README.md`](defaults/README.md) for the vestigial keys
+> (`Protocol`, `MaxKnownMajorProtocolVersion`) this library does not parse.
 
 ```console
 $ cat config.json
 {
-    "Protocol": "protocol.json",
-    "Storage": "storage.json"
+    "ProtocolConfig": "protocol.json",
+    "StorageConfig": "storage.json"
 }
 $ cat storage.json
 {
@@ -300,7 +306,7 @@ and nested objects merge recursively:
 ```console
 $ cat config.json
 {
-    "Network": ["Network.variants/Network.relay.json", { "PeerSharing": false }]
+    "NetworkConfig": ["NetworkConfig.variants/NetworkConfig.relay.json", { "PeerSharing": false }]
 }
 ```
 

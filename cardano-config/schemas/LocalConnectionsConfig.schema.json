@@ -1,0 +1,27 @@
+{
+    "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/LocalConnectionsConfig.schema.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "LocalConnectionsConfig",
+    "properties": {
+        "EnableRpc": {
+            "default": false,
+            "description": "Whether to enable the gRPC server",
+            "title": "EnableRpc",
+            "type": "boolean"
+        },
+        "RpcSocketPath": {
+            "description": "Path of the gRPC server socket",
+            "format": "path",
+            "title": "RpcSocketPath",
+            "type": "string"
+        },
+        "SocketPath": {
+            "description": "Path of the socket for local clients",
+            "format": "path",
+            "title": "SocketPath",
+            "type": "string"
+        }
+    },
+    "title": "LocalConnectionsConfig",
+    "type": "object"
+}

@@ -58,6 +58,16 @@ all the differences this library parses, **except**:
   that the node ignores, and this library matches that behaviour (it surfaces as
   an unrecognised-key warning).
 
+- `Protocol` (e.g. `"Protocol": "Cardano"`) is a **vestigial selector** that this
+  library does **not** parse. The node *does* read it
+  (`Cardano.Node.Configuration.POM`: `v .:? "Protocol" .!= CardanoProtocol`), but
+  it is optional, defaults to `CardanoProtocol`, and `"Cardano"` is its only
+  accepted value — so omitting it is equivalent. To avoid clashing with this
+  scalar, the per-component section keys here are suffixed `Config`
+  (`ProtocolConfig`, `ConsensusConfig`, …), leaving the bare `Protocol` key free;
+  a `Protocol` key in a config surfaces as an unrecognised-key warning and is
+  ignored.
+
 The role variants fully capture the block-producer/relay divergence
 (`TargetNumberOfRootPeers`, `TargetNumberOfKnownPeers`, `PeerSharing`; the other
 targets are role-independent).

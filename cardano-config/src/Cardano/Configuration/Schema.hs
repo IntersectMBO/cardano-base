@@ -63,25 +63,25 @@ import Data.Text (Text)
 import qualified Data.Text as T
 
 storageSchema :: Value
-storageSchema = component "Storage" rawStorageSchema
+storageSchema = component "StorageConfig" rawStorageSchema
 
 consensusSchema :: Value
-consensusSchema = component "Consensus" rawConsensusSchema
+consensusSchema = component "ConsensusConfig" rawConsensusSchema
 
 protocolSchema :: Value
-protocolSchema = component "Protocol" rawProtocolSchema
+protocolSchema = component "ProtocolConfig" rawProtocolSchema
 
 networkSchema :: Value
-networkSchema = component "Network" rawNetworkSchema
+networkSchema = component "NetworkConfig" rawNetworkSchema
 
 localConnectionsSchema :: Value
-localConnectionsSchema = component "LocalConnections" rawLocalConnectionsSchema
+localConnectionsSchema = component "LocalConnectionsConfig" rawLocalConnectionsSchema
 
 mempoolSchema :: Value
-mempoolSchema = component "Mempool" rawMempoolSchema
+mempoolSchema = component "MempoolConfig" rawMempoolSchema
 
 testingSchema :: Value
-testingSchema = component "Testing" rawTestingSchema
+testingSchema = component "TestingConfig" rawTestingSchema
 
 -- The raw schemas as emitted by autodocodec-schema (descriptions in @$comment@,
 -- no @$schema@). Used internally for merging; 'publish' makes them public.
@@ -101,13 +101,13 @@ rawTracingSchema = toJSON (jsonSchemaViaCodec @TracingConfiguration)
 -- single top-level @HermodTracing@ key (see 'hermodTracingProps').
 rawComponentSchemas :: [(Text, Value)]
 rawComponentSchemas =
-  [ ("Storage", rawStorageSchema)
-  , ("Consensus", rawConsensusSchema)
-  , ("Protocol", rawProtocolSchema)
-  , ("Network", rawNetworkSchema)
-  , ("LocalConnections", rawLocalConnectionsSchema)
-  , ("Mempool", rawMempoolSchema)
-  , ("Testing", rawTestingSchema)
+  [ ("StorageConfig", rawStorageSchema)
+  , ("ConsensusConfig", rawConsensusSchema)
+  , ("ProtocolConfig", rawProtocolSchema)
+  , ("NetworkConfig", rawNetworkSchema)
+  , ("LocalConnectionsConfig", rawLocalConnectionsSchema)
+  , ("MempoolConfig", rawMempoolSchema)
+  , ("TestingConfig", rawTestingSchema)
   ]
 
 -- | Tracing is not a component/section of its own; it contributes exactly one
@@ -127,8 +127,8 @@ configurationSchemas = [(name, component name s) | (name, s) <- rawComponentSche
 --   * the /single-file/ form, in which every component reads its keys from the
 --     top-level object (so all component keys appear flat at the top level); and
 --   * the /split-file/ form, in which a component is instead given under its
---     section key (e.g. @Storage@) as a path to a sub-file, an inline object, or
---     a non-empty list of paths\/objects deep-merged in order.
+--     section key (e.g. @StorageConfig@) as a path to a sub-file, an inline
+--     object, or a non-empty list of paths\/objects deep-merged in order.
 --
 -- The whole document may additionally be wrapped in a @{ Version, Configuration
 -- }@ envelope. Because a mandatory key may be provided through either form, the

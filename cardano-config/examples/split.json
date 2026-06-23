@@ -1,4 +1,4 @@
 {
-    "Protocol": "protocol.json",
-    "Storage": "storage.json"
+    "ProtocolConfig": "protocol.json",
+    "StorageConfig": "storage.json"
 }

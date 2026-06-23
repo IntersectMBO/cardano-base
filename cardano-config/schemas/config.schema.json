@@ -3,10 +3,10 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "allOf": [
         {
-            "description": "Give the Storage configuration either under the Storage section key or as its individual top-level keys, not both.",
+            "description": "Give the StorageConfig configuration either under the StorageConfig section key or as its individual top-level keys, not both.",
             "if": {
                 "required": [
-                    "Storage"
+                    "StorageConfig"
                 ]
             },
             "then": {
@@ -27,10 +27,10 @@
             }
         },
         {
-            "description": "Give the Consensus configuration either under the Consensus section key or as its individual top-level keys, not both.",
+            "description": "Give the ConsensusConfig configuration either under the ConsensusConfig section key or as its individual top-level keys, not both.",
             "if": {
                 "required": [
-                    "Consensus"
+                    "ConsensusConfig"
                 ]
             },
             "then": {
@@ -51,10 +51,10 @@
             }
         },
         {
-            "description": "Give the Protocol configuration either under the Protocol section key or as its individual top-level keys, not both.",
+            "description": "Give the ProtocolConfig configuration either under the ProtocolConfig section key or as its individual top-level keys, not both.",
             "if": {
                 "required": [
-                    "Protocol"
+                    "ProtocolConfig"
                 ]
             },
             "then": {
@@ -145,10 +145,10 @@
             }
         },
         {
-            "description": "Give the Network configuration either under the Network section key or as its individual top-level keys, not both.",
+            "description": "Give the NetworkConfig configuration either under the NetworkConfig section key or as its individual top-level keys, not both.",
             "if": {
                 "required": [
-                    "Network"
+                    "NetworkConfig"
                 ]
             },
             "then": {
@@ -299,10 +299,10 @@
             }
         },
         {
-            "description": "Give the LocalConnections configuration either under the LocalConnections section key or as its individual top-level keys, not both.",
+            "description": "Give the LocalConnectionsConfig configuration either under the LocalConnectionsConfig section key or as its individual top-level keys, not both.",
             "if": {
                 "required": [
-                    "LocalConnections"
+                    "LocalConnectionsConfig"
                 ]
             },
             "then": {
@@ -328,10 +328,10 @@
             }
         },
         {
-            "description": "Give the Mempool configuration either under the Mempool section key or as its individual top-level keys, not both.",
+            "description": "Give the MempoolConfig configuration either under the MempoolConfig section key or as its individual top-level keys, not both.",
             "if": {
                 "required": [
-                    "Mempool"
+                    "MempoolConfig"
                 ]
             },
             "then": {
@@ -362,10 +362,10 @@
             }
         },
         {
-            "description": "Give the Testing configuration either under the Testing section key or as its individual top-level keys, not both.",
+            "description": "Give the TestingConfig configuration either under the TestingConfig section key or as its individual top-level keys, not both.",
             "if": {
                 "required": [
-                    "Testing"
+                    "TestingConfig"
                 ]
             },
             "then": {
@@ -541,10 +541,10 @@
             "title": "Configuration",
             "type": "object"
         },
-        "Consensus": {
+        "ConsensusConfig": {
             "anyOf": [
                 {
-                    "description": "Path to a file holding the Consensus section",
+                    "description": "Path to a file holding the ConsensusConfig section",
                     "format": "path",
                     "title": "File path",
                     "type": "string"
@@ -611,14 +611,14 @@
                             "type": "object"
                         }
                     },
-                    "title": "Consensus",
+                    "title": "ConsensusConfig",
                     "type": "object"
                 },
                 {
                     "items": {
                         "anyOf": [
                             {
-                                "description": "Path to a file holding the Consensus section",
+                                "description": "Path to a file holding the ConsensusConfig section",
                                 "format": "path",
                                 "title": "File path",
                                 "type": "string"
@@ -685,19 +685,19 @@
                                         "type": "object"
                                     }
                                 },
-                                "title": "Consensus",
+                                "title": "ConsensusConfig",
                                 "type": "object"
                             }
                         ],
-                        "title": "Consensus source"
+                        "title": "ConsensusConfig source"
                     },
                     "minItems": 1,
-                    "title": "Consensus (list of sources)",
+                    "title": "ConsensusConfig (list of sources)",
                     "type": "array"
                 }
             ],
-            "description": "The Consensus section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "Consensus"
+            "description": "The ConsensusConfig section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
+            "title": "ConsensusConfig"
         },
         "ConsensusMode": {
             "default": "PraosMode",
@@ -922,10 +922,10 @@
             "title": "LedgerDB",
             "type": "object"
         },
-        "LocalConnections": {
+        "LocalConnectionsConfig": {
             "anyOf": [
                 {
-                    "description": "Path to a file holding the LocalConnections section",
+                    "description": "Path to a file holding the LocalConnectionsConfig section",
                     "format": "path",
                     "title": "File path",
                     "type": "string"
@@ -951,14 +951,14 @@
                             "type": "string"
                         }
                     },
-                    "title": "LocalConnections",
+                    "title": "LocalConnectionsConfig",
                     "type": "object"
                 },
                 {
                     "items": {
                         "anyOf": [
                             {
-                                "description": "Path to a file holding the LocalConnections section",
+                                "description": "Path to a file holding the LocalConnectionsConfig section",
                                 "format": "path",
                                 "title": "File path",
                                 "type": "string"
@@ -984,19 +984,19 @@
                                         "type": "string"
                                     }
                                 },
-                                "title": "LocalConnections",
+                                "title": "LocalConnectionsConfig",
                                 "type": "object"
                             }
                         ],
-                        "title": "LocalConnections source"
+                        "title": "LocalConnectionsConfig source"
                     },
                     "minItems": 1,
-                    "title": "LocalConnections (list of sources)",
+                    "title": "LocalConnectionsConfig (list of sources)",
                     "type": "array"
                 }
             ],
-            "description": "The LocalConnections section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "LocalConnections"
+            "description": "The LocalConnectionsConfig section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
+            "title": "LocalConnectionsConfig"
         },
         "LowLevelGenesisOptions": {
             "description": "Low-level Genesis tuning (GenesisMode only)\nGenesisConfigFlags",
@@ -1063,10 +1063,28 @@
             "title": "MaxConcurrencyDeadline",
             "type": "integer"
         },
-        "Mempool": {
+        "MempoolCapacityBytesOverride": {
             "anyOf": [
                 {
-                    "description": "Path to a file holding the Mempool section",
+                    "maximum": 1.8446744073709551615e19,
+                    "minimum": 0,
+                    "title": "Integer",
+                    "type": "integer"
+                },
+                {
+                    "const": "NoOverride",
+                    "title": "NoOverride",
+                    "type": "string"
+                }
+            ],
+            "default": "NoOverride",
+            "description": "Override for the maximum mempool size in bytes, or the string \"NoOverride\"",
+            "title": "MempoolCapacityBytesOverride"
+        },
+        "MempoolConfig": {
+            "anyOf": [
+                {
+                    "description": "Path to a file holding the MempoolConfig section",
                     "format": "path",
                     "title": "File path",
                     "type": "string"
@@ -1107,14 +1125,14 @@
                             "type": "number"
                         }
                     },
-                    "title": "Mempool",
+                    "title": "MempoolConfig",
                     "type": "object"
                 },
                 {
                     "items": {
                         "anyOf": [
                             {
-                                "description": "Path to a file holding the Mempool section",
+                                "description": "Path to a file holding the MempoolConfig section",
                                 "format": "path",
                                 "title": "File path",
                                 "type": "string"
@@ -1155,37 +1173,19 @@
                                         "type": "number"
                                     }
                                 },
-                                "title": "Mempool",
+                                "title": "MempoolConfig",
                                 "type": "object"
                             }
                         ],
-                        "title": "Mempool source"
+                        "title": "MempoolConfig source"
                     },
                     "minItems": 1,
-                    "title": "Mempool (list of sources)",
+                    "title": "MempoolConfig (list of sources)",
                     "type": "array"
                 }
             ],
-            "description": "The Mempool section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "Mempool"
-        },
-        "MempoolCapacityBytesOverride": {
-            "anyOf": [
-                {
-                    "maximum": 1.8446744073709551615e19,
-                    "minimum": 0,
-                    "title": "Integer",
-                    "type": "integer"
-                },
-                {
-                    "const": "NoOverride",
-                    "title": "NoOverride",
-                    "type": "string"
-                }
-            ],
-            "default": "NoOverride",
-            "description": "Override for the maximum mempool size in bytes, or the string \"NoOverride\"",
-            "title": "MempoolCapacityBytesOverride"
+            "description": "The MempoolConfig section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
+            "title": "MempoolConfig"
         },
         "MempoolTimeoutCapacity": {
             "description": "Capacity mempool timeout, in seconds",
@@ -1210,10 +1210,10 @@
             "title": "MinBigLedgerPeersForTrustedState",
             "type": "integer"
         },
-        "Network": {
+        "NetworkConfig": {
             "anyOf": [
                 {
-                    "description": "Path to a file holding the Network section",
+                    "description": "Path to a file holding the NetworkConfig section",
                     "format": "path",
                     "title": "File path",
                     "type": "string"
@@ -1426,14 +1426,14 @@
                             "type": "string"
                         }
                     },
-                    "title": "Network",
+                    "title": "NetworkConfig",
                     "type": "object"
                 },
                 {
                     "items": {
                         "anyOf": [
                             {
-                                "description": "Path to a file holding the Network section",
+                                "description": "Path to a file holding the NetworkConfig section",
                                 "format": "path",
                                 "title": "File path",
                                 "type": "string"
@@ -1646,19 +1646,19 @@
                                         "type": "string"
                                     }
                                 },
-                                "title": "Network",
+                                "title": "NetworkConfig",
                                 "type": "object"
                             }
                         ],
-                        "title": "Network source"
+                        "title": "NetworkConfig source"
                     },
                     "minItems": 1,
-                    "title": "Network (list of sources)",
+                    "title": "NetworkConfig (list of sources)",
                     "type": "array"
                 }
             ],
-            "description": "The Network section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "Network"
+            "description": "The NetworkConfig section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
+            "title": "NetworkConfig"
         },
         "PBftSignatureThreshold": {
             "description": "Byron PBFT signature threshold",
@@ -1670,10 +1670,10 @@
             "title": "PeerSharing",
             "type": "boolean"
         },
-        "Protocol": {
+        "ProtocolConfig": {
             "anyOf": [
                 {
-                    "description": "Path to a file holding the Protocol section",
+                    "description": "Path to a file holding the ProtocolConfig section",
                     "format": "path",
                     "title": "File path",
                     "type": "string"
@@ -1785,14 +1785,14 @@
                         "LastKnownBlockVersion-Major",
                         "ByronGenesisFile"
                     ],
-                    "title": "Protocol",
+                    "title": "ProtocolConfig",
                     "type": "object"
                 },
                 {
                     "items": {
                         "anyOf": [
                             {
-                                "description": "Path to a file holding the Protocol section",
+                                "description": "Path to a file holding the ProtocolConfig section",
                                 "format": "path",
                                 "title": "File path",
                                 "type": "string"
@@ -1904,19 +1904,19 @@
                                     "LastKnownBlockVersion-Major",
                                     "ByronGenesisFile"
                                 ],
-                                "title": "Protocol",
+                                "title": "ProtocolConfig",
                                 "type": "object"
                             }
                         ],
-                        "title": "Protocol source"
+                        "title": "ProtocolConfig source"
                     },
                     "minItems": 1,
-                    "title": "Protocol (list of sources)",
+                    "title": "ProtocolConfig (list of sources)",
                     "type": "array"
                 }
             ],
-            "description": "The Protocol section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "Protocol"
+            "description": "The ProtocolConfig section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
+            "title": "ProtocolConfig"
         },
         "ProtocolIdleTimeout": {
             "default": 5,
@@ -1969,10 +1969,10 @@
             "title": "StartAsNonProducingNode",
             "type": "boolean"
         },
-        "Storage": {
+        "StorageConfig": {
             "anyOf": [
                 {
-                    "description": "Path to a file holding the Storage section",
+                    "description": "Path to a file holding the StorageConfig section",
                     "format": "path",
                     "title": "File path",
                     "type": "string"
@@ -2106,14 +2106,14 @@
                             "type": "object"
                         }
                     },
-                    "title": "Storage",
+                    "title": "StorageConfig",
                     "type": "object"
                 },
                 {
                     "items": {
                         "anyOf": [
                             {
-                                "description": "Path to a file holding the Storage section",
+                                "description": "Path to a file holding the StorageConfig section",
                                 "format": "path",
                                 "title": "File path",
                                 "type": "string"
@@ -2247,19 +2247,19 @@
                                         "type": "object"
                                     }
                                 },
-                                "title": "Storage",
+                                "title": "StorageConfig",
                                 "type": "object"
                             }
                         ],
-                        "title": "Storage source"
+                        "title": "StorageConfig source"
                     },
                     "minItems": 1,
-                    "title": "Storage (list of sources)",
+                    "title": "StorageConfig (list of sources)",
                     "type": "array"
                 }
             ],
-            "description": "The Storage section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "Storage"
+            "description": "The StorageConfig section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
+            "title": "StorageConfig"
         },
         "SyncTargetNumberOfActiveBigLedgerPeers": {
             "default": 30,
@@ -2464,10 +2464,10 @@
             "title": "TestShelleyHardForkAtVersion",
             "type": "integer"
         },
-        "Testing": {
+        "TestingConfig": {
             "anyOf": [
                 {
-                    "description": "Path to a file holding the Testing section",
+                    "description": "Path to a file holding the TestingConfig section",
                     "format": "path",
                     "title": "File path",
                     "type": "string"
@@ -2590,14 +2590,14 @@
                             "type": "integer"
                         }
                     },
-                    "title": "Testing",
+                    "title": "TestingConfig",
                     "type": "object"
                 },
                 {
                     "items": {
                         "anyOf": [
                             {
-                                "description": "Path to a file holding the Testing section",
+                                "description": "Path to a file holding the TestingConfig section",
                                 "format": "path",
                                 "title": "File path",
                                 "type": "string"
@@ -2720,19 +2720,19 @@
                                         "type": "integer"
                                     }
                                 },
-                                "title": "Testing",
+                                "title": "TestingConfig",
                                 "type": "object"
                             }
                         ],
-                        "title": "Testing source"
+                        "title": "TestingConfig source"
                     },
                     "minItems": 1,
-                    "title": "Testing (list of sources)",
+                    "title": "TestingConfig (list of sources)",
                     "type": "array"
                 }
             ],
-            "description": "The Testing section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "Testing"
+            "description": "The TestingConfig section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
+            "title": "TestingConfig"
         },
         "TimeWaitTimeout": {
             "default": 60,
