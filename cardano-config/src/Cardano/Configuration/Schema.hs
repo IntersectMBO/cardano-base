@@ -19,11 +19,11 @@
 --     tools that key off them (e.g. @jsonschema2md@) render names rather than
 --     @Untitled@\/@undefined@.
 --
--- Tracing keys are surfaced here only as an informational placeholder (the
--- @Tracing@ component): the node resolves them through its tracing system
--- (hermod/@trace-dispatcher@), whose authoritative configuration schema lives in
--- that package. They appear so that users can see the keys exist; their contents
--- are not validated here.
+-- Tracing is not a component of its own: it is surfaced only as the single
+-- top-level @HermodTracing@ key, a path to a separate file that the node's
+-- tracing system (hermod/@trace-dispatcher@) reads. Its contents are neither
+-- parsed nor described here; the authoritative tracing schema lives in that
+-- package.
 module Cardano.Configuration.Schema (
   -- * Whole configuration
   wholeConfigSchema,
@@ -43,7 +43,6 @@ module Cardano.Configuration.Schema (
   localConnectionsSchema,
   mempoolSchema,
   testingSchema,
-  tracingSchema,
 ) where
 
 import Autodocodec.Schema (jsonSchemaViaCodec)
@@ -84,11 +83,6 @@ mempoolSchema = component "Mempool" rawMempoolSchema
 testingSchema :: Value
 testingSchema = component "Testing" rawTestingSchema
 
--- | The tracing keys, surfaced as an informational placeholder. Their contents
--- are owned and validated by @trace-dispatcher@, not by @cardano-config@.
-tracingSchema :: Value
-tracingSchema = component "Tracing" rawTracingSchema
-
 -- The raw schemas as emitted by autodocodec-schema (descriptions in @$comment@,
 -- no @$schema@). Used internally for merging; 'publish' makes them public.
 rawStorageSchema, rawConsensusSchema, rawProtocolSchema, rawNetworkSchema :: Value
@@ -102,6 +96,9 @@ rawMempoolSchema = toJSON (jsonSchemaViaCodec @(MempoolConfiguration Maybe))
 rawTestingSchema = toJSON (jsonSchemaViaCodec @(TestingConfiguration Maybe))
 rawTracingSchema = toJSON (jsonSchemaViaCodec @TracingConfiguration)
 
+-- The components that are sections of their own (given inline, as a sub-file, or
+-- as a list). Tracing is deliberately absent: it is not a section, only the
+-- single top-level @HermodTracing@ key (see 'hermodTracingProps').
 rawComponentSchemas :: [(Text, Value)]
 rawComponentSchemas =
   [ ("Storage", rawStorageSchema)
@@ -111,8 +108,15 @@ rawComponentSchemas =
   , ("LocalConnections", rawLocalConnectionsSchema)
   , ("Mempool", rawMempoolSchema)
   , ("Testing", rawTestingSchema)
-  , ("Tracing", rawTracingSchema)
   ]
+
+-- | Tracing is not a component/section of its own; it contributes exactly one
+-- top-level key, @HermodTracing@ — a path to a separate file that the node's
+-- tracing system reads (and which @cardano-config@ neither parses nor describes
+-- further). We take that key's schema straight from the TracingConfiguration
+-- codec so it stays in step with the parser.
+hermodTracingProps :: KM.KeyMap Value
+hermodTracingProps = properties rawTracingSchema
 
 -- | The JSON Schema of each configuration component, keyed by name.
 configurationSchemas :: [(Text, Value)]
@@ -131,8 +135,9 @@ configurationSchemas = [(name, component name s) | (name, s) <- rawComponentSche
 -- top-level schema marks nothing as required (the mandatory keys are listed in
 -- its description, and the inline section forms keep their own @required@).
 --
--- Note: the tracing keys appear only as an opaque placeholder (resolved by the
--- node's tracing system; see the module header).
+-- Note: tracing is not a section; it is just the top-level @HermodTracing@ key
+-- (a path to a file the node's tracing system reads). Its contents are neither
+-- parsed nor described here.
 wholeConfigSchema :: Value
 wholeConfigSchema =
   publish "Cardano node configuration" "config.schema.json" $
@@ -143,8 +148,9 @@ wholeConfigSchema =
       , "allOf" .= sectionExclusivity
       ]
   where
-    -- The single-file form: every component's keys, flat at the top level.
-    singleFileProps = foldr (KM.union . properties) KM.empty (map snd rawComponentSchemas)
+    -- The single-file form: every component's keys, flat at the top level, plus
+    -- the lone top-level HermodTracing key.
+    singleFileProps = foldr (KM.union . properties) hermodTracingProps (map snd rawComponentSchemas)
     -- The split-file form: each component also reachable under its section key.
     sectionRefProps =
       KM.fromList [(K.fromText name, sectionRef name raw) | (name, raw) <- rawComponentSchemas]
@@ -258,10 +264,11 @@ configurationRef =
 recognisedKeys :: [Text]
 recognisedKeys =
   nub $
-    envelopeKeys <> sectionKeys <> concatMap snd componentPropertyNames
+    envelopeKeys <> sectionKeys <> tracingKeys <> concatMap snd componentPropertyNames
   where
     envelopeKeys = ["Version", "Configuration"]
     sectionKeys = map fst componentPropertyNames
+    tracingKeys = map K.toText (KM.keys hermodTracingProps)
 
 -- | The property names of each component (the keys it reads at the top level in
 -- the single-file form), keyed by the component's section name. Used to detect

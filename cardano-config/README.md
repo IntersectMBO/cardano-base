@@ -238,12 +238,12 @@ knobs).
 ### Tracing is *not* parsed
 
 Tracing is owned by the node's tracing system (hermod / `trace-dispatcher`), not
-by this library. It is given under a single `HermodTracing` key, whose value is
-either an inline object or a path (a string) to a separate file holding it. The
-key is recognised and captured **opaquely**: it appears in the schema so that
-users can see it exists, but its contents are neither interpreted nor validated
-here. The authoritative schema for them lives in
-[`hermod-tracing`](https://github.com/IntersectMBO/hermod-tracing).
+by this library. It is given under a single top-level `HermodTracing` key, whose
+value is a path (a string) to a separate file holding it — it is *not* a section
+of its own. The key is recognised and captured **opaquely**: it appears in the
+schema (as a `HermodTracing` path) so that users can see it exists, but its
+contents are neither interpreted nor validated here. The authoritative schema for
+them lives in [`hermod-tracing`](https://github.com/IntersectMBO/hermod-tracing).
 
 ## Single-file and split forms
 

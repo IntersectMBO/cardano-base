@@ -459,25 +459,6 @@
                     ]
                 }
             }
-        },
-        {
-            "description": "Give the Tracing configuration either under the Tracing section key or as its individual top-level keys, not both.",
-            "if": {
-                "required": [
-                    "Tracing"
-                ]
-            },
-            "then": {
-                "not": {
-                    "anyOf": [
-                        {
-                            "required": [
-                                "HermodTracing"
-                            ]
-                        }
-                    ]
-                }
-            }
         }
     ],
     "description": "The cardano-node configuration. Each component's keys may be given directly at the top level (single-file form) or, per component, under that component's section key as a path to a sub-file, an inline object, or a non-empty list of paths/objects deep-merged in order (split-file form); the two forms may be mixed. The whole document may also be wrapped in a { Version, Configuration } envelope. Mandatory keys (in the single-file form): ByronGenesisFile, ShelleyGenesisFile, AlonzoGenesisFile, ConwayGenesisFile, LastKnownBlockVersion-Major and LastKnownBlockVersion-Minor.",
@@ -2758,60 +2739,6 @@
             "description": "TIME-WAIT timeout, in seconds",
             "title": "TimeWaitTimeout",
             "type": "number"
-        },
-        "Tracing": {
-            "anyOf": [
-                {
-                    "description": "Path to a file holding the Tracing section",
-                    "format": "path",
-                    "title": "File path",
-                    "type": "string"
-                },
-                {
-                    "description": "TracingConfiguration",
-                    "properties": {
-                        "HermodTracing": {
-                            "description": "Tracing configuration as a path to a separate file holding it. Consumed by the node tracing system (trace-dispatcher), not parsed or validated by cardano-config.",
-                            "format": "path",
-                            "title": "HermodTracing",
-                            "type": "string"
-                        }
-                    },
-                    "title": "Tracing",
-                    "type": "object"
-                },
-                {
-                    "items": {
-                        "anyOf": [
-                            {
-                                "description": "Path to a file holding the Tracing section",
-                                "format": "path",
-                                "title": "File path",
-                                "type": "string"
-                            },
-                            {
-                                "description": "TracingConfiguration",
-                                "properties": {
-                                    "HermodTracing": {
-                                        "description": "Tracing configuration as a path to a separate file holding it. Consumed by the node tracing system (trace-dispatcher), not parsed or validated by cardano-config.",
-                                        "format": "path",
-                                        "title": "HermodTracing",
-                                        "type": "string"
-                                    }
-                                },
-                                "title": "Tracing",
-                                "type": "object"
-                            }
-                        ],
-                        "title": "Tracing source"
-                    },
-                    "minItems": 1,
-                    "title": "Tracing (list of sources)",
-                    "type": "array"
-                }
-            ],
-            "description": "The Tracing section, given inline (an object), as a path to a sub-file, or as a non-empty list of paths/objects deep-merged in order (later entries override earlier ones).",
-            "title": "Tracing"
         },
         "TxSubmissionInitDelay": {
             "default": 0,
