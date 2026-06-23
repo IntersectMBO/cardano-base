@@ -14,6 +14,7 @@ import Control.Exception (SomeException, displayException, try)
 import Options.Applicative (execParser, fullDesc, helper, info, progDesc, (<**>))
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
+import Text.Show.Pretty (ppShow)
 
 main :: IO ()
 main = do
@@ -23,7 +24,7 @@ main = do
     Left err -> die (displayException (err :: SomeException))
     Right file -> case resolveConfiguration cli file of
       Left err -> die (displayException err)
-      Right nc -> print nc
+      Right nc -> putStrLn (ppShow nc)
   where
     opts =
       info

@@ -114,6 +114,7 @@ executable cardano-config-resolve
     base,
     cardano-config,
     optparse-applicative,
+    pretty-show,
 
   default-language: Haskell2010
 
