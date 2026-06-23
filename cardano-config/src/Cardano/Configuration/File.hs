@@ -42,8 +42,6 @@ import Cardano.Configuration.File.Storage
 import Cardano.Configuration.File.Testing
 import Cardano.Configuration.File.Tracing
 import Cardano.Configuration.Schema (componentPropertyNames, recognisedKeys)
-import Data.Maybe (catMaybes, fromMaybe)
-import Data.Scientific (toBoundedInteger)
 import Control.Exception
 import Control.Monad (unless)
 import Data.Aeson (FromJSON, Value (..), parseJSON)
@@ -53,6 +51,8 @@ import Data.Aeson.Types (JSONPath, JSONPathElement (..), formatError, iparseEith
 import Data.Foldable (toList)
 import Data.Functor.Identity (Identity (..))
 import Data.List (intercalate)
+import Data.Maybe (catMaybes, fromMaybe)
+import Data.Scientific (toBoundedInteger)
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import GHC.Generics (Generic)

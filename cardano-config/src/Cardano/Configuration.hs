@@ -221,7 +221,9 @@ resolveConfigurationWith checks cli file = do
       require "ConsensusMode" (getConsensusConfiguration (runIdentity (File.consensusConfiguration file)))
   startNonProducing <-
     finalize $
-      require "StartAsNonProducingNode" (CLI.startAsNonProducingNode cli <|> File.startAsNonProducingNode pc)
+      require
+        "StartAsNonProducingNode"
+        (CLI.startAsNonProducingNode cli <|> File.startAsNonProducingNode pc)
   runConfigChecks checks $
     NodeConfiguration
       { storageConfiguration = File.adjustDbPath sc dbPath

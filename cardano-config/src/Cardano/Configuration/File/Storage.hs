@@ -118,7 +118,10 @@ backendCodec =
         .= (\(b, _, _) -> b)
       <*> optionalFieldWith "LSMDatabasePath" filePathCodec "Custom path to the LSM database (V2LSM only)"
         .= (\(_, p, _) -> p)
-      <*> optionalFieldWith "LSMExportPath" filePathCodec "Directory into which the LSM backend exports snapshots (V2LSM only)"
+      <*> optionalFieldWith
+        "LSMExportPath"
+        filePathCodec
+        "Directory into which the LSM backend exports snapshots (V2LSM only)"
         .= (\(_, _, e) -> e)
   where
     toSelector (Nothing, _, _) = Right Nothing

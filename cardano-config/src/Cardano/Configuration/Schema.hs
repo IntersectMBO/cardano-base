@@ -161,10 +161,10 @@ wholeConfigSchema =
       [ object
           [ "$comment"
               .= ( "Give the "
-                    <> name
-                    <> " configuration either under the "
-                    <> name
-                    <> " section key or as its individual top-level keys, not both."
+                     <> name
+                     <> " configuration either under the "
+                     <> name
+                     <> " section key or as its individual top-level keys, not both."
                  )
           , "if" .= object ["required" .= [name]]
           , "then"
@@ -203,9 +203,9 @@ sectionRef name raw =
   object
     [ "$comment"
         .= ( "The "
-              <> name
-              <> " section, given inline (an object), as a path to a sub-file, or as a"
-              <> " non-empty list of paths/objects deep-merged in order (later entries override earlier ones)."
+               <> name
+               <> " section, given inline (an object), as a path to a sub-file, or as a"
+               <> " non-empty list of paths/objects deep-merged in order (later entries override earlier ones)."
            )
     , "anyOf" .= [pathRef desc, withTitle name raw, listRef]
     ]
@@ -252,8 +252,8 @@ configurationRef =
     [ "type" .= ("object" :: Text)
     , "$comment"
         .= ( "When using the { Version, Configuration } envelope, the configuration object goes here"
-              <> " (the same shape as this schema)." ::
-              Text
+               <> " (the same shape as this schema)." ::
+               Text
            )
     ]
 

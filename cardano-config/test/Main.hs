@@ -12,7 +12,10 @@ module Main (main) where
 import Cardano.Configuration (resolveConfiguration)
 import Cardano.Configuration.CliArgs (parseCliArgs)
 import Cardano.Configuration.File
-import Cardano.Configuration.Schema (configurationSchemasWithDefaults, wholeConfigSchemaWithDefaults)
+import Cardano.Configuration.Schema (
+  configurationSchemasWithDefaults,
+  wholeConfigSchemaWithDefaults,
+ )
 import Control.Exception (SomeException, evaluate, try)
 import Data.Aeson (FromJSON, Value, eitherDecodeFileStrict')
 import Data.Functor.Identity (runIdentity)

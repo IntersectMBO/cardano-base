@@ -96,7 +96,6 @@ schemaValidationHelp = vsep (map pretty ls)
       , "--strict=false lets ajv ignore the informational \"path\" format."
       ]
 
-
 -- | Parser for the @schema@ subcommand options.
 schemaParser :: Parser SchemaCmd
 schemaParser =
