@@ -18,8 +18,7 @@ extra-doc-files:
   CHANGELOG.md
 
 data-files:
-  defaults/*.json
-  defaults/*.variants/*.json
+  defaults/**/*.json
   examples/*.json
 
 common warnings
