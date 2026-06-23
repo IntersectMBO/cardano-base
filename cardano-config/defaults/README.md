@@ -18,9 +18,38 @@ file and the CLI arguments, so that a resolved `NodeConfiguration` is complete.
     network-specific genesis files/hashes, `RequiresNetworkMagic` and
     `LastKnownBlockVersion-*` (these legitimately differ per network, so they
     are not in the base `Protocol.json`).
+  - `Consensus.variants/Consensus.{preview,preprod}.json` — `ConsensusMode`,
+    which is `GenesisMode` on the test networks but `PraosMode` (the base
+    default) on mainnet.
+  - `Testing.variants/Testing.preview.json` — preview forces the Shelley…Alonzo
+    hard forks at epoch 0 (it launched with those eras already active).
   - `Network.variants/Network.{relay,blockproducer}.json` — the deadline peer
     targets and `PeerSharing`, which differ between a relay and a
     block-producing node (`defaultDeadlineTargets` / `defaultPeerSharing`).
+
+Because divergence spans several components, selecting a network means referencing
+its variant in *each* affected section (e.g. preview pulls in
+`Protocol.variants/Protocol.preview.json`, `Consensus.variants/Consensus.preview.json`
+and `Testing.variants/Testing.preview.json`).
+
+## Divergence coverage
+
+Comparing the published mainnet/preview/preprod configs, the variants above cover
+all the differences this library parses, **except**:
+
+- `LedgerDB.SnapshotInterval` differs (mainnet/preprod 4320, preview 864). It is
+  not yet captured as a `Storage` variant because the base default uses the
+  `Mithril` snapshot policy rather than an explicit interval; whether the
+  per-network interval still applies under `Mithril` needs confirming before
+  adding a `Storage.variants/Storage.preview.json`.
+- `MaxKnownMajorProtocolVersion` (mainnet only) is **not parsed** by this library
+  at all — it is neither a base default nor a variant. If it is still a live
+  configuration key it needs adding to the `Protocol` codec; otherwise it is
+  legacy and can stay ignored.
+
+The role variants fully capture the block-producer/relay divergence
+(`TargetNumberOfRootPeers`, `TargetNumberOfKnownPeers`, `PeerSharing`; the other
+targets are role-independent).
 
 A configuration can layer them with the list form, e.g.
 `"Network": ["Network.variants/Network.relay.json"]`, which is merged on top of

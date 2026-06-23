@@ -1,0 +1,6 @@
+{
+    "TestShelleyHardForkAtEpoch": 0,
+    "TestAllegraHardForkAtEpoch": 0,
+    "TestMaryHardForkAtEpoch": 0,
+    "TestAlonzoHardForkAtEpoch": 0
+}
