@@ -42,10 +42,12 @@ all the differences this library parses, **except**:
   `Mithril` snapshot policy rather than an explicit interval; whether the
   per-network interval still applies under `Mithril` needs confirming before
   adding a `Storage.variants/Storage.preview.json`.
-- `MaxKnownMajorProtocolVersion` (mainnet only) is **not parsed** by this library
-  at all — it is neither a base default nor a variant. If it is still a live
-  configuration key it needs adding to the `Protocol` codec; otherwise it is
-  legacy and can stay ignored.
+- `MaxKnownMajorProtocolVersion` (present in mainnet/testnet config files) is
+  intentionally **not parsed**. The node's own parser
+  (`Cardano.Node.Configuration.POM`) does not read this key either — it only
+  reads `LastKnownBlockVersion-Major`/`-Minor`/`-Alt` — so it is a vestigial key
+  that the node ignores, and this library matches that behaviour (it surfaces as
+  an unrecognised-key warning).
 
 The role variants fully capture the block-producer/relay divergence
 (`TargetNumberOfRootPeers`, `TargetNumberOfKnownPeers`, `PeerSharing`; the other
