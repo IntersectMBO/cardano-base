@@ -13,6 +13,78 @@ The goal of this library is to offer a single entry-point for applications that
 need access to the configuration file of the node, such as [`cardano-cli`](https://github.com/IntersectMBO/cardano-cli),
 [`dmq-node`](https://github.com/IntersectMBO/dmq-node/), [the `ouroboros-consensus` tools](https://github.com/IntersectMBO/ouroboros-consensus/tree/main/ouroboros-consensus-cardano#consensus-db-tools), ...
 
+## Cookbook: I want to ...
+
+### ... run a relay node on mainnet with the default configuration
+
+```json
+{
+  "Protocol": "Protocol.variants/Protocol.mainnet.json",
+  "Network": "Network.variants/Network.relay.json"
+}
+```
+
+### ... override a single specific option
+
+```json
+{
+  "Protocol": "Protocol.variants/Protocol.mainnet.json",
+  "Network": ["Network.variants/Network.relay.json", { "TargetNumberOfRootPeers": 100 } ]
+}
+```
+
+### ... override many options in a component
+
+```json
+{
+  "Protocol": "Protocol.variants/Protocol.mainnet.json",
+  "Network": ["Network.variants/Network.relay.json", "my-custom-networking-options.json" ]
+}
+```
+
+### ... see what my current configuration resolves to, with defaults
+
+```console
+$ cabal run cardano-config-resolve -- --config <your-config.json> --<other node CLI options>
+Consensus:
+  ConsensusMode: PraosMode
+LocalConnections:
+  EnableRpc: false
+Mempool:
+  MempoolCapacityBytesOverride: NoOverride
+Network:
+  AcceptedConnectionsLimit:
+    delay: 5
+    hardLimit: 512
+    softLimit: 384
+  ChainSyncIdleTimeout: 3373
+...
+```
+
+### ... see the schema for a component (e.g. Network)
+
+```console
+$ cabal run cardano-config-schema -- Network
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "NetworkConfiguration",
+    "properties": {
+        "AcceptedConnectionsLimit": {
+...
+```
+
+### ... see the schema for the whole config (deprecated, please use sub-files)
+
+```console
+$ cabal run cardano-config-schema
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "description": "The cardano-node configuration (single-file form)",
+    "properties": {
+        "AcceptedConnectionsLimit": {
+...
+```
+
 ## CLI options
 
 `parseCliArgs` is an `optparse-applicative` parser producing a `CliArgs` value.
