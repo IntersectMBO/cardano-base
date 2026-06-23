@@ -140,6 +140,7 @@ wholeConfigSchema =
       [ "$comment" .= wholeDescription
       , "type" .= ("object" :: Text)
       , "properties" .= Object (singleFileProps <> sectionRefProps <> envelopeProps)
+      , "allOf" .= sectionExclusivity
       ]
   where
     -- The single-file form: every component's keys, flat at the top level.
@@ -147,6 +148,27 @@ wholeConfigSchema =
     -- The split-file form: each component also reachable under its section key.
     sectionRefProps =
       KM.fromList [(K.fromText name, sectionRef name raw) | (name, raw) <- rawComponentSchemas]
+    -- Give each component one way or the other, not both: if the section key is
+    -- present, none of that component's top-level keys may be (they would be
+    -- shadowed by the section). Mirrors the runtime shadowed-key check.
+    sectionExclusivity =
+      [ object
+          [ "$comment"
+              .= ( "Give the "
+                    <> name
+                    <> " configuration either under the "
+                    <> name
+                    <> " section key or as its individual top-level keys, not both."
+                 )
+          , "if" .= object ["required" .= [name]]
+          , "then"
+              .= object
+                ["not" .= object ["anyOf" .= [object ["required" .= [k]] | k <- keys]]]
+          ]
+      | (name, raw) <- rawComponentSchemas
+      , let keys = map K.toText (KM.keys (properties raw))
+      , not (null keys)
+      ]
     -- The envelope keys.
     envelopeProps =
       KM.fromList
@@ -329,13 +351,18 @@ titleBranches o = foldr titleUnion o ["anyOf", "oneOf"]
     titleUnion key m = case KM.lookup key m of
       Just (Array bs) -> KM.insert key (Array (fmap addTitle bs)) m
       _ -> m
-    addTitle (Object b) | not (KM.member "title" b) = Object (KM.insert "title" (String (branchTitle b)) b)
+    addTitle (Object b)
+      | not (KM.member "title" b)
+      , Just t <- branchTitle b =
+          Object (KM.insert "title" (String t) b)
     addTitle v = v
+    -- Name a branch by its const value or its type; leave structural branches
+    -- (e.g. a bare @{ required: [..] }@ constraint) untitled.
     branchTitle b = case KM.lookup "const" b of
-      Just (String s) -> s
+      Just (String s) -> Just s
       _ -> case KM.lookup "type" b of
-        Just (String t) -> T.toTitle t
-        _ -> "value"
+        Just (String t) -> Just (T.toTitle t)
+        _ -> Nothing
 
 -- | Give a bare @const@ schema the @type@ implied by its value, so even a single
 -- enumerated alternative (e.g. the @"NoOverride"@ branch of a union) declares a

@@ -1,6 +1,485 @@
 {
     "$id": "https://raw.githubusercontent.com/IntersectMBO/cardano-base/master/cardano-config/schemas/config.schema.json",
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "allOf": [
+        {
+            "description": "Give the Storage configuration either under the Storage section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "Storage"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "DatabasePath"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "LedgerDB"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "description": "Give the Consensus configuration either under the Consensus section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "Consensus"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "ConsensusMode"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "LowLevelGenesisOptions"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "description": "Give the Protocol configuration either under the Protocol section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "Protocol"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "AlonzoGenesisFile"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "AlonzoGenesisHash"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ByronGenesisFile"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ByronGenesisHash"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "CheckpointsFile"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "CheckpointsFileHash"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ConwayGenesisFile"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ConwayGenesisHash"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "LastKnownBlockVersion-Alt"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "LastKnownBlockVersion-Major"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "LastKnownBlockVersion-Minor"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "PBftSignatureThreshold"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "RequiresNetworkMagic"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ShelleyGenesisFile"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ShelleyGenesisHash"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "StartAsNonProducingNode"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "description": "Give the Network configuration either under the Network section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "Network"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "AcceptedConnectionsLimit"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ChainSyncIdleTimeout"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "DiffusionMode"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "EgressPollInterval"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ExperimentalProtocolsEnabled"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "MaxConcurrencyBulkSync"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "MaxConcurrencyDeadline"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "MinBigLedgerPeersForTrustedState"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "PeerSharing"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ProtocolIdleTimeout"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ResponderCoreAffinityPolicy"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SyncTargetNumberOfActiveBigLedgerPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SyncTargetNumberOfActivePeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SyncTargetNumberOfEstablishedBigLedgerPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SyncTargetNumberOfEstablishedPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SyncTargetNumberOfKnownBigLedgerPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SyncTargetNumberOfKnownPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SyncTargetNumberOfRootPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TargetNumberOfActiveBigLedgerPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TargetNumberOfActivePeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TargetNumberOfEstablishedBigLedgerPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TargetNumberOfEstablishedPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TargetNumberOfKnownBigLedgerPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TargetNumberOfKnownPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TargetNumberOfRootPeers"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TimeWaitTimeout"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TxSubmissionInitDelay"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TxSubmissionLogicVersion"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "description": "Give the LocalConnections configuration either under the LocalConnections section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "LocalConnections"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "EnableRpc"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "RpcSocketPath"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "SocketPath"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "description": "Give the Mempool configuration either under the Mempool section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "Mempool"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "MempoolCapacityBytesOverride"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "MempoolTimeoutCapacity"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "MempoolTimeoutHard"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "MempoolTimeoutSoft"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "description": "Give the Testing configuration either under the Testing section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "Testing"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "DijkstraGenesisFile"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "DijkstraGenesisHash"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "ExperimentalHardForksEnabled"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestAllegraHardForkAtEpoch"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestAllegraHardForkAtVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestAlonzoHardForkAtEpoch"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestAlonzoHardForkAtVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestBabbageHardForkAtEpoch"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestBabbageHardForkAtVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestConwayHardForkAtEpoch"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestConwayHardForkAtVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestDijkstraHardForkAtEpoch"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestDijkstraHardForkAtVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestMaryHardForkAtEpoch"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestMaryHardForkAtVersion"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestShelleyHardForkAtEpoch"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "TestShelleyHardForkAtVersion"
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "description": "Give the Tracing configuration either under the Tracing section key or as its individual top-level keys, not both.",
+            "if": {
+                "required": [
+                    "Tracing"
+                ]
+            },
+            "then": {
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "HermodTracing"
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    ],
     "description": "The cardano-node configuration. Each component's keys may be given directly at the top level (single-file form) or, per component, under that component's section key as a path to a sub-file, an inline object, or a non-empty list of paths/objects deep-merged in order (split-file form); the two forms may be mixed. The whole document may also be wrapped in a { Version, Configuration } envelope. Mandatory keys (in the single-file form): ByronGenesisFile, ShelleyGenesisFile, AlonzoGenesisFile, ConwayGenesisFile, LastKnownBlockVersion-Major and LastKnownBlockVersion-Minor.",
     "properties": {
         "AcceptedConnectionsLimit": {

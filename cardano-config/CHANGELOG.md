@@ -28,6 +28,9 @@
   cross-field checks (`ConfigCheck` / `ConfigResolutionError`).
 * Unrecognised top-level keys warn by default; `RejectUnknownKeys` makes them an
   error.
+* The whole-configuration schema encodes section/top-level exclusivity: a
+  component must be given either under its section key or as its top-level keys,
+  not both, so a generic JSON Schema validator flags the combination too.
 * Shadowed top-level keys (a component supplied as its own section while one of
   its keys also appears at the top level, where it is then ignored) warn by
   default and are rejected under `RejectUnknownKeys`.

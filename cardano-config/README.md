@@ -192,6 +192,10 @@ warns by default and is rejected under `RejectUnknownKeys`. (This concerns only
 the keys you write; the per-component defaults are merged separately and never
 trigger it.)
 
+The whole-config JSON Schema encodes the same rule statically: each component is
+given **either** under its section key **or** as its individual top-level keys,
+not both, so a generic JSON Schema validator also flags the combination.
+
 The recognised keys are grouped into the following components. Every component
 may be given inline, as a sub-file path, or as a list of sources (see
 [Single-file and split forms](#single-file-and-split-forms)).
