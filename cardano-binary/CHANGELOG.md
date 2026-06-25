@@ -2,7 +2,7 @@
 
 ## 1.9.0.1
 
-*
+* Add `NFData` instance for `DecoderError`.
 
 ## 1.9.0.0
 
