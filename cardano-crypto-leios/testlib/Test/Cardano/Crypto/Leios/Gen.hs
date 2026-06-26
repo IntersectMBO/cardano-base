@@ -23,13 +23,13 @@ import Cardano.Crypto.DSIGN (
   signDSIGN,
  )
 import Cardano.Crypto.Leios (
-  Committee (..),
   LeiosCert,
+  LeiosCommittee (..),
   LeiosDSIGN,
   LeiosSignature,
   LeiosSigningKey,
   LeiosVoter (..),
-  VoterId (..),
+  LeiosVoterId (..),
   aggregateLeiosCert,
   leiosSignContext,
  )
@@ -79,7 +79,7 @@ genLeiosCert = do
   n <- elements [1, 8, 9, 16, 17, 24]
   sks <- vectorOf n genLeiosSigningKey
   let committee =
-        Committee . V.fromList $
+        LeiosCommittee . V.fromList $
           [LeiosVoter (1 % toInteger n) (deriveVerKeyDSIGN sk) | sk <- sks]
   k <- chooseInt (1, n)
   signerIxs <- take k <$> shuffle [0 .. n - 1]
@@ -87,7 +87,7 @@ genLeiosCert = do
   msg <- genByteString msgLen
   let sigs =
         Map.fromList
-          [ (VoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg (sks !! i))
+          [ (LeiosVoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg (sks !! i))
           | i <- signerIxs
           ]
   case aggregateLeiosCert committee sigs of

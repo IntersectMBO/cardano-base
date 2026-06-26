@@ -15,24 +15,24 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.Leios (
   AggregationError (..),
-  Committee (..),
   LeiosCert (..),
+  LeiosCommittee (..),
   LeiosDSIGN,
   LeiosSignature,
   LeiosSigningKey,
   LeiosVoter (..),
+  LeiosVoterId (..),
   VerificationError (..),
-  VoterId (..),
   Weight,
   aggregateLeiosCert,
   decodeLeiosCert,
-  decodeVoterId,
+  decodeLeiosVoterId,
   encodeBitField,
   encodeLeiosCert,
-  encodeVoterId,
-  getVoterId,
+  encodeLeiosVoterId,
+  getLeiosVoterId,
   leiosSignContext,
-  resolveVoter,
+  resolveLeiosVoter,
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
@@ -71,7 +71,7 @@ spec = do
       goldenEncoding "test/golden/LeiosCert" encodeLeiosCert exampleCert
 
     describe "aggregateLeiosCert" $ do
-      prop "rejects an out-of-range VoterId" prop_aggregateLeiosCert_rejects_out_of_range
+      prop "rejects an out-of-range LeiosVoterId" prop_aggregateLeiosCert_rejects_out_of_range
       prop "rejects empty contributions" prop_aggregateLeiosCert_rejects_empty
 
     describe "verifyLeiosCert" $ do
@@ -84,14 +84,16 @@ spec = do
         prop "rejects a bitfield wider than the committee" prop_verifyLeiosCert_rejects_oversized_signers
         prop "rejects a tampered bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
 
-  describe "VoterId" $ do
+  describe "LeiosVoterId" $ do
     prop "round-trips through CBOR" prop_roundtrip_VoterId
     it "matches golden encoding" $
-      goldenEncoding "test/golden/VoterId" encodeVoterId exampleVoterId
+      goldenEncoding "test/golden/LeiosVoterId" encodeLeiosVoterId exampleVoterId
 
-  describe "Committee" $ do
-    prop "getVoterId and resolveVoter agree on verification keys" prop_resolveVoter_getVoterId_inverse
-    prop "getVoterId returns the first matching index" prop_getVoterId_returns_first_index
+  describe "LeiosCommittee" $ do
+    prop
+      "getLeiosVoterId and resolveLeiosVoter agree on verification keys"
+      prop_resolveVoter_getVoterId_inverse
+    prop "getLeiosVoterId returns the first matching index" prop_getVoterId_returns_first_index
 
 -- * CBOR roundtrip / golden
 
@@ -137,18 +139,18 @@ exampleCert = case aggregateLeiosCert committee contributions of
     msg = "leios-golden-message" :: BS.ByteString
     contributions = signContribs msg (zip [0 ..] (toList sks))
 
--- * VoterId CBOR / committee lookup
+-- * LeiosVoterId CBOR / committee lookup
 
 prop_roundtrip_VoterId :: Property
-prop_roundtrip_VoterId = forAll (VoterId <$> QC.arbitrary) $ \vid ->
-  let bs = CBOR.serialize (encodeVoterId vid)
-   in CBOR.decodeFullDecoder "VoterId" decodeVoterId bs === Right vid
+prop_roundtrip_VoterId = forAll (LeiosVoterId <$> QC.arbitrary) $ \vid ->
+  let bs = CBOR.serialize (encodeLeiosVoterId vid)
+   in CBOR.decodeFullDecoder "LeiosVoterId" decodeLeiosVoterId bs === Right vid
 
-exampleVoterId :: VoterId
-exampleVoterId = VoterId 0xABCD
+exampleVoterId :: LeiosVoterId
+exampleVoterId = LeiosVoterId 0xABCD
 
--- | 'getVoterId' and 'resolveVoter' are mutual inverses on the verification
--- key projection: for any voter in the committee, looking up its 'VoterId'
+-- | 'getLeiosVoterId' and 'resolveLeiosVoter' are mutual inverses on the verification
+-- key projection: for any voter in the committee, looking up its 'LeiosVoterId'
 -- via its key and resolving back to a 'LeiosVoter' yields the same key.
 prop_resolveVoter_getVoterId_inverse :: Property
 prop_resolveVoter_getVoterId_inverse =
@@ -157,16 +159,16 @@ prop_resolveVoter_getVoterId_inverse =
         voters = V.toList committee.committeeVoters
      in QC.conjoin
           [ counterexample ("voter index " <> show i) $
-              case getVoterId (voterVKey voter) committee of
+              case getLeiosVoterId (voterVKey voter) committee of
                 Nothing -> QC.property False
                 Just vid ->
-                  case resolveVoter committee vid of
+                  case resolveLeiosVoter committee vid of
                     Nothing -> QC.property False
                     Just voter' -> voterVKey voter' === voterVKey voter
           | (i :: Int, voter) <- zip [0 ..] voters
           ]
 
--- | When the committee carries duplicate verification keys, 'getVoterId'
+-- | When the committee carries duplicate verification keys, 'getLeiosVoterId'
 -- returns the smallest matching index. We don't deduplicate committees
 -- internally; downstream selection is expected to.
 prop_getVoterId_returns_first_index :: Property
@@ -176,10 +178,10 @@ prop_getVoterId_returns_first_index =
         voters = V.toList committee.committeeVoters
      in QC.conjoin
           [ counterexample ("first occurrence at " <> show i) $
-              getVoterId (voterVKey voter) duped
-                === Just (VoterId (fromIntegral i))
+              getLeiosVoterId (voterVKey voter) duped
+                === Just (LeiosVoterId (fromIntegral i))
           | let duped =
-                  Committee
+                  LeiosCommittee
                     (committee.committeeVoters <> committee.committeeVoters)
           , (i :: Int, voter) <- zip [0 ..] voters
           ]
@@ -190,10 +192,10 @@ prop_getVoterId_returns_first_index =
 -- Returns the signing keys alongside the committee so tests can produce
 -- contributions. The 'NonEmpty' return reflects the @n ≥ 1@ precondition and
 -- gives tests a total 'head' for "any-one-signer" cases.
-fixedCommittee :: Int -> (NonEmpty LeiosSigningKey, Committee)
+fixedCommittee :: Int -> (NonEmpty LeiosSigningKey, LeiosCommittee)
 fixedCommittee n =
   ( sks
-  , Committee
+  , LeiosCommittee
       ( V.fromList
           [LeiosVoter (1 / fromIntegral @Int @Weight n) (deriveVerKeyDSIGN sk) | sk <- toList sks]
       )
@@ -216,16 +218,16 @@ genMsg :: QC.Gen BS.ByteString
 genMsg = chooseInt (0, 64) >>= genByteString
 
 -- | Sign @msg@ with each of the given keys and pack them into a 'Map' keyed
--- by 'VoterId', matching the input shape of 'aggregateLeiosCert'.
-signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map VoterId LeiosSignature
+-- by 'LeiosVoterId', matching the input shape of 'aggregateLeiosCert'.
+signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map LeiosVoterId LeiosSignature
 signContribs msg pairs =
   Map.fromList
-    [(VoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
+    [(LeiosVoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
 
 -- | Aggregate or fail the property with the error.
 aggregateOrFail ::
-  Committee ->
-  Map VoterId LeiosSignature ->
+  LeiosCommittee ->
+  Map LeiosVoterId LeiosSignature ->
   (LeiosCert -> Property) ->
   Property
 aggregateOrFail committee contributions k = case aggregateLeiosCert committee contributions of
@@ -315,13 +317,13 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n
               verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
                 === Left InvalidSignature
 
--- | A 'VoterId' past the committee bound is rejected at aggregation time.
+-- | A 'LeiosVoterId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
 prop_aggregateLeiosCert_rejects_out_of_range = forAll genN $ \n ->
   forAll (chooseInt (n, n + 100)) $ \badIdx ->
     let (sk0 :| _, committee) = fixedCommittee n
         msg = "x" :: BS.ByteString
-        bad = VoterId (fromIntegral @Int @Word16 badIdx)
+        bad = LeiosVoterId (fromIntegral @Int @Word16 badIdx)
         contributions = Map.singleton bad (signDSIGN leiosSignContext msg sk0)
      in aggregateLeiosCert committee contributions === Left (VoterIdsOutOfBounds (bad :| []))
 

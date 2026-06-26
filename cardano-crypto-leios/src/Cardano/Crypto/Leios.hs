@@ -25,14 +25,14 @@ module Cardano.Crypto.Leios (
 
   -- * Voting committee
   Weight,
-  VoterId (..),
-  encodeVoterId,
-  decodeVoterId,
+  LeiosVoterId (..),
+  encodeLeiosVoterId,
+  decodeLeiosVoterId,
   LeiosVoter (..),
-  Committee (..),
-  committeeSize,
-  resolveVoter,
-  getVoterId,
+  LeiosCommittee (..),
+  leiosCommitteeSize,
+  resolveLeiosVoter,
+  getLeiosVoterId,
 
   -- * Leios certificates
   LeiosCert (..),
@@ -130,19 +130,19 @@ type Weight = Rational
 -- 'committeeVoters' and determines its bit in the 'LeiosCert' @signers@
 -- bitfield (MSB-first within each byte, so voter @i@ ↔ bit @7-(i mod 8)@ of
 -- byte @i \`div\` 8@).
-newtype VoterId = VoterId {voterIndex :: Word16}
+newtype LeiosVoterId = LeiosVoterId {voterIndex :: Word16}
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (NFData, NoThunks)
 
--- | Plain CBOR encoder for 'VoterId'.
-encodeVoterId :: VoterId -> Encoding
-encodeVoterId (VoterId idx) = encodeWord16 idx
+-- | Plain CBOR encoder for 'LeiosVoterId'.
+encodeLeiosVoterId :: LeiosVoterId -> Encoding
+encodeLeiosVoterId (LeiosVoterId idx) = encodeWord16 idx
 
--- | Plain CBOR decoder for 'VoterId'.
-decodeVoterId :: Decoder s VoterId
-decodeVoterId = VoterId <$> decodeWord16
+-- | Plain CBOR decoder for 'LeiosVoterId'.
+decodeLeiosVoterId :: Decoder s LeiosVoterId
+decodeLeiosVoterId = LeiosVoterId <$> decodeWord16
 
--- | A single seat in a 'Committee': a voter's normalised weight paired with
+-- | A single seat in a 'LeiosCommittee': a voter's normalised weight paired with
 -- its BLS verification key.
 data LeiosVoter = LeiosVoter
   { voterWeight :: !Weight
@@ -154,49 +154,49 @@ data LeiosVoter = LeiosVoter
 -- | The voting committee for a Leios epoch: an ordered vector of
 -- 'LeiosVoter' seats.
 --
--- Ixition determines the voter's 'VoterId' and its bit in the certificate's
+-- Ixition determines the voter's 'LeiosVoterId' and its bit in the certificate's
 -- bitfield, so callers must keep the order stable between construction and
 -- verification of any cert.
 --
 -- This package intentionally does not provide committee selection — sampling
 -- voters from the active stake distribution lives in consensus/ledger.
 -- However, callers are responsible for ensuring that every voter's BLS
--- proof-of-possession has been verified before a 'Committee' value is built;
+-- proof-of-possession has been verified before a 'LeiosCommittee' value is built;
 -- 'verifyLeiosCert' and 'aggregateLeiosCert' both rely on this invariant to
 -- skip per-key PoP checks (they use 'uncheckedAggregateVerKeysDSIGN' /
 -- 'aggregateSigsDSIGN' under the hood). Passing in unchecked keys defeats
 -- the security of the aggregate signature.
-newtype Committee = Committee {committeeVoters :: Vector LeiosVoter}
+newtype LeiosCommittee = LeiosCommittee {committeeVoters :: Vector LeiosVoter}
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData)
   -- 'nothunks' ships no instance for 'Data.Vector.Strict.Vector' and we don't
   -- want to add an orphan. A WHNF-only check on the wrapper is sufficient here:
   -- the strict 'Vector' forces every cell to WHNF, and a WHNF 'LeiosVoter'
-  -- forces both of its strict fields, so "Committee in WHNF" structurally
+  -- forces both of its strict fields, so "LeiosCommittee in WHNF" structurally
   -- implies no thunks anywhere inside.
-  deriving (NoThunks) via OnlyCheckWhnfNamed "Committee" Committee
+  deriving (NoThunks) via OnlyCheckWhnfNamed "LeiosCommittee" LeiosCommittee
 
 -- | Number of seats in the committee.
-committeeSize :: Committee -> Int
-committeeSize Committee {committeeVoters} = length committeeVoters
+leiosCommitteeSize :: LeiosCommittee -> Int
+leiosCommitteeSize LeiosCommittee {committeeVoters} = length committeeVoters
 
--- | Resolve a 'VoterId' to its 'LeiosVoter' on the 'Committee', or 'Nothing'
+-- | Resolve a 'LeiosVoterId' to its 'LeiosVoter' on the 'LeiosCommittee', or 'Nothing'
 -- if the index is past the committee bound.
-resolveVoter :: Committee -> VoterId -> Maybe LeiosVoter
-resolveVoter committee voterId =
+resolveLeiosVoter :: LeiosCommittee -> LeiosVoterId -> Maybe LeiosVoter
+resolveLeiosVoter committee voterId =
   committee.committeeVoters V.!? idx
   where
     idx = fromIntegral @Word16 @Int voterId.voterIndex
 
--- | Find a voter's 'VoterId' on the 'Committee' by its
+-- | Find a voter's 'LeiosVoterId' on the 'LeiosCommittee' by its
 -- 'LeiosVerificationKey', or 'Nothing' if the key is not on the committee.
 --
 -- If the committee carries duplicate verification keys, returns the smallest
 -- index matching @vk@ (committee selection is expected to deduplicate, but
 -- this module does not enforce it).
-getVoterId :: LeiosVerificationKey -> Committee -> Maybe VoterId
-getVoterId vk committee =
-  VoterId . fromIntegral @Int @Word16
+getLeiosVoterId :: LeiosVerificationKey -> LeiosCommittee -> Maybe LeiosVoterId
+getLeiosVoterId vk committee =
+  LeiosVoterId . fromIntegral @Int @Word16
     <$> V.findIndex ((== vk) . voterVKey) committee.committeeVoters
 
 -- | A Leios certificate over an endorser block, as specified in CIP-164:
@@ -256,7 +256,7 @@ decodeLeiosCert = do
 
 data AggregationError
   = -- | One or more voter indices in the sigs are past the committee bound.
-    VoterIdsOutOfBounds (NonEmpty VoterId)
+    VoterIdsOutOfBounds (NonEmpty LeiosVoterId)
   | -- | BLS signature aggregation failed (e.g. malformed input signature).
     BLSAggregationFailed Text
   deriving stock (Eq, Show, Generic)
@@ -274,15 +274,15 @@ data AggregationError
 --
 -- == What this function does
 --
---   * Range-checks each 'VoterId' against the committee.
+--   * Range-checks each 'LeiosVoterId' against the committee.
 --   * Encodes the bitfield over the committee and aggregates the input
 --     signatures.
 --
 -- This is the only way to construct a 'LeiosCert' from outside the package;
 -- the bitfield layout is an internal wire-format detail.
 aggregateLeiosCert ::
-  Committee ->
-  Map VoterId LeiosSignature ->
+  LeiosCommittee ->
+  Map LeiosVoterId LeiosSignature ->
   Either AggregationError LeiosCert
 aggregateLeiosCert committee sigs = do
   case nonEmpty outOfBoundsVoterIds of
@@ -294,14 +294,14 @@ aggregateLeiosCert committee sigs = do
   pure LeiosCert {signers, aggregatedSignature}
   where
     outOfBoundsVoterIds =
-      [vid | vid <- Map.keys sigs, isNothing $ resolveVoter committee vid]
+      [vid | vid <- Map.keys sigs, isNothing $ resolveLeiosVoter committee vid]
 
     -- Builds directly into a mutable 'ByteArray' via a single allocation and
     -- writes one bit per member of the input set.
     signers = BitField $ runByteArray $ do
       mba <- newByteArray len
       fillByteArray mba 0 len 0
-      forM_ (Map.keys sigs) $ \(VoterId i) -> do
+      forM_ (Map.keys sigs) $ \(LeiosVoterId i) -> do
         let idx = fromIntegral @Word16 @Int i
         when (idx < n) $ do
           let byteIx = idx `shiftR` 3
@@ -310,12 +310,12 @@ aggregateLeiosCert committee sigs = do
           writeByteArray mba byteIx (b `setBit` bitIx)
       pure mba
 
-    n = committeeSize committee
+    n = leiosCommitteeSize committee
 
     len = (n + 7) `div` 8
 
 data VerificationError
-  = -- | 'signers' bitfield is longer than @⌈committeeSize/8⌉@ bytes.
+  = -- | 'signers' bitfield is longer than @⌈leiosCommitteeSize/8⌉@ bytes.
     MalformedSigners
   | -- | The aggregate-BLS verification failed (wrong message, tampered
     -- signature, or a bitfield/aggregate mismatch).
@@ -325,12 +325,12 @@ data VerificationError
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
--- | Verify a 'LeiosCert' against a 'Committee', a weight threshold, and the
+-- | Verify a 'LeiosCert' against a 'LeiosCommittee', a weight threshold, and the
 -- message the signers were supposed to have signed.
 --
 -- == Caller obligations
 --
--- Every voter in the 'Committee' must have had its BLS proof-of-possession
+-- Every voter in the 'LeiosCommittee' must have had its BLS proof-of-possession
 -- verified beforehand (when the committee was selected). 'verifyLeiosCert'
 -- uses 'uncheckedAggregateVerKeysDSIGN' and does not re-check PoPs; passing
 -- in an unchecked committee breaks the security of the aggregate signature.
@@ -348,7 +348,7 @@ data VerificationError
 --      @msg@.
 verifyLeiosCert ::
   SignableRepresentation msg =>
-  Committee ->
+  LeiosCommittee ->
   -- | Minimum signer weight required to accept the cert.
   Weight ->
   -- | The message the signers signed.
@@ -372,15 +372,15 @@ verifyLeiosCert committee weightRequired msg cert = do
     & first (const InvalidSignature)
   pure weightReceived
   where
-    n = committeeSize committee
+    n = leiosCommitteeSize committee
 
     accumSigner vid (!w, !ks) =
-      case resolveVoter committee vid of
+      case resolveLeiosVoter committee vid of
         Nothing -> Left MalformedSigners
         Just (LeiosVoter w' vk) -> Right (w + w', vk : ks)
 
     bitFieldMembers (BitField ba) =
-      [ VoterId (fromIntegral @Int @Word16 globalIx)
+      [ LeiosVoterId (fromIntegral @Int @Word16 globalIx)
       | byteIx <- [0 .. sizeofByteArray ba - 1]
       , let byte = indexByteArray ba byteIx :: Word8
       , bitIx <- [0 .. 7]
@@ -389,7 +389,7 @@ verifyLeiosCert committee weightRequired msg cert = do
       , testBit byte (7 - bitIx)
       ]
 
--- | The @signers@ bitfield of a 'LeiosCert': a @⌈committeeSize\/8⌉@-byte
+-- | The @signers@ bitfield of a 'LeiosCert': a @⌈leiosCommitteeSize\/8⌉@-byte
 -- MSB-first packed-bits representation of which committee voters contributed
 -- to the aggregate signature.
 --
