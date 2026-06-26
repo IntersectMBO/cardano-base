@@ -44,7 +44,6 @@ module Cardano.Crypto.Leios (
   aggregateLeiosCert,
 
   -- ** Verification
-  WeightMismatch (..),
   VerificationError (..),
   verifyLeiosCert,
 
@@ -322,17 +321,7 @@ data VerificationError
     -- signature, or a bitfield/aggregate mismatch).
     InvalidSignature
   | -- | Sum of signers' weights is below the required threshold.
-    InsufficientWeight !WeightMismatch
-  deriving stock (Eq, Show, Generic)
-  deriving anyclass (NFData)
-
--- | The mismatch between the actual contributing weight and the minimum
--- threshold a 'LeiosCert' is required to meet. Carried by
--- 'InsufficientWeight'.
-data WeightMismatch = WeightMismatch
-  { got :: !Weight
-  , required :: !Weight
-  }
+    InsufficientWeight Weight
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -367,25 +356,25 @@ verifyLeiosCert ::
   LeiosCert ->
   -- | Total weight of the contributing signers on success.
   Either VerificationError Weight
-verifyLeiosCert committee required msg cert = do
+verifyLeiosCert committee weightRequired msg cert = do
   -- The bitfield must be exactly the canonical 'committee-many bits, padded
   -- to a whole byte' length. Trailing bytes (zero-padded or otherwise) are
   -- not accepted; the wire form is fixed for a given committee size.
   when (sizeofByteArray (bitFieldBytes cert.signers) /= (n + 7) `div` 8) $
     Left MalformedSigners
-  (got, vks) <- foldlM accumSigner (0, []) $ bitFieldMembers cert.signers
-  when (got < required) $
-    Left (InsufficientWeight WeightMismatch {got, required})
+  (weightReceived, vks) <- foldrM accumSigner (0, []) $ bitFieldMembers cert.signers
+  when (weightReceived < weightRequired) $
+    Left (InsufficientWeight weightReceived)
   aggVk <-
-    uncheckedAggregateVerKeysDSIGN (reverse vks) -- REVIEW: reverse needed?
+    uncheckedAggregateVerKeysDSIGN vks
       & first (const InvalidSignature)
   verifyDSIGN leiosSignContext aggVk msg cert.aggregatedSignature
     & first (const InvalidSignature)
-  pure got
+  pure weightReceived
   where
     n = committeeSize committee
 
-    accumSigner (!w, !ks) vid =
+    accumSigner vid (!w, !ks) =
       case resolveVoter committee vid of
         Nothing -> Left MalformedSigners
         Just (LeiosVoter w' vk) -> Right (w + w', vk : ks)

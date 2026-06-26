@@ -24,7 +24,6 @@ import Cardano.Crypto.Leios (
   VerificationError (..),
   VoterId (..),
   Weight,
-  WeightMismatch (..),
   aggregateLeiosCert,
   decodeLeiosCert,
   decodeVoterId,
@@ -277,7 +276,7 @@ prop_verifyLeiosCert_rejects_below_threshold = forAll (chooseInt (2, 16)) $ \n -
       contributions = signContribs msg [(0, sk0)]
    in aggregateOrFail committee contributions $ \cert ->
         verifyLeiosCert committee 1 msg cert
-          === Left (InsufficientWeight WeightMismatch {got = 1 / fromIntegral @Int @Weight n, required = 1})
+          === Left (InsufficientWeight (1 / fromIntegral @Int @Weight n))
 
 -- | A 'signers' bitfield whose byte length differs from @⌈n/8⌉@ must be
 -- rejected as 'MalformedSigners' before any signature work is done. We
