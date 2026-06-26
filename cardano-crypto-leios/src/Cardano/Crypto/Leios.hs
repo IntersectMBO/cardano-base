@@ -194,10 +194,24 @@ resolveLeiosVoter committee voterId =
 -- If the committee carries duplicate verification keys, returns the smallest
 -- index matching @vk@ (committee selection is expected to deduplicate, but
 -- this module does not enforce it).
+--
+-- Errors if the matching index does not fit in 'Word16'. The wire format of
+-- 'LeiosCert' indexes voters by a 16-bit field, so a committee with more than
+-- @2^16@ seats is already malformed. NOTE: this partiality could later be
+-- avoided by introducing a smart constructor for 'LeiosCommittee' (or for the
+-- committee-selection step in consensus) that rejects oversized committees
+-- up front.
 getLeiosVoterId :: LeiosVerificationKey -> LeiosCommittee -> Maybe LeiosVoterId
 getLeiosVoterId vk committee =
-  LeiosVoterId . fromIntegral @Int @Word16
-    <$> V.findIndex ((== vk) . voterVKey) committee.committeeVoters
+  toVoterId <$> V.findIndex ((== vk) . voterVKey) committee.committeeVoters
+  where
+    toVoterId i
+      | i > fromIntegral @Word16 @Int maxBound =
+          error $
+            "Cardano.Crypto.Leios.getVoterId: committee index "
+              <> show i
+              <> " does not fit in Word16"
+      | otherwise = LeiosVoterId (fromIntegral @Int @Word16 i)
 
 -- | A Leios certificate over an endorser block, as specified in CIP-164:
 --
