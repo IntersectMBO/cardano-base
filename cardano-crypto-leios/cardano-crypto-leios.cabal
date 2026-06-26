@@ -45,7 +45,7 @@ library
     containers,
     deepseq,
     nothunks,
-    primitive,
+    primitive >=0.7.3,
     text,
     vector,
 
@@ -58,7 +58,7 @@ library testlib
 
   build-depends:
     QuickCheck,
-    bytestring,
+    cardano-base:testlib,
     cardano-crypto-class,
     cardano-crypto-leios,
     containers,
@@ -76,6 +76,7 @@ test-suite tests
     QuickCheck,
     base16-bytestring,
     bytestring,
+    cardano-base:testlib,
     cardano-binary,
     cardano-crypto-class,
     cardano-crypto-leios:{cardano-crypto-leios, testlib},

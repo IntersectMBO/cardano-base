@@ -54,8 +54,8 @@ module Cardano.Crypto.Leios (
   decodeBitField,
 ) where
 
-import Cardano.Base.Bytes (byteArrayFromByteString, byteArrayToByteString)
-import Cardano.Binary (matchSize)
+import Cardano.Base.Bytes (byteArrayFromByteString)
+import Cardano.Binary (matchSize, toCBOR)
 import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (aggregateSigsDSIGN, uncheckedAggregateVerKeysDSIGN),
   DSIGNAlgorithm (rawSerialiseSigDSIGN),
@@ -70,7 +70,7 @@ import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, 
 import Cardano.Crypto.DSIGN.Class (sigSizeDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
 import Codec.CBOR.Decoding (Decoder, decodeBreakOr, decodeBytes, decodeListLenOrIndef, decodeWord16)
-import Codec.CBOR.Encoding (Encoding, encodeBytes, encodeListLen, encodeWord16)
+import Codec.CBOR.Encoding (Encoding, encodeListLen, encodeWord16)
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, unless, when)
 import Data.Array.Byte (ByteArray)
@@ -78,8 +78,9 @@ import Data.Bifunctor (first)
 import Data.Bits (setBit, shiftR, testBit, (.&.))
 import Data.ByteString (ByteString)
 import Data.Data (Proxy (..))
-import Data.Foldable (foldlM)
+import Data.Foldable (foldrM)
 import Data.Function ((&))
+import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
@@ -255,10 +256,10 @@ decodeLeiosCert = do
   pure cert
 
 data AggregationError
-  = -- | A voter index in the sigs is past the committee bound.
-    VoterIdOutOfBounds !VoterId
+  = -- | One or more voter indices in the sigs are past the committee bound.
+    VoterIdsOutOfBounds (NonEmpty VoterId)
   | -- | BLS signature aggregation failed (e.g. malformed input signature).
-    BLSAggregationFailed !Text
+    BLSAggregationFailed Text
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
@@ -285,9 +286,9 @@ aggregateLeiosCert ::
   Map VoterId LeiosSignature ->
   Either AggregationError LeiosCert
 aggregateLeiosCert committee sigs = do
-  case outOfBoundsVoterIds of
-    v : _ -> Left (VoterIdOutOfBounds v)
-    [] -> pure ()
+  case nonEmpty outOfBoundsVoterIds of
+    Just vs -> Left (VoterIdsOutOfBounds vs)
+    Nothing -> pure ()
   aggregatedSignature <-
     first (BLSAggregationFailed . T.pack) $
       aggregateSigsDSIGN (Map.elems sigs)
@@ -299,7 +300,6 @@ aggregateLeiosCert committee sigs = do
     -- Builds directly into a mutable 'ByteArray' via a single allocation and
     -- writes one bit per member of the input set.
     signers = BitField $ runByteArray $ do
-      let len = (n + 7) `div` 8
       mba <- newByteArray len
       fillByteArray mba 0 len 0
       forM_ (Map.keys sigs) $ \(VoterId i) -> do
@@ -312,6 +312,8 @@ aggregateLeiosCert committee sigs = do
       pure mba
 
     n = committeeSize committee
+
+    len = (n + 7) `div` 8
 
 data VerificationError
   = -- | 'signers' bitfield is longer than @⌈committeeSize/8⌉@ bytes.
@@ -412,7 +414,7 @@ newtype BitField = BitField {bitFieldBytes :: ByteArray}
 
 -- | Encode a 'BitField' to CBOR bytes.
 encodeBitField :: BitField -> Encoding
-encodeBitField = encodeBytes . byteArrayToByteString . bitFieldBytes
+encodeBitField = toCBOR . bitFieldBytes
 
 -- | Decode a 'BitField' from CBOR bytes.
 decodeBitField :: Decoder s BitField

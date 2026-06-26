@@ -42,13 +42,14 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy as BSL
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..), fromList)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
+import Test.Cardano.Base.Bytes (genByteString)
 import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
 import Test.Hspec (Spec, context, describe, it)
 import Test.Hspec.Golden (Golden (..))
@@ -135,7 +136,7 @@ exampleCert = case aggregateLeiosCert committee contributions of
   where
     (sks, committee) = fixedCommittee 1000
     msg = "leios-golden-message" :: BS.ByteString
-    contributions = signContribs msg (zip [0 ..] (NE.toList sks))
+    contributions = signContribs msg (zip [0 ..] (toList sks))
 
 -- * VoterId CBOR / committee lookup
 
@@ -189,19 +190,19 @@ prop_getVoterId_returns_first_index =
 -- | Equal-weighted committee of @n@ voters derived from a fixed seed pattern.
 -- Returns the signing keys alongside the committee so tests can produce
 -- contributions. The 'NonEmpty' return reflects the @n ≥ 1@ precondition and
--- gives tests a total 'NE.head' for "any-one-signer" cases.
+-- gives tests a total 'head' for "any-one-signer" cases.
 fixedCommittee :: Int -> (NonEmpty LeiosSigningKey, Committee)
 fixedCommittee n =
   ( sks
   , Committee
       ( V.fromList
-          [LeiosVoter (1 / fromIntegral @Int @Weight n) (deriveVerKeyDSIGN sk) | sk <- NE.toList sks]
+          [LeiosVoter (1 / fromIntegral @Int @Weight n) (deriveVerKeyDSIGN sk) | sk <- toList sks]
       )
   )
   where
     seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
     sks =
-      NE.fromList
+      fromList
         [ genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen (fromIntegral @Int @Word8 i)))
         | i <- [1 .. max 1 n]
         ]
@@ -213,9 +214,7 @@ genN :: QC.Gen Int
 genN = chooseInt (1, 16)
 
 genMsg :: QC.Gen BS.ByteString
-genMsg = do
-  len <- chooseInt (0, 64)
-  BS.pack <$> QC.vectorOf len QC.arbitrary
+genMsg = chooseInt (0, 64) >>= genByteString
 
 -- | Sign @msg@ with each of the given keys and pack them into a 'Map' keyed
 -- by 'VoterId', matching the input shape of 'aggregateLeiosCert'.
@@ -239,7 +238,7 @@ aggregateOrFail committee contributions k = case aggregateLeiosCert committee co
 prop_verifyLeiosCert_accepts_aggregated :: Property
 prop_verifyLeiosCert_accepts_aggregated = forAll genN $ \n -> forAll genMsg $ \msg ->
   let (sks, committee) = fixedCommittee n
-      contributions = signContribs msg (zip [0 :: Int ..] (NE.toList sks))
+      contributions = signContribs msg (zip [0 :: Int ..] (toList sks))
    in aggregateOrFail committee contributions $ \cert ->
         verifyLeiosCert committee 1 msg cert === Right 1
 
@@ -252,7 +251,7 @@ prop_verifyLeiosCert_accepts_subset = forAll genN $ \n ->
   forAll (chooseInt (1, n)) $ \k ->
     forAll genMsg $ \msg ->
       let (sks, committee) = fixedCommittee n
-          contributions = signContribs msg (take k (zip [0 :: Int ..] (NE.toList sks)))
+          contributions = signContribs msg (take k (zip [0 :: Int ..] (toList sks)))
           expectedWeight = fromIntegral @Int @Weight k / fromIntegral @Int @Weight n
        in aggregateOrFail committee contributions $ \cert ->
             verifyLeiosCert committee expectedWeight msg cert === Right expectedWeight
@@ -263,7 +262,7 @@ prop_verifyLeiosCert_rejects_wrong_message = forAll genN $ \n ->
   let (sks, committee) = fixedCommittee n
       m1 = "leios-message-one" :: BS.ByteString
       m2 = "leios-message-two" :: BS.ByteString
-      contributions = signContribs m1 (zip [0 :: Int ..] (NE.toList sks))
+      contributions = signContribs m1 (zip [0 :: Int ..] (toList sks))
    in aggregateOrFail committee contributions $ \cert ->
         verifyLeiosCert committee 1 m2 cert === Left InvalidSignature
 
@@ -273,9 +272,9 @@ prop_verifyLeiosCert_rejects_wrong_message = forAll genN $ \n ->
 -- than the full-weight threshold.
 prop_verifyLeiosCert_rejects_below_threshold :: Property
 prop_verifyLeiosCert_rejects_below_threshold = forAll (chooseInt (2, 16)) $ \n ->
-  let (sks, committee) = fixedCommittee n
+  let (sk0 :| _, committee) = fixedCommittee n
       msg = "leios-quorum-test" :: BS.ByteString
-      contributions = signContribs msg [(0, NE.head sks)]
+      contributions = signContribs msg [(0, sk0)]
    in aggregateOrFail committee contributions $ \cert ->
         verifyLeiosCert committee 1 msg cert
           === Left (InsufficientWeight WeightMismatch {got = 1 / fromIntegral @Int @Weight n, required = 1})
@@ -290,7 +289,7 @@ prop_verifyLeiosCert_rejects_oversized_signers = forAll genN $ \n ->
   let (sks, committeeA) = fixedCommittee n
       (_, committeeB) = fixedCommittee (n + 8)
       msg = "leios-malformed-test" :: BS.ByteString
-      contributions = signContribs msg (zip [0 :: Int ..] (NE.toList sks))
+      contributions = signContribs msg (zip [0 :: Int ..] (toList sks))
    in aggregateOrFail committeeA contributions $ \cert ->
         verifyLeiosCert committeeB 1 msg cert === Left MalformedSigners
 
@@ -303,9 +302,10 @@ prop_verifyLeiosCert_rejects_oversized_signers = forAll genN $ \n ->
 prop_verifyLeiosCert_rejects_tampered_bitfield :: Property
 prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n ->
   let (sks, committee) = fixedCommittee n
+      (sks0, sks1) = case sks of
+        s0 :| (s1 : _) -> (s0, s1)
+        _ -> error "prop_verifyLeiosCert_rejects_tampered_bitfield: n >= 2 invariant violated"
       msg = "leios-tamper-test" :: BS.ByteString
-      sks0 = NE.head sks
-      sks1 = NE.toList sks !! 1
       contribsAlone = signContribs msg [(0, sks0)]
       contribsPair = signContribs msg [(0, sks0), (1, sks1)]
    in aggregateOrFail committee contribsAlone $ \certA ->
@@ -320,11 +320,11 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
 prop_aggregateLeiosCert_rejects_out_of_range = forAll genN $ \n ->
   forAll (chooseInt (n, n + 100)) $ \badIdx ->
-    let (sks, committee) = fixedCommittee n
+    let (sk0 :| _, committee) = fixedCommittee n
         msg = "x" :: BS.ByteString
         bad = VoterId (fromIntegral @Int @Word16 badIdx)
-        contributions = Map.singleton bad (signDSIGN leiosSignContext msg (NE.head sks))
-     in aggregateLeiosCert committee contributions === Left (VoterIdOutOfBounds bad)
+        contributions = Map.singleton bad (signDSIGN leiosSignContext msg sk0)
+     in aggregateLeiosCert committee contributions === Left (VoterIdsOutOfBounds (bad :| []))
 
 -- | Aggregating an empty contribution set must fail: the underlying BLS
 -- 'aggregateSigsDSIGN' rejects the empty input, which surfaces as

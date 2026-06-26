@@ -34,12 +34,13 @@ import Cardano.Crypto.Leios (
   leiosSignContext,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
-import qualified Data.ByteString as BS
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (Proxy))
+import Data.Ratio ((%))
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word64)
-import Test.QuickCheck (Gen, arbitrary, choose, chooseInt, elements, shuffle, vectorOf)
+import Test.Cardano.Base.Bytes (genByteString)
+import Test.QuickCheck (Gen, choose, chooseInt, elements, shuffle, vectorOf)
 import Test.QuickCheck.Gen (unGen)
 import Test.QuickCheck.Random (mkQCGen)
 
@@ -48,7 +49,7 @@ import Test.QuickCheck.Random (mkQCGen)
 genLeiosSigningKey :: Gen LeiosSigningKey
 genLeiosSigningKey = do
   let seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
-  seedBytes <- BS.pack <$> vectorOf seedLen arbitrary
+  seedBytes <- genByteString seedLen
   pure $ genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes seedBytes)
 
 -- | Generate a real BLS 'LeiosSignature' by signing a random message with a
@@ -60,7 +61,7 @@ genLeiosSignature :: Gen LeiosSignature
 genLeiosSignature = do
   sk <- genLeiosSigningKey
   msgLen <- choose (0, 256)
-  msg <- BS.pack <$> vectorOf msgLen arbitrary
+  msg <- genByteString msgLen
   pure $ signDSIGN leiosSignContext msg sk
 
 -- | Generate a real, canonical 'LeiosCert' by building a fresh committee
@@ -79,11 +80,11 @@ genLeiosCert = do
   sks <- vectorOf n genLeiosSigningKey
   let committee =
         Committee . V.fromList $
-          [LeiosVoter (1 / fromIntegral n) (deriveVerKeyDSIGN sk) | sk <- sks]
+          [LeiosVoter (1 % toInteger n) (deriveVerKeyDSIGN sk) | sk <- sks]
   k <- chooseInt (1, n)
   signerIxs <- take k <$> shuffle [0 .. n - 1]
   msgLen <- choose (0, 64)
-  msg <- BS.pack <$> vectorOf msgLen arbitrary
+  msg <- genByteString msgLen
   let sigs =
         Map.fromList
           [ (VoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg (sks !! i))
