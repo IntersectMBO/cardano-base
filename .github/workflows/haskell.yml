@@ -112,7 +112,7 @@ jobs:
     # We use the hash of `dependencies.txt` as part of the cache key because that will be stable
     # until the `index-state` values in the `cabal.project` file changes.
     - name: Restore cached dependencies
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@v6
       id: cache
       with:
         path: |
@@ -129,7 +129,7 @@ jobs:
     # Always store the cabal cache.
     # This may fail (benign failure) if the cache key is already populated.
     - name: Cache Cabal store
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@v6
       with:
         path: |
           ${{ steps.setup-haskell.outputs.cabal-store }}
