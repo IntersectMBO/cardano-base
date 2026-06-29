@@ -41,6 +41,7 @@ import Codec.CBOR.FlatTerm
 import qualified Codec.CBOR.Read as CBOR.Read
 import Codec.CBOR.Term
 import Control.Category (Category ((.)))
+import Control.DeepSeq (NFData (..))
 import Control.Exception (Exception)
 import Control.Monad (replicateM, when)
 import Data.Array.Byte (ByteArray)
@@ -113,6 +114,17 @@ data DecoderError
   | DecoderErrorUnknownTag Text Word
   | DecoderErrorVoid
   deriving (Eq, Show)
+
+instance NFData DecoderError where
+  rnf = \case
+    DecoderErrorCanonicityViolation lbl -> rnf lbl
+    DecoderErrorCustom lbl err -> rnf (lbl, err)
+    DecoderErrorDeserialiseFailure lbl err -> rnf (lbl, err)
+    DecoderErrorEmptyList lbl -> rnf lbl
+    DecoderErrorLeftover lbl leftover -> rnf (lbl, leftover)
+    DecoderErrorSizeMismatch lbl requested actual -> rnf (lbl, requested, actual)
+    DecoderErrorUnknownTag lbl tag -> rnf (lbl, tag)
+    DecoderErrorVoid -> ()
 
 instance Exception DecoderError
 

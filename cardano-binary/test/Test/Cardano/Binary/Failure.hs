@@ -8,6 +8,7 @@ where
 
 import qualified Codec.CBOR.Read as CR
 
+import Control.DeepSeq (rnf)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Set (Set)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
@@ -83,15 +84,18 @@ prop_shouldFailNegativeNatural = property $ do
 
 assertIsLeft :: (HasCallStack, MonadTest m) => Either DecoderError b -> m ()
 assertIsLeft (Right _) = withFrozenCallStack $ failWith Nothing "This should have Left : failed"
-assertIsLeft (Left !x) = case x of
-  DecoderErrorDeserialiseFailure _ (CR.DeserialiseFailure _ str) | not (null str) -> success
-  DecoderErrorCanonicityViolation _ -> success
-  DecoderErrorCustom _ _ -> success
-  DecoderErrorEmptyList _ -> success
-  DecoderErrorLeftover _ _ -> success
-  DecoderErrorSizeMismatch _ _ _ -> success
-  DecoderErrorUnknownTag _ i | i > 0 -> success
-  _ -> success
+assertIsLeft (Left x) =
+  rnf x `seq`
+    ( case x of
+        DecoderErrorDeserialiseFailure _ (CR.DeserialiseFailure _ str) | not (null str) -> success
+        DecoderErrorCanonicityViolation _ -> success
+        DecoderErrorCustom _ _ -> success
+        DecoderErrorEmptyList _ -> success
+        DecoderErrorLeftover _ _ -> success
+        DecoderErrorSizeMismatch _ _ _ -> success
+        DecoderErrorUnknownTag _ i | i > 0 -> success
+        _ -> success
+    )
 
 decode :: FromCBOR a => Encoding -> Either DecoderError a
 decode enc =
