@@ -38,7 +38,7 @@ library
 
   build-depends:
     bytestring,
-    cardano-base,
+    cardano-base >=0.1.6,
     cardano-binary,
     cardano-crypto-class,
     cborg,
