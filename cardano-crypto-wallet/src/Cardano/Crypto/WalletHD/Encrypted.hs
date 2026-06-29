@@ -289,7 +289,10 @@ unEncryptedKey (EncryptedKey e) = e
 
 encryptedCreate ::
   (ByteArrayAccess passphrase, ByteArrayAccess secret, ByteArrayAccess cc) =>
-  secret -> passphrase -> cc -> IO (Either XPrvError EncryptedKey)
+  secret ->
+  passphrase ->
+  cc ->
+  IO (Either XPrvError EncryptedKey)
 encryptedCreate sec pass cc
   | B.length sec /= 32 = pure (Left XPrvInvalidSecretKey)
   | B.length cc /= ccSize = pure (Left XPrvInvalidChainCode)
@@ -303,7 +306,9 @@ encryptedCreate sec pass cc
 
 encryptedCreateDirectWithTweak ::
   (ByteArrayAccess passphrase, ByteArrayAccess secret) =>
-  secret -> passphrase -> IO (Either XPrvError EncryptedKey)
+  secret ->
+  passphrase ->
+  IO (Either XPrvError EncryptedKey)
 encryptedCreateDirectWithTweak sec pass
   | B.length sec /= 96 = pure (Left XPrvInvalidSecretKey)
   | otherwise = do
@@ -316,7 +321,9 @@ encryptedCreateDirectWithTweak sec pass
 
 encryptedValidatePassphrase ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError ())
+  EncryptedKey ->
+  passphrase ->
+  IO (Either XPrvError ())
 encryptedValidatePassphrase ekey pass = do
   emat <- decryptKeyMaterial ekey pass
   case emat of
@@ -327,7 +334,10 @@ encryptedValidatePassphrase ekey pass = do
 
 encryptedChangePass ::
   (ByteArrayAccess oldPassPhrase, ByteArrayAccess newPassPhrase) =>
-  oldPassPhrase -> newPassPhrase -> EncryptedKey -> IO (Either XPrvError EncryptedKey)
+  oldPassPhrase ->
+  newPassPhrase ->
+  EncryptedKey ->
+  IO (Either XPrvError EncryptedKey)
 encryptedChangePass oldPass newPass ekey =
   mask $ \restore -> do
     emat <- restore (decryptKeyMaterial ekey oldPass)
@@ -338,7 +348,10 @@ encryptedChangePass oldPass newPass ekey =
 
 encryptedSign ::
   (ByteArrayAccess passphrase, ByteArrayAccess msg) =>
-  EncryptedKey -> passphrase -> msg -> IO (Either XPrvError Signature)
+  EncryptedKey ->
+  passphrase ->
+  msg ->
+  IO (Either XPrvError Signature)
 encryptedSign ekey pass msg =
   mask $ \restore -> do
     emat <- restore (decryptKeyMaterial ekey pass)
@@ -429,7 +442,9 @@ encryptedChainCode (EncryptedKey ekey) =
 -- done with it.
 encryptedKeyMaterial ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError (MLockedSizedBytes 64))
+  EncryptedKey ->
+  passphrase ->
+  IO (Either XPrvError (MLockedSizedBytes 64))
 encryptedKeyMaterial ekey pass = do
   emat <- decryptKeyMaterial ekey pass
   case emat of
@@ -580,7 +595,9 @@ decodeAadFields = do
 
 decryptKeyMaterial ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError KeyMaterial)
+  EncryptedKey ->
+  passphrase ->
+  IO (Either XPrvError KeyMaterial)
 decryptKeyMaterial ekey pass =
   case encryptedKeyFormat ekey of
     LegacyV1 -> pure (Left XPrvDecodeError)
@@ -588,7 +605,9 @@ decryptKeyMaterial ekey pass =
 
 v2Decrypt ::
   ByteArrayAccess passphrase =>
-  EncryptedKey -> passphrase -> IO (Either XPrvError KeyMaterial)
+  EncryptedKey ->
+  passphrase ->
+  IO (Either XPrvError KeyMaterial)
 v2Decrypt (EncryptedKey bs) pass =
   case decodeV2Envelope bs of
     Left err -> pure (Left err)
@@ -630,7 +649,9 @@ v2Decrypt (EncryptedKey bs) pass =
 
 wrapKeyMaterial ::
   ByteArrayAccess passphrase =>
-  passphrase -> KeyMaterial -> IO (Either XPrvError EncryptedKey)
+  passphrase ->
+  KeyMaterial ->
+  IO (Either XPrvError EncryptedKey)
 wrapKeyMaterial pass material = do
   eVal <- validateKeyMaterial material
   case eVal of
@@ -725,7 +746,9 @@ withEncryptedKeyOutput onFailure action =
 
 legacyMaterialFromSecret ::
   (ByteArrayAccess secret, ByteArrayAccess cc) =>
-  secret -> cc -> IO (Either XPrvError KeyMaterial)
+  secret ->
+  cc ->
+  IO (Either XPrvError KeyMaterial)
 legacyMaterialFromSecret sec cc =
   withEncryptedKeyOutput XPrvInvalidSecretKey $ \outPtr ->
     withByteArray sec $ \psec ->
@@ -756,7 +779,9 @@ legacyDerivePrivate dscheme parent childIndex =
 
 deriveWrappingKey ::
   ByteArrayAccess passphrase =>
-  passphrase -> ByteString -> IO (Either XPrvError B.ScrubbedBytes)
+  passphrase ->
+  ByteString ->
+  IO (Either XPrvError B.ScrubbedBytes)
 deriveWrappingKey pass salt
   | BS.length salt /= saltSize = pure (Left XPrvInvalidSaltLength)
   | otherwise = do
