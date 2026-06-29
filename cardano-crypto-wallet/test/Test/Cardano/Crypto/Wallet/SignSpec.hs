@@ -11,7 +11,7 @@ import Test.Hspec
 
 import Cardano.Crypto.WalletHD.Encrypted
 
-foreign import ccall "ccw_ed25519_sign_open"
+foreign import ccall "cardano_crypto_ed25519_sign_open"
   c_ed25519_sign_open ::
     Ptr a ->
     CSize ->

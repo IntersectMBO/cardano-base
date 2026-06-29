@@ -42,7 +42,7 @@ static void wallet_encrypted_initialize
      encrypted_key *out)
 {
 	ed25519_public_key pub_key;
-	ccw_ed25519_publickey(secret_key, pub_key);
+	cardano_crypto_ed25519_publickey(secret_key, pub_key);
 	memcpy(out->ekey, secret_key, ENCRYPTED_KEY_SIZE);
 	memcpy(out->pkey, pub_key, PUBLIC_KEY_SIZE);
 	memcpy(out->cc, cc, CHAIN_CODE_SIZE);
@@ -54,7 +54,7 @@ int cardano_wallet_encrypted_from_secret
      encrypted_key *out)
 {
 	ed25519_secret_key secret_key;
-	if (ccw_ed25519_extend(seed, secret_key)) {
+	if (cardano_crypto_ed25519_extend(seed, secret_key)) {
 		secure_clear(secret_key, sizeof(secret_key));
 		return 1;
 	}
@@ -85,7 +85,7 @@ int cardano_wallet_encrypted_decrypt
 {
 	ed25519_public_key pub_key;
 
-	ccw_ed25519_publickey(in->ekey, pub_key);
+	cardano_crypto_ed25519_publickey(in->ekey, pub_key);
 	if (sodium_memcmp(pub_key, in->pkey, PUBLIC_KEY_SIZE) != 0) {
 		secure_clear(pub_key, sizeof(pub_key));
 		return 1;
@@ -105,8 +105,8 @@ int cardano_wallet_encrypted_sign
      ed25519_signature signature)
 {
 	ed25519_public_key pub_key;
-	ccw_ed25519_publickey(in->ekey, pub_key);
-	ccw_ed25519_sign(data, data_len, in->cc, CHAIN_CODE_SIZE, in->ekey, pub_key, signature);
+	cardano_crypto_ed25519_publickey(in->ekey, pub_key);
+	cardano_crypto_ed25519_sign(data, data_len, in->cc, CHAIN_CODE_SIZE, in->ekey, pub_key, signature);
 	secure_clear(pub_key, sizeof(pub_key));
 	return 0;
 }
@@ -206,7 +206,7 @@ static void add_left(ed25519_secret_key res_key, uint8_t *z, ed25519_secret_key 
 	switch (mode) {
 	case DERIVATION_V1:
 		multiply8_v1(zl8, z, 32);
-		ccw_ed25519_scalar_add(zl8, priv_key, res_key);
+		cardano_crypto_ed25519_scalar_add(zl8, priv_key, res_key);
 		break;
 	case DERIVATION_V2:
 		multiply8_v2(zl8, z, 28);
@@ -242,8 +242,8 @@ static void add_left_public(uint8_t *out, uint8_t *z, uint8_t *in, derivation_sc
 		break;
 	}
 
-	ccw_ed25519_publickey(zl8, pub_zl8);
-	ccw_ed25519_point_add(pub_zl8, in, out);
+	cardano_crypto_ed25519_publickey(zl8, pub_zl8);
+	cardano_crypto_ed25519_point_add(pub_zl8, in, out);
 }
 
 int cardano_wallet_encrypted_derive_private
