@@ -99,6 +99,7 @@ import Data.Vector.Strict (Vector)
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 type LeiosDSIGN = BLS12381MinSigDSIGN
@@ -202,14 +203,14 @@ resolveLeiosVoter committee voterId =
 -- avoided by introducing a smart constructor for 'LeiosCommittee' (or for the
 -- committee-selection step in consensus) that rejects oversized committees
 -- up front.
-getLeiosVoterId :: LeiosVerificationKey -> LeiosCommittee -> Maybe LeiosVoterId
+getLeiosVoterId :: HasCallStack => LeiosVerificationKey -> LeiosCommittee -> Maybe LeiosVoterId
 getLeiosVoterId vk committee =
   toVoterId <$> V.findIndex ((== vk) . voterVKey) committee.leiosCommitteeVoters
   where
     toVoterId i
       | i > fromIntegral @Word16 @Int maxBound =
           error $
-            "Cardano.Crypto.Leios.getVoterId: committee index "
+            "Cardano.Crypto.Leios.getLeiosVoterId: committee index "
               <> show i
               <> " does not fit in Word16"
       | otherwise = LeiosVoterId (fromIntegral @Int @Word16 i)
