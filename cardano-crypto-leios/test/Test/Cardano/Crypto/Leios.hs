@@ -108,8 +108,8 @@ prop_decode_indefinite_LeiosCert :: Property
 prop_decode_indefinite_LeiosCert = forAll genLeiosCert $ \cert ->
   let indef =
         encodeListLenIndef
-          <> encodeBitField (signers cert)
-          <> encodeSigDSIGN (aggregatedSignature cert)
+          <> encodeBitField (leiosCertSigners cert)
+          <> encodeSigDSIGN (leiosCertSignature cert)
           <> encodeBreak
    in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (CBOR.serialize indef)
         === Right cert
@@ -294,7 +294,7 @@ prop_verifyLeiosCert_rejects_oversized_signers = forAll genN $ \n ->
    in aggregateOrFail committeeA contributions $ \cert ->
         verifyLeiosCert committeeB 1 msg cert === Left MalformedSigners
 
--- | A cert whose 'signers' bitfield disagrees with its 'aggregatedSignature'
+-- | A cert whose 'leiosCertSigners' bitfield disagrees with its 'leiosCertSignature'
 -- must be rejected with 'InvalidSignature'. We construct two real certs
 -- against the same committee (voter 0 alone, then voters 0+1), then splice
 -- certA's signature with certB's bitfield. The bitfield claims voter 1 also
@@ -311,7 +311,7 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n
       contribsPair = signContribs msg [(0, sks0), (1, sks1)]
    in aggregateOrFail committee contribsAlone $ \certA ->
         aggregateOrFail committee contribsPair $ \certB ->
-          let tampered = certA {signers = certB.signers}
+          let tampered = certA {leiosCertSigners = certB.leiosCertSigners}
            in -- Threshold is below the tampered weight 2/n so we exercise the BLS
               -- pairing failure, not the short-circuit.
               verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
