@@ -132,7 +132,7 @@ type Weight = Rational
 -- 'leiosCommitteeVoters' and determines its bit in the 'LeiosCert' @leiosCertSigners@
 -- bitfield (MSB-first within each byte, so voter @i@ ↔ bit @7-(i mod 8)@ of
 -- byte @i \`div\` 8@).
-newtype LeiosVoterId = LeiosVoterId {voterIndex :: Word16}
+newtype LeiosVoterId = LeiosVoterId {leiosVoterIndex :: Word16}
   deriving stock (Eq, Ord, Show, Generic)
   deriving newtype (NFData, NoThunks)
 
@@ -188,7 +188,7 @@ resolveLeiosVoter :: LeiosCommittee -> LeiosVoterId -> Maybe LeiosVoter
 resolveLeiosVoter committee voterId =
   committee.leiosCommitteeVoters V.!? idx
   where
-    idx = fromIntegral @Word16 @Int voterId.voterIndex
+    idx = fromIntegral @Word16 @Int voterId.leiosVoterIndex
 
 -- | Find a voter's 'LeiosVoterId' on the 'LeiosCommittee' by its
 -- 'LeiosVerificationKey', or 'Nothing' if the key is not on the committee.
