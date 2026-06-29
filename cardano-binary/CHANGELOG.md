@@ -1,6 +1,6 @@
 # Changelog for `cardano-binary`
 
-## 1.9.0.1
+## 1.9.1.0
 
 * Add `NFData` instance for `DecoderError`.
 
