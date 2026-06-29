@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -127,12 +128,12 @@ leiosSignatureToBytes = rawSerialiseSigDSIGN
 type Weight = Rational
 
 -- | A committee member's seat index. The index is the voter's position in
--- 'committeeVoters' and determines its bit in the 'LeiosCert' @signers@
+-- 'leiosCommitteeVoters' and determines its bit in the 'LeiosCert' @signers@
 -- bitfield (MSB-first within each byte, so voter @i@ ↔ bit @7-(i mod 8)@ of
 -- byte @i \`div\` 8@).
 newtype LeiosVoterId = LeiosVoterId {voterIndex :: Word16}
   deriving stock (Eq, Ord, Show, Generic)
-  deriving anyclass (NFData, NoThunks)
+  deriving newtype (NFData, NoThunks)
 
 -- | Plain CBOR encoder for 'LeiosVoterId'.
 encodeLeiosVoterId :: LeiosVoterId -> Encoding
@@ -166,9 +167,9 @@ data LeiosVoter = LeiosVoter
 -- skip per-key PoP checks (they use 'uncheckedAggregateVerKeysDSIGN' /
 -- 'aggregateSigsDSIGN' under the hood). Passing in unchecked keys defeats
 -- the security of the aggregate signature.
-newtype LeiosCommittee = LeiosCommittee {committeeVoters :: Vector LeiosVoter}
+newtype LeiosCommittee = LeiosCommittee {leiosCommitteeVoters :: Vector LeiosVoter}
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (NFData)
+  deriving newtype (NFData)
   -- 'nothunks' ships no instance for 'Data.Vector.Strict.Vector' and we don't
   -- want to add an orphan. A WHNF-only check on the wrapper is sufficient here:
   -- the strict 'Vector' forces every cell to WHNF, and a WHNF 'LeiosVoter'
@@ -178,13 +179,13 @@ newtype LeiosCommittee = LeiosCommittee {committeeVoters :: Vector LeiosVoter}
 
 -- | Number of seats in the committee.
 leiosCommitteeSize :: LeiosCommittee -> Int
-leiosCommitteeSize LeiosCommittee {committeeVoters} = length committeeVoters
+leiosCommitteeSize LeiosCommittee {leiosCommitteeVoters} = length leiosCommitteeVoters
 
 -- | Resolve a 'LeiosVoterId' to its 'LeiosVoter' on the 'LeiosCommittee', or 'Nothing'
 -- if the index is past the committee bound.
 resolveLeiosVoter :: LeiosCommittee -> LeiosVoterId -> Maybe LeiosVoter
 resolveLeiosVoter committee voterId =
-  committee.committeeVoters V.!? idx
+  committee.leiosCommitteeVoters V.!? idx
   where
     idx = fromIntegral @Word16 @Int voterId.voterIndex
 
@@ -203,7 +204,7 @@ resolveLeiosVoter committee voterId =
 -- up front.
 getLeiosVoterId :: LeiosVerificationKey -> LeiosCommittee -> Maybe LeiosVoterId
 getLeiosVoterId vk committee =
-  toVoterId <$> V.findIndex ((== vk) . voterVKey) committee.committeeVoters
+  toVoterId <$> V.findIndex ((== vk) . voterVKey) committee.leiosCommitteeVoters
   where
     toVoterId i
       | i > fromIntegral @Word16 @Int maxBound =
@@ -412,7 +413,7 @@ verifyLeiosCert committee weightRequired msg cert = do
 -- form cannot be accidentally confused with arbitrary @bytes@.
 newtype BitField = BitField {bitFieldBytes :: ByteArray}
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (NFData)
+  deriving newtype (NFData)
   deriving (NoThunks) via OnlyCheckWhnfNamed "BitField" BitField
 
 -- | Encode a 'BitField' to CBOR bytes.

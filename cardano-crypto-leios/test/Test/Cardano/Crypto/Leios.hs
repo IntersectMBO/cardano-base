@@ -156,7 +156,7 @@ prop_resolveVoter_getVoterId_inverse :: Property
 prop_resolveVoter_getVoterId_inverse =
   forAll genN $ \n ->
     let (_, committee) = fixedCommittee n
-        voters = V.toList committee.committeeVoters
+        voters = V.toList committee.leiosCommitteeVoters
      in QC.conjoin
           [ counterexample ("voter index " <> show i) $
               case getLeiosVoterId (voterVKey voter) committee of
@@ -175,14 +175,14 @@ prop_getVoterId_returns_first_index :: Property
 prop_getVoterId_returns_first_index =
   forAll genN $ \n ->
     let (_, committee) = fixedCommittee n
-        voters = V.toList committee.committeeVoters
+        voters = V.toList committee.leiosCommitteeVoters
      in QC.conjoin
           [ counterexample ("first occurrence at " <> show i) $
               getLeiosVoterId (voterVKey voter) duped
                 === Just (LeiosVoterId (fromIntegral i))
           | let duped =
                   LeiosCommittee
-                    (committee.committeeVoters <> committee.committeeVoters)
+                    (committee.leiosCommitteeVoters <> committee.leiosCommitteeVoters)
           , (i :: Int, voter) <- zip [0 ..] voters
           ]
 
