@@ -213,7 +213,7 @@ instance
       convertSK =
         fmap (fromMaybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failed"))
           . rawDeserialiseSignKeyDSIGNM
-          . rawSerialiseSignKeyDSIGN
+          . rawEncodeFixedSized
 
 instance
   (UnsoundDSIGNMAlgorithm d, KnownNat t, KESAlgorithm (SimpleKES d t)) =>
@@ -228,7 +228,7 @@ instance
 
   rawDeserialiseSignKeyKESWith allocator bs
     | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy d))
+          sizeKey = fromIntegral @Word @Int (fixedSize (Proxy :: Proxy (SignKeyDSIGN d)))
     , skbs <- splitsAt (replicate duration sizeKey) bs
     , length skbs == duration =
         runMaybeT $ do
@@ -249,7 +249,7 @@ instance
     BS.concat [rawEncodeFixedSized vk | vk <- Vec.toList vks]
   rawDecodeFixedSized bs = guardFixedSized bs $ do
     let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-        sizeKey = fromIntegral @Word @Int (verKeySizeDSIGN (Proxy :: Proxy d))
+        sizeKey = fromIntegral @Word @Int (fixedSize (Proxy :: Proxy (VerKeyDSIGN d)))
         vkbs = splitsAt (replicate duration sizeKey) bs
     unless (length vkbs == duration) $
       fail "VerKeyKES (SimpleKES d t): vkbs length is not equal to duration"
@@ -278,7 +278,7 @@ instance
     foldMap rawEncodeFixedSized sks
   rawDecodeFixedSized bs = guardFixedSized bs $ do
     let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-        sizeKey = fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy d))
+        sizeKey = fromIntegral @Word @Int (fixedSize (Proxy :: Proxy (SignKeyDSIGN d)))
         skbs = splitsAt (replicate duration sizeKey) bs
     unless (length skbs == duration) $
       fail "UnsoundPureSignKeyKES (SimpleKES d t): vkbs length is not equal to duration"

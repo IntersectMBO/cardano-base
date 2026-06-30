@@ -469,14 +469,14 @@ prove sk msg =
 -- | Construct a BatchCompat vkey from praos, non-batchcompat
 vkToBatchCompat :: VerKeyVRF PraosVRF -> VerKeyVRF BC.PraosBatchCompatVRF
 vkToBatchCompat praosVk =
-  case rawDeserialiseVerKeyVRF (rawSerialiseVerKeyVRF praosVk) of
+  case rawDecodeFixedSized (rawEncodeFixedSized praosVk) of
     Just vk -> vk
     Nothing -> error "VerKeyVRF: Unable to convert PraosVK to BatchCompatVK."
 
 -- | Construct a BatchCompat skey from praos, non-batchcompat
 skToBatchCompat :: SignKeyVRF PraosVRF -> SignKeyVRF BC.PraosBatchCompatVRF
 skToBatchCompat praosSk =
-  case rawDeserialiseSignKeyVRF (rawSerialiseSignKeyVRF praosSk) of
+  case rawDecodeFixedSized (rawEncodeFixedSized praosSk) of
     Just sk -> sk
     Nothing -> error "SignKeyVRF: Unable to convert PraosSK to BatchCompatSK."
 

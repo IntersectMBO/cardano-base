@@ -282,8 +282,8 @@ instance
       mconcat
         [ ssk
         , sr1
-        , rawSerialiseVerKeyKES vk_0
-        , rawSerialiseVerKeyKES vk_1
+        , rawEncodeFixedSized vk_0
+        , rawEncodeFixedSized vk_1
         ]
 
   {-# NOINLINE rawDeserialiseSignKeyKESWith #-}
@@ -291,8 +291,8 @@ instance
     guard (BS.length b == fromIntegral @Word @Int size_total)
     sk <- MaybeT $ rawDeserialiseSignKeyKESWith allocator b_sk
     r <- MaybeT $ mlsbFromByteStringCheckWith allocator b_r
-    vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES b_vk0
-    vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES b_vk1
+    vk_0 <- MaybeT . return $ rawDecodeFixedSized b_vk0
+    vk_1 <- MaybeT . return $ rawDecodeFixedSized b_vk1
     return (SignKeySumKES sk (MLockedSeed r) vk_0 vk_1)
     where
       b_sk = slice off_sk size_sk b
@@ -302,7 +302,7 @@ instance
 
       size_sk = signKeySizeKES (Proxy :: Proxy d)
       size_r = seedSizeKES (Proxy :: Proxy d)
-      size_vk = verKeySizeKES (Proxy :: Proxy d)
+      size_vk = fixedSize (Proxy :: Proxy (VerKeyKES d))
       size_total = signKeySizeKES (Proxy :: Proxy (SumKES h d))
 
       off_sk = 0 :: Word
@@ -344,8 +344,8 @@ instance
       b_vk0 = slice off_vk0 size_vk b
       b_vk1 = slice off_vk1 size_vk b
 
-      size_sig = sigSizeKES (Proxy :: Proxy d)
-      size_vk = verKeySizeKES (Proxy :: Proxy d)
+      size_sig = fixedSize (Proxy :: Proxy (SigKES d))
+      size_vk = fixedSize (Proxy :: Proxy (VerKeyKES d))
 
       off_sig = 0 :: Word
       off_vk0 = size_sig
@@ -381,7 +381,7 @@ instance
 
       size_sk = signKeySizeKES (Proxy :: Proxy d)
       size_r = seedSizeKES (Proxy :: Proxy d)
-      size_vk = verKeySizeKES (Proxy :: Proxy d)
+      size_vk = fixedSize (Proxy :: Proxy (VerKeyKES d))
 
       off_sk = 0 :: Word
       off_r = size_sk

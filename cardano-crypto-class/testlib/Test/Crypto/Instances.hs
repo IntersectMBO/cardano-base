@@ -8,6 +8,7 @@ module Test.Crypto.Instances (
   withMLockedSeedFromPSB,
 ) where
 
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..), fixedSize)
 import Cardano.Crypto.DSIGN.Class hiding (Signable)
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.MLockedSeed
@@ -115,15 +116,15 @@ errorInvalidSize n = maybe (error $ "Impossible: Invalid size " ++ show n) pure
 
 instance DSIGNAlgorithm v => Arbitrary (SignKeyDSIGN v) where
   arbitrary = do
-    let n = fromIntegral (signKeySizeDSIGN (Proxy @v))
+    let n = fromIntegral (fixedSize (Proxy @(SignKeyDSIGN v)))
     bs <- genByteString n
-    errorInvalidSize n $ rawDeserialiseSignKeyDSIGN bs
+    errorInvalidSize n $ rawDecodeFixedSized bs
 
 instance DSIGNAlgorithm v => Arbitrary (SigDSIGN v) where
   arbitrary = do
-    let n = fromIntegral (sigSizeDSIGN (Proxy @v))
+    let n = fromIntegral (fixedSize (Proxy @(SigDSIGN v)))
     bs <- genByteString n
-    errorInvalidSize n $ rawDeserialiseSigDSIGN bs
+    errorInvalidSize n $ rawDecodeFixedSized bs
 
 instance DSIGNAlgorithm v => Arbitrary (SignedDSIGN v a) where
   arbitrary = SignedDSIGN <$> arbitrary

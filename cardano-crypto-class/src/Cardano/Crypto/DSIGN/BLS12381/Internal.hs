@@ -59,7 +59,6 @@ import Cardano.Crypto.DSIGN.Class (
   encodedSigDSIGNSizeExpr,
   encodedSignKeyDSIGNSizeExpr,
   encodedVerKeyDSIGNSizeExpr,
-  rawSerialiseVerKeyDSIGN,
   seedSizeDSIGN,
  )
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
@@ -543,13 +542,13 @@ instance
   {-# INLINE createPossessionProofDSIGN #-}
   createPossessionProofDSIGN ctx sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = signDSIGN ctx (rawSerialiseVerKeyDSIGN vk) sk
+        SigBLS12381 sig = signDSIGN ctx (rawEncodeFixedSized vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
   verifyPossessionProofDSIGN ctx vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (verifyDSIGN ctx vk (rawSerialiseVerKeyDSIGN vk) (SigBLS12381 mu1Psb))
+      (verifyDSIGN ctx vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>

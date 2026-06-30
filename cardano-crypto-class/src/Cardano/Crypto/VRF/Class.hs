@@ -129,7 +129,7 @@ class
   deriveVerKeyVRF :: SignKeyVRF v -> VerKeyVRF v
 
   hashVerKeyVRF :: HashAlgorithm h => VerKeyVRF v -> Hash h (VerKeyVRF v)
-  hashVerKeyVRF = hashWith rawSerialiseVerKeyVRF
+  hashVerKeyVRF = hashWith rawEncodeFixedSized
 
   --
   -- Core algorithm operations
@@ -207,15 +207,25 @@ class
     , sizeOutputVRF
     #-}
 
+{-# DEPRECATED rawSerialiseVerKeyVRF "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawSerialiseSignKeyVRF "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawSerialiseCertVRF "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseVerKeyVRF "Use `rawDecodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseSignKeyVRF "Use `rawDecodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseCertVRF "Use `rawDecodeFixedSized` instead" #-}
+
 sizeVerKeyVRF ::
   forall v proxy. FixedSizeCodec (VerKeyVRF v) => proxy v -> Word
 sizeVerKeyVRF _ = fixedSize $ Proxy @(VerKeyVRF v)
+{-# DEPRECATED sizeVerKeyVRF "Use `fixedSize` instead" #-}
 
 sizeSignKeyVRF :: forall v proxy. FixedSizeCodec (SignKeyVRF v) => proxy v -> Word
 sizeSignKeyVRF _ = fixedSize $ Proxy @(SignKeyVRF v)
+{-# DEPRECATED sizeSignKeyVRF "Use `fixedSize` instead" #-}
 
 sizeCertVRF :: forall v proxy. FixedSizeCodec (CertVRF v) => proxy v -> Word
 sizeCertVRF _ = fixedSize $ Proxy @(CertVRF v)
+{-# DEPRECATED sizeCertVRF "Use `fixedSize` instead" #-}
 
 --
 -- Do not provide Ord instances for keys, see #38
@@ -275,15 +285,15 @@ mkTestOutputVRF = OutputVRF . naturalToByteArray sz
 --
 
 encodeVerKeyVRF :: VRFAlgorithm v => VerKeyVRF v -> Encoding
-encodeVerKeyVRF = encodeBytes . rawSerialiseVerKeyVRF
+encodeVerKeyVRF = encodeBytes . rawEncodeFixedSized
 {-# DEPRECATED encodeVerKeyVRF "Use `encodeFixedSized` instead" #-}
 
 encodeSignKeyVRF :: VRFAlgorithm v => SignKeyVRF v -> Encoding
-encodeSignKeyVRF = encodeBytes . rawSerialiseSignKeyVRF
+encodeSignKeyVRF = encodeBytes . rawEncodeFixedSized
 {-# DEPRECATED encodeSignKeyVRF "Use `encodeFixedSized` instead" #-}
 
 encodeCertVRF :: VRFAlgorithm v => CertVRF v -> Encoding
-encodeCertVRF = encodeBytes . rawSerialiseCertVRF
+encodeCertVRF = encodeBytes . rawEncodeFixedSized
 {-# DEPRECATED encodeCertVRF "Use `encodeFixedSized` instead" #-}
 
 decodeVerKeyVRF :: forall v s. VRFAlgorithm v => Decoder s (VerKeyVRF v)
@@ -324,7 +334,7 @@ instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
   encodedSizeExpr _size proxy =
     1
       + certifiedOutputSize (certifiedOutput <$> proxy)
-      + fromIntegral @Word @Size (sizeCertVRF (Proxy :: Proxy v))
+      + fromIntegral @Word @Size (fixedSize (Proxy @(CertVRF v)))
     where
       certifiedOutputSize :: Proxy (OutputVRF v) -> Size
       certifiedOutputSize _proxy =
@@ -362,29 +372,23 @@ verifyCertified ctxt vk a CertifiedVRF {certifiedOutput, certifiedProof} =
 -- 'Size' expressions for 'ToCBOR' instances
 --
 
--- | 'Size' expression for 'VerKeyVRF' which is using 'sizeVerKeyVRF' encoded as
--- 'Size'.
 encodedVerKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (VerKeyVRF v) -> Size
 encodedVerKeyVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sizeVerKeyVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(VerKeyVRF v))))
     -- payload
-    + fromIntegral @Word @Size (sizeVerKeyVRF (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(VerKeyVRF v)))
 
--- | 'Size' expression for 'SignKeyVRF' which is using 'sizeSignKeyVRF' encoded
--- as 'Size'
 encodedSignKeyVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (SignKeyVRF v) -> Size
 encodedSignKeyVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sizeSignKeyVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(SignKeyVRF v))))
     -- payload
-    + fromIntegral @Word @Size (sizeSignKeyVRF (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(SignKeyVRF v)))
 
--- | 'Size' expression for 'CertVRF' which is using 'sizeCertVRF' encoded as
--- 'Size'.
 encodedCertVRFSizeExpr :: forall v. VRFAlgorithm v => Proxy (CertVRF v) -> Size
 encodedCertVRFSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sizeCertVRF (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(CertVRF v))))
     -- payload
-    + fromIntegral @Word @Size (sizeCertVRF (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(CertVRF v)))
