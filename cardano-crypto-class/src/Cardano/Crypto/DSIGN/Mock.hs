@@ -20,6 +20,12 @@ module Cardano.Crypto.DSIGN.Mock (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
 import Control.DeepSeq (NFData)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
@@ -28,21 +34,18 @@ import GHC.Stack
 import GHC.TypeLits (type (+))
 import NoThunks.Class (NoThunks)
 
-import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util
+import qualified Data.ByteString as BS
 
 data MockDSIGN
 
 instance DSIGNAlgorithm MockDSIGN where
   type SeedSizeDSIGN MockDSIGN = 8
-  type VerKeySizeDSIGN MockDSIGN = 8 -- for 64 bit int
-  type SignKeySizeDSIGN MockDSIGN = 8
-  type SigSizeDSIGN MockDSIGN = HashSize ShortHash + 8
 
   --
   -- Key and signature types
@@ -95,58 +98,53 @@ instance DSIGNAlgorithm MockDSIGN where
   genKeyDSIGN seed =
     SignKeyMockDSIGN (runMonadRandomWithSeed seed getRandomWord64)
 
-  --
-  -- raw serialise/deserialise
-  --
+instance FixedSizeCodec (VerKeyDSIGN MockDSIGN) where
+  type FixedSize (VerKeyDSIGN MockDSIGN) = 8 -- for 64 bit int
+  rawEncodeFixedSized (VerKeyMockDSIGN k) = writeBinaryWord64 k
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(VerKeyDSIGN MockDSIGN)) bs
+    pure $! VerKeyMockDSIGN (readBinaryWord64 bs)
+  {-# INLINE rawDecodeFixedSized #-}
 
-  rawSerialiseVerKeyDSIGN (VerKeyMockDSIGN k) = writeBinaryWord64 k
-  rawSerialiseSignKeyDSIGN (SignKeyMockDSIGN k) = writeBinaryWord64 k
-  rawSerialiseSigDSIGN (SigMockDSIGN h k) =
-    hashToBytes h
-      <> writeBinaryWord64 k
+instance FixedSizeCodec (SignKeyDSIGN MockDSIGN) where
+  type FixedSize (SignKeyDSIGN MockDSIGN) = 8
+  rawEncodeFixedSized (SignKeyMockDSIGN k) = writeBinaryWord64 k
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(SignKeyDSIGN MockDSIGN)) bs
+    pure $! SignKeyMockDSIGN (readBinaryWord64 bs)
+  {-# INLINE rawDecodeFixedSized #-}
 
-  rawDeserialiseVerKeyDSIGN bs
-    | [kb] <- splitsAt [8] bs
-    , let k = readBinaryWord64 kb =
-        Just $! VerKeyMockDSIGN k
-    | otherwise =
-        Nothing
-
-  rawDeserialiseSignKeyDSIGN bs
-    | [kb] <- splitsAt [8] bs
-    , let k = readBinaryWord64 kb =
-        Just $! SignKeyMockDSIGN k
-    | otherwise =
-        Nothing
-
-  rawDeserialiseSigDSIGN bs
-    | [hb, kb] <- splitsAt [fromIntegral @Word @Int $ hashSize (Proxy :: Proxy ShortHash), 8] bs
-    , Just h <- hashFromBytes hb
-    , let k = readBinaryWord64 kb =
-        Just $! SigMockDSIGN h k
-    | otherwise =
-        Nothing
+instance FixedSizeCodec (SigDSIGN MockDSIGN) where
+  type FixedSize (SigDSIGN MockDSIGN) = HashSize ShortHash + 8
+  rawEncodeFixedSized (SigMockDSIGN h k) = hashToBytes h <> writeBinaryWord64 k
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(SigDSIGN MockDSIGN)) bs
+    let
+      (hb, kb) = BS.splitAt (fromIntegral @Word @Int $ hashSize (Proxy :: Proxy ShortHash)) bs
+    h <- hashFromByteStringM hb
+    pure $! SigMockDSIGN h (readBinaryWord64 kb)
+  {-# INLINE rawDecodeFixedSized #-}
 
 instance ToCBOR (VerKeyDSIGN MockDSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN MockDSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SignKeyDSIGN MockDSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN MockDSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SigDSIGN MockDSIGN) where
-  toCBOR = encodeSigDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN MockDSIGN) where
-  fromCBOR = decodeSigDSIGN
+  fromCBOR = decodeFixedSized
 
 -- | Debugging: provide information about the verification failure
 --

@@ -16,6 +16,7 @@ import GHC.Generics (Generic)
 
 import NoThunks.Class (NoThunks)
 
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
 import Cardano.Crypto.DSIGN.Class
 
 -- | DSIGN never used
@@ -26,9 +27,6 @@ data NeverDSIGN
 
 instance DSIGNAlgorithm NeverDSIGN where
   type SeedSizeDSIGN NeverDSIGN = 0
-  type VerKeySizeDSIGN NeverDSIGN = 0
-  type SignKeySizeDSIGN NeverDSIGN = 0
-  type SigSizeDSIGN NeverDSIGN = 0
 
   data VerKeyDSIGN NeverDSIGN = NeverUsedVerKeyDSIGN
     deriving (Show, Eq, Generic, NoThunks)
@@ -48,10 +46,17 @@ instance DSIGNAlgorithm NeverDSIGN where
 
   genKeyDSIGN _ = NeverUsedSignKeyDSIGN
 
-  rawSerialiseVerKeyDSIGN _ = mempty
-  rawSerialiseSignKeyDSIGN _ = mempty
-  rawSerialiseSigDSIGN _ = mempty
+instance FixedSizeCodec (VerKeyDSIGN NeverDSIGN) where
+  type FixedSize (VerKeyDSIGN NeverDSIGN) = 0
+  rawEncodeFixedSized _ = mempty
+  rawDecodeFixedSized _ = pure NeverUsedVerKeyDSIGN
 
-  rawDeserialiseVerKeyDSIGN _ = Just NeverUsedVerKeyDSIGN
-  rawDeserialiseSignKeyDSIGN _ = Just NeverUsedSignKeyDSIGN
-  rawDeserialiseSigDSIGN _ = Just NeverUsedSigDSIGN
+instance FixedSizeCodec (SignKeyDSIGN NeverDSIGN) where
+  type FixedSize (SignKeyDSIGN NeverDSIGN) = 0
+  rawEncodeFixedSized _ = mempty
+  rawDecodeFixedSized _ = pure NeverUsedSignKeyDSIGN
+
+instance FixedSizeCodec (SigDSIGN NeverDSIGN) where
+  type FixedSize (SigDSIGN NeverDSIGN) = 0
+  rawEncodeFixedSized _ = mempty
+  rawDecodeFixedSized _ = pure NeverUsedSigDSIGN

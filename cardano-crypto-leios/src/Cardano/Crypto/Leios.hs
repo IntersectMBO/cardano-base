@@ -56,14 +56,13 @@ module Cardano.Crypto.Leios (
 
 import Cardano.Base.Bytes (byteArrayFromByteString)
 import Cardano.Binary (matchSize, toCBOR)
+import Cardano.Binary.FixedSizeCodec (decodeFixedSized, encodeFixedSized)
 import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (aggregateSigsDSIGN, uncheckedAggregateVerKeysDSIGN),
   DSIGNAlgorithm (rawSerialiseSigDSIGN),
   SigDSIGN,
   SignKeyDSIGN,
   VerKeyDSIGN,
-  decodeSigDSIGN,
-  encodeSigDSIGN,
   verifyDSIGN,
  )
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
@@ -242,7 +241,7 @@ encodeLeiosCert :: LeiosCert -> Encoding
 encodeLeiosCert cert =
   encodeListLen 2
     <> encodeBitField cert.leiosCertSigners
-    <> encodeSigDSIGN cert.leiosCertSignature
+    <> encodeFixedSized cert.leiosCertSignature
 
 -- | Plain CBOR decoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
 -- Accepts both definite-length and indefinite-length encodings of the
@@ -256,7 +255,7 @@ decodeLeiosCert = do
   cert <-
     LeiosCert
       <$> decodeBitField
-      <*> decodeSigDSIGN
+      <*> decodeFixedSized
   when isIndef $ do
     isBreak <- decodeBreakOr
     unless isBreak $

@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Cardano.Crypto.KES.NeverUsed (
@@ -13,9 +14,11 @@ module Cardano.Crypto.KES.NeverUsed (
 )
 where
 
+import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..), guardFixedSized)
 import Cardano.Crypto.KES.Class
 
 -- | KES never used
@@ -42,15 +45,7 @@ instance KESAlgorithm NeverKES where
 
   type TotalPeriodsKES NeverKES = 0
 
-  type VerKeySizeKES NeverKES = 0
   type SignKeySizeKES NeverKES = 0
-  type SigSizeKES NeverKES = 0
-
-  rawSerialiseVerKeyKES _ = mempty
-  rawSerialiseSigKES _ = mempty
-
-  rawDeserialiseVerKeyKES _ = Just NeverUsedVerKeyKES
-  rawDeserialiseSigKES _ = Just NeverUsedSigKES
 
   deriveVerKeyKES _ = return NeverUsedVerKeyKES
 
@@ -61,9 +56,33 @@ instance KESAlgorithm NeverKES where
 
   forgetSignKeyKESWith _ = const $ return ()
 
+instance FixedSizeCodec (VerKeyKES NeverKES) where
+  type FixedSize (VerKeyKES NeverKES) = 0
+  rawEncodeFixedSized _ = mempty
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(VerKeyKES NeverKES)) bs
+    return NeverUsedVerKeyKES
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (SigKES NeverKES) where
+  type FixedSize (SigKES NeverKES) = 0
+  rawEncodeFixedSized _ = mempty
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(SigKES NeverKES)) bs
+    return NeverUsedSigKES
+  {-# INLINE rawDecodeFixedSized #-}
+
 instance UnsoundKESAlgorithm NeverKES where
   rawSerialiseSignKeyKES _ = return mempty
   rawDeserialiseSignKeyKESWith _ _ = return $ Just NeverUsedSignKeyKES
+
+instance FixedSizeCodec (UnsoundPureSignKeyKES NeverKES) where
+  type FixedSize (UnsoundPureSignKeyKES NeverKES) = SignKeySizeKES NeverKES
+  rawEncodeFixedSized _ = mempty
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(UnsoundPureSignKeyKES NeverKES)) bs
+    return NeverUsedUnsoundPureSignKeyKES
+  {-# INLINE rawDecodeFixedSized #-}
 
 instance UnsoundPureKESAlgorithm NeverKES where
   data UnsoundPureSignKeyKES NeverKES = NeverUsedUnsoundPureSignKeyKES
@@ -74,5 +93,3 @@ instance UnsoundPureKESAlgorithm NeverKES where
   unsoundPureDeriveVerKeyKES _ = NeverUsedVerKeyKES
   unsoundPureUpdateKES _ = error "KES not available"
   unsoundPureSignKeyKESToSoundSignKeyKES _ = return NeverUsedSignKeyKES
-  rawSerialiseUnsoundPureSignKeyKES _ = mempty
-  rawDeserialiseUnsoundPureSignKeyKES _ = Just NeverUsedUnsoundPureSignKeyKES

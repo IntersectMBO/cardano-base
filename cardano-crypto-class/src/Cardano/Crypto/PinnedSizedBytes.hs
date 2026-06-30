@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 module Cardano.Crypto.PinnedSizedBytes (
@@ -81,10 +82,17 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as SBS
 import qualified Data.Primitive as Prim
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
 import Cardano.Crypto.Libsodium.C (c_sodium_compare)
 import Cardano.Crypto.PackedBytes.Internal (PackedBytes, packBytes)
 import Cardano.Crypto.Util (decodeHexString)
 import Cardano.Foreign
+import Data.Maybe (fromMaybe)
 import Data.MemPack.Buffer (byteArrayToShortByteString)
 
 {- HLINT ignore "Reduce duplication" -}
@@ -135,7 +143,7 @@ instance KnownNat n => Ord (PinnedSizedBytes n) where
       size = fromInteger (natVal (Proxy :: Proxy n))
 
 instance KnownNat n => ToCBOR (PinnedSizedBytes n) where
-  toCBOR = toCBOR . psbToByteString
+  toCBOR = encodeFixedSized
   {-# INLINE toCBOR #-}
 
   encodedSizeExpr _size proxy =
@@ -145,17 +153,13 @@ instance KnownNat n => ToCBOR (PinnedSizedBytes n) where
       pinnedBytesSize = fromInteger (natVal (Proxy @n))
 
 instance KnownNat n => FromCBOR (PinnedSizedBytes n) where
-  fromCBOR = do
-    bs <- fromCBOR
-    case psbFromByteStringCheck bs of
-      Nothing ->
-        fail $
-          "Size mismatch. Expected: " <> show size <> " number of bytes, but got: " <> show (BS.length bs)
-      Just psb -> pure psb
-    where
-      size :: Int
-      size = fromInteger (natVal (Proxy :: Proxy n))
+  fromCBOR = decodeFixedSized
   {-# INLINE fromCBOR #-}
+
+instance KnownNat n => FixedSizeCodec (PinnedSizedBytes n) where
+  type FixedSize (PinnedSizedBytes n) = n
+  rawEncodeFixedSized = psbToByteString
+  rawDecodeFixedSized = psbFromByteStringM $ Proxy @(PinnedSizedBytes n)
 
 -- | This instance is meant to be used with @TemplateHaskell@
 --
@@ -180,7 +184,14 @@ instance KnownNat n => IsString (Q (TExp (PinnedSizedBytes n))) where
     let n = fromInteger $ natVal (Proxy :: Proxy n)
     case decodeHexString hexStr n of
       Left err -> fail $ "<PinnedSizedBytes>: " ++ err
-      Right _ -> examineSplice [||either error psbFromByteString (decodeHexString hexStr n)||]
+      Right _ ->
+        examineSplice
+          [||
+          either
+            error
+            (fromMaybe (error "<PinnedSizedBytes>: size mismatch") . rawDecodeFixedSized)
+            (decodeHexString hexStr n)
+          ||]
 
 instance KnownNat n => IsString (Code Q (PinnedSizedBytes n)) where
   fromString = Code . fromString
@@ -226,37 +237,30 @@ psbFromBytes ws0 = PSB (pinnedByteArrayFromListN size ws)
 
 -- | Convert a ByteString into PinnedSizedBytes. Input should contain the exact
 -- number of bytes as expected by type level @n@ size, otherwise error.
-psbFromByteString :: KnownNat n => BS.ByteString -> PinnedSizedBytes n
-psbFromByteString bs =
-  case psbFromByteStringCheck bs of
+psbFromByteString ::
+  (KnownNat n, FixedSizeCodec a) => Proxy a -> BS.ByteString -> PinnedSizedBytes n
+psbFromByteString proxy bs =
+  case psbFromByteStringCheck proxy bs of
     Nothing -> error $ "psbFromByteString: Size mismatch, got: " ++ show (BS.length bs)
     Just psb -> psb
 
-psbFromByteStringCheck :: forall n. KnownNat n => BS.ByteString -> Maybe (PinnedSizedBytes n)
+psbFromByteStringCheck ::
+  forall n a. (KnownNat n, FixedSizeCodec a) => Proxy a -> BS.ByteString -> Maybe (PinnedSizedBytes n)
 psbFromByteStringCheck = psbFromByteStringM
 
 psbFromByteStringM ::
-  forall n m.
-  (KnownNat n, MonadFail m) =>
-  BS.ByteString -> m (PinnedSizedBytes n)
-psbFromByteStringM bs
-  | n == size = pure $
-      unsafeDupablePerformIO $
-        BS.useAsCStringLen bs $ \(Ptr addr#, _) -> do
-          marr@(MutableByteArray marr#) <- newPinnedByteArray size
-          primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
-          arr <- unsafeFreezeByteArray marr
-          return (PSB arr)
-  | otherwise =
-      fail $
-        "Supplied ByteString with size: "
-          <> show n
-          <> " did not match the expected number of bytes: "
-          <> show size
-  where
-    n = BS.length bs
-    size :: Int
-    size = fromInteger (natVal (Proxy :: Proxy n))
+  forall n m a.
+  (KnownNat n, MonadFail m, FixedSizeCodec a) =>
+  Proxy a -> BS.ByteString -> m (PinnedSizedBytes n)
+psbFromByteStringM proxy bs = do
+  let size = fromInteger (natVal (Proxy :: Proxy n))
+  guardFixedSized proxy bs
+  unsafeDupablePerformIO $
+    BS.useAsCStringLen bs $ \(Ptr addr#, _) -> do
+      marr@(MutableByteArray marr#) <- newPinnedByteArray size
+      primitive_ $ copyAddrToByteArray# addr# marr# 0# (case size of I# s -> s)
+      arr <- unsafeFreezeByteArray marr
+      return (pure $ PSB arr)
 
 {-# DEPRECATED psbZero "This is not referentially transparent" #-}
 psbZero :: KnownNat n => PinnedSizedBytes n

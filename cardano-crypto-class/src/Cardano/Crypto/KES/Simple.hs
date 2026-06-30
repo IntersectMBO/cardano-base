@@ -25,7 +25,13 @@ module Cardano.Crypto.KES.Simple (
 )
 where
 
-import Control.Monad ((<$!>))
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
+import Control.Monad (unless, (<$!>))
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as BS
 import Data.Proxy (Proxy (..))
@@ -132,27 +138,7 @@ instance
   -- raw serialise/deserialise
   --
 
-  type VerKeySizeKES (SimpleKES d t) = VerKeySizeDSIGN d * t
   type SignKeySizeKES (SimpleKES d t) = SignKeySizeDSIGN d * t
-  type SigSizeKES (SimpleKES d t) = SigSizeDSIGN d
-
-  rawSerialiseVerKeyKES (VerKeySimpleKES vks) =
-    BS.concat [rawSerialiseVerKeyDSIGN vk | vk <- Vec.toList vks]
-
-  rawSerialiseSigKES (SigSimpleKES sig) =
-    rawSerialiseSigDSIGN sig
-
-  rawDeserialiseVerKeyKES bs
-    | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral @Word @Int (verKeySizeDSIGN (Proxy :: Proxy d))
-    , vkbs <- splitsAt (replicate duration sizeKey) bs
-    , length vkbs == duration
-    , Just vks <- mapM rawDeserialiseVerKeyDSIGN vkbs =
-        Just $! VerKeySimpleKES (Vec.fromList vks)
-    | otherwise =
-        Nothing
-
-  rawDeserialiseSigKES = fmap SigSimpleKES . rawDeserialiseSigDSIGN
 
   deriveVerKeyKES (SignKeySimpleKES sks) =
     VerKeySimpleKES <$!> Vec.mapM deriveVerKeyDSIGNM sks
@@ -229,20 +215,6 @@ instance
           . rawDeserialiseSignKeyDSIGNM
           . rawSerialiseSignKeyDSIGN
 
-  rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySimpleKES sks) =
-    foldMap rawSerialiseSignKeyDSIGN sks
-
-  rawDeserialiseUnsoundPureSignKeyKES bs
-    | let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
-          sizeKey = fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy d))
-          skbs = splitsAt (replicate duration sizeKey) bs
-    , length skbs == duration =
-        do
-          sks <- mapM rawDeserialiseSignKeyDSIGN skbs
-          return $! UnsoundPureSignKeySimpleKES (Vec.fromList sks)
-    | otherwise =
-        Nothing
-
 instance
   (UnsoundDSIGNMAlgorithm d, KnownNat t, KESAlgorithm (SimpleKES d t)) =>
   UnsoundKESAlgorithm (SimpleKES d t)
@@ -264,6 +236,57 @@ instance
           return $! SignKeySimpleKES (Vec.fromList sks)
     | otherwise =
         return Nothing
+
+instance
+  ( DSIGNAlgorithm d
+  , KnownNat t
+  , KnownNat (VerKeySizeDSIGN d * t)
+  ) =>
+  FixedSizeCodec (VerKeyKES (SimpleKES d t))
+  where
+  type FixedSize (VerKeyKES (SimpleKES d t)) = VerKeySizeDSIGN d * t
+  rawEncodeFixedSized (VerKeySimpleKES vks) =
+    BS.concat [rawEncodeFixedSized vk | vk <- Vec.toList vks]
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(VerKeyKES (SimpleKES d t))) bs
+    let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
+        sizeKey = fromIntegral @Word @Int (verKeySizeDSIGN (Proxy :: Proxy d))
+        vkbs = splitsAt (replicate duration sizeKey) bs
+    unless (length vkbs == duration) $
+      fail "VerKeyKES (SimpleKES d t): vkbs length is not equal to duration"
+    vks <- mapM rawDecodeFixedSized vkbs
+    return $! VerKeySimpleKES (Vec.fromList vks)
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance
+  (DSIGNAlgorithm d, KnownNat t) =>
+  FixedSizeCodec (SigKES (SimpleKES d t))
+  where
+  type FixedSize (SigKES (SimpleKES d t)) = SigSizeDSIGN d
+  rawEncodeFixedSized (SigSimpleKES sig) = rawEncodeFixedSized sig
+  rawDecodeFixedSized bs = SigSimpleKES <$> rawDecodeFixedSized bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance
+  ( DSIGNAlgorithm d
+  , KnownNat t
+  , KnownNat (SignKeySizeDSIGN d * t)
+  ) =>
+  FixedSizeCodec (UnsoundPureSignKeyKES (SimpleKES d t))
+  where
+  type FixedSize (UnsoundPureSignKeyKES (SimpleKES d t)) = SignKeySizeKES (SimpleKES d t)
+  rawEncodeFixedSized (UnsoundPureSignKeySimpleKES sks) =
+    foldMap rawEncodeFixedSized sks
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(UnsoundPureSignKeyKES (SimpleKES d t))) bs
+    let duration = fromIntegral @Natural @Int (natVal (Proxy :: Proxy t))
+        sizeKey = fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy d))
+        skbs = splitsAt (replicate duration sizeKey) bs
+    unless (length skbs == duration) $
+      fail "UnsoundPureSignKeyKES (SimpleKES d t): vkbs length is not equal to duration"
+    sks <- mapM rawDecodeFixedSized skbs
+    return $! UnsoundPureSignKeySimpleKES (Vec.fromList sks)
+  {-# INLINE rawDecodeFixedSized #-}
 
 deriving instance DSIGNMAlgorithm d => Show (VerKeyKES (SimpleKES d t))
 deriving instance (DSIGNMAlgorithm d, Show (SignKeyDSIGNM d)) => Show (SignKeyKES (SimpleKES d t))
@@ -289,7 +312,7 @@ instance
   ) =>
   ToCBOR (VerKeyKES (SimpleKES d t))
   where
-  toCBOR = encodeVerKeyKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance
@@ -301,7 +324,7 @@ instance
   ) =>
   FromCBOR (VerKeyKES (SimpleKES d t))
   where
-  fromCBOR = decodeVerKeyKES
+  fromCBOR = decodeFixedSized
 
 instance
   ( DSIGNMAlgorithm d
@@ -312,7 +335,7 @@ instance
   ) =>
   ToCBOR (SigKES (SimpleKES d t))
   where
-  toCBOR = encodeSigKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance
@@ -324,7 +347,7 @@ instance
   ) =>
   FromCBOR (SigKES (SimpleKES d t))
   where
-  fromCBOR = decodeSigKES
+  fromCBOR = decodeFixedSized
 
 instance DirectSerialise (VerKeyDSIGN d) => DirectSerialise (VerKeyKES (SimpleKES d t)) where
   directSerialise push (VerKeySimpleKES vks) =

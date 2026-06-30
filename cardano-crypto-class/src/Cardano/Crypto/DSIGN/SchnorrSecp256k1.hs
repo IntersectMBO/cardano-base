@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -27,6 +28,12 @@ module Cardano.Crypto.DSIGN.SchnorrSecp256k1 (
 ) where
 
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (encodedSizeExpr, toCBOR))
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  fixedSize,
+ )
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (
     SeedSizeDSIGN,
@@ -36,25 +43,12 @@ import Cardano.Crypto.DSIGN.Class (
     SignKeySizeDSIGN,
     Signable,
     VerKeyDSIGN,
-    VerKeySizeDSIGN,
     algorithmNameDSIGN,
     deriveVerKeyDSIGN,
     genKeyDSIGN,
-    rawDeserialiseSigDSIGN,
-    rawDeserialiseSignKeyDSIGN,
-    rawDeserialiseVerKeyDSIGN,
-    rawSerialiseSigDSIGN,
-    rawSerialiseSignKeyDSIGN,
-    rawSerialiseVerKeyDSIGN,
     signDSIGN,
     verifyDSIGN
   ),
-  decodeSigDSIGN,
-  decodeSignKeyDSIGN,
-  decodeVerKeyDSIGN,
-  encodeSigDSIGN,
-  encodeSignKeyDSIGN,
-  encodeVerKeyDSIGN,
   encodedSigDSIGNSizeExpr,
   encodedSignKeyDSIGNSizeExpr,
   encodedVerKeyDSIGNSizeExpr,
@@ -65,7 +59,6 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbCreate,
   psbCreateSized,
   psbCreateSizedResult,
-  psbFromByteStringCheck,
   psbToByteString,
   psbUseAsSizedPtr,
  )
@@ -97,7 +90,6 @@ import Foreign.C.Types (CSize)
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (castPtr, nullPtr)
 import GHC.Generics (Generic)
-import GHC.TypeNats (Natural, natVal)
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -105,9 +97,6 @@ data SchnorrSecp256k1DSIGN
 
 instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
   type SeedSizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
-  type SigSizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_SIGNATURE_BYTES
-  type SignKeySizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PRIVKEY_BYTES
-  type VerKeySizeDSIGN SchnorrSecp256k1DSIGN = SECP256K1_SCHNORR_PUBKEY_BYTES
   type Signable SchnorrSecp256k1DSIGN = SignableRepresentation
   newtype VerKeyDSIGN SchnorrSecp256k1DSIGN
     = VerKeySchnorrSecp256k1 (PinnedSizedBytes SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL)
@@ -185,53 +174,68 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
             psbCreate $ \skp ->
               useAsCStringLen bs $ \(bsp, sz) ->
                 copyPtr skp (castPtr bsp) sz
-  rawSerialiseSigDSIGN (SigSchnorrSecp256k1 sigPSB) = psbToByteString sigPSB
-  {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
-  rawSerialiseVerKeyDSIGN (VerKeySchnorrSecp256k1 vkPSB) =
+
+instance FixedSizeCodec (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
+  type FixedSize (VerKeyDSIGN SchnorrSecp256k1DSIGN) = SECP256K1_SCHNORR_PUBKEY_BYTES
+  {-# NOINLINE rawEncodeFixedSized #-}
+  rawEncodeFixedSized (VerKeySchnorrSecp256k1 vkPSB) =
     unsafeDupablePerformIO . psbUseAsSizedPtr vkPSB $ \pkbPtr -> do
       res <- psbCreateSized $ \bsPtr ->
         withForeignPtr secpCtxPtr $ \ctx -> do
           res' <- secpXOnlyPubkeySerialize ctx bsPtr pkbPtr
           when
             (res' /= 1)
-            (error "rawSerialiseVerKeyDSIGN: Failed to serialise VerKeyDSIGN SchnorrSecp256k1DSIGN")
+            (error "rawEncodeFixedSized @(VerKeyDSIGN SchnorrSecp256k1DSIGN): Failed to serialise")
       pure . psbToByteString $ res
-  rawSerialiseSignKeyDSIGN (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
-  {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
-  rawDeserialiseVerKeyDSIGN bs =
-    unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \(ptr, len) ->
-      if len /= (fromIntegral @Natural @Int . natVal $ Proxy @(VerKeySizeDSIGN SchnorrSecp256k1DSIGN))
-        then pure Nothing
-        else do
-          let dataPtr = castPtr ptr
-          (vkPsb, res) <- psbCreateSizedResult $ \outPtr ->
-            withForeignPtr secpCtxPtr $ \ctx ->
-              secpXOnlyPubkeyParse ctx outPtr dataPtr
-          pure $ case res of
-            1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
-            _ -> Nothing
-  rawDeserialiseSignKeyDSIGN bs =
-    SignKeySchnorrSecp256k1 <$> psbFromByteStringCheck bs
-  rawDeserialiseSigDSIGN bs =
-    SigSchnorrSecp256k1 <$> psbFromByteStringCheck bs
+  {-# NOINLINE rawDecodeFixedSized #-}
+  rawDecodeFixedSized bs = do
+    let
+      expectedSize =
+        fromIntegral @Word @Int . fixedSize $ Proxy @(VerKeyDSIGN SchnorrSecp256k1DSIGN)
+    unsafeDupablePerformIO . unsafeUseAsCStringLen bs $ \case
+      (ptr, len)
+        | len /= expectedSize ->
+            pure . fail $
+              "VerKeyDSIGN SchnorrSecp256k1DSIGN: wrong length, expected "
+                <> show expectedSize
+                <> " bytes but got "
+                <> show len
+        | otherwise -> do
+            let dataPtr = castPtr ptr
+            (vkPsb, res) <- psbCreateSizedResult $ \outPtr ->
+              withForeignPtr secpCtxPtr $ \ctx ->
+                secpXOnlyPubkeyParse ctx outPtr dataPtr
+            pure $ case res of
+              1 -> pure . VerKeySchnorrSecp256k1 $ vkPsb
+              _ -> fail "VerKeyDSIGN SchnorrSecp256k1DSIGN: deserialisation failed"
+
+instance FixedSizeCodec (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
+  type FixedSize (SignKeyDSIGN SchnorrSecp256k1DSIGN) = SECP256K1_SCHNORR_PRIVKEY_BYTES
+  rawEncodeFixedSized (SignKeySchnorrSecp256k1 skPSB) = psbToByteString skPSB
+  rawDecodeFixedSized bs = SignKeySchnorrSecp256k1 <$> rawDecodeFixedSized bs
+
+instance FixedSizeCodec (SigDSIGN SchnorrSecp256k1DSIGN) where
+  type FixedSize (SigDSIGN SchnorrSecp256k1DSIGN) = SECP256K1_SCHNORR_SIGNATURE_BYTES
+  rawEncodeFixedSized (SigSchnorrSecp256k1 sigPSB) = psbToByteString sigPSB
+  rawDecodeFixedSized bs = SigSchnorrSecp256k1 <$> rawDecodeFixedSized bs
 
 instance ToCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN SchnorrSecp256k1DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN SchnorrSecp256k1DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
-  toCBOR = encodeSigDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN SchnorrSecp256k1DSIGN) where
-  fromCBOR = decodeSigDSIGN
+  fromCBOR = decodeFixedSized

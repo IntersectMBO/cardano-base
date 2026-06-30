@@ -266,31 +266,19 @@ testVRFAlgorithm _ n =
 
       describe "size" $ do
         prop "VerKey" $
-          prop_size_serialise @(VerKeyVRF v)
-            rawSerialiseVerKeyVRF
-            (sizeVerKeyVRF (Proxy @v))
+          prop_size_serialise_fixed_sized @(VerKeyVRF v)
         prop "SignKey" $
-          prop_size_serialise @(SignKeyVRF v)
-            rawSerialiseSignKeyVRF
-            (sizeSignKeyVRF (Proxy @v))
+          prop_size_serialise_fixed_sized @(SignKeyVRF v)
         prop "Cert" $
-          prop_size_serialise @(CertVRF v)
-            rawSerialiseCertVRF
-            (sizeCertVRF (Proxy @v))
+          prop_size_serialise_fixed_sized @(CertVRF v)
 
       describe "direct CBOR" $ do
         prop "VerKey" $
-          prop_cbor_with @(VerKeyVRF v)
-            encodeVerKeyVRF
-            decodeVerKeyVRF
+          prop_cbor_fixed_sized @(VerKeyVRF v)
         prop "SignKey" $
-          prop_cbor_with @(SignKeyVRF v)
-            encodeSignKeyVRF
-            decodeSignKeyVRF
+          prop_cbor_fixed_sized @(SignKeyVRF v)
         prop "Cert" $
-          prop_cbor_with @(CertVRF v)
-            encodeCertVRF
-            decodeCertVRF
+          prop_cbor_fixed_sized @(CertVRF v)
 
       describe "To/FromCBOR class" $ do
         prop "VerKey" $ prop_cbor @(VerKeyVRF v)
@@ -304,14 +292,11 @@ testVRFAlgorithm _ n =
 
       describe "direct matches class" $ do
         prop "VerKey" $
-          prop_cbor_direct_vs_class @(VerKeyVRF v)
-            encodeVerKeyVRF
+          prop_cbor_fixed_sized_vs_class @(VerKeyVRF v)
         prop "SignKey" $
-          prop_cbor_direct_vs_class @(SignKeyVRF v)
-            encodeSignKeyVRF
+          prop_cbor_fixed_sized_vs_class @(SignKeyVRF v)
         prop "Cert" $
-          prop_cbor_direct_vs_class @(CertVRF v)
-            encodeCertVRF
+          prop_cbor_fixed_sized_vs_class @(CertVRF v)
 
     describe "verify" $ do
       -- NOTE: we no longer test against maxVRF, because the maximum numeric
