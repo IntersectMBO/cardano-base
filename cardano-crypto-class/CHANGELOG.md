@@ -1,9 +1,15 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.6.0.0
+## 2.5.2.0
 
 * Add `VerKeySizeVRF`, `SignKeySizeVRF` and `CertSizeVRF` type-level sizes to `VRFAlgorithm`
 * Change `sizeVerKeyVRF`, `sizeSignKeyVRF` and `sizeCertVRF` from `VRFAlgorithm` methods to standalone functions
+* Add `FixedSizeCodec` as a superclass of `DSIGNAlgorithm`, `KESAlgorithm`, `VRFAlgorithm`, `UnsoundPureKESAlgorithm` and `DSIGNAggregatable`
+* Remove `failSizeCheck`
+* Deprecate the `encode*` and `decode*` functions for DSIGN, KES and VRF keys, signatures and certificates in favor of `encodeFixedSized` and `decodeFixedSized`
+* Add `FixedSizeCodec` instances for `PinnedSizedBytes` and `PackedBytes`
+* Add `psbFromByteStringForM`
+* Add `hashFromByteStringM`
 
 ## 2.5.1.0
 

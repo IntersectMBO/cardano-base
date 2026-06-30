@@ -39,6 +39,7 @@ module Cardano.Crypto.Hash.Class (
   hashToByteArray,
   hashToBytes,
   hashFromBytes,
+  hashFromByteStringM,
   hashToBytesShort,
   hashFromBytesShort,
   hashFromOffsetBytesShort,
@@ -209,17 +210,23 @@ hashToBytes :: Hash h a -> ByteString
 hashToBytes (UnsafeHashRep h) = unpackPinnedBytes h
 
 -- | Make a hash from it bytes representation.
+hashFromByteStringM ::
+  forall h a m.
+  ( HashAlgorithm h
+  , MonadFail m
+  ) =>
+  -- | It must have an exact length, as given by 'hashSize'.
+  ByteString ->
+  m (Hash h a)
+hashFromByteStringM = fmap UnsafeHashRep . packByteString
+
 hashFromBytes ::
   forall h a.
   HashAlgorithm h =>
   -- | It must have an exact length, as given by 'hashSize'.
   ByteString ->
   Maybe (Hash h a)
-hashFromBytes bytes
-  | BS.length bytes == fromIntegral @Word @Int (hashSize (Proxy :: Proxy h)) =
-      Just $ UnsafeHashRep (packPinnedBytes bytes)
-  | otherwise =
-      Nothing
+hashFromBytes = hashFromByteStringM
 
 -- | Make a hash from it bytes representation, as a 'ShortByteString'.
 hashFromBytesShort ::

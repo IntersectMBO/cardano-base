@@ -27,7 +27,6 @@ module Cardano.Crypto.PackedBytes.Internal
   , xorPackedBytes
   ) where
 
-import Codec.CBOR.Decoding as D (decodeBytes)
 import Cardano.Base.Bytes (byteArrayToByteString)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..), Size)
 import Control.DeepSeq (NFData(..))
@@ -57,6 +56,8 @@ import GHC.ST
 import GHC.TypeLits
 import GHC.Word
 import NoThunks.Class
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..), decodeFixedSized)
+import qualified Data.MemPack as MP
 
 #include "MachDeps.h"
 
@@ -151,7 +152,14 @@ instance KnownNat n => MemPack (PackedBytes n) where
       (\addr# -> accursedUnutterablePerformIO $ packPinnedPtr (Ptr (addr# `plusAddr#` curPos#)))
   {-# INLINE unpackM #-}
 
+instance KnownNat n => FixedSizeCodec (PackedBytes n) where
+  type FixedSize (PackedBytes n) = n
+  rawDecodeFixedSized = packByteString
+  rawEncodeFixedSized = MP.packByteString
+
 instance KnownNat n => ToCBOR (PackedBytes n) where
+  -- The `toCBOR` implementation for `PackedBytes` does not use
+  -- `rawEncodeFixedSized` to prevent redundant copying of the bytestring
   toCBOR = toCBOR . unpackBytes
   {-# INLINE toCBOR #-}
 
@@ -162,7 +170,7 @@ instance KnownNat n => ToCBOR (PackedBytes n) where
       packedBytesSize = fromInteger (natVal' (proxy# @n))
 
 instance KnownNat n => FromCBOR (PackedBytes n) where
-  fromCBOR = D.decodeBytes >>= packByteString
+  fromCBOR = decodeFixedSized
   {-# INLINE fromCBOR #-}
 
 instance KnownNat n => Storable (PackedBytes n) where

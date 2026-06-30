@@ -54,11 +54,16 @@ import Cardano.Binary (
   FromCBOR (..),
   Size,
   ToCBOR (..),
-  decodeBytes,
   encodeBytes,
   encodeListLen,
   enforceSize,
   withWordSize,
+ )
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  fixedSize,
  )
 import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, hashWith)
 import Cardano.Crypto.Seed (Seed)
@@ -66,7 +71,6 @@ import Cardano.Crypto.Util (Empty, byteArrayToNatural, naturalToByteArray)
 import Control.DeepSeq (NFData)
 import Data.Array.Byte (ByteArray)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import Data.ByteString.Short as SBS (fromShort)
 import Data.Kind (Type)
 import Data.MemPack.Buffer (byteArrayToShortByteString)
@@ -75,7 +79,7 @@ import Data.Typeable (Typeable)
 import GHC.Exts (Constraint)
 import GHC.Generics (Generic)
 import GHC.Stack
-import GHC.TypeLits (ErrorMessage (..), KnownNat, Nat, TypeError, natVal)
+import GHC.TypeLits (ErrorMessage (..), KnownNat, Nat, TypeError)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 import Numeric.Natural (Natural)
 
@@ -95,6 +99,9 @@ class
   , KnownNat (VerKeySizeVRF v)
   , KnownNat (SignKeySizeVRF v)
   , KnownNat (CertSizeVRF v)
+  , FixedSizeCodec (CertVRF v)
+  , FixedSizeCodec (VerKeyVRF v)
+  , FixedSizeCodec (SignKeyVRF v)
   ) =>
   VRFAlgorithm v
   where
@@ -107,8 +114,11 @@ class
   data CertVRF v :: Type
 
   type VerKeySizeVRF v :: Nat
+  type VerKeySizeVRF v = FixedSize (VerKeyVRF v)
   type SignKeySizeVRF v :: Nat
+  type SignKeySizeVRF v = FixedSize (SignKeyVRF v)
   type CertSizeVRF v :: Nat
+  type CertSizeVRF v = FixedSize (CertVRF v)
 
   --
   -- Metadata and basic key operations
@@ -174,12 +184,18 @@ class
   sizeOutputVRF :: proxy v -> Word
 
   rawSerialiseVerKeyVRF :: VerKeyVRF v -> ByteString
+  rawSerialiseVerKeyVRF = rawEncodeFixedSized
   rawSerialiseSignKeyVRF :: SignKeyVRF v -> ByteString
+  rawSerialiseSignKeyVRF = rawEncodeFixedSized
   rawSerialiseCertVRF :: CertVRF v -> ByteString
+  rawSerialiseCertVRF = rawEncodeFixedSized
 
   rawDeserialiseVerKeyVRF :: ByteString -> Maybe (VerKeyVRF v)
+  rawDeserialiseVerKeyVRF = rawDecodeFixedSized
   rawDeserialiseSignKeyVRF :: ByteString -> Maybe (SignKeyVRF v)
+  rawDeserialiseSignKeyVRF = rawDecodeFixedSized
   rawDeserialiseCertVRF :: ByteString -> Maybe (CertVRF v)
+  rawDeserialiseCertVRF = rawDecodeFixedSized
 
   {-# MINIMAL
     algorithmNameVRF
@@ -188,23 +204,18 @@ class
     , verifyVRF
     , seedSizeVRF
     , (genKeyVRF | genKeyPairVRF)
-    , rawSerialiseVerKeyVRF
-    , rawSerialiseSignKeyVRF
-    , rawSerialiseCertVRF
-    , rawDeserialiseVerKeyVRF
-    , rawDeserialiseSignKeyVRF
-    , rawDeserialiseCertVRF
     , sizeOutputVRF
     #-}
 
-sizeVerKeyVRF :: forall v proxy. KnownNat (VerKeySizeVRF v) => proxy v -> Word
-sizeVerKeyVRF _ = fromInteger @Word . natVal $ Proxy @(VerKeySizeVRF v)
+sizeVerKeyVRF ::
+  forall v proxy. FixedSizeCodec (VerKeyVRF v) => proxy v -> Word
+sizeVerKeyVRF _ = fixedSize $ Proxy @(VerKeyVRF v)
 
-sizeSignKeyVRF :: forall v proxy. KnownNat (SignKeySizeVRF v) => proxy v -> Word
-sizeSignKeyVRF _ = fromInteger @Word . natVal $ Proxy @(SignKeySizeVRF v)
+sizeSignKeyVRF :: forall v proxy. FixedSizeCodec (SignKeyVRF v) => proxy v -> Word
+sizeSignKeyVRF _ = fixedSize $ Proxy @(SignKeyVRF v)
 
-sizeCertVRF :: forall v proxy. KnownNat (CertSizeVRF v) => proxy v -> Word
-sizeCertVRF _ = fromInteger @Word . natVal $ Proxy @(CertSizeVRF v)
+sizeCertVRF :: forall v proxy. FixedSizeCodec (CertVRF v) => proxy v -> Word
+sizeCertVRF _ = fixedSize $ Proxy @(CertVRF v)
 
 --
 -- Do not provide Ord instances for keys, see #38
@@ -265,68 +276,30 @@ mkTestOutputVRF = OutputVRF . naturalToByteArray sz
 
 encodeVerKeyVRF :: VRFAlgorithm v => VerKeyVRF v -> Encoding
 encodeVerKeyVRF = encodeBytes . rawSerialiseVerKeyVRF
+{-# DEPRECATED encodeVerKeyVRF "Use `encodeFixedSized` instead" #-}
 
 encodeSignKeyVRF :: VRFAlgorithm v => SignKeyVRF v -> Encoding
 encodeSignKeyVRF = encodeBytes . rawSerialiseSignKeyVRF
+{-# DEPRECATED encodeSignKeyVRF "Use `encodeFixedSized` instead" #-}
 
 encodeCertVRF :: VRFAlgorithm v => CertVRF v -> Encoding
 encodeCertVRF = encodeBytes . rawSerialiseCertVRF
+{-# DEPRECATED encodeCertVRF "Use `encodeFixedSized` instead" #-}
 
 decodeVerKeyVRF :: forall v s. VRFAlgorithm v => Decoder s (VerKeyVRF v)
-decodeVerKeyVRF = do
-  bs <- decodeBytes
-  case rawDeserialiseVerKeyVRF bs of
-    Just vk -> return vk
-    Nothing
-      | actual /= expected ->
-          fail
-            ( "decodeVerKeyVRF: wrong length, expected "
-                ++ show expected
-                ++ " bytes but got "
-                ++ show actual
-            )
-      | otherwise -> fail "decodeVerKeyVRF: cannot decode key"
-      where
-        expected = fromIntegral @Word @Int (sizeVerKeyVRF (Proxy :: Proxy v))
-        actual = BS.length bs
-{-# INLINEABLE decodeVerKeyVRF #-}
+decodeVerKeyVRF = decodeFixedSized
+{-# INLINE decodeVerKeyVRF #-}
+{-# DEPRECATED decodeVerKeyVRF "Use `decodeFixedSized` instead" #-}
 
 decodeSignKeyVRF :: forall v s. VRFAlgorithm v => Decoder s (SignKeyVRF v)
-decodeSignKeyVRF = do
-  bs <- decodeBytes
-  case rawDeserialiseSignKeyVRF bs of
-    Just sk -> return sk
-    Nothing
-      | actual /= expected ->
-          fail
-            ( "decodeSignKeyVRF: wrong length, expected "
-                ++ show expected
-                ++ " bytes but got "
-                ++ show actual
-            )
-      | otherwise -> fail "decodeSignKeyVRF: cannot decode key"
-      where
-        expected = fromIntegral @Word @Int (sizeSignKeyVRF (Proxy :: Proxy v))
-        actual = BS.length bs
+decodeSignKeyVRF = decodeFixedSized
+{-# INLINE decodeSignKeyVRF #-}
+{-# DEPRECATED decodeSignKeyVRF "Use `decodeFixedSized` instead" #-}
 
 decodeCertVRF :: forall v s. VRFAlgorithm v => Decoder s (CertVRF v)
-decodeCertVRF = do
-  bs <- decodeBytes
-  case rawDeserialiseCertVRF bs of
-    Just crt -> return crt
-    Nothing
-      | actual /= expected ->
-          fail
-            ( "decodeCertVRF: wrong length, expected "
-                ++ show expected
-                ++ " bytes but got "
-                ++ show actual
-            )
-      | otherwise -> fail "decodeCertVRF: cannot decode key"
-      where
-        expected = fromIntegral @Word @Int (sizeCertVRF (Proxy :: Proxy v))
-        actual = BS.length bs
-{-# INLINEABLE decodeCertVRF #-}
+decodeCertVRF = decodeFixedSized
+{-# INLINE decodeCertVRF #-}
+{-# DEPRECATED decodeCertVRF "Use `decodeFixedSized` instead" #-}
 
 data CertifiedVRF v a = CertifiedVRF
   { certifiedOutput :: !(OutputVRF v)
@@ -346,7 +319,7 @@ instance (VRFAlgorithm v, Typeable a) => ToCBOR (CertifiedVRF v a) where
   toCBOR cvrf =
     encodeListLen 2
       <> toCBOR (certifiedOutput cvrf)
-      <> encodeCertVRF (certifiedProof cvrf)
+      <> encodeFixedSized (certifiedProof cvrf)
 
   encodedSizeExpr _size proxy =
     1
@@ -362,7 +335,7 @@ instance (VRFAlgorithm v, Typeable a) => FromCBOR (CertifiedVRF v a) where
     CertifiedVRF
       <$ enforceSize "CertifiedVRF" 2
       <*> fromCBOR
-      <*> decodeCertVRF
+      <*> decodeFixedSized
   {-# INLINE fromCBOR #-}
 
 evalCertified ::

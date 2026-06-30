@@ -57,12 +57,6 @@ import Cardano.Crypto.DSIGN (
   verKeySizeDSIGN,
   signKeySizeDSIGN,
   sigSizeDSIGN,
-  encodeVerKeyDSIGN,
-  decodeVerKeyDSIGN,
-  encodeSignKeyDSIGN,
-  decodeSignKeyDSIGN,
-  encodeSigDSIGN,
-  decodeSigDSIGN,
   seedSizeDSIGN,
 
   DSIGNMAlgorithm (..),
@@ -78,9 +72,7 @@ import Cardano.Crypto.DSIGN (
 
   DSIGNAggregatable (..),
   BLS12381SignContext,
-  possessionProofSizeDSIGN,
-  encodePossessionProofDSIGN,
-  decodePossessionProofDSIGN
+  possessionProofSizeDSIGN
   )
 import Cardano.Crypto.DSIGN.BLS12381.Internal (BLS12381SignContext (..))
 import Cardano.Binary (FromCBOR, ToCBOR)
@@ -97,12 +89,11 @@ import Test.Crypto.Util (
   prop_keygen_context_changes_verkey,
   prop_raw_serialise,
   prop_raw_deserialise,
-  prop_size_serialise,
   prop_bad_cbor_bytes,
-  prop_cbor_with,
+  prop_cbor_fixed_sized,
   prop_cbor,
   prop_cbor_size,
-  prop_cbor_direct_vs_class,
+  prop_cbor_fixed_sized_vs_class,
   prop_no_thunks,
   prop_no_thunks_IO,
   arbitrarySeedOfSize,
@@ -110,7 +101,7 @@ import Test.Crypto.Util (
   withLock,
   directSerialiseToBS,
   directDeserialiseFromBS,
-  hexBS,
+  hexBS, prop_size_serialise_fixed_sized,
   )
 import Cardano.Crypto.Libsodium.MLockedSeed
 
@@ -122,7 +113,6 @@ import Cardano.Crypto.DSIGN (
   EcdsaSecp256k1DSIGN,
   SchnorrSecp256k1DSIGN,
   MessageHash,
-  toMessageHash,
   hashAndPack,
   )
 import Test.Crypto.Util (
@@ -134,6 +124,7 @@ import Cardano.Crypto.Hash (SHA3_256, HashAlgorithm (HashSize), Blake2b_256, SHA
 import Cardano.Crypto.DSIGN.Class (DSIGNAlgorithm(..))
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN)
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinVerKeyDSIGN)
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec(..))
 #endif
 
 blsGenKeyWithContextGen :: Gen (Maybe BS.ByteString)
@@ -158,7 +149,7 @@ blsSignContextGen = do
 genEcdsaMsg :: Gen MessageHash
 genEcdsaMsg =
   Gen.suchThatMap (GHC.fromListN 32 <$> replicateM 32 arbitrary)
-                  toMessageHash
+                  rawDecodeFixedSized
 #endif
 
 defaultSignKeyWithContextGen
@@ -323,28 +314,28 @@ testDSIGNAlgorithmWithContext proxy ctxMatters genContext genKeyCtx genMsg name 
       prop "VerKey" .
         forAllShow genVerKey
                    ppShow $
-                   prop_size_serialise rawSerialiseVerKeyDSIGN (verKeySizeDSIGN (Proxy @v))
+                   prop_size_serialise_fixed_sized @(VerKeyDSIGN v)
       prop "SignKey" .
         forAllShow (defaultSignKeyWithContextGen @v genKeyCtx)
                    ppShow $
-                   prop_size_serialise rawSerialiseSignKeyDSIGN (signKeySizeDSIGN (Proxy @v))
+                   prop_size_serialise_fixed_sized  @(SignKeyDSIGN v)
       prop "Sig" .
         forAllShow genSig
                    ppShow $
-                   prop_size_serialise rawSerialiseSigDSIGN (sigSizeDSIGN (Proxy @v))
+                   prop_size_serialise_fixed_sized @(SigDSIGN v)
     describe "direct CBOR" $ do
       prop "VerKey" .
         forAllShow genVerKey
                    ppShow $
-                   prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN
+                   prop_cbor_fixed_sized
       prop "SignKey" .
         forAllShow (defaultSignKeyWithContextGen @v genKeyCtx)
                    ppShow $
-                   prop_cbor_with encodeSignKeyDSIGN decodeSignKeyDSIGN
+                   prop_cbor_fixed_sized
       prop "Sig" .
         forAllShow genSig
                    ppShow $
-                   prop_cbor_with encodeSigDSIGN decodeSigDSIGN
+                   prop_cbor_fixed_sized
     describe "To/FromCBOR class" $ do
       prop "VerKey" . forAllShow genVerKey ppShow $ prop_cbor
       prop "SignKey" . forAllShow (defaultSignKeyWithContextGen @v genKeyCtx) ppShow $ prop_cbor
@@ -356,13 +347,13 @@ testDSIGNAlgorithmWithContext proxy ctxMatters genContext genKeyCtx genMsg name 
     describe "direct matches class" $ do
       prop "VerKey" .
         forAllShow genVerKey ppShow $
-        prop_cbor_direct_vs_class encodeVerKeyDSIGN
+        prop_cbor_fixed_sized_vs_class
       prop "SignKey" .
         forAllShow (defaultSignKeyWithContextGen @v genKeyCtx) ppShow $
-        prop_cbor_direct_vs_class encodeSignKeyDSIGN
+        prop_cbor_fixed_sized_vs_class
       prop "Sig" .
         forAllShow genSig ppShow $
-        prop_cbor_direct_vs_class encodeSigDSIGN
+        prop_cbor_fixed_sized_vs_class
     describe "verify" $ do
       prop "signing and verifying with matching keys" .
         forAllShow ((,,) <$> genContext <*> genMsg <*> defaultSignKeyWithContextGen @v genKeyCtx) ppShow $
@@ -491,13 +482,13 @@ testDSIGNMAlgorithm lock _ n =
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
-              return $ prop_cbor_with encodeVerKeyDSIGN decodeVerKeyDSIGN vk
+              return $ prop_cbor_fixed_sized vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
          prop "Sig" $ \(msg :: Message) -> do
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
-              return $ prop_cbor_with encodeSigDSIGN decodeSigDSIGN sig
+              return $ prop_cbor_fixed_sized sig
 
        describe "To/FromCBOR class" $ do
          prop "VerKey"  $
@@ -525,13 +516,13 @@ testDSIGNMAlgorithm lock _ n =
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
               vk :: VerKeyDSIGN v <- deriveVerKeyDSIGNM sk
-              return $ prop_cbor_direct_vs_class encodeVerKeyDSIGN vk
+              return $ prop_cbor_fixed_sized_vs_class vk
         -- No CBOR testing for SignKey: sign keys are stored in MLocked memory
         -- and require IO for access.
          prop "Sig" $ \(msg :: Message) ->
             ioPropertyWithSK @v lock $ \sk -> do
               sig :: SigDSIGN v <- signDSIGNM () msg sk
-              return $ prop_cbor_direct_vs_class encodeSigDSIGN sig
+              return $ prop_cbor_fixed_sized_vs_class sig
        describe "DirectSerialise" $ do
          prop "VerKey" $
             ioPropertyWithSK @v lock $ \sk -> do
@@ -748,7 +739,7 @@ instance Arbitrary (BadInputFor MessageHash) where
 testEcdsaInvalidMessageHash :: String -> Spec
 testEcdsaInvalidMessageHash name = testEnough . describe name $ do
     prop "MessageHash deserialization (wrong length)" $
-      prop_raw_deserialise toMessageHash
+      prop_raw_deserialise $ rawDecodeFixedSized @MessageHash
     prop "MessageHash fail fromCBOR" $ prop_bad_cbor_bytes @MessageHash
 
 testEcdsaWithHashAlgorithm ::
@@ -813,18 +804,15 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       prop "PoP deserialization (wrong length)" $ prop_raw_deserialise (rawDeserialisePossessionProofDSIGN @v)
       prop "PoP fail fromCBOR" $ prop_bad_cbor_bytes @(PossessionProofDSIGN v)
     describe "size" $ do
-      prop "PoP" .
-        forAllPoP $ prop_size_serialise rawSerialisePossessionProofDSIGN (possessionProofSizeDSIGN (Proxy @v))
+      prop "PoP" $ forAllPoP prop_size_serialise_fixed_sized
     describe "direct CBOR" $ do
-      prop "PoP" .
-        forAllPoP $ prop_cbor_with encodePossessionProofDSIGN decodePossessionProofDSIGN
+      prop "PoP" $ forAllPoP prop_cbor_fixed_sized
     describe "To/FromCBOR class" $ do
-      prop "PoP" . forAllPoP $ prop_cbor
+      prop "PoP" $ forAllPoP prop_cbor
     describe "ToCBOR size" $ do
-      prop "PoP" . forAllPoP $ prop_cbor_size
+      prop "PoP" $ forAllPoP prop_cbor_size
     describe "direct matches class" $ do
-      prop "PoP" .
-        forAllPoP $ prop_cbor_direct_vs_class encodePossessionProofDSIGN
+      prop "PoP" $ forAllPoP prop_cbor_fixed_sized_vs_class
   describe "aggregate" $ do
     prop "aggregate verify positive" $
       withNumTests 1000 .

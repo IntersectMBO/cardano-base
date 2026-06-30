@@ -20,33 +20,38 @@ import Data.Data (Proxy (Proxy))
 import GHC.TypeLits (natVal)
 
 invalidEcdsaVerKeyLengthError :: Integer -> String
-invalidEcdsaVerKeyLengthError = invalidVerKeyLengthError $ natVal $ Proxy @SECP256K1_ECDSA_PUBKEY_BYTES
+invalidEcdsaVerKeyLengthError =
+  wrongLengthError "VerKeyDSIGN EcdsaSecp256k1DSIGN" $ natVal $ Proxy @SECP256K1_ECDSA_PUBKEY_BYTES
 
 invalidSchnorrVerKeyLengthError :: Integer -> String
-invalidSchnorrVerKeyLengthError = invalidVerKeyLengthError $ natVal $ Proxy @SECP256K1_SCHNORR_PUBKEY_BYTES
-
-invalidVerKeyLengthError :: Integer -> Integer -> String
-invalidVerKeyLengthError expectedLength actualLength =
-  "decodeVerKeyDSIGN: wrong length, expected "
-    ++ show expectedLength
-    ++ " bytes but got "
-    ++ show actualLength
+invalidSchnorrVerKeyLengthError =
+  wrongLengthError "VerKeyDSIGN SchnorrSecp256k1DSIGN" $
+    natVal $
+      Proxy @SECP256K1_SCHNORR_PUBKEY_BYTES
 
 invalidEcdsaSigLengthError :: Integer -> String
-invalidEcdsaSigLengthError = invalidSigLengthError $ natVal $ Proxy @SECP256K1_ECDSA_SIGNATURE_BYTES
+invalidEcdsaSigLengthError =
+  wrongLengthError "SigDSIGN EcdsaSecp256k1DSIGN" $ natVal $ Proxy @SECP256K1_ECDSA_SIGNATURE_BYTES
 
+-- | The Schnorr signature decoder validates length via the underlying
+-- 'PinnedSizedBytes', so the error is tagged with that type rather than the
+-- DSIGN type.
 invalidSchnorrSigLengthError :: Integer -> String
-invalidSchnorrSigLengthError = invalidSigLengthError $ natVal $ Proxy @SECP256K1_SCHNORR_SIGNATURE_BYTES
+invalidSchnorrSigLengthError =
+  wrongLengthError ("PinnedSizedBytes " ++ show schnorrSigSize) schnorrSigSize
+  where
+    schnorrSigSize = natVal $ Proxy @SECP256K1_SCHNORR_SIGNATURE_BYTES
 
-invalidSigLengthError :: Integer -> Integer -> String
-invalidSigLengthError expectedLength actualLength =
-  "decodeSigDSIGN: wrong length, expected "
+wrongLengthError :: String -> Integer -> Integer -> String
+wrongLengthError typeName expectedLength actualLength =
+  typeName
+    ++ ": wrong length, expected "
     ++ show expectedLength
     ++ " bytes but got "
     ++ show actualLength
 
 cannotDecodeVerificationKeyError :: String
-cannotDecodeVerificationKeyError = "decodeVerKeyDSIGN: cannot decode key"
+cannotDecodeVerificationKeyError = "VerKeyDSIGN SchnorrSecp256k1DSIGN: deserialisation failed"
 
 unexpectedDecodingError :: String
 unexpectedDecodingError = "Test failed. Unexpected decoding error encountered."

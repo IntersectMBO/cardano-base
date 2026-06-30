@@ -128,7 +128,6 @@ library
     cardano-base >=0.1.6,
     cardano-binary >=1.7.3,
     cardano-strict-containers,
-    cborg,
     crypton ^>=1.0,
     deepseq,
     heapwords,

@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Ed448 digital signatures.
@@ -15,6 +16,11 @@ module Cardano.Crypto.DSIGN.Ed448 (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+ )
 import Control.DeepSeq (NFData)
 import Data.ByteArray as BA (ByteArrayAccess, convert)
 import GHC.Generics (Generic)
@@ -33,11 +39,6 @@ data Ed448DSIGN
 
 instance DSIGNAlgorithm Ed448DSIGN where
   type SeedSizeDSIGN Ed448DSIGN = 57
-
-  -- \| Goldilocks points are 448 bits long
-  type VerKeySizeDSIGN Ed448DSIGN = 57
-  type SignKeySizeDSIGN Ed448DSIGN = 57
-  type SigSizeDSIGN Ed448DSIGN = 114
 
   --
   -- Key and signature types
@@ -89,48 +90,45 @@ instance DSIGNAlgorithm Ed448DSIGN where
     let sk = runMonadRandomWithSeed seed Ed448.generateSecretKey
      in SignKeyEd448DSIGN sk
 
-  --
-  -- raw serialise/deserialise
-  --
-
-  rawSerialiseVerKeyDSIGN = BA.convert
-  rawSerialiseSignKeyDSIGN = BA.convert
-  rawSerialiseSigDSIGN = BA.convert
-
-  rawDeserialiseVerKeyDSIGN =
-    fmap VerKeyEd448DSIGN
-      . cryptoFailableToMaybe
-      . Ed448.publicKey
-  rawDeserialiseSignKeyDSIGN =
-    fmap SignKeyEd448DSIGN
-      . cryptoFailableToMaybe
-      . Ed448.secretKey
-  rawDeserialiseSigDSIGN =
-    fmap SigEd448DSIGN
-      . cryptoFailableToMaybe
-      . Ed448.signature
-
 instance ToCBOR (VerKeyDSIGN Ed448DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN Ed448DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SignKeyDSIGN Ed448DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN Ed448DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SigDSIGN Ed448DSIGN) where
-  toCBOR = encodeSigDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN Ed448DSIGN) where
-  fromCBOR = decodeSigDSIGN
+  fromCBOR = decodeFixedSized
 
-cryptoFailableToMaybe :: CryptoFailable a -> Maybe a
-cryptoFailableToMaybe (CryptoPassed a) = Just a
-cryptoFailableToMaybe (CryptoFailed _) = Nothing
+instance FixedSizeCodec (VerKeyDSIGN Ed448DSIGN) where
+  type FixedSize (VerKeyDSIGN Ed448DSIGN) = 57
+  rawEncodeFixedSized (VerKeyEd448DSIGN vk) = BA.convert vk
+  rawDecodeFixedSized bs = VerKeyEd448DSIGN <$> liftCryptoFailable (Ed448.publicKey bs)
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (SignKeyDSIGN Ed448DSIGN) where
+  type FixedSize (SignKeyDSIGN Ed448DSIGN) = 57
+  rawEncodeFixedSized (SignKeyEd448DSIGN sk) = BA.convert sk
+  rawDecodeFixedSized bs = SignKeyEd448DSIGN <$> liftCryptoFailable (Ed448.secretKey bs)
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (SigDSIGN Ed448DSIGN) where
+  type FixedSize (SigDSIGN Ed448DSIGN) = 114
+  rawEncodeFixedSized (SigEd448DSIGN sig) = BA.convert sig
+  rawDecodeFixedSized bs = SigEd448DSIGN <$> liftCryptoFailable (Ed448.signature bs)
+  {-# INLINE rawDecodeFixedSized #-}
+
+liftCryptoFailable :: MonadFail m => CryptoFailable a -> m a
+liftCryptoFailable (CryptoPassed a) = pure a
+liftCryptoFailable (CryptoFailed a) = fail $ show a

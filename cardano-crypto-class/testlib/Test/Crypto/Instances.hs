@@ -66,9 +66,12 @@ instance KnownNat n => Arbitrary (PinnedSizedBytes n) where
     let size = fromIntegral @Integer @Int . natVal $ Proxy @n
     Gen.suchThatMap
       (fromListN size <$> Gen.vectorOf size arbitrary)
-      psbFromByteStringCheck
+      (psbFromByteStringForM $ Proxy @(PinnedSizedBytes n))
   shrink psb = case toList . psbToByteString $ psb of
-    bytes -> mapMaybe (psbFromByteStringCheck . fromList) . shrink $ bytes
+    bytes ->
+      mapMaybe
+        (psbFromByteStringForM (Proxy @(PinnedSizedBytes n)) . fromList . shrink)
+        bytes
 
 instance VRFAlgorithm v => Arbitrary (OutputVRF v) where
   arbitrary = do

@@ -68,6 +68,7 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
 where
 
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -548,10 +549,6 @@ instance VRFAlgorithm PraosBatchCompatVRF where
 
   type Signable PraosBatchCompatVRF = SignableRepresentation
 
-  type VerKeySizeVRF PraosBatchCompatVRF = 32
-  type SignKeySizeVRF PraosBatchCompatVRF = 64
-  type CertSizeVRF PraosBatchCompatVRF = 128
-
   algorithmNameVRF = const "PraosBatchCompatVRF"
 
   deriveVerKeyVRF = coerce skToVerKey
@@ -576,16 +573,20 @@ instance VRFAlgorithm PraosBatchCompatVRF where
         (pk, sk) = keypairFromSeed seed
      in sk `seq` pk `seq` (SignKeyPraosBatchCompatVRF sk, VerKeyPraosBatchCompatVRF pk)
 
-  rawSerialiseVerKeyVRF (VerKeyPraosBatchCompatVRF pk) = vkBytes pk
-  rawSerialiseSignKeyVRF (SignKeyPraosBatchCompatVRF sk) = skBytes sk
-  rawSerialiseCertVRF (CertPraosBatchCompatVRF proof) = proofBytes proof
-  rawDeserialiseVerKeyVRF = fmap (VerKeyPraosBatchCompatVRF . vkFromBytes) . assertLength verKeySizeVRF
-  rawDeserialiseSignKeyVRF = fmap (SignKeyPraosBatchCompatVRF . skFromBytes) . assertLength signKeySizeVRF
-  rawDeserialiseCertVRF = fmap (CertPraosBatchCompatVRF . proofFromBytes) . assertLength certSizeVRF
+instance FixedSizeCodec (VerKeyVRF PraosBatchCompatVRF) where
+  type FixedSize (VerKeyVRF PraosBatchCompatVRF) = 32
+  rawEncodeFixedSized (VerKeyPraosBatchCompatVRF pk) = vkBytes pk
+  rawDecodeFixedSized bs = pure $! VerKeyPraosBatchCompatVRF (vkFromBytes bs)
+  {-# INLINE rawDecodeFixedSized #-}
 
-assertLength :: Int -> ByteString -> Maybe ByteString
-assertLength l bs
-  | BS.length bs == l =
-      Just bs
-  | otherwise =
-      Nothing
+instance FixedSizeCodec (SignKeyVRF PraosBatchCompatVRF) where
+  type FixedSize (SignKeyVRF PraosBatchCompatVRF) = 64
+  rawEncodeFixedSized (SignKeyPraosBatchCompatVRF sk) = skBytes sk
+  rawDecodeFixedSized bs = pure $! SignKeyPraosBatchCompatVRF (skFromBytes bs)
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (CertVRF PraosBatchCompatVRF) where
+  type FixedSize (CertVRF PraosBatchCompatVRF) = 128
+  rawEncodeFixedSized (CertPraosBatchCompatVRF proof) = proofBytes proof
+  rawDecodeFixedSized bs = pure $! CertPraosBatchCompatVRF (proofFromBytes bs)
+  {-# INLINE rawDecodeFixedSized #-}

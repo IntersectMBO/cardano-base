@@ -12,6 +12,7 @@ module Test.Crypto.Vector.Secp256k1DSIGN (
 where
 
 import Cardano.Binary (DecoderError (DecoderErrorDeserialiseFailure), FromCBOR, decodeFull')
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
 import Cardano.Crypto.DSIGN (
   DSIGNAlgorithm (
     ContextDSIGN,
@@ -27,7 +28,6 @@ import Cardano.Crypto.DSIGN (
   MessageHash,
   SchnorrSecp256k1DSIGN,
   hashAndPack,
-  toMessageHash,
  )
 import Cardano.Crypto.Hash.SHA3_256 (SHA3_256)
 import Codec.CBOR.Read (DeserialiseFailure (..))
@@ -256,7 +256,7 @@ mismatchSignKeyVerKeyTest vKey = it "Verification should not be successful when 
 wrongMessageHashLengthTest :: Spec
 wrongMessageHashLengthTest = it "toMessageHash should return Nothing when using invalid length message hash." $
   forM_ wrongLengthMessageHashTestVectors $ \msg -> do
-    let msgHash = toMessageHash msg
+    let msgHash = rawDecodeFixedSized @MessageHash msg
     assertBool "Test failed. Wrong message hash length is treated as right." $ isNothing msgHash
 
 -- Test for vKey, message and signature test vectors without using sign key

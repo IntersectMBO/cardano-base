@@ -20,13 +20,16 @@ module Test.Crypto.Util (
   ToCBOR (..),
   prop_cbor,
   prop_cbor_size,
-  prop_cbor_with,
+  prop_cbor_fixed_sized,
   prop_cbor_valid,
   prop_cbor_roundtrip,
   prop_raw_serialise,
+  prop_raw_serialise_fixed_sized,
   prop_raw_deserialise,
+  prop_raw_deserialise_fixed_sized,
   prop_size_serialise,
-  prop_cbor_direct_vs_class,
+  prop_size_serialise_fixed_sized,
+  prop_cbor_fixed_sized_vs_class,
   prop_bad_cbor_bytes,
 
   -- * NoThunks
@@ -94,6 +97,12 @@ import Cardano.Binary (
   serialize,
   szGreedy,
   szSimplify,
+ )
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  fixedSize,
  )
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (..),
@@ -266,7 +275,9 @@ prop_cbor ::
   (ToCBOR a, FromCBOR a, Eq a, Show a) =>
   a ->
   Property
-prop_cbor = prop_cbor_with toCBOR fromCBOR
+prop_cbor x =
+  prop_cbor_valid toCBOR x
+    .&&. prop_cbor_roundtrip toCBOR fromCBOR x
 
 prop_cbor_size :: forall a. ToCBOR a => a -> Property
 prop_cbor_size a =
@@ -280,15 +291,13 @@ prop_cbor_size a =
         Right x -> x
         Left err -> error . show . build $ err
 
-prop_cbor_with ::
-  (Eq a, Show a) =>
-  (a -> Encoding) ->
-  (forall s. Decoder s a) ->
+prop_cbor_fixed_sized ::
+  (FixedSizeCodec a, Eq a, Show a) =>
   a ->
   Property
-prop_cbor_with encoder decoder x =
-  prop_cbor_valid encoder x
-    .&&. prop_cbor_roundtrip encoder decoder x
+prop_cbor_fixed_sized x =
+  prop_cbor_valid encodeFixedSized x
+    .&&. prop_cbor_roundtrip encodeFixedSized decodeFixedSized x
 
 prop_cbor_valid :: (a -> Encoding) -> a -> Property
 prop_cbor_valid encoder x =
@@ -326,6 +335,9 @@ prop_raw_serialise serialise deserialise x =
     Just y -> y === x
     Nothing -> property False
 
+prop_raw_serialise_fixed_sized :: (Eq a, Show a, FixedSizeCodec a) => a -> Property
+prop_raw_serialise_fixed_sized = prop_raw_serialise rawEncodeFixedSized rawDecodeFixedSized
+
 prop_raw_deserialise ::
   forall (a :: Type).
   Show a =>
@@ -339,6 +351,13 @@ prop_raw_deserialise deserialise (BadInputFor forbiddenLen bs) =
     $ case deserialise bs of
       Nothing -> property True
       Just x -> counterexample (ppShow x) False
+
+prop_raw_deserialise_fixed_sized ::
+  forall (a :: Type).
+  (FixedSizeCodec a, Show a) =>
+  BadInputFor a ->
+  Property
+prop_raw_deserialise_fixed_sized = prop_raw_deserialise rawDecodeFixedSized
 
 prop_bad_cbor_bytes ::
   forall (a :: Type).
@@ -356,17 +375,19 @@ prop_bad_cbor_bytes (BadInputFor forbiddenLen bs) =
 -- | The crypto algorithm classes have direct encoding functions, and the key
 -- types are also typically a member of the 'ToCBOR' class. Where a 'ToCBOR'
 -- instance is provided then these should match.
-prop_cbor_direct_vs_class ::
-  ToCBOR a =>
-  (a -> Encoding) ->
+prop_cbor_fixed_sized_vs_class ::
+  (FixedSizeCodec a, ToCBOR a) =>
   a ->
   Property
-prop_cbor_direct_vs_class encoder x =
-  toFlatTerm (encoder x) === toFlatTerm (toCBOR x)
+prop_cbor_fixed_sized_vs_class x =
+  toFlatTerm (encodeFixedSized x) === toFlatTerm (toCBOR x)
 
 prop_size_serialise :: (a -> ByteString) -> Word -> a -> Property
 prop_size_serialise serialise size x =
   BS.length (serialise x) === fromIntegral @Word @Int size
+
+prop_size_serialise_fixed_sized :: forall a. FixedSizeCodec a => a -> Property
+prop_size_serialise_fixed_sized = prop_size_serialise rawEncodeFixedSized (fixedSize $ Proxy @a)
 
 --------------------------------------------------------------------------------
 -- NoThunks

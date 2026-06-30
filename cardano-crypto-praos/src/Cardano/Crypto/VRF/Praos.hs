@@ -60,6 +60,7 @@ module Cardano.Crypto.VRF.Praos (
 where
 
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -537,10 +538,6 @@ instance VRFAlgorithm PraosVRF where
 
   type Signable PraosVRF = SignableRepresentation
 
-  type VerKeySizeVRF PraosVRF = 32
-  type SignKeySizeVRF PraosVRF = 64
-  type CertSizeVRF PraosVRF = 80
-
   algorithmNameVRF = const "PraosVRF"
 
   deriveVerKeyVRF = coerce skToVerKey
@@ -564,11 +561,20 @@ instance VRFAlgorithm PraosVRF where
         !(!pk, !sk) = keypairFromSeed seed
      in (SignKeyPraosVRF sk, VerKeyPraosVRF pk)
 
-  rawSerialiseVerKeyVRF (VerKeyPraosVRF pk) = vkBytes pk
-  rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
-  rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
-  rawDeserialiseVerKeyVRF = fmap VerKeyPraosVRF . vkFromBytes
-  {-# INLINE rawDeserialiseVerKeyVRF #-}
-  rawDeserialiseSignKeyVRF = fmap SignKeyPraosVRF . skFromBytes
-  rawDeserialiseCertVRF = fmap CertPraosVRF . proofFromBytes
-  {-# INLINE rawDeserialiseCertVRF #-}
+instance FixedSizeCodec (VerKeyVRF PraosVRF) where
+  type FixedSize (VerKeyVRF PraosVRF) = 32
+  rawEncodeFixedSized (VerKeyPraosVRF pk) = vkBytes pk
+  rawDecodeFixedSized bs = VerKeyPraosVRF <$> vkFromBytes bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (SignKeyVRF PraosVRF) where
+  type FixedSize (SignKeyVRF PraosVRF) = 64
+  rawEncodeFixedSized (SignKeyPraosVRF sk) = skBytes sk
+  rawDecodeFixedSized bs = SignKeyPraosVRF <$> skFromBytes bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (CertVRF PraosVRF) where
+  type FixedSize (CertVRF PraosVRF) = 80
+  rawEncodeFixedSized (CertPraosVRF proof) = proofBytes proof
+  rawDecodeFixedSized bs = CertPraosVRF <$> proofFromBytes bs
+  {-# INLINE rawDecodeFixedSized #-}

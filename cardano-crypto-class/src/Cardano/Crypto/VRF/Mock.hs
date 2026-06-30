@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -13,13 +14,18 @@ module Cardano.Crypto.VRF.Mock (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
 import Control.DeepSeq (NFData)
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
-import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.Hash
@@ -42,10 +48,6 @@ instance VRFAlgorithm MockVRF where
 
   newtype CertVRF MockVRF = CertMockVRF Word64
     deriving (Show, Eq, Ord, Generic, NoThunks, NFData)
-
-  type VerKeySizeVRF MockVRF = 8
-  type SignKeySizeVRF MockVRF = 8
-  type CertSizeVRF MockVRF = 8
 
   --
   -- Metadata and basic key operations
@@ -80,55 +82,44 @@ instance VRFAlgorithm MockVRF where
     where
       sk = runMonadRandomWithSeed seed getRandomWord64
 
-  --
-  -- raw serialise/deserialise
-  --
-
-  rawSerialiseVerKeyVRF (VerKeyMockVRF k) = writeBinaryWord64 k
-  rawSerialiseSignKeyVRF (SignKeyMockVRF k) = writeBinaryWord64 k
-  rawSerialiseCertVRF (CertMockVRF k) = writeBinaryWord64 k
-
-  rawDeserialiseVerKeyVRF bs
-    | [kb] <- splitsAt [8] bs
-    , let k = readBinaryWord64 kb =
-        Just $! VerKeyMockVRF k
-    | otherwise =
-        Nothing
-
-  rawDeserialiseSignKeyVRF bs
-    | [kb] <- splitsAt [8] bs
-    , let k = readBinaryWord64 kb =
-        Just $! SignKeyMockVRF k
-    | otherwise =
-        Nothing
-
-  rawDeserialiseCertVRF bs
-    | [kb] <- splitsAt [8] bs
-    , let k = readBinaryWord64 kb =
-        Just $! CertMockVRF k
-    | otherwise =
-        Nothing
-
 instance ToCBOR (VerKeyVRF MockVRF) where
-  toCBOR = encodeVerKeyVRF
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedVerKeyVRFSizeExpr
 
 instance FromCBOR (VerKeyVRF MockVRF) where
-  fromCBOR = decodeVerKeyVRF
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SignKeyVRF MockVRF) where
-  toCBOR = encodeSignKeyVRF
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedSignKeyVRFSizeExpr
 
 instance FromCBOR (SignKeyVRF MockVRF) where
-  fromCBOR = decodeSignKeyVRF
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (CertVRF MockVRF) where
-  toCBOR = encodeCertVRF
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedCertVRFSizeExpr
 
 instance FromCBOR (CertVRF MockVRF) where
-  fromCBOR = decodeCertVRF
+  fromCBOR = decodeFixedSized
+
+instance FixedSizeCodec (VerKeyVRF MockVRF) where
+  type FixedSize (VerKeyVRF MockVRF) = 8
+  rawEncodeFixedSized (VerKeyMockVRF k) = writeBinaryWord64 k
+  rawDecodeFixedSized bs = guardFixedSized bs $ pure $! VerKeyMockVRF (readBinaryWord64 bs)
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (SignKeyVRF MockVRF) where
+  type FixedSize (SignKeyVRF MockVRF) = 8
+  rawEncodeFixedSized (SignKeyMockVRF k) = writeBinaryWord64 k
+  rawDecodeFixedSized bs = guardFixedSized bs $ pure $! SignKeyMockVRF (readBinaryWord64 bs)
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (CertVRF MockVRF) where
+  type FixedSize (CertVRF MockVRF) = 8
+  rawEncodeFixedSized (CertMockVRF k) = writeBinaryWord64 k
+  rawDecodeFixedSized bs = guardFixedSized bs $ pure $! CertMockVRF (readBinaryWord64 bs)
+  {-# INLINE rawDecodeFixedSized #-}
 
 evalVRF' ::
   SignableRepresentation a =>
