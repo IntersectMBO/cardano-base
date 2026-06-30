@@ -37,6 +37,7 @@ import Cardano.Binary.FixedSizeCodec (
   FixedSizeCodec (..),
   decodeFixedSized,
   encodeFixedSized,
+  fixedSize,
   guardFixedSized,
  )
 import Control.DeepSeq (NFData (..), rwhnf)
@@ -424,12 +425,12 @@ instance DirectSerialise (VerKeyDSIGN Ed25519DSIGN) where
     psbUseAsCPtrLen psb $ \ptr _ ->
       push
         (castPtr ptr)
-        (fromIntegral @Word @CSize $ verKeySizeDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ fixedSize (Proxy @(VerKeyDSIGN Ed25519DSIGN)))
 
 instance DirectDeserialise (VerKeyDSIGN Ed25519DSIGN) where
   directDeserialise pull = do
     psb <- psbCreate $ \ptr ->
       pull
         (castPtr ptr)
-        (fromIntegral @Word @CSize $ verKeySizeDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ fixedSize (Proxy @(VerKeyDSIGN Ed25519DSIGN)))
     return $! VerKeyEd25519DSIGN psb

@@ -50,6 +50,7 @@ module Cardano.Crypto.KES.Class (
   encodedSigKESSizeExpr,
 
   -- * Raw sizes
+  fixedSize,
   verKeySizeKES,
   sigSizeKES,
   signKeySizeKES,
@@ -98,6 +99,7 @@ import Cardano.Binary.FixedSizeCodec (
   FixedSizeCodec (..),
   decodeFixedSized,
   encodeFixedSized,
+  fixedSize,
  )
 import Cardano.Crypto.Hash.Class (Hash, HashAlgorithm, hashWith)
 import Cardano.Crypto.Libsodium (MLockedAllocator, mlockedMalloc)
@@ -157,7 +159,7 @@ class
   algorithmNameKES :: proxy v -> String
 
   hashVerKeyKES :: HashAlgorithm h => VerKeyKES v -> Hash h (VerKeyKES v)
-  hashVerKeyKES = hashWith rawSerialiseVerKeyKES
+  hashVerKeyKES = hashWith rawEncodeFixedSized
 
   -- | Context required to run the KES algorithm
   --
@@ -258,26 +260,33 @@ class
     SignKeyKES v ->
     m ()
 
+{-# DEPRECATED rawSerialiseVerKeyKES "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawSerialiseSigKES "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseVerKeyKES "Use `rawDecodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseSigKES "Use `rawDecodeFixedSized` instead" #-}
+
 verKeySizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-verKeySizeKES _ = fromInteger (natVal (Proxy @(VerKeySizeKES v)))
+verKeySizeKES _ = fixedSize $ Proxy @(VerKeyKES v)
+{-# DEPRECATED verKeySizeKES "Use `fixedSize` instead" #-}
 
 sigSizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sigSizeKES _ = fromInteger (natVal (Proxy @(SigSizeKES v)))
+sigSizeKES _ = fixedSize $ Proxy @(SigKES v)
+{-# DEPRECATED sigSizeKES "Use `fixedSize` instead" #-}
 
 signKeySizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
 signKeySizeKES _ = fromInteger (natVal (Proxy @(SignKeySizeKES v)))
 
-{-# DEPRECATED sizeVerKeyKES "In favor of `verKeySizeKES`" #-}
+{-# DEPRECATED sizeVerKeyKES "Use `fixedSize` instead" #-}
 sizeVerKeyKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeVerKeyKES = verKeySizeKES
+sizeVerKeyKES _ = fixedSize $ Proxy @(VerKeyKES v)
 
 {-# DEPRECATED sizeSignKeyKES "In favor of `signKeySizeKES`" #-}
 sizeSignKeyKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
 sizeSignKeyKES = signKeySizeKES
 
-{-# DEPRECATED sizeSigKES "In favor of `sigSizeKES`" #-}
+{-# DEPRECATED sizeSigKES "Use `fixedSize` instead" #-}
 sizeSigKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
-sizeSigKES = sigSizeKES
+sizeSigKES _ = fixedSize $ Proxy @(SigKES v)
 
 -- | The upper bound on the 'Seed' size needed by 'genKeyKES'
 seedSizeKES :: forall v proxy. KESAlgorithm v => proxy v -> Word
@@ -377,6 +386,9 @@ class
   rawDeserialiseUnsoundPureSignKeyKES :: ByteString -> Maybe (UnsoundPureSignKeyKES v)
   rawDeserialiseUnsoundPureSignKeyKES = rawDecodeFixedSized
 
+{-# DEPRECATED rawSerialiseUnsoundPureSignKeyKES "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseUnsoundPureSignKeyKES "Use `rawDecodeFixedSized` instead" #-}
+
 -- | Unsound operations on KES sign keys. These operations violate secure
 -- forgetting constraints by leaking secrets to unprotected memory. Consider
 -- using the 'DirectSerialise' / 'DirectDeserialise' APIs instead.
@@ -405,7 +417,7 @@ unsoundPureSignKeyKESToSoundSignKeyKESViaSer ::
   m (SignKeyKES k)
 unsoundPureSignKeyKESToSoundSignKeyKESViaSer sk =
   maybe (error "unsoundPureSignKeyKESToSoundSignKeyKES: deserialisation failure") return
-    =<< (rawDeserialiseSignKeyKES . rawSerialiseUnsoundPureSignKeyKES $ sk)
+    =<< (rawDeserialiseSignKeyKES . rawEncodeFixedSized $ sk)
 
 -- | Subclass for KES algorithms that embed a copy of the VerKey into the
 -- signature itself, rather than relying on the externally supplied VerKey
@@ -478,15 +490,15 @@ instance
 --
 
 encodeVerKeyKES :: KESAlgorithm v => VerKeyKES v -> Encoding
-encodeVerKeyKES = encodeBytes . rawSerialiseVerKeyKES
+encodeVerKeyKES = encodeBytes . rawEncodeFixedSized
 {-# DEPRECATED encodeVerKeyKES "Use `encodeFixedSized` instead" #-}
 
 encodeUnsoundPureSignKeyKES :: UnsoundPureKESAlgorithm v => UnsoundPureSignKeyKES v -> Encoding
-encodeUnsoundPureSignKeyKES = encodeBytes . rawSerialiseUnsoundPureSignKeyKES
+encodeUnsoundPureSignKeyKES = encodeBytes . rawEncodeFixedSized
 {-# DEPRECATED encodeUnsoundPureSignKeyKES "Use `encodeFixedSized` instead" #-}
 
 encodeSigKES :: KESAlgorithm v => SigKES v -> Encoding
-encodeSigKES = encodeBytes . rawSerialiseSigKES
+encodeSigKES = encodeBytes . rawEncodeFixedSized
 {-# DEPRECATED encodeSigKES "Use `encodeFixedSized` instead" #-}
 
 encodeSignKeyKES ::
@@ -617,14 +629,12 @@ updateKESWithPeriod c (SignKeyWithPeriodKES sk t) = runMaybeT $ do
 -- 'Size' expressions for 'ToCBOR' instances.
 --
 
--- | 'Size' expression for 'VerKeyKES' which is using 'verKeySizeKES' encoded
--- as 'Size'.
 encodedVerKeyKESSizeExpr :: forall v. KESAlgorithm v => Proxy (VerKeyKES v) -> Size
 encodedVerKeyKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (verKeySizeKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(VerKeyKES v))))
     -- payload
-    + fromIntegral @Word @Size (verKeySizeKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(VerKeyKES v)))
 
 -- | 'Size' expression for 'SignKeyKES' which is using 'signKeySizeKES' encoded
 -- as 'Size'.
@@ -635,14 +645,12 @@ encodedSignKeyKESSizeExpr _proxy =
     -- payload
     + fromIntegral @Word @Size (signKeySizeKES (Proxy :: Proxy v))
 
--- | 'Size' expression for 'SigKES' which is using 'sigSizeKES' encoded as
--- 'Size'.
 encodedSigKESSizeExpr :: forall v. KESAlgorithm v => Proxy (SigKES v) -> Size
 encodedSigKESSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sigSizeKES (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(SigKES v))))
     -- payload
-    + fromIntegral @Word @Size (sigSizeKES (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(SigKES v)))
 
 hashPairOfVKeys ::
   (KESAlgorithm d, HashAlgorithm h) =>
@@ -650,7 +658,7 @@ hashPairOfVKeys ::
   Hash h (VerKeyKES d, VerKeyKES d)
 hashPairOfVKeys =
   hashWith $ \(a, b) ->
-    rawSerialiseVerKeyKES a <> rawSerialiseVerKeyKES b
+    rawEncodeFixedSized a <> rawEncodeFixedSized b
 
 mungeName :: String -> String
 mungeName basename

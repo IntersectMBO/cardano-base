@@ -225,8 +225,8 @@ instance
       b_sig = slice off_sig size_sig b
       b_vk = slice off_vk size_vk b
 
-      size_sig = sigSizeDSIGN (Proxy :: Proxy d)
-      size_vk = verKeySizeDSIGN (Proxy :: Proxy d)
+      size_sig = fixedSize (Proxy :: Proxy (SigDSIGN d))
+      size_vk = fixedSize (Proxy :: Proxy (VerKeyDSIGN d))
 
       off_sig = 0 :: Word
       off_vk = size_sig

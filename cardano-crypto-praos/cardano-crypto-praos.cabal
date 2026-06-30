@@ -117,6 +117,7 @@ library testlib
     QuickCheck,
     base,
     bytestring >=0.10.12.0,
+    cardano-binary,
     cardano-crypto-class:{cardano-crypto-class, testlib},
     cardano-crypto-praos,
     hspec,

@@ -7,6 +7,9 @@
 * Add `FixedSizeCodec` as a superclass of `DSIGNAlgorithm`, `KESAlgorithm`, `VRFAlgorithm`, `UnsoundPureKESAlgorithm` and `DSIGNAggregatable`
 * Remove `failSizeCheck`
 * Deprecate the `encode*` and `decode*` functions for DSIGN, KES and VRF keys, signatures and certificates in favor of `encodeFixedSized` and `decodeFixedSized`
+* Deprecate the `rawSerialise*` and `rawDeserialise*` methods for DSIGN, KES and VRF keys, signatures, certificates and proofs of possession in favor of `rawEncodeFixedSized` and `rawDecodeFixedSized`
+* Deprecate `verKeySizeDSIGN`, `signKeySizeDSIGN`, `sigSizeDSIGN`, `verKeySizeKES`, `sigSizeKES`, `sizeVerKeyVRF`, `sizeSignKeyVRF` and `sizeCertVRF` in favor of `fixedSize`
+* Re-export `fixedSize` from `Cardano.Crypto.KES.Class`
 * Add `FixedSizeCodec` instances for `PinnedSizedBytes` and `PackedBytes`
 * Change `psbFromByteString`, `psbFromByteStringCheck` and `psbFromByteStringM` to take a `Proxy` argument
 * Add `hashFromByteStringM`

@@ -157,7 +157,7 @@ class
   deriveVerKeyDSIGN :: SignKeyDSIGN v -> VerKeyDSIGN v
 
   hashVerKeyDSIGN :: HashAlgorithm h => VerKeyDSIGN v -> Hash h (VerKeyDSIGN v)
-  hashVerKeyDSIGN = hashWith rawSerialiseVerKeyDSIGN
+  hashVerKeyDSIGN = hashWith rawEncodeFixedSized
 
   --
   -- Core algorithm operations
@@ -221,6 +221,13 @@ class
   rawDeserialiseSigDSIGN :: ByteString -> Maybe (SigDSIGN v)
   rawDeserialiseSigDSIGN = rawDecodeFixedSized
 
+{-# DEPRECATED rawSerialiseVerKeyDSIGN "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawSerialiseSignKeyDSIGN "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawSerialiseSigDSIGN "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseVerKeyDSIGN "Use `rawDecodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseSignKeyDSIGN "Use `rawDecodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialiseSigDSIGN "Use `rawDecodeFixedSized` instead" #-}
+
 --
 -- Do not provide Ord instances for keys, see #38
 --
@@ -241,17 +248,17 @@ instance
   where
   compare = error "unsupported"
 
-{-# DEPRECATED sizeVerKeyDSIGN "In favor of `verKeySizeDSIGN`" #-}
+{-# DEPRECATED sizeVerKeyDSIGN "In favor of `fixedSize`" #-}
 sizeVerKeyDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
-sizeVerKeyDSIGN = verKeySizeDSIGN
+sizeVerKeyDSIGN _ = fixedSize $ Proxy @(VerKeyDSIGN v)
 
-{-# DEPRECATED sizeSignKeyDSIGN "In favor of `signKeySizeDSIGN`" #-}
+{-# DEPRECATED sizeSignKeyDSIGN "In favor of `fixedSize`" #-}
 sizeSignKeyDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
-sizeSignKeyDSIGN = signKeySizeDSIGN
+sizeSignKeyDSIGN _ = fixedSize $ Proxy @(SignKeyDSIGN v)
 
-{-# DEPRECATED sizeSigDSIGN "In favor of `sigSizeDSIGN`" #-}
+{-# DEPRECATED sizeSigDSIGN "In favor of `fixedSize`" #-}
 sizeSigDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
-sizeSigDSIGN = sigSizeDSIGN
+sizeSigDSIGN _ = fixedSize $ Proxy @(SigDSIGN v)
 
 -- | The upper bound on the 'Seed' size needed by 'genKeyDSIGN'
 seedSizeDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
@@ -259,12 +266,15 @@ seedSizeDSIGN _ = fromInteger (natVal (Proxy @(SeedSizeDSIGN v)))
 
 verKeySizeDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
 verKeySizeDSIGN _ = fixedSize $ Proxy @(VerKeyDSIGN v)
+{-# DEPRECATED verKeySizeDSIGN "Use `fixedSize` instead" #-}
 
 signKeySizeDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
 signKeySizeDSIGN _ = fixedSize $ Proxy @(SignKeyDSIGN v)
+{-# DEPRECATED signKeySizeDSIGN "Use `fixedSize` instead" #-}
 
 sigSizeDSIGN :: forall v proxy. DSIGNAlgorithm v => proxy v -> Word
 sigSizeDSIGN _ = fixedSize $ Proxy @(SigDSIGN v)
+{-# DEPRECATED sigSizeDSIGN "Use `fixedSize` instead" #-}
 
 --
 -- Convenient CBOR encoding/decoding
@@ -351,33 +361,27 @@ decodeSignedDSIGN = decodeFixedSized
 -- Encoded 'Size' expressions for 'ToCBOR' instances
 --
 
--- | 'Size' expression for 'VerKeyDSIGN' which is using 'verKeySizeDSIGN'
--- encoded as 'Size'.
 encodedVerKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (VerKeyDSIGN v) -> Size
 encodedVerKeyDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (verKeySizeDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(VerKeyDSIGN v))))
     -- payload
-    + fromIntegral @Word @Size (verKeySizeDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(VerKeyDSIGN v)))
 
--- | 'Size' expression for 'SignKeyDSIGN' which is using 'signKeySizeDSIGN'
--- encoded as 'Size'.
 encodedSignKeyDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SignKeyDSIGN v) -> Size
 encodedSignKeyDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
   fromIntegral @Integer @Size
-    (withWordSize (signKeySizeDSIGN (Proxy :: Proxy v)))
+    (withWordSize (fixedSize (Proxy @(SignKeyDSIGN v))))
     -- payload
-    + fromIntegral @Word @Size (signKeySizeDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(SignKeyDSIGN v)))
 
--- | 'Size' expression for 'SigDSIGN' which is using 'sigSizeDSIGN' encoded as
--- 'Size'.
 encodedSigDSIGNSizeExpr :: forall v. DSIGNAlgorithm v => Proxy (SigDSIGN v) -> Size
 encodedSigDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (sigSizeDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(SigDSIGN v))))
     -- payload
-    + fromIntegral @Word @Size (sigSizeDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(SigDSIGN v)))
 
 class (DSIGNAlgorithm v, NoThunks (SignKeyDSIGNM v)) => DSIGNMAlgorithm v where
   data SignKeyDSIGNM v :: Type
@@ -505,7 +509,7 @@ decodeSignKeyDSIGNM = do
               )
         | otherwise -> error "decodeSignKeyDSIGNM: cannot decode key"
         where
-          expected = fromIntegral @Word @Int (signKeySizeDSIGN (Proxy :: Proxy v))
+          expected = fromIntegral @Word @Int (fixedSize (Proxy @(SignKeyDSIGN v)))
           actual = BS.length bs
 
 -- | Extension of the `DSIGNAlgorithm` to allow for aggregatable digital
@@ -571,6 +575,9 @@ class
   rawDeserialisePossessionProofDSIGN :: ByteString -> Maybe (PossessionProofDSIGN v)
   rawDeserialisePossessionProofDSIGN = rawDecodeFixedSized
 
+{-# DEPRECATED rawSerialisePossessionProofDSIGN "Use `rawEncodeFixedSized` instead" #-}
+{-# DEPRECATED rawDeserialisePossessionProofDSIGN "Use `rawDecodeFixedSized` instead" #-}
+
 -- | Aggregate multiple verification keys into a single verification key given
 -- their corresponding Proofs of Possession.
 --
@@ -587,6 +594,7 @@ aggregateVerKeysDSIGN ctx verKeysAndPoPs = do
 
 possessionProofSizeDSIGN :: forall v proxy. DSIGNAggregatable v => proxy v -> Word
 possessionProofSizeDSIGN _ = fixedSize $ Proxy @(PossessionProofDSIGN v)
+{-# DEPRECATED possessionProofSizeDSIGN "Use `fixedSize` instead" #-}
 
 -- | Encode a PoP into CBOR.
 encodePossessionProofDSIGN :: DSIGNAggregatable v => PossessionProofDSIGN v -> Encoding
@@ -600,12 +608,10 @@ decodePossessionProofDSIGN = decodeFixedSized
 {-# INLINE decodePossessionProofDSIGN #-}
 {-# DEPRECATED decodePossessionProofDSIGN "Use `decodeFixedSized` instead" #-}
 
--- | 'Size' expression for 'PossessionProofDSIGN' which is using 'possessionProofSizeDSIGN'
--- encoded as 'Size'.
 encodedPossessionProofDSIGNSizeExpr ::
   forall v. DSIGNAggregatable v => Proxy (PossessionProofDSIGN v) -> Size
 encodedPossessionProofDSIGNSizeExpr _proxy =
   -- 'encodeBytes' envelope
-  fromIntegral @Integer @Size (withWordSize (possessionProofSizeDSIGN (Proxy :: Proxy v)))
+  fromIntegral @Integer @Size (withWordSize (fixedSize (Proxy @(PossessionProofDSIGN v))))
     -- payload
-    + fromIntegral @Word @Size (possessionProofSizeDSIGN (Proxy :: Proxy v))
+    + fromIntegral @Word @Size (fixedSize (Proxy @(PossessionProofDSIGN v)))

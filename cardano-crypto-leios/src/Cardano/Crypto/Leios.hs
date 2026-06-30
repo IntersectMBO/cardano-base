@@ -56,17 +56,20 @@ module Cardano.Crypto.Leios (
 
 import Cardano.Base.Bytes (byteArrayFromByteString)
 import Cardano.Binary (matchSize, toCBOR)
-import Cardano.Binary.FixedSizeCodec (decodeFixedSized, encodeFixedSized)
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  fixedSize,
+ )
 import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (aggregateSigsDSIGN, uncheckedAggregateVerKeysDSIGN),
-  DSIGNAlgorithm (rawSerialiseSigDSIGN),
   SigDSIGN,
   SignKeyDSIGN,
   VerKeyDSIGN,
   verifyDSIGN,
  )
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
-import Cardano.Crypto.DSIGN.Class (sigSizeDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
 import Codec.CBOR.Decoding (Decoder, decodeBreakOr, decodeBytes, decodeListLenOrIndef, decodeWord16)
 import Codec.CBOR.Encoding (Encoding, encodeListLen, encodeWord16)
@@ -116,11 +119,11 @@ leiosSignContext = minSigPoPDST
 
 -- | Size of a Leios signature in the chosen signature scheme.
 leiosSignatureSize :: Word
-leiosSignatureSize = sigSizeDSIGN (Proxy @LeiosDSIGN)
+leiosSignatureSize = fixedSize (Proxy @(SigDSIGN LeiosDSIGN))
 
 -- | Get the bytes of a Leios signature.
 leiosSignatureToBytes :: LeiosSignature -> ByteString
-leiosSignatureToBytes = rawSerialiseSigDSIGN
+leiosSignatureToBytes = rawEncodeFixedSized
 
 -- | A weight assigned to a committee voter, normalised so the total over a
 -- committee sums to @1@. Threshold checks in 'verifyLeiosCert' are against

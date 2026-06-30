@@ -190,12 +190,12 @@ instance KnownNat t => UnsoundKESAlgorithm (MockKES t) where
 instance KnownNat t => FixedSizeCodec (SignKeyKES (MockKES t)) where
   type FixedSize (SignKeyKES (MockKES t)) = 16
   rawEncodeFixedSized (SignKeyMockKES vk t) =
-    rawSerialiseVerKeyKES vk
+    rawEncodeFixedSized vk
       <> writeBinaryWord64 (fromIntegral @Period @Word64 t)
   rawDecodeFixedSized bs = do
     guardFixedSized (Proxy @(SignKeyKES (MockKES t))) bs
     let (vkb, tb) = BS.splitAt 8 bs
-    vk <- case rawDeserialiseVerKeyKES vkb of
+    vk <- case rawDecodeFixedSized vkb of
       Just x -> pure x
       Nothing -> fail "rawDeserialiseSignKeyMockKES: Failed to deserialise VerKeyKES"
     let t = fromIntegral @Word64 @Period (readBinaryWord64 tb)
@@ -273,15 +273,15 @@ instance KnownNat t => DirectDeserialise (SignKeyKES (MockKES t)) where
 
 instance KnownNat t => DirectSerialise (VerKeyKES (MockKES t)) where
   directSerialise push sk = do
-    let bs = rawSerialiseVerKeyKES sk
+    let bs = rawEncodeFixedSized sk
     unpackByteStringCStringLen bs $ \(cstr, len) -> push cstr (fromIntegral @Int @CSize len)
 
 instance KnownNat t => DirectDeserialise (VerKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral @Word @Int $ verKeySizeKES (Proxy @(MockKES t))
+    let len = fromIntegral @Word @Int $ fixedSize (Proxy @(VerKeyKES (MockKES t)))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
       pull (castPtr ptr) (fromIntegral @Int @CSize len)
     let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
-      rawDeserialiseVerKeyKES bs
+      rawDecodeFixedSized bs

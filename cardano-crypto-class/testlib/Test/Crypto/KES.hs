@@ -38,6 +38,7 @@ import Control.Monad.Class.MonadThrow
 import Control.Monad.IO.Class (liftIO)
 import Control.Tracer
 
+import Cardano.Binary.FixedSizeCodec (rawDecodeFixedSized, rawEncodeFixedSized)
 import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.DirectSerialise (DirectDeserialise, DirectSerialise)
 import Cardano.Crypto.Hash
@@ -289,7 +290,7 @@ testKESAlgorithm lock n =
       prop "VerKey DirectSerialise" $
         ioPropertyWithSK @v lock $ \sk -> do
           vk :: VerKeyKES v <- deriveVerKeyKES sk
-          direct <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeKES (Proxy @v)) vk
+          direct <- directSerialiseToBS (fromIntegral @Word @Int $ fixedSize (Proxy @(VerKeyKES v))) vk
           prop_no_thunks_IO (return $! direct)
       prop "SignKey DirectSerialise" $
         ioPropertyWithSK @v lock $ \sk -> do
@@ -298,7 +299,7 @@ testKESAlgorithm lock n =
       prop "VerKey DirectDeserialise" $
         ioPropertyWithSK @v lock $ \sk -> do
           vk :: VerKeyKES v <- deriveVerKeyKES sk
-          direct <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeKES (Proxy @v)) $! vk
+          direct <- directSerialiseToBS (fromIntegral @Word @Int $ fixedSize (Proxy @(VerKeyKES v))) $! vk
           prop_no_thunks_IO (directDeserialiseFromBS @IO @(VerKeyKES v) $! direct)
       prop "SignKey DirectDeserialise" $
         ioPropertyWithSK @v lock $ \sk -> do
@@ -314,7 +315,7 @@ testKESAlgorithm lock n =
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            return $ (rawDeserialiseVerKeyKES . rawSerialiseVerKeyKES $ vk) === Just vk
+            return $ (rawDecodeFixedSized . rawEncodeFixedSized $ vk) === Just vk
         prop "SignKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             serialized <- rawSerialiseSignKeyKES sk
@@ -328,13 +329,14 @@ testKESAlgorithm lock n =
         prop "Sig" $ \(msg :: Message) ->
           ioPropertyWithSK @v lock $ \sk -> do
             sig :: SigKES v <- signKES () 0 msg sk
-            return $ (rawDeserialiseSigKES . rawSerialiseSigKES $ sig) === Just sig
+            return $ (rawDecodeFixedSized . rawEncodeFixedSized $ sig) === Just sig
       describe "size" $ do
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
             return $
-              (fromIntegral @Int @Word . BS.length . rawSerialiseVerKeyKES $ vk) === verKeySizeKES (Proxy @v)
+              (fromIntegral @Int @Word . BS.length . rawEncodeFixedSized $ vk)
+                === fixedSize (Proxy @(VerKeyKES v))
         prop "SignKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             serialized <- rawSerialiseSignKeyKES sk
@@ -342,7 +344,8 @@ testKESAlgorithm lock n =
         prop "Sig" $ \(msg :: Message) ->
           ioPropertyWithSK @v lock $ \sk -> do
             sig :: SigKES v <- signKES () 0 msg sk
-            return $ (fromIntegral @Int @Word . BS.length . rawSerialiseSigKES $ sig) === sigSizeKES (Proxy @v)
+            return $
+              (fromIntegral @Int @Word . BS.length . rawEncodeFixedSized $ sig) === fixedSize (Proxy @(SigKES v))
       describe "direct CBOR" $ do
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
@@ -392,7 +395,7 @@ testKESAlgorithm lock n =
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            serialized <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeKES (Proxy @v)) vk
+            serialized <- directSerialiseToBS (fromIntegral @Word @Int $ fixedSize (Proxy @(VerKeyKES v))) vk
             vk' <- directDeserialiseFromBS serialized
             return $ vk === vk'
         prop "SignKey" $
@@ -411,8 +414,8 @@ testKESAlgorithm lock n =
         prop "VerKey" $
           ioPropertyWithSK @v lock $ \sk -> do
             vk :: VerKeyKES v <- deriveVerKeyKES sk
-            direct <- directSerialiseToBS (fromIntegral @Word @Int $ verKeySizeKES (Proxy @v)) vk
-            let raw = rawSerialiseVerKeyKES vk
+            direct <- directSerialiseToBS (fromIntegral @Word @Int $ fixedSize (Proxy @(VerKeyKES v))) vk
+            let raw = rawEncodeFixedSized vk
             return $ direct === raw
         prop "SignKey" $
           ioPropertyWithSK @v lock $ \sk -> do

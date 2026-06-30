@@ -11,6 +11,7 @@ module Test.Crypto.VRF (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
 import Cardano.Crypto.Util
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
@@ -252,17 +253,11 @@ testVRFAlgorithm _ n =
     describe "serialisation" $ do
       describe "raw" $ do
         prop "VerKey" $
-          prop_raw_serialise @(VerKeyVRF v)
-            rawSerialiseVerKeyVRF
-            rawDeserialiseVerKeyVRF
+          prop_raw_serialise_fixed_sized @(VerKeyVRF v)
         prop "SignKey" $
-          prop_raw_serialise @(SignKeyVRF v)
-            rawSerialiseSignKeyVRF
-            rawDeserialiseSignKeyVRF
+          prop_raw_serialise_fixed_sized @(SignKeyVRF v)
         prop "Cert" $
-          prop_raw_serialise @(CertVRF v)
-            rawSerialiseCertVRF
-            rawDeserialiseCertVRF
+          prop_raw_serialise_fixed_sized @(CertVRF v)
 
       describe "size" $ do
         prop "VerKey" $
@@ -397,14 +392,14 @@ prop_naturalToBytes (NonNegative sz) n =
 --
 prop_pubKeyToBatchComopat :: VerKeyVRF PraosVRF -> Property
 prop_pubKeyToBatchComopat vk =
-  rawSerialiseVerKeyVRF (vkToBatchCompat vk) === rawSerialiseVerKeyVRF vk
+  rawEncodeFixedSized (vkToBatchCompat vk) === rawEncodeFixedSized vk
 
 --
 -- Praos <-> BatchCompatPraos SignKey conversion
 --
 prop_signKeyToBatchCompat :: SignKeyVRF PraosVRF -> Property
 prop_signKeyToBatchCompat sk =
-  rawSerialiseSignKeyVRF (skToBatchCompat sk) === rawSerialiseSignKeyVRF sk
+  rawEncodeFixedSized (skToBatchCompat sk) === rawEncodeFixedSized sk
 
 --
 -- Praos <-> BatchCompatPraos Output conversion
