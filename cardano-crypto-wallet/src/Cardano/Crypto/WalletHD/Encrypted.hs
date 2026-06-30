@@ -1,6 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeData #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- |
 -- Module      : Cardano.Crypto.WalletHD.Encrypted
@@ -25,16 +31,64 @@ module Cardano.Crypto.WalletHD.Encrypted (
   DerivationScheme (..),
   DerivationIndex,
 
+  -- ** PublicKey
+  PublicKey,
+  publicKeySize,
+  mkPublicKey,
+  publicKeyByteArray,
+  publicKeyByteString,
+
+  -- ** Encrypted SecretKey
+  EncSecretKey,
+  encSecretKeySize,
+  mkEncSecretKey,
+  encSecretKeyByteArray,
+  encSecretKeyByteString,
+
+  -- ** ChainCode
+  ChainCode,
+  chainCodeSize,
+  mkChainCode,
+  chainCodeByteArray,
+  chainCodeByteString,
+
+  -- ** Salt
+  Salt,
+  saltSize,
+  mkSalt,
+  saltByteArray,
+  saltByteString,
+
+  -- ** Nonce
+  Nonce,
+  nonceSize,
+  mkNonce,
+  nonceByteArray,
+  nonceByteString,
+
+  -- ** Tag
+  Tag,
+  tagSize,
+  mkTag,
+  tagByteArray,
+  tagByteString,
+
+  -- ** Envelope
+  Envelope (eSalt, eNonce, ePublicKey, eChainCode),
+  encodeEnvelope,
+  decodeEnvelope,
+
   -- * Construction & validation
   encryptedCreate,
   encryptedCreateDirectWithTweak,
-  encryptedKey,
+  mkEncryptedKey,
   unEncryptedKey,
+  encryptedKey,
   encryptedKeyFormat,
 
   -- * Passphrase operations
   encryptedValidatePassphrase,
-  encryptedChangePass,
+  encryptedChangePassphrase,
 
   -- * Signing & derivation
   encryptedSign,
@@ -44,16 +98,30 @@ module Cardano.Crypto.WalletHD.Encrypted (
   -- * Accessors
   encryptedPublic,
   encryptedChainCode,
-  encryptedKeyMaterial,
 
   -- * Test helpers
   withFastKdfForTesting,
   withDeterministicRandomnessForTesting,
 ) where
 
+import Cardano.Crypto.Libsodium.Memory (zeroMem)
+import Cardano.Crypto.PinnedSizedBytes (
+  PinnedSizedBytes,
+  psbCreate,
+  psbCreateResult,
+  psbCreateResultLen,
+  psbFromByteString,
+  psbFromByteStringM,
+  psbToByteArray,
+  psbToByteString,
+  psbUseAsCPtr,
+ )
+import Control.Arrow (first)
 import Control.DeepSeq
-import Control.Exception (bracket, finally, mask, onException)
+import Control.Exception (bracket)
 import Control.Monad (when)
+import Control.Monad.Trans.Fail.String (errorFail)
+import Data.Array.Byte (ByteArray)
 import Data.Bits (shiftR)
 import Data.ByteArray (ByteArrayAccess, withByteArray)
 import qualified Data.ByteArray as B
@@ -67,12 +135,22 @@ import Data.IORef (
   readIORef,
   writeIORef,
  )
+import Data.Proxy (Proxy (..))
 import Data.Word
 import Foreign.C.Types
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr
+import GHC.Stack (HasCallStack)
+import GHC.TypeLits
 import System.IO.Unsafe (unsafePerformIO)
 
+import Cardano.Binary (toCBOR)
+import Cardano.Crypto.Libsodium.MLockedBytes (
+  MLockedSizedBytes,
+  mlsbFinalize,
+  mlsbNew,
+  mlsbUseAsCPtr,
+ )
 import Codec.CBOR.Decoding (
   Decoder,
   decodeBytes,
@@ -80,19 +158,14 @@ import Codec.CBOR.Decoding (
   decodeWord,
  )
 import Codec.CBOR.Encoding (
+  Encoding,
   encodeBytes,
+  encodeInt,
   encodeListLen,
   encodeWord,
  )
 import qualified Codec.CBOR.Read as CBOR
 import qualified Codec.CBOR.Write as CBOR
-
-import Cardano.Crypto.Libsodium.MLockedBytes (
-  MLockedSizedBytes,
-  mlsbFinalize,
-  mlsbNewZero,
-  mlsbUseAsCPtr,
- )
 
 -- ---------------------------------------------------------------------------
 -- Key derivation scheme
@@ -107,22 +180,153 @@ data DerivationScheme = DerivationScheme1 | DerivationScheme2
 -- Size constants
 -- ---------------------------------------------------------------------------
 
-legacyKeySize, publicKeySize, ccSize, signatureSize :: Int
-legacyKeySize = 64
-publicKeySize = 32
-ccSize = 32
+signatureSize :: Int
 signatureSize = 64
 
-type PublicKey = ByteString
-type ChainCode = ByteString
-type Salt = ByteString
-type Nonce = ByteString
-type Ciphertext = ByteString
-type AuthenticationTag = ByteString
-type AadContext = ByteString
+mlsbCreate :: KnownNat n => (MLockedSizedBytes n -> b) -> (b -> IO c) -> IO c
+mlsbCreate mkType action = bracket mlsbNew mlsbFinalize (action . mkType)
 
-legacyTotalKeySize :: Int
-legacyTotalKeySize = legacyKeySize + publicKeySize + ccSize
+------------------------------------------------------------------------------
+-- SECRET_KEY
+------------------------------------------------------------------------------
+
+-- TODO: Derive from: `UNENCRYPTED_KEY_SIZE`
+type SECRET_KEY_SIZE = 64
+
+secretKeySize :: Int
+secretKeySize = fromInteger (natVal (Proxy @SECRET_KEY_SIZE))
+
+-- | Plaintext version of the secret key used for creating signatures
+newtype SecretKey = SecretKey {_unSecretKey :: MLockedSizedBytes SECRET_KEY_SIZE}
+
+newtype SecretKeyPtr = SecretKeyPtr (Ptr Word8)
+
+withSecretKeyPtr :: SecretKey -> (SecretKeyPtr -> IO a) -> IO a
+withSecretKeyPtr (SecretKey secretKey) action =
+  mlsbUseAsCPtr secretKey (action . SecretKeyPtr)
+{-# INLINE withSecretKeyPtr #-}
+
+-- Encrypted version (same size as decrypted)
+type ENC_SECRET_KEY_SIZE = SECRET_KEY_SIZE
+
+-- | Encrypted version of `SecretKey`
+newtype EncSecretKey = EncSecretKey {unEncSecretKey :: PinnedSizedBytes ENC_SECRET_KEY_SIZE}
+  deriving (Eq, Show)
+
+newtype EncSecretKeyPtr = EncSecretKeyPtr (Ptr Word8)
+
+encSecretKeySize :: Int
+encSecretKeySize = fromInteger (natVal (Proxy @ENC_SECRET_KEY_SIZE))
+
+withEncSecretKeyPtr :: EncSecretKey -> (EncSecretKeyPtr -> IO a) -> IO a
+withEncSecretKeyPtr (EncSecretKey encSecretKey) action =
+  psbUseAsCPtr encSecretKey (action . EncSecretKeyPtr)
+{-# INLINE withEncSecretKeyPtr #-}
+
+mkEncSecretKey :: MonadFail f => ByteString -> f EncSecretKey
+mkEncSecretKey bs = EncSecretKey <$> psbFromByteStringM bs
+
+encSecretKeyByteArray :: EncSecretKey -> ByteArray
+encSecretKeyByteArray = psbToByteArray . unEncSecretKey
+
+encSecretKeyByteString :: EncSecretKey -> ByteString
+encSecretKeyByteString = psbToByteString . unEncSecretKey
+
+encodeEncSecretKey :: EncSecretKey -> Encoding
+encodeEncSecretKey = toCBOR . psbToByteArray . unEncSecretKey
+
+decodeEncSecretKey :: Decoder s EncSecretKey
+decodeEncSecretKey = do
+  saltBytes <- decodeBytes
+  case mkEncSecretKey saltBytes of
+    Nothing -> failDecoder XPrvInvalidCiphertextLength
+    Just salt -> pure salt
+
+------------------------------------------------------------------------------
+-- PUBLIC_KEY
+------------------------------------------------------------------------------
+
+type PUBLIC_KEY_SIZE = 32
+
+publicKeySize :: Int
+publicKeySize = fromInteger (natVal (Proxy @PUBLIC_KEY_SIZE))
+
+newtype PublicKey = PublicKey {unPublicKey :: PinnedSizedBytes PUBLIC_KEY_SIZE}
+  deriving (Eq, Show)
+newtype PublicKeyPtr = PublicKeyPtr (Ptr Word8)
+
+withPublicKeyPtr :: PublicKey -> (PublicKeyPtr -> IO a) -> IO a
+withPublicKeyPtr (PublicKey publicKey) action =
+  psbUseAsCPtr publicKey (action . PublicKeyPtr)
+{-# INLINE withPublicKeyPtr #-}
+
+mkPublicKey :: MonadFail f => ByteString -> f PublicKey
+mkPublicKey bs = PublicKey <$> psbFromByteStringM bs
+
+publicKeyByteArray :: PublicKey -> ByteArray
+publicKeyByteArray = psbToByteArray . unPublicKey
+
+publicKeyByteString :: PublicKey -> ByteString
+publicKeyByteString = psbToByteString . unPublicKey
+
+encodePublicKey :: PublicKey -> Encoding
+encodePublicKey = toCBOR . psbToByteArray . unPublicKey
+
+------------------------------------------------------------------------------
+-- CHAIN_CODE
+------------------------------------------------------------------------------
+
+type CHAIN_CODE_SIZE = 32
+
+chainCodeSize :: Int
+chainCodeSize = fromInteger (natVal (Proxy @CHAIN_CODE_SIZE))
+
+newtype ChainCode = ChainCode {unChainCode :: PinnedSizedBytes CHAIN_CODE_SIZE}
+  deriving (Eq, Show)
+newtype ChainCodePtr = ChainCodePtr (Ptr Word8)
+
+withChainCodePtr :: ChainCode -> (ChainCodePtr -> IO a) -> IO a
+withChainCodePtr (ChainCode publicKey) action =
+  psbUseAsCPtr publicKey (action . ChainCodePtr)
+{-# INLINE withChainCodePtr #-}
+
+mkChainCode :: MonadFail f => ByteString -> f ChainCode
+mkChainCode bs = ChainCode <$> psbFromByteStringM bs
+
+chainCodeByteArray :: ChainCode -> ByteArray
+chainCodeByteArray = psbToByteArray . unChainCode
+
+chainCodeByteString :: ChainCode -> ByteString
+chainCodeByteString = psbToByteString . unChainCode
+
+encodeChainCode :: ChainCode -> Encoding
+encodeChainCode = toCBOR . psbToByteArray . unChainCode
+
+------------------------------------------------------------------------------
+-- KEY_MATERIAL
+------------------------------------------------------------------------------
+
+type data Validity = Validated | Unchecked
+
+-- | Key material with the secret key in @sodium_malloc@'d locked memory.
+data KeyMaterial (v :: Validity) = KeyMaterial
+  { kmSecretKey :: !SecretKey
+  , kmPublicKey :: !PublicKey
+  , kmChainCode :: !ChainCode
+  }
+
+type KEY_MATERIAL_SIZE = SECRET_KEY_SIZE + PUBLIC_KEY_SIZE + CHAIN_CODE_SIZE
+
+keyMaterialSize :: Int
+keyMaterialSize = fromInteger (natVal (Proxy @KEY_MATERIAL_SIZE))
+
+newtype KeyMaterialBuffer = KeyMaterialBuffer (MLockedSizedBytes KEY_MATERIAL_SIZE)
+newtype KeyMaterialPtr = KeyMaterialPtr (Ptr Word8)
+
+allocaKeyMaterialBuffer :: (KeyMaterialPtr -> IO c) -> IO c
+allocaKeyMaterialBuffer action =
+  mlsbCreate KeyMaterialBuffer $ \(KeyMaterialBuffer keyMaterialBuffer) ->
+    mlsbUseAsCPtr keyMaterialBuffer (action . KeyMaterialPtr)
 
 -- ---------------------------------------------------------------------------
 -- V2 envelope constants
@@ -141,12 +345,11 @@ data KdfParams = KdfParams
   { kdfMemoryKiB :: !Word
   , kdfTimeCost :: !Word
   , kdfParallelism :: !Word
-  , kdfOutputLength :: !Word
   }
 
 productionKdfParams, fastTestKdfParams :: KdfParams
-productionKdfParams = KdfParams 131072 3 4 32
-fastTestKdfParams = KdfParams 4096 1 1 32
+productionKdfParams = KdfParams 131072 3 4
+fastTestKdfParams = KdfParams 4096 1 1
 
 runtimeKdfParamsRef :: IORef KdfParams
 runtimeKdfParamsRef = unsafePerformIO (newIORef productionKdfParams)
@@ -160,12 +363,7 @@ productionArgonMemoryKiB
 productionArgonMemoryKiB = kdfMemoryKiB productionKdfParams
 productionArgonTimeCost = kdfTimeCost productionKdfParams
 productionArgonParallelism = kdfParallelism productionKdfParams
-productionArgonOutputLength = kdfOutputLength productionKdfParams
-
-saltSize, nonceSize, tagSize :: Int
-saltSize = 32
-nonceSize = 24
-tagSize = 16
+productionArgonOutputLength = fromIntegral @Int @Word wrappingKeySize
 
 -- ---------------------------------------------------------------------------
 -- Random-mode override (for testing)
@@ -237,38 +435,153 @@ newtype EncryptedKey = EncryptedKey ByteString
 -- V2 envelope data
 -- ---------------------------------------------------------------------------
 
-data V2Envelope = V2Envelope
-  { v2Salt :: !Salt
-  , v2Nonce :: !Nonce
-  , v2PublicKey :: !PublicKey
-  , v2ChainCode :: !ChainCode
-  , v2Ciphertext :: !Ciphertext
-  , v2Tag :: !AuthenticationTag
+------------------------------------------------------------------------------
+-- SALT
+------------------------------------------------------------------------------
+
+type SALT_SIZE = 32
+
+saltSize :: Int
+saltSize = fromInteger (natVal (Proxy @SALT_SIZE))
+
+newtype Salt = Salt {unSalt :: PinnedSizedBytes SALT_SIZE}
+  deriving (Eq, Show)
+newtype SaltPtr = SaltPtr (Ptr Word8)
+
+withSaltPtr :: Salt -> (SaltPtr -> IO a) -> IO a
+withSaltPtr (Salt publicKey) action =
+  psbUseAsCPtr publicKey (action . SaltPtr)
+{-# INLINE withSaltPtr #-}
+
+mkSalt :: MonadFail f => ByteString -> f Salt
+mkSalt bs = Salt <$> psbFromByteStringM bs
+
+saltByteArray :: Salt -> ByteArray
+saltByteArray = psbToByteArray . unSalt
+
+saltByteString :: Salt -> ByteString
+saltByteString = psbToByteString . unSalt
+
+encodeSalt :: Salt -> Encoding
+encodeSalt = toCBOR . psbToByteArray . unSalt
+
+decodeSalt :: Decoder s Salt
+decodeSalt = do
+  saltBytes <- decodeBytes
+  case mkSalt saltBytes of
+    Nothing -> failDecoder XPrvInvalidSaltLength
+    Just salt -> pure salt
+
+------------------------------------------------------------------------------
+-- NONCE
+------------------------------------------------------------------------------
+
+-- TODO: Derive from `crypto_aead_xchacha20poly1305_ietf_NPUBBYTES`
+type NONCE_SIZE = 24
+
+nonceSize :: Int
+nonceSize = fromInteger (natVal (Proxy @NONCE_SIZE))
+
+newtype Nonce = Nonce {unNonce :: PinnedSizedBytes NONCE_SIZE}
+  deriving (Eq, Show)
+newtype NoncePtr = NoncePtr (Ptr Word8)
+
+withNoncePtr :: Nonce -> (NoncePtr -> IO a) -> IO a
+withNoncePtr (Nonce publicKey) action =
+  psbUseAsCPtr publicKey (action . NoncePtr)
+{-# INLINE withNoncePtr #-}
+
+mkNonce :: MonadFail f => ByteString -> f Nonce
+mkNonce bs = Nonce <$> psbFromByteStringM bs
+
+nonceByteArray :: Nonce -> ByteArray
+nonceByteArray = psbToByteArray . unNonce
+
+nonceByteString :: Nonce -> ByteString
+nonceByteString = psbToByteString . unNonce
+
+encodeNonce :: Nonce -> Encoding
+encodeNonce = toCBOR . psbToByteArray . unNonce
+
+decodeNonce :: Decoder s Nonce
+decodeNonce = do
+  nonceBytes <- decodeBytes
+  case mkNonce nonceBytes of
+    Nothing -> failDecoder XPrvInvalidNonceLength
+    Just nonce -> pure nonce
+
+------------------------------------------------------------------------------
+-- TAG
+------------------------------------------------------------------------------
+
+-- TODO: Derive from: `crypto_aead_xchacha20poly1305_ietf_ABYTES`
+type TAG_SIZE = 16
+
+tagSize :: Int
+tagSize = fromInteger (natVal (Proxy @TAG_SIZE))
+
+newtype Tag = Tag {unTag :: PinnedSizedBytes TAG_SIZE}
+  deriving (Eq, Show)
+newtype TagPtr = TagPtr (Ptr Word8)
+
+withTagPtr :: Tag -> (TagPtr -> IO a) -> IO a
+withTagPtr (Tag publicKey) action =
+  psbUseAsCPtr publicKey (action . TagPtr)
+{-# INLINE withTagPtr #-}
+
+mkTag :: MonadFail f => ByteString -> f Tag
+mkTag bs = Tag <$> psbFromByteStringM bs
+
+tagByteArray :: Tag -> ByteArray
+tagByteArray = psbToByteArray . unTag
+
+tagByteString :: Tag -> ByteString
+tagByteString = psbToByteString . unTag
+
+encodeTag :: Tag -> Encoding
+encodeTag = toCBOR . psbToByteArray . unTag
+
+decodeTag :: Decoder s Tag
+decodeTag = do
+  tagBytes <- decodeBytes
+  case mkTag tagBytes of
+    Nothing -> failDecoder XPrvInvalidTagLength
+    Just tag -> pure tag
+
+------------------------------------------------------------------------------
+-- WRAPPING_KEY
+------------------------------------------------------------------------------
+
+-- TODO: Derive from: `crypto_aead_xchacha20poly1305_ietf_KEYBYTES`
+type WRAPPING_KEY_SIZE = 32
+
+-- | Plaintext version of the wrapping key used for creating signatures
+newtype WrappingKey = WrappingKey {_unWrappingKey :: MLockedSizedBytes WRAPPING_KEY_SIZE}
+
+newtype WrappingKeyPtr = WrappingKeyPtr (Ptr Word8)
+
+wrappingKeySize :: Int
+wrappingKeySize = fromInteger (natVal (Proxy @WRAPPING_KEY_SIZE))
+
+withWrappingKeyPtr :: WrappingKey -> (WrappingKeyPtr -> IO a) -> IO a
+withWrappingKeyPtr (WrappingKey wrappingKey) action =
+  mlsbUseAsCPtr wrappingKey (action . WrappingKeyPtr)
+{-# INLINE withWrappingKeyPtr #-}
+
+data Envelope = Envelope
+  { eSalt :: !Salt
+  , eNonce :: !Nonce
+  , ePublicKey :: !PublicKey
+  , eChainCode :: !ChainCode
+  , eEncSecretKey :: !EncSecretKey
+  , eTag :: !Tag
   }
   deriving (Eq, Show)
 
--- | Key material with the secret key in @sodium_malloc@'d locked memory.
--- The caller who receives a 'KeyMaterial' from a 'decryptKeyMaterial'-style
--- call is responsible for calling 'mlsbFinalize' on 'kmSecretKey' when done.
-data KeyMaterial = KeyMaterial
-  { kmSecretKey :: !(MLockedSizedBytes 64)
-  , kmPublicKey :: !PublicKey
-  , kmChainCode :: !ChainCode
-  }
-
 -- FFI pointer newtypes
-newtype SecretKeyPtr = SecretKeyPtr (Ptr Word8)
 newtype MasterKeyPtr = MasterKeyPtr (Ptr Word8)
-newtype PublicKeyPtr = PublicKeyPtr (Ptr Word8)
-newtype ChainCodePtr = ChainCodePtr (Ptr Word8)
-newtype EncryptedKeyPtr = EncryptedKeyPtr (Ptr Word8)
 newtype SignaturePtr = SignaturePtr (Ptr Word8)
 newtype PassPhrasePtr = PassPhrasePtr (Ptr Word8)
-newtype SaltPtr = SaltPtr (Ptr Word8)
-newtype NoncePtr = NoncePtr (Ptr Word8)
-newtype TagPtr = TagPtr (Ptr Word8)
-newtype CiphertextPtr = CiphertextPtr (Ptr Word8)
-newtype WrappingKeyPtr = WrappingKeyPtr (Ptr Word8)
 
 type CDerivationScheme = CInt
 
@@ -276,12 +589,26 @@ type CDerivationScheme = CInt
 -- Public API
 -- ---------------------------------------------------------------------------
 
+-- | Construct `EncryptedKey` from bytes.
+mkEncryptedKey :: ByteString -> Either XPrvError EncryptedKey
+mkEncryptedKey bs =
+  let eKey = EncryptedKey bs
+   in eKey <$ validateSerializedKey eKey
+
+-- | In order to promote smoother migration from @cardano-crypto@. Use `mkEncryptedKey` instead
 encryptedKey :: ByteString -> Either XPrvError EncryptedKey
-encryptedKey bs = EncryptedKey bs <$ validateSerializedKey bs
+encryptedKey = mkEncryptedKey
+{-# DEPRECATED encryptedKey "In favor of `mkEncryptedKey`" #-}
+
+validateSerializedKey :: EncryptedKey -> Either XPrvError ()
+validateSerializedKey eKey =
+  case encryptedKeyFormat eKey of
+    LegacyV1 -> Right ()
+    EnvelopeV2 -> () <$ decodeEncryptedKeyV2 eKey
 
 encryptedKeyFormat :: EncryptedKey -> XPrvFormat
 encryptedKeyFormat (EncryptedKey bs)
-  | BS.length bs == legacyTotalKeySize = LegacyV1
+  | BS.length bs == keyMaterialSize = LegacyV1
   | otherwise = EnvelopeV2
 
 unEncryptedKey :: EncryptedKey -> ByteString
@@ -289,88 +616,46 @@ unEncryptedKey (EncryptedKey e) = e
 
 encryptedCreate ::
   (ByteArrayAccess passphrase, ByteArrayAccess secret, ByteArrayAccess cc) =>
-  secret ->
-  passphrase ->
-  cc ->
-  IO (Either XPrvError EncryptedKey)
+  secret -> passphrase -> cc -> IO (Either XPrvError EncryptedKey)
 encryptedCreate sec pass cc
   | B.length sec /= 32 = pure (Left XPrvInvalidSecretKey)
-  | B.length cc /= ccSize = pure (Left XPrvInvalidChainCode)
-  | otherwise = do
-      emat <- legacyMaterialFromSecret sec cc
-      case emat of
-        Left err -> pure (Left err)
-        Right mat ->
-          finally (wrapKeyMaterial pass mat) (mlsbFinalize (kmSecretKey mat))
-{-# NOINLINE encryptedCreate #-}
+  | B.length cc /= chainCodeSize = pure (Left XPrvInvalidChainCode)
+  | otherwise = legacyMaterialFromSecret sec cc (wrapKeyMaterial pass)
 
 encryptedCreateDirectWithTweak ::
   (ByteArrayAccess passphrase, ByteArrayAccess secret) =>
-  secret ->
-  passphrase ->
-  IO (Either XPrvError EncryptedKey)
+  secret -> passphrase -> IO (Either XPrvError EncryptedKey)
 encryptedCreateDirectWithTweak sec pass
   | B.length sec /= 96 = pure (Left XPrvInvalidSecretKey)
-  | otherwise = do
-      emat <- legacyMaterialFromMasterKey sec
-      case emat of
-        Left err -> pure (Left err)
-        Right mat ->
-          finally (wrapKeyMaterial pass mat) (mlsbFinalize (kmSecretKey mat))
-{-# NOINLINE encryptedCreateDirectWithTweak #-}
+  | otherwise = legacyMaterialFromMasterKey sec (wrapKeyMaterial pass)
 
 encryptedValidatePassphrase ::
   ByteArrayAccess passphrase =>
-  EncryptedKey ->
-  passphrase ->
-  IO (Either XPrvError ())
-encryptedValidatePassphrase ekey pass = do
-  emat <- decryptKeyMaterial ekey pass
-  case emat of
-    Left err -> pure (Left err)
-    Right mat -> do
-      mlsbFinalize (kmSecretKey mat)
-      pure (Right ())
+  EncryptedKey -> passphrase -> IO (Either XPrvError ())
+encryptedValidatePassphrase eKey pass =
+  withDecryptedKeyMaterial eKey pass (\_ -> pure $ Right ())
 
-encryptedChangePass ::
+encryptedChangePassphrase ::
   (ByteArrayAccess oldPassPhrase, ByteArrayAccess newPassPhrase) =>
-  oldPassPhrase ->
-  newPassPhrase ->
-  EncryptedKey ->
-  IO (Either XPrvError EncryptedKey)
-encryptedChangePass oldPass newPass ekey =
-  mask $ \restore -> do
-    emat <- restore (decryptKeyMaterial ekey oldPass)
-    case emat of
-      Left err -> pure (Left err)
-      Right mat ->
-        restore (wrapKeyMaterial newPass mat) `finally` mlsbFinalize (kmSecretKey mat)
+  oldPassPhrase -> newPassPhrase -> EncryptedKey -> IO (Either XPrvError EncryptedKey)
+encryptedChangePassphrase oldPass newPass eKey =
+  withDecryptedKeyMaterial eKey oldPass (wrapKeyMaterial newPass)
 
 encryptedSign ::
   (ByteArrayAccess passphrase, ByteArrayAccess msg) =>
-  EncryptedKey ->
-  passphrase ->
-  msg ->
-  IO (Either XPrvError Signature)
-encryptedSign ekey pass msg =
-  mask $ \restore -> do
-    emat <- restore (decryptKeyMaterial ekey pass)
-    case emat of
-      Left err -> pure (Left err)
-      Right mat ->
-        restore
-          ( withLegacyStruct mat $ \legPtr -> do
-              (status, sig) <-
-                B.allocRet signatureSize $ \outSig ->
-                  withByteArray msg $ \msgPtr ->
-                    wallet_encrypted_sign
-                      (coerce legPtr)
-                      msgPtr
-                      (fromIntegral $ B.length msg)
-                      (coerce outSig)
-              pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
-          )
-          `finally` mlsbFinalize (kmSecretKey mat)
+  EncryptedKey -> passphrase -> msg -> IO (Either XPrvError Signature)
+encryptedSign eKey pass msg =
+  withDecryptedKeyMaterial eKey pass $ \keyMaterial ->
+    withKeyMaterialPtr keyMaterial $ \keyMaterialPtr -> do
+      (status, sig) <-
+        B.allocRet signatureSize $ \outSig ->
+          withByteArray msg $ \msgPtr ->
+            wallet_sign
+              keyMaterialPtr
+              msgPtr
+              (fromIntegral @Int @CSize $ B.length msg)
+              (SignaturePtr outSig)
+      pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
 
 encryptedDerivePrivate ::
   ByteArrayAccess passphrase =>
@@ -379,99 +664,64 @@ encryptedDerivePrivate ::
   passphrase ->
   DerivationIndex ->
   IO (Either XPrvError EncryptedKey)
-encryptedDerivePrivate dscheme ekey pass childIndex =
-  mask $ \restore -> do
-    emat <- restore (decryptKeyMaterial ekey pass)
-    case emat of
-      Left err -> pure (Left err)
-      Right parentMat ->
-        ( do
-            echildMat <- restore (legacyDerivePrivate dscheme parentMat childIndex)
-            case echildMat of
-              Left err -> pure (Left err)
-              Right childMat ->
-                restore (wrapKeyMaterial pass childMat) `finally` mlsbFinalize (kmSecretKey childMat)
-        )
-          `finally` mlsbFinalize (kmSecretKey parentMat)
+encryptedDerivePrivate dScheme eKey pass childIndex =
+  withDecryptedKeyMaterial eKey pass $ \parentKeyMaterial ->
+    legacyDerivePrivate dScheme parentKeyMaterial childIndex (wrapKeyMaterial pass)
 
 encryptedDerivePublic ::
   DerivationScheme ->
   (PublicKey, ChainCode) ->
   DerivationIndex ->
   (PublicKey, ChainCode)
-encryptedDerivePublic dscheme (pub, cc) childIndex
+encryptedDerivePublic dscheme (publicKey, cc) childIndex
   | childIndex >= 0x80000000 =
       error "encryptedDerivePublic: cannot derive hardened key from public key"
   | otherwise = unsafePerformIO $ do
-      (newCC, newPub) <-
-        B.allocRet publicKeySize $ \outPub ->
-          B.alloc ccSize $ \outCc ->
-            withByteArray pub $ \ppub ->
-              withByteArray cc $ \pcc -> do
-                r <-
-                  wallet_encrypted_derive_public
-                    (coerce ppub)
-                    (coerce pcc)
-                    childIndex
-                    (coerce outPub)
-                    (coerce outCc)
-                    (dschemeToC dscheme)
-                if r /= 0
-                  then error "encryptedDerivePublic: hardened index check failed"
-                  else pure ()
-      pure (newPub, newCC)
+      fmap (first PublicKey) $ psbCreateResult $ \publicKeyPtrOut ->
+        fmap ChainCode $ psbCreate $ \ccOutPtr ->
+          withPublicKeyPtr publicKey $ \publicKeyPtr ->
+            withChainCodePtr cc $ \chainCodePtr -> do
+              r <-
+                wallet_derive_public
+                  publicKeyPtr
+                  chainCodePtr
+                  childIndex
+                  (PublicKeyPtr publicKeyPtrOut)
+                  (ChainCodePtr ccOutPtr)
+                  (dschemeToC dscheme)
+              if r /= 0
+                then error "encryptedDerivePublic: hardened index check failed"
+                else pure ()
 
-encryptedPublic :: EncryptedKey -> ByteString
-encryptedPublic (EncryptedKey ekey) =
-  case encryptedKeyFormat (EncryptedKey ekey) of
-    LegacyV1 -> sub legacyKeySize publicKeySize ekey
-    EnvelopeV2 -> either (const badEnvelope) v2PublicKey (decodeV2Envelope ekey)
+encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
+encryptedPublic eKey@(EncryptedKey eKeyBytes) =
+  case encryptedKeyFormat eKey of
+    LegacyV1 -> errorFail $ mkPublicKey $ sub secretKeySize publicKeySize eKeyBytes
+    EnvelopeV2 -> either (const badEnvelope) ePublicKey (decodeEncryptedKeyV2 eKey)
   where
     badEnvelope = error "encryptedPublic: invalid v2 envelope"
 
-encryptedChainCode :: EncryptedKey -> ByteString
-encryptedChainCode (EncryptedKey ekey) =
-  case encryptedKeyFormat (EncryptedKey ekey) of
-    LegacyV1 -> sub (legacyKeySize + publicKeySize) ccSize ekey
-    EnvelopeV2 -> either (const badEnvelope) v2ChainCode (decodeV2Envelope ekey)
+encryptedChainCode :: HasCallStack => EncryptedKey -> ChainCode
+encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
+  case encryptedKeyFormat eKey of
+    LegacyV1 ->
+      errorFail $ mkChainCode $ sub (secretKeySize + publicKeySize) chainCodeSize eKeyBytes
+    EnvelopeV2 -> either (const badEnvelope) eChainCode (decodeEncryptedKeyV2 eKey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
-
--- | Decrypt a v2 'EncryptedKey' and return the 64-byte extended ed25519
--- scalar in locked memory.  The caller must 'mlsbFinalize' the result when
--- done with it.
-encryptedKeyMaterial ::
-  ByteArrayAccess passphrase =>
-  EncryptedKey ->
-  passphrase ->
-  IO (Either XPrvError (MLockedSizedBytes 64))
-encryptedKeyMaterial ekey pass = do
-  emat <- decryptKeyMaterial ekey pass
-  case emat of
-    Left err -> pure (Left err)
-    Right mat -> pure (Right (kmSecretKey mat))
-
--- ---------------------------------------------------------------------------
--- Internal: serialization validation
--- ---------------------------------------------------------------------------
-
-validateSerializedKey :: ByteString -> Either XPrvError ()
-validateSerializedKey bs
-  | BS.length bs == legacyTotalKeySize = Right ()
-  | otherwise = decodeV2Envelope bs >> pure ()
 
 -- ---------------------------------------------------------------------------
 -- Internal: CBOR V2 envelope codec
 -- ---------------------------------------------------------------------------
 
-decodeV2Envelope :: ByteString -> Either XPrvError V2Envelope
-decodeV2Envelope bs =
-  case CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict bs) of
+decodeEncryptedKeyV2 :: EncryptedKey -> Either XPrvError Envelope
+decodeEncryptedKeyV2 (EncryptedKey eKeyBytes) =
+  case CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict eKeyBytes) of
     Right (rest, envelope)
       | BL.null rest -> Right envelope
     _ -> Left XPrvDecodeError
 
-decodeEnvelope :: Decoder s V2Envelope
+decodeEnvelope :: Decoder s Envelope
 decodeEnvelope = do
   decodeListLenOf 9
   version <- decodeWord
@@ -490,30 +740,26 @@ decodeEnvelope = do
         || outputLength /= productionArgonOutputLength
     )
     (failDecoder XPrvInvalidKdfParams)
-  salt <- decodeBytes
-  when (BS.length salt /= saltSize) (failDecoder XPrvInvalidSaltLength)
+  salt <- decodeSalt
   cipherId <- decodeWord
   when (cipherId /= xchacha20poly1305Id) (failDecoder XPrvUnsupportedCipher)
-  nonce <- decodeBytes
-  when (BS.length nonce /= nonceSize) (failDecoder XPrvInvalidNonceLength)
+  nonce <- decodeNonce
   aad <- decodeBytes
-  ciphertext <- decodeBytes
-  when (BS.length ciphertext /= legacyKeySize) (failDecoder XPrvInvalidCiphertextLength)
-  tag <- decodeBytes
-  when (BS.length tag /= tagSize) (failDecoder XPrvInvalidTagLength)
+  encSecretKey <- decodeEncSecretKey
+  tag <- decodeTag
   (pub, cc) <- either failDecoder pure $ decodeAad aad
   pure $
-    V2Envelope
-      { v2Salt = salt
-      , v2Nonce = nonce
-      , v2PublicKey = pub
-      , v2ChainCode = cc
-      , v2Ciphertext = ciphertext
-      , v2Tag = tag
+    Envelope
+      { eSalt = salt
+      , eNonce = nonce
+      , ePublicKey = pub
+      , eChainCode = cc
+      , eEncSecretKey = encSecretKey
+      , eTag = tag
       }
 
-encodeV2Envelope :: V2Envelope -> ByteString
-encodeV2Envelope envelope =
+encodeEnvelope :: Envelope -> ByteString
+encodeEnvelope envelope =
   CBOR.toStrictByteString $
     mconcat
       [ encodeListLen 9
@@ -524,16 +770,16 @@ encodeV2Envelope envelope =
       , encodeWord productionArgonTimeCost
       , encodeWord productionArgonParallelism
       , encodeWord productionArgonOutputLength
-      , encodeBytes (v2Salt envelope)
+      , encodeSalt (eSalt envelope)
       , encodeWord xchacha20poly1305Id
-      , encodeBytes (v2Nonce envelope)
-      , encodeBytes (encodeAad (v2PublicKey envelope) (v2ChainCode envelope))
-      , encodeBytes (v2Ciphertext envelope)
-      , encodeBytes (v2Tag envelope)
+      , encodeNonce (eNonce envelope)
+      , encodeBytes (encodeAad (ePublicKey envelope) (eChainCode envelope))
+      , encodeEncSecretKey (eEncSecretKey envelope)
+      , encodeTag (eTag envelope)
       ]
 
-encodeAad :: PublicKey -> ChainCode -> AadContext
-encodeAad pub cc =
+encodeAad :: PublicKey -> ChainCode -> ByteString
+encodeAad publicKey cc =
   CBOR.toStrictByteString $
     mconcat
       [ encodeListLen 8
@@ -546,12 +792,12 @@ encodeAad pub cc =
       , encodeWord productionArgonOutputLength
       , encodeWord xchacha20poly1305Id
       , encodeWord 1
-      , encodeWord (fromIntegral legacyKeySize)
-      , encodeBytes pub
-      , encodeBytes cc
+      , encodeInt secretKeySize
+      , encodePublicKey publicKey
+      , encodeChainCode cc
       ]
 
-decodeAad :: AadContext -> Either XPrvError (PublicKey, ChainCode)
+decodeAad :: ByteString -> Either XPrvError (PublicKey, ChainCode)
 decodeAad bs =
   case CBOR.deserialiseFromBytes decodeAadFields (BL.fromStrict bs) of
     Right (rest, result)
@@ -582,124 +828,132 @@ decodeAadFields = do
   payloadKind <- decodeWord
   when (payloadKind /= 1) (failDecoder XPrvDecodeError)
   payloadLen <- decodeWord
-  when (payloadLen /= fromIntegral legacyKeySize) (failDecoder XPrvInvalidCiphertextLength)
-  pub <- decodeBytes
-  cc <- decodeBytes
-  when (BS.length pub /= publicKeySize) (failDecoder XPrvInvalidPublicKey)
-  when (BS.length cc /= ccSize) (failDecoder XPrvInvalidChainCode)
-  pure (pub, cc)
+  when (payloadLen /= fromIntegral @Int @Word encSecretKeySize) $
+    failDecoder XPrvInvalidCiphertextLength
+  pubKeyBytes <- decodeBytes
+  chainCodeBytes <- decodeBytes
+  case mkPublicKey pubKeyBytes of
+    Nothing -> failDecoder XPrvInvalidPublicKey
+    Just publicKey ->
+      case mkChainCode chainCodeBytes of
+        Nothing -> failDecoder XPrvInvalidChainCode
+        Just chainCode -> pure (publicKey, chainCode)
 
 -- ---------------------------------------------------------------------------
 -- Internal: v2 encrypt / decrypt
 -- ---------------------------------------------------------------------------
 
-decryptKeyMaterial ::
+withDecryptedKeyMaterial ::
   ByteArrayAccess passphrase =>
   EncryptedKey ->
   passphrase ->
-  IO (Either XPrvError KeyMaterial)
-decryptKeyMaterial ekey pass =
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+withDecryptedKeyMaterial ekey pass action =
   case encryptedKeyFormat ekey of
     LegacyV1 -> pure (Left XPrvDecodeError)
-    EnvelopeV2 -> v2Decrypt ekey pass
+    EnvelopeV2 ->
+      mlsbCreate SecretKey $ \secretKey ->
+        decryptKeyMaterialV2 secretKey ekey pass >>= \case
+          Left err -> pure $ Left err
+          Right uncheckedKeyMaterial ->
+            validateKeyMaterial uncheckedKeyMaterial >>= \case
+              Left err -> pure $ Left err
+              Right keyMaterial -> action keyMaterial
 
-v2Decrypt ::
+decryptKeyMaterialV2 ::
   ByteArrayAccess passphrase =>
+  -- | Empty SecretKey that will be populated from EncryptedKey
+  SecretKey ->
   EncryptedKey ->
   passphrase ->
-  IO (Either XPrvError KeyMaterial)
-v2Decrypt (EncryptedKey bs) pass =
-  case decodeV2Envelope bs of
+  IO (Either XPrvError (KeyMaterial Unchecked))
+decryptKeyMaterialV2 secretKey eKey pass =
+  case decodeEncryptedKeyV2 eKey of
     Left err -> pure (Left err)
     Right envelope -> do
-      eWrappingKey <- deriveWrappingKey pass (v2Salt envelope)
-      case eWrappingKey of
-        Left err -> pure (Left err)
-        Right wrappingKey -> do
-          let aad = encodeAad (v2PublicKey envelope) (v2ChainCode envelope)
-          ptextMlsb <- (mlsbNewZero :: IO (MLockedSizedBytes 64))
-          status <-
-            mlsbUseAsCPtr ptextMlsb $ \ptextPtr ->
-              withByteArray (v2Ciphertext envelope) $ \ct ->
-                withByteArray (v2Tag envelope) $ \tg ->
-                  withByteArray aad $ \ad ->
-                    withByteArray (v2Nonce envelope) $ \np ->
-                      withByteArray wrappingKey $ \kp ->
-                        wallet_sodium_xchacha20poly1305_decrypt
-                          (coerce ptextPtr)
-                          (coerce ct)
-                          (fromIntegral @Int @CULLong $ BS.length (v2Ciphertext envelope))
-                          (coerce tg)
-                          ad
-                          (fromIntegral @Int @CULLong $ BS.length aad)
-                          (coerce np)
-                          (coerce kp)
-          if status /= 0
-            then do
-              mlsbFinalize ptextMlsb
-              pure (Left XPrvAuthenticationFailed)
-            else do
-              let mat = KeyMaterial ptextMlsb (v2PublicKey envelope) (v2ChainCode envelope)
-              eVal <- validateKeyMaterial mat `onException` mlsbFinalize ptextMlsb
-              case eVal of
-                Left err -> do
-                  mlsbFinalize ptextMlsb
-                  pure (Left err)
-                Right () -> pure (Right mat)
+      withWrappingKey pass (eSalt envelope) $ \wrappingKey -> do
+        let aad = encodeAad (ePublicKey envelope) (eChainCode envelope)
+        status <-
+          withSecretKeyPtr secretKey $ \secretKeyPtr ->
+            withEncSecretKeyPtr (eEncSecretKey envelope) $ \encSecretKeyPtr ->
+              withTagPtr (eTag envelope) $ \tagPtr ->
+                withByteArray aad $ \ad ->
+                  withNoncePtr (eNonce envelope) $ \noncePtr ->
+                    withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr ->
+                      wallet_xchacha20poly1305_decrypt
+                        secretKeyPtr
+                        encSecretKeyPtr
+                        tagPtr
+                        ad
+                        (fromIntegral @Int @CULLong $ BS.length aad)
+                        noncePtr
+                        wrappingKeyPtr
+        if status /= 0
+          then
+            pure $ Left XPrvAuthenticationFailed
+          else
+            pure $
+              Right $
+                KeyMaterial
+                  { kmSecretKey = secretKey
+                  , kmPublicKey = ePublicKey envelope
+                  , kmChainCode = eChainCode envelope
+                  }
 
 wrapKeyMaterial ::
   ByteArrayAccess passphrase =>
-  passphrase ->
-  KeyMaterial ->
-  IO (Either XPrvError EncryptedKey)
-wrapKeyMaterial pass material = do
-  eVal <- validateKeyMaterial material
-  case eVal of
+  passphrase -> KeyMaterial Validated -> IO (Either XPrvError EncryptedKey)
+wrapKeyMaterial pass KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} = do
+  eSalt <- fmap Salt <$> randomBytesIO
+  eNonce <- fmap Nonce <$> randomBytesIO
+  case (,) <$> eSalt <*> eNonce of
     Left err -> pure (Left err)
-    Right () -> do
-      eSalt <- randomBytesIO saltSize
-      eNonce <- randomBytesIO nonceSize
-      case (,) <$> eSalt <*> eNonce of
-        Left err -> pure (Left err)
-        Right (salt, nonce) -> do
-          eWrappingKey <- deriveWrappingKey pass salt
-          case eWrappingKey of
-            Left err -> pure (Left err)
-            Right wrappingKey -> do
-              let aad = encodeAad (kmPublicKey material) (kmChainCode material)
-              mlsbUseAsCPtr (kmSecretKey material) $ \skPtr -> do
-                ((status, tag), ciphertext) <-
-                  B.allocRet legacyKeySize $ \outCipher ->
-                    B.allocRet tagSize $ \outTag ->
-                      withByteArray aad $ \ad ->
-                        withByteArray nonce $ \np ->
-                          withByteArray wrappingKey $ \kp ->
-                            wallet_sodium_xchacha20poly1305_encrypt
-                              (coerce outCipher)
-                              (coerce outTag)
-                              (coerce skPtr)
-                              (fromIntegral @Int @CULLong legacyKeySize)
-                              ad
-                              (fromIntegral @Int @CULLong $ BS.length aad)
-                              (coerce np)
-                              (coerce kp)
-                if status /= 0
-                  then pure (Left XPrvInternalError)
-                  else
-                    pure $
-                      Right $
-                        EncryptedKey $
-                          encodeV2Envelope $
-                            V2Envelope salt nonce (kmPublicKey material) (kmChainCode material) ciphertext tag
+    Right (salt, nonce) -> do
+      withWrappingKey pass salt $ \wrappingKey -> do
+        let aad = encodeAad kmPublicKey kmChainCode
+        withSecretKeyPtr kmSecretKey $ \skPtr -> do
+          (encSecretKey, (tag, status)) <-
+            fmap (first EncSecretKey) $ psbCreateResult $ \outEncSecretKey ->
+              fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
+                withByteArray aad $ \ad ->
+                  withNoncePtr nonce $ \noncePtr ->
+                    withWrappingKeyPtr wrappingKey $ \wrappingKeyPtr -> do
+                      zeroMem outTagPtr (fromIntegral @Int @CSize tagSize)
+                      wallet_xchacha20poly1305_encrypt
+                        (EncSecretKeyPtr outEncSecretKey)
+                        (TagPtr outTagPtr)
+                        skPtr
+                        ad
+                        (fromIntegral @Int @CULLong $ BS.length aad)
+                        noncePtr
+                        wrappingKeyPtr
+          if status /= 0
+            then pure (Left XPrvInternalError)
+            else
+              pure $
+                Right $
+                  EncryptedKey $
+                    encodeEnvelope $
+                      Envelope
+                        { eSalt = salt
+                        , eNonce = nonce
+                        , ePublicKey = kmPublicKey
+                        , eChainCode = kmChainCode
+                        , eEncSecretKey = encSecretKey
+                        , eTag = tag
+                        }
 
-validateKeyMaterial :: KeyMaterial -> IO (Either XPrvError ())
-validateKeyMaterial mat =
-  withLegacyStruct mat $ \inPtr ->
-    bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \outMlsb -> do
-      r <-
-        mlsbUseAsCPtr outMlsb $ \outPtr ->
-          wallet_encrypted_decrypt (coerce inPtr) (coerce outPtr)
-      pure (if r /= 0 then Left XPrvPublicKeyMismatch else Right ())
+-- | Verify that associated public key matches the secret key in the `KeyMaterial`
+validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
+validateKeyMaterial KeyMaterial {..} =
+  withSecretKeyPtr kmSecretKey $ \secretKeyPtr -> do
+    withPublicKeyPtr kmPublicKey $ \publicKeyPtr -> do
+      r <- wallet_validate secretKeyPtr publicKeyPtr
+      pure $
+        if r /= 0
+          then Left XPrvPublicKeyMismatch
+          else Right (KeyMaterial {..})
 
 -- ---------------------------------------------------------------------------
 -- Internal: locked memory helpers
@@ -708,37 +962,51 @@ validateKeyMaterial mat =
 -- | Build a temporary 128-byte locked buffer (ekey || pkey || cc) from
 -- 'KeyMaterial' and pass a pointer to it to the action.  The buffer is zeroed
 -- and freed when the action returns (normally or via exception).
-withLegacyStruct :: KeyMaterial -> (Ptr Word8 -> IO r) -> IO r
-withLegacyStruct mat action =
-  bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \mlsb ->
-    mlsbUseAsCPtr mlsb $ \base -> do
-      mlsbUseAsCPtr (kmSecretKey mat) $ \skPtr ->
-        copyBytes base skPtr 64
-      BS.useAsCStringLen (kmPublicKey mat) $ \(pkPtr, _) ->
-        copyBytes (base `plusPtr` 64) (castPtr pkPtr) 32
-      BS.useAsCStringLen (kmChainCode mat) $ \(ccPtr, _) ->
-        copyBytes (base `plusPtr` 96) (castPtr ccPtr) 32
-      action base
+withKeyMaterialPtr :: KeyMaterial v -> (KeyMaterialPtr -> IO r) -> IO r
+withKeyMaterialPtr KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} action =
+  allocaKeyMaterialBuffer $ \ptr@(KeyMaterialPtr keyMaterialPtr) -> do
+    withSecretKeyPtr kmSecretKey $ \(SecretKeyPtr skPtr) ->
+      copyBytes keyMaterialPtr skPtr secretKeySize
+    withPublicKeyPtr kmPublicKey $ \(PublicKeyPtr pkPtr) ->
+      copyBytes (keyMaterialPtr `plusPtr` secretKeySize) pkPtr publicKeySize
+    withChainCodePtr kmChainCode $ \(ChainCodePtr ccPtr) ->
+      copyBytes (keyMaterialPtr `plusPtr` (secretKeySize + publicKeySize)) ccPtr chainCodeSize
+    action ptr
 
 -- | Call a C function that writes a 128-byte @encrypted_key@ struct to the
 -- pointer it receives, then split the result into 'KeyMaterial'.  On failure
--- (non-zero return) returns 'Left onFailure'.  The caller owns the
--- 'MLockedSizedBytes 64' in the returned 'KeyMaterial' and must finalize it.
-withEncryptedKeyOutput ::
+-- (non-zero return) returns 'Left onFailure'.
+withNewKeyMaterial ::
   XPrvError ->
-  (Ptr Word8 -> IO CInt) ->
-  IO (Either XPrvError KeyMaterial)
-withEncryptedKeyOutput onFailure action =
-  bracket (mlsbNewZero :: IO (MLockedSizedBytes 128)) mlsbFinalize $ \outMlsb -> do
-    r <- mlsbUseAsCPtr outMlsb $ \ptr -> action ptr
+  -- | Action that will use the newly populated `KeyMaterial`
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  -- | Action that will populate `KeyMaterialPtr` on the C-side, after which it
+  -- will usable in the `KeyMaterial` for the action above
+  (KeyMaterialPtr -> IO CInt) ->
+  IO (Either XPrvError a)
+withNewKeyMaterial onFailure keyMaterialAction fillKeyMaterialPtrAction =
+  allocaKeyMaterialBuffer $ \keyMaterialPtr@(KeyMaterialPtr inPtr) -> do
+    r <- fillKeyMaterialPtrAction keyMaterialPtr
     if r /= 0
       then pure (Left onFailure)
-      else mlsbUseAsCPtr outMlsb $ \base -> do
-        sk <- (mlsbNewZero :: IO (MLockedSizedBytes 64))
-        mlsbUseAsCPtr sk $ \skPtr -> copyBytes skPtr base 64
-        pub <- BS.packCStringLen (castPtr (base `plusPtr` 64), 32)
-        cc <- BS.packCStringLen (castPtr (base `plusPtr` 96), 32)
-        pure (Right (KeyMaterial sk pub cc))
+      else mlsbCreate SecretKey $ \secretKey -> do
+        withSecretKeyPtr secretKey $ \(SecretKeyPtr skPtr) -> copyBytes skPtr inPtr secretKeySize
+        publicKey <-
+          psbCreate $ \pkPtr ->
+            copyBytes pkPtr (inPtr `plusPtr` secretKeySize) publicKeySize
+        chainCode <-
+          psbCreate $ \ccPtr ->
+            copyBytes ccPtr (inPtr `plusPtr` (secretKeySize + publicKeySize)) chainCodeSize
+        eKeyMaterial <-
+          validateKeyMaterial $
+            KeyMaterial
+              { kmSecretKey = secretKey
+              , kmPublicKey = PublicKey publicKey
+              , kmChainCode = ChainCode chainCode
+              }
+        case eKeyMaterial of
+          Left err -> pure $ Left err
+          Right keyMaterial -> keyMaterialAction keyMaterial
 
 -- ---------------------------------------------------------------------------
 -- Internal: key-material construction (using C/ed25519)
@@ -748,70 +1016,70 @@ legacyMaterialFromSecret ::
   (ByteArrayAccess secret, ByteArrayAccess cc) =>
   secret ->
   cc ->
-  IO (Either XPrvError KeyMaterial)
-legacyMaterialFromSecret sec cc =
-  withEncryptedKeyOutput XPrvInvalidSecretKey $ \outPtr ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+legacyMaterialFromSecret sec cc action =
+  withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
       withByteArray cc $ \pcc ->
-        wallet_encrypted_from_secret (coerce psec) (coerce pcc) (coerce outPtr)
+        wallet_from_secret (coerce psec) (coerce pcc) outPtr
 
 legacyMaterialFromMasterKey ::
-  ByteArrayAccess secret => secret -> IO (Either XPrvError KeyMaterial)
-legacyMaterialFromMasterKey sec =
-  withEncryptedKeyOutput XPrvInvalidSecretKey $ \outPtr ->
+  ByteArrayAccess secret =>
+  secret ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+legacyMaterialFromMasterKey sec action =
+  withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
-      wallet_encrypted_new_from_mkg (MasterKeyPtr psec) (coerce outPtr)
+      wallet_new_from_mkg (MasterKeyPtr psec) outPtr
 
 legacyDerivePrivate ::
-  DerivationScheme -> KeyMaterial -> DerivationIndex -> IO (Either XPrvError KeyMaterial)
-legacyDerivePrivate dscheme parent childIndex =
-  withLegacyStruct parent $ \inPtr ->
-    withEncryptedKeyOutput XPrvInternalError $ \outPtr ->
-      wallet_encrypted_derive_private
-        (coerce inPtr)
-        childIndex
-        (coerce outPtr)
-        (dschemeToC dscheme)
+  DerivationScheme ->
+  KeyMaterial Validated ->
+  DerivationIndex ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+legacyDerivePrivate dscheme parent childIndex action =
+  withKeyMaterialPtr parent $ \inPtr ->
+    withNewKeyMaterial XPrvInternalError action $ \outPtr ->
+      wallet_derive_private inPtr childIndex outPtr (dschemeToC dscheme)
 
 -- ---------------------------------------------------------------------------
 -- Internal: KDF and random bytes
 -- ---------------------------------------------------------------------------
 
-deriveWrappingKey ::
+withWrappingKey ::
   ByteArrayAccess passphrase =>
-  passphrase ->
-  ByteString ->
-  IO (Either XPrvError B.ScrubbedBytes)
-deriveWrappingKey pass salt
-  | BS.length salt /= saltSize = pure (Left XPrvInvalidSaltLength)
-  | otherwise = do
-      params <- readRuntimeKdfParams
-      let outputLen = fromIntegral (kdfOutputLength params)
-          memBytes = fromIntegral (kdfMemoryKiB params) * 1024 :: Word64
-      (status, key) <-
-        B.allocRet outputLen $ \out ->
-          withByteArray pass $ \ppass ->
-            withByteArray salt $ \psalt ->
-              wallet_sodium_argon2id
-                (coerce out)
-                (fromIntegral @Int @CULLong outputLen)
-                (coerce ppass)
-                (fromIntegral @Int @CULLong $ B.length pass)
-                (coerce psalt)
-                (fromIntegral @Word @CULLong $ kdfTimeCost params)
-                (fromIntegral @Word64 @CSize memBytes)
-      pure (if status == 0 then Right key else Left XPrvInternalError)
+  passphrase -> Salt -> (WrappingKey -> IO (Either XPrvError a)) -> IO (Either XPrvError a)
+withWrappingKey pass salt action = do
+  params <- readRuntimeKdfParams
+  let memBytes = (fromIntegral @Word @CSize (kdfMemoryKiB params)) * 1024
+      passLen = fromIntegral @Int @CULLong (B.length pass)
+      timeCost = fromIntegral @Word @CULLong (kdfTimeCost params)
+  mlsbCreate WrappingKey $ \wrappingKey ->
+    withWrappingKeyPtr wrappingKey $ \outWrappingKeyPtr ->
+      withByteArray pass $ \passPtr ->
+        withSaltPtr salt $ \saltPtr -> do
+          status <-
+            wallet_argon2id outWrappingKeyPtr (PassPhrasePtr passPtr) passLen saltPtr timeCost memBytes
+          if status == 0
+            then
+              action wrappingKey
+            else
+              pure $ Left XPrvInternalError
 
-randomBytesIO :: Int -> IO (Either XPrvError ByteString)
-randomBytesIO len = do
+randomBytesIO :: KnownNat n => IO (Either XPrvError (PinnedSizedBytes n))
+randomBytesIO = do
   mode <- readIORef randomModeRef
   case mode of
     SystemRandom -> do
-      (status, bytes) <- B.allocRet len $ \out ->
-        wallet_sodium_randombytes out (fromIntegral @Int @CSize len)
+      (bytes, status) <- psbCreateResultLen wallet_randombytes
       pure $ if status == 0 then Right bytes else Left XPrvInternalError
     DeterministicRandom counter -> do
-      let bytes = deterministicBytes len counter
+      let
+        len = fromInteger (natVal bytes)
+        bytes = psbFromByteString (deterministicBytes len counter)
       writeIORef randomModeRef (DeterministicRandom (counter + 1))
       pure (Right bytes)
 
@@ -820,14 +1088,14 @@ deterministicBytes len counter =
   BS.pack $
     take len $
       cycle
-        [ fromIntegral counter
-        , fromIntegral (counter `shiftR` 8)
-        , fromIntegral (counter `shiftR` 16)
-        , fromIntegral (counter `shiftR` 24)
-        , fromIntegral (counter `shiftR` 32)
-        , fromIntegral (counter `shiftR` 40)
-        , fromIntegral (counter `shiftR` 48)
-        , fromIntegral (counter `shiftR` 56)
+        [ fromIntegral @Word64 @Word8 counter
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 8)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 16)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 24)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 32)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 40)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 48)
+        , fromIntegral @Word64 @Word8 (counter `shiftR` 56)
         ]
 
 -- ---------------------------------------------------------------------------
@@ -848,43 +1116,43 @@ failDecoder = fail . show
 -- FFI declarations
 -- ---------------------------------------------------------------------------
 
-foreign import ccall "cardano_wallet_encrypted_from_secret"
-  wallet_encrypted_from_secret ::
+foreign import ccall "cardano_crypto_wallet_from_secret"
+  wallet_from_secret ::
     SecretKeyPtr ->
     ChainCodePtr ->
-    EncryptedKeyPtr ->
+    KeyMaterialPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_new_from_mkg"
-  wallet_encrypted_new_from_mkg ::
+foreign import ccall "cardano_crypto_wallet_new_from_mkg"
+  wallet_new_from_mkg ::
     MasterKeyPtr ->
-    EncryptedKeyPtr ->
+    KeyMaterialPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_decrypt"
-  wallet_encrypted_decrypt ::
-    EncryptedKeyPtr ->
-    EncryptedKeyPtr ->
+foreign import ccall "cardano_crypto_wallet_validate"
+  wallet_validate ::
+    SecretKeyPtr ->
+    PublicKeyPtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_sign"
-  wallet_encrypted_sign ::
-    EncryptedKeyPtr ->
+foreign import ccall "cardano_crypto_wallet_sign"
+  wallet_sign ::
+    KeyMaterialPtr ->
     Ptr Word8 ->
-    Word32 ->
+    CSize ->
     SignaturePtr ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_derive_private"
-  wallet_encrypted_derive_private ::
-    EncryptedKeyPtr ->
+foreign import ccall "cardano_crypto_wallet_derive_private"
+  wallet_derive_private ::
+    KeyMaterialPtr ->
     DerivationIndex ->
-    EncryptedKeyPtr ->
+    KeyMaterialPtr ->
     CDerivationScheme ->
     IO CInt
 
-foreign import ccall "cardano_wallet_encrypted_derive_public"
-  wallet_encrypted_derive_public ::
+foreign import ccall "cardano_crypto_wallet_derive_public"
+  wallet_derive_public ::
     PublicKeyPtr ->
     ChainCodePtr ->
     DerivationIndex ->
@@ -893,13 +1161,12 @@ foreign import ccall "cardano_wallet_encrypted_derive_public"
     CDerivationScheme ->
     IO CInt
 
-foreign import ccall "wallet_sodium_randombytes"
-  wallet_sodium_randombytes :: Ptr a -> CSize -> IO CInt
+foreign import ccall "cardano_crypto_wallet_randombytes"
+  wallet_randombytes :: Ptr a -> CSize -> IO CInt
 
-foreign import ccall "wallet_sodium_argon2id"
-  wallet_sodium_argon2id ::
+foreign import ccall "cardano_crypto_wallet_argon2id"
+  wallet_argon2id ::
     WrappingKeyPtr ->
-    CULLong ->
     PassPhrasePtr ->
     CULLong ->
     SaltPtr ->
@@ -907,23 +1174,21 @@ foreign import ccall "wallet_sodium_argon2id"
     CSize ->
     IO CInt
 
-foreign import ccall "wallet_sodium_xchacha20poly1305_encrypt"
-  wallet_sodium_xchacha20poly1305_encrypt ::
-    CiphertextPtr ->
+foreign import ccall "cardano_crypto_wallet_xchacha20poly1305_encrypt"
+  wallet_xchacha20poly1305_encrypt ::
+    EncSecretKeyPtr ->
     TagPtr ->
     SecretKeyPtr ->
-    CULLong ->
     Ptr Word8 ->
     CULLong ->
     NoncePtr ->
     WrappingKeyPtr ->
     IO CInt
 
-foreign import ccall "wallet_sodium_xchacha20poly1305_decrypt"
-  wallet_sodium_xchacha20poly1305_decrypt ::
+foreign import ccall "cardano_crypto_wallet_xchacha20poly1305_decrypt"
+  wallet_xchacha20poly1305_decrypt ::
     SecretKeyPtr ->
-    CiphertextPtr ->
-    CULLong ->
+    EncSecretKeyPtr ->
     TagPtr ->
     Ptr Word8 ->
     CULLong ->

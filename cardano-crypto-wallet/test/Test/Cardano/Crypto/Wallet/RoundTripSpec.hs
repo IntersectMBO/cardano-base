@@ -47,25 +47,25 @@ tests = describe "RoundTrip" $ do
         r <- encryptedValidatePassphrase key (BS.replicate 32 0x00)
         r `shouldBe` Left XPrvAuthenticationFailed
 
-  it "encryptedChangePass preserves public key" $ do
+  it "encryptedChangePassphrase preserves public key" $ do
     res <- encryptedCreate testSeed testPass testCC
     case res of
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
       Right key -> do
         let newPass = BS.replicate 32 0xFF
-        res' <- encryptedChangePass testPass newPass key
+        res' <- encryptedChangePassphrase testPass newPass key
         case res' of
           Left err -> expectationFailure $ "changePass failed: " ++ show err
           Right key' -> encryptedPublic key `shouldBe` encryptedPublic key'
 
-  prop "encryptedChangePass roundtrip preserves public key" $
+  prop "encryptedChangePassphrase roundtrip preserves public key" $
     \(key :: EncryptedKey) -> monadicIO $ do
       let newPass = BS.replicate 32 0xFF
-      res1 <- run $ encryptedChangePass emptyPass newPass key
+      res1 <- run $ encryptedChangePassphrase emptyPass newPass key
       case res1 of
         Left err -> pure $ counterexample ("changePass failed: " ++ show err) False
         Right key' -> do
-          res2 <- run $ encryptedChangePass newPass emptyPass key'
+          res2 <- run $ encryptedChangePassphrase newPass emptyPass key'
           case res2 of
             Left err -> pure $ counterexample ("change back failed: " ++ show err) False
             Right key'' -> pure (encryptedPublic key === encryptedPublic key'')
@@ -96,9 +96,9 @@ tests = describe "RoundTrip" $ do
             (pub2, _) = encryptedDerivePublic DerivationScheme2 (pub, cc) 0
         pub1 `shouldNotBe` pub2
 
-  prop "encryptedKey . unEncryptedKey is identity" $
+  prop "mkEncryptedKey . unEncryptedKey is identity" $
     \(key :: EncryptedKey) ->
-      case encryptedKey (unEncryptedKey key) of
+      case mkEncryptedKey (unEncryptedKey key) of
         Left err -> counterexample ("re-parse failed: " ++ show err) False
         Right key' -> unEncryptedKey key === unEncryptedKey key'
 

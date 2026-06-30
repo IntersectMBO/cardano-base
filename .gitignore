@@ -39,6 +39,7 @@ stack-local.yaml
 
 # Test artefacts
 /result-*
+cardano-crypto-wallet/output
 cardano-crypto-class/output
 cardano-crypto-praos/output
 

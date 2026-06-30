@@ -5,8 +5,6 @@
 */
 
 
-#define ED25519_FN(fn)         ccw_##fn
-
 #include "ed25519-donna.h"
 #include "ed25519.h"
 #include "ed25519-randombytes.h"
@@ -37,7 +35,7 @@ ed25519_hram(hash_512bits hram, const ed25519_signature RS, const ed25519_public
 }
 
 void
-ED25519_FN(ed25519_publickey) (const ed25519_secret_key sk, ed25519_public_key pk) {
+CCW_FN(ed25519_publickey) (const ed25519_secret_key sk, ed25519_public_key pk) {
 	bignum256modm a;
 	ge25519 ALIGN(16) A;
 	hash_512bits extsk = { 0 };
@@ -55,7 +53,7 @@ ED25519_FN(ed25519_publickey) (const ed25519_secret_key sk, ed25519_public_key p
 }
 
 void
-ED25519_FN(ed25519_sign) (const unsigned char *m, size_t mlen, const unsigned char *salt, size_t slen, const ed25519_secret_key sk, const ed25519_public_key pk, ed25519_signature RS) {
+CCW_FN(ed25519_sign) (const unsigned char *m, size_t mlen, const unsigned char *salt, size_t slen, const ed25519_secret_key sk, const ed25519_public_key pk, ed25519_signature RS) {
 	ed25519_hash_context ctx;
 	bignum256modm r, S, a;
 	ge25519 ALIGN(16) R;
@@ -94,7 +92,7 @@ ED25519_FN(ed25519_sign) (const unsigned char *m, size_t mlen, const unsigned ch
 }
 
 int
-ED25519_FN(ed25519_sign_open) (const unsigned char *m, size_t mlen, const ed25519_public_key pk, const ed25519_signature RS) {
+CCW_FN(ed25519_sign_open) (const unsigned char *m, size_t mlen, const ed25519_public_key pk, const ed25519_signature RS) {
 	ge25519 ALIGN(16) R, A;
 	hash_512bits hash;
 	bignum256modm hram, S;
@@ -120,7 +118,7 @@ ED25519_FN(ed25519_sign_open) (const unsigned char *m, size_t mlen, const ed2551
 
 /* we only need the leftmost 32 bytes of the extended secret key */
 int
-ED25519_FN(ed25519_scalar_add) (const ed25519_secret_key sk1, const ed25519_secret_key sk2, ed25519_secret_key res)
+CCW_FN(ed25519_scalar_add) (const ed25519_secret_key sk1, const ed25519_secret_key sk2, ed25519_secret_key res)
 {
 	bignum256modm s1, s2;
 	expand256_modm(s1, sk1, 32);
@@ -131,7 +129,7 @@ ED25519_FN(ed25519_scalar_add) (const ed25519_secret_key sk1, const ed25519_secr
 }
 
 int
-ED25519_FN(ed25519_point_add) (const ed25519_public_key pk1, const ed25519_public_key pk2, ed25519_public_key res)
+CCW_FN(ed25519_point_add) (const ed25519_public_key pk1, const ed25519_public_key pk2, ed25519_public_key res)
 {
 	ge25519 ALIGN(16) R, P, Q;
 
@@ -148,7 +146,7 @@ ED25519_FN(ed25519_point_add) (const ed25519_public_key pk1, const ed25519_publi
 }
 
 int
-ED25519_FN(ed25519_extend) (const ed25519_unextended_secret_key seed, ed25519_secret_key secret)
+CCW_FN(ed25519_extend) (const ed25519_unextended_secret_key seed, ed25519_secret_key secret)
 {
 	ed25519_extsk(secret, seed);
 
