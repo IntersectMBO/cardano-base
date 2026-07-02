@@ -97,7 +97,7 @@ import Test.Crypto.Util (
   withLock,
   directSerialiseToBS,
   directDeserialiseFromBS,
-  hexBS, 
+  hexBS,
   prop_size_serialise_fixed_sized,
   prop_raw_deserialise_fixed_sized,
   )

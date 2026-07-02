@@ -145,13 +145,13 @@ checkVer13TestVector file = do
       (assertFailure $ "parsing test vector: " <> file <> " not successful")
       pure
       testVectorE
-  let signKey = Ver13.skFromBytes testVectorSigningKey
-  let verKey = Ver13.vkFromBytes testVectorVerifyingKey
+  signKey <- Ver13.skFromBytes testVectorSigningKey
+  verKey <- Ver13.vkFromBytes testVectorVerifyingKey
   testVectorName @?= algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
   testVectorVersion @?= "ietfdraft13"
   testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
   -- prove signKey msg -> proof
-  let proof' = Ver13.proofFromBytes testVectorProof
+  proof' <- Ver13.proofFromBytes testVectorProof
   hash' <- Ver13.outputFromBytes testVectorHash
   Ver13.prove signKey testVectorMessage @?= Just proof'
   -- signKey -> verKey

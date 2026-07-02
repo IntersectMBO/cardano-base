@@ -60,7 +60,7 @@ module Cardano.Crypto.VRF.Praos (
 where
 
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
-import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..), guardFixedSized)
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -349,54 +349,31 @@ mkProof :: IO Proof
 mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 
 proofFromBytes :: MonadFail m => ByteString -> m Proof
-proofFromBytes bs
-  | bsLen /= certSizeVRF =
-      fail $
-        "Invalid proof length "
-          <> show @Int bsLen
-          <> ", expecting "
-          <> show @Int certSizeVRF
-  | otherwise = pure $! unsafePerformIO $ do
-      proof <- mkProof
-      withForeignPtr (unProof proof) $ \ptr ->
-        copyFromByteString ptr bs certSizeVRF
-      return proof
-  where
-    bsLen = BS.length bs
+proofFromBytes bs = do
+  guardFixedSized (Proxy @(CertVRF PraosVRF)) bs
+  pure $! unsafePerformIO $ do
+    proof <- mkProof
+    withForeignPtr (unProof proof) $ \ptr ->
+      copyFromByteString ptr bs certSizeVRF
+    return proof
 
 skFromBytes :: MonadFail m => ByteString -> m SignKey
 skFromBytes bs = do
-  if bsLen /= signKeySizeVRF
-    then
-      fail $
-        "Invalid SignKey length "
-          <> show @Int bsLen
-          <> ", expecting "
-          <> show @Int signKeySizeVRF
-    else pure $! unsafePerformIO $ do
-      sk <- mkSignKey
-      withForeignPtr (unSignKey sk) $ \ptr ->
-        copyFromByteString ptr bs signKeySizeVRF
-      return sk
-  where
-    bsLen = BS.length bs
+  guardFixedSized (Proxy @(SignKeyVRF PraosVRF)) bs
+  pure $! unsafePerformIO $ do
+    sk <- mkSignKey
+    withForeignPtr (unSignKey sk) $ \ptr ->
+      copyFromByteString ptr bs signKeySizeVRF
+    return sk
 
 vkFromBytes :: MonadFail m => ByteString -> m VerKey
 vkFromBytes bs = do
-  if bsLen /= verKeySizeVRF
-    then
-      fail $
-        "Invalid VerKey length "
-          <> show @Int bsLen
-          <> ", expecting "
-          <> show @Int verKeySizeVRF
-    else pure $! unsafePerformIO $ do
-      pk <- mkVerKey
-      withForeignPtr (unVerKey pk) $ \ptr ->
-        copyFromByteString ptr bs verKeySizeVRF
-      return pk
-  where
-    bsLen = BS.length bs
+  guardFixedSized (Proxy @(VerKeyVRF PraosVRF)) bs
+  pure $! unsafePerformIO $ do
+    pk <- mkVerKey
+    withForeignPtr (unVerKey pk) $ \ptr ->
+      copyFromByteString ptr bs verKeySizeVRF
+    return pk
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
