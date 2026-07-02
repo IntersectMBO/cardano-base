@@ -119,12 +119,12 @@ checkVer03TestVector file = do
       (assertFailure $ "parsing test vector: " <> file <> " not successful")
       pure
       testVectorE
-  signKey <- Ver03.skFromBytes testVectorSigningKey
-  verKey <- Ver03.vkFromBytes testVectorVerifyingKey
+  signKey <- rawDecodeFixedSized @Ver03.SignKey testVectorSigningKey
+  verKey <- rawDecodeFixedSized @Ver03.VerKey testVectorVerifyingKey
   testVectorName @?= algorithmNameVRF (Proxy :: Proxy PraosVRF)
   testVectorVersion @?= "ietfdraft03"
   testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
-  proof' <- Ver03.proofFromBytes testVectorProof
+  proof' <- rawDecodeFixedSized @Ver03.Proof testVectorProof
   hash' <- Ver03.outputFromBytes testVectorHash
   -- prove signKey msg -> proof
   Ver03.prove signKey testVectorMessage @?= Just proof'
@@ -145,13 +145,13 @@ checkVer13TestVector file = do
       (assertFailure $ "parsing test vector: " <> file <> " not successful")
       pure
       testVectorE
-  let signKey = Ver13.skFromBytes testVectorSigningKey
-  let verKey = Ver13.vkFromBytes testVectorVerifyingKey
+  signKey <- rawDecodeFixedSized @Ver13.SignKey testVectorSigningKey
+  verKey <- rawDecodeFixedSized @Ver13.VerKey testVectorVerifyingKey
   testVectorName @?= algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
   testVectorVersion @?= "ietfdraft13"
   testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
   -- prove signKey msg -> proof
-  let proof' = Ver13.proofFromBytes testVectorProof
+  proof' <- rawDecodeFixedSized @Ver13.Proof testVectorProof
   hash' <- Ver13.outputFromBytes testVectorHash
   Ver13.prove signKey testVectorMessage @?= Just proof'
   -- signKey -> verKey

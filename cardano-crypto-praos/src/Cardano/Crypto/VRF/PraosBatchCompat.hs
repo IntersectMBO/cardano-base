@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -10,6 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Verifiable Random Function (VRF) implemented as FFI wrappers around the
 -- implementation in https://github.com/input-output-hk/libsodium
@@ -63,12 +65,19 @@ module Cardano.Crypto.VRF.PraosBatchCompat (
   VerKeyVRF (..),
   CertVRF (..),
   Proof,
+  SignKey,
+  VerKey,
   Output,
 )
 where
 
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
-import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -216,12 +225,6 @@ verKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_ietfdraft13_publickeybyte
 vrfKeySizeVRF :: Int
 vrfKeySizeVRF = fromIntegral @CSize @Int $! crypto_vrf_ietfdraft13_outputbytes
 
-ioSignKeySizeVRF :: IO Int
-ioSignKeySizeVRF = fromIntegral @CSize @Int <$> io_crypto_vrf_ietfdraft13_secretkeybytes
-
-ioVerKeySizeVRF :: IO Int
-ioVerKeySizeVRF = fromIntegral @CSize @Int <$> io_crypto_vrf_ietfdraft13_publickeybytes
-
 -- | Allocate a 'Seed' and attach a finalizer. The allocated memory will not be initialized.
 mkSeed :: IO Seed
 mkSeed = do
@@ -295,65 +298,104 @@ outputByteArray (Output op) =
 outputToOutputVRF :: Output -> OutputVRF v
 outputToOutputVRF = OutputVRF . outputByteArray
 
+instance FixedSizeCodec Proof where
+  type FixedSize Proof = 128
+  rawEncodeFixedSized (Proof op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
+    BS.packCStringLen (castPtr ptr, certSizeVRF)
+  rawDecodeFixedSized bs =
+    guardFixedSized bs $
+      pure $!
+        unsafePerformIO $ do
+          proof <- mkProof
+          withForeignPtr (unProof proof) $ \ptr ->
+            copyFromByteString ptr bs certSizeVRF
+          return proof
+
+instance FixedSizeCodec VerKey where
+  type FixedSize VerKey = 32
+  rawEncodeFixedSized (VerKey op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
+    BS.packCStringLen (castPtr ptr, verKeySizeVRF)
+  rawDecodeFixedSized bs =
+    guardFixedSized bs $
+      pure $!
+        unsafePerformIO $ do
+          pk <- mkVerKey
+          withForeignPtr (unVerKey pk) $ \ptr ->
+            copyFromByteString ptr bs verKeySizeVRF
+          return pk
+
+instance FixedSizeCodec SignKey where
+  type FixedSize SignKey = 64
+  rawEncodeFixedSized (SignKey op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
+    BS.packCStringLen (castPtr ptr, signKeySizeVRF)
+  rawDecodeFixedSized bs =
+    guardFixedSized bs $
+      pure $!
+        unsafePerformIO $ do
+          sk <- mkSignKey
+          withForeignPtr (unSignKey sk) $ \ptr ->
+            copyFromByteString ptr bs signKeySizeVRF
+          return sk
+
 -- | Convert a proof into a 'ByteString' that we can inspect.
 proofBytes :: Proof -> ByteString
-proofBytes (Proof op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
-  BS.packCStringLen (castPtr ptr, certSizeVRF)
+proofBytes = rawEncodeFixedSized
+{-# DEPRECATED proofBytes "Use `rawEncodeFixedSized` instead" #-}
 
 -- | Convert a verification key into a 'ByteString' that we can inspect.
 vkBytes :: VerKey -> ByteString
-vkBytes (VerKey op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
-  BS.packCStringLen (castPtr ptr, verKeySizeVRF)
+vkBytes = rawEncodeFixedSized
+{-# DEPRECATED vkBytes "Use `rawEncodeFixedSized` instead" #-}
 
 -- | Convert a signing key into a 'ByteString' that we can inspect.
 skBytes :: SignKey -> ByteString
-skBytes (SignKey op) = unsafePerformIO $ withForeignPtr op $ \ptr ->
-  BS.packCStringLen (castPtr ptr, signKeySizeVRF)
+skBytes = rawEncodeFixedSized
+{-# DEPRECATED skBytes "Use `rawEncodeFixedSized` instead" #-}
 
 instance Show Proof where
-  show = show . proofBytes
+  show = show . rawEncodeFixedSized
 
 instance Eq Proof where
-  a == b = proofBytes a == proofBytes b
+  a == b = rawEncodeFixedSized a == rawEncodeFixedSized b
 
 instance Ord Proof where
-  compare = comparing proofBytes
+  compare = comparing rawEncodeFixedSized
 
 instance ToCBOR Proof where
-  toCBOR = toCBOR . proofBytes
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ _ =
     encodedSizeExpr (\_ -> fromIntegral @Int @Size certSizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR Proof where
-  fromCBOR = proofFromBytes <$> fromCBOR
+  fromCBOR = decodeFixedSized
 
 instance Show SignKey where
-  show = show . skBytes
+  show = show . rawEncodeFixedSized
 
 instance Eq SignKey where
-  a == b = skBytes a == skBytes b
+  a == b = rawEncodeFixedSized a == rawEncodeFixedSized b
 
 instance ToCBOR SignKey where
-  toCBOR = toCBOR . skBytes
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ _ =
     encodedSizeExpr (\_ -> fromIntegral @Int @Size signKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR SignKey where
-  fromCBOR = skFromBytes <$> fromCBOR
+  fromCBOR = decodeFixedSized
 
 instance Show VerKey where
-  show = show . vkBytes
+  show = show . rawEncodeFixedSized
 
 instance Eq VerKey where
-  a == b = vkBytes a == vkBytes b
+  a == b = rawEncodeFixedSized a == rawEncodeFixedSized b
 
 instance ToCBOR VerKey where
-  toCBOR = toCBOR . vkBytes
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ _ =
     encodedSizeExpr (\_ -> fromIntegral @Int @Size verKeySizeVRF) (Proxy :: Proxy ByteString)
 
 instance FromCBOR VerKey where
-  fromCBOR = vkFromBytes <$> fromCBOR
+  fromCBOR = decodeFixedSized
 
 -- | Allocate a Verification Key and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -370,58 +412,17 @@ mkSignKey = fmap SignKey $ newForeignPtr finalizerFree =<< mallocBytes signKeySi
 mkProof :: IO Proof
 mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 
-proofFromBytes :: ByteString -> Proof
-proofFromBytes bs
-  | BS.length bs /= certSizeVRF =
-      error "Invalid proof length"
-  | otherwise =
-      unsafePerformIO $ do
-        proof <- mkProof
-        withForeignPtr (unProof proof) $ \ptr ->
-          copyFromByteString ptr bs certSizeVRF
-        return proof
+proofFromBytes :: MonadFail m => ByteString -> m Proof
+proofFromBytes = rawDecodeFixedSized
+{-# DEPRECATED proofFromBytes "Use `rawDecodeFixedSized` instead" #-}
 
-skFromBytes :: ByteString -> SignKey
-skFromBytes bs = unsafePerformIO $ do
-  if bsLen /= signKeySizeVRF
-    then do
-      ioSize <- ioSignKeySizeVRF
-      error
-        ( "Invalid sk length "
-            <> show @Int bsLen
-            <> ", expecting "
-            <> show @Int signKeySizeVRF
-            <> " or "
-            <> show @Int ioSize
-        )
-    else do
-      sk <- mkSignKey
-      withForeignPtr (unSignKey sk) $ \ptr ->
-        copyFromByteString ptr bs signKeySizeVRF
-      return sk
-  where
-    bsLen = BS.length bs
+skFromBytes :: MonadFail m => ByteString -> m SignKey
+skFromBytes = rawDecodeFixedSized
+{-# DEPRECATED skFromBytes "Use `rawDecodeFixedSized` instead" #-}
 
-vkFromBytes :: ByteString -> VerKey
-vkFromBytes bs = unsafePerformIO $ do
-  if BS.length bs /= verKeySizeVRF
-    then do
-      ioSize <- ioVerKeySizeVRF
-      error
-        ( "Invalid pk length "
-            <> show @Int bsLen
-            <> ", expecting "
-            <> show @Int verKeySizeVRF
-            <> " or "
-            <> show @Int ioSize
-        )
-    else do
-      pk <- mkVerKey
-      withForeignPtr (unVerKey pk) $ \ptr ->
-        copyFromByteString ptr bs verKeySizeVRF
-      return pk
-  where
-    bsLen = BS.length bs
+vkFromBytes :: MonadFail m => ByteString -> m VerKey
+vkFromBytes = rawDecodeFixedSized
+{-# DEPRECATED vkFromBytes "Use `rawDecodeFixedSized` instead" #-}
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -574,19 +575,21 @@ instance VRFAlgorithm PraosBatchCompatVRF where
      in sk `seq` pk `seq` (SignKeyPraosBatchCompatVRF sk, VerKeyPraosBatchCompatVRF pk)
 
 instance FixedSizeCodec (VerKeyVRF PraosBatchCompatVRF) where
-  type FixedSize (VerKeyVRF PraosBatchCompatVRF) = 32
-  rawEncodeFixedSized (VerKeyPraosBatchCompatVRF pk) = vkBytes pk
-  rawDecodeFixedSized bs = pure $! VerKeyPraosBatchCompatVRF (vkFromBytes bs)
+  type FixedSize (VerKeyVRF PraosBatchCompatVRF) = FixedSize VerKey
+  rawEncodeFixedSized (VerKeyPraosBatchCompatVRF pk) = rawEncodeFixedSized pk
+  rawDecodeFixedSized bs =
+    fmap VerKeyPraosBatchCompatVRF $! rawDecodeFixedSized bs
   {-# INLINE rawDecodeFixedSized #-}
 
 instance FixedSizeCodec (SignKeyVRF PraosBatchCompatVRF) where
-  type FixedSize (SignKeyVRF PraosBatchCompatVRF) = 64
-  rawEncodeFixedSized (SignKeyPraosBatchCompatVRF sk) = skBytes sk
-  rawDecodeFixedSized bs = pure $! SignKeyPraosBatchCompatVRF (skFromBytes bs)
+  type FixedSize (SignKeyVRF PraosBatchCompatVRF) = FixedSize SignKey
+  rawEncodeFixedSized (SignKeyPraosBatchCompatVRF sk) = rawEncodeFixedSized sk
+  rawDecodeFixedSized bs =
+    fmap SignKeyPraosBatchCompatVRF $! rawDecodeFixedSized bs
   {-# INLINE rawDecodeFixedSized #-}
 
 instance FixedSizeCodec (CertVRF PraosBatchCompatVRF) where
-  type FixedSize (CertVRF PraosBatchCompatVRF) = 128
-  rawEncodeFixedSized (CertPraosBatchCompatVRF proof) = proofBytes proof
-  rawDecodeFixedSized bs = pure $! CertPraosBatchCompatVRF (proofFromBytes bs)
+  type FixedSize (CertVRF PraosBatchCompatVRF) = FixedSize Proof
+  rawEncodeFixedSized (CertPraosBatchCompatVRF proof) = rawEncodeFixedSized proof
+  rawDecodeFixedSized bs = fmap CertPraosBatchCompatVRF $! rawDecodeFixedSized bs
   {-# INLINE rawDecodeFixedSized #-}
