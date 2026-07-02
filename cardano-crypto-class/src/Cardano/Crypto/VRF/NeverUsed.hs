@@ -1,6 +1,8 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Cardano.Crypto.VRF.NeverUsed (
@@ -11,7 +13,10 @@ module Cardano.Crypto.VRF.NeverUsed (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..), guardFixedSized)
 import Control.DeepSeq (NFData (..))
+import qualified Data.ByteString as BS
+import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 
@@ -55,14 +60,26 @@ instance VRFAlgorithm NeverVRF where
   genKeyVRF _ = NeverUsedSignKeyVRF
   seedSizeVRF _ = 0
 
-  sizeVerKeyVRF _ = 0
-  sizeSignKeyVRF _ = 0
-  sizeCertVRF _ = 0
+instance FixedSizeCodec (VerKeyVRF NeverVRF) where
+  type FixedSize (VerKeyVRF NeverVRF) = 0
+  rawEncodeFixedSized _ = BS.empty
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(VerKeyVRF NeverVRF)) bs
+    pure NeverUsedVerKeyVRF
+  {-# INLINE rawDecodeFixedSized #-}
 
-  rawSerialiseVerKeyVRF _ = mempty
-  rawSerialiseSignKeyVRF _ = mempty
-  rawSerialiseCertVRF _ = mempty
+instance FixedSizeCodec (SignKeyVRF NeverVRF) where
+  type FixedSize (SignKeyVRF NeverVRF) = 0
+  rawEncodeFixedSized _ = BS.empty
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(SignKeyVRF NeverVRF)) bs
+    pure NeverUsedSignKeyVRF
+  {-# INLINE rawDecodeFixedSized #-}
 
-  rawDeserialiseVerKeyVRF _ = Just NeverUsedVerKeyVRF
-  rawDeserialiseSignKeyVRF _ = Just NeverUsedSignKeyVRF
-  rawDeserialiseCertVRF _ = Just NeverUsedCertVRF
+instance FixedSizeCodec (CertVRF NeverVRF) where
+  type FixedSize (CertVRF NeverVRF) = 0
+  rawEncodeFixedSized _ = BS.empty
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(CertVRF NeverVRF)) bs
+    pure NeverUsedCertVRF
+  {-# INLINE rawDecodeFixedSized #-}

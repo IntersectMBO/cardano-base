@@ -36,8 +36,14 @@ module Cardano.Crypto.KES.Single (
   SigKES (..),
 ) where
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+ )
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
+import GHC.TypeLits (KnownNat)
 import NoThunks.Class (NoThunks)
 
 import Control.DeepSeq (NFData)
@@ -63,7 +69,13 @@ deriving via
   instance
     NFData (SignKeyDSIGNM d) => NFData (SignKeyKES (SingleKES d))
 
-instance DSIGNMAlgorithm d => KESAlgorithm (SingleKES d) where
+instance
+  ( DSIGNMAlgorithm d
+  , KnownNat (FixedSize (VerKeyDSIGN d))
+  , KnownNat (FixedSize (SigDSIGN d))
+  ) =>
+  KESAlgorithm (SingleKES d)
+  where
   type SeedSizeKES (SingleKES d) = SeedSizeDSIGN d
 
   --
@@ -97,20 +109,10 @@ instance DSIGNMAlgorithm d => KESAlgorithm (SingleKES d) where
   -- raw serialise/deserialise
   --
 
-  type VerKeySizeKES (SingleKES d) = VerKeySizeDSIGN d
   type SignKeySizeKES (SingleKES d) = SignKeySizeDSIGN d
-  type SigSizeKES (SingleKES d) = SigSizeDSIGN d
 
   hashVerKeyKES (VerKeySingleKES vk) =
     castHash (hashVerKeyDSIGN vk)
-
-  rawSerialiseVerKeyKES (VerKeySingleKES vk) = rawSerialiseVerKeyDSIGN vk
-  rawSerialiseSigKES (SigSingleKES sig) = rawSerialiseSigDSIGN sig
-
-  rawDeserialiseVerKeyKES = fmap VerKeySingleKES . rawDeserialiseVerKeyDSIGN
-  {-# INLINE rawDeserialiseVerKeyKES #-}
-  rawDeserialiseSigKES = fmap SigSingleKES . rawDeserialiseSigDSIGN
-  {-# INLINE rawDeserialiseSigKES #-}
 
   deriveVerKeyKES (SignKeySingleKES v) =
     VerKeySingleKES <$!> deriveVerKeyDSIGNM v
@@ -167,11 +169,6 @@ instance
   unsoundPureSignKeyKESToSoundSignKeyKES =
     unsoundPureSignKeyKESToSoundSignKeyKESViaSer
 
-  rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeySingleKES sk) =
-    rawSerialiseSignKeyDSIGN sk
-  rawDeserialiseUnsoundPureSignKeyKES b =
-    UnsoundPureSignKeySingleKES <$> rawDeserialiseSignKeyDSIGN b
-
 instance
   (KESAlgorithm (SingleKES d), UnsoundDSIGNMAlgorithm d) =>
   UnsoundKESAlgorithm (SingleKES d)
@@ -183,6 +180,28 @@ instance
     fmap SignKeySingleKES <$> rawDeserialiseSignKeyDSIGNMWith allocator bs
 
 --
+-- FixedSizeCodec instances
+--
+
+instance DSIGNAlgorithm d => FixedSizeCodec (VerKeyKES (SingleKES d)) where
+  type FixedSize (VerKeyKES (SingleKES d)) = FixedSize (VerKeyDSIGN d)
+  rawEncodeFixedSized (VerKeySingleKES vk) = rawEncodeFixedSized vk
+  rawDecodeFixedSized bs = VerKeySingleKES <$> rawDecodeFixedSized bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance DSIGNAlgorithm d => FixedSizeCodec (SigKES (SingleKES d)) where
+  type FixedSize (SigKES (SingleKES d)) = FixedSize (SigDSIGN d)
+  rawEncodeFixedSized (SigSingleKES sig) = rawEncodeFixedSized sig
+  rawDecodeFixedSized bs = SigSingleKES <$> rawDecodeFixedSized bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance DSIGNAlgorithm d => FixedSizeCodec (UnsoundPureSignKeyKES (SingleKES d)) where
+  type FixedSize (UnsoundPureSignKeyKES (SingleKES d)) = SignKeySizeKES (SingleKES d)
+  rawEncodeFixedSized (UnsoundPureSignKeySingleKES sk) = rawEncodeFixedSized sk
+  rawDecodeFixedSized bs = UnsoundPureSignKeySingleKES <$> rawDecodeFixedSized bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+--
 -- VerKey instances
 --
 
@@ -190,11 +209,11 @@ deriving instance DSIGNAlgorithm d => Show (VerKeyKES (SingleKES d))
 deriving instance DSIGNAlgorithm d => Eq (VerKeyKES (SingleKES d))
 
 instance DSIGNMAlgorithm d => ToCBOR (VerKeyKES (SingleKES d)) where
-  toCBOR = encodeVerKeyKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance DSIGNMAlgorithm d => FromCBOR (VerKeyKES (SingleKES d)) where
-  fromCBOR = decodeVerKeyKES
+  fromCBOR = decodeFixedSized
   {-# INLINE fromCBOR #-}
 
 instance DSIGNMAlgorithm d => NoThunks (VerKeyKES (SingleKES d))
@@ -215,11 +234,11 @@ deriving instance DSIGNAlgorithm d => Eq (SigKES (SingleKES d))
 instance DSIGNAlgorithm d => NoThunks (SigKES (SingleKES d))
 
 instance DSIGNMAlgorithm d => ToCBOR (SigKES (SingleKES d)) where
-  toCBOR = encodeSigKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance DSIGNMAlgorithm d => FromCBOR (SigKES (SingleKES d)) where
-  fromCBOR = decodeSigKES
+  fromCBOR = decodeFixedSized
 
 --
 -- UnsoundPureSignKey instances
@@ -229,11 +248,11 @@ deriving instance DSIGNAlgorithm d => Show (UnsoundPureSignKeyKES (SingleKES d))
 deriving instance Eq (SignKeyDSIGN d) => Eq (UnsoundPureSignKeyKES (SingleKES d))
 
 instance UnsoundDSIGNMAlgorithm d => ToCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
-  toCBOR = encodeUnsoundPureSignKeyKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (SingleKES d)))
 
 instance UnsoundDSIGNMAlgorithm d => FromCBOR (UnsoundPureSignKeyKES (SingleKES d)) where
-  fromCBOR = decodeUnsoundPureSignKeyKES
+  fromCBOR = decodeFixedSized
 
 instance DSIGNAlgorithm d => NoThunks (UnsoundPureSignKeyKES (SingleKES d))
 

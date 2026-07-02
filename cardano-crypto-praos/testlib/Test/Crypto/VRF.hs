@@ -11,6 +11,7 @@ module Test.Crypto.VRF (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
 import Cardano.Crypto.Util
 import Cardano.Crypto.VRF
 import Cardano.Crypto.VRF.Praos
@@ -144,13 +145,13 @@ checkVer13TestVector file = do
       (assertFailure $ "parsing test vector: " <> file <> " not successful")
       pure
       testVectorE
-  let signKey = Ver13.skFromBytes testVectorSigningKey
-  let verKey = Ver13.vkFromBytes testVectorVerifyingKey
+  signKey <- Ver13.skFromBytes testVectorSigningKey
+  verKey <- Ver13.vkFromBytes testVectorVerifyingKey
   testVectorName @?= algorithmNameVRF (Proxy :: Proxy PraosBatchCompatVRF)
   testVectorVersion @?= "ietfdraft13"
   testVectorCipherSuite @?= "ECVRF-ED25519-SHA512-Elligator2"
   -- prove signKey msg -> proof
-  let proof' = Ver13.proofFromBytes testVectorProof
+  proof' <- Ver13.proofFromBytes testVectorProof
   hash' <- Ver13.outputFromBytes testVectorHash
   Ver13.prove signKey testVectorMessage @?= Just proof'
   -- signKey -> verKey
@@ -252,45 +253,27 @@ testVRFAlgorithm _ n =
     describe "serialisation" $ do
       describe "raw" $ do
         prop "VerKey" $
-          prop_raw_serialise @(VerKeyVRF v)
-            rawSerialiseVerKeyVRF
-            rawDeserialiseVerKeyVRF
+          prop_raw_serialise_fixed_sized @(VerKeyVRF v)
         prop "SignKey" $
-          prop_raw_serialise @(SignKeyVRF v)
-            rawSerialiseSignKeyVRF
-            rawDeserialiseSignKeyVRF
+          prop_raw_serialise_fixed_sized @(SignKeyVRF v)
         prop "Cert" $
-          prop_raw_serialise @(CertVRF v)
-            rawSerialiseCertVRF
-            rawDeserialiseCertVRF
+          prop_raw_serialise_fixed_sized @(CertVRF v)
 
       describe "size" $ do
         prop "VerKey" $
-          prop_size_serialise @(VerKeyVRF v)
-            rawSerialiseVerKeyVRF
-            (sizeVerKeyVRF (Proxy @v))
+          prop_size_serialise_fixed_sized @(VerKeyVRF v)
         prop "SignKey" $
-          prop_size_serialise @(SignKeyVRF v)
-            rawSerialiseSignKeyVRF
-            (sizeSignKeyVRF (Proxy @v))
+          prop_size_serialise_fixed_sized @(SignKeyVRF v)
         prop "Cert" $
-          prop_size_serialise @(CertVRF v)
-            rawSerialiseCertVRF
-            (sizeCertVRF (Proxy @v))
+          prop_size_serialise_fixed_sized @(CertVRF v)
 
       describe "direct CBOR" $ do
         prop "VerKey" $
-          prop_cbor_with @(VerKeyVRF v)
-            encodeVerKeyVRF
-            decodeVerKeyVRF
+          prop_cbor_fixed_sized @(VerKeyVRF v)
         prop "SignKey" $
-          prop_cbor_with @(SignKeyVRF v)
-            encodeSignKeyVRF
-            decodeSignKeyVRF
+          prop_cbor_fixed_sized @(SignKeyVRF v)
         prop "Cert" $
-          prop_cbor_with @(CertVRF v)
-            encodeCertVRF
-            decodeCertVRF
+          prop_cbor_fixed_sized @(CertVRF v)
 
       describe "To/FromCBOR class" $ do
         prop "VerKey" $ prop_cbor @(VerKeyVRF v)
@@ -304,14 +287,11 @@ testVRFAlgorithm _ n =
 
       describe "direct matches class" $ do
         prop "VerKey" $
-          prop_cbor_direct_vs_class @(VerKeyVRF v)
-            encodeVerKeyVRF
+          prop_cbor_fixed_sized_vs_class @(VerKeyVRF v)
         prop "SignKey" $
-          prop_cbor_direct_vs_class @(SignKeyVRF v)
-            encodeSignKeyVRF
+          prop_cbor_fixed_sized_vs_class @(SignKeyVRF v)
         prop "Cert" $
-          prop_cbor_direct_vs_class @(CertVRF v)
-            encodeCertVRF
+          prop_cbor_fixed_sized_vs_class @(CertVRF v)
 
     describe "verify" $ do
       -- NOTE: we no longer test against maxVRF, because the maximum numeric
@@ -412,14 +392,14 @@ prop_naturalToBytes (NonNegative sz) n =
 --
 prop_pubKeyToBatchComopat :: VerKeyVRF PraosVRF -> Property
 prop_pubKeyToBatchComopat vk =
-  rawSerialiseVerKeyVRF (vkToBatchCompat vk) === rawSerialiseVerKeyVRF vk
+  rawEncodeFixedSized (vkToBatchCompat vk) === rawEncodeFixedSized vk
 
 --
 -- Praos <-> BatchCompatPraos SignKey conversion
 --
 prop_signKeyToBatchCompat :: SignKeyVRF PraosVRF -> Property
 prop_signKeyToBatchCompat sk =
-  rawSerialiseSignKeyVRF (skToBatchCompat sk) === rawSerialiseSignKeyVRF sk
+  rawEncodeFixedSized (skToBatchCompat sk) === rawEncodeFixedSized sk
 
 --
 -- Praos <-> BatchCompatPraos Output conversion

@@ -1,8 +1,8 @@
 # Changelog for `cardano-crypto-praos`
 
-## 2.2.3.1
+## 2.2.4.0
 
-*
+* Add `FixedSizeCodec` instances for `PraosVRF` and `PraosBatchCompatVRF`
 
 ## 2.2.3.0
 

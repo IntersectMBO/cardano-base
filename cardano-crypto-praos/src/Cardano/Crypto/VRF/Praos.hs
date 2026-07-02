@@ -60,6 +60,7 @@ module Cardano.Crypto.VRF.Praos (
 where
 
 import Cardano.Binary (FromCBOR (..), Size, ToCBOR (..))
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..), guardFixedSized)
 import Cardano.Crypto.RandomBytes (randombytes_buf)
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -348,54 +349,31 @@ mkProof :: IO Proof
 mkProof = fmap Proof $ newForeignPtr finalizerFree =<< mallocBytes certSizeVRF
 
 proofFromBytes :: MonadFail m => ByteString -> m Proof
-proofFromBytes bs
-  | bsLen /= certSizeVRF =
-      fail $
-        "Invalid proof length "
-          <> show @Int bsLen
-          <> ", expecting "
-          <> show @Int certSizeVRF
-  | otherwise = pure $! unsafePerformIO $ do
-      proof <- mkProof
-      withForeignPtr (unProof proof) $ \ptr ->
-        copyFromByteString ptr bs certSizeVRF
-      return proof
-  where
-    bsLen = BS.length bs
+proofFromBytes bs = do
+  guardFixedSized (Proxy @(CertVRF PraosVRF)) bs
+  pure $! unsafePerformIO $ do
+    proof <- mkProof
+    withForeignPtr (unProof proof) $ \ptr ->
+      copyFromByteString ptr bs certSizeVRF
+    return proof
 
 skFromBytes :: MonadFail m => ByteString -> m SignKey
 skFromBytes bs = do
-  if bsLen /= signKeySizeVRF
-    then
-      fail $
-        "Invalid SignKey length "
-          <> show @Int bsLen
-          <> ", expecting "
-          <> show @Int signKeySizeVRF
-    else pure $! unsafePerformIO $ do
-      sk <- mkSignKey
-      withForeignPtr (unSignKey sk) $ \ptr ->
-        copyFromByteString ptr bs signKeySizeVRF
-      return sk
-  where
-    bsLen = BS.length bs
+  guardFixedSized (Proxy @(SignKeyVRF PraosVRF)) bs
+  pure $! unsafePerformIO $ do
+    sk <- mkSignKey
+    withForeignPtr (unSignKey sk) $ \ptr ->
+      copyFromByteString ptr bs signKeySizeVRF
+    return sk
 
 vkFromBytes :: MonadFail m => ByteString -> m VerKey
 vkFromBytes bs = do
-  if bsLen /= verKeySizeVRF
-    then
-      fail $
-        "Invalid VerKey length "
-          <> show @Int bsLen
-          <> ", expecting "
-          <> show @Int verKeySizeVRF
-    else pure $! unsafePerformIO $ do
-      pk <- mkVerKey
-      withForeignPtr (unVerKey pk) $ \ptr ->
-        copyFromByteString ptr bs verKeySizeVRF
-      return pk
-  where
-    bsLen = BS.length bs
+  guardFixedSized (Proxy @(VerKeyVRF PraosVRF)) bs
+  pure $! unsafePerformIO $ do
+    pk <- mkVerKey
+    withForeignPtr (unVerKey pk) $ \ptr ->
+      copyFromByteString ptr bs verKeySizeVRF
+    return pk
 
 -- | Allocate an Output and attach a finalizer. The allocated memory will
 -- not be initialized.
@@ -468,14 +446,14 @@ prove sk msg =
 -- | Construct a BatchCompat vkey from praos, non-batchcompat
 vkToBatchCompat :: VerKeyVRF PraosVRF -> VerKeyVRF BC.PraosBatchCompatVRF
 vkToBatchCompat praosVk =
-  case rawDeserialiseVerKeyVRF (rawSerialiseVerKeyVRF praosVk) of
+  case rawDecodeFixedSized (rawEncodeFixedSized praosVk) of
     Just vk -> vk
     Nothing -> error "VerKeyVRF: Unable to convert PraosVK to BatchCompatVK."
 
 -- | Construct a BatchCompat skey from praos, non-batchcompat
 skToBatchCompat :: SignKeyVRF PraosVRF -> SignKeyVRF BC.PraosBatchCompatVRF
 skToBatchCompat praosSk =
-  case rawDeserialiseSignKeyVRF (rawSerialiseSignKeyVRF praosSk) of
+  case rawDecodeFixedSized (rawEncodeFixedSized praosSk) of
     Just sk -> sk
     Nothing -> error "SignKeyVRF: Unable to convert PraosSK to BatchCompatSK."
 
@@ -560,15 +538,20 @@ instance VRFAlgorithm PraosVRF where
         !(!pk, !sk) = keypairFromSeed seed
      in (SignKeyPraosVRF sk, VerKeyPraosVRF pk)
 
-  rawSerialiseVerKeyVRF (VerKeyPraosVRF pk) = vkBytes pk
-  rawSerialiseSignKeyVRF (SignKeyPraosVRF sk) = skBytes sk
-  rawSerialiseCertVRF (CertPraosVRF proof) = proofBytes proof
-  rawDeserialiseVerKeyVRF = fmap VerKeyPraosVRF . vkFromBytes
-  {-# INLINE rawDeserialiseVerKeyVRF #-}
-  rawDeserialiseSignKeyVRF = fmap SignKeyPraosVRF . skFromBytes
-  rawDeserialiseCertVRF = fmap CertPraosVRF . proofFromBytes
-  {-# INLINE rawDeserialiseCertVRF #-}
+instance FixedSizeCodec (VerKeyVRF PraosVRF) where
+  type FixedSize (VerKeyVRF PraosVRF) = 32
+  rawEncodeFixedSized (VerKeyPraosVRF pk) = vkBytes pk
+  rawDecodeFixedSized bs = VerKeyPraosVRF <$> vkFromBytes bs
+  {-# INLINE rawDecodeFixedSized #-}
 
-  sizeVerKeyVRF _ = fromIntegral @Int @Word verKeySizeVRF
-  sizeSignKeyVRF _ = fromIntegral @Int @Word signKeySizeVRF
-  sizeCertVRF _ = fromIntegral @Int @Word certSizeVRF
+instance FixedSizeCodec (SignKeyVRF PraosVRF) where
+  type FixedSize (SignKeyVRF PraosVRF) = 64
+  rawEncodeFixedSized (SignKeyPraosVRF sk) = skBytes sk
+  rawDecodeFixedSized bs = SignKeyPraosVRF <$> skFromBytes bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (CertVRF PraosVRF) where
+  type FixedSize (CertVRF PraosVRF) = 80
+  rawEncodeFixedSized (CertPraosVRF proof) = proofBytes proof
+  rawDecodeFixedSized bs = CertPraosVRF <$> proofFromBytes bs
+  {-# INLINE rawDecodeFixedSized #-}

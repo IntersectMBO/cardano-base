@@ -84,6 +84,12 @@ module Cardano.Crypto.KES.CompactSum (
   CompactSum7KES,
 ) where
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
 import Control.Monad (guard, (<$!>))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
@@ -106,6 +112,7 @@ import Cardano.Crypto.Seed
 import Control.DeepSeq (NFData (..))
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
+import Data.Typeable (Typeable)
 import Foreign.C.Types (CSize)
 import Foreign.Ptr (castPtr)
 import GHC.TypeLits (KnownNat, type (*), type (+))
@@ -227,43 +234,11 @@ instance
   -- raw serialise/deserialise
   --
 
-  type VerKeySizeKES (CompactSumKES h d) = HashSize h
   type
     SignKeySizeKES (CompactSumKES h d) =
       SignKeySizeKES d
         + SeedSizeKES d
         + VerKeySizeKES d * 2
-  type
-    SigSizeKES (CompactSumKES h d) =
-      SigSizeKES d
-        + VerKeySizeKES d
-
-  rawSerialiseVerKeyKES (VerKeyCompactSumKES vk) = hashToBytes vk
-
-  rawSerialiseSigKES (SigCompactSumKES sigma vk_other) =
-    mconcat
-      [ rawSerialiseSigKES sigma
-      , rawSerialiseVerKeyKES vk_other
-      ]
-
-  rawDeserialiseVerKeyKES = fmap VerKeyCompactSumKES . hashFromBytes
-
-  rawDeserialiseSigKES b = do
-    guard (BS.length b == fromIntegral @Word @Int size_total)
-    sigma <- rawDeserialiseSigKES b_sig
-    vk <- rawDeserialiseVerKeyKES b_vk
-    return (SigCompactSumKES sigma vk)
-    where
-      b_sig = slice off_sig size_sig b
-      b_vk = slice off_vk size_vk b
-
-      size_sig = sigSizeKES (Proxy :: Proxy d)
-      size_vk = verKeySizeKES (Proxy :: Proxy d)
-      size_total = sigSizeKES (Proxy :: Proxy (CompactSumKES h d))
-
-      off_sig = 0 :: Word
-      off_vk = size_sig
-
   deriveVerKeyKES (SignKeyCompactSumKES _ _ vk_0 vk_1) =
     return $! VerKeyCompactSumKES (hashPairOfVKeys (vk_0, vk_1))
 
@@ -341,8 +316,8 @@ instance
       mconcat
         [ ssk
         , sr1
-        , rawSerialiseVerKeyKES vk_0
-        , rawSerialiseVerKeyKES vk_1
+        , rawEncodeFixedSized vk_0
+        , rawEncodeFixedSized vk_1
         ]
 
   {-# NOINLINE rawDeserialiseSignKeyKESWith #-}
@@ -350,8 +325,8 @@ instance
     guard (BS.length b == fromIntegral @Word @Int size_total)
     sk <- MaybeT $ rawDeserialiseSignKeyKESWith allocator b_sk
     r <- MaybeT $ mlsbFromByteStringCheckWith allocator b_r
-    vk_0 <- MaybeT . return $ rawDeserialiseVerKeyKES b_vk0
-    vk_1 <- MaybeT . return $ rawDeserialiseVerKeyKES b_vk1
+    vk_0 <- MaybeT . return $ rawDecodeFixedSized b_vk0
+    vk_1 <- MaybeT . return $ rawDecodeFixedSized b_vk1
     return (SignKeyCompactSumKES sk (MLockedSeed r) vk_0 vk_1)
     where
       b_sk = slice off_sk size_sk b
@@ -361,7 +336,7 @@ instance
 
       size_sk = signKeySizeKES (Proxy :: Proxy d)
       size_r = seedSizeKES (Proxy :: Proxy d)
-      size_vk = verKeySizeKES (Proxy :: Proxy d)
+      size_vk = fixedSize (Proxy :: Proxy (VerKeyKES d))
       size_total = signKeySizeKES (Proxy :: Proxy (CompactSumKES h d))
 
       off_sk = 0 :: Word
@@ -393,6 +368,83 @@ instance
         | otherwise = (vk_other, verKeyFromSigKES ctxt t' sigma)
 
 --
+-- FixedSizeCodec instances
+--
+
+instance (HashAlgorithm h, Typeable d) => FixedSizeCodec (VerKeyKES (CompactSumKES h d)) where
+  type FixedSize (VerKeyKES (CompactSumKES h d)) = HashSize h
+  rawEncodeFixedSized (VerKeyCompactSumKES vk) = hashToBytes vk
+  rawDecodeFixedSized bs = VerKeyCompactSumKES <$> hashFromByteStringM bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance
+  ( KESAlgorithm d
+  , KnownNat (SigSizeKES d + VerKeySizeKES d)
+  , Typeable h
+  ) =>
+  FixedSizeCodec (SigKES (CompactSumKES h d))
+  where
+  type FixedSize (SigKES (CompactSumKES h d)) = SigSizeKES d + VerKeySizeKES d
+  rawEncodeFixedSized (SigCompactSumKES sigma vk_other) =
+    mconcat
+      [ rawEncodeFixedSized sigma
+      , rawEncodeFixedSized vk_other
+      ]
+  rawDecodeFixedSized b = do
+    guardFixedSized (Proxy @(SigKES (CompactSumKES h d))) b
+    sigma <- rawDecodeFixedSized b_sig
+    vk <- rawDecodeFixedSized b_vk
+    return (SigCompactSumKES sigma vk)
+    where
+      b_sig = slice off_sig size_sig b
+      b_vk = slice off_vk size_vk b
+
+      size_sig = fixedSize (Proxy :: Proxy (SigKES d))
+      size_vk = fixedSize (Proxy :: Proxy (VerKeyKES d))
+
+      off_sig = 0 :: Word
+      off_vk = size_sig
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance
+  ( KESAlgorithm (CompactSumKES h d)
+  , UnsoundPureKESAlgorithm d
+  , KnownNat (SignKeySizeKES d + SeedSizeKES d + VerKeySizeKES d * 2)
+  ) =>
+  FixedSizeCodec (UnsoundPureSignKeyKES (CompactSumKES h d))
+  where
+  type FixedSize (UnsoundPureSignKeyKES (CompactSumKES h d)) = SignKeySizeKES (CompactSumKES h d)
+  rawEncodeFixedSized (UnsoundPureSignKeyCompactSumKES sk r_1 vk_0 vk_1) =
+    mconcat
+      [ rawEncodeFixedSized sk
+      , getSeedBytes r_1
+      , rawEncodeFixedSized vk_0
+      , rawEncodeFixedSized vk_1
+      ]
+  rawDecodeFixedSized b = do
+    guardFixedSized (Proxy @(UnsoundPureSignKeyKES (CompactSumKES h d))) b
+    sk <- rawDecodeFixedSized b_sk
+    let r = mkSeedFromBytes b_r
+    vk_0 <- rawDecodeFixedSized b_vk0
+    vk_1 <- rawDecodeFixedSized b_vk1
+    return (UnsoundPureSignKeyCompactSumKES sk r vk_0 vk_1)
+    where
+      b_sk = slice off_sk size_sk b
+      b_r = slice off_r size_r b
+      b_vk0 = slice off_vk0 size_vk b
+      b_vk1 = slice off_vk1 size_vk b
+
+      size_sk = signKeySizeKES (Proxy :: Proxy d)
+      size_r = seedSizeKES (Proxy :: Proxy d)
+      size_vk = fixedSize (Proxy :: Proxy (VerKeyKES d))
+
+      off_sk = 0 :: Word
+      off_r = size_sk
+      off_vk0 = off_r + size_r
+      off_vk1 = off_vk0 + size_vk
+  {-# INLINE rawDecodeFixedSized #-}
+
+--
 -- VerKey instances
 --
 
@@ -415,7 +467,7 @@ instance
   ) =>
   ToCBOR (VerKeyKES (CompactSumKES h d))
   where
-  toCBOR = encodeVerKeyKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance
@@ -427,7 +479,7 @@ instance
   ) =>
   FromCBOR (VerKeyKES (CompactSumKES h d))
   where
-  fromCBOR = decodeVerKeyKES
+  fromCBOR = decodeFixedSized
 
 --
 -- SignKey instances
@@ -442,12 +494,12 @@ instance
 --
 -- instance (OptimizedKESAlgorithm d, HashAlgorithm h, HashSize h ~ SeedSizeKES d)
 --       => ToCBOR (SignKeyKES (CompactSumKES h d)) where
---   toCBOR = encodeSignKeyKES
+--   toCBOR = encodeFixedSized
 --   encodedSizeExpr _size = encodedSignKeyKESSizeExpr
 --
 -- instance (OptimizedKESAlgorithm d, HashAlgorithm h, HashSize h ~ SeedSizeKES d)
 --       => FromCBOR (SignKeyKES (CompactSumKES h d)) where
---   fromCBOR = decodeSignKeyKES
+--   fromCBOR = decodeFixedSized
 
 --
 -- Sig instances
@@ -467,7 +519,7 @@ instance
   ) =>
   ToCBOR (SigKES (CompactSumKES h d))
   where
-  toCBOR = encodeSigKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance
@@ -479,7 +531,7 @@ instance
   ) =>
   FromCBOR (SigKES (CompactSumKES h d))
   where
-  fromCBOR = decodeSigKES
+  fromCBOR = decodeFixedSized
 
 --
 -- Unsound pure KES API
@@ -547,39 +599,6 @@ instance
       <*> pure vk_0
       <*> pure vk_1
 
-  rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyCompactSumKES sk r_1 vk_0 vk_1) =
-    let ssk = rawSerialiseUnsoundPureSignKeyKES sk
-        sr1 = getSeedBytes r_1
-     in mconcat
-          [ ssk
-          , sr1
-          , rawSerialiseVerKeyKES vk_0
-          , rawSerialiseVerKeyKES vk_1
-          ]
-
-  rawDeserialiseUnsoundPureSignKeyKES b = do
-    guard (BS.length b == fromIntegral @Word @Int size_total)
-    sk <- rawDeserialiseUnsoundPureSignKeyKES b_sk
-    let r = mkSeedFromBytes b_r
-    vk_0 <- rawDeserialiseVerKeyKES b_vk0
-    vk_1 <- rawDeserialiseVerKeyKES b_vk1
-    return (UnsoundPureSignKeyCompactSumKES sk r vk_0 vk_1)
-    where
-      b_sk = slice off_sk size_sk b
-      b_r = slice off_r size_r b
-      b_vk0 = slice off_vk0 size_vk b
-      b_vk1 = slice off_vk1 size_vk b
-
-      size_sk = signKeySizeKES (Proxy :: Proxy d)
-      size_r = seedSizeKES (Proxy :: Proxy d)
-      size_vk = verKeySizeKES (Proxy :: Proxy d)
-      size_total = signKeySizeKES (Proxy :: Proxy (CompactSumKES h d))
-
-      off_sk = 0 :: Word
-      off_r = size_sk
-      off_vk0 = off_r + size_r
-      off_vk1 = off_vk0 + size_vk
-
 --
 -- UnsoundPureSignKey instances
 --
@@ -598,7 +617,7 @@ instance
   ) =>
   ToCBOR (UnsoundPureSignKeyKES (CompactSumKES h d))
   where
-  toCBOR = encodeUnsoundPureSignKeyKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (CompactSumKES h d)))
 
 instance
@@ -610,7 +629,7 @@ instance
   ) =>
   FromCBOR (UnsoundPureSignKeyKES (CompactSumKES h d))
   where
-  fromCBOR = decodeUnsoundPureSignKeyKES
+  fromCBOR = decodeFixedSized
 
 instance
   (NoThunks (UnsoundPureSignKeyKES d), KESAlgorithm d) =>

@@ -19,6 +19,12 @@ where
 
 import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (Encoding, FromCBOR (..), ToCBOR (..))
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
 import Cardano.Crypto.Hash
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util
@@ -27,6 +33,7 @@ import Control.DeepSeq (NFData, force)
 import qualified Crypto.PubKey.ECC.Prim as C
 import qualified Crypto.PubKey.ECC.Types as C
 import Data.Array.Byte (ByteArray)
+import qualified Data.ByteString as BS
 import Data.Proxy (Proxy (..))
 import GHC.Generics (Generic)
 import NoThunks.Class (InspectHeap (..), NoThunks)
@@ -135,10 +142,6 @@ instance VRFAlgorithm SimpleVRF where
   deriveVerKeyVRF (SignKeySimpleVRF k) =
     VerKeySimpleVRF $ pow k
 
-  sizeVerKeyVRF _ = 32
-  sizeSignKeyVRF _ = 16
-  sizeCertVRF _ = 64
-
   --
   -- Core algorithm operations
   --
@@ -184,71 +187,69 @@ instance VRFAlgorithm SimpleVRF where
     SignKeySimpleVRF
       (runMonadRandomWithSeed seed (C.scalarGenerate curve))
 
-  --
-  -- raw serialise/deserialise
-  --
+instance ToCBOR (VerKeyVRF SimpleVRF) where
+  toCBOR = encodeFixedSized
+  encodedSizeExpr _size = encodedVerKeyVRFSizeExpr
 
-  -- All the integers here are 15 or 16 bytes big, we round up to 16.
+instance FromCBOR (VerKeyVRF SimpleVRF) where
+  fromCBOR = decodeFixedSized
 
-  rawSerialiseVerKeyVRF (VerKeySimpleVRF (Point C.PointO)) =
-    error "rawSerialiseVerKeyVRF: Point at infinity"
-  rawSerialiseVerKeyVRF (VerKeySimpleVRF (Point (C.Point p1 p2))) =
+instance ToCBOR (SignKeyVRF SimpleVRF) where
+  toCBOR = encodeFixedSized
+  encodedSizeExpr _size = encodedSignKeyVRFSizeExpr
+
+instance FromCBOR (SignKeyVRF SimpleVRF) where
+  fromCBOR = decodeFixedSized
+
+instance ToCBOR (CertVRF SimpleVRF) where
+  toCBOR = encodeFixedSized
+  encodedSizeExpr _size = encodedCertVRFSizeExpr
+
+instance FromCBOR (CertVRF SimpleVRF) where
+  fromCBOR = decodeFixedSized
+
+-- All the integers here are 15 or 16 bytes big, we round up to 16.
+
+instance FixedSizeCodec (VerKeyVRF SimpleVRF) where
+  type FixedSize (VerKeyVRF SimpleVRF) = 32
+  rawEncodeFixedSized (VerKeySimpleVRF (Point C.PointO)) =
+    error "rawEncodeFixedSized: Point at infinity"
+  rawEncodeFixedSized (VerKeySimpleVRF (Point (C.Point p1 p2))) =
     writeBinaryNatural 16 (fromInteger p1)
       <> writeBinaryNatural 16 (fromInteger p2)
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(VerKeyVRF SimpleVRF)) bs
+    let p1 = toInteger (readBinaryNatural (BS.take 16 bs))
+        p2 = toInteger (readBinaryNatural (BS.drop 16 bs))
+    pure $! VerKeySimpleVRF (Point (C.Point p1 p2))
+  {-# INLINE rawDecodeFixedSized #-}
 
-  rawSerialiseSignKeyVRF (SignKeySimpleVRF sk) =
+instance FixedSizeCodec (SignKeyVRF SimpleVRF) where
+  type FixedSize (SignKeyVRF SimpleVRF) = 16
+  rawEncodeFixedSized (SignKeySimpleVRF sk) =
     writeBinaryNatural 16 (fromInteger sk)
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(SignKeyVRF SimpleVRF)) bs
+    let sk = toInteger (readBinaryNatural bs)
+    pure $! SignKeySimpleVRF sk
+  {-# INLINE rawDecodeFixedSized #-}
 
-  rawSerialiseCertVRF (CertSimpleVRF (Point C.PointO) _ _) =
-    error "rawSerialiseCertVRF: Point at infinity"
-  rawSerialiseCertVRF (CertSimpleVRF (Point (C.Point p1 p2)) c s) =
+instance FixedSizeCodec (CertVRF SimpleVRF) where
+  type FixedSize (CertVRF SimpleVRF) = 64
+  rawEncodeFixedSized (CertSimpleVRF (Point C.PointO) _ _) =
+    error "rawEncodeFixedSized: Point at infinity"
+  rawEncodeFixedSized (CertSimpleVRF (Point (C.Point p1 p2)) c s) =
     writeBinaryNatural 16 (fromInteger p1)
       <> writeBinaryNatural 16 (fromInteger p2)
       <> writeBinaryNatural 16 c
       <> writeBinaryNatural 16 (fromInteger s)
-
-  rawDeserialiseVerKeyVRF bs
-    | [p1b, p2b] <- splitsAt [16, 16] bs
-    , let p1 = toInteger (readBinaryNatural p1b)
-          p2 = toInteger (readBinaryNatural p2b) =
-        Just $! VerKeySimpleVRF (Point (C.Point p1 p2))
-    | otherwise =
-        Nothing
-
-  rawDeserialiseSignKeyVRF bs
-    | [skb] <- splitsAt [16] bs
-    , let sk = toInteger (readBinaryNatural skb) =
-        Just $! SignKeySimpleVRF sk
-    | otherwise =
-        Nothing
-
-  rawDeserialiseCertVRF bs
-    | [p1b, p2b, cb, sb] <- splitsAt [16, 16, 16, 16] bs
-    , let p1 = toInteger (readBinaryNatural p1b)
-          p2 = toInteger (readBinaryNatural p2b)
-          c = readBinaryNatural cb
-          s = toInteger (readBinaryNatural sb) =
-        Just $! CertSimpleVRF (Point (C.Point p1 p2)) c s
-    | otherwise =
-        Nothing
-
-instance ToCBOR (VerKeyVRF SimpleVRF) where
-  toCBOR = encodeVerKeyVRF
-  encodedSizeExpr _size = encodedVerKeyVRFSizeExpr
-
-instance FromCBOR (VerKeyVRF SimpleVRF) where
-  fromCBOR = decodeVerKeyVRF
-
-instance ToCBOR (SignKeyVRF SimpleVRF) where
-  toCBOR = encodeSignKeyVRF
-  encodedSizeExpr _size = encodedSignKeyVRFSizeExpr
-
-instance FromCBOR (SignKeyVRF SimpleVRF) where
-  fromCBOR = decodeSignKeyVRF
-
-instance ToCBOR (CertVRF SimpleVRF) where
-  toCBOR = encodeCertVRF
-  encodedSizeExpr _size = encodedCertVRFSizeExpr
-
-instance FromCBOR (CertVRF SimpleVRF) where
-  fromCBOR = decodeCertVRF
+  rawDecodeFixedSized bs = do
+    case splitsAt [16, 16, 16, 16] bs of
+      [p1b, p2b, cb, sb] -> do
+        let p1 = toInteger (readBinaryNatural p1b)
+            p2 = toInteger (readBinaryNatural p2b)
+            c = readBinaryNatural cb
+            s = toInteger (readBinaryNatural sb)
+        pure $! CertSimpleVRF (Point (C.Point p1 p2)) c s
+      _ -> fail "CertVRF SimpleVRF: invalid size"
+  {-# INLINE rawDecodeFixedSized #-}

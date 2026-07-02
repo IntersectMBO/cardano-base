@@ -3,6 +3,7 @@
 ## 1.9.1.0
 
 * Add `NFData` instance for `DecoderError`.
+* Add `Cardano.Binary.FixedSizeCodec` module
 
 ## 1.9.0.0
 

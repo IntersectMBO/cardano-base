@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Mock key evolving signatures.
 module Cardano.Crypto.KES.Mock (
@@ -20,6 +21,12 @@ module Cardano.Crypto.KES.Mock (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  guardFixedSized,
+ )
 import qualified Data.ByteString.Internal as BS
 import Data.Proxy (Proxy (..))
 import Data.Word (Word64)
@@ -31,7 +38,6 @@ import NoThunks.Class (NoThunks)
 import Control.DeepSeq (NFData)
 import Control.Exception (assert)
 
-import Cardano.Base.Bytes (splitsAt)
 import Cardano.Binary (FromCBOR (..), ToCBOR (..))
 
 import Cardano.Crypto.DirectSerialise
@@ -49,6 +55,7 @@ import Cardano.Crypto.Libsodium.Memory (
  )
 import Cardano.Crypto.Seed
 import Cardano.Crypto.Util
+import qualified Data.ByteString as BS
 import Foreign.C.Types (CSize)
 
 data MockKES (t :: Nat)
@@ -91,10 +98,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
 
   algorithmNameKES proxy = "mock_" ++ show (totalPeriodsKES proxy)
 
-  type VerKeySizeKES (MockKES t) = 8
-  type SignKeySizeKES (MockKES t) = 16
-  type SigSizeKES (MockKES t) = 24
-
   --
   -- Core algorithm operations
   --
@@ -111,32 +114,6 @@ instance KnownNat t => KESAlgorithm (MockKES t) where
         Left "KES verification failed"
 
   type TotalPeriodsKES (MockKES t) = t
-
-  --
-  -- raw serialise/deserialise
-  --
-
-  rawSerialiseVerKeyKES (VerKeyMockKES vk) =
-    writeBinaryWord64 vk
-
-  rawSerialiseSigKES (SigMockKES h sk) =
-    hashToBytes h
-      <> rawSerialiseSignKeyMockKES sk
-
-  rawDeserialiseVerKeyKES bs
-    | [vkb] <- splitsAt [8] bs
-    , let vk = readBinaryWord64 vkb =
-        Just $! VerKeyMockKES vk
-    | otherwise =
-        Nothing
-
-  rawDeserialiseSigKES bs
-    | [hb, skb] <- splitsAt [8, 16] bs
-    , Just h <- hashFromBytes hb
-    , Just sk <- rawDeserialiseSignKeyMockKES skb =
-        Just $! SigMockKES h sk
-    | otherwise =
-        Nothing
 
   deriveVerKeyKES (SignKeyMockKES vk _) = return $! vk
 
@@ -203,64 +180,85 @@ instance KnownNat t => UnsoundPureKESAlgorithm (MockKES t) where
   unsoundPureSignKeyKESToSoundSignKeyKES (UnsoundPureSignKeyMockKES vk t) =
     return $ SignKeyMockKES vk t
 
-  rawSerialiseUnsoundPureSignKeyKES (UnsoundPureSignKeyMockKES vk t) =
-    rawSerialiseSignKeyMockKES (SignKeyMockKES vk t)
-
-  rawDeserialiseUnsoundPureSignKeyKES bs = do
-    SignKeyMockKES vt t <- rawDeserialiseSignKeyMockKES bs
-    return $ UnsoundPureSignKeyMockKES vt t
-
 instance KnownNat t => UnsoundKESAlgorithm (MockKES t) where
   rawSerialiseSignKeyKES sk =
-    return $ rawSerialiseSignKeyMockKES sk
+    return $ rawEncodeFixedSized sk
 
   rawDeserialiseSignKeyKESWith _alloc bs =
-    return $ rawDeserialiseSignKeyMockKES bs
+    return $ rawDecodeFixedSized bs
 
-rawDeserialiseSignKeyMockKES ::
-  KnownNat t =>
-  ByteString ->
-  Maybe (SignKeyKES (MockKES t))
-rawDeserialiseSignKeyMockKES bs
-  | [vkb, tb] <- splitsAt [8, 8] bs
-  , Just vk <- rawDeserialiseVerKeyKES vkb
-  , let t = fromIntegral @Word64 @Period (readBinaryWord64 tb) =
-      Just $! SignKeyMockKES vk t
-  | otherwise =
-      Nothing
+instance KnownNat t => FixedSizeCodec (SignKeyKES (MockKES t)) where
+  type FixedSize (SignKeyKES (MockKES t)) = 16
+  rawEncodeFixedSized (SignKeyMockKES vk t) =
+    rawEncodeFixedSized vk
+      <> writeBinaryWord64 (fromIntegral @Period @Word64 t)
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(SignKeyKES (MockKES t))) bs
+    let (vkb, tb) = BS.splitAt 8 bs
+    vk <- case rawDecodeFixedSized vkb of
+      Just x -> pure x
+      Nothing -> fail "rawDeserialiseSignKeyMockKES: Failed to deserialise VerKeyKES"
+    let t = fromIntegral @Word64 @Period (readBinaryWord64 tb)
+    pure $! SignKeyMockKES vk t
 
-rawSerialiseSignKeyMockKES ::
-  KnownNat t =>
-  SignKeyKES (MockKES t) ->
-  ByteString
-rawSerialiseSignKeyMockKES (SignKeyMockKES vk t) =
-  rawSerialiseVerKeyKES vk
-    <> writeBinaryWord64 (fromIntegral @Period @Word64 t)
+instance KnownNat t => FixedSizeCodec (VerKeyKES (MockKES t)) where
+  type FixedSize (VerKeyKES (MockKES t)) = 8
+  rawEncodeFixedSized (VerKeyMockKES vk) =
+    writeBinaryWord64 vk
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(VerKeyKES (MockKES t))) bs
+    let vk = readBinaryWord64 bs
+    return $! VerKeyMockKES vk
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance KnownNat t => FixedSizeCodec (SigKES (MockKES t)) where
+  type FixedSize (SigKES (MockKES t)) = 24
+  rawEncodeFixedSized (SigMockKES h sk) =
+    hashToBytes h
+      <> rawEncodeFixedSized sk
+  rawDecodeFixedSized bs = do
+    guardFixedSized (Proxy @(SigKES (MockKES t))) bs
+    let (hb, skb) = BS.splitAt 8 bs
+    h <- case hashFromBytes hb of
+      Just x -> pure x
+      Nothing -> fail "SigKES (MockKES t): Failed to decode hash"
+    sk <- rawDecodeFixedSized skb
+    return $! SigMockKES h sk
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance KnownNat t => FixedSizeCodec (UnsoundPureSignKeyKES (MockKES t)) where
+  type FixedSize (UnsoundPureSignKeyKES (MockKES t)) = FixedSize (SignKeyKES (MockKES t))
+  rawEncodeFixedSized (UnsoundPureSignKeyMockKES vk t) =
+    rawEncodeFixedSized (SignKeyMockKES vk t)
+  rawDecodeFixedSized bs = do
+    SignKeyMockKES vt t <- rawDecodeFixedSized bs
+    return $! UnsoundPureSignKeyMockKES vt t
+  {-# INLINE rawDecodeFixedSized #-}
 
 instance KnownNat t => ToCBOR (VerKeyKES (MockKES t)) where
-  toCBOR = encodeVerKeyKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedVerKeyKESSizeExpr
 
 instance KnownNat t => FromCBOR (VerKeyKES (MockKES t)) where
-  fromCBOR = decodeVerKeyKES
+  fromCBOR = decodeFixedSized
 
 instance KnownNat t => ToCBOR (SigKES (MockKES t)) where
-  toCBOR = encodeSigKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size = encodedSigKESSizeExpr
 
 instance KnownNat t => FromCBOR (SigKES (MockKES t)) where
-  fromCBOR = decodeSigKES
+  fromCBOR = decodeFixedSized
 
 instance KnownNat t => ToCBOR (UnsoundPureSignKeyKES (MockKES t)) where
-  toCBOR = encodeUnsoundPureSignKeyKES
+  toCBOR = encodeFixedSized
   encodedSizeExpr _size _skProxy = encodedSignKeyKESSizeExpr (Proxy :: Proxy (SignKeyKES (MockKES t)))
 
 instance KnownNat t => FromCBOR (UnsoundPureSignKeyKES (MockKES t)) where
-  fromCBOR = decodeUnsoundPureSignKeyKES
+  fromCBOR = decodeFixedSized
 
 instance KnownNat t => DirectSerialise (SignKeyKES (MockKES t)) where
   directSerialise put sk = do
-    let bs = rawSerialiseSignKeyMockKES sk
+    let bs = rawEncodeFixedSized sk
     unpackByteStringCStringLen bs $ \(cstr, len) -> put cstr (fromIntegral @Int @CSize len)
 
 instance KnownNat t => DirectDeserialise (SignKeyKES (MockKES t)) where
@@ -271,19 +269,19 @@ instance KnownNat t => DirectDeserialise (SignKeyKES (MockKES t)) where
       pull (castPtr ptr) (fromIntegral @Int @CSize len)
     let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(SignKeyKES (MockKES t))") return $
-      rawDeserialiseSignKeyMockKES bs
+      rawDecodeFixedSized bs
 
 instance KnownNat t => DirectSerialise (VerKeyKES (MockKES t)) where
   directSerialise push sk = do
-    let bs = rawSerialiseVerKeyKES sk
+    let bs = rawEncodeFixedSized sk
     unpackByteStringCStringLen bs $ \(cstr, len) -> push cstr (fromIntegral @Int @CSize len)
 
 instance KnownNat t => DirectDeserialise (VerKeyKES (MockKES t)) where
   directDeserialise pull = do
-    let len = fromIntegral @Word @Int $ verKeySizeKES (Proxy @(MockKES t))
+    let len = fromIntegral @Word @Int $ fixedSize (Proxy @(VerKeyKES (MockKES t)))
     fptr <- mallocForeignPtrBytes len
     withForeignPtr fptr $ \ptr ->
       pull (castPtr ptr) (fromIntegral @Int @CSize len)
     let bs = BS.fromForeignPtr (unsafeRawForeignPtr fptr) 0 len
     maybe (error "directDeserialise @(VerKeyKES (MockKES t))") return $
-      rawDeserialiseVerKeyKES bs
+      rawDecodeFixedSized bs
