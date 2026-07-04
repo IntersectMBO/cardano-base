@@ -75,6 +75,7 @@ module Cardano.Crypto.WalletHD.Encrypted (
 
   -- ** Envelope
   Envelope (eSalt, eNonce, ePublicKey, eChainCode),
+  decodeEncryptedKey,
   encodeEnvelope,
   decodeEnvelope,
 
@@ -604,7 +605,7 @@ validateSerializedKey :: EncryptedKey -> Either XPrvError ()
 validateSerializedKey eKey =
   case encryptedKeyFormat eKey of
     LegacyV1 -> Right ()
-    EnvelopeV2 -> () <$ decodeEncryptedKeyV2 eKey
+    EnvelopeV2 -> () <$ decodeEncryptedKey eKey
 
 encryptedKeyFormat :: EncryptedKey -> XPrvFormat
 encryptedKeyFormat (EncryptedKey bs)
@@ -697,7 +698,7 @@ encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
 encryptedPublic eKey@(EncryptedKey eKeyBytes) =
   case encryptedKeyFormat eKey of
     LegacyV1 -> errorFail $ mkPublicKey $ sub secretKeySize publicKeySize eKeyBytes
-    EnvelopeV2 -> either (const badEnvelope) ePublicKey (decodeEncryptedKeyV2 eKey)
+    EnvelopeV2 -> either (const badEnvelope) ePublicKey (decodeEncryptedKey eKey)
   where
     badEnvelope = error "encryptedPublic: invalid v2 envelope"
 
@@ -706,16 +707,16 @@ encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
   case encryptedKeyFormat eKey of
     LegacyV1 ->
       errorFail $ mkChainCode $ sub (secretKeySize + publicKeySize) chainCodeSize eKeyBytes
-    EnvelopeV2 -> either (const badEnvelope) eChainCode (decodeEncryptedKeyV2 eKey)
+    EnvelopeV2 -> either (const badEnvelope) eChainCode (decodeEncryptedKey eKey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
 
 -- ---------------------------------------------------------------------------
--- Internal: CBOR V2 envelope codec
+-- CBOR V2 envelope codec
 -- ---------------------------------------------------------------------------
 
-decodeEncryptedKeyV2 :: EncryptedKey -> Either XPrvError Envelope
-decodeEncryptedKeyV2 (EncryptedKey eKeyBytes) =
+decodeEncryptedKey :: EncryptedKey -> Either XPrvError Envelope
+decodeEncryptedKey (EncryptedKey eKeyBytes) =
   case CBOR.deserialiseFromBytes decodeEnvelope (BL.fromStrict eKeyBytes) of
     Right (rest, envelope)
       | BL.null rest -> Right envelope
@@ -843,7 +844,7 @@ decryptKeyMaterialV2 ::
   passphrase ->
   IO (Either XPrvError (KeyMaterial Unchecked))
 decryptKeyMaterialV2 secretKey eKey pass =
-  case decodeEncryptedKeyV2 eKey of
+  case decodeEncryptedKey eKey of
     Left err -> pure (Left err)
     Right envelope -> do
       withWrappingKey pass (eSalt envelope) $ \wrappingKey -> do
