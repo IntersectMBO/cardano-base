@@ -96,6 +96,7 @@ test-suite tests
 
   build-depends:
     FailT,
+    HUnit,
     QuickCheck,
     bytestring,
     cardano-crypto-class,

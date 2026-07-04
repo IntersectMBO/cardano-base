@@ -5,6 +5,7 @@ import qualified Codec.CBOR.Read as CBOR
 import Control.Monad.Trans.Fail.String (errorFail)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
+import Test.HUnit.Base (assertFailure)
 import Test.Hspec
 
 import Cardano.Crypto.WalletHD.Encrypted
@@ -70,53 +71,44 @@ expectedPublicKey =
 
 tests :: Spec
 tests = describe "V2Format" $ do
+  let
+    createTestKey :: HasCallStack => IO EncryptedKey
+    createTestKey = do
+      res <- encryptedCreate testSeed testPass testCC
+      case res of
+        Left err -> assertFailure $ "encryptedCreate failed: " ++ show err
+        Right key -> pure key
+
   it "encryptedCreate produces EnvelopeV2 format" $ do
-    res <- encryptedCreate testSeed testPass testCC
-    case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> encryptedKeyFormat key `shouldBe` EnvelopeV2
+    key <- createTestKey
+    encryptedKeyFormat key `shouldBe` EnvelopeV2
 
   it "v2 key validates with correct passphrase" $ do
-    res <- encryptedCreate testSeed testPass testCC
-    case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> do
-        r <- encryptedValidatePassphrase key testPass
-        r `shouldBe` Right ()
+    key <- createTestKey
+    encryptedValidatePassphrase key testPass `shouldReturn` Right ()
 
   it "v2 key rejects wrong passphrase with XPrvAuthenticationFailed" $ do
-    res <- encryptedCreate testSeed testPass testCC
-    case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> do
-        r <- encryptedValidatePassphrase key wrongPass
-        r `shouldBe` Left XPrvAuthenticationFailed
+    key <- createTestKey
+    encryptedValidatePassphrase key wrongPass `shouldReturn` Left XPrvAuthenticationFailed
 
   it "v2 envelope is a CBOR 9-element array" $ do
-    res <- encryptedCreate testSeed testPass testCC
-    case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> do
-        let bs = unEncryptedKey key
-        case CBOR.deserialiseFromBytes CBOR.decodeListLen (BL.fromStrict bs) of
-          Left e -> expectationFailure $ "CBOR decode failed: " ++ show e
-          Right (_, 9) -> pure ()
-          Right (_, n) ->
-            expectationFailure $
-              "Expected 9-element CBOR array, got: " ++ show n
+    bs <- unEncryptedKey <$> createTestKey
+    case CBOR.deserialiseFromBytes CBOR.decodeListLen (BL.fromStrict bs) of
+      Left e -> expectationFailure $ "CBOR decode failed: " ++ show e
+      Right (_, 9) -> pure ()
+      Right (_, n) ->
+        expectationFailure $
+          "Expected 9-element CBOR array, got: " ++ show n
 
   it "public key and chain code in envelope match accessors" $ do
-    res <- encryptedCreate testSeed testPass testCC
-    case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> do
-        let pub = encryptedPublic key
-            cc = encryptedChainCode key
-        case mkEncryptedKey (unEncryptedKey key) of
-          Left err -> expectationFailure $ "re-parse failed: " ++ show err
-          Right key' -> do
-            encryptedPublic key' `shouldBe` pub
-            encryptedChainCode key' `shouldBe` cc
+    key <- createTestKey
+    let pub = encryptedPublic key
+        cc = encryptedChainCode key
+    case mkEncryptedKey (unEncryptedKey key) of
+      Left err -> expectationFailure $ "re-parse failed: " ++ show err
+      Right key' -> do
+        encryptedPublic key' `shouldBe` pub
+        encryptedChainCode key' `shouldBe` cc
 
   it "presenting a v1 raw blob returns Left XPrvDecodeError" $ do
     let v1blob = BS.replicate 128 0x00
@@ -127,27 +119,19 @@ tests = describe "V2Format" $ do
         r `shouldBe` Left XPrvDecodeError
 
   it "truncated CBOR bytes return Left XPrvDecodeError" $ do
-    res <- encryptedCreate testSeed testPass testCC
-    case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key ->
-        mkEncryptedKey (BS.take 10 (unEncryptedKey key))
-          `shouldBe` Left XPrvDecodeError
+    key <- createTestKey
+    mkEncryptedKey (BS.take 10 (unEncryptedKey key))
+      `shouldBe` Left XPrvDecodeError
 
   it "encryptedChangePassphrase re-randomizes envelope (different bytes, same public key)" $ do
-    res <- encryptedCreate testSeed testPass testCC
+    key <- createTestKey
+    res <- encryptedChangePassphrase testPass testPass key
     case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> do
-        res' <- encryptedChangePassphrase testPass testPass key
-        case res' of
-          Left err -> expectationFailure $ "changePass failed: " ++ show err
-          Right key' -> do
-            encryptedPublic key `shouldBe` encryptedPublic key'
-            unEncryptedKey key `shouldNotBe` unEncryptedKey key'
+      Left err -> expectationFailure $ "changePass failed: " ++ show err
+      Right key' -> do
+        encryptedPublic key `shouldBe` encryptedPublic key'
+        unEncryptedKey key `shouldNotBe` unEncryptedKey key'
 
   it "golden: public key matches deterministic ed25519 derivation from testSeed" $ do
-    res <- encryptedCreate testSeed testPass testCC
-    case res of
-      Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
-      Right key -> encryptedPublic key `shouldBe` expectedPublicKey
+    key <- createTestKey
+    encryptedPublic key `shouldBe` expectedPublicKey
