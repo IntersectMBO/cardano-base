@@ -48,15 +48,17 @@ library
     Cardano.Crypto.WalletHD.Encrypted
 
   build-depends:
+    FailT,
     bytestring,
     cardano-binary,
     cardano-crypto-class,
     cborg,
     deepseq,
-    FailT,
     memory,
 
-  pkgconfig-depends: libsodium
+  pkgconfig-depends:
+    libsodium >=1.0.13
+
   c-sources:
     cbits/ed25519/ed25519.c
     cbits/encrypted_sign.c
@@ -93,13 +95,13 @@ test-suite tests
     -with-rtsopts=-N
 
   build-depends:
+    FailT,
     QuickCheck,
     bytestring,
     cardano-crypto-class,
     cardano-crypto-wallet:{cardano-crypto-wallet, testlib},
     cborg,
     hspec,
-    FailT,
 
 benchmark bench
   import: base, project-config
