@@ -2,9 +2,10 @@ module Test.Cardano.Crypto.Wallet.V2FormatSpec (tests) where
 
 import qualified Codec.CBOR.Decoding as CBOR
 import qualified Codec.CBOR.Read as CBOR
+import qualified Codec.CBOR.Write as CBOR (toLazyByteString)
 import Control.Monad.Trans.Fail.String (errorFail)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy as BSL
 import Test.HUnit.Base (assertFailure)
 import Test.Hspec
 
@@ -93,12 +94,24 @@ tests = describe "V2Format" $ do
 
   it "v2 envelope is a CBOR 5-element array" $ do
     bs <- unEncryptedKey <$> createTestKey
-    case CBOR.deserialiseFromBytes CBOR.decodeListLen (BL.fromStrict bs) of
+    case CBOR.deserialiseFromBytes CBOR.decodeListLen (BSL.fromStrict bs) of
       Left e -> expectationFailure $ "CBOR decode failed: " ++ show e
       Right (_, 5) -> pure ()
       Right (_, n) ->
         expectationFailure $
           "Expected 5-element CBOR array, got: " ++ show n
+
+  it "v2 envelope roundtrips CBOR serialization" $ do
+    res <- decodeEncryptedKey <$> createTestKey
+    case res of
+      Left e -> expectationFailure $ "decodeEncryptedKey: " ++ show e
+      Right envelope -> do
+        let bs = CBOR.toLazyByteString $ encodeEnvelope envelope
+        case CBOR.deserialiseFromBytes decodeEnvelope bs of
+          Left e -> expectationFailure $ "CBOR decode failed: " ++ show e
+          Right (rest, envelope') -> do
+            BSL.length rest `shouldBe` 0
+            envelope' `shouldBe` envelope
 
   it "public key and chain code in envelope match accessors" $ do
     key <- createTestKey

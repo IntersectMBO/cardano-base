@@ -741,17 +741,16 @@ decodeEnvelope = do
       , eTag = tag
       }
 
-encodeEnvelope :: Envelope -> ByteString
+encodeEnvelope :: Envelope -> Encoding
 encodeEnvelope envelope =
-  CBOR.toStrictByteString $
-    mconcat
-      [ encodeListLen 5
-      , encodeSalt (eSalt envelope)
-      , encodeNonce (eNonce envelope)
-      , encodeBytes (encodeAad (ePublicKey envelope) (eChainCode envelope))
-      , encodeEncSecretKey (eEncSecretKey envelope)
-      , encodeTag (eTag envelope)
-      ]
+  mconcat
+    [ encodeListLen 5
+    , encodeSalt (eSalt envelope)
+    , encodeNonce (eNonce envelope)
+    , encodeBytes (encodeAad (ePublicKey envelope) (eChainCode envelope))
+    , encodeEncSecretKey (eEncSecretKey envelope)
+    , encodeTag (eTag envelope)
+    ]
 
 encodeAad :: PublicKey -> ChainCode -> ByteString
 encodeAad publicKey cc =
@@ -909,15 +908,16 @@ wrapKeyMaterial pass KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} = do
               pure $
                 Right $
                   EncryptedKey $
-                    encodeEnvelope $
-                      Envelope
-                        { eSalt = salt
-                        , eNonce = nonce
-                        , ePublicKey = kmPublicKey
-                        , eChainCode = kmChainCode
-                        , eEncSecretKey = encSecretKey
-                        , eTag = tag
-                        }
+                    CBOR.toStrictByteString $
+                      encodeEnvelope $
+                        Envelope
+                          { eSalt = salt
+                          , eNonce = nonce
+                          , ePublicKey = kmPublicKey
+                          , eChainCode = kmChainCode
+                          , eEncSecretKey = encSecretKey
+                          , eTag = tag
+                          }
 
 -- | Verify that associated public key matches the secret key in the `KeyMaterial`
 validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
