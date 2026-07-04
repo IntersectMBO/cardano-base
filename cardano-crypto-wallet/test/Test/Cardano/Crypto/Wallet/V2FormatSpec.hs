@@ -91,14 +91,14 @@ tests = describe "V2Format" $ do
     key <- createTestKey
     encryptedValidatePassphrase key wrongPass `shouldReturn` Left XPrvAuthenticationFailed
 
-  it "v2 envelope is a CBOR 9-element array" $ do
+  it "v2 envelope is a CBOR 5-element array" $ do
     bs <- unEncryptedKey <$> createTestKey
     case CBOR.deserialiseFromBytes CBOR.decodeListLen (BL.fromStrict bs) of
       Left e -> expectationFailure $ "CBOR decode failed: " ++ show e
-      Right (_, 9) -> pure ()
+      Right (_, 5) -> pure ()
       Right (_, n) ->
         expectationFailure $
-          "Expected 9-element CBOR array, got: " ++ show n
+          "Expected 5-element CBOR array, got: " ++ show n
 
   it "public key and chain code in envelope match accessors" $ do
     key <- createTestKey

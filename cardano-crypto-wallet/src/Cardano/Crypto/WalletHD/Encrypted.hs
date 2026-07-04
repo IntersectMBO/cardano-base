@@ -723,26 +723,8 @@ decodeEncryptedKeyV2 (EncryptedKey eKeyBytes) =
 
 decodeEnvelope :: Decoder s Envelope
 decodeEnvelope = do
-  decodeListLenOf 9
-  version <- decodeWord
-  when (version /= v2Version) (failDecoder XPrvUnsupportedVersion)
-  kdfId <- decodeWord
-  when (kdfId /= argon2idId) (failDecoder XPrvUnsupportedKdf)
-  decodeListLenOf 4
-  memoryKiB <- decodeWord
-  timeCost <- decodeWord
-  parallelism <- decodeWord
-  outputLength <- decodeWord
-  when
-    ( memoryKiB /= productionArgonMemoryKiB
-        || timeCost /= productionArgonTimeCost
-        || parallelism /= productionArgonParallelism
-        || outputLength /= productionArgonOutputLength
-    )
-    (failDecoder XPrvInvalidKdfParams)
+  decodeListLenOf 5
   salt <- decodeSalt
-  cipherId <- decodeWord
-  when (cipherId /= xchacha20poly1305Id) (failDecoder XPrvUnsupportedCipher)
   nonce <- decodeNonce
   aad <- decodeBytes
   encSecretKey <- decodeEncSecretKey
@@ -762,16 +744,8 @@ encodeEnvelope :: Envelope -> ByteString
 encodeEnvelope envelope =
   CBOR.toStrictByteString $
     mconcat
-      [ encodeListLen 9
-      , encodeWord v2Version
-      , encodeWord argon2idId
-      , encodeListLen 4
-      , encodeWord productionArgonMemoryKiB
-      , encodeWord productionArgonTimeCost
-      , encodeWord productionArgonParallelism
-      , encodeWord productionArgonOutputLength
+      [ encodeListLen 5
       , encodeSalt (eSalt envelope)
-      , encodeWord xchacha20poly1305Id
       , encodeNonce (eNonce envelope)
       , encodeBytes (encodeAad (ePublicKey envelope) (eChainCode envelope))
       , encodeEncSecretKey (eEncSecretKey envelope)
