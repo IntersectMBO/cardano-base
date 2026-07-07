@@ -28,11 +28,6 @@ typedef struct {
 	uint8_t cc[CHAIN_CODE_SIZE];
 } key_material;
 
-typedef struct {
-	uint8_t pkey[PUBLIC_KEY_SIZE];
-	uint8_t cc[CHAIN_CODE_SIZE];
-} public_key;
-
 /* Store a plaintext (unencrypted) secret key as an key_material struct.
  * The skey field holds the raw secret bytes; callers unwrap with v2 Argon2id
  * + XChaCha20-Poly1305 at the Haskell layer, not here. */
