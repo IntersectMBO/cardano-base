@@ -22,17 +22,21 @@ static int ensure_sodium(void)
 
 #define FULL_KEY_SIZE (UNENCRYPTED_KEY_SIZE + PUBLIC_KEY_SIZE + CHAIN_CODE_SIZE)
 
+/* This captures the unencrypted BIP-39-Ed25519 extended root key `root = kL ‖ kR ‖ c ` as per CIP-1852.
+ * where `kL` is the left half of the extended Ed25519 secret scalar,
+ * `kR` is its right half (used only as keying material during child derivation),
+ * and `c` is the 32-byte chain code. */
 typedef struct {
-	uint8_t skey[UNENCRYPTED_KEY_SIZE];
-	uint8_t pkey[PUBLIC_KEY_SIZE];
-	uint8_t cc[CHAIN_CODE_SIZE];
+	uint8_t skey[UNENCRYPTED_KEY_SIZE]; // kL ‖ kR
+	uint8_t pkey[PUBLIC_KEY_SIZE]; // A = compress(kL · B)
+	uint8_t cc[CHAIN_CODE_SIZE]; // c
 } key_material;
 
 /* Store a plaintext (unencrypted) secret key as an key_material struct.
  * The skey field holds the raw secret bytes; callers unwrap with v2 Argon2id
  * + XChaCha20-Poly1305 at the Haskell layer, not here. */
 static void wallet_initialize
-    (const ed25519_secret_key secret_key,
+(const ed25519_secret_key secret_key,
      const uint8_t cc[CHAIN_CODE_SIZE],
      key_material *out)
 {
