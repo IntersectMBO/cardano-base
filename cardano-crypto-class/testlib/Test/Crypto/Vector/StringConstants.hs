@@ -21,7 +21,7 @@ import GHC.TypeLits (natVal)
 
 invalidEcdsaVerKeyLengthError :: Integer -> String
 invalidEcdsaVerKeyLengthError =
-  wrongLengthError "VerKeyDSIGN EcdsaSecp256k1DSIGN" $ natVal $ Proxy @SECP256K1_ECDSA_PUBKEY_BYTES
+  wrongLengthError "PinnedSizedBytes 33" $ natVal $ Proxy @SECP256K1_ECDSA_PUBKEY_BYTES
 
 invalidSchnorrVerKeyLengthError :: Integer -> String
 invalidSchnorrVerKeyLengthError =
@@ -31,7 +31,7 @@ invalidSchnorrVerKeyLengthError =
 
 invalidEcdsaSigLengthError :: Integer -> String
 invalidEcdsaSigLengthError =
-  wrongLengthError "SigDSIGN EcdsaSecp256k1DSIGN" $ natVal $ Proxy @SECP256K1_ECDSA_SIGNATURE_BYTES
+  wrongLengthError "PinnedSizedBytes 64" $ natVal $ Proxy @SECP256K1_ECDSA_SIGNATURE_BYTES
 
 -- | The Schnorr signature decoder validates length via the underlying
 -- 'PinnedSizedBytes', so the error is tagged with that type rather than the
