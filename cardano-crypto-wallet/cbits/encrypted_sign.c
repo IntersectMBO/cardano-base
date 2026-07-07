@@ -208,6 +208,7 @@ static void add_left(ed25519_secret_key res_key, uint8_t *z, ed25519_secret_key 
 		scalar_add_no_overflow(zl8, priv_key, res_key);
 		break;
 	}
+	secure_clear(zl8, 64);
 }
 
 static void add_right(ed25519_secret_key res_key, uint8_t *z, ed25519_secret_key priv_key, derivation_scheme_mode mode)
@@ -239,6 +240,7 @@ static void add_left_public(uint8_t *out, uint8_t *z, uint8_t *in, derivation_sc
 
 	CCW_FN (ed25519_publickey) (zl8, pub_zl8);
 	CCW_FN (ed25519_point_add) (pub_zl8, in, out);
+	secure_clear(zl8, 64);
 }
 
 int CCW_FN (derive_private)
