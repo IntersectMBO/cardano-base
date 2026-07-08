@@ -1,8 +1,8 @@
 # Changelog for `cardano-crypto-leios`
 
-## 0.1.1.0
+## 0.1.0.1
 
-* Change lower bound of `cardano-crypto-class` to `>=2.6`
+* 
 
 ## 0.1.0.0
 

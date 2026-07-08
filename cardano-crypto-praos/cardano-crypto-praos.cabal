@@ -85,7 +85,7 @@ library
   build-depends:
     base,
     bytestring,
-    cardano-binary,
+    cardano-binary >=1.9.1,
     cardano-crypto-class >=2.3,
     deepseq,
     nothunks,
