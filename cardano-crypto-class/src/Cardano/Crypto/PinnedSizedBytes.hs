@@ -22,7 +22,9 @@ module Cardano.Crypto.PinnedSizedBytes (
   psbToBytes,
   psbFromByteString,
   psbFromByteStringCheck,
+  psbFromByteStringM,
   psbToByteString,
+  psbToByteArray,
 
   -- * C usage
   psbUseAsCPtr,
@@ -237,6 +239,14 @@ psbFromByteStringCheck bs
   where
     size :: Int
     size = fromInteger (natVal (Proxy :: Proxy n))
+
+psbFromByteStringM :: (KnownNat n, MonadFail f) => BS.ByteString -> f (PinnedSizedBytes n)
+psbFromByteStringM bs = case psbFromByteStringCheck bs of
+  Just psb -> pure psb
+  Nothing -> fail $ "psbFromByteStringM: size mismatch, expected " ++ show (BS.length bs) ++ " bytes"
+
+psbToByteArray :: PinnedSizedBytes n -> ByteArray
+psbToByteArray (PSB ba) = ba
 
 {-# DEPRECATED psbZero "This is not referentially transparent" #-}
 psbZero :: KnownNat n => PinnedSizedBytes n

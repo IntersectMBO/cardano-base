@@ -1,5 +1,10 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.3.3.0
+
+* Add `psbToByteArray`
+* Add `psbFromByteStringM`
+
 ## 2.3.2.0
 
 * Add `Storable` instance for `PackedBytes` and `Hash`
