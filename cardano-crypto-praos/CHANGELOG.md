@@ -1,8 +1,11 @@
 # Changelog for `cardano-crypto-praos`
 
-## 2.2.3.1
+## 2.2.4.0
 
-*
+* Add `FixedSizeCodec` instances for `PraosVRF` and `PraosBatchCompatVRF`
+* Add `FixedSizeCodec` instances for `Proof`, `SignKey`, `VerKey` in `Cardano.Crypto.VRF.Praos` and `Cardano.Crypto.VRF.PraosBatchCompat`
+* Deprecate `proofBytes`, `skBytes`, `vkBytes`, `proofFromBytes`, `skFromBytes`, `vkFromBytes` in favour of `rawEncodeFixedSized`/`rawDecodeFixedSized`
+* Export `SignKey` and `VerKey` from `Cardano.Crypto.VRF.PraosBatchCompat`
 
 ## 2.2.3.0
 

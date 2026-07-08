@@ -36,34 +36,24 @@ module Cardano.Crypto.DSIGN.EcdsaSecp256k1 (
 ) where
 
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (encodedSizeExpr, toCBOR))
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+ )
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAlgorithm (
     SeedSizeDSIGN,
     SigDSIGN,
-    SigSizeDSIGN,
     SignKeyDSIGN,
-    SignKeySizeDSIGN,
     Signable,
     VerKeyDSIGN,
-    VerKeySizeDSIGN,
     algorithmNameDSIGN,
     deriveVerKeyDSIGN,
     genKeyDSIGN,
-    rawDeserialiseSigDSIGN,
-    rawDeserialiseSignKeyDSIGN,
-    rawDeserialiseVerKeyDSIGN,
-    rawSerialiseSigDSIGN,
-    rawSerialiseSignKeyDSIGN,
-    rawSerialiseVerKeyDSIGN,
     signDSIGN,
     verifyDSIGN
   ),
-  decodeSigDSIGN,
-  decodeSignKeyDSIGN,
-  decodeVerKeyDSIGN,
-  encodeSigDSIGN,
-  encodeSignKeyDSIGN,
-  encodeVerKeyDSIGN,
   encodedSigDSIGNSizeExpr,
   encodedSignKeyDSIGNSizeExpr,
   encodedVerKeyDSIGNSizeExpr,
@@ -74,7 +64,8 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbCreateLen,
   psbCreateSized,
   psbCreateSizedResult,
-  psbFromByteStringCheck,
+  psbFromByteStringForM,
+  psbFromByteStringM,
   psbToByteString,
   psbUseAsCPtrLen,
   psbUseAsSizedPtr,
@@ -104,7 +95,7 @@ import Control.Monad (unless, void, when)
 import Crypto.Random (getRandomBytes)
 import Data.ByteString (ByteString)
 import Data.Kind (Type)
-import Data.Proxy (Proxy)
+import Data.Proxy (Proxy (..))
 import Foreign.C.Types (CSize)
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Marshal.Alloc (alloca)
@@ -129,14 +120,21 @@ newtype MessageHash = MH (PinnedSizedBytes SECP256K1_ECDSA_MESSAGE_BYTES)
   deriving stock (Show)
   deriving newtype (ToCBOR, FromCBOR)
 
+instance FixedSizeCodec MessageHash where
+  type FixedSize MessageHash = SECP256K1_ECDSA_MESSAGE_BYTES
+  rawEncodeFixedSized (MH psb) = rawEncodeFixedSized psb
+  rawDecodeFixedSized bs = MH <$> rawDecodeFixedSized bs
+
 -- | Take a blob of bytes (which is presumed to be a 32-byte hash), verify its
 -- length, and package it into a 'MessageHash' if that length is exactly 32.
 toMessageHash :: ByteString -> Maybe MessageHash
-toMessageHash bs = MH <$> psbFromByteStringCheck bs
+toMessageHash = rawDecodeFixedSized
+{-# DEPRECATED toMessageHash "Use `rawDecodeFixedSized` instead" #-}
 
 -- | Turn a 'MessageHash' into its bytes without a length marker.
 fromMessageHash :: MessageHash -> ByteString
-fromMessageHash (MH psb) = psbToByteString psb
+fromMessageHash = rawEncodeFixedSized
+{-# DEPRECATED fromMessageHash "Use rawEncodeFixedSized instead" #-}
 
 -- | A helper to use with the 'HashAlgorithm' API, as this can ensure sizing.
 hashAndPack ::
@@ -145,7 +143,7 @@ hashAndPack ::
   Proxy h ->
   ByteString ->
   MessageHash
-hashAndPack p bs = case psbFromByteStringCheck . digest p $ bs of
+hashAndPack p bs = case rawDecodeFixedSized . digest p $ bs of
   Nothing ->
     error $
       "hashAndPack: unexpected mismatch of guaranteed hash length\n"
@@ -156,9 +154,6 @@ data EcdsaSecp256k1DSIGN
 
 instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
   type SeedSizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PRIVKEY_BYTES
-  type SigSizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_SIGNATURE_BYTES
-  type SignKeySizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PRIVKEY_BYTES
-  type VerKeySizeDSIGN EcdsaSecp256k1DSIGN = SECP256K1_ECDSA_PUBKEY_BYTES
   type Signable EcdsaSecp256k1DSIGN = ((~) MessageHash)
   newtype VerKeyDSIGN EcdsaSecp256k1DSIGN
     = VerKeyEcdsaSecp256k1 (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
@@ -210,26 +205,17 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
               _ -> Right ()
   genKeyDSIGN seed = runMonadRandomWithSeed seed $ do
     bs <- getRandomBytes 32
-    case psbFromByteStringCheck bs of
+    case rawDecodeFixedSized bs of
       Nothing -> error "genKeyDSIGN: Failed to generate SignKeyDSIGN EcdsaSecp256k1DSIGN unexpectedly"
       Just psb -> pure $ SignKeyEcdsaSecp256k1 psb
-  {-# NOINLINE rawSerialiseSigDSIGN #-}
-  rawSerialiseSigDSIGN (SigEcdsaSecp256k1 psb) =
-    psbToByteString @SECP256K1_ECDSA_SIGNATURE_BYTES . unsafeDupablePerformIO $ do
-      psbUseAsSizedPtr psb $ \psp ->
-        psbCreateSized $ \dstp ->
-          withForeignPtr secpCtxPtr $ \ctx ->
-            void $ secpEcdsaSignatureSerializeCompact ctx dstp psp
-  {-# NOINLINE rawSerialiseVerKeyDSIGN #-}
-  rawSerialiseVerKeyDSIGN (VerKeyEcdsaSecp256k1 psb) =
+
+instance FixedSizeCodec (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
+  type FixedSize (VerKeyDSIGN EcdsaSecp256k1DSIGN) = SECP256K1_ECDSA_PUBKEY_BYTES
+  {-# NOINLINE rawEncodeFixedSized #-}
+  rawEncodeFixedSized (VerKeyEcdsaSecp256k1 psb) =
     psbToByteString . unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp ->
       psbCreateLen @SECP256K1_ECDSA_PUBKEY_BYTES $ \ptr len -> do
         let dstp = castPtr ptr
-        -- This is necessary because of how the C API handles checking writes:
-        -- maximum permissible length is given as a pointer, which is
-        -- overwritten to indicate the number of bytes we actually wrote; if
-        -- we get a mismatch, then the serialization failed. While an odd
-        -- choice, we have to go with it.
         alloca $ \(lenPtr :: Ptr CSize) -> do
           poke lenPtr len
           withForeignPtr secpCtxPtr $ \ctx -> do
@@ -237,34 +223,19 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
             writtenLen <- peek lenPtr
             unless
               (writtenLen == len)
-              (error "rawSerializeVerKeyDSIGN: Did not write correct length for VerKeyDSIGN EcdsaSecp256k1DSIGN")
-            -- This should never happen, since `secpEcPubkeySerialize` in the current
-            -- version of `secp256k1` library always returns 1:
+              (error "rawEncodeFixedSized @(VerKeyDSIGN EcdsaSecp256k1DSIGN): Did not write correct length")
             unless
               (ret == 1)
-              (error "rawSerializeVerKeyDSIGN: Failed for unknown reason")
-  rawSerialiseSignKeyDSIGN (SignKeyEcdsaSecp256k1 psb) = psbToByteString psb
-  {-# NOINLINE rawDeserialiseSigDSIGN #-}
-  rawDeserialiseSigDSIGN bs =
-    SigEcdsaSecp256k1 <$> (psbFromByteStringCheck bs >>= go)
+              (error "rawEncodeFixedSized @(VerKeyDSIGN EcdsaSecp256k1DSIGN): Failed for unknown reason")
+  {-# NOINLINE rawDecodeFixedSized #-}
+  rawDecodeFixedSized bs = do
+    psb <- psbFromByteStringM bs
+    VerKeyEcdsaSecp256k1 <$> go psb
     where
       go ::
-        PinnedSizedBytes SECP256K1_ECDSA_SIGNATURE_BYTES ->
-        Maybe (PinnedSizedBytes SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL)
-      go psb = unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp -> do
-        (sigPsb, res) <- psbCreateSizedResult $ \sigp ->
-          withForeignPtr secpCtxPtr $ \ctx ->
-            secpEcdsaSignatureParseCompact ctx sigp psp
-        pure $ case res of
-          1 -> pure sigPsb
-          _ -> Nothing
-  {-# NOINLINE rawDeserialiseVerKeyDSIGN #-}
-  rawDeserialiseVerKeyDSIGN bs =
-    VerKeyEcdsaSecp256k1 <$> (psbFromByteStringCheck bs >>= go)
-    where
-      go ::
+        MonadFail m =>
         PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES ->
-        Maybe (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
+        m (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
       go psb = unsafeDupablePerformIO . psbUseAsCPtrLen psb $ \p srcLen -> do
         let srcp = castPtr p
         (vkPsb, res) <- psbCreateSizedResult $ \vkp ->
@@ -272,27 +243,56 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
             secpEcPubkeyParse ctx vkp srcp srcLen
         pure $ case res of
           1 -> pure vkPsb
-          _ -> Nothing
-  rawDeserialiseSignKeyDSIGN bs =
-    SignKeyEcdsaSecp256k1 <$> psbFromByteStringCheck bs
+          _ -> fail "VerKeyDSIGN SchnorrSecp256k1DSIGN: deserialisation failed"
+
+instance FixedSizeCodec (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
+  type FixedSize (SignKeyDSIGN EcdsaSecp256k1DSIGN) = SECP256K1_ECDSA_PRIVKEY_BYTES
+  rawEncodeFixedSized (SignKeyEcdsaSecp256k1 psb) = psbToByteString psb
+  rawDecodeFixedSized bs = SignKeyEcdsaSecp256k1 <$> rawDecodeFixedSized bs
+
+instance FixedSizeCodec (SigDSIGN EcdsaSecp256k1DSIGN) where
+  type FixedSize (SigDSIGN EcdsaSecp256k1DSIGN) = SECP256K1_ECDSA_SIGNATURE_BYTES
+  {-# NOINLINE rawEncodeFixedSized #-}
+  rawEncodeFixedSized (SigEcdsaSecp256k1 psb) =
+    psbToByteString @SECP256K1_ECDSA_SIGNATURE_BYTES . unsafeDupablePerformIO $ do
+      psbUseAsSizedPtr psb $ \psp ->
+        psbCreateSized $ \dstp ->
+          withForeignPtr secpCtxPtr $ \ctx ->
+            void $ secpEcdsaSignatureSerializeCompact ctx dstp psp
+  {-# NOINLINE rawDecodeFixedSized #-}
+  rawDecodeFixedSized bs = do
+    psb <- psbFromByteStringForM (Proxy @(SigDSIGN EcdsaSecp256k1DSIGN)) bs
+    SigEcdsaSecp256k1 <$> go psb
+    where
+      go ::
+        MonadFail m =>
+        PinnedSizedBytes SECP256K1_ECDSA_SIGNATURE_BYTES ->
+        m (PinnedSizedBytes SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL)
+      go psb = unsafeDupablePerformIO . psbUseAsSizedPtr psb $ \psp -> do
+        (sigPsb, res) <- psbCreateSizedResult $ \sigp ->
+          withForeignPtr secpCtxPtr $ \ctx ->
+            secpEcdsaSignatureParseCompact ctx sigp psp
+        pure $ case res of
+          1 -> pure sigPsb
+          _ -> fail "SigDSIGN: deserialisation failed"
 
 instance ToCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN EcdsaSecp256k1DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN EcdsaSecp256k1DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
-  toCBOR = encodeSigDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN EcdsaSecp256k1DSIGN) where
-  fromCBOR = decodeSigDSIGN
+  fromCBOR = decodeFixedSized

@@ -33,6 +33,11 @@ module Cardano.Crypto.DSIGN.BLS12381.Internal (
 #include "blst_util.h"
 
 import Cardano.Binary (FromCBOR (fromCBOR), ToCBOR (encodedSizeExpr, toCBOR))
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+ )
 import Cardano.Crypto.DSIGN.Class (
   DSIGNAggregatable (..),
   DSIGNAlgorithm (
@@ -40,33 +45,16 @@ import Cardano.Crypto.DSIGN.Class (
     KeyGenContextDSIGN,
     SeedSizeDSIGN,
     SigDSIGN,
-    SigSizeDSIGN,
     SignKeyDSIGN,
-    SignKeySizeDSIGN,
     Signable,
     VerKeyDSIGN,
-    VerKeySizeDSIGN,
     algorithmNameDSIGN,
     deriveVerKeyDSIGN,
     genKeyDSIGN,
     genKeyDSIGNWithContext,
-    rawDeserialiseSigDSIGN,
-    rawDeserialiseSignKeyDSIGN,
-    rawDeserialiseVerKeyDSIGN,
-    rawSerialiseSigDSIGN,
-    rawSerialiseSignKeyDSIGN,
-    rawSerialiseVerKeyDSIGN,
     signDSIGN,
     verifyDSIGN
   ),
-  decodePossessionProofDSIGN,
-  decodeSigDSIGN,
-  decodeSignKeyDSIGN,
-  decodeVerKeyDSIGN,
-  encodePossessionProofDSIGN,
-  encodeSigDSIGN,
-  encodeSignKeyDSIGN,
-  encodeVerKeyDSIGN,
   encodedPossessionProofDSIGNSizeExpr,
   encodedSigDSIGNSizeExpr,
   encodedSignKeyDSIGNSizeExpr,
@@ -105,6 +93,7 @@ import Cardano.Crypto.PinnedSizedBytes (
 import Cardano.Crypto.Seed (getBytesFromSeedT)
 import Cardano.Crypto.Util (SignableRepresentation (getSignableRepresentation))
 import Control.DeepSeq (NFData)
+import Control.Monad (when)
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -119,6 +108,10 @@ import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 import GHC.TypeNats (KnownNat, type (+))
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
+
+failDecodeBLS :: MonadFail m => String -> String -> m a
+failDecodeBLS ty msg =
+  fail $ ty <> " BLS12381DSIGN: deserialisation failed (" <> msg <> ")"
 
 data BLS12381DSIGN curve
 
@@ -275,12 +268,9 @@ instance
   DSIGNAlgorithm (BLS12381DSIGN curve)
   where
   type SeedSizeDSIGN (BLS12381DSIGN curve) = CARDANO_BLST_SCALAR_SIZE
-  type SignKeySizeDSIGN (BLS12381DSIGN curve) = CARDANO_BLST_SCALAR_SIZE
 
   -- These *Sizes* are used in the serialization/deserialization
   -- so these use the compressed sizes of the BLS12-381 `Point curve`
-  type VerKeySizeDSIGN (BLS12381DSIGN curve) = CompressedPointSize curve
-  type SigSizeDSIGN (BLS12381DSIGN curve) = CompressedPointSize (DualCurve curve)
   type Signable (BLS12381DSIGN curve) = SignableRepresentation
 
   -- Context can hold domain separation tag and/or augmentation data for signatures
@@ -378,51 +368,6 @@ instance
                     infoPtr
                     (fromIntegral @Int @CSize infoLen)
 
-  -- Note that this also compresses the signature according to the ZCash standard
-  {-# INLINE rawSerialiseSigDSIGN #-}
-  rawSerialiseSigDSIGN (SigBLS12381 sigPSB) = blsCompress @(DualCurve curve) sigPSB
-
-  {-# INLINE rawSerialiseVerKeyDSIGN #-}
-  -- Note that this also compresses the verification key according to the ZCash standard
-  rawSerialiseVerKeyDSIGN (VerKeyBLS12381 vkPSB) = blsCompress @curve vkPSB
-
-  {-# INLINE rawSerialiseSignKeyDSIGN #-}
-  rawSerialiseSignKeyDSIGN (SignKeyBLS12381 skPSB) = scalarToBS skPSB
-
-  {-# INLINE rawDeserialiseVerKeyDSIGN #-}
-  rawDeserialiseVerKeyDSIGN bs =
-    -- Note that this also performs a group membership check.
-    -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
-    case blsUncompress @curve bs of
-      Left _ -> Nothing
-      Right vkPsb ->
-        -- Reject the identity (point at infinity) as a verification key
-        if blsIsInf @curve vkPsb
-          then Nothing
-          else Just (VerKeyBLS12381 vkPsb)
-
-  {-# INLINE rawDeserialiseSignKeyDSIGN #-}
-  rawDeserialiseSignKeyDSIGN bs =
-    -- A signing key is strictly a BE integer mod the curve order.
-    -- The `DSIGN` interface via PSB would ensure at the type level that
-    -- they are of size 32 bytes (256 bits). But we must even ensure
-    -- they are valid Scalars, i.e., less than the curve order (255 bits).
-    case scalarFromBS bs of
-      Left _ -> Nothing
-      Right skScalar ->
-        -- Reject the zero scalar as a signing key
-        if BS.all (== 0) (scalarToBS skScalar)
-          then Nothing
-          else Just (SignKeyBLS12381 skScalar)
-
-  {-# INLINE rawDeserialiseSigDSIGN #-}
-  rawDeserialiseSigDSIGN bs =
-    -- Note that this also performs a group membership check.
-    -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
-    case blsUncompress @(DualCurve curve) bs of
-      Left _ -> Nothing
-      Right sigPsb -> Just (SigBLS12381 sigPsb)
-
 deriving stock instance
   BLS curve =>
   Eq (VerKeyDSIGN (BLS12381DSIGN curve))
@@ -447,35 +392,89 @@ instance Show (SignKeyDSIGN (BLS12381DSIGN curve)) where
 
 instance
   BLS12381CurveConstraints curve =>
+  FixedSizeCodec (VerKeyDSIGN (BLS12381DSIGN curve))
+  where
+  type FixedSize (VerKeyDSIGN (BLS12381DSIGN curve)) = CompressedPointSize curve
+
+  -- Note that this also compresses the verification key according to the ZCash standard
+  {-# INLINE rawEncodeFixedSized #-}
+  rawEncodeFixedSized (VerKeyBLS12381 vkPSB) = blsCompress @curve vkPSB
+  {-# INLINE rawDecodeFixedSized #-}
+  rawDecodeFixedSized bs =
+    -- Note that this also performs a group membership check.
+    -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
+    case blsUncompress @curve bs of
+      Left err -> failDecodeBLS "VerKeyDSIGN" $ show err
+      Right vkPsb ->
+        -- Reject the identity (point at infinity) as a verification key
+        if blsIsInf @curve vkPsb
+          then failDecodeBLS "VerKeyDSIGN" "infinity point"
+          else pure (VerKeyBLS12381 vkPsb)
+
+instance FixedSizeCodec (SignKeyDSIGN (BLS12381DSIGN curve)) where
+  type FixedSize (SignKeyDSIGN (BLS12381DSIGN curve)) = CARDANO_BLST_SCALAR_SIZE
+  {-# INLINE rawEncodeFixedSized #-}
+  rawEncodeFixedSized (SignKeyBLS12381 skPSB) = scalarToBS skPSB
+  {-# INLINE rawDecodeFixedSized #-}
+  rawDecodeFixedSized bs = do
+    -- A signing key is strictly a BE integer mod the curve order.
+    -- We must ensure they are valid Scalars, i.e., less than the curve order (255 bits).
+    case scalarFromBS bs of
+      Left err -> failDecodeBLS "SignKeyDSIGN" $ show err
+      Right skScalar ->
+        -- Reject the zero scalar as a signing key
+        if BS.all (== 0) (scalarToBS skScalar)
+          then failDecodeBLS "SignKeyDSIGN" "zero scalar"
+          else pure (SignKeyBLS12381 skScalar)
+
+instance
+  BLS12381CurveConstraints curve =>
+  FixedSizeCodec (SigDSIGN (BLS12381DSIGN curve))
+  where
+  type FixedSize (SigDSIGN (BLS12381DSIGN curve)) = CompressedPointSize (DualCurve curve)
+
+  -- Note that this also compresses the signature according to the ZCash standard
+  {-# INLINE rawEncodeFixedSized #-}
+  rawEncodeFixedSized (SigBLS12381 sigPSB) = blsCompress @(DualCurve curve) sigPSB
+  {-# INLINE rawDecodeFixedSized #-}
+  rawDecodeFixedSized bs =
+    -- Note that this also performs a group membership check.
+    -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
+    case blsUncompress @(DualCurve curve) bs of
+      Left err -> failDecodeBLS "SigDSIGN" $ show err
+      Right sigPsb -> pure (SigBLS12381 sigPsb)
+
+instance
+  BLS12381CurveConstraints curve =>
   ToCBOR (VerKeyDSIGN (BLS12381DSIGN curve))
   where
-  toCBOR = encodeVerKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance
   BLS12381CurveConstraints curve =>
   FromCBOR (VerKeyDSIGN (BLS12381DSIGN curve))
   where
-  fromCBOR = decodeVerKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance
   BLS12381CurveConstraints curve =>
   ToCBOR (SignKeyDSIGN (BLS12381DSIGN curve))
   where
-  toCBOR = encodeSignKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance
   BLS12381CurveConstraints curve =>
   FromCBOR (SignKeyDSIGN (BLS12381DSIGN curve))
   where
-  fromCBOR = decodeSignKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance
   BLS12381CurveConstraints curve =>
   ToCBOR (SigDSIGN (BLS12381DSIGN curve))
   where
-  toCBOR = encodeSigDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 -- | Helper functions to extract the internal Point representation
@@ -490,7 +489,7 @@ instance
   BLS12381CurveConstraints curve =>
   FromCBOR (SigDSIGN (BLS12381DSIGN curve))
   where
-  fromCBOR = decodeSigDSIGN
+  fromCBOR = decodeFixedSized
 
 instance
   BLS12381CurveConstraints curve =>
@@ -543,30 +542,39 @@ instance
   {-# INLINE createPossessionProofDSIGN #-}
   createPossessionProofDSIGN ctx sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = signDSIGN ctx (rawSerialiseVerKeyDSIGN vk) sk
+        SigBLS12381 sig = signDSIGN ctx (rawEncodeFixedSized vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
   verifyPossessionProofDSIGN ctx vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (verifyDSIGN ctx vk (rawSerialiseVerKeyDSIGN vk) (SigBLS12381 mu1Psb))
-  {-# INLINE rawSerialisePossessionProofDSIGN #-}
-  rawSerialisePossessionProofDSIGN (PossessionProofBLS12381 mu1Psb) =
-    blsCompress @(DualCurve curve) mu1Psb
-  {-# INLINE rawDeserialisePossessionProofDSIGN #-}
-  rawDeserialisePossessionProofDSIGN bs = do
-    -- Note that these also perform group membership and size checks.
-    -- It will also ensure that all of the supplied `ByteString` is consumed
-    -- through the size checks.
-    Right mu1Point <- pure $ blsUncompress @(DualCurve curve) bs
-    -- Reject the zero point (point at infinity) for both mu1 and mu2
-    if blsIsInf @(DualCurve curve) mu1Point
-      then Nothing
-      else Just $ PossessionProofBLS12381 mu1Point
+      (verifyDSIGN ctx vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>
   Eq (PossessionProofDSIGN (BLS12381DSIGN curve))
+
+instance
+  BLS12381CurveConstraints curve =>
+  FixedSizeCodec (PossessionProofDSIGN (BLS12381DSIGN curve))
+  where
+  type
+    FixedSize (PossessionProofDSIGN (BLS12381DSIGN curve)) =
+      PossessionProofSizeDSIGN (BLS12381DSIGN curve)
+  rawEncodeFixedSized (PossessionProofBLS12381 mu1Psb) =
+    blsCompress @(DualCurve curve) mu1Psb
+  rawDecodeFixedSized bs = do
+    -- Note that these also perform group membership and size checks.
+    -- It will also ensure that all of the supplied `ByteString` is consumed
+    -- through the size checks.
+    case blsUncompress @(DualCurve curve) bs of
+      Left err -> failDecodeBLS "PossessionProofDSIGN" (show err)
+      Right mu1Point -> do
+        -- Reject the zero point (point at infinity) for both mu1 and mu2
+        when (blsIsInf @(DualCurve curve) mu1Point) $ do
+          failDecodeBLS "PossessionProofDSIGN" "infinity point"
+        pure $ PossessionProofBLS12381 mu1Point
+  {-# INLINE rawDecodeFixedSized #-}
 
 instance
   ( BLS12381CurveConstraints curve
@@ -574,7 +582,7 @@ instance
   ) =>
   ToCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
-  toCBOR = encodePossessionProofDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedPossessionProofDSIGNSizeExpr
 
 instance
@@ -583,4 +591,4 @@ instance
   ) =>
   FromCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
-  fromCBOR = decodePossessionProofDSIGN
+  fromCBOR = decodeFixedSized

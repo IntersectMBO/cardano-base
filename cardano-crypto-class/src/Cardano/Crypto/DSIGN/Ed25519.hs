@@ -33,8 +33,15 @@ module Cardano.Crypto.DSIGN.Ed25519 (
 )
 where
 
+import Cardano.Binary.FixedSizeCodec (
+  FixedSizeCodec (..),
+  decodeFixedSized,
+  encodeFixedSized,
+  fixedSize,
+  guardFixedSized,
+ )
 import Control.DeepSeq (NFData (..), rwhnf)
-import Control.Monad (guard, unless, (<$!>))
+import Control.Monad (unless, (<$!>))
 import Control.Monad.Class.MonadST (MonadST (..))
 import Control.Monad.Class.MonadThrow (MonadThrow (..), throwIO)
 import Control.Monad.ST (ST)
@@ -69,7 +76,6 @@ import Cardano.Crypto.PinnedSizedBytes (
   psbCreate,
   psbCreateSized,
   psbCreateSizedResult,
-  psbFromByteStringCheck,
   psbToByteString,
   psbUseAsCPtrLen,
   psbUseAsSizedPtr,
@@ -133,24 +139,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
   -- a sign key is literally just taking a chunk from the seed. We use
   -- SEEDBYTES to define both the seed size and the sign key size.
   type SeedSizeDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_SEEDBYTES
-
-  -- \| Ed25519 key size is 32 octets
-  -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
-  type VerKeySizeDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_PUBLICKEYBYTES
-
-  -- \| Ed25519 secret key size is 32 octets; however, libsodium packs both
-  -- the secret key and the public key into a 64-octet compound and exposes
-  -- that as the secret key; the actual 32-octet secret key is called
-  -- \"seed\" in libsodium. For backwards compatibility reasons and
-  -- efficiency, we use the 64-octet compounds internally (this is what
-  -- libsodium expects), but we only serialize the 32-octet secret key part
-  -- (the libsodium \"seed\"). And because of this, we need to define the
-  -- sign key size to be SEEDBYTES (which is 32), not PRIVATEKEYBYTES (which
-  -- would be 64).
-  type SignKeySizeDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_SEEDBYTES
-
-  -- \| Ed25519 signature size is 64 octets
-  type SigSizeDSIGN Ed25519DSIGN = CRYPTO_SIGN_ED25519_BYTES
 
   --
   -- Key and signature types
@@ -233,28 +221,6 @@ instance DSIGNAlgorithm Ed25519DSIGN where
                 allocaSized $ \pkPtr -> do
                   cOrThrowError "genKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_seed_keypair" $
                     c_crypto_sign_ed25519_seed_keypair pkPtr skPtr (SizedPtr . castPtr $ seedPtr)
-
-  --
-  -- raw serialise/deserialise
-  --
-
-  rawSerialiseVerKeyDSIGN (VerKeyEd25519DSIGN vk) = psbToByteString vk
-  rawSerialiseSignKeyDSIGN (SignKeyEd25519DSIGN sk) =
-    psbToByteString @(SeedSizeDSIGN Ed25519DSIGN) $ unsafeDupablePerformIO $ do
-      psbCreateSized $ \seedPtr ->
-        psbUseAsSizedPtr sk $ \skPtr ->
-          cOrThrowError "deriveVerKeyDSIGN @Ed25519DSIGN" "c_crypto_sign_ed25519_sk_to_seed" $
-            c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
-
-  rawSerialiseSigDSIGN (SigEd25519DSIGN sig) = psbToByteString sig
-
-  rawDeserialiseVerKeyDSIGN = fmap VerKeyEd25519DSIGN . psbFromByteStringCheck
-  {-# INLINE rawDeserialiseVerKeyDSIGN #-}
-  rawDeserialiseSignKeyDSIGN bs = do
-    guard (fromIntegral @Int @Word (BS.length bs) == seedSizeDSIGN (Proxy @Ed25519DSIGN))
-    pure . genKeyDSIGN . mkSeedFromBytes $ bs
-  rawDeserialiseSigDSIGN = fmap SigEd25519DSIGN . psbFromByteStringCheck
-  {-# INLINE rawDeserialiseSigDSIGN #-}
 
 instance DSIGNMAlgorithm Ed25519DSIGN where
   -- Note that the size of the internal key data structure is the SECRET KEY
@@ -352,26 +318,61 @@ instance UnsoundDSIGNMAlgorithm Ed25519DSIGN where
         mlockedSeedFinalize seed
         return sk
 
+instance FixedSizeCodec (VerKeyDSIGN Ed25519DSIGN) where
+  -- \| Ed25519 key size is 32 octets
+  -- (per <https://tools.ietf.org/html/rfc8032#section-5.1.6>)
+  type FixedSize (VerKeyDSIGN Ed25519DSIGN) = CRYPTO_SIGN_ED25519_PUBLICKEYBYTES
+  rawEncodeFixedSized (VerKeyEd25519DSIGN vk) = psbToByteString vk
+  rawDecodeFixedSized bs = VerKeyEd25519DSIGN <$> rawDecodeFixedSized bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (SignKeyDSIGN Ed25519DSIGN) where
+  -- \| Ed25519 secret key size is 32 octets; however, libsodium packs both
+  -- the secret key and the public key into a 64-octet compound and exposes
+  -- that as the secret key; the actual 32-octet secret key is called
+  -- \"seed\" in libsodium. For backwards compatibility reasons and
+  -- efficiency, we use the 64-octet compounds internally (this is what
+  -- libsodium expects), but we only serialize the 32-octet secret key part
+  -- (the libsodium \"seed\"). And because of this, we need to define the
+  -- sign key size to be SEEDBYTES (which is 32), not PRIVATEKEYBYTES (which
+  -- would be 64).
+  type FixedSize (SignKeyDSIGN Ed25519DSIGN) = CRYPTO_SIGN_ED25519_SEEDBYTES
+  rawEncodeFixedSized (SignKeyEd25519DSIGN sk) =
+    psbToByteString @(SeedSizeDSIGN Ed25519DSIGN) $ unsafeDupablePerformIO $ do
+      psbCreateSized $ \seedPtr ->
+        psbUseAsSizedPtr sk $ \skPtr ->
+          cOrThrowError "rawEncodeFixedSized @(SignKeyDSIGN Ed25519DSIGN)" "c_crypto_sign_ed25519_sk_to_seed" $
+            c_crypto_sign_ed25519_sk_to_seed seedPtr skPtr
+  rawDecodeFixedSized bs = guardFixedSized bs $ pure . genKeyDSIGN $ mkSeedFromBytes bs
+  {-# INLINE rawDecodeFixedSized #-}
+
+instance FixedSizeCodec (SigDSIGN Ed25519DSIGN) where
+  -- \| Ed25519 signature size is 64 octets
+  type FixedSize (SigDSIGN Ed25519DSIGN) = CRYPTO_SIGN_ED25519_BYTES
+  rawEncodeFixedSized (SigEd25519DSIGN sig) = psbToByteString sig
+  rawDecodeFixedSized bs = SigEd25519DSIGN <$> rawDecodeFixedSized bs
+  {-# INLINE rawDecodeFixedSized #-}
+
 instance ToCBOR (VerKeyDSIGN Ed25519DSIGN) where
-  toCBOR = encodeVerKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedVerKeyDSIGNSizeExpr
 
 instance FromCBOR (VerKeyDSIGN Ed25519DSIGN) where
-  fromCBOR = decodeVerKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SignKeyDSIGN Ed25519DSIGN) where
-  toCBOR = encodeSignKeyDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSignKeyDSIGNSizeExpr
 
 instance FromCBOR (SignKeyDSIGN Ed25519DSIGN) where
-  fromCBOR = decodeSignKeyDSIGN
+  fromCBOR = decodeFixedSized
 
 instance ToCBOR (SigDSIGN Ed25519DSIGN) where
-  toCBOR = encodeSigDSIGN
+  toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
 instance FromCBOR (SigDSIGN Ed25519DSIGN) where
-  fromCBOR = decodeSigDSIGN
+  fromCBOR = decodeFixedSized
 
 instance
   TypeError ('Text "CBOR encoding would violate mlocking guarantees") =>
@@ -422,12 +423,12 @@ instance DirectSerialise (VerKeyDSIGN Ed25519DSIGN) where
     psbUseAsCPtrLen psb $ \ptr _ ->
       push
         (castPtr ptr)
-        (fromIntegral @Word @CSize $ verKeySizeDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ fixedSize (Proxy @(VerKeyDSIGN Ed25519DSIGN)))
 
 instance DirectDeserialise (VerKeyDSIGN Ed25519DSIGN) where
   directDeserialise pull = do
     psb <- psbCreate $ \ptr ->
       pull
         (castPtr ptr)
-        (fromIntegral @Word @CSize $ verKeySizeDSIGN (Proxy @Ed25519DSIGN))
+        (fromIntegral @Word @CSize $ fixedSize (Proxy @(VerKeyDSIGN Ed25519DSIGN)))
     return $! VerKeyEd25519DSIGN psb

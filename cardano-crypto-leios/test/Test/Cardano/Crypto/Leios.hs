@@ -6,9 +6,9 @@
 module Test.Cardano.Crypto.Leios (spec, exampleCert) where
 
 import qualified Cardano.Binary as CBOR
+import Cardano.Binary.FixedSizeCodec (encodeFixedSized)
 import Cardano.Crypto.DSIGN (
   DSIGNAlgorithm (deriveVerKeyDSIGN),
-  encodeSigDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
   signDSIGN,
@@ -109,7 +109,7 @@ prop_decode_indefinite_LeiosCert = forAll genLeiosCert $ \cert ->
   let indef =
         encodeListLenIndef
           <> encodeBitField (leiosCertSigners cert)
-          <> encodeSigDSIGN (leiosCertSignature cert)
+          <> encodeFixedSized (leiosCertSignature cert)
           <> encodeBreak
    in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (CBOR.serialize indef)
         === Right cert
