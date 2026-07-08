@@ -49,5 +49,5 @@ main = do
     , bench "sign-v2 (encryptedSign)" $
         whnfIO (encryptedSign key testPass testMsg)
     , bench "change-passphrase (encryptedChangePass)" $
-        whnfIO (encryptedChangePass testPass newPass key)
+        whnfIO (encryptedChangePassphrase testPass newPass key)
     ]

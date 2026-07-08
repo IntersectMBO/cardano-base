@@ -11,21 +11,21 @@ import Test.Hspec
 
 import Cardano.Crypto.WalletHD.Encrypted
 
-foreign import ccall "ccw_ed25519_sign_open"
-  c_ed25519_sign_open ::
+foreign import ccall "cardano_crypto_wallet_ed25519_sign_open"
+  wallet_ed25519_sign_open ::
     Ptr a ->
     CSize ->
     Ptr a ->
     Ptr a ->
     IO CInt
 
-verifySignature :: BS.ByteString -> BS.ByteString -> Signature -> Bool
-verifySignature pub msg (Signature sig) = unsafePerformIO $
+verifySignature :: PublicKey -> BS.ByteString -> Signature -> Bool
+verifySignature publicKey msg (Signature sig) = unsafePerformIO $
   BS.useAsCStringLen msg $ \(mp, ml) ->
-    BS.useAsCString pub $ \pkp ->
+    BS.useAsCString (publicKeyByteString publicKey) $ \pkp ->
       BS.useAsCString sig $ \sigp ->
         (== 0)
-          <$> c_ed25519_sign_open
+          <$> wallet_ed25519_sign_open
             (castPtr mp)
             (fromIntegral @Int @CSize ml)
             (castPtr pkp)
@@ -79,9 +79,9 @@ tests = describe "Sign" $ do
       Left err -> expectationFailure $ "encryptedCreate failed: " ++ show err
       Right key -> do
         let newPass = BS.replicate 32 0xFF
-        res' <- encryptedChangePass testPass newPass key
+        res' <- encryptedChangePassphrase testPass newPass key
         case res' of
-          Left err -> expectationFailure $ "encryptedChangePass failed: " ++ show err
+          Left err -> expectationFailure $ "encryptedChangePassphrase failed: " ++ show err
           Right key' -> do
             res'' <- encryptedSign key' newPass testMsg
             case res'' of
@@ -98,8 +98,8 @@ tests = describe "Sign" $ do
           Left err -> expectationFailure $ "encryptedSign failed: " ++ show err
           Right sig -> do
             let newPass = BS.replicate 32 0xFF
-            res'' <- encryptedChangePass testPass newPass key
+            res'' <- encryptedChangePassphrase testPass newPass key
             case res'' of
-              Left err -> expectationFailure $ "encryptedChangePass failed: " ++ show err
+              Left err -> expectationFailure $ "encryptedChangePassphrase failed: " ++ show err
               Right key' ->
                 verifySignature (encryptedPublic key') testMsg sig `shouldBe` True
