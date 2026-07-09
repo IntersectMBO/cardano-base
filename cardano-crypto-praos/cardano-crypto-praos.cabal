@@ -86,7 +86,7 @@ library
     base,
     bytestring,
     cardano-binary >=1.9.1,
-    cardano-crypto-class >=2.5.2,
+    cardano-crypto-class >=2.5.1,
     deepseq,
     nothunks,
     primitive,

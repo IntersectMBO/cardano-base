@@ -1,6 +1,6 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.5.2.0
+## 2.5.1.0
 
 * Add `VerKeySizeVRF`, `SignKeySizeVRF` and `CertSizeVRF` type-level sizes to `VRFAlgorithm`
 * Change `sizeVerKeyVRF`, `sizeSignKeyVRF` and `sizeCertVRF` from `VRFAlgorithm` methods to standalone functions
@@ -13,9 +13,6 @@
 * Add `FixedSizeCodec` instances for `PinnedSizedBytes` and `PackedBytes`
 * Add `psbFromByteStringForM`
 * Add `hashFromByteStringM`
-
-## 2.5.1.0
-
 * Add `psbToByteArray`
 * Add `psbFromByteStringM`
 
@@ -43,11 +40,22 @@
 * Add `withHashContext` and `withHashContextST` for resource management when incremental hashing
 * Add `psbCreateSizedAligned` and `psbCreateSizedResultAligned` to `Cardano.Crypto.PinnedSizedBytes`
 * Deprecate `CRYPTO_BLAKE2B_256_STATE_SIZE`; add `CRYPTO_BLAKE2B_STATE_SIZE` in its place
+* Remove `psbToByteArray`
+* Remove `psbFromByteStringM`
 
 ### `testlib`
 
 * Add `Arbitrary` for `PackedBytes`
 * Add `AnyPackedBytes`
+
+## 2.3.3.0
+
+* Add `psbToByteArray`
+* Add `psbFromByteStringM`
+
+## 2.3.2.0
+
+* Add `Storable` instance for `PackedBytes` and `Hash`
 
 ## 2.3.1.0
 
