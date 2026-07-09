@@ -1,5 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
+## 2.5.1.1
+
+*
+
 ## 2.5.1.0
 
 * Add `VerKeySizeVRF`, `SignKeySizeVRF` and `CertSizeVRF` type-level sizes to `VRFAlgorithm`
