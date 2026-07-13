@@ -93,7 +93,9 @@ tests = describe "RoundTrip" $ do
       Right key -> do
         let pub = encryptedPublic key
             cc = encryptedChainCode key
-        case (encryptedDerivePublic DerivationScheme1 (pub, cc) 0, encryptedDerivePublic DerivationScheme2 (pub, cc) 0) of
+        case ( encryptedDerivePublic DerivationScheme1 (pub, cc) 0
+             , encryptedDerivePublic DerivationScheme2 (pub, cc) 0
+             ) of
           (Right (pub1, _), Right (pub2, _)) -> pub1 `shouldNotBe` pub2
           (Left err, _) -> expectationFailure $ "derivePublic scheme1 failed: " ++ show err
           (_, Left err) -> expectationFailure $ "derivePublic scheme2 failed: " ++ show err
