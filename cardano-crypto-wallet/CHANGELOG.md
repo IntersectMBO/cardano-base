@@ -5,6 +5,10 @@
 * Breaking: `encryptedDerivePublic` now returns `Either XPrvError (PublicKey, ChainCode)`
   instead of throwing on hardened indices.
 * Breaking: `XPrvHardenedDerivationUnsupported` constructor added to `XPrvError`.
+* Added `withDecryptedKeyMaterial`, `deriveKeyMaterial`, `signWithKeyMaterial`,
+  and `keyMaterialPublicBytes` for batch decrypt/derive/sign without repeated
+  Argon2id KDF invocations.
+* Added `KeyMaterial` (abstract) and `Validated` to exports.
 
 ## 0.1.0.0
 

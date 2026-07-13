@@ -100,6 +100,14 @@ module Cardano.Crypto.WalletHD.Encrypted (
   encryptedPublic,
   encryptedChainCode,
 
+  -- * CPS-style key-material API
+  KeyMaterial,
+  Validated,
+  withDecryptedKeyMaterial,
+  deriveKeyMaterial,
+  signWithKeyMaterial,
+  keyMaterialPublicBytes,
+
   -- * Test helpers
   withFastKdfForTesting,
   withDeterministicRandomnessForTesting,
@@ -711,6 +719,44 @@ encryptedChainCode eKey@(EncryptedKey eKeyBytes) =
     EnvelopeV2 -> either (const badEnvelope) eChainCode (decodeEncryptedKey eKey)
   where
     badEnvelope = error "encryptedChainCode: invalid v2 envelope"
+
+-- ---------------------------------------------------------------------------
+-- CPS-style key-material API
+-- ---------------------------------------------------------------------------
+
+-- | Decrypt the root key once, then derive a child key in-memory.
+-- The child's secret key lives in @sodium_malloc@'d memory for the duration
+-- of the action and is zeroed on return.
+deriveKeyMaterial ::
+  DerivationScheme ->
+  KeyMaterial Validated ->
+  DerivationIndex ->
+  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  IO (Either XPrvError a)
+deriveKeyMaterial = legacyDerivePrivate
+
+-- | Sign a message using an already-decrypted key material, without a
+-- passphrase round-trip.
+signWithKeyMaterial ::
+  ByteArrayAccess msg =>
+  KeyMaterial Validated ->
+  msg ->
+  IO (Either XPrvError Signature)
+signWithKeyMaterial keyMaterial msg =
+  withKeyMaterialPtr keyMaterial $ \keyMaterialPtr -> do
+    (status, sig) <-
+      B.allocRet signatureSize $ \outSig ->
+        withByteArray msg $ \msgPtr ->
+          wallet_sign
+            keyMaterialPtr
+            msgPtr
+            (fromIntegral @Int @CSize $ B.length msg)
+            (SignaturePtr outSig)
+    pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
+
+-- | Extract the 32-byte public key from in-memory key material.
+keyMaterialPublicBytes :: KeyMaterial Validated -> ByteString
+keyMaterialPublicBytes = publicKeyByteString . kmPublicKey
 
 -- ---------------------------------------------------------------------------
 -- CBOR V2 envelope codec
