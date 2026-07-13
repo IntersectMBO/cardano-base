@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-crypto-wallet
-version: 0.1.0.0
+version: 0.2.0.0
 synopsis: Authenticated v2 envelope for HD wallet keys
 description:
   Provides authenticated encryption and key derivation for HD wallet keys,

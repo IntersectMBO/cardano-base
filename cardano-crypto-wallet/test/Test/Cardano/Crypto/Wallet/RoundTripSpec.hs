@@ -82,8 +82,9 @@ tests = describe "RoundTrip" $ do
         case res' of
           Left err -> expectationFailure $ "derivePrivate failed: " ++ show err
           Right child ->
-            let (derivedPub, _) = encryptedDerivePublic DerivationScheme2 (pub, cc) idx
-             in encryptedPublic child `shouldBe` derivedPub
+            case encryptedDerivePublic DerivationScheme2 (pub, cc) idx of
+              Left err -> expectationFailure $ "derivePublic failed: " ++ show err
+              Right (derivedPub, _) -> encryptedPublic child `shouldBe` derivedPub
 
   it "encryptedDerivePublic is consistent for both schemes" $ do
     res <- encryptedCreate testSeed testPass testCC
@@ -92,9 +93,12 @@ tests = describe "RoundTrip" $ do
       Right key -> do
         let pub = encryptedPublic key
             cc = encryptedChainCode key
-            (pub1, _) = encryptedDerivePublic DerivationScheme1 (pub, cc) 0
-            (pub2, _) = encryptedDerivePublic DerivationScheme2 (pub, cc) 0
-        pub1 `shouldNotBe` pub2
+        case ( encryptedDerivePublic DerivationScheme1 (pub, cc) 0
+             , encryptedDerivePublic DerivationScheme2 (pub, cc) 0
+             ) of
+          (Right (pub1, _), Right (pub2, _)) -> pub1 `shouldNotBe` pub2
+          (Left err, _) -> expectationFailure $ "derivePublic scheme1 failed: " ++ show err
+          (_, Left err) -> expectationFailure $ "derivePublic scheme2 failed: " ++ show err
 
   prop "mkEncryptedKey . unEncryptedKey is identity" $
     \(key :: EncryptedKey) ->

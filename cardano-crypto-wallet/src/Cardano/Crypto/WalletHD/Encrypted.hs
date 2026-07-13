@@ -427,6 +427,7 @@ data XPrvError
   | XPrvInvalidChainCode
   | XPrvPublicKeyMismatch
   | XPrvInternalError
+  | XPrvHardenedDerivationUnsupported
   deriving (Eq, Show)
 
 newtype EncryptedKey = EncryptedKey ByteString
@@ -673,16 +674,15 @@ encryptedDerivePublic ::
   DerivationScheme ->
   (PublicKey, ChainCode) ->
   DerivationIndex ->
-  (PublicKey, ChainCode)
+  Either XPrvError (PublicKey, ChainCode)
 encryptedDerivePublic dscheme (publicKey, cc) childIndex
-  | childIndex >= 0x80000000 =
-      error "encryptedDerivePublic: cannot derive hardened key from public key"
-  | otherwise = unsafePerformIO $ do
-      fmap (first PublicKey) $ psbCreateResult $ \publicKeyPtrOut ->
-        fmap ChainCode $ psbCreate $ \ccOutPtr ->
-          withPublicKeyPtr publicKey $ \publicKeyPtr ->
-            withChainCodePtr cc $ \chainCodePtr -> do
-              r <-
+  | childIndex >= 0x80000000 = Left XPrvHardenedDerivationUnsupported
+  | otherwise = unsafePerformIO $
+      withPublicKeyPtr publicKey $ \publicKeyPtr ->
+        withChainCodePtr cc $ \chainCodePtr -> do
+          (pubKeyBytes, (ccBytes, r)) <-
+            psbCreateResult $ \publicKeyPtrOut ->
+              psbCreateResult $ \ccOutPtr ->
                 wallet_derive_public
                   publicKeyPtr
                   chainCodePtr
@@ -690,9 +690,10 @@ encryptedDerivePublic dscheme (publicKey, cc) childIndex
                   (PublicKeyPtr publicKeyPtrOut)
                   (ChainCodePtr ccOutPtr)
                   (dschemeToC dscheme)
-              if r /= 0
-                then error "encryptedDerivePublic: hardened index check failed"
-                else pure ()
+          pure $
+            if r /= 0
+              then Left XPrvInternalError
+              else Right (PublicKey pubKeyBytes, ChainCode ccBytes)
 
 encryptedPublic :: HasCallStack => EncryptedKey -> PublicKey
 encryptedPublic eKey@(EncryptedKey eKeyBytes) =
