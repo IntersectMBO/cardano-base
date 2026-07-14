@@ -45,6 +45,7 @@ module Cardano.Crypto.WalletHD.Encrypted (
   extKeyMaterialChainCode,
   withDecryptedExtKeyMaterial,
   deriveExtKeyMaterial,
+  signWithExtKeyMaterial,
 
   -- ** Encrypted SecretKey
   EncSecretKey,
@@ -662,17 +663,7 @@ encryptedSign ::
   (ByteArrayAccess passphrase, ByteArrayAccess msg) =>
   EncryptedKey -> passphrase -> msg -> IO (Either XPrvError Signature)
 encryptedSign eKey pass msg =
-  withDecryptedExtKeyMaterial eKey pass $ \extKeyMaterial ->
-    withExtKeyMaterialPtr extKeyMaterial $ \extKeyMaterialPtr -> do
-      (status, sig) <-
-        B.allocRet signatureSize $ \outSig ->
-          withByteArray msg $ \msgPtr ->
-            wallet_sign
-              extKeyMaterialPtr
-              msgPtr
-              (fromIntegral @Int @CSize $ B.length msg)
-              (SignaturePtr outSig)
-      pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
+  withDecryptedExtKeyMaterial eKey pass (`signWithExtKeyMaterial` msg)
 
 encryptedDerivePrivate ::
   ByteArrayAccess passphrase =>
@@ -832,6 +823,25 @@ decodeAadFields = do
 -- ---------------------------------------------------------------------------
 -- Internal: v2 encrypt / decrypt
 -- ---------------------------------------------------------------------------
+
+-- | Sign a message using an already-decrypted key material, without a
+-- passphrase round-trip.
+signWithExtKeyMaterial ::
+  ByteArrayAccess msg =>
+  ExtKeyMaterial Validated ->
+  msg ->
+  IO (Either XPrvError Signature)
+signWithExtKeyMaterial extKeyMaterial msg =
+  withExtKeyMaterialPtr extKeyMaterial $ \extKeyMaterialPtr -> do
+    (status, sig) <-
+      B.allocRet signatureSize $ \outSig ->
+        withByteArray msg $ \msgPtr ->
+          wallet_sign
+            extKeyMaterialPtr
+            msgPtr
+            (fromIntegral @Int @CSize $ B.length msg)
+            (SignaturePtr outSig)
+    pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
 
 withDecryptedExtKeyMaterial ::
   ByteArrayAccess passphrase =>
