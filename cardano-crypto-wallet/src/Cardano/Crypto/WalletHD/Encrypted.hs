@@ -3,6 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeData #-}
@@ -320,16 +321,16 @@ type data Validity = Validated | Unchecked
 
 -- | Extended key material with the secret key in @sodium_malloc@'d locked memory, `PublicKey` `and
 -- ChainCode`.
-data ExtKeyMaterial (v :: Validity) = ExtKeyMaterial
+data ExtKeyMaterial s (v :: Validity) = ExtKeyMaterial
   { ekmSecretKey :: !SecretKey
   , ekmPublicKey :: !PublicKey
   , ekmChainCode :: !ChainCode
   }
 
-extKeyMaterialPublicKey :: ExtKeyMaterial Validated -> PublicKey
+extKeyMaterialPublicKey :: ExtKeyMaterial s Validated -> PublicKey
 extKeyMaterialPublicKey = ekmPublicKey
 
-extKeyMaterialChainCode :: ExtKeyMaterial Validated -> ChainCode
+extKeyMaterialChainCode :: ExtKeyMaterial s Validated -> ChainCode
 extKeyMaterialChainCode = ekmChainCode
 
 type KEY_MATERIAL_SIZE = SECRET_KEY_SIZE + PUBLIC_KEY_SIZE + CHAIN_CODE_SIZE
@@ -828,7 +829,7 @@ decodeAadFields = do
 -- passphrase round-trip.
 signWithExtKeyMaterial ::
   ByteArrayAccess msg =>
-  ExtKeyMaterial Validated ->
+  ExtKeyMaterial s Validated ->
   msg ->
   IO (Either XPrvError Signature)
 signWithExtKeyMaterial extKeyMaterial msg =
@@ -847,7 +848,7 @@ withDecryptedExtKeyMaterial ::
   ByteArrayAccess passphrase =>
   EncryptedKey ->
   passphrase ->
-  (ExtKeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 withDecryptedExtKeyMaterial ekey pass action =
   case encryptedKeyFormat ekey of
@@ -867,7 +868,7 @@ decryptExtKeyMaterialV2 ::
   SecretKey ->
   EncryptedKey ->
   passphrase ->
-  IO (Either XPrvError (ExtKeyMaterial Unchecked))
+  IO (Either XPrvError (ExtKeyMaterial s Unchecked))
 decryptExtKeyMaterialV2 secretKey eKey pass =
   case decodeEncryptedKey eKey of
     Left err -> pure (Left err)
@@ -903,7 +904,7 @@ decryptExtKeyMaterialV2 secretKey eKey pass =
 
 wrapExtKeyMaterial ::
   ByteArrayAccess passphrase =>
-  passphrase -> ExtKeyMaterial Validated -> IO (Either XPrvError EncryptedKey)
+  passphrase -> ExtKeyMaterial s Validated -> IO (Either XPrvError EncryptedKey)
 wrapExtKeyMaterial pass ExtKeyMaterial {ekmSecretKey, ekmPublicKey, ekmChainCode} = do
   eSalt <- fmap Salt <$> randomBytesIO
   eNonce <- fmap Nonce <$> randomBytesIO
@@ -947,7 +948,7 @@ wrapExtKeyMaterial pass ExtKeyMaterial {ekmSecretKey, ekmPublicKey, ekmChainCode
 
 -- | Verify that associated public key matches the secret key in the `ExtKeyMaterial`
 validateExtKeyMaterial ::
-  ExtKeyMaterial Unchecked -> IO (Either XPrvError (ExtKeyMaterial Validated))
+  ExtKeyMaterial s Unchecked -> IO (Either XPrvError (ExtKeyMaterial s Validated))
 validateExtKeyMaterial ExtKeyMaterial {..} =
   withSecretKeyPtr ekmSecretKey $ \secretKeyPtr -> do
     withPublicKeyPtr ekmPublicKey $ \publicKeyPtr -> do
@@ -964,7 +965,7 @@ validateExtKeyMaterial ExtKeyMaterial {..} =
 -- | Build a temporary 128-byte locked buffer (ekey || pkey || cc) from
 -- 'ExtKeyMaterial' and pass a pointer to it to the action.  The buffer is zeroed
 -- and freed when the action returns (normally or via exception).
-withExtKeyMaterialPtr :: ExtKeyMaterial v -> (ExtKeyMaterialPtr -> IO r) -> IO r
+withExtKeyMaterialPtr :: ExtKeyMaterial s v -> (ExtKeyMaterialPtr -> IO r) -> IO r
 withExtKeyMaterialPtr ExtKeyMaterial {ekmSecretKey, ekmPublicKey, ekmChainCode} action =
   allocaExtKeyMaterialBuffer $ \ptr@(ExtKeyMaterialPtr extKeyMaterialPtr) -> do
     withSecretKeyPtr ekmSecretKey $ \(SecretKeyPtr skPtr) ->
@@ -981,7 +982,7 @@ withExtKeyMaterialPtr ExtKeyMaterial {ekmSecretKey, ekmPublicKey, ekmChainCode} 
 withNewExtKeyMaterial ::
   XPrvError ->
   -- | Action that will use the newly populated `ExtKeyMaterial`
-  (ExtKeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   -- | Action that will populate `ExtKeyMaterialPtr` on the C-side, after which it
   -- will usable in the `ExtKeyMaterial` for the action above
   (ExtKeyMaterialPtr -> IO CInt) ->
@@ -1018,7 +1019,7 @@ legacyMaterialFromSecret ::
   (ByteArrayAccess secret, ByteArrayAccess cc) =>
   secret ->
   cc ->
-  (ExtKeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 legacyMaterialFromSecret sec cc action =
   withNewExtKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
@@ -1029,7 +1030,7 @@ legacyMaterialFromSecret sec cc action =
 legacyMaterialFromMasterKey ::
   ByteArrayAccess secret =>
   secret ->
-  (ExtKeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 legacyMaterialFromMasterKey sec action =
   withNewExtKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
@@ -1038,9 +1039,9 @@ legacyMaterialFromMasterKey sec action =
 
 deriveExtKeyMaterial ::
   DerivationScheme ->
-  ExtKeyMaterial Validated ->
+  ExtKeyMaterial s' Validated ->
   DerivationIndex ->
-  (ExtKeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 deriveExtKeyMaterial dscheme parent childIndex action =
   withExtKeyMaterialPtr parent $ \inPtr ->
