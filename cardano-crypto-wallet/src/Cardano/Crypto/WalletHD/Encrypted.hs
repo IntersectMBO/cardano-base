@@ -38,6 +38,14 @@ module Cardano.Crypto.WalletHD.Encrypted (
   publicKeyByteArray,
   publicKeyByteString,
 
+  -- ** Extended KeyMaterial
+  ExtKeyMaterial,
+  Validated,
+  extKeyMaterialPublicKey,
+  extKeyMaterialChainCode,
+  withDecryptedExtKeyMaterial,
+  deriveExtKeyMaterial,
+
   -- ** Encrypted SecretKey
   EncSecretKey,
   encSecretKeySize,
@@ -316,6 +324,12 @@ data ExtKeyMaterial (v :: Validity) = ExtKeyMaterial
   , ekmPublicKey :: !PublicKey
   , ekmChainCode :: !ChainCode
   }
+
+extKeyMaterialPublicKey :: ExtKeyMaterial Validated -> PublicKey
+extKeyMaterialPublicKey = ekmPublicKey
+
+extKeyMaterialChainCode :: ExtKeyMaterial Validated -> ChainCode
+extKeyMaterialChainCode = ekmChainCode
 
 type KEY_MATERIAL_SIZE = SECRET_KEY_SIZE + PUBLIC_KEY_SIZE + CHAIN_CODE_SIZE
 
@@ -669,7 +683,7 @@ encryptedDerivePrivate ::
   IO (Either XPrvError EncryptedKey)
 encryptedDerivePrivate dScheme eKey pass childIndex =
   withDecryptedExtKeyMaterial eKey pass $ \parentExtKeyMaterial ->
-    legacyDerivePrivate dScheme parentExtKeyMaterial childIndex (wrapExtKeyMaterial pass)
+    deriveExtKeyMaterial dScheme parentExtKeyMaterial childIndex (wrapExtKeyMaterial pass)
 
 encryptedDerivePublic ::
   DerivationScheme ->
@@ -1012,13 +1026,13 @@ legacyMaterialFromMasterKey sec action =
     withByteArray sec $ \psec ->
       wallet_new_from_mkg (MasterKeyPtr psec) outPtr
 
-legacyDerivePrivate ::
+deriveExtKeyMaterial ::
   DerivationScheme ->
   ExtKeyMaterial Validated ->
   DerivationIndex ->
   (ExtKeyMaterial Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
-legacyDerivePrivate dscheme parent childIndex action =
+deriveExtKeyMaterial dscheme parent childIndex action =
   withExtKeyMaterialPtr parent $ \inPtr ->
     withNewExtKeyMaterial XPrvInternalError action $ \outPtr ->
       wallet_derive_private inPtr childIndex outPtr (dschemeToC dscheme)
