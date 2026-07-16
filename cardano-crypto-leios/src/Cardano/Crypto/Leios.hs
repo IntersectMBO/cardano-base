@@ -27,8 +27,6 @@ module Cardano.Crypto.Leios (
   -- * Voting committee
   Weight,
   LeiosVoterId (..),
-  encodeLeiosVoterId,
-  decodeLeiosVoterId,
   LeiosVoter (..),
   LeiosCommittee (..),
   leiosCommitteeSize,
@@ -37,8 +35,6 @@ module Cardano.Crypto.Leios (
 
   -- * Leios certificates
   LeiosCert (..),
-  encodeLeiosCert,
-  decodeLeiosCert,
 
   -- ** Construction
   AggregationError (..),
@@ -49,17 +45,11 @@ module Cardano.Crypto.Leios (
   verifyLeiosCert,
 
   -- * Bitfield wire-format helpers
-  BitField,
-  encodeBitField,
-  decodeBitField,
+  BitField (..),
 ) where
 
-import Cardano.Base.Bytes (byteArrayFromByteString)
-import Cardano.Binary (matchSize, toCBOR)
 import Cardano.Binary.FixedSizeCodec (
   FixedSizeCodec (..),
-  decodeFixedSized,
-  encodeFixedSized,
   fixedSize,
  )
 import Cardano.Crypto.DSIGN (
@@ -71,10 +61,8 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
 import Cardano.Crypto.Util (SignableRepresentation)
-import Codec.CBOR.Decoding (Decoder, decodeBreakOr, decodeBytes, decodeListLenOrIndef, decodeWord16)
-import Codec.CBOR.Encoding (Encoding, encodeListLen, encodeWord16)
 import Control.DeepSeq (NFData)
-import Control.Monad (forM_, unless, when)
+import Control.Monad (forM_, when)
 import Data.Array.Byte (ByteArray)
 import Data.Bifunctor (first)
 import Data.Bits (setBit, shiftR, testBit, (.&.))
@@ -137,14 +125,6 @@ type Weight = Rational
 newtype LeiosVoterId = LeiosVoterId {leiosVoterIndex :: Word16}
   deriving stock (Eq, Ord, Show, Generic)
   deriving newtype (NFData, NoThunks)
-
--- | Plain CBOR encoder for 'LeiosVoterId'.
-encodeLeiosVoterId :: LeiosVoterId -> Encoding
-encodeLeiosVoterId (LeiosVoterId idx) = encodeWord16 idx
-
--- | Plain CBOR decoder for 'LeiosVoterId'.
-decodeLeiosVoterId :: Decoder s LeiosVoterId
-decodeLeiosVoterId = LeiosVoterId <$> decodeWord16
 
 -- | A single seat in a 'LeiosCommittee': a voter's normalised weight paired with
 -- its BLS verification key.
@@ -238,32 +218,6 @@ data LeiosCert = LeiosCert
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData, NoThunks)
-
--- | Plain CBOR encoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
-encodeLeiosCert :: LeiosCert -> Encoding
-encodeLeiosCert cert =
-  encodeListLen 2
-    <> encodeBitField cert.leiosCertSigners
-    <> encodeFixedSized cert.leiosCertSignature
-
--- | Plain CBOR decoder for 'LeiosCert', matching the CDDL in 'LeiosCert'.
--- Accepts both definite-length and indefinite-length encodings of the
--- outer 2-element array.
-decodeLeiosCert :: Decoder s LeiosCert
-decodeLeiosCert = do
-  isIndef <-
-    decodeListLenOrIndef >>= \case
-      Just n -> False <$ matchSize "LeiosCert" 2 n
-      Nothing -> pure True
-  cert <-
-    LeiosCert
-      <$> decodeBitField
-      <*> decodeFixedSized
-  when isIndef $ do
-    isBreak <- decodeBreakOr
-    unless isBreak $
-      fail "LeiosCert: expected break after 2 elements of indefinite-length list"
-  pure cert
 
 data AggregationError
   = -- | One or more voter indices in the sigs are past the committee bound.
@@ -411,11 +365,3 @@ newtype BitField = BitField {bitFieldBytes :: ByteArray}
   deriving stock (Show, Eq, Generic)
   deriving newtype (NFData)
   deriving (NoThunks) via OnlyCheckWhnfNamed "BitField" BitField
-
--- | Encode a 'BitField' to CBOR bytes.
-encodeBitField :: BitField -> Encoding
-encodeBitField = toCBOR . bitFieldBytes
-
--- | Decode a 'BitField' from CBOR bytes.
-decodeBitField :: Decoder s BitField
-decodeBitField = BitField . byteArrayFromByteString <$> decodeBytes
