@@ -40,7 +40,6 @@ library
     bytestring,
     cardano-binary,
     cardano-crypto-class >=2.5.1,
-    cborg,
     containers,
     deepseq,
     nothunks,
@@ -73,15 +72,12 @@ test-suite tests
 
   build-depends:
     QuickCheck,
-    base16-bytestring,
     bytestring,
     cardano-base:testlib,
-    cardano-binary >=1.9.1,
     cardano-crypto-class >=2.5.1,
     cardano-crypto-leios,
     containers,
     hspec,
-    hspec-golden,
     vector,
 
   ghc-options:

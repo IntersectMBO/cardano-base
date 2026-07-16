@@ -2,7 +2,13 @@
 
 ## 0.2.0.0
 
-* Remove `encodeLeiosCert`, `decodeLeiosCert`, `encodeBitField` and `decodeBitField`
+* Remove:
+  - `encodeLeiosCert`
+  - `decodeLeiosCert`
+  - `encodeLeiosVoterId`
+  - `decodeLeiosVoterId`
+  - `encodeBitField`
+  - `decodeBitField`
 * Export `BitField` constructor
 
 ## 0.1.0.1

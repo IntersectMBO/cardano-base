@@ -5,8 +5,6 @@
 
 module Test.Cardano.Crypto.Leios (spec, exampleCert) where
 
-import Cardano.Binary (Encoding)
-import qualified Cardano.Binary as CBOR
 import Cardano.Crypto.DSIGN (
   DSIGNAlgorithm (deriveVerKeyDSIGN),
   genKeyDSIGN,
@@ -25,8 +23,6 @@ import Cardano.Crypto.Leios (
   VerificationError (..),
   Weight,
   aggregateLeiosCert,
-  decodeLeiosVoterId,
-  encodeLeiosVoterId,
   getLeiosVoterId,
   leiosSignContext,
   resolveLeiosVoter,
@@ -34,9 +30,6 @@ import Cardano.Crypto.Leios (
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base16 as BS16
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.ByteString.Lazy as BSL
 import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty (..), fromList)
 import Data.Map.Strict (Map)
@@ -45,8 +38,7 @@ import Data.Proxy (Proxy (Proxy))
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import Test.Cardano.Base.Bytes (genByteString)
-import Test.Hspec (Spec, context, describe, it)
-import Test.Hspec.Golden (Golden (..))
+import Test.Hspec (Spec, context, describe)
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (
   Property,
@@ -74,32 +66,11 @@ spec = do
         prop "rejects a bitfield wider than the committee" prop_verifyLeiosCert_rejects_oversized_signers
         prop "rejects a tampered bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
 
-  describe "LeiosVoterId" $ do
-    prop "round-trips through CBOR" prop_roundtrip_VoterId
-    it "matches golden encoding" $
-      goldenEncoding "test/golden/LeiosVoterId" encodeLeiosVoterId exampleVoterId
-
   describe "LeiosCommittee" $ do
     prop
       "getLeiosVoterId and resolveLeiosVoter agree on verification keys"
       prop_resolveVoter_getVoterId_inverse
     prop "getLeiosVoterId returns the first matching index" prop_getVoterId_returns_first_index
-
--- | Pin the byte-for-byte CBOR encoding of a value to a golden file using
--- 'hspec-golden'. Failure diffs are rendered as base16 hex. Decode
--- round-trip of arbitrary values is covered by the matching @roundtrip_@
--- property; this only locks the encoding shape.
-goldenEncoding :: FilePath -> (a -> Encoding) -> a -> Golden BSL.ByteString
-goldenEncoding path enc value =
-  Golden
-    { output = CBOR.serialize (enc value)
-    , encodePretty = BS8.unpack . BS16.encode . BSL.toStrict
-    , writeToFile = BSL.writeFile
-    , readFromFile = BSL.readFile
-    , goldenFile = path
-    , actualFile = Nothing
-    , failFirstTime = False
-    }
 
 exampleCert :: LeiosCert
 exampleCert = case aggregateLeiosCert committee contributions of
@@ -110,15 +81,7 @@ exampleCert = case aggregateLeiosCert committee contributions of
     msg = "leios-golden-message" :: BS.ByteString
     contributions = signContribs msg (zip [0 ..] (toList sks))
 
--- * LeiosVoterId CBOR / committee lookup
-
-prop_roundtrip_VoterId :: Property
-prop_roundtrip_VoterId = forAll (LeiosVoterId <$> QC.arbitrary) $ \vid ->
-  let bs = CBOR.serialize (encodeLeiosVoterId vid)
-   in CBOR.decodeFullDecoder "LeiosVoterId" decodeLeiosVoterId bs === Right vid
-
-exampleVoterId :: LeiosVoterId
-exampleVoterId = LeiosVoterId 0xABCD
+-- * LeiosVoterId committee lookup
 
 -- | 'getLeiosVoterId' and 'resolveLeiosVoter' are mutual inverses on the verification
 -- key projection: for any voter in the committee, looking up its 'LeiosVoterId'

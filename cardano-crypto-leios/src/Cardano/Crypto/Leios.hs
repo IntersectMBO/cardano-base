@@ -27,8 +27,6 @@ module Cardano.Crypto.Leios (
   -- * Voting committee
   Weight,
   LeiosVoterId (..),
-  encodeLeiosVoterId,
-  decodeLeiosVoterId,
   LeiosVoter (..),
   LeiosCommittee (..),
   leiosCommitteeSize,
@@ -63,8 +61,6 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
 import Cardano.Crypto.Util (SignableRepresentation)
-import Codec.CBOR.Decoding (Decoder, decodeWord16)
-import Codec.CBOR.Encoding (Encoding, encodeWord16)
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when)
 import Data.Array.Byte (ByteArray)
@@ -129,14 +125,6 @@ type Weight = Rational
 newtype LeiosVoterId = LeiosVoterId {leiosVoterIndex :: Word16}
   deriving stock (Eq, Ord, Show, Generic)
   deriving newtype (NFData, NoThunks)
-
--- | Plain CBOR encoder for 'LeiosVoterId'.
-encodeLeiosVoterId :: LeiosVoterId -> Encoding
-encodeLeiosVoterId (LeiosVoterId idx) = encodeWord16 idx
-
--- | Plain CBOR decoder for 'LeiosVoterId'.
-decodeLeiosVoterId :: Decoder s LeiosVoterId
-decodeLeiosVoterId = LeiosVoterId <$> decodeWord16
 
 -- | A single seat in a 'LeiosCommittee': a voter's normalised weight paired with
 -- its BLS verification key.
