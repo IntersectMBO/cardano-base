@@ -5,8 +5,8 @@
 
 module Test.Cardano.Crypto.Leios (spec, exampleCert) where
 
+import Cardano.Binary (Encoding)
 import qualified Cardano.Binary as CBOR
-import Cardano.Binary.FixedSizeCodec (encodeFixedSized)
 import Cardano.Crypto.DSIGN (
   DSIGNAlgorithm (deriveVerKeyDSIGN),
   genKeyDSIGN,
@@ -25,10 +25,7 @@ import Cardano.Crypto.Leios (
   VerificationError (..),
   Weight,
   aggregateLeiosCert,
-  decodeLeiosCert,
   decodeLeiosVoterId,
-  encodeBitField,
-  encodeLeiosCert,
   encodeLeiosVoterId,
   getLeiosVoterId,
   leiosSignContext,
@@ -36,7 +33,6 @@ import Cardano.Crypto.Leios (
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
-import Codec.CBOR.Encoding (Encoding, encodeBreak, encodeListLenIndef)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Char8 as BS8
@@ -49,7 +45,6 @@ import Data.Proxy (Proxy (Proxy))
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import Test.Cardano.Base.Bytes (genByteString)
-import Test.Cardano.Crypto.Leios.Gen (genLeiosCert)
 import Test.Hspec (Spec, context, describe, it)
 import Test.Hspec.Golden (Golden (..))
 import Test.Hspec.QuickCheck (prop)
@@ -65,11 +60,6 @@ import qualified Test.QuickCheck as QC
 spec :: Spec
 spec = do
   describe "LeiosCert" $ do
-    prop "round-trips through CBOR" prop_roundtrip_LeiosCert
-    prop "decodes indefinite-length encoding" prop_decode_indefinite_LeiosCert
-    it "matches golden encoding" $
-      goldenEncoding "test/golden/LeiosCert" encodeLeiosCert exampleCert
-
     describe "aggregateLeiosCert" $ do
       prop "rejects an out-of-range LeiosVoterId" prop_aggregateLeiosCert_rejects_out_of_range
       prop "rejects empty contributions" prop_aggregateLeiosCert_rejects_empty
@@ -94,25 +84,6 @@ spec = do
       "getLeiosVoterId and resolveLeiosVoter agree on verification keys"
       prop_resolveVoter_getVoterId_inverse
     prop "getLeiosVoterId returns the first matching index" prop_getVoterId_returns_first_index
-
--- * CBOR roundtrip / golden
-
-prop_roundtrip_LeiosCert :: Property
-prop_roundtrip_LeiosCert = forAll genLeiosCert $ \cert ->
-  let bs = CBOR.serialize (encodeLeiosCert cert)
-   in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert bs === Right cert
-
--- | The decoder must accept indefinite-length encodings of the outer
--- 2-element array, not just the canonical definite-length form.
-prop_decode_indefinite_LeiosCert :: Property
-prop_decode_indefinite_LeiosCert = forAll genLeiosCert $ \cert ->
-  let indef =
-        encodeListLenIndef
-          <> encodeBitField (leiosCertSigners cert)
-          <> encodeFixedSized (leiosCertSignature cert)
-          <> encodeBreak
-   in CBOR.decodeFullDecoder "LeiosCert" decodeLeiosCert (CBOR.serialize indef)
-        === Right cert
 
 -- | Pin the byte-for-byte CBOR encoding of a value to a golden file using
 -- 'hspec-golden'. Failure diffs are rendered as base16 hex. Decode
