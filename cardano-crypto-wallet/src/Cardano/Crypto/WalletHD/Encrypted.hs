@@ -3,6 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeData #-}
@@ -37,6 +38,15 @@ module Cardano.Crypto.WalletHD.Encrypted (
   mkPublicKey,
   publicKeyByteArray,
   publicKeyByteString,
+
+  -- ** Extended KeyMaterial
+  ExtKeyMaterial,
+  Validated,
+  extKeyMaterialPublicKey,
+  extKeyMaterialChainCode,
+  withDecryptedExtKeyMaterial,
+  deriveExtKeyMaterial,
+  signWithExtKeyMaterial,
 
   -- ** Encrypted SecretKey
   EncSecretKey,
@@ -309,25 +319,32 @@ encodeChainCode = toCBOR . psbToByteArray . unChainCode
 
 type data Validity = Validated | Unchecked
 
--- | Key material with the secret key in @sodium_malloc@'d locked memory.
-data KeyMaterial (v :: Validity) = KeyMaterial
-  { kmSecretKey :: !SecretKey
-  , kmPublicKey :: !PublicKey
-  , kmChainCode :: !ChainCode
+-- | Extended key material with the secret key in @sodium_malloc@'d locked memory, `PublicKey` `and
+-- ChainCode`.
+data ExtKeyMaterial s (v :: Validity) = ExtKeyMaterial
+  { ekmSecretKey :: !SecretKey
+  , ekmPublicKey :: !PublicKey
+  , ekmChainCode :: !ChainCode
   }
+
+extKeyMaterialPublicKey :: ExtKeyMaterial s Validated -> PublicKey
+extKeyMaterialPublicKey = ekmPublicKey
+
+extKeyMaterialChainCode :: ExtKeyMaterial s Validated -> ChainCode
+extKeyMaterialChainCode = ekmChainCode
 
 type KEY_MATERIAL_SIZE = SECRET_KEY_SIZE + PUBLIC_KEY_SIZE + CHAIN_CODE_SIZE
 
-keyMaterialSize :: Int
-keyMaterialSize = fromInteger (natVal (Proxy @KEY_MATERIAL_SIZE))
+extKeyMaterialSize :: Int
+extKeyMaterialSize = fromInteger (natVal (Proxy @KEY_MATERIAL_SIZE))
 
-newtype KeyMaterialBuffer = KeyMaterialBuffer (MLockedSizedBytes KEY_MATERIAL_SIZE)
-newtype KeyMaterialPtr = KeyMaterialPtr (Ptr Word8)
+newtype ExtKeyMaterialBuffer = ExtKeyMaterialBuffer (MLockedSizedBytes KEY_MATERIAL_SIZE)
+newtype ExtKeyMaterialPtr = ExtKeyMaterialPtr (Ptr Word8)
 
-allocaKeyMaterialBuffer :: (KeyMaterialPtr -> IO c) -> IO c
-allocaKeyMaterialBuffer action =
-  mlsbCreate KeyMaterialBuffer $ \(KeyMaterialBuffer keyMaterialBuffer) ->
-    mlsbUseAsCPtr keyMaterialBuffer (action . KeyMaterialPtr)
+allocaExtKeyMaterialBuffer :: (ExtKeyMaterialPtr -> IO c) -> IO c
+allocaExtKeyMaterialBuffer action =
+  mlsbCreate ExtKeyMaterialBuffer $ \(ExtKeyMaterialBuffer extKeyMaterialBuffer) ->
+    mlsbUseAsCPtr extKeyMaterialBuffer (action . ExtKeyMaterialPtr)
 
 -- ---------------------------------------------------------------------------
 -- V2 envelope constants
@@ -610,7 +627,7 @@ validateSerializedKey eKey =
 
 encryptedKeyFormat :: EncryptedKey -> XPrvFormat
 encryptedKeyFormat (EncryptedKey bs)
-  | BS.length bs == keyMaterialSize = LegacyV1
+  | BS.length bs == extKeyMaterialSize = LegacyV1
   | otherwise = EnvelopeV2
 
 unEncryptedKey :: EncryptedKey -> ByteString
@@ -622,42 +639,32 @@ encryptedCreate ::
 encryptedCreate sec pass cc
   | B.length sec /= 32 = pure (Left XPrvInvalidSecretKey)
   | B.length cc /= chainCodeSize = pure (Left XPrvInvalidChainCode)
-  | otherwise = legacyMaterialFromSecret sec cc (wrapKeyMaterial pass)
+  | otherwise = legacyMaterialFromSecret sec cc (wrapExtKeyMaterial pass)
 
 encryptedCreateDirectWithTweak ::
   (ByteArrayAccess passphrase, ByteArrayAccess secret) =>
   secret -> passphrase -> IO (Either XPrvError EncryptedKey)
 encryptedCreateDirectWithTweak sec pass
   | B.length sec /= 96 = pure (Left XPrvInvalidSecretKey)
-  | otherwise = legacyMaterialFromMasterKey sec (wrapKeyMaterial pass)
+  | otherwise = legacyMaterialFromMasterKey sec (wrapExtKeyMaterial pass)
 
 encryptedValidatePassphrase ::
   ByteArrayAccess passphrase =>
   EncryptedKey -> passphrase -> IO (Either XPrvError ())
 encryptedValidatePassphrase eKey pass =
-  withDecryptedKeyMaterial eKey pass (\_ -> pure $ Right ())
+  withDecryptedExtKeyMaterial eKey pass (\_ -> pure $ Right ())
 
 encryptedChangePassphrase ::
   (ByteArrayAccess oldPassPhrase, ByteArrayAccess newPassPhrase) =>
   oldPassPhrase -> newPassPhrase -> EncryptedKey -> IO (Either XPrvError EncryptedKey)
 encryptedChangePassphrase oldPass newPass eKey =
-  withDecryptedKeyMaterial eKey oldPass (wrapKeyMaterial newPass)
+  withDecryptedExtKeyMaterial eKey oldPass (wrapExtKeyMaterial newPass)
 
 encryptedSign ::
   (ByteArrayAccess passphrase, ByteArrayAccess msg) =>
   EncryptedKey -> passphrase -> msg -> IO (Either XPrvError Signature)
 encryptedSign eKey pass msg =
-  withDecryptedKeyMaterial eKey pass $ \keyMaterial ->
-    withKeyMaterialPtr keyMaterial $ \keyMaterialPtr -> do
-      (status, sig) <-
-        B.allocRet signatureSize $ \outSig ->
-          withByteArray msg $ \msgPtr ->
-            wallet_sign
-              keyMaterialPtr
-              msgPtr
-              (fromIntegral @Int @CSize $ B.length msg)
-              (SignaturePtr outSig)
-      pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
+  withDecryptedExtKeyMaterial eKey pass (`signWithExtKeyMaterial` msg)
 
 encryptedDerivePrivate ::
   ByteArrayAccess passphrase =>
@@ -667,8 +674,8 @@ encryptedDerivePrivate ::
   DerivationIndex ->
   IO (Either XPrvError EncryptedKey)
 encryptedDerivePrivate dScheme eKey pass childIndex =
-  withDecryptedKeyMaterial eKey pass $ \parentKeyMaterial ->
-    legacyDerivePrivate dScheme parentKeyMaterial childIndex (wrapKeyMaterial pass)
+  withDecryptedExtKeyMaterial eKey pass $ \parentExtKeyMaterial ->
+    deriveExtKeyMaterial dScheme parentExtKeyMaterial childIndex (wrapExtKeyMaterial pass)
 
 encryptedDerivePublic ::
   DerivationScheme ->
@@ -818,32 +825,51 @@ decodeAadFields = do
 -- Internal: v2 encrypt / decrypt
 -- ---------------------------------------------------------------------------
 
-withDecryptedKeyMaterial ::
+-- | Sign a message using an already-decrypted key material, without a
+-- passphrase round-trip.
+signWithExtKeyMaterial ::
+  ByteArrayAccess msg =>
+  ExtKeyMaterial s Validated ->
+  msg ->
+  IO (Either XPrvError Signature)
+signWithExtKeyMaterial extKeyMaterial msg =
+  withExtKeyMaterialPtr extKeyMaterial $ \extKeyMaterialPtr -> do
+    (status, sig) <-
+      B.allocRet signatureSize $ \outSig ->
+        withByteArray msg $ \msgPtr ->
+          wallet_sign
+            extKeyMaterialPtr
+            msgPtr
+            (fromIntegral @Int @CSize $ B.length msg)
+            (SignaturePtr outSig)
+    pure (if status /= 0 then Left XPrvInternalError else Right (Signature sig))
+
+withDecryptedExtKeyMaterial ::
   ByteArrayAccess passphrase =>
   EncryptedKey ->
   passphrase ->
-  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
-withDecryptedKeyMaterial ekey pass action =
+withDecryptedExtKeyMaterial ekey pass action =
   case encryptedKeyFormat ekey of
     LegacyV1 -> pure (Left XPrvDecodeError)
     EnvelopeV2 ->
       mlsbCreate SecretKey $ \secretKey ->
-        decryptKeyMaterialV2 secretKey ekey pass >>= \case
+        decryptExtKeyMaterialV2 secretKey ekey pass >>= \case
           Left err -> pure $ Left err
-          Right uncheckedKeyMaterial ->
-            validateKeyMaterial uncheckedKeyMaterial >>= \case
+          Right uncheckedExtKeyMaterial ->
+            validateExtKeyMaterial uncheckedExtKeyMaterial >>= \case
               Left err -> pure $ Left err
-              Right keyMaterial -> action keyMaterial
+              Right extKeyMaterial -> action extKeyMaterial
 
-decryptKeyMaterialV2 ::
+decryptExtKeyMaterialV2 ::
   ByteArrayAccess passphrase =>
   -- | Empty SecretKey that will be populated from EncryptedKey
   SecretKey ->
   EncryptedKey ->
   passphrase ->
-  IO (Either XPrvError (KeyMaterial Unchecked))
-decryptKeyMaterialV2 secretKey eKey pass =
+  IO (Either XPrvError (ExtKeyMaterial s Unchecked))
+decryptExtKeyMaterialV2 secretKey eKey pass =
   case decodeEncryptedKey eKey of
     Left err -> pure (Left err)
     Right envelope -> do
@@ -870,24 +896,24 @@ decryptKeyMaterialV2 secretKey eKey pass =
           else
             pure $
               Right $
-                KeyMaterial
-                  { kmSecretKey = secretKey
-                  , kmPublicKey = ePublicKey envelope
-                  , kmChainCode = eChainCode envelope
+                ExtKeyMaterial
+                  { ekmSecretKey = secretKey
+                  , ekmPublicKey = ePublicKey envelope
+                  , ekmChainCode = eChainCode envelope
                   }
 
-wrapKeyMaterial ::
+wrapExtKeyMaterial ::
   ByteArrayAccess passphrase =>
-  passphrase -> KeyMaterial Validated -> IO (Either XPrvError EncryptedKey)
-wrapKeyMaterial pass KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} = do
+  passphrase -> ExtKeyMaterial s Validated -> IO (Either XPrvError EncryptedKey)
+wrapExtKeyMaterial pass ExtKeyMaterial {ekmSecretKey, ekmPublicKey, ekmChainCode} = do
   eSalt <- fmap Salt <$> randomBytesIO
   eNonce <- fmap Nonce <$> randomBytesIO
   case (,) <$> eSalt <*> eNonce of
     Left err -> pure (Left err)
     Right (salt, nonce) -> do
       withWrappingKey pass salt $ \wrappingKey -> do
-        let aad = encodeAad kmPublicKey kmChainCode
-        withSecretKeyPtr kmSecretKey $ \skPtr -> do
+        let aad = encodeAad ekmPublicKey ekmChainCode
+        withSecretKeyPtr ekmSecretKey $ \skPtr -> do
           (encSecretKey, (tag, status)) <-
             fmap (first EncSecretKey) $ psbCreateResult $ \outEncSecretKey ->
               fmap (first Tag) $ psbCreateResult $ \outTagPtr ->
@@ -914,55 +940,56 @@ wrapKeyMaterial pass KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} = do
                         Envelope
                           { eSalt = salt
                           , eNonce = nonce
-                          , ePublicKey = kmPublicKey
-                          , eChainCode = kmChainCode
+                          , ePublicKey = ekmPublicKey
+                          , eChainCode = ekmChainCode
                           , eEncSecretKey = encSecretKey
                           , eTag = tag
                           }
 
--- | Verify that associated public key matches the secret key in the `KeyMaterial`
-validateKeyMaterial :: KeyMaterial Unchecked -> IO (Either XPrvError (KeyMaterial Validated))
-validateKeyMaterial KeyMaterial {..} =
-  withSecretKeyPtr kmSecretKey $ \secretKeyPtr -> do
-    withPublicKeyPtr kmPublicKey $ \publicKeyPtr -> do
+-- | Verify that associated public key matches the secret key in the `ExtKeyMaterial`
+validateExtKeyMaterial ::
+  ExtKeyMaterial s Unchecked -> IO (Either XPrvError (ExtKeyMaterial s Validated))
+validateExtKeyMaterial ExtKeyMaterial {..} =
+  withSecretKeyPtr ekmSecretKey $ \secretKeyPtr -> do
+    withPublicKeyPtr ekmPublicKey $ \publicKeyPtr -> do
       r <- wallet_validate secretKeyPtr publicKeyPtr
       pure $
         if r /= 0
           then Left XPrvPublicKeyMismatch
-          else Right (KeyMaterial {..})
+          else Right (ExtKeyMaterial {..})
 
 -- ---------------------------------------------------------------------------
 -- Internal: locked memory helpers
 -- ---------------------------------------------------------------------------
 
 -- | Build a temporary 128-byte locked buffer (ekey || pkey || cc) from
--- 'KeyMaterial' and pass a pointer to it to the action.  The buffer is zeroed
+-- 'ExtKeyMaterial' and pass a pointer to it to the action.  The buffer is zeroed
 -- and freed when the action returns (normally or via exception).
-withKeyMaterialPtr :: KeyMaterial v -> (KeyMaterialPtr -> IO r) -> IO r
-withKeyMaterialPtr KeyMaterial {kmSecretKey, kmPublicKey, kmChainCode} action =
-  allocaKeyMaterialBuffer $ \ptr@(KeyMaterialPtr keyMaterialPtr) -> do
-    withSecretKeyPtr kmSecretKey $ \(SecretKeyPtr skPtr) ->
-      copyBytes keyMaterialPtr skPtr secretKeySize
-    withPublicKeyPtr kmPublicKey $ \(PublicKeyPtr pkPtr) ->
-      copyBytes (keyMaterialPtr `plusPtr` secretKeySize) pkPtr publicKeySize
-    withChainCodePtr kmChainCode $ \(ChainCodePtr ccPtr) ->
-      copyBytes (keyMaterialPtr `plusPtr` (secretKeySize + publicKeySize)) ccPtr chainCodeSize
+withExtKeyMaterialPtr :: ExtKeyMaterial s v -> (ExtKeyMaterialPtr -> IO r) -> IO r
+withExtKeyMaterialPtr ExtKeyMaterial {ekmSecretKey, ekmPublicKey, ekmChainCode} action =
+  allocaExtKeyMaterialBuffer $ \ptr@(ExtKeyMaterialPtr extKeyMaterialPtr) -> do
+    withSecretKeyPtr ekmSecretKey $ \(SecretKeyPtr skPtr) ->
+      copyBytes extKeyMaterialPtr skPtr secretKeySize
+    withPublicKeyPtr ekmPublicKey $ \(PublicKeyPtr pkPtr) ->
+      copyBytes (extKeyMaterialPtr `plusPtr` secretKeySize) pkPtr publicKeySize
+    withChainCodePtr ekmChainCode $ \(ChainCodePtr ccPtr) ->
+      copyBytes (extKeyMaterialPtr `plusPtr` (secretKeySize + publicKeySize)) ccPtr chainCodeSize
     action ptr
 
 -- | Call a C function that writes a 128-byte @encrypted_key@ struct to the
--- pointer it receives, then split the result into 'KeyMaterial'.  On failure
+-- pointer it receives, then split the result into 'ExtKeyMaterial'.  On failure
 -- (non-zero return) returns 'Left onFailure'.
-withNewKeyMaterial ::
+withNewExtKeyMaterial ::
   XPrvError ->
-  -- | Action that will use the newly populated `KeyMaterial`
-  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
-  -- | Action that will populate `KeyMaterialPtr` on the C-side, after which it
-  -- will usable in the `KeyMaterial` for the action above
-  (KeyMaterialPtr -> IO CInt) ->
+  -- | Action that will use the newly populated `ExtKeyMaterial`
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
+  -- | Action that will populate `ExtKeyMaterialPtr` on the C-side, after which it
+  -- will usable in the `ExtKeyMaterial` for the action above
+  (ExtKeyMaterialPtr -> IO CInt) ->
   IO (Either XPrvError a)
-withNewKeyMaterial onFailure keyMaterialAction fillKeyMaterialPtrAction =
-  allocaKeyMaterialBuffer $ \keyMaterialPtr@(KeyMaterialPtr inPtr) -> do
-    r <- fillKeyMaterialPtrAction keyMaterialPtr
+withNewExtKeyMaterial onFailure extKeyMaterialAction fillExtKeyMaterialPtrAction =
+  allocaExtKeyMaterialBuffer $ \extKeyMaterialPtr@(ExtKeyMaterialPtr inPtr) -> do
+    r <- fillExtKeyMaterialPtrAction extKeyMaterialPtr
     if r /= 0
       then pure (Left onFailure)
       else mlsbCreate SecretKey $ \secretKey -> do
@@ -973,16 +1000,16 @@ withNewKeyMaterial onFailure keyMaterialAction fillKeyMaterialPtrAction =
         chainCode <-
           psbCreate $ \ccPtr ->
             copyBytes ccPtr (inPtr `plusPtr` (secretKeySize + publicKeySize)) chainCodeSize
-        eKeyMaterial <-
-          validateKeyMaterial $
-            KeyMaterial
-              { kmSecretKey = secretKey
-              , kmPublicKey = PublicKey publicKey
-              , kmChainCode = ChainCode chainCode
+        eExtKeyMaterial <-
+          validateExtKeyMaterial $
+            ExtKeyMaterial
+              { ekmSecretKey = secretKey
+              , ekmPublicKey = PublicKey publicKey
+              , ekmChainCode = ChainCode chainCode
               }
-        case eKeyMaterial of
+        case eExtKeyMaterial of
           Left err -> pure $ Left err
-          Right keyMaterial -> keyMaterialAction keyMaterial
+          Right extKeyMaterial -> extKeyMaterialAction extKeyMaterial
 
 -- ---------------------------------------------------------------------------
 -- Internal: key-material construction (using C/ed25519)
@@ -992,10 +1019,10 @@ legacyMaterialFromSecret ::
   (ByteArrayAccess secret, ByteArrayAccess cc) =>
   secret ->
   cc ->
-  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 legacyMaterialFromSecret sec cc action =
-  withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
+  withNewExtKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
       withByteArray cc $ \pcc ->
         wallet_from_secret (coerce psec) (coerce pcc) outPtr
@@ -1003,22 +1030,22 @@ legacyMaterialFromSecret sec cc action =
 legacyMaterialFromMasterKey ::
   ByteArrayAccess secret =>
   secret ->
-  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
 legacyMaterialFromMasterKey sec action =
-  withNewKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
+  withNewExtKeyMaterial XPrvInvalidSecretKey action $ \outPtr ->
     withByteArray sec $ \psec ->
       wallet_new_from_mkg (MasterKeyPtr psec) outPtr
 
-legacyDerivePrivate ::
+deriveExtKeyMaterial ::
   DerivationScheme ->
-  KeyMaterial Validated ->
+  ExtKeyMaterial s' Validated ->
   DerivationIndex ->
-  (KeyMaterial Validated -> IO (Either XPrvError a)) ->
+  (forall s. ExtKeyMaterial s Validated -> IO (Either XPrvError a)) ->
   IO (Either XPrvError a)
-legacyDerivePrivate dscheme parent childIndex action =
-  withKeyMaterialPtr parent $ \inPtr ->
-    withNewKeyMaterial XPrvInternalError action $ \outPtr ->
+deriveExtKeyMaterial dscheme parent childIndex action =
+  withExtKeyMaterialPtr parent $ \inPtr ->
+    withNewExtKeyMaterial XPrvInternalError action $ \outPtr ->
       wallet_derive_private inPtr childIndex outPtr (dschemeToC dscheme)
 
 -- ---------------------------------------------------------------------------
@@ -1096,13 +1123,13 @@ foreign import ccall "cardano_crypto_wallet_from_secret"
   wallet_from_secret ::
     SecretKeyPtr ->
     ChainCodePtr ->
-    KeyMaterialPtr ->
+    ExtKeyMaterialPtr ->
     IO CInt
 
 foreign import ccall "cardano_crypto_wallet_new_from_mkg"
   wallet_new_from_mkg ::
     MasterKeyPtr ->
-    KeyMaterialPtr ->
+    ExtKeyMaterialPtr ->
     IO CInt
 
 foreign import ccall "cardano_crypto_wallet_validate"
@@ -1113,7 +1140,7 @@ foreign import ccall "cardano_crypto_wallet_validate"
 
 foreign import ccall "cardano_crypto_wallet_sign"
   wallet_sign ::
-    KeyMaterialPtr ->
+    ExtKeyMaterialPtr ->
     Ptr Word8 ->
     CSize ->
     SignaturePtr ->
@@ -1121,9 +1148,9 @@ foreign import ccall "cardano_crypto_wallet_sign"
 
 foreign import ccall "cardano_crypto_wallet_derive_private"
   wallet_derive_private ::
-    KeyMaterialPtr ->
+    ExtKeyMaterialPtr ->
     DerivationIndex ->
-    KeyMaterialPtr ->
+    ExtKeyMaterialPtr ->
     CDerivationScheme ->
     IO CInt
 

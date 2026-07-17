@@ -2,6 +2,9 @@
 
 ## 0.2.0.0
 
+* Expose `ExtKeyMaterial`, `Validated`, `withDecryptedExtKeyMaterial` and `deriveExtKeyMaterial`
+* Add `extKeyMaterialPublicKey` and `extKeyMaterialChainCode`
+* Add `signWithExtKeyMaterial`
 * Breaking: `encryptedDerivePublic` now returns `Either XPrvError (PublicKey, ChainCode)`
   instead of throwing on hardened indices.
 * Breaking: `XPrvHardenedDerivationUnsupported` constructor added to `XPrvError`.
