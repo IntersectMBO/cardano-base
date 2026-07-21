@@ -1,8 +1,9 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.5.1.1
+## 2.6.0.0
 
-*
+* Replace memory dependency with ram (drop in replacement)
+* Depend on crypton ^>- 1.1
 
 ## 2.5.1.0
 

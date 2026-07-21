@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-crypto-class
-version: 2.5.1.0
+version: 2.6.0.0
 synopsis:
   Type classes abstracting over cryptography primitives for Cardano
 
@@ -128,16 +128,16 @@ library
     cardano-base >=0.1.6,
     cardano-binary >=1.9.1,
     cardano-strict-containers,
-    crypton ^>=1.0,
+    crypton ^>=1.1,
     deepseq,
     heapwords,
     io-classes >=1.4.1,
-    memory,
     memory-pool,
     mempack,
     mtl,
     nothunks,
     primitive >=0.8,
+    ram,
     template-haskell,
     text,
     th-compat,

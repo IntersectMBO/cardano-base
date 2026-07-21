@@ -11,8 +11,8 @@ repository cardano-haskell-packages
 
 -- The index-states
 index-state:
-  , hackage.haskell.org 2026-05-07T19:55:27Z
-  , cardano-haskell-packages 2026-05-20T06:15:42Z
+  , hackage.haskell.org 2026-07-19T18:15:41Z
+  , cardano-haskell-packages 2026-07-17T14:40:55Z
 
 packages:
   base-deriving-via
@@ -46,15 +46,10 @@ package bitvec
 -- cabal-allow-newer begin
 if impl(ghc >=9.14)
   allow-newer:
-    , boring:base
     , canonical-json:containers
     , cborg:base
     , cborg:containers
     , serialise:base
     , serialise:containers
     , serialise:time
-    , tree-diff:QuickCheck
-    , tree-diff:base
-    , tree-diff:containers
-    , tree-diff:time
 -- cabal-allow-newer end
