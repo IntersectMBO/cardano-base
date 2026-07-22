@@ -60,6 +60,14 @@ flag external-libsodium-vrf
   default: True
   manual: True
 
+flag use-haskell-clibs
+  description:
+    Use Haskell *-clib packages (sodium-clib) instead of system-provided C
+    libraries via pkg-config. Don't enable this flag when building cardano-node!
+    It is there for less sensitive clients, such as Plinth.
+  default: False
+  manual: True
+
 common base
   build-depends: base >=4.18 && <5
 
@@ -91,7 +99,11 @@ library
     nothunks,
     primitive,
 
-  pkgconfig-depends: libsodium
+  if flag(use-haskell-clibs)
+    build-depends: sodium-clib
+    ghc-options: -Wno-unused-packages
+  else
+    pkgconfig-depends: libsodium
 
   if !flag(external-libsodium-vrf)
     c-sources:
