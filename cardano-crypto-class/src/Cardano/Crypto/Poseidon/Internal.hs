@@ -1,0 +1,102 @@
+-- | Low-level bindings to the vendored Poseidon permutation.
+--
+-- The C implementation (@cbits\/poseidon.c@, taken from Nomadic Labs'
+-- @ocaml-bls12-381-hash@) implements __only the Poseidon permutation__ over
+-- the BLS12-381 scalar field: no sponge construction, no hashing API, no
+-- memory allocation and __no input validation whatsoever__. This module owns
+-- all of that. Everything below is part of the C contract and is
+-- load-bearing for correctness; each fact is enforced or consumed at a
+-- specific place in this module and in @cbits\/poseidon_util.c@.
+--
+-- == Buffer layout
+--
+-- @poseidon_ctxt_t.state@ points to a __single contiguous array__ of
+-- @blst_fr@ elements laid out as
+--
+-- @
+-- [ state: w elements | MDS matrix: w×w elements, row-major | round constants: N elements ]
+-- @
+--
+-- The MDS matrix comes immediately after the state
+-- (@poseidon_get_mds_from_context@ returns @state + w@) and the round
+-- constants immediately after the MDS
+-- (@poseidon_get_round_constants_from_context@ returns @state + w + w²@).
+-- Getting this order wrong produces silently wrong digests. The layout is
+-- encoded exactly once, in @poseidon_ctxt_new@ (@cbits\/poseidon_util.c@);
+-- Haskell code never computes region offsets itself, it asks the C accessors.
+--
+-- == Montgomery form
+--
+-- @blst_fr@ is 32 bytes (4 × @uint64@) in __Montgomery representation__, not
+-- a plain little-endian integer. Every value written into the buffer — state
+-- inputs, MDS entries, round constants — must go through the existing
+-- conversion path in "Cardano.Crypto.EllipticCurve.BLS12_381.Internal"
+-- (@scalarFromInteger@ then @frFromScalar@); outputs must be read back via
+-- @scalarFromFr@ \/ @scalarToInteger@. Writing raw integer limbs would not
+-- crash — it would produce wrong digests.
+--
+-- == Constant consumption
+--
+-- The permutation (@poseidon_apply_permutation@) consumes the constants
+-- region strictly sequentially: one ARK (add-round-key) of @w@ constants up
+-- front, then @R_F\/2@ full rounds (x⁵ S-box on every element, MDS multiply,
+-- ARK), then the partial rounds (S-box on the __last__ state element only),
+-- then @R_F\/2@ more full rounds. The exact number of constants consumed is
+-- returned by @poseidon_compute_number_of_constants@; the binding asserts
+-- that the constants it supplies match this count instead of trusting a
+-- hardcoded number.
+--
+-- == Zero padding
+--
+-- The final constant addition consumes @w@ constants that must be __zero__:
+-- the algorithm has no ARK in the last round, and the C implementation pads
+-- with zero constants instead of branching.
+-- @poseidon_compute_number_of_constants@ already includes these @w@ trailing
+-- zeros in its count. The constants region is therefore the raw ARK
+-- constants followed by @w@ zero field elements; @poseidon_ctxt_new@
+-- zero-allocates the buffer (@calloc@) so the padding holds without relying
+-- on uninitialized memory.
+--
+-- == Batched partial rounds — deliberately disabled
+--
+-- The C supports an optimization (the \"linear trick\" of
+-- <https://eprint.iacr.org/2022/462 eprint 2022\/462>, §4.2) that flattens
+-- groups of @batch_size@ partial rounds. The constants for batched sections
+-- are /composed/ coefficients derived from the MDS and the ARK constants —
+-- __not__ the raw ARK constants. Supplying raw ARK constants while a batch
+-- is active (@batch_size <= R_P@) produces garbage output, and — because a
+-- batched configuration needs /more/ constants than the raw count — a heap
+-- out-of-bounds read.
+--
+-- This binding therefore sets @batch_size = R_P + 1@, so that
+-- @R_P \`div\` batch_size == 0@ and every partial round takes the plain
+-- (unbatched) path, which consumes exactly the raw ARK constants. This has
+-- been verified empirically: the unbatched configuration reproduces the
+-- reference test vector, the batched configuration with raw constants does
+-- not. A future optimization may implement the constant composition and
+-- lower @batch_size@; until then, treat any @batch_size <= R_P@ as a bug.
+--
+-- == Parameter validation
+--
+-- The C validates nothing, so @poseidon_ctxt_new@ (our helper in
+-- @cbits\/poseidon_util.c@) rejects, returning @NULL@:
+--
+-- * @batch_size < 1@ — division by zero and a negative-length VLA in the C
+--   (undefined behavior);
+-- * odd @R_F@ — the permutation runs @R_F \`div\` 2@ full rounds twice, i.e.
+--   one round fewer than the constant count assumes (silently wrong digest);
+-- * @w < 2@ — no capacity\/rate split, degenerate instance;
+-- * negative counts, and parameters above a documented overflow guard.
+--
+-- == ABI handling
+--
+-- @poseidon_ctxt_t@ is a pointer followed by four @int@s. Its layout is
+-- __never__ replicated as hand-written byte offsets in Haskell; contexts are
+-- created and freed only via the C helpers @poseidon_ctxt_new@ \/
+-- @poseidon_ctxt_free@, and fields are read via the @poseidon_get_*@
+-- accessors. @cbits\/poseidon_util.c@ carries a @static_assert@ tying
+-- @sizeof(blst_fr)@ to the @CARDANO_BLST_FR_SIZE@ constant used by the
+-- Haskell marshalling, following the @cbits\/blst_util.c@ pattern.
+module Cardano.Crypto.Poseidon.Internal (
+
+) where
