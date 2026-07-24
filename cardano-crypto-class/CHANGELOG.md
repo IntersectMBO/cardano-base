@@ -4,6 +4,17 @@
 
 * Replace memory dependency with ram (drop in replacement)
 * Depend on crypton ^>- 1.1
+* Add bindings to the Poseidon permutation over the BLS12-381 scalar field
+  (vendored from Nomadic Labs' `ocaml-bls12-381-hash` C implementation),
+  intended to back a future Plutus builtin:
+  - `Cardano.Crypto.Poseidon` with `poseidonPermutation` (full-state
+    permutation selected by an append-only variant registry index; input is
+    validated, never padded) and `poseidonPermutationInteger` (the
+    `Integer` boundary with mod-r reduction semantics)
+  - `Cardano.Crypto.Poseidon.Constants` with the width-3 / 128-bit-security
+    instance as registry index 0
+  - `Cardano.Crypto.Poseidon.Internal` with the FFI bindings and the
+    documented C contract
 
 ## 2.5.1.0
 

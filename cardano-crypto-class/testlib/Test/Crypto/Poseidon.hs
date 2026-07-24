@@ -83,6 +83,9 @@ foreign import ccall unsafe "poseidon_compute_number_of_constants"
     CInt ->
     CInt
 
+-- | All Poseidon tests: constants invariants, Internal-level binding tests
+-- (acceptance vector, differential property against the reference
+-- implementation, rejections), and the public API tests.
 tests :: Spec
 tests =
   describe "Crypto.Poseidon" $ do
