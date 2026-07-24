@@ -30,6 +30,10 @@ import Cardano.Crypto.Poseidon (
   poseidonPermutation,
   poseidonPermutationInteger,
  )
+import Cardano.Crypto.Poseidon.Batching (
+  computeConstantsRegion,
+  width3_128bitBatch3Region,
+ )
 import Cardano.Crypto.Poseidon.Constants (
   PoseidonInstance (..),
   batchSize,
@@ -39,6 +43,8 @@ import Cardano.Crypto.Poseidon.Constants (
 import Cardano.Crypto.Poseidon.Internal (
   PoseidonTemplate,
   newPoseidonTemplate,
+  newPoseidonTemplateWithBatchSize,
+  newPoseidonTemplateWithRegion,
   poseidonPermute,
  )
 import qualified Data.ByteString.Base16 as Base16
@@ -57,6 +63,8 @@ import Test.QuickCheck (
   Gen,
   arbitrary,
   choose,
+  conjoin,
+  counterexample,
   elements,
   forAll,
   frequency,
@@ -175,6 +183,81 @@ tests =
         r1 <- frsToIntegers out1
         r2 <- frsToIntegers out2
         assertEqual "two independent executions" r1 r2
+    describe "Batching" $ do
+      it "the unbatched region is exactly the raw ARK list" $
+        -- The identity that makes phase 1 a special case of the general
+        -- constants-region computation: with batch size R_P + 1 there are
+        -- no batches and the region's four sections reassemble the raw
+        -- ARK list.
+        assertEqual
+          "constantsRegion (R_P + 1)"
+          (ark width3_128bit)
+          (computeConstantsRegion (batchSize width3_128bit) width3_128bit)
+      it "region length + width matches poseidon_compute_number_of_constants" $
+        -- The composition must produce exactly the number of constants the
+        -- C consumes for every batch size, not just the production one.
+        mapM_
+          ( \k ->
+              assertEqual
+                ("batch size " ++ show k)
+                ( c_poseidon_compute_number_of_constants
+                    (fromIntegral k)
+                    (fromIntegral (nbPartialRounds width3_128bit))
+                    (fromIntegral (nbFullRounds width3_128bit))
+                    (fromIntegral (width width3_128bit))
+                )
+                (fromIntegral (length (computeConstantsRegion k width3_128bit) + width width3_128bit))
+          )
+          ([1 .. 8] ++ [55, 56, 57])
+      it "stored batch-3 region equals the composition helper's output" $
+        -- The guard test of the storage decision: the shipped, hardcoded
+        -- region must be exactly what computeConstantsRegion derives from
+        -- the raw constants — drift between the two is a test failure,
+        -- never a silent divergence.
+        assertEqual
+          "width3_128bitBatch3Region"
+          (computeConstantsRegion 3 width3_128bit)
+          width3_128bitBatch3Region
+      it "stored composed constants are canonical field elements (0 <= x < r)" $
+        assertBool
+          "stored batch-3 region in [0, r)"
+          (all (\x -> x >= 0 && x < scalarPeriod) width3_128bitBatch3Region)
+      it "builds batched templates for all exercised batch sizes" $
+        assertEqual "template count" (length exercisedBatchSizes) (length batchedTemplates)
+      it "matches the acceptance vector through the stored batched configuration (k = 3)" $ do
+        -- Built from the hardcoded region, i.e. the exact production path
+        -- a batched variant 0 would take.
+        tmpl <-
+          expectJust
+            "batched template"
+            (newPoseidonTemplateWithRegion 3 width3_128bitBatch3Region width3_128bit)
+        input <- integersToFrs acceptanceInput
+        output <- expectJust "permute" (poseidonPermute tmpl input)
+        outputIntegers <- frsToIntegers output
+        assertEqual "output state" acceptanceOutput outputIntegers
+      prop "batched and unbatched configurations agree on random states" $
+        -- The load-bearing phase 2 test: the unbatched path (raw ARK
+        -- constants, phase 1) is the oracle; every batched configuration
+        -- must compute the identical permutation. Exercises degenerate
+        -- batches (k = 1), the production candidate (k = 3), a batch size
+        -- that leaves unbatched leftover rounds (k = 5, since
+        -- R_P mod 5 /= 0), and one giant batch (k = 56).
+        forAll genState $ \xs -> ioProperty $ do
+          input <- integersToFrs xs
+          oracle <- expectJust "unbatched" (poseidonPermute width3Template input)
+          oracleIntegers <- frsToIntegers oracle
+          results <-
+            mapM
+              ( \(k, tmpl) -> do
+                  out <- expectJust ("batched k=" ++ show k) (poseidonPermute tmpl input)
+                  (,) k <$> frsToIntegers out
+              )
+              batchedTemplates
+          pure $
+            conjoin
+              [ counterexample ("batch size " ++ show k) (out === oracleIntegers)
+              | (k, out) <- results
+              ]
     describe "Public API" $ do
       it "matches the Nomadic Labs acceptance vector (Integer API, variant 0)" $
         -- The same reference vector as the Internal-level test, now through
@@ -246,6 +329,20 @@ tests =
           fr <- scalarFromInteger n >>= frFromScalar
           n' <- scalarFromFr fr >>= scalarToInteger
           pure (n' === n `mod` scalarPeriod)
+
+-- | The batch sizes the batched-vs-unbatched property exercises.
+exercisedBatchSizes :: [Int]
+exercisedBatchSizes = [1, 2, 3, 5, 56]
+
+-- | Batched-configuration templates for variant 0, built once. A batch
+-- size whose template fails to build would be silently dropped here, which
+-- is why a test asserts the length of this list.
+batchedTemplates :: [(Int, PoseidonTemplate)]
+batchedTemplates =
+  [ (k, tmpl)
+  | k <- exercisedBatchSizes
+  , Just tmpl <- [newPoseidonTemplateWithBatchSize k width3_128bit]
+  ]
 
 -- | The variant-0 template, built once and shared by the property tests.
 width3Template :: PoseidonTemplate

@@ -112,7 +112,7 @@
 -- the @length ark@ leading constants, and the trailing @w@ zeros hold
 -- without relying on uninitialized memory.
 --
--- == Batched partial rounds — deliberately disabled
+-- == Batched partial rounds
 --
 -- The C supports an optimization (the \"linear trick\" of
 -- <https://eprint.iacr.org/2022/462 eprint 2022\/462>, §4.2) that flattens
@@ -123,18 +123,19 @@
 -- batched configuration needs /more/ constants than the raw count — a heap
 -- out-of-bounds read.
 --
--- This binding therefore sets @batch_size = R_P + 1@ (see
--- 'Cardano.Crypto.Poseidon.Constants.batchSize'), so that
--- @R_P \`div\` batch_size == 0@ and every partial round takes the plain
--- (unbatched) path, which consumes exactly the raw ARK constants. This has
--- been verified empirically: the unbatched configuration reproduces the
--- reference test vector, the batched configuration with raw constants does
--- not. A future optimization may implement the constant composition and
--- lower @batch_size@; until then, treat any @batch_size <= R_P@ as a bug.
--- The constant-count assertion in 'newPoseidonTemplate' enforces this: with
--- an active batch, @poseidon_compute_number_of_constants@ returns more than
--- @length ark + w@ and template construction fails rather than reading out
--- of bounds.
+-- Template construction therefore always writes the constants region
+-- computed by 'Cardano.Crypto.Poseidon.Batching.constantsRegion' for the
+-- template's batch size — the raw ARK list when the batch size exceeds
+-- @R_P@ (the two are identical then; the test suite asserts it), the
+-- composed coefficients otherwise. 'newPoseidonTemplate' uses the
+-- unbatched configuration @batch_size = R_P + 1@ (see
+-- 'Cardano.Crypto.Poseidon.Constants.batchSize'), which remains the
+-- reference oracle; 'newPoseidonTemplateWithBatchSize' opts into batching,
+-- and a property test asserts the batched and unbatched configurations
+-- compute the identical permutation. The constant-count assertion below
+-- ensures a mis-sized region can never be handed to the C: the region
+-- length plus the zero padding must equal exactly what
+-- @poseidon_compute_number_of_constants@ budgets for the configuration.
 --
 -- == Parameter validation
 --
@@ -200,7 +201,10 @@ module Cardano.Crypto.Poseidon.Internal (
   -- * Template-based permutation
   PoseidonTemplate,
   templateInstance,
+  templateBatchSize,
   newPoseidonTemplate,
+  newPoseidonTemplateWithBatchSize,
+  newPoseidonTemplateWithRegion,
   poseidonPermute,
 
   -- * Fr buffer marshalling
@@ -228,6 +232,7 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   sizeFr,
  )
 import Cardano.Crypto.PinnedSizedBytes (psbCreate, psbUseAsCPtr)
+import Cardano.Crypto.Poseidon.Batching (computeConstantsRegion)
 import Cardano.Crypto.Poseidon.Constants (PoseidonInstance (..), batchSize)
 import Control.Exception (bracket)
 import Control.Monad (zipWithM_)
@@ -347,6 +352,11 @@ writeIntegerAsFr dst n = do
 data PoseidonTemplate = PoseidonTemplate
   { templateInstance :: !PoseidonInstance
   -- ^ The instance this template was built from.
+  , templateBatchSize :: !Int
+  -- ^ The batch size this template was configured with; the constants
+  -- region matches it (raw ARK for an inactive batch, composed
+  -- coefficients otherwise), so the same value must be used for every
+  -- scratch context the template is copied into.
   , templateBufferBytes :: !Int
   -- ^ Size in bytes of the whole context buffer,
   -- @(w + w² + N) * sizeFr@; cached for the per-call copy.
@@ -355,33 +365,61 @@ data PoseidonTemplate = PoseidonTemplate
   -- when the template is garbage collected.
   }
 
--- | Build the immutable template for an instance. Returns 'Nothing' if
+-- | Build the immutable template for an instance in the __unbatched__
+-- configuration (@batch_size = R_P + 1@,
+-- 'Cardano.Crypto.Poseidon.Constants.batchSize'), where the constants
+-- region is exactly the raw ARK list. This configuration is the reference
+-- oracle for the batched one and is never removed.
+newPoseidonTemplate :: PoseidonInstance -> Maybe PoseidonTemplate
+newPoseidonTemplate inst = newPoseidonTemplateWithBatchSize (batchSize inst) inst
+
+-- | Build the immutable template for an instance with an explicit batch
+-- size, computing the constants region with
+-- 'Cardano.Crypto.Poseidon.Batching.computeConstantsRegion'. This is the
+-- generate-and-verify path (tests exercise it for many batch sizes);
+-- production configurations use 'newPoseidonTemplateWithRegion' with a
+-- stored region instead, so no composition runs outside the test suite.
+newPoseidonTemplateWithBatchSize :: Int -> PoseidonInstance -> Maybe PoseidonTemplate
+newPoseidonTemplateWithBatchSize k inst
+  | k < 1 = Nothing
+  | otherwise = newPoseidonTemplateWithRegion k (computeConstantsRegion k inst) inst
+
+-- | Build the immutable template for an instance with an explicit batch
+-- size and an explicitly supplied constants region (e.g. the stored
+-- 'Cardano.Crypto.Poseidon.Batching.width3_128bitBatch3Region').
+-- Returns 'Nothing' if
 --
+-- * the batch size is below 1;
 -- * the MDS is not @w@ rows of @w@ entries (checked here — the C cannot
 --   see the Haskell lists);
 -- * the constant count is wrong: @poseidon_compute_number_of_constants@
---   must equal @length ark + w@ (the raw constants plus the trailing zero
---   padding). This is the assertion demanded by the C contract — a
---   mismatch means the permutation would read constants out of bounds (in
---   particular, any configuration with active batching fails here);
+--   must equal the region length plus the @w@ trailing zeros. This is the
+--   assertion demanded by the C contract — a mismatch (in particular a
+--   region composed for a different batch size) means the permutation
+--   would read constants out of bounds;
 -- * the C-level parameter validation in @poseidon_ctxt_new@ rejects the
 --   configuration (see /Parameter validation/ in the module header), or
 --   allocation fails.
 --
+-- Note the count assertion cannot detect a region with the right length
+-- but wrong /values/; that is what the guard test (stored region equals
+-- the computed one) and the behavioral tests are for.
+--
 -- Pure despite the allocation inside: the result is a function of the
--- instance alone, and the built context is only ever reachable through the
--- returned template — see /Purity and the template scheme/ in the module
--- header for the full @unsafePerformIO@ justification.
-newPoseidonTemplate :: PoseidonInstance -> Maybe PoseidonTemplate
-newPoseidonTemplate inst
+-- arguments alone, and the built context is only ever reachable through
+-- the returned template — see /Purity and the template scheme/ in the
+-- module header for the full @unsafePerformIO@ justification.
+newPoseidonTemplateWithRegion :: Int -> [Integer] -> PoseidonInstance -> Maybe PoseidonTemplate
+newPoseidonTemplateWithRegion k region inst
+  | k < 1 = Nothing
   | length (mds inst) /= w || any ((/= w) . length) (mds inst) = Nothing
-  | length (ark inst) + w /= fromIntegral nConstants = Nothing
+  | length region + w /= fromIntegral nConstants = Nothing
   | otherwise = unsafePerformIO $ do
       PoseidonCtxtPtr raw <-
         c_poseidon_ctxt_new
           (fromIntegral (nbFullRounds inst))
           (fromIntegral (nbPartialRounds inst))
-          (fromIntegral (batchSize inst))
+          (fromIntegral k)
           (fromIntegral w)
       if raw == nullPtr
         then pure Nothing
@@ -399,18 +437,19 @@ newPoseidonTemplate inst
               (\i x -> writeIntegerAsFr (mdsPtr `plusPtr` (i * sizeFr)) x)
               [0 ..]
               (concat (mds inst))
-            -- Only the length ark leading constants are written; the w
+            -- Only the region's leading constants are written; the w
             -- trailing zero constants are provided by the calloc'd buffer
             -- (see /Zero padding/ in the module header).
             arkPtr <- c_poseidon_get_round_constants_from_context ctxt
             zipWithM_
               (\i x -> writeIntegerAsFr (arkPtr `plusPtr` (i * sizeFr)) x)
               [0 ..]
-              (ark inst)
+              region
           pure $
             Just
               PoseidonTemplate
                 { templateInstance = inst
+                , templateBatchSize = k
                 , templateBufferBytes = (w + w * w + fromIntegral nConstants) * sizeFr
                 , templateForeignPtr = fp
                 }
@@ -418,11 +457,11 @@ newPoseidonTemplate inst
     w = width inst
     nConstants =
       c_poseidon_compute_number_of_constants
-        (fromIntegral (batchSize inst))
+        (fromIntegral k)
         (fromIntegral (nbPartialRounds inst))
         (fromIntegral (nbFullRounds inst))
         (fromIntegral w)
-{-# NOINLINE newPoseidonTemplate #-}
+{-# NOINLINE newPoseidonTemplateWithRegion #-}
 
 -- | Apply the Poseidon permutation to a full state of exactly @width@
 -- elements, returning the full output state. Returns 'Nothing' if the
@@ -458,9 +497,12 @@ poseidonPermute t inputState
     inst = templateInstance t
     w = width inst
     acquire =
+      -- The scratch context must use the template's batch size: the copied
+      -- constants region only makes sense under the batching configuration
+      -- it was composed for.
       c_poseidon_ctxt_new
         (fromIntegral (nbFullRounds inst))
         (fromIntegral (nbPartialRounds inst))
-        (fromIntegral (batchSize inst))
+        (fromIntegral (templateBatchSize t))
         (fromIntegral w)
 {-# NOINLINE poseidonPermute #-}

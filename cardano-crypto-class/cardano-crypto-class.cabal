@@ -111,6 +111,7 @@ library
     Cardano.Crypto.PackedBytes
     Cardano.Crypto.PinnedSizedBytes
     Cardano.Crypto.Poseidon
+    Cardano.Crypto.Poseidon.Batching
     Cardano.Crypto.Poseidon.Constants
     Cardano.Crypto.Poseidon.Internal
     Cardano.Crypto.Seed
