@@ -25,6 +25,11 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   scalarToInteger,
  )
 import Cardano.Crypto.Hash (SHA256, digest)
+import Cardano.Crypto.Poseidon (
+  PoseidonError (..),
+  poseidonPermutation,
+  poseidonPermutationInteger,
+ )
 import Cardano.Crypto.Poseidon.Constants (
   PoseidonInstance (..),
   batchSize,
@@ -48,7 +53,17 @@ import Test.Crypto.Poseidon.Reference (referencePoseidon)
 import Test.HUnit (assertBool, assertEqual, assertFailure)
 import Test.Hspec (Spec, describe, it)
 import Test.Hspec.QuickCheck (prop)
-import Test.QuickCheck (Gen, choose, elements, forAll, frequency, ioProperty, vectorOf, (===))
+import Test.QuickCheck (
+  Gen,
+  arbitrary,
+  choose,
+  elements,
+  forAll,
+  frequency,
+  ioProperty,
+  vectorOf,
+  (===),
+ )
 
 -- The canonical FFI imports will live in Cardano.Crypto.Poseidon.Internal;
 -- this import is declared here as well so the count invariant is asserted
@@ -119,21 +134,10 @@ tests =
         -- choice and zero padding would each corrupt the output if wrong.
         -- (Chunk 5 re-asserts this vector through the public API.)
         tmpl <- expectJust "template" (newPoseidonTemplate width3_128bit)
-        input <-
-          integersToFrs
-            [ 0
-            , 19540886853600136773806888540031779652697522926951761090609474934921975120659
-            , 27368034540955591518185075247638312229509481411752400387472688330662143761856
-            ]
+        input <- integersToFrs acceptanceInput
         output <- expectJust "permute" (poseidonPermute tmpl input)
         outputIntegers <- frsToIntegers output
-        assertEqual
-          "output state"
-          [ 17943489144262435388134690770306545365190731633977654215868012824127324198151
-          , 2231754119684576552235072561055622129225837122807214026821170668631716242147
-          , 29261523742327067247029179638981197564247814302680832614540814949720900275190
-          ]
-          outputIntegers
+        assertEqual "output state" acceptanceOutput outputIntegers
       prop "agrees with the pure reference implementation on random states" $
         -- Differential test against Test.Crypto.Poseidon.Reference, a naive
         -- spec-faithful Poseidon over the FieldElem oracle that shares
@@ -168,6 +172,77 @@ tests =
         r1 <- frsToIntegers out1
         r2 <- frsToIntegers out2
         assertEqual "two independent executions" r1 r2
+    describe "Public API" $ do
+      it "matches the Nomadic Labs acceptance vector (Integer API, variant 0)" $
+        -- The same reference vector as the Internal-level test, now through
+        -- the whole public stack: registry lookup, cached template,
+        -- Integer reduction and canonical read-back.
+        assertEqual
+          "output state"
+          (Right acceptanceOutput)
+          (poseidonPermutationInteger 0 acceptanceInput)
+      it "matches the acceptance vector through the Fr API" $ do
+        input <- integersToFrs acceptanceInput
+        output <- expectRight (poseidonPermutation 0 input)
+        outputIntegers <- frsToIntegers output
+        assertEqual "output state" acceptanceOutput outputIntegers
+      it "rejects unregistered variant indices" $ do
+        let rejected i =
+              assertEqual
+                ("variant " ++ show i)
+                (Left (PoseidonUnknownVariant i))
+                (poseidonPermutationInteger i [0, 0, 0])
+        mapM_ rejected [1, -1, 2 ^ (64 :: Int)]
+      it "rejects wrong input lengths (width - 1, width + 1, empty), never pads" $ do
+        let w = width width3_128bit
+            rejected xs =
+              assertEqual
+                ("length " ++ show (length xs))
+                (Left (PoseidonWrongInputLength w (length xs)))
+                (poseidonPermutationInteger 0 xs)
+        rejected [1, 2]
+        rejected [1, 2, 3, 4]
+        rejected []
+        -- and through the Fr API
+        frs <- integersToFrs [1, 2]
+        assertEqual
+          "Fr API, length 2"
+          (Left (PoseidonWrongInputLength w 2))
+          (fmap (const ()) (poseidonPermutation 0 frs))
+      it "reduces Integer inputs modulo r (negative and >= r values)" $
+        -- The documented reduction semantics: -1 ~ r-1, r ~ 0, r+1 ~ 1.
+        -- The two argument lists differ syntactically, so the two calls
+        -- cannot be collapsed by CSE.
+        assertEqual
+          "[-1, r, r+1] permutes like [r-1, 0, 1]"
+          (poseidonPermutationInteger 0 [scalarPeriod - 1, 0, 1])
+          (poseidonPermutationInteger 0 [-1, scalarPeriod, scalarPeriod + 1])
+      it "is deterministic through the public API" $ do
+        -- Same construction as the Internal-level determinism test: two
+        -- independently converted (equal-valued) inputs, so the two calls
+        -- are distinct expressions and both really execute.
+        input1 <- integersToFrs [8, 9, 10]
+        input2 <- integersToFrs [8, 9, 10]
+        out1 <- expectRight (poseidonPermutation 0 input1) >>= frsToIntegers
+        out2 <- expectRight (poseidonPermutation 0 input2) >>= frsToIntegers
+        assertEqual "two independent executions" out1 out2
+      prop "Integer wrapper agrees with the Fr API on in-range values" $
+        -- Two independent paths through conversion and permutation; the
+        -- Integer wrapper must be observably nothing more than
+        -- conversion + Fr API + conversion.
+        forAll genState $ \xs -> ioProperty $ do
+          frs <- integersToFrs xs
+          viaFr <- expectRight (poseidonPermutation 0 frs) >>= frsToIntegers
+          pure (poseidonPermutationInteger 0 xs === Right viaFr)
+      prop "Integer <-> Fr marshalling round-trips modulo r" $
+        -- Sanity for the conversion path everything above relies on:
+        -- scalarFromInteger >>= frFromScalar, read back via scalarFromFr
+        -- >>= scalarToInteger, must be exactly (`mod` r) — including
+        -- values >= r and negative values.
+        forAll genAnyInteger $ \n -> ioProperty $ do
+          fr <- scalarFromInteger n >>= frFromScalar
+          n' <- scalarFromFr fr >>= scalarToInteger
+          pure (n' === n `mod` scalarPeriod)
 
 -- | The variant-0 template, built once and shared by the property tests.
 width3Template :: PoseidonTemplate
@@ -183,6 +258,38 @@ genState = vectorOf (width width3_128bit) genFieldInteger
         [ (1, elements [0, 1, scalarPeriod - 1])
         , (9, choose (0, scalarPeriod - 1))
         ]
+
+-- | The Nomadic Labs reference vector for variant 0 (from the upstream
+-- ocaml-bls12-381-hash test suite): input state (capacity slot zero, then
+-- the two inputs) and the expected full output state.
+acceptanceInput, acceptanceOutput :: [Integer]
+acceptanceInput =
+  [ 0
+  , 19540886853600136773806888540031779652697522926951761090609474934921975120659
+  , 27368034540955591518185075247638312229509481411752400387472688330662143761856
+  ]
+acceptanceOutput =
+  [ 17943489144262435388134690770306545365190731633977654215868012824127324198151
+  , 2231754119684576552235072561055622129225837122807214026821170668631716242147
+  , 29261523742327067247029179638981197564247814302680832614540814949720900275190
+  ]
+
+-- | Integers for the marshalling round-trip: small values (positive and
+-- negative), in-range field elements, values >= r, large negatives, and
+-- the exact boundaries.
+genAnyInteger :: Gen Integer
+genAnyInteger =
+  frequency
+    [ (2, arbitrary)
+    , (4, choose (0, scalarPeriod - 1))
+    , (2, choose (scalarPeriod, 2 * scalarPeriod))
+    , (1, negate <$> choose (0, 2 * scalarPeriod))
+    , (1, elements [0, 1, -1, scalarPeriod - 1, scalarPeriod, scalarPeriod + 1])
+    ]
+
+-- | Fail the test on 'Left' instead of an incomplete pattern match.
+expectRight :: Show e => Either e a -> IO a
+expectRight = either (assertFailure . show) pure
 
 -- | Fail the test on 'Nothing' instead of an incomplete pattern match.
 expectJust :: String -> Maybe a -> IO a
