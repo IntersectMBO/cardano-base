@@ -16,7 +16,14 @@ module Test.Crypto.Poseidon (
   tests,
 ) where
 
-import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (scalarPeriod)
+import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
+  Fr,
+  frFromScalar,
+  scalarFromFr,
+  scalarFromInteger,
+  scalarPeriod,
+  scalarToInteger,
+ )
 import Cardano.Crypto.Hash (SHA256, digest)
 import Cardano.Crypto.Poseidon.Constants (
   PoseidonInstance (..),
@@ -24,14 +31,24 @@ import Cardano.Crypto.Poseidon.Constants (
   poseidonVariants,
   width3_128bit,
  )
+import Cardano.Crypto.Poseidon.Internal (
+  PoseidonTemplate,
+  newPoseidonTemplate,
+  poseidonPermute,
+ )
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
 import Data.List (subsequences, transpose)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Proxy (Proxy (..))
 import qualified Data.Set as Set
 import Foreign.C.Types (CInt (..))
-import Test.HUnit (assertBool, assertEqual)
+import Test.Crypto.Poseidon.Field (FieldElem)
+import Test.Crypto.Poseidon.Reference (referencePoseidon)
+import Test.HUnit (assertBool, assertEqual, assertFailure)
 import Test.Hspec (Spec, describe, it)
+import Test.Hspec.QuickCheck (prop)
+import Test.QuickCheck (Gen, choose, elements, forAll, frequency, ioProperty, vectorOf, (===))
 
 -- The canonical FFI imports will live in Cardano.Crypto.Poseidon.Internal;
 -- this import is declared here as well so the count invariant is asserted
@@ -70,6 +87,114 @@ tests =
             "SHA256 (show (width, mds, ark))"
             "1289be84a2c6c1f5e4c2057c53677323ba3e223e8b3313817f388245a8fb9fae"
             (constantsDigest width3_128bit)
+    describe "Internal" $ do
+      it "builds a template for width3_128bit" $
+        assertBool "newPoseidonTemplate width3_128bit" (isJust (newPoseidonTemplate width3_128bit))
+      it "rejects invalid instances" $ do
+        -- Each of these exercises a distinct validation layer documented in
+        -- Cardano.Crypto.Poseidon.Internal: the first three are rejected by
+        -- the C constructor (poseidon_ctxt_new), the last two by the
+        -- Haskell-side shape and constant-count assertions.
+        let rejects inst label = assertBool label (isNothing (newPoseidonTemplate inst))
+        rejects width3_128bit {width = 1} "width 1"
+        rejects width3_128bit {nbFullRounds = 7} "odd R_F"
+        rejects width3_128bit {nbFullRounds = -2} "negative R_F"
+        rejects width3_128bit {mds = [[1]]} "MDS shape mismatch"
+        rejects width3_128bit {ark = drop 1 (ark width3_128bit)} "constant count mismatch"
+      it "rejects input states of the wrong length (no implicit padding)" $ do
+        tmpl <- expectJust "template" (newPoseidonTemplate width3_128bit)
+        someFr <- integersToFrs [1, 2, 3, 4]
+        mapM_
+          ( \n ->
+              assertBool
+                ("input length " ++ show n)
+                (isNothing (poseidonPermute tmpl (take n someFr)))
+          )
+          [0, 2, 4]
+      it "matches the Nomadic Labs acceptance vector" $ do
+        -- The reference vector for this instance, from the upstream test
+        -- suite (ocaml-bls12-381-hash). Input: capacity slot zero, then the
+        -- two inputs; asserted on the full output state. This exercises the
+        -- whole binding: buffer layout, Montgomery conversion, batch-size
+        -- choice and zero padding would each corrupt the output if wrong.
+        -- (Chunk 5 re-asserts this vector through the public API.)
+        tmpl <- expectJust "template" (newPoseidonTemplate width3_128bit)
+        input <-
+          integersToFrs
+            [ 0
+            , 19540886853600136773806888540031779652697522926951761090609474934921975120659
+            , 27368034540955591518185075247638312229509481411752400387472688330662143761856
+            ]
+        output <- expectJust "permute" (poseidonPermute tmpl input)
+        outputIntegers <- frsToIntegers output
+        assertEqual
+          "output state"
+          [ 17943489144262435388134690770306545365190731633977654215868012824127324198151
+          , 2231754119684576552235072561055622129225837122807214026821170668631716242147
+          , 29261523742327067247029179638981197564247814302680832614540814949720900275190
+          ]
+          outputIntegers
+      prop "agrees with the pure reference implementation on random states" $
+        -- Differential test against Test.Crypto.Poseidon.Reference, a naive
+        -- spec-faithful Poseidon over the FieldElem oracle that shares
+        -- nothing with the C (no blst, no batching, no zero-padding trick).
+        -- The acceptance vector pins a single input; this covers random
+        -- states across the whole field, including the boundary values the
+        -- generator injects deliberately, and re-checks the zero-padding
+        -- claim on every case (the reference's last round simply has no
+        -- ARK).
+        forAll genState $ \xs -> ioProperty $ do
+          input <- integersToFrs xs
+          output <- expectJust "permute" (poseidonPermute width3Template input)
+          outIntegers <- frsToIntegers output
+          pure $
+            map fromInteger outIntegers === referencePoseidon width3_128bit (map fromInteger xs)
+      it "is deterministic across independent executions" $ do
+        -- The two inputs are built by two separate IO actions, so they are
+        -- distinct heap objects with equal contents and the two
+        -- poseidonPermute applications are distinct expressions. This
+        -- matters: with a single shared `input`, both calls would be
+        -- syntactically identical pure expressions that CSE may legally
+        -- collapse into one, and the test would compare a value with
+        -- itself. Built this way, the C permutation demonstrably runs
+        -- twice (fresh scratch context each time), which is what
+        -- determinism-across-calls is actually about: no hidden state, no
+        -- uninitialized-memory influence.
+        tmpl <- expectJust "template" (newPoseidonTemplate width3_128bit)
+        input1 <- integersToFrs [5, 6, 7]
+        input2 <- integersToFrs [5, 6, 7]
+        out1 <- expectJust "permute 1" (poseidonPermute tmpl input1)
+        out2 <- expectJust "permute 2" (poseidonPermute tmpl input2)
+        r1 <- frsToIntegers out1
+        r2 <- frsToIntegers out2
+        assertEqual "two independent executions" r1 r2
+
+-- | The variant-0 template, built once and shared by the property tests.
+width3Template :: PoseidonTemplate
+width3Template = fromMaybe (error "width3_128bit template failed") (newPoseidonTemplate width3_128bit)
+
+-- | A random state for variant 0: width elements of F_r, with the boundary
+-- values 0, 1 and r-1 deliberately over-represented.
+genState :: Gen [Integer]
+genState = vectorOf (width width3_128bit) genFieldInteger
+  where
+    genFieldInteger =
+      frequency
+        [ (1, elements [0, 1, scalarPeriod - 1])
+        , (9, choose (0, scalarPeriod - 1))
+        ]
+
+-- | Fail the test on 'Nothing' instead of an incomplete pattern match.
+expectJust :: String -> Maybe a -> IO a
+expectJust label = maybe (assertFailure label) pure
+
+-- | Integer -> Fr via the canonical conversion path.
+integersToFrs :: [Integer] -> IO [Fr]
+integersToFrs = mapM (\n -> scalarFromInteger n >>= frFromScalar)
+
+-- | Fr -> Integer via the canonical conversion path.
+frsToIntegers :: [Fr] -> IO [Integer]
+frsToIntegers = mapM (\f -> scalarFromFr f >>= scalarToInteger)
 
 -- | SHA256 over the 'show'n @(width, mds, ark)@ of an instance. 'show' on
 -- 'Integer' lists is an unambiguous, order-preserving serialization.
@@ -124,7 +249,7 @@ constantsInvariants inst = do
     -- security argument; [GKRRS21] footnote 7: "a matrix M is MDS iff every
     -- submatrix of M is non-singular". Subsumes invertibility (the order-w
     -- minor is the determinant).
-    assertBool "all minors nonzero" (allSquareMinorsNonZero (mds inst))
+    assertBool "all minors nonzero" (allSquareMinorsNonZero (mdsF inst))
   it "no power M^i (i <= 4 * width) has an eigenvalue in F_r (subspace-trail check)" $
     -- [GKRRS21] section 2.3, "Avoiding Insecure Matrices": the MDS matrix
     -- must not admit (infinitely long) invariant or iterative subspace
@@ -143,41 +268,30 @@ constantsInvariants inst = do
     -- factorization check per [GRS20].
     assertBool
       "charpoly of M^1 .. M^(4t) rootless in F_r"
-      ( not
-          ( any
-              (hasRootInFr . charPoly)
-              (take (4 * width inst) (iterate (matMul (mds inst)) (mds inst)))
-          )
+      ( let m = mdsF inst
+         in not (any (hasRootInFr . charPoly) (take (4 * width inst) (iterate (matMul m) m)))
       )
 
----- Arithmetic over the BLS12-381 scalar field F_r (r = 'scalarPeriod') on
----- plain 'Integer's. Only used to check static properties of the embedded
----- constants, so clarity beats speed throughout.
+---- Field arithmetic for the checks above lives in
+---- Test.Crypto.Poseidon.Field ('FieldElem', an Integer-based independent
+---- oracle for F_r, with Num/Fractional instances so expressions read like
+---- ordinary math). Everything below is small linear algebra over it; only
+---- used to check static properties of the embedded constants, so clarity
+---- beats speed throughout.
 
-modR :: Integer -> Integer
-modR x = x `mod` scalarPeriod
+-- | The instance's MDS matrix as field elements.
+mdsF :: PoseidonInstance -> [[FieldElem]]
+mdsF = map (map fromInteger) . mds
 
--- | Modular exponentiation by squaring.
-powModR :: Integer -> Integer -> Integer
-powModR b e
-  | e == 0 = 1
-  | even e = powModR (modR (b * b)) (e `div` 2)
-  | otherwise = modR (b * powModR b (e - 1))
-
--- | Multiplicative inverse via Fermat little theorem (r is prime).
-invModR :: Integer -> Integer
-invModR x = powModR x (scalarPeriod - 2)
-
-matMul :: [[Integer]] -> [[Integer]] -> [[Integer]]
-matMul a b =
-  [[modR (sum (zipWith (*) row col)) | col <- transpose b] | row <- a]
+matMul :: [[FieldElem]] -> [[FieldElem]] -> [[FieldElem]]
+matMul a b = [[sum (zipWith (*) row col) | col <- transpose b] | row <- a]
 
 -- | Determinant by Laplace expansion along the first row. Exponential in the
 -- matrix size, which is fine for the tiny widths in the registry.
-determinant :: [[Integer]] -> Integer
+determinant :: [[FieldElem]] -> FieldElem
 determinant [] = 1
 determinant m =
-  modR . sum $
+  sum
     [ sign j * (head m !! j) * determinant (map (dropColumn j) (tail m))
     | j <- [0 .. length m - 1]
     ]
@@ -187,7 +301,7 @@ determinant m =
 
 -- | Every square submatrix (all row subsets x all equally-sized column
 -- subsets) has a nonzero determinant.
-allSquareMinorsNonZero :: [[Integer]] -> Bool
+allSquareMinorsNonZero :: [[FieldElem]] -> Bool
 allSquareMinorsNonZero m =
   and
     [ determinant [[(m !! i) !! j | j <- cols] | i <- rows] /= 0
@@ -202,19 +316,19 @@ allSquareMinorsNonZero m =
 -- | Coefficients of the characteristic polynomial det(xI - M), lowest degree
 -- first, monic. Faddeev-LeVerrier; the divisions are by 1..w, invertible
 -- since r is a large prime.
-charPoly :: [[Integer]] -> [Integer]
-charPoly a = go 1 zero [1]
+charPoly :: [[FieldElem]] -> [FieldElem]
+charPoly a = go 1 zeroMatrix [1]
   where
     w = length a
-    zero = replicate w (replicate w 0)
+    zeroMatrix = replicate w (replicate w 0)
     identityScaled c = [[if i == j then c else 0 | j <- [0 .. w - 1]] | i <- [0 .. w - 1]]
-    trace m = modR (sum [(m !! i) !! i | i <- [0 .. w - 1]])
-    matAdd = zipWith (zipWith (\x y -> modR (x + y)))
+    trace m = sum [(m !! i) !! i | i <- [0 .. w - 1]]
+    matAdd = zipWith (zipWith (+))
     go k mPrev cs
       | k > w = cs
       | otherwise =
           let mK = matAdd (matMul a mPrev) (identityScaled (head cs))
-              cK = modR (negate (trace (matMul a mK) * invModR (fromIntegral k)))
+              cK = negate (trace (matMul a mK) / fromIntegral k)
            in go (k + 1) mK (cK : cs)
 
 ---- Minimal polynomial arithmetic over F_r, enough to decide whether a monic
@@ -223,12 +337,12 @@ charPoly a = go 1 zero [1]
 ---- Polynomials are coefficient lists, lowest degree first.
 
 -- | Multiply two already-reduced polynomials and reduce modulo the monic f.
-polyMulMod :: [Integer] -> [Integer] -> [Integer] -> [Integer]
+polyMulMod :: [FieldElem] -> [FieldElem] -> [FieldElem] -> [FieldElem]
 polyMulMod f p q = reduce full
   where
     d = length f - 1
     full =
-      [ modR (sum [p !! i * q !! (k - i) | i <- [max 0 (k - (length q - 1)) .. min k (length p - 1)]])
+      [ sum [p !! i * q !! (k - i) | i <- [max 0 (k - (length q - 1)) .. min k (length p - 1)]]
       | k <- [0 .. length p + length q - 2]
       ]
     reduce cs
@@ -238,13 +352,13 @@ polyMulMod f p q = reduce full
               rest = init cs
               offset = length rest - d
               rest' =
-                [ if i >= offset then modR (c - top * f !! (i - offset)) else c
+                [ if i >= offset then c - top * f !! (i - offset) else c
                 | (i, c) <- zip [0 ..] rest
                 ]
            in reduce rest'
 
 -- | x^r modulo the monic polynomial f, by square-and-multiply on r's bits.
-xPowRMod :: [Integer] -> [Integer]
+xPowRMod :: [FieldElem] -> [FieldElem]
 xPowRMod f = go [1] xPoly scalarPeriod
   where
     d = length f - 1
@@ -254,7 +368,7 @@ xPowRMod f = go [1] xPoly scalarPeriod
       | odd e = go (polyMulMod f acc b) (polyMulMod f b b) (e `div` 2)
       | otherwise = go acc (polyMulMod f b b) (e `div` 2)
 
-polyDegree :: [Integer] -> Int
+polyDegree :: [FieldElem] -> Int
 polyDegree p = go (length p - 1)
   where
     go i
@@ -262,7 +376,7 @@ polyDegree p = go (length p - 1)
       | p !! i /= 0 = i
       | otherwise = go (i - 1)
 
-polyGcdDegree :: [Integer] -> [Integer] -> Int
+polyGcdDegree :: [FieldElem] -> [FieldElem] -> Int
 polyGcdDegree a b
   | polyDegree b < 0 = polyDegree a
   | polyDegree a < polyDegree b = polyGcdDegree b a
@@ -270,24 +384,24 @@ polyGcdDegree a b
   where
     polyRem p q =
       let dq = polyDegree q
-          inv = invModR (q !! dq)
+          inv = recip (q !! dq)
           step u
             | polyDegree u < dq = u
             | otherwise =
                 let du = polyDegree u
-                    c = modR (u !! du * inv)
+                    c = u !! du * inv
                  in step
-                      [ if i >= du - dq && i <= du then modR (x - c * q !! (i - (du - dq))) else x
+                      [ if i >= du - dq && i <= du then x - c * q !! (i - (du - dq)) else x
                       | (i, x) <- zip [0 ..] u
                       ]
        in step p
 
 -- | Does the monic polynomial f have a root in F_r?
-hasRootInFr :: [Integer] -> Bool
+hasRootInFr :: [FieldElem] -> Bool
 hasRootInFr f = polyGcdDegree f xrMinusX > 0
   where
     xr = xPowRMod f
     -- x^r - x, already reduced mod f
     xrMinusX = case xr of
-      (c0 : c1 : rest) -> c0 : modR (c1 - 1) : rest
+      (c0 : c1 : rest) -> c0 : (c1 - 1) : rest
       _ -> error "hasRootInFr: degree < 2 polynomial"
