@@ -18,21 +18,22 @@ module Test.Cardano.Crypto.Leios.Gen (
 
 import Cardano.Crypto.DSIGN (
   DSIGNAlgorithm (deriveVerKeyDSIGN),
+  createPossessionProofDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
   signDSIGN,
  )
 import Cardano.Crypto.Leios (
   LeiosCert,
-  LeiosCommittee (..),
   LeiosDSIGN,
+  LeiosSeatId (..),
   LeiosSignature,
   LeiosSigningKey,
-  LeiosVoter (..),
-  LeiosVoterId (..),
   aggregateLeiosCert,
   leiosSignContext,
+  mkLeiosCommittee,
  )
+import Data.Maybe.Strict (StrictMaybe (..))
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import qualified Data.Map.Strict as Map
 import Data.Proxy (Proxy (Proxy))
@@ -79,15 +80,19 @@ genLeiosCert = do
   n <- elements [1, 8, 9, 16, 17, 24]
   sks <- vectorOf n genLeiosSigningKey
   let committee =
-        LeiosCommittee . V.fromList $
-          [LeiosVoter (1 % toInteger n) (deriveVerKeyDSIGN sk) | sk <- sks]
+        mkLeiosCommittee . V.fromList $
+          [ (SJust (vk, pop), 1 % toInteger n)
+          | sk <- sks
+          , let vk = deriveVerKeyDSIGN sk
+                pop = createPossessionProofDSIGN leiosSignContext sk
+          ]
   k <- chooseInt (1, n)
   signerIxs <- take k <$> shuffle [0 .. n - 1]
   msgLen <- choose (0, 64)
   msg <- genByteString msgLen
   let sigs =
         Map.fromList
-          [ (LeiosVoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg (sks !! i))
+          [ (LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg (sks !! i))
           | i <- signerIxs
           ]
   case aggregateLeiosCert committee sigs of

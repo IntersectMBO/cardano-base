@@ -40,6 +40,7 @@ library
     bytestring,
     cardano-binary,
     cardano-crypto-class >=2.5.1,
+    cardano-strict-containers,
     containers,
     deepseq,
     nothunks,
@@ -59,6 +60,7 @@ library testlib
     cardano-base:testlib,
     cardano-crypto-class,
     cardano-crypto-leios,
+    cardano-strict-containers,
     containers,
     vector,
 
@@ -76,6 +78,7 @@ test-suite tests
     cardano-base:testlib,
     cardano-crypto-class >=2.5.1,
     cardano-crypto-leios,
+    cardano-strict-containers,
     containers,
     hspec,
     vector,

@@ -7,6 +7,7 @@ module Test.Cardano.Crypto.Leios (spec, exampleCert) where
 
 import Cardano.Crypto.DSIGN (
   DSIGNAlgorithm (deriveVerKeyDSIGN),
+  createPossessionProofDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
   signDSIGN,
@@ -18,14 +19,15 @@ import Cardano.Crypto.Leios (
   LeiosDSIGN,
   LeiosSignature,
   LeiosSigningKey,
-  LeiosVoter (..),
-  LeiosVoterId (..),
+  LeiosSeat (..),
+  LeiosSeatId (..),
   VerificationError (..),
   Weight,
   aggregateLeiosCert,
-  getLeiosVoterId,
+  getLeiosSeatId,
   leiosSignContext,
-  resolveLeiosVoter,
+  mkLeiosCommittee,
+  resolveLeiosSeat,
   verifyLeiosCert,
  )
 import Cardano.Crypto.Seed (mkSeedFromBytes)
@@ -34,7 +36,9 @@ import Data.Foldable (toList)
 import Data.List.NonEmpty (NonEmpty (..), fromList)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe.Strict (StrictMaybe (..), isSJust)
 import Data.Proxy (Proxy (Proxy))
+import qualified Data.Set as Set
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import Test.Cardano.Base.Bytes (genByteString)
@@ -45,6 +49,9 @@ import Test.QuickCheck (
   chooseInt,
   counterexample,
   forAll,
+  once,
+  sublistOf,
+  (.&&.),
   (===),
  )
 import qualified Test.QuickCheck as QC
@@ -53,7 +60,7 @@ spec :: Spec
 spec = do
   describe "LeiosCert" $ do
     describe "aggregateLeiosCert" $ do
-      prop "rejects an out-of-range LeiosVoterId" prop_aggregateLeiosCert_rejects_out_of_range
+      prop "rejects an out-of-range LeiosSeatId" prop_aggregateLeiosCert_rejects_out_of_range
       prop "rejects empty contributions" prop_aggregateLeiosCert_rejects_empty
 
     describe "verifyLeiosCert" $ do
@@ -65,12 +72,21 @@ spec = do
         prop "rejects when total weight is below threshold" prop_verifyLeiosCert_rejects_below_threshold
         prop "rejects a bitfield wider than the committee" prop_verifyLeiosCert_rejects_oversized_signers
         prop "rejects a tampered bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
+        prop "rejects a bit set for a seat without a key" prop_verifyLeiosCert_rejects_keyless_signer
 
   describe "LeiosCommittee" $ do
     prop
-      "getLeiosVoterId and resolveLeiosVoter agree on verification keys"
+      "getLeiosSeatId and resolveLeiosSeat agree on verification keys"
       prop_resolveVoter_getVoterId_inverse
-    prop "getLeiosVoterId returns the first matching index" prop_getVoterId_returns_first_index
+    prop "getLeiosSeatId returns the first matching index" prop_getVoterId_returns_first_index
+
+    describe "mkLeiosCommittee" $ do
+      prop
+        "keeps every seat; only pools with a registered key carry one"
+        prop_committee_reflects_registered_keys
+      prop
+        "an invalid proof of possession yields a keyless seat"
+        prop_invalid_pop_yields_keyless_seat
 
 exampleCert :: LeiosCert
 exampleCert = case aggregateLeiosCert committee contributions of
@@ -81,42 +97,46 @@ exampleCert = case aggregateLeiosCert committee contributions of
     msg = "leios-golden-message" :: BS.ByteString
     contributions = signContribs msg (zip [0 ..] (toList sks))
 
--- * LeiosVoterId committee lookup
+-- * LeiosSeatId committee lookup
 
--- | 'getLeiosVoterId' and 'resolveLeiosVoter' are mutual inverses on the verification
--- key projection: for any voter in the committee, looking up its 'LeiosVoterId'
--- via its key and resolving back to a 'LeiosVoter' yields the same key.
+-- | 'getLeiosSeatId' and 'resolveLeiosSeat' are mutual inverses on the verification
+-- key projection: for any voter in the committee, looking up its 'LeiosSeatId'
+-- via its key and resolving back to a 'LeiosSeat' yields the same key.
 prop_resolveVoter_getVoterId_inverse :: Property
 prop_resolveVoter_getVoterId_inverse =
   forAll genN $ \n ->
     let (_, committee) = fixedCommittee n
-        voters = V.toList committee.leiosCommitteeVoters
+        voters = V.toList committee.leiosCommitteeSeats
      in QC.conjoin
           [ counterexample ("voter index " <> show i) $
-              case getLeiosVoterId (voterVKey voter) committee of
-                Nothing -> QC.property False
-                Just vid ->
-                  case resolveLeiosVoter committee vid of
+              case seatVKey voter of
+                SNothing -> counterexample "fixedCommittee seat unexpectedly keyless" (QC.property False)
+                SJust vk ->
+                  case getLeiosSeatId vk committee of
                     Nothing -> QC.property False
-                    Just voter' -> voterVKey voter' === voterVKey voter
+                    Just vid ->
+                      case resolveLeiosSeat committee vid of
+                        Nothing -> QC.property False
+                        Just voter' -> seatVKey voter' === seatVKey voter
           | (i :: Int, voter) <- zip [0 ..] voters
           ]
 
--- | When the committee carries duplicate verification keys, 'getLeiosVoterId'
+-- | When the committee carries duplicate verification keys, 'getLeiosSeatId'
 -- returns the smallest matching index. We don't deduplicate committees
 -- internally; downstream selection is expected to.
 prop_getVoterId_returns_first_index :: Property
 prop_getVoterId_returns_first_index =
   forAll genN $ \n ->
     let (_, committee) = fixedCommittee n
-        voters = V.toList committee.leiosCommitteeVoters
+        voters = V.toList committee.leiosCommitteeSeats
      in QC.conjoin
           [ counterexample ("first occurrence at " <> show i) $
-              getLeiosVoterId (voterVKey voter) duped
-                === Just (LeiosVoterId (fromIntegral i))
+              case seatVKey voter of
+                SNothing -> counterexample "fixedCommittee seat unexpectedly keyless" (QC.property False)
+                SJust vk -> getLeiosSeatId vk duped === Just (LeiosSeatId (fromIntegral i))
           | let duped =
-                  LeiosCommittee
-                    (committee.leiosCommitteeVoters <> committee.leiosCommitteeVoters)
+                  UnsafeLeiosCommittee
+                    (committee.leiosCommitteeSeats <> committee.leiosCommitteeSeats)
           , (i :: Int, voter) <- zip [0 ..] voters
           ]
 
@@ -129,9 +149,9 @@ prop_getVoterId_returns_first_index =
 fixedCommittee :: Int -> (NonEmpty LeiosSigningKey, LeiosCommittee)
 fixedCommittee n =
   ( sks
-  , LeiosCommittee
+  , UnsafeLeiosCommittee
       ( V.fromList
-          [LeiosVoter (1 / fromIntegral @Int @Weight n) (deriveVerKeyDSIGN sk) | sk <- toList sks]
+          [LeiosSeat (1 / fromIntegral @Int @Weight n) (SJust (deriveVerKeyDSIGN sk)) | sk <- toList sks]
       )
   )
   where
@@ -152,16 +172,16 @@ genMsg :: QC.Gen BS.ByteString
 genMsg = chooseInt (0, 64) >>= genByteString
 
 -- | Sign @msg@ with each of the given keys and pack them into a 'Map' keyed
--- by 'LeiosVoterId', matching the input shape of 'aggregateLeiosCert'.
-signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map LeiosVoterId LeiosSignature
+-- by 'LeiosSeatId', matching the input shape of 'aggregateLeiosCert'.
+signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map LeiosSeatId LeiosSignature
 signContribs msg pairs =
   Map.fromList
-    [(LeiosVoterId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
+    [(LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
 
 -- | Aggregate or fail the property with the error.
 aggregateOrFail ::
   LeiosCommittee ->
-  Map LeiosVoterId LeiosSignature ->
+  Map LeiosSeatId LeiosSignature ->
   (LeiosCert -> Property) ->
   Property
 aggregateOrFail committee contributions k = case aggregateLeiosCert committee contributions of
@@ -251,13 +271,13 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = forAll (chooseInt (2, 16)) $ \n
               verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
                 === Left InvalidSignature
 
--- | A 'LeiosVoterId' past the committee bound is rejected at aggregation time.
+-- | A 'LeiosSeatId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
 prop_aggregateLeiosCert_rejects_out_of_range = forAll genN $ \n ->
   forAll (chooseInt (n, n + 100)) $ \badIdx ->
     let (sk0 :| _, committee) = fixedCommittee n
         msg = "x" :: BS.ByteString
-        bad = LeiosVoterId (fromIntegral @Int @Word16 badIdx)
+        bad = LeiosSeatId (fromIntegral @Int @Word16 badIdx)
         contributions = Map.singleton bad (signDSIGN leiosSignContext msg sk0)
      in aggregateLeiosCert committee contributions === Left (VoterIdsOutOfBounds (bad :| []))
 
@@ -270,3 +290,105 @@ prop_aggregateLeiosCert_rejects_empty = forAll genN $ \n ->
    in case aggregateLeiosCert committee Map.empty of
         Left BLSAggregationFailed {} -> QC.property True
         other -> counterexample (show other) (QC.property False)
+
+-- * Committee derived from the stake distribution
+
+-- | A deterministic signing key from a single seed byte.
+skFromByte :: Word8 -> LeiosSigningKey
+skFromByte b = genKeyDSIGN @LeiosDSIGN (mkSeedFromBytes (BS.replicate seedLen b))
+  where
+    seedLen = fromIntegral @Word @Int (seedSizeDSIGN (Proxy @LeiosDSIGN))
+
+-- | Build a committee from a list of seats, each with equal weight @1/n@. A
+-- 'Just' seat carries a real key and a valid proof of possession; a 'Nothing'
+-- seat is a pool that has not (yet) registered a Leios key. This mirrors the
+-- consensus path: the committee is the whole stake distribution, keyed or not.
+mkMixedCommittee :: [Maybe LeiosSigningKey] -> LeiosCommittee
+mkMixedCommittee seats =
+  mkLeiosCommittee . V.fromList $
+    [(maybe SNothing (SJust . keyPop) mSk, weight) | mSk <- seats]
+  where
+    weight = 1 / fromIntegral @Int @Weight (length seats)
+    keyPop sk = (deriveVerKeyDSIGN sk, createPossessionProofDSIGN leiosSignContext sk)
+
+-- | Every pool in the stake distribution gets a seat with its stake weight,
+-- whether or not it registered a key. Seats for pools with a registered key
+-- carry it ('Just'); the rest are keyless ('Nothing'). Crucially the seat
+-- count and the weights are independent of which pools have keys, so voter
+-- indices are stable as keys come and go.
+prop_committee_reflects_registered_keys :: Property
+prop_committee_reflects_registered_keys = forAll genN $ \n ->
+  forAll (sublistOf [0 .. n - 1]) $ \keyedList ->
+    let keyed = Set.fromList keyedList
+        seats =
+          [ if i `Set.member` keyed
+              then Just (skFromByte (fromIntegral @Int @Word8 (i + 1)))
+              else Nothing
+          | i <- [0 .. n - 1]
+          ]
+        committee = mkMixedCommittee seats
+        voters = V.toList committee.leiosCommitteeSeats
+     in counterexample ("keyed = " <> show keyedList) $
+          (length voters === n)
+            .&&. QC.conjoin
+              [ counterexample ("seat " <> show i) $
+                  isSJust (seatVKey v) === (i `Set.member` keyed)
+              | (i :: Int, v) <- zip [0 ..] voters
+              ]
+            .&&. QC.conjoin
+              [ counterexample ("weight " <> show i) $
+                  seatWeight v === 1 / fromIntegral @Int @Weight n
+              | (i :: Int, v) <- zip [0 ..] voters
+              ]
+
+-- | A seat whose registered key comes with a proof of possession that does
+-- not verify is admitted to the committee but stripped of its key, exactly as
+-- if the pool had never registered one. Committee construction never fails on
+-- a bad proof: one misbehaving pool must not take down the whole committee
+-- (and the ledger POOL rule rejects such registrations upstream anyway).
+prop_invalid_pop_yields_keyless_seat :: Property
+prop_invalid_pop_yields_keyless_seat = once $
+  let sk0 = skFromByte 1
+      sk1 = skFromByte 2
+      vk0 = deriveVerKeyDSIGN sk0
+      vk1 = deriveVerKeyDSIGN sk1
+      half = 1 / 2 :: Weight
+      -- vk1 paired with a proof of possession for sk0's secret: does not verify.
+      forgedPoP = createPossessionProofDSIGN leiosSignContext sk0
+      committee =
+        mkLeiosCommittee $
+          V.fromList
+            [ (SJust (vk0, createPossessionProofDSIGN leiosSignContext sk0), half)
+            , (SJust (vk1, forgedPoP), half)
+            ]
+   in case V.toList committee.leiosCommitteeSeats of
+        [v0, v1] ->
+          counterexample (show committee) $
+            seatVKey v0 === SJust vk0 .&&. seatVKey v1 === SNothing
+        _ -> counterexample "expected exactly two seats" (QC.property False)
+
+-- | The forgery this whole design turns on: a certificate must not be able to
+-- borrow weight from keyless seats. Seat 0 (keyed) signs alone — below the
+-- full-weight threshold. We splice in a bitfield that additionally sets the
+-- keyless seat 1, which would push the summed weight to the threshold. The
+-- verifier must reject on the keyless seat *before* counting its weight or
+-- touching the BLS pairing, so the padded weight never helps.
+prop_verifyLeiosCert_rejects_keyless_signer :: Property
+prop_verifyLeiosCert_rejects_keyless_signer = forAll genMsg $ \msg ->
+  let sk0 = skFromByte 1
+      sk1 = skFromByte 2
+      mixed = mkMixedCommittee [Just sk0, Nothing]
+      allKeyed = mkMixedCommittee [Just sk0, Just sk1]
+      sig0 = signDSIGN leiosSignContext msg sk0
+      sig1 = signDSIGN leiosSignContext msg sk1
+      certAlone =
+        either (error . show) id $
+          aggregateLeiosCert mixed (Map.singleton (LeiosSeatId 0) sig0)
+      -- A well-formed cert on the all-keyed committee whose bitfield sets {0,1}.
+      certPair =
+        either (error . show) id $
+          aggregateLeiosCert
+            allKeyed
+            (Map.fromList [(LeiosSeatId 0, sig0), (LeiosSeatId 1, sig1)])
+      tampered = certAlone {leiosCertSigners = certPair.leiosCertSigners}
+   in verifyLeiosCert mixed 1 msg tampered === Left (SignerWithoutKey (LeiosSeatId 1 :| []))
