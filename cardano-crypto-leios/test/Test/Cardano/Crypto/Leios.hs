@@ -93,125 +93,96 @@ exampleCert = case aggregateLeiosCert committee contributions of
 -- key projection: for any voter in the committee, looking up its 'LeiosSeatId'
 -- via its key and resolving back to a 'LeiosSeat' yields the same key.
 prop_resolveVoter_getVoterId_inverse :: Property
-prop_resolveVoter_getVoterId_inverse =
-  forAll genCommittee $ \(_, committee) ->
-    let voters = V.toList committee.leiosCommitteeSeats
-     in conjoin
-          [ counterexample ("voter index " <> show i) $
-              case seatVKey voter of
-                SNothing -> counterexample "genCommittee seat unexpectedly keyless" (property False)
-                SJust vk ->
-                  case getLeiosSeatId vk committee of
+prop_resolveVoter_getVoterId_inverse = property $ do
+  (_, committee) <- genCommittee
+  let voters = V.toList committee.leiosCommitteeSeats
+  pure $
+    conjoin
+      [ counterexample ("voter index " <> show i) $
+          case seatVKey voter of
+            SNothing -> counterexample "genCommittee seat unexpectedly keyless" (property False)
+            SJust vk ->
+              case getLeiosSeatId vk committee of
+                Nothing -> property False
+                Just vid ->
+                  case resolveLeiosSeat committee vid of
                     Nothing -> property False
-                    Just vid ->
-                      case resolveLeiosSeat committee vid of
-                        Nothing -> property False
-                        Just voter' -> seatVKey voter' === seatVKey voter
-          | (i :: Int, voter) <- zip [0 ..] voters
-          ]
+                    Just voter' -> seatVKey voter' === seatVKey voter
+      | (i :: Int, voter) <- zip [0 ..] voters
+      ]
 
 -- | When the committee carries duplicate verification keys, 'getLeiosSeatId'
 -- returns the smallest matching index. We don't deduplicate committees
 -- internally; downstream selection is expected to.
 prop_getVoterId_returns_first_index :: Property
-prop_getVoterId_returns_first_index =
-  forAll genCommittee $ \(_, committee) ->
-    let voters = V.toList committee.leiosCommitteeSeats
-     in conjoin
-          [ counterexample ("first occurrence at " <> show i) $
-              case seatVKey voter of
-                SNothing -> counterexample "genCommittee seat unexpectedly keyless" (property False)
-                SJust vk -> getLeiosSeatId vk duped === Just (LeiosSeatId (fromIntegral i))
-          | let duped =
-                  UnsafeLeiosCommittee
-                    (committee.leiosCommitteeSeats <> committee.leiosCommitteeSeats)
-          , (i :: Int, voter) <- zip [0 ..] voters
-          ]
-
--- | Generate an all-keyed committee together with its signing keys, at an
--- interesting size: driven by the QuickCheck size parameter but capped at 16 —
--- covering the single-voter (1), single-byte-bitfield (≤ 8) and two-byte
--- boundary (9..16) cases — and always ≥ 1. Built via 'mkCommitteeFromTestSeats'
--- so it goes through the real 'mkLeiosCommittee'. The 'NonEmpty' return reflects
--- the @n ≥ 1@ precondition and gives tests a total 'head' for "any-one-signer"
--- cases.
-genCommittee :: Gen (NonEmpty LeiosSigningKey, LeiosCommittee)
-genCommittee = sized $ \size -> do
-  n <- chooseInt (1, max 1 (min size 16))
-  let (keys, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
-  pure (fromList keys, committee)
-
-genMsg :: Gen BS.ByteString
-genMsg = chooseInt (0, 64) >>= genByteString
-
--- | Sign @msg@ with each of the given keys and pack them into a 'Map' keyed
--- by 'LeiosSeatId', matching the input shape of 'aggregateLeiosCert'.
-signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map LeiosSeatId LeiosSignature
-signContribs msg pairs =
-  Map.fromList
-    [(LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
-
--- | Aggregate or fail the property with the error.
-aggregateOrFail ::
-  LeiosCommittee ->
-  Map LeiosSeatId LeiosSignature ->
-  (LeiosCert -> Property) ->
-  Property
-aggregateOrFail committee contributions k = case aggregateLeiosCert committee contributions of
-  Right c -> k c
-  Left e -> counterexample (show e) (property False)
+prop_getVoterId_returns_first_index = property $ do
+  (_, committee) <- genCommittee
+  let voters = V.toList committee.leiosCommitteeSeats
+      duped = UnsafeLeiosCommittee (committee.leiosCommitteeSeats <> committee.leiosCommitteeSeats)
+  pure $
+    conjoin
+      [ counterexample ("first occurrence at " <> show i) $
+          case seatVKey voter of
+            SNothing -> counterexample "genCommittee seat unexpectedly keyless" (property False)
+            SJust vk -> getLeiosSeatId vk duped === Just (LeiosSeatId (fromIntegral i))
+      | (i :: Int, voter) <- zip [0 ..] voters
+      ]
 
 -- | All committee members sign the same message; the resulting cert verifies
 -- against that committee, threshold and message, and reports full weight.
 prop_verifyLeiosCert_accepts_aggregated :: Property
-prop_verifyLeiosCert_accepts_aggregated =
-  forAll genCommittee $ \(sks, committee) ->
-    forAll genMsg $ \msg ->
-      let contributions = signContribs msg (zip [0 :: Int ..] (toList sks))
-       in aggregateOrFail committee contributions $ \cert ->
-            verifyLeiosCert committee 1 msg cert === Right 1
+prop_verifyLeiosCert_accepts_aggregated = property $ do
+  (sks, committee) <- genCommittee
+  msg <- genMsg
+  let contributions = signContribs msg (zip [0 :: Int ..] (toList sks))
+  pure $
+    aggregateOrFail committee contributions $ \cert ->
+      verifyLeiosCert committee 1 msg cert === Right 1
 
 -- | An arbitrary subset of @k@ committee members signs the same message.
 -- The cert must verify against any threshold @≤ k/n@ and report weight
 -- @k/n@. Catches bugs where the verifier doesn't actually sum the correct
 -- subset of weights.
 prop_verifyLeiosCert_accepts_subset :: Property
-prop_verifyLeiosCert_accepts_subset =
-  forAll genCommittee $ \(sks, committee) ->
-    let n = length (toList sks)
-     in forAll (chooseInt (1, n)) $ \k ->
-          forAll genMsg $ \msg ->
-            let contributions = signContribs msg (take k (zip [0 :: Int ..] (toList sks)))
-                expectedWeight = fromIntegral @Int @Weight k / fromIntegral @Int @Weight n
-             in aggregateOrFail committee contributions $ \cert ->
-                  verifyLeiosCert committee expectedWeight msg cert === Right expectedWeight
+prop_verifyLeiosCert_accepts_subset = property $ do
+  (sks, committee) <- genCommittee
+  let n = length (toList sks)
+  k <- chooseInt (1, n)
+  msg <- genMsg
+  let contributions = signContribs msg (take k (zip [0 :: Int ..] (toList sks)))
+      expectedWeight = fromIntegral @Int @Weight k / fromIntegral @Int @Weight n
+  pure $
+    aggregateOrFail committee contributions $ \cert ->
+      verifyLeiosCert committee expectedWeight msg cert === Right expectedWeight
 
 -- | A cert built over message @m1@ must not verify against message @m2@.
 prop_verifyLeiosCert_rejects_wrong_message :: Property
-prop_verifyLeiosCert_rejects_wrong_message =
-  forAll genCommittee $ \(sks, committee) ->
-    let m1 = "leios-message-one" :: BS.ByteString
-        m2 = "leios-message-two" :: BS.ByteString
-        contributions = signContribs m1 (zip [0 :: Int ..] (toList sks))
-     in aggregateOrFail committee contributions $ \cert ->
-          verifyLeiosCert committee 1 m2 cert === Left InvalidSignature
+prop_verifyLeiosCert_rejects_wrong_message = property $ do
+  (sks, committee) <- genCommittee
+  let m1 = "leios-message-one" :: BS.ByteString
+      m2 = "leios-message-two" :: BS.ByteString
+      contributions = signContribs m1 (zip [0 :: Int ..] (toList sks))
+  pure $
+    aggregateOrFail committee contributions $ \cert ->
+      verifyLeiosCert committee 1 m2 cert === Left InvalidSignature
 
 -- | A cert whose signers' summed weight is below the threshold must be
 -- rejected with 'InsufficientWeight', without ever performing the BLS
 -- pairing. Uses n ≥ 2 so a single signer's weight @1/n@ is strictly less
 -- than the full-weight threshold.
 prop_verifyLeiosCert_rejects_below_threshold :: Property
-prop_verifyLeiosCert_rejects_below_threshold =
-  forAll (chooseInt (2, 16)) $ \n ->
-    let (sks, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
-        sk0 = case sks of
-          (s0 : _) -> s0
-          _ -> error "prop_verifyLeiosCert_rejects_below_threshold: n >= 2 invariant violated"
-        msg = "leios-quorum-test" :: BS.ByteString
-        contributions = signContribs msg [(0, sk0)]
-     in aggregateOrFail committee contributions $ \cert ->
-          verifyLeiosCert committee 1 msg cert
-            === Left (InsufficientWeight (1 / fromIntegral @Int @Weight n))
+prop_verifyLeiosCert_rejects_below_threshold = property $ do
+  n <- chooseInt (2, 16)
+  let (sks, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
+      sk0 = case sks of
+        (s0 : _) -> s0
+        _ -> error "prop_verifyLeiosCert_rejects_below_threshold: n >= 2 invariant violated"
+      msg = "leios-quorum-test" :: BS.ByteString
+      contributions = signContribs msg [(0, sk0)]
+  pure $
+    aggregateOrFail committee contributions $ \cert ->
+      verifyLeiosCert committee 1 msg cert
+        === Left (InsufficientWeight (1 / fromIntegral @Int @Weight n))
 
 -- | A 'signers' bitfield whose byte length differs from @⌈n/8⌉@ must be
 -- rejected as 'MalformedSigners' before any signature work is done. We
@@ -219,14 +190,15 @@ prop_verifyLeiosCert_rejects_below_threshold =
 -- size sits in the next byte bucket (A's bitfield is one byte short of
 -- what B expects).
 prop_verifyLeiosCert_rejects_oversized_signers :: Property
-prop_verifyLeiosCert_rejects_oversized_signers =
-  forAll genCommittee $ \(sks, committeeA) ->
-    let n = length (toList sks)
-        (_, committeeB) = mkCommitteeFromTestSeats (replicate (n + 8) (WithKey, 1 / fromIntegral (n + 8)))
-        msg = "leios-malformed-test" :: BS.ByteString
-        contributions = signContribs msg (zip [0 :: Int ..] (toList sks))
-     in aggregateOrFail committeeA contributions $ \cert ->
-          verifyLeiosCert committeeB 1 msg cert === Left MalformedSigners
+prop_verifyLeiosCert_rejects_oversized_signers = property $ do
+  (sks, committeeA) <- genCommittee
+  let n = length (toList sks)
+      (_, committeeB) = mkCommitteeFromTestSeats (replicate (n + 8) (WithKey, 1 / fromIntegral (n + 8)))
+      msg = "leios-malformed-test" :: BS.ByteString
+      contributions = signContribs msg (zip [0 :: Int ..] (toList sks))
+  pure $
+    aggregateOrFail committeeA contributions $ \cert ->
+      verifyLeiosCert committeeB 1 msg cert === Left MalformedSigners
 
 -- | A cert whose 'leiosCertSigners' bitfield disagrees with its 'leiosCertSignature'
 -- must be rejected with 'InvalidSignature'. We construct two real certs
@@ -235,43 +207,44 @@ prop_verifyLeiosCert_rejects_oversized_signers =
 -- signed but the aggregate doesn't include voter 1's signature, so the BLS
 -- pairing fails. Uses n ≥ 2 so there are at least two voters to splice.
 prop_verifyLeiosCert_rejects_tampered_bitfield :: Property
-prop_verifyLeiosCert_rejects_tampered_bitfield =
-  forAll (chooseInt (2, 16)) $ \n ->
-    let (sks, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
-        (sks0, sks1) = case sks of
-          (s0 : s1 : _) -> (s0, s1)
-          _ -> error "prop_verifyLeiosCert_rejects_tampered_bitfield: n >= 2 invariant violated"
-        msg = "leios-tamper-test" :: BS.ByteString
-        contribsAlone = signContribs msg [(0, sks0)]
-        contribsPair = signContribs msg [(0, sks0), (1, sks1)]
-     in aggregateOrFail committee contribsAlone $ \certA ->
-          aggregateOrFail committee contribsPair $ \certB ->
-            let tampered = certA {leiosCertSigners = certB.leiosCertSigners}
-             in -- Threshold is below the tampered weight 2/n so we exercise the BLS
-                -- pairing failure, not the short-circuit.
-                verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
-                  === Left InvalidSignature
+prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
+  n <- chooseInt (2, 16)
+  let (sks, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
+      (sks0, sks1) = case sks of
+        (s0 : s1 : _) -> (s0, s1)
+        _ -> error "prop_verifyLeiosCert_rejects_tampered_bitfield: n >= 2 invariant violated"
+      msg = "leios-tamper-test" :: BS.ByteString
+      contribsAlone = signContribs msg [(0, sks0)]
+      contribsPair = signContribs msg [(0, sks0), (1, sks1)]
+  pure $
+    aggregateOrFail committee contribsAlone $ \certA ->
+      aggregateOrFail committee contribsPair $ \certB ->
+        let tampered = certA {leiosCertSigners = certB.leiosCertSigners}
+         in -- Threshold is below the tampered weight 2/n so we exercise the BLS
+            -- pairing failure, not the short-circuit.
+            verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
+              === Left InvalidSignature
 
 -- | A 'LeiosSeatId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
-prop_aggregateLeiosCert_rejects_out_of_range =
-  forAll genCommittee $ \(sks@(sk0 :| _), committee) ->
-    let n = length sks
-     in forAll (chooseInt (n, n + 100)) $ \badIdx ->
-          let msg = "x" :: BS.ByteString
-              bad = LeiosSeatId (fromIntegral @Int @Word16 badIdx)
-              contributions = Map.singleton bad (signDSIGN leiosSignContext msg sk0)
-           in aggregateLeiosCert committee contributions === Left (VoterIdsOutOfBounds (bad :| []))
+prop_aggregateLeiosCert_rejects_out_of_range = property $ do
+  (sks@(sk0 :| _), committee) <- genCommittee
+  let n = length sks
+  badIdx <- chooseInt (n, n + 100)
+  let msg = "x" :: BS.ByteString
+      bad = LeiosSeatId (fromIntegral @Int @Word16 badIdx)
+      contributions = Map.singleton bad (signDSIGN leiosSignContext msg sk0)
+  pure $ aggregateLeiosCert committee contributions === Left (VoterIdsOutOfBounds (bad :| []))
 
 -- | Aggregating an empty contribution set must fail: the underlying BLS
 -- 'aggregateSigsDSIGN' rejects the empty input, which surfaces as
 -- 'BLSAggregationFailed'. We don't pin the exact message string.
 prop_aggregateLeiosCert_rejects_empty :: Property
-prop_aggregateLeiosCert_rejects_empty =
-  forAll genCommittee $ \(_, committee) ->
-    case aggregateLeiosCert committee Map.empty of
-      Left BLSAggregationFailed {} -> property True
-      other -> counterexample (show other) (property False)
+prop_aggregateLeiosCert_rejects_empty = property $ do
+  (_, committee) <- genCommittee
+  pure $ case aggregateLeiosCert committee Map.empty of
+    Left BLSAggregationFailed {} -> property True
+    other -> counterexample (show other) (property False)
 
 -- | Every committee member gets a seat with its weight regardless of its key,
 -- and a seat keeps its key exactly when a valid key was registered with a
@@ -326,6 +299,19 @@ instance Arbitrary TestSeatType where
   arbitrary = elements [minBound .. maxBound]
   shrink = const []
 
+-- | Generate an all-keyed committee together with its signing keys, at an
+-- interesting size: driven by the QuickCheck size parameter but capped at 16 —
+-- covering the single-voter (1), single-byte-bitfield (≤ 8) and two-byte
+-- boundary (9..16) cases — and always ≥ 1. Built via 'mkCommitteeFromTestSeats'
+-- so it goes through the real 'mkLeiosCommittee'. The 'NonEmpty' return reflects
+-- the @n ≥ 1@ precondition and gives tests a total 'head' for "any-one-signer"
+-- cases.
+genCommittee :: Gen (NonEmpty LeiosSigningKey, LeiosCommittee)
+genCommittee = sized $ \size -> do
+  n <- chooseInt (1, max 1 (min size 16))
+  let (keys, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
+  pure (fromList keys, committee)
+
 -- | Generate input for 'mkLeiosCommittee' via 'mkCommitteeFromTestSeats': a non-empty
 -- run of seats, each a type and a weight, with sizes chosen to cover the
 -- bitfield byte boundaries (n = 1, ≤ 8, 9..16).
@@ -334,11 +320,14 @@ genTestSeats = chooseInt (1, 16) >>= \n -> vectorOf n genSeat
   where
     genSeat = (,) <$> arbitrary <*> (fromIntegral <$> chooseInt (0, 100))
 
+genMsg :: Gen BS.ByteString
+genMsg = chooseInt (0, 64) >>= genByteString
+
 -- | Build the committee that 'mkLeiosCommittee' produces from a generated seat
--- list, returning the per-seat signing keys alongside it (as 'fixedCommittee'
--- does) so callers can sign without re-deriving keys. Keys are derived per
--- position: a 'NoKey' seat registers no key, and a 'BadPoP' seat pairs its key
--- with an unrelated key's proof of possession, which cannot verify.
+-- list, returning the per-seat signing keys alongside it so callers can sign
+-- without re-deriving keys. Keys are derived per position: a 'NoKey' seat
+-- registers no key, and a 'BadPoP' seat pairs its key with an unrelated key's
+-- proof of possession, which cannot verify.
 mkCommitteeFromTestSeats :: [(TestSeatType, Weight)] -> ([LeiosSigningKey], LeiosCommittee)
 mkCommitteeFromTestSeats testSeats =
   (keys, mkLeiosCommittee (V.fromList (zipWith seatInput keys testSeats)))
@@ -355,3 +344,20 @@ mkCommitteeFromTestSeats testSeats =
           BadPoP -> SJust (vk, createPossessionProofDSIGN leiosSignContext unrelatedSk)
 
         unrelatedSk = genLeiosSigningKey `generateWith` (length testSeats + 1)
+
+-- | Sign @msg@ with each of the given keys and pack them into a 'Map' keyed
+-- by 'LeiosSeatId', matching the input shape of 'aggregateLeiosCert'.
+signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map LeiosSeatId LeiosSignature
+signContribs msg pairs =
+  Map.fromList
+    [(LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
+
+-- | Aggregate or fail the property with the error.
+aggregateOrFail ::
+  LeiosCommittee ->
+  Map LeiosSeatId LeiosSignature ->
+  (LeiosCert -> Property) ->
+  Property
+aggregateOrFail committee contributions k = case aggregateLeiosCert committee contributions of
+  Right c -> k c
+  Left e -> counterexample (show e) (property False)
