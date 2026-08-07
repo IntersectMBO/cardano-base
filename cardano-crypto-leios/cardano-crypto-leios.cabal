@@ -58,7 +58,7 @@ library testlib
   build-depends:
     QuickCheck,
     cardano-base:testlib,
-    cardano-crypto-class,
+    cardano-crypto-class:{cardano-crypto-class, testlib},
     cardano-crypto-leios,
     cardano-strict-containers,
     containers,
