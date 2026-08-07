@@ -33,13 +33,13 @@ import Cardano.Crypto.Leios (
   leiosSignContext,
   mkLeiosCommittee,
  )
-import Data.Maybe.Strict (StrictMaybe (..))
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import qualified Data.Map.Strict as Map
+import Data.Maybe.Strict (StrictMaybe (..))
 import Data.Proxy (Proxy (Proxy))
 import Data.Ratio ((%))
 import qualified Data.Vector.Strict as V
-import Data.Word (Word16, Word64)
+import Data.Word (Word16)
 import Test.Cardano.Base.Bytes (genByteString)
 import Test.QuickCheck (Gen, choose, chooseInt, elements, shuffle, vectorOf)
 import Test.QuickCheck.Gen (unGen)
@@ -102,5 +102,5 @@ genLeiosCert = do
 -- | Deterministically evaluate a QuickCheck 'Gen' at a fixed seed. Useful for
 -- pinning a single value (e.g. for golden tests) without going through
 -- 'Test.QuickCheck.generate' in 'IO'.
-generateWith :: Gen a -> Word64 -> a
-generateWith gen seed = unGen gen (mkQCGen (fromIntegral @Word64 @Int seed)) 30
+generateWith :: Integral i => Gen a -> i -> a
+generateWith gen seed = unGen gen (mkQCGen (fromIntegral seed)) 30
