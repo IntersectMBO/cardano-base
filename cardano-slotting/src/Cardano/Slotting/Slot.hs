@@ -9,6 +9,7 @@
 
 module Cardano.Slotting.Slot (
   SlotNo (..),
+  SlotInterval (..),
   WithOrigin (..),
   at,
   origin,
@@ -46,6 +47,13 @@ instance ToCBOR SlotNo where
 
 instance FromCBOR SlotNo where
   fromCBOR = decode
+
+newtype SlotInterval = SlotInterval
+  { unSlotInterval :: Word32
+  }
+  deriving (Eq, Ord, Generic)
+  deriving (Show) via Quiet SlotInterval
+  deriving newtype (NoThunks, NFData, ToJSON, FromJSON, ToCBOR, FromCBOR)
 
 {-------------------------------------------------------------------------------
   WithOrigin

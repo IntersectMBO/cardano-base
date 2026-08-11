@@ -11,12 +11,15 @@ import Cardano.Slotting.Slot (
   EpochInterval (..),
   EpochNo (..),
   EpochSize (..),
+  SlotInterval (..),
   SlotNo (..),
   WithOrigin (..),
  )
 import Cardano.Slotting.Time (SystemStart (..))
 import Test.QuickCheck
 import Test.QuickCheck.Instances.Time ()
+
+deriving instance Arbitrary SlotInterval
 
 deriving instance Arbitrary BlockNo
 
