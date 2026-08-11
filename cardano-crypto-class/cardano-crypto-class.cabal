@@ -196,7 +196,7 @@ library testlib
     cardano-crypto-class,
     cborg,
     containers,
-    contra-tracer ^>=0.2.1,
+    contra-tracer >=0.1 && <0.3,
     crypton,
     formatting,
     hspec,

@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -206,7 +207,15 @@ testKESAlloc _p n =
       it "genKey" $ testMLockGenKeyKES _p
 
 eventTracer :: IORef [event] -> Tracer IO event
-eventTracer logVar = mkTracer (\ev -> liftIO $ atomicModifyIORef' logVar (\acc -> (acc ++ [ev], ())))
+eventTracer logVar =
+  mkTracer
+    (\ev -> liftIO $ atomicModifyIORef' logVar (\acc -> (acc ++ [ev], ())))
+{- FOURMOLU_DISABLE -}
+#if ! MIN_VERSION_contra_tracer(0,2,0)
+  where
+    mkTracer = Tracer
+#endif
+{- FOURMOLU_ENABLE -}
 
 matchAllocLog :: [AllocEvent] -> Set WordPtr
 matchAllocLog = F.foldl' (flip go) Set.empty

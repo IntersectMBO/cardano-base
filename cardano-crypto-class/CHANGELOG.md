@@ -5,6 +5,12 @@
 * Replace memory dependency with ram (drop in replacement)
 * Depend on crypton ^>- 1.1
 
+### `testlib`
+
+* Widen `contra-tracer` bound to `>=0.1 && <0.3`, using CPP to support both the
+  `0.1.x` and `0.2.x` API (the latter requires `mkTracer` in place of the
+  `Tracer` constructor to build a tracer from a callback)
+
 ## 2.5.1.0
 
 * Add `VerKeySizeVRF`, `SignKeySizeVRF` and `CertSizeVRF` type-level sizes to `VRFAlgorithm`
