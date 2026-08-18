@@ -158,8 +158,8 @@ popProofSignContext _ =
     Nothing -> minSigPoPProofDST
 
 type family CurveVariant (c :: Type) :: Symbol where
-  CurveVariant Curve1 = "BLS-Signature-Mininimal-Verification-Key-Size"
-  CurveVariant Curve2 = "BLS-Signature-Mininimal-Signature-Size"
+  CurveVariant Curve1 = "BLS-Signature-Minimal-Verification-Key-Size"
+  CurveVariant Curve2 = "BLS-Signature-Minimal-Signature-Size"
 
 -- | This module provides support only for proof-of-possession (PoP) ciphersuite
 -- contexts:
