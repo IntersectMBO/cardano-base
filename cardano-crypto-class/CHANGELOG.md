@@ -4,6 +4,12 @@
 
 * Replace memory dependency with ram (drop in replacement)
 * Depend on crypton ^>- 1.1
+* Fix the DST used when hashing the public key for BLS12-381 proofs of possession:
+  `createPossessionProofDSIGN` and `verifyPossessionProofDSIGN` now use the
+  `"BLS_POP_"`-prefixed DST prescribed by draft-irtf-cfrg-bls-signature-06
+  (Section 4.2.3) instead of the `"BLS_SIG_"` one used for ordinary signatures.
+  The PoP DST is selected internally per curve variant, so these functions (and
+  `aggregateVerKeysDSIGN`) no longer take a signing context.
 
 ## 2.5.1.0
 

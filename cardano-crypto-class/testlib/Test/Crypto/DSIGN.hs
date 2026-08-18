@@ -172,13 +172,11 @@ defaultSignKeyGen =
 defaultPossessionProofGen
   :: forall v.
      DSIGNAggregatable v
-  => Gen (ContextDSIGN v)
-  -> Gen (KeyGenContextDSIGN v)
+  => Gen (KeyGenContextDSIGN v)
   -> Gen (PossessionProofDSIGN v)
-defaultPossessionProofGen genContext genKeyCtx = do
-  ctx <- genContext
-  sk  <- defaultSignKeyWithContextGen @v genKeyCtx
-  pure $ createPossessionProofDSIGN ctx sk
+defaultPossessionProofGen genKeyCtx = do
+  sk <- defaultSignKeyWithContextGen @v genKeyCtx
+  pure $ createPossessionProofDSIGN sk
 
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
@@ -817,7 +815,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       forAllShow (genAggregateCase genContext genMsg) ppShow $
           \(ctx, msg, vksPops, sigs) -> (=== Right ()) $ do
             sig <- aggregateSigsDSIGN @v sigs
-            aggVk <- aggregateVerKeysDSIGN ctx vksPops
+            aggVk <- aggregateVerKeysDSIGN vksPops
             verifyDSIGN @v ctx aggVk msg sig
     prop "aggregate verify negative (wrong message)" $
       withNumTests 1000 .
@@ -825,7 +823,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
           forAllShow arbitrary ppShow $ \msg' ->
             msg /= msg' ==> (=/= Right ()) $ do
                 sig <- aggregateSigsDSIGN @v sigs
-                aggVk <- aggregateVerKeysDSIGN ctx vksPops
+                aggVk <- aggregateVerKeysDSIGN vksPops
                 verifyDSIGN @v ctx aggVk msg' sig
     prop "aggregate verify negative (wrong PoP)" $
         forAllShow (genAggregateCaseAtLeast2 genContext genMsg) ppShow $
@@ -834,7 +832,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
               (a:b:rest) -> (=/= Right ()) $ do
                 let vksPops' = (fst a, snd b) : (fst b, snd a) : rest
                 sig <- aggregateSigsDSIGN @v sigs
-                aggVk <- aggregateVerKeysDSIGN ctx vksPops'
+                aggVk <- aggregateVerKeysDSIGN vksPops'
                 verifyDSIGN @v ctx aggVk msg sig
               _ ->
                 counterexample "genAggregateCaseAtLeast2 produced <2 entries (bug in generator)" False
@@ -850,7 +848,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       => (PossessionProofDSIGN v -> prop)
       -> Property
     forAllPoP =
-      forAllShow (defaultPossessionProofGen @v genContext genKeyCtx) ppShow
+      forAllShow (defaultPossessionProofGen @v genKeyCtx) ppShow
     genAggregateCase genCtx genMsg' = do
       ctx <- genCtx
       msg <- genMsg'
@@ -859,7 +857,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       n   <- Gen.chooseInt (1, 8)
       sks <- replicateM n (defaultSignKeyWithContextGen @v genKeyCtx)
       let vksPops = [ ( deriveVerKeyDSIGN sk
-                     , createPossessionProofDSIGN ctx sk
+                     , createPossessionProofDSIGN sk
                      )
                    | sk <- sks
                    ]
@@ -874,7 +872,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       n   <- Gen.chooseInt (2, 8)
       sks <- replicateM n (defaultSignKeyWithContextGen @v genKeyCtx)
       let vksPops = [ ( deriveVerKeyDSIGN sk
-                     , createPossessionProofDSIGN ctx sk
+                     , createPossessionProofDSIGN sk
                      )
                    | sk <- sks
                    ]

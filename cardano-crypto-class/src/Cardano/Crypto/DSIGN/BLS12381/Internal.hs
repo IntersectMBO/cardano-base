@@ -98,10 +98,11 @@ import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Data.Data (Typeable)
+import Data.Data (Typeable, eqT)
 import qualified Data.Foldable as F (foldl')
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
+import Data.Type.Equality ((:~:) (Refl))
 import Foreign.C.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
@@ -132,6 +133,29 @@ minSigPoPDST = BLS12381SignContext (Just "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO
 -- | The BLS12381 signing context for the "PoP" based ciphersuite for the minimal verification key size variant of bls signatures
 minVerKeyPoPDST :: BLS12381SignContext
 minVerKeyPoPDST = BLS12381SignContext (Just "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_") Nothing
+
+-- The context used by @hash_pubkey_to_point@ when creating and verifying
+-- proofs of possession for the minimal signature size variant, as per
+-- draft-irtf-cfrg-bls-signature-06, Section 4.2.3: proofs of possession use
+-- @"BLS_POP_" || H2C_SUITE_ID || SC_TAG || "_"@ as DST, whereas ordinary
+-- signatures use the @"BLS_SIG_"@ prefix. Not exported: it is applied
+-- internally by 'createPossessionProofDSIGN' and 'verifyPossessionProofDSIGN',
+-- so users cannot accidentally create or verify a proof under the signature
+-- DST.
+minSigPoPProofDST :: BLS12381SignContext
+minSigPoPProofDST = BLS12381SignContext (Just "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_") Nothing
+
+-- As 'minSigPoPProofDST', for the minimal verification key size variant.
+minVerKeyPoPProofDST :: BLS12381SignContext
+minVerKeyPoPProofDST = BLS12381SignContext (Just "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_") Nothing
+
+-- Select the proof-of-possession context for the curve the verification keys
+-- live on.
+popProofSignContext :: forall curve. Typeable curve => Proxy curve -> BLS12381SignContext
+popProofSignContext _ =
+  case eqT @curve @Curve1 of
+    Just Refl -> minVerKeyPoPProofDST
+    Nothing -> minSigPoPProofDST
 
 type family CurveVariant (c :: Type) :: Symbol where
   CurveVariant Curve1 = "BLS-Signature-Mininimal-Verification-Key-Size"
@@ -194,6 +218,14 @@ type family CurveVariant (c :: Type) :: Symbol where
 --   public keys live in G1 (48 bytes compressed), signatures in G2
 --   (96 bytes compressed).
 --
+-- Within each variant, the PoP ciphersuite prescribes two DSTs (Section 4.2.3):
+-- ordinary signing and verification use the @\"BLS_SIG_\"@-prefixed DST
+-- ('minSigPoPDST' \/ 'minVerKeyPoPDST'), while creating and verifying proofs of
+-- possession hash the public key with the @\"BLS_POP_\"@-prefixed DST.
+-- 'createPossessionProofDSIGN' and 'verifyPossessionProofDSIGN' take no signing
+-- context: they select the @\"BLS_POP_\"@ context internally from the curve, so
+-- callers cannot accidentally use the signature DST for proofs of possession.
+--
 -- The draft recommends the minimal-pubkey-size variant for aggregation,
 -- because the size of @(PK_1, ..., PK_n, signature)@ is usually dominated by
 -- the public keys. Other protocols, like Leios, might favor minimal-signature-size.
@@ -223,14 +255,14 @@ type family CurveVariant (c :: Type) :: Symbol where
 --         (mkSeedFromBytes (BS.replicate 32 2))
 --     vk1 = deriveVerKeyDSIGN sk1
 --     vk2 = deriveVerKeyDSIGN sk2
---     pop1 = createPossessionProofDSIGN ctx sk1
---     pop2 = createPossessionProofDSIGN ctx sk2
+--     pop1 = createPossessionProofDSIGN sk1
+--     pop2 = createPossessionProofDSIGN sk2
 -- :}
 --
--- >>> verifyPossessionProofDSIGN ctx vk1 pop1
+-- >>> verifyPossessionProofDSIGN vk1 pop1
 -- Right ()
 --
--- >>> verifyPossessionProofDSIGN ctx vk2 pop2
+-- >>> verifyPossessionProofDSIGN vk2 pop2
 -- Right ()
 --
 -- -- Once the proofs have been checked, it is safe to aggregate keys
@@ -540,15 +572,15 @@ instance
                 else Right $ SigBLS12381 aggrPoint
 
   {-# INLINE createPossessionProofDSIGN #-}
-  createPossessionProofDSIGN ctx sk =
+  createPossessionProofDSIGN sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = signDSIGN ctx (rawEncodeFixedSized vk) sk
+        SigBLS12381 sig = signDSIGN (popProofSignContext (Proxy @curve)) (rawEncodeFixedSized vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
-  verifyPossessionProofDSIGN ctx vk (PossessionProofBLS12381 mu1Psb) =
+  verifyPossessionProofDSIGN vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (verifyDSIGN ctx vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
+      (verifyDSIGN (popProofSignContext (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>
