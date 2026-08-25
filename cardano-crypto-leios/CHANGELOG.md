@@ -18,6 +18,10 @@
 
 ## 0.2.0.0
 
+* Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
+  `BLS12381MinSigDSIGN`, so pass `()` as the signing context to `signDSIGN` /
+  `verifyDSIGN`.
+
 * Remove:
   - `encodeLeiosCert`
   - `decodeLeiosCert`
