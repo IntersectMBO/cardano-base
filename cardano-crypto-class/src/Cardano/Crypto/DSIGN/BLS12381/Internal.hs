@@ -295,6 +295,70 @@ type BLS12381CurveConstraints curve =
   , Typeable curve
   )
 
+-- The core signing routine shared by 'signDSIGN' and
+-- 'createPossessionProofDSIGN'; the caller chooses the signing context (in
+-- particular the DST, which differs between ordinary signatures and proofs of
+-- possession).
+{-# INLINE blsCoreSign #-}
+blsCoreSign ::
+  forall curve a.
+  (BLS curve, BLS (DualCurve curve), SignableRepresentation a) =>
+  BLS12381SignContext ->
+  a ->
+  SignKeyDSIGN (BLS12381DSIGN curve) ->
+  SigDSIGN (BLS12381DSIGN curve)
+blsCoreSign BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} msg (SignKeyBLS12381 (Scalar skPsb)) =
+  SigBLS12381 $ unsafeDupablePerformIO $ do
+    psbUseAsCPtr skPsb $ \skPtp -> do
+      withNewPoint_ @(DualCurve curve) $ \hashPtr -> do
+        withMaybeCStringLen dst $ \(dstPtr, dstLen) ->
+          withMaybeCStringLen aug $ \(augPtr, augLen) ->
+            unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) ->
+              c_blst_hash @(DualCurve curve)
+                hashPtr
+                msgPtr
+                (fromIntegral @Int @CSize msgLen)
+                dstPtr
+                (fromIntegral @Int @CSize dstLen)
+                augPtr
+                (fromIntegral @Int @CSize augLen)
+        withNewPoint' @(DualCurve curve) $ \sigPtr -> do
+          c_blst_sign @curve sigPtr hashPtr (ScalarPtr skPtp)
+
+-- The core verification routine shared by 'verifyDSIGN' and
+-- 'verifyPossessionProofDSIGN'; as 'blsCoreSign', the caller chooses the
+-- signing context.
+{-# INLINE blsCoreVerify #-}
+blsCoreVerify ::
+  forall curve a.
+  (BLS curve, BLS (DualCurve curve), SignableRepresentation a) =>
+  BLS12381SignContext ->
+  VerKeyDSIGN (BLS12381DSIGN curve) ->
+  a ->
+  SigDSIGN (BLS12381DSIGN curve) ->
+  Either String ()
+blsCoreVerify BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
+  unsafeDupablePerformIO $ do
+    withMaybeCStringLen dst $ \(dstPtr, dstLen) -> do
+      withAffine (toAffine @curve pbPsb) $ \pkAff ->
+        withAffine (toAffine @(DualCurve curve) sigPsb) $ \sigAff ->
+          withMaybeCStringLen aug $ \(augPtr, augLen) ->
+            unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) -> do
+              err <-
+                c_blst_core_verify @curve
+                  pkAff
+                  sigAff
+                  True
+                  msgPtr
+                  (fromIntegral @Int @CSize msgLen)
+                  dstPtr
+                  (fromIntegral @Int @CSize dstLen)
+                  augPtr
+                  (fromIntegral @Int @CSize augLen)
+              pure $! case mkBLSTError err of
+                BLST_SUCCESS -> Right ()
+                _ -> Left "verifyDSIGN: BLS12381DSIGN signature failed to verify"
+
 instance
   BLS12381CurveConstraints curve =>
   DSIGNAlgorithm (BLS12381DSIGN curve)
@@ -338,47 +402,11 @@ instance
         c_blst_sk_to_pk @curve vkPtp (ScalarPtr skp)
 
   {-# INLINE signDSIGN #-}
-  signDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} msg (SignKeyBLS12381 (Scalar skPsb)) =
-    SigBLS12381 $ unsafeDupablePerformIO $ do
-      psbUseAsCPtr skPsb $ \skPtp -> do
-        withNewPoint_ @(DualCurve curve) $ \hashPtr -> do
-          withMaybeCStringLen dst $ \(dstPtr, dstLen) ->
-            withMaybeCStringLen aug $ \(augPtr, augLen) ->
-              unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) ->
-                c_blst_hash @(DualCurve curve)
-                  hashPtr
-                  msgPtr
-                  (fromIntegral @Int @CSize msgLen)
-                  dstPtr
-                  (fromIntegral @Int @CSize dstLen)
-                  augPtr
-                  (fromIntegral @Int @CSize augLen)
-          withNewPoint' @(DualCurve curve) $ \sigPtr -> do
-            c_blst_sign @curve sigPtr hashPtr (ScalarPtr skPtp)
+  signDSIGN = blsCoreSign
 
   {-# INLINE verifyDSIGN #-}
   -- Context can hold domain separation tag and/or augmentation data for signatures
-  verifyDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
-    unsafeDupablePerformIO $ do
-      withMaybeCStringLen dst $ \(dstPtr, dstLen) -> do
-        withAffine (toAffine @curve pbPsb) $ \pkAff ->
-          withAffine (toAffine @(DualCurve curve) sigPsb) $ \sigAff ->
-            withMaybeCStringLen aug $ \(augPtr, augLen) ->
-              unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) -> do
-                err <-
-                  c_blst_core_verify @curve
-                    pkAff
-                    sigAff
-                    True
-                    msgPtr
-                    (fromIntegral @Int @CSize msgLen)
-                    dstPtr
-                    (fromIntegral @Int @CSize dstLen)
-                    augPtr
-                    (fromIntegral @Int @CSize augLen)
-                pure $! case mkBLSTError err of
-                  BLST_SUCCESS -> Right ()
-                  _ -> Left "verifyDSIGN: BLS12381DSIGN signature failed to verify"
+  verifyDSIGN = blsCoreVerify
 
   {-# INLINE genKeyDSIGN #-}
   genKeyDSIGN = genKeyDSIGNWithContext Nothing
@@ -574,13 +602,13 @@ instance
   {-# INLINE createPossessionProofDSIGN #-}
   createPossessionProofDSIGN sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = signDSIGN (popProofSignContext (Proxy @curve)) (rawEncodeFixedSized vk) sk
+        SigBLS12381 sig = blsCoreSign (popProofSignContext (Proxy @curve)) (rawEncodeFixedSized vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
   verifyPossessionProofDSIGN vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (verifyDSIGN (popProofSignContext (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
+      (blsCoreVerify (popProofSignContext (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>
