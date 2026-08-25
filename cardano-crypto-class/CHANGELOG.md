@@ -10,6 +10,12 @@
   (Section 4.2.3) instead of the `"BLS_SIG_"` one used for ordinary signatures.
   The PoP DST is selected internally per curve variant, so these functions (and
   `aggregateVerKeysDSIGN`) no longer take a signing context.
+* Select the BLS12-381 *signing* DST internally per curve variant as well:
+  `ContextDSIGN (BLS12381DSIGN curve)` is now `()`, and `signDSIGN` /
+  `verifyDSIGN` use the canonical `"BLS_SIG_"`-prefixed DST of the PoP
+  ciphersuite for the chosen variant. `BLS12381SignContext`, `minSigPoPDST` and
+  `minVerKeyPoPDST` are removed from the public API, and message augmentation
+  is no longer supported (the POP scheme does not use it).
 
 ## 2.5.1.0
 
