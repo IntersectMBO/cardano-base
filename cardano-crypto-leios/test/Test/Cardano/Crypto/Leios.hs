@@ -27,6 +27,7 @@ import Cardano.Crypto.Leios (
  )
 import qualified Data.ByteString as BS
 import Data.Foldable (toList)
+import Data.List (uncons)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -49,6 +50,7 @@ import Test.QuickCheck (
   chooseInt,
   conjoin,
   counterexample,
+  discard,
   forAll,
   forAllShrink,
   genericShrink,
@@ -229,8 +231,8 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
 prop_aggregateLeiosCert_rejects_out_of_range = property $ do
   TestCommittee {committee, allKeys} <- genCommittee
-  let sk0 = head allKeys
-      n = length allKeys
+  (sk0, _) <- maybe discard pure $ uncons allKeys
+  let n = length allKeys
   badIdx <- chooseInt (n, n + 100)
   let msg = "x" :: BS.ByteString
       bad = LeiosSeatId (fromIntegral @Int @Word16 badIdx)

@@ -145,9 +145,8 @@ newtype LeiosCommittee = UnsafeLeiosCommittee {leiosCommitteeSeats :: Vector Lei
   deriving (NoThunks) via OnlyCheckWhnfNamed "LeiosCommittee" LeiosCommittee
 
 -- | Build a 'LeiosCommittee' from an ordered vector of seats. A seat with no
--- key — or one whose proof of possession fails to verify — is admitted keyless,
--- so one bad proof can't take down the committee. Seat order is the voter
--- indexing, so derive it deterministically.
+-- key, or one whose proof of possession fails to verify, is admitted keyless.
+-- Seat order is the voter indexing, so derive it deterministically.
 --
 -- NOTE: Seat weights are assumed to be in range [0,1] with sum ≤ 1.
 --
