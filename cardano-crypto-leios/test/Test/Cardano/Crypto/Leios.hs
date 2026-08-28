@@ -11,6 +11,7 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.Leios (
   AggregationError (..),
+  BitField (..),
   LeiosCert (..),
   LeiosCommittee (..),
   LeiosSeat (..),
@@ -22,6 +23,7 @@ import Cardano.Crypto.Leios (
   aggregateLeiosCert,
   getLeiosSeatId,
   leiosSignContext,
+  maxLeiosCommitteeSize,
   resolveLeiosSeat,
   verifyLeiosCert,
  )
@@ -32,14 +34,17 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe.Strict (StrictMaybe (..), isSJust)
+import Data.Primitive.ByteArray (byteArrayFromList, sizeofByteArray)
 import qualified Data.Vector.Strict as V
-import Data.Word (Word16)
+import Data.Word (Word16, Word8)
 import Test.Cardano.Base.Bytes (genByteString)
 import Test.Cardano.Crypto.Leios.Gen (
   TestCommittee (..),
   TestSeatType (..),
   genCommittee,
+  genLeiosSigningKey,
   genTestSeats,
+  generateWith,
   mkCommitteeFromTestSeats,
  )
 import Test.Hspec (Spec, context, describe)
@@ -70,6 +75,9 @@ spec = do
     describe "aggregateLeiosCert" $ do
       prop "rejects an out-of-range LeiosSeatId" prop_aggregateLeiosCert_rejects_out_of_range
       prop "rejects empty contributions" prop_aggregateLeiosCert_rejects_empty
+      prop
+        "never builds a bitfield past what maxLeiosCommitteeSize needs"
+        prop_aggregateLeiosCert_bitfield_fits_max_committee
 
     describe "verifyLeiosCert" $ do
       context "with a valid certificate" $ do
@@ -79,6 +87,9 @@ spec = do
         prop "rejects a wrong message" prop_verifyLeiosCert_rejects_wrong_message
         prop "rejects when total weight is below threshold" prop_verifyLeiosCert_rejects_below_threshold
         prop "rejects a bitfield wider than the committee" prop_verifyLeiosCert_rejects_oversized_signers
+        prop
+          "rejects a committee past maxLeiosCommitteeSize"
+          prop_verifyLeiosCert_rejects_oversized_committee
         prop "rejects a tampered bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
         prop "rejects a bit set for a seat without a key" prop_verifyLeiosCert_rejects_keyless_signer
 
@@ -202,6 +213,23 @@ prop_verifyLeiosCert_rejects_oversized_signers = property $ do
     aggregateOrFail committee contributions $ \cert ->
       verifyLeiosCert committeeB 1 msg cert === Left MalformedSigners
 
+-- | A committee past 'maxLeiosCommitteeSize' has seats whose index no longer
+-- fits a 'LeiosSeatId', so a bit set for one of them would wrap onto a low seat
+-- and borrow its key and weight. Verification must refuse the committee outright
+-- rather than resolve any bit against it, and must say so as 'MalformedCommittee'
+-- — 'MalformedSigners' would pin the blame on a bitfield that is above reproach.
+prop_verifyLeiosCert_rejects_oversized_committee :: Property
+prop_verifyLeiosCert_rejects_oversized_committee = property $ do
+  n <- chooseInt (maxLeiosCommitteeSize + 1, maxLeiosCommitteeSize + 8)
+  msg <- genMsg
+  let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
+      -- Exactly the length this committee demands, so the bitfield is not what fails.
+      signers = BitField $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
+      sig = signDSIGN leiosSignContext msg (genLeiosSigningKey `generateWith` n)
+      cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig}
+  pure . counterexample ("committee of " <> show n <> " seats") $
+    verifyLeiosCert committee 1 msg cert === Left (MalformedCommittee n)
+
 -- | A cert whose 'leiosCertSigners' bitfield disagrees with its 'leiosCertSignature'
 -- must be rejected with 'InvalidSignature'. We construct two real certs
 -- against the same committee (voter 0 alone, then voters 0+1), then splice
@@ -238,6 +266,27 @@ prop_aggregateLeiosCert_rejects_out_of_range = property $ do
       bad = LeiosSeatId (fromIntegral @Int @Word16 badIdx)
       contributions = Map.singleton bad (signDSIGN leiosSignContext msg sk0)
   pure $ aggregateLeiosCert committee contributions === Left (VoterIdsOutOfBounds (bad :| []))
+
+-- | A decoder has no committee to size 'leiosCertSigners' against, so it can
+-- only bound it by what the largest addressable committee would need. That bound
+-- is worth nothing unless aggregation respects it, so no committee may push the
+-- bitfield past it — we straddle the boundary. Seats are keyless (and so cheap
+-- to build in bulk) because only their count matters here.
+prop_aggregateLeiosCert_bitfield_fits_max_committee :: Property
+prop_aggregateLeiosCert_bitfield_fits_max_committee = property $ do
+  n <- chooseInt (maxLeiosCommitteeSize - 8, maxLeiosCommitteeSize + 8)
+  msg <- genMsg
+  let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 0 SNothing)
+      sig = signDSIGN leiosSignContext msg (genLeiosSigningKey `generateWith` n)
+      contributions = Map.singleton (LeiosSeatId 0) sig
+  pure . counterexample ("committee of " <> show n <> " seats") $
+    case aggregateLeiosCert committee contributions of
+      -- Refusing an unaddressable committee outright is just as sound.
+      Left _ -> property True
+      Right cert ->
+        let numBytes = sizeofByteArray (bitFieldBytes cert.leiosCertSigners)
+         in counterexample ("bitfield of " <> show numBytes <> " bytes") $
+              numBytes <= (maxLeiosCommitteeSize + 7) `div` 8
 
 -- | Aggregating an empty contribution set must fail: the underlying BLS
 -- 'aggregateSigsDSIGN' rejects the empty input, which surfaces as

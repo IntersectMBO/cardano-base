@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-crypto-leios
-version: 0.2.0.0
+version: 0.3.0.0
 synopsis: Crypto primitives for Leios
 description:
   Data types for the Leios cryptographic artifacts as specified in CIP-0164.
@@ -81,6 +81,7 @@ test-suite tests
     cardano-strict-containers,
     containers,
     hspec,
+    primitive >=0.7.3,
     vector,
 
   ghc-options:
