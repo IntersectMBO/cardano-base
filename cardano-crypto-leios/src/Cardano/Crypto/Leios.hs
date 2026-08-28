@@ -28,6 +28,7 @@ module Cardano.Crypto.Leios (
   LeiosCommittee (..),
   mkLeiosCommittee,
   leiosCommitteeSize,
+  maxLeiosCommitteeSize,
   resolveLeiosSeat,
   getLeiosSeatId,
 
@@ -172,6 +173,11 @@ mkLeiosCommittee seats =
 leiosCommitteeSize :: LeiosCommittee -> Int
 leiosCommitteeSize = length . leiosCommitteeSeats
 
+-- | Most seats a committee can have: 'LeiosSeatId' is a 'Word16', so seats past
+-- this could not be addressed by a vote.
+maxLeiosCommitteeSize :: Int
+maxLeiosCommitteeSize = fromIntegral @Word16 @Int maxBound + 1
+
 -- | Resolve a 'LeiosSeatId' to its 'LeiosSeat' on the 'LeiosCommittee', or 'Nothing'
 -- if the index is past the committee bound.
 resolveLeiosSeat :: LeiosCommittee -> LeiosSeatId -> Maybe LeiosSeat
@@ -208,6 +214,9 @@ data LeiosCert = LeiosCert
 data AggregationError
   = -- | One or more voter indices in the sigs are past the committee bound.
     VoterIdsOutOfBounds (NonEmpty LeiosSeatId)
+  | -- | The certificate would have more than 'maxLeiosCommitteeSize' seats, so
+    -- 'LeiosSeatId' cannot address all of them.
+    TooManySigners Int
   | -- | BLS signature aggregation failed (e.g. malformed input signature).
     BLSAggregationFailed Text
   deriving stock (Eq, Show, Generic)
@@ -222,6 +231,10 @@ aggregateLeiosCert ::
   Map LeiosSeatId LeiosSignature ->
   Either AggregationError LeiosCert
 aggregateLeiosCert committee sigs = do
+  -- The bitfield below is sized from the committee, so an unaddressable committee
+  -- would put it past any bound a decoder could sanely admit.
+  when (n > maxLeiosCommitteeSize) $
+    Left (TooManySigners n)
   case nonEmpty outOfBoundsVoterIds of
     Just vs -> Left (VoterIdsOutOfBounds vs)
     Nothing -> pure ()
@@ -252,8 +265,13 @@ aggregateLeiosCert committee sigs = do
     len = (n + 7) `div` 8
 
 data VerificationError
-  = -- | 'leiosCertSigners' bitfield is longer than @⌈leiosCommitteeSize/8⌉@ bytes.
+  = -- | 'leiosCertSigners' is not @⌈leiosCommitteeSize\/8⌉@ bytes, so its bits do
+    -- not line up with this committee's seats.
     MalformedSigners
+  | -- | The committee has more than 'maxLeiosCommitteeSize' seats, so its tail
+    -- seats have no 'LeiosSeatId' to be named by and a bit standing for one
+    -- could only be read as some other seat's.
+    MalformedCommittee Int
   | -- | The aggregate-BLS verification failed (wrong message, tampered
     -- signature, or a bitfield/aggregate mismatch).
     InvalidSignature
@@ -266,10 +284,10 @@ data VerificationError
   deriving anyclass (NFData)
 
 -- | Verify a 'LeiosCert' against a committee, a weight threshold, and the
--- signed message, returning the signers' total weight. Rejects a malformed
--- bitfield, any bit on a keyless seat, a summed weight below the threshold , or
--- a bad aggregate signature with a 'VerificationError'. Keys are trusted as
--- PoP-checked by 'mkLeiosCommittee'.
+-- signed message, returning the signers' total weight. Rejects an unaddressable
+-- committee, a malformed bitfield, any bit on a keyless seat, a summed weight
+-- below the threshold, or a bad aggregate signature with a 'VerificationError'.
+-- Keys are trusted as PoP-checked by 'mkLeiosCommittee'.
 verifyLeiosCert ::
   SignableRepresentation msg =>
   LeiosCommittee ->
@@ -281,6 +299,11 @@ verifyLeiosCert ::
   -- | Total weight of the contributing signers on success.
   Either VerificationError Weight
 verifyLeiosCert committee weightRequired msg cert = do
+  -- Judge the committee before judging the bitfield against it: past this bound a
+  -- seat index no longer fits the 'Word16' that 'bitFieldMembers' casts to, so
+  -- bits would silently wrap onto the wrong seats.
+  when (n > maxLeiosCommitteeSize) $
+    Left (MalformedCommittee n)
   -- Bitfield length is fixed at ⌈committee/8⌉ bytes; anything else is malformed.
   when (sizeofByteArray (bitFieldBytes cert.leiosCertSigners) /= (n + 7) `div` 8) $
     Left MalformedSigners
