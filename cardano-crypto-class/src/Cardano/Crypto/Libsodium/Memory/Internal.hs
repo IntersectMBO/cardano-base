@@ -118,7 +118,7 @@ makeMLockedPool = do
     )
 
 eraseMem :: forall n a. KnownNat n => Proxy n -> Ptr a -> IO ()
-eraseMem proxy ptr = fillBytes ptr 0xff (fromIntegral @Integer @Int $ natVal proxy)
+eraseMem proxy ptr = fillBytes ptr 0x00 (fromIntegral @Integer @Int $ natVal proxy)
 
 mlockedPool32 :: Pool 32 RealWorld
 mlockedPool32 = unsafePerformIO $ stToIO makeMLockedPool
