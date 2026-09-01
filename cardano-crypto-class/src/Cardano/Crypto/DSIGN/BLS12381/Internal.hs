@@ -240,7 +240,7 @@ type BLS12381MinSigDSIGN = BLS12381DSIGN Curve2
 -- possession use the @"BLS_POP_"@-prefixed one (both are
 -- @prefix || H2C_SUITE_ID || SC_TAG || "_"@). None of these are exported:
 -- they are selected internally per curve variant via 'signatureDST' and
--- 'popProofDST', so users cannot sign, verify, or prove possession under a
+-- 'popDST', so users cannot sign, verify, or prove possession under a
 -- non-canonical DST.
 
 -- Signing DST for the minimal signature size variant (signatures in G1).
@@ -252,12 +252,12 @@ minVerKeySignatureDST :: ByteString
 minVerKeySignatureDST = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
 
 -- Proof-of-possession DST for the minimal signature size variant.
-minSigPoPProofDST :: ByteString
-minSigPoPProofDST = "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
+minSigPoPDST :: ByteString
+minSigPoPDST = "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
 
 -- Proof-of-possession DST for the minimal verification key size variant.
-minVerKeyPoPProofDST :: ByteString
-minVerKeyPoPProofDST = "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
+minVerKeyPoPDST :: ByteString
+minVerKeyPoPDST = "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
 
 -- Select the signing DST for the curve the verification keys live on.
 signatureDST :: forall curve. Typeable curve => Proxy curve -> ByteString
@@ -268,11 +268,11 @@ signatureDST _ =
 
 -- Select the proof-of-possession DST for the curve the verification keys
 -- live on.
-popProofDST :: forall curve. Typeable curve => Proxy curve -> ByteString
-popProofDST _ =
+popDST :: forall curve. Typeable curve => Proxy curve -> ByteString
+popDST _ =
   case eqT @curve @Curve1 of
-    Just Refl -> minVerKeyPoPProofDST
-    Nothing -> minSigPoPProofDST
+    Just Refl -> minVerKeyPoPDST
+    Nothing -> minSigPoPDST
 
 type family CurveVariant (c :: Type) :: Symbol where
   CurveVariant Curve1 = "BLS-Signature-Minimal-Verification-Key-Size"
@@ -593,13 +593,13 @@ instance
   {-# INLINE createPossessionProofDSIGN #-}
   createPossessionProofDSIGN sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = blsCoreSign (popProofDST (Proxy @curve)) (rawEncodeFixedSized vk) sk
+        SigBLS12381 sig = blsCoreSign (popDST (Proxy @curve)) (rawEncodeFixedSized vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
   verifyPossessionProofDSIGN vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (blsCoreVerify (popProofDST (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
+      (blsCoreVerify (popDST (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>
