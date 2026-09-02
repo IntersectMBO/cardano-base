@@ -271,8 +271,8 @@ signatureDST _ =
 popDST :: forall curve. Typeable curve => Proxy curve -> ByteString
 popDST _ =
   case eqT @curve @Curve1 of
-    Just Refl -> minVerKeyPoPDST
-    Nothing -> minSigPoPDST
+    Just Refl -> "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
+    Nothing -> "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
 
 type family CurveVariant (c :: Type) :: Symbol where
   CurveVariant Curve1 = "BLS-Signature-Minimal-Verification-Key-Size"
