@@ -22,7 +22,6 @@ import Cardano.Crypto.Leios (
   Weight,
   aggregateLeiosCert,
   getLeiosSeatId,
-  leiosSignContext,
   maxLeiosCommitteeSize,
   resolveLeiosSeat,
   verifyLeiosCert,
@@ -225,7 +224,7 @@ prop_verifyLeiosCert_rejects_oversized_committee = property $ do
   let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
       -- Exactly the length this committee demands, so the bitfield is not what fails.
       signers = BitField $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
-      sig = signDSIGN leiosSignContext msg (genLeiosSigningKey `generateWith` n)
+      sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig}
   pure . counterexample ("committee of " <> show n <> " seats") $
     verifyLeiosCert committee 1 msg cert === Left (MalformedCommittee n)
@@ -264,7 +263,7 @@ prop_aggregateLeiosCert_rejects_out_of_range = property $ do
   badIdx <- chooseInt (n, n + 100)
   let msg = "x" :: BS.ByteString
       bad = LeiosSeatId (fromIntegral @Int @Word16 badIdx)
-      contributions = Map.singleton bad (signDSIGN leiosSignContext msg sk0)
+      contributions = Map.singleton bad (signDSIGN () msg sk0)
   pure $ aggregateLeiosCert committee contributions === Left (VoterIdsOutOfBounds (bad :| []))
 
 -- | A decoder has no committee to size 'leiosCertSigners' against, so it can
@@ -277,7 +276,7 @@ prop_aggregateLeiosCert_bitfield_fits_max_committee = property $ do
   n <- chooseInt (maxLeiosCommitteeSize - 8, maxLeiosCommitteeSize + 8)
   msg <- genMsg
   let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 0 SNothing)
-      sig = signDSIGN leiosSignContext msg (genLeiosSigningKey `generateWith` n)
+      sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       contributions = Map.singleton (LeiosSeatId 0) sig
   pure . counterexample ("committee of " <> show n <> " seats") $
     case aggregateLeiosCert committee contributions of
@@ -332,7 +331,7 @@ prop_verifyLeiosCert_rejects_keyless_signer =
        in conjoin
             [ counterexample ("keyless seat " <> show j) $
                 let vid = LeiosSeatId (fromIntegral j)
-                    sig = signDSIGN leiosSignContext msg (sks !! j)
+                    sig = signDSIGN () msg (sks !! j)
                     cert = either (error . show) id (aggregateLeiosCert committee (Map.singleton vid sig))
                  in verifyLeiosCert committee 1 msg cert === Left (SignerWithoutKey (vid :| []))
             | j <- keylessIxs
@@ -348,7 +347,7 @@ genMsg = chooseInt (0, 64) >>= genByteString
 signContribs :: BS.ByteString -> [(Int, LeiosSigningKey)] -> Map LeiosSeatId LeiosSignature
 signContribs msg pairs =
   Map.fromList
-    [(LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg sk) | (i, sk) <- pairs]
+    [(LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN () msg sk) | (i, sk) <- pairs]
 
 -- | Aggregate or fail the property with the error.
 aggregateOrFail ::

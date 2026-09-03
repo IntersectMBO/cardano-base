@@ -39,7 +39,7 @@ library
   build-depends:
     bytestring,
     cardano-binary,
-    cardano-crypto-class >=2.5.1,
+    cardano-crypto-class >=2.6,
     cardano-strict-containers,
     containers,
     deepseq,
@@ -76,7 +76,7 @@ test-suite tests
     QuickCheck,
     bytestring,
     cardano-base:testlib,
-    cardano-crypto-class >=2.5.1,
+    cardano-crypto-class >=2.6,
     cardano-crypto-leios:{cardano-crypto-leios, testlib},
     cardano-strict-containers,
     containers,

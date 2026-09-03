@@ -25,9 +25,6 @@ module Cardano.Crypto.DSIGN.BLS12381.Internal (
   SignKeyDSIGN (..),
   SigDSIGN (..),
   PossessionProofDSIGN (..),
-  BLS12381SignContext (..),
-  minSigPoPDST,
-  minVerKeyPoPDST,
 ) where
 
 #include "blst_util.h"
@@ -98,10 +95,11 @@ import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Data.Data (Typeable)
+import Data.Data (Typeable, eqT)
 import qualified Data.Foldable as F (foldl')
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
+import Data.Type.Equality ((:~:) (Refl))
 import Foreign.C.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
@@ -113,41 +111,13 @@ failDecodeBLS :: MonadFail m => String -> String -> m a
 failDecodeBLS ty msg =
   fail $ ty <> " BLS12381DSIGN: deserialisation failed (" <> msg <> ")"
 
-data BLS12381DSIGN curve
-
--- Making sure different 'Signature schemes are not 'Coercible', which would ruin the
--- intended type safety:
-type role BLS12381DSIGN nominal
-
--- | The BLS12-381 minimal verification key size variant
-type BLS12381MinVerKeyDSIGN = BLS12381DSIGN Curve1
-
--- | The BLS12-381 minimal signature size variant
-type BLS12381MinSigDSIGN = BLS12381DSIGN Curve2
-
--- | The BLS12381 signing context for the "PoP" based ciphersuite for the minimal signature size variant of bls signatures
-minSigPoPDST :: BLS12381SignContext
-minSigPoPDST = BLS12381SignContext (Just "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_") Nothing
-
--- | The BLS12381 signing context for the "PoP" based ciphersuite for the minimal verification key size variant of bls signatures
-minVerKeyPoPDST :: BLS12381SignContext
-minVerKeyPoPDST = BLS12381SignContext (Just "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_") Nothing
-
-type family CurveVariant (c :: Type) :: Symbol where
-  CurveVariant Curve1 = "BLS-Signature-Mininimal-Verification-Key-Size"
-  CurveVariant Curve2 = "BLS-Signature-Mininimal-Signature-Size"
-
--- | This module provides support only for proof-of-possession (PoP) ciphersuite
--- contexts:
+-- | A BLS12-381 signature scheme implementing the __proof of possession__
+-- (@POP@) ciphersuite of the IETF BLS signature draft
+-- (draft-irtf-cfrg-bls-signature-06). The @curve@ type parameter selects one
+-- of the two standard instantiations, 'BLS12381MinVerKeyDSIGN' or
+-- 'BLS12381MinSigDSIGN'.
 --
--- * 'minSigPoPDST'
--- * 'minVerKeyPoPDST'
---
--- even though the underlying signing and verification primitives can be used
--- to realise the Basic (@NUL@) and message-augmentation (@AUG@) schemes as
--- well.
---
--- == Why only the "PoP" ciphersuite is exported
+-- == Why only the "PoP" ciphersuite is supported
 --
 -- The main reason is API clarity and safety.
 --
@@ -173,26 +143,31 @@ type family CurveVariant (c :: Type) :: Symbol where
 --
 -- By contrast, this module does /not/ provide the draft's general
 -- @AggregateVerify((PK_1, ..., PK_n), (message_1, ..., message_n), signature)@
--- API for aggregation over different messages.  Exporting predefined Basic and
--- AUG contexts would therefore suggest a broader aggregate-signature API than
--- the module actually offers.
+-- API for aggregation over different messages.  Supporting the Basic and AUG
+-- schemes would therefore suggest a broader aggregate-signature API than the
+-- module actually offers.
 --
--- Restricting the public ciphersuite exports to PoP makes the intended usage
--- explicit: this module supports ordinary BLS signing and verification, plus a
--- PoP-based aggregation story.
+-- == Curve variants and domain separation
 --
--- == What the exported contexts mean
---
--- The exported values are standard BLS ciphersuite DSTs from
+-- The two variants are standard BLS ciphersuite instantiations from
 -- draft-irtf-cfrg-bls-signature-06, Section 4.2:
 --
--- * 'minSigPoPDST' selects the __minimal-signature-size__ variant:
+-- * 'BLS12381MinSigDSIGN' is the __minimal-signature-size__ variant:
 --   signatures live in G1 (48 bytes compressed), public keys in G2
 --   (96 bytes compressed).
 --
--- * 'minVerKeyPoPDST' selects the __minimal-pubkey-size__ variant:
+-- * 'BLS12381MinVerKeyDSIGN' is the __minimal-pubkey-size__ variant:
 --   public keys live in G1 (48 bytes compressed), signatures in G2
 --   (96 bytes compressed).
+--
+-- Within each variant, the PoP ciphersuite prescribes exactly one pair of
+-- DSTs (Section 4.2.3): ordinary signing and verification use the
+-- @\"BLS_SIG_\"@-prefixed DST, while creating and verifying proofs of
+-- possession hash the public key with the @\"BLS_POP_\"@-prefixed DST. Both
+-- DSTs are fixed internally from the curve variant, and the POP scheme does
+-- not use message augmentation, so the signing context is trivial:
+-- @'ContextDSIGN' ('BLS12381DSIGN' curve) = ()@. Users cannot sign, verify,
+-- or prove possession under a non-canonical DST.
 --
 -- The draft recommends the minimal-pubkey-size variant for aggregation,
 -- because the size of @(PK_1, ..., PK_n, signature)@ is usually dominated by
@@ -209,8 +184,7 @@ type family CurveVariant (c :: Type) :: Symbol where
 -- >>> import Cardano.Crypto.Seed (mkSeedFromBytes)
 --
 -- >>> :{
--- let ctx = minVerKeyPoPDST
---     msg = BS.pack [0, 1, 2, 3]
+-- let msg = BS.pack [0, 1, 2, 3]
 --     sk1 =
 --       genKeyDSIGNWithContext
 --         @BLS12381MinVerKeyDSIGN
@@ -223,36 +197,70 @@ type family CurveVariant (c :: Type) :: Symbol where
 --         (mkSeedFromBytes (BS.replicate 32 2))
 --     vk1 = deriveVerKeyDSIGN sk1
 --     vk2 = deriveVerKeyDSIGN sk2
---     pop1 = createPossessionProofDSIGN ctx sk1
---     pop2 = createPossessionProofDSIGN ctx sk2
+--     pop1 = createPossessionProofDSIGN sk1
+--     pop2 = createPossessionProofDSIGN sk2
 -- :}
 --
--- >>> verifyPossessionProofDSIGN ctx vk1 pop1
+-- >>> verifyPossessionProofDSIGN vk1 pop1
 -- Right ()
 --
--- >>> verifyPossessionProofDSIGN ctx vk2 pop2
+-- >>> verifyPossessionProofDSIGN vk2 pop2
 -- Right ()
 --
 -- -- Once the proofs have been checked, it is safe to aggregate keys
 -- >>> Right avk = uncheckedAggregateVerKeysDSIGN [vk1, vk2]
 --
 -- -- Both participants sign the same message
--- >>> let sig1 = signDSIGN ctx msg sk1
--- >>> let sig2 = signDSIGN ctx msg sk2
+-- >>> let sig1 = signDSIGN () msg sk1
+-- >>> let sig2 = signDSIGN () msg sk2
 --
 -- The signatures can be aggregated:
 --
 -- >>> Right asig = aggregateSigsDSIGN [sig1, sig2]
 --
 -- -- The aggregate signature can then be checked against the aggregate key:
--- >>> verifyDSIGN ctx avk msg asig
+-- >>> verifyDSIGN () avk msg asig
 -- Right ()
-data BLS12381SignContext = BLS12381SignContext
-  { blsSignContextDst :: !(Maybe ByteString)
-  , blsSignContextAug :: !(Maybe ByteString)
-  }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (NFData, NoThunks)
+data BLS12381DSIGN curve
+
+-- Making sure different 'Signature schemes are not 'Coercible', which would ruin the
+-- intended type safety:
+type role BLS12381DSIGN nominal
+
+-- | The BLS12-381 minimal verification key size variant
+type BLS12381MinVerKeyDSIGN = BLS12381DSIGN Curve1
+
+-- | The BLS12-381 minimal signature size variant
+type BLS12381MinSigDSIGN = BLS12381DSIGN Curve2
+
+-- The DSTs of the "PoP" ciphersuite of the IETF BLS signature draft
+-- (draft-irtf-cfrg-bls-signature-06, Section 4.2.3). Each curve variant has
+-- exactly one canonical pair of DSTs: ordinary signing and verification use
+-- the @"BLS_SIG_"@-prefixed DST, while creating and verifying proofs of
+-- possession use the @"BLS_POP_"@-prefixed one (both are
+-- @prefix || H2C_SUITE_ID || SC_TAG || "_"@). None of these are exported:
+-- they are selected internally per curve variant via 'signatureDST' and
+-- 'popDST', so users cannot sign, verify, or prove possession under a
+-- non-canonical DST.
+
+-- | Select the signing DST for the curve the verification keys live on.
+signatureDST :: forall curve. Typeable curve => Proxy curve -> ByteString
+signatureDST _ =
+  case eqT @curve @Curve1 of
+    Just Refl -> "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
+    Nothing -> "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
+
+-- | Select the proof-of-possession DST for the curve the verification keys live
+-- on.
+popDST :: forall curve. Typeable curve => Proxy curve -> ByteString
+popDST _ =
+  case eqT @curve @Curve1 of
+    Just Refl -> "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
+    Nothing -> "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
+
+type family CurveVariant (c :: Type) :: Symbol where
+  CurveVariant Curve1 = "BLS-Signature-Minimal-Verification-Key-Size"
+  CurveVariant Curve2 = "BLS-Signature-Minimal-Signature-Size"
 
 type BLS12381CurveConstraints curve =
   ( BLS curve
@@ -262,6 +270,69 @@ type BLS12381CurveConstraints curve =
   , KnownNat (CompressedPointSize (DualCurve curve))
   , Typeable curve
   )
+
+-- The core signing routine shared by 'signDSIGN' and
+-- 'createPossessionProofDSIGN'; the caller chooses the DST, which differs
+-- between ordinary signatures and proofs of possession. The POP scheme does
+-- not use message augmentation, so none is passed.
+{-# INLINE blsCoreSign #-}
+blsCoreSign ::
+  forall curve a.
+  (BLS curve, BLS (DualCurve curve), SignableRepresentation a) =>
+  ByteString ->
+  a ->
+  SignKeyDSIGN (BLS12381DSIGN curve) ->
+  SigDSIGN (BLS12381DSIGN curve)
+blsCoreSign dst msg (SignKeyBLS12381 (Scalar skPsb)) =
+  SigBLS12381 $ unsafeDupablePerformIO $ do
+    psbUseAsCPtr skPsb $ \skPtp -> do
+      withNewPoint_ @(DualCurve curve) $ \hashPtr -> do
+        unsafeUseAsCStringLen dst $ \(dstPtr, dstLen) ->
+          withMaybeCStringLen Nothing $ \(augPtr, augLen) ->
+            unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) ->
+              c_blst_hash @(DualCurve curve)
+                hashPtr
+                msgPtr
+                (fromIntegral @Int @CSize msgLen)
+                dstPtr
+                (fromIntegral @Int @CSize dstLen)
+                augPtr
+                (fromIntegral @Int @CSize augLen)
+        withNewPoint' @(DualCurve curve) $ \sigPtr -> do
+          c_blst_sign @curve sigPtr hashPtr (ScalarPtr skPtp)
+
+-- The core verification routine shared by 'verifyDSIGN' and
+-- 'verifyPossessionProofDSIGN'; as 'blsCoreSign', the caller chooses the DST.
+{-# INLINE blsCoreVerify #-}
+blsCoreVerify ::
+  forall curve a.
+  (BLS curve, BLS (DualCurve curve), SignableRepresentation a) =>
+  ByteString ->
+  VerKeyDSIGN (BLS12381DSIGN curve) ->
+  a ->
+  SigDSIGN (BLS12381DSIGN curve) ->
+  Either String ()
+blsCoreVerify dst (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
+  unsafeDupablePerformIO $ do
+    unsafeUseAsCStringLen dst $ \(dstPtr, dstLen) -> do
+      withAffine (toAffine @curve pbPsb) $ \pkAff ->
+        withAffine (toAffine @(DualCurve curve) sigPsb) $ \sigAff ->
+          withMaybeCStringLen Nothing $ \(augPtr, augLen) ->
+            unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) -> do
+              err <-
+                c_blst_core_verify @curve
+                  pkAff
+                  sigAff
+                  True
+                  msgPtr
+                  (fromIntegral @Int @CSize msgLen)
+                  dstPtr
+                  (fromIntegral @Int @CSize dstLen)
+                  augPtr
+                  (fromIntegral @Int @CSize augLen)
+              pure $! case mkBLSTError err of
+                BLST_SUCCESS -> Right ()
+                _ -> Left "verifyDSIGN: BLS12381DSIGN signature failed to verify"
 
 instance
   BLS12381CurveConstraints curve =>
@@ -273,8 +344,9 @@ instance
   -- so these use the compressed sizes of the BLS12-381 `Point curve`
   type Signable (BLS12381DSIGN curve) = SignableRepresentation
 
-  -- Context can hold domain separation tag and/or augmentation data for signatures
-  type ContextDSIGN (BLS12381DSIGN curve) = BLS12381SignContext
+  -- The signing context carries no information: the DST is fixed internally
+  -- per curve variant, and the POP scheme does not use augmentation.
+  type ContextDSIGN (BLS12381DSIGN curve) = ()
   type KeyGenContextDSIGN (BLS12381DSIGN curve) = Maybe ByteString
 
   newtype VerKeyDSIGN (BLS12381DSIGN curve)
@@ -306,47 +378,10 @@ instance
         c_blst_sk_to_pk @curve vkPtp (ScalarPtr skp)
 
   {-# INLINE signDSIGN #-}
-  signDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} msg (SignKeyBLS12381 (Scalar skPsb)) =
-    SigBLS12381 $ unsafeDupablePerformIO $ do
-      psbUseAsCPtr skPsb $ \skPtp -> do
-        withNewPoint_ @(DualCurve curve) $ \hashPtr -> do
-          withMaybeCStringLen dst $ \(dstPtr, dstLen) ->
-            withMaybeCStringLen aug $ \(augPtr, augLen) ->
-              unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) ->
-                c_blst_hash @(DualCurve curve)
-                  hashPtr
-                  msgPtr
-                  (fromIntegral @Int @CSize msgLen)
-                  dstPtr
-                  (fromIntegral @Int @CSize dstLen)
-                  augPtr
-                  (fromIntegral @Int @CSize augLen)
-          withNewPoint' @(DualCurve curve) $ \sigPtr -> do
-            c_blst_sign @curve sigPtr hashPtr (ScalarPtr skPtp)
+  signDSIGN () = blsCoreSign (signatureDST (Proxy @curve))
 
   {-# INLINE verifyDSIGN #-}
-  -- Context can hold domain separation tag and/or augmentation data for signatures
-  verifyDSIGN BLS12381SignContext {blsSignContextDst = dst, blsSignContextAug = aug} (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
-    unsafeDupablePerformIO $ do
-      withMaybeCStringLen dst $ \(dstPtr, dstLen) -> do
-        withAffine (toAffine @curve pbPsb) $ \pkAff ->
-          withAffine (toAffine @(DualCurve curve) sigPsb) $ \sigAff ->
-            withMaybeCStringLen aug $ \(augPtr, augLen) ->
-              unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) -> do
-                err <-
-                  c_blst_core_verify @curve
-                    pkAff
-                    sigAff
-                    True
-                    msgPtr
-                    (fromIntegral @Int @CSize msgLen)
-                    dstPtr
-                    (fromIntegral @Int @CSize dstLen)
-                    augPtr
-                    (fromIntegral @Int @CSize augLen)
-                pure $! case mkBLSTError err of
-                  BLST_SUCCESS -> Right ()
-                  _ -> Left "verifyDSIGN: BLS12381DSIGN signature failed to verify"
+  verifyDSIGN () = blsCoreVerify (signatureDST (Proxy @curve))
 
   {-# INLINE genKeyDSIGN #-}
   genKeyDSIGN = genKeyDSIGNWithContext Nothing
@@ -540,15 +575,15 @@ instance
                 else Right $ SigBLS12381 aggrPoint
 
   {-# INLINE createPossessionProofDSIGN #-}
-  createPossessionProofDSIGN ctx sk =
+  createPossessionProofDSIGN sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = signDSIGN ctx (rawEncodeFixedSized vk) sk
+        SigBLS12381 sig = blsCoreSign (popDST (Proxy @curve)) (rawEncodeFixedSized vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
-  verifyPossessionProofDSIGN ctx vk (PossessionProofBLS12381 mu1Psb) =
+  verifyPossessionProofDSIGN vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (verifyDSIGN ctx vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
+      (blsCoreVerify (popDST (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>

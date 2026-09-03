@@ -68,9 +68,7 @@ import Cardano.Crypto.DSIGN (
   BLS12381DSIGN,
 
   DSIGNAggregatable (..),
-  BLS12381SignContext,
   )
-import Cardano.Crypto.DSIGN.BLS12381.Internal (BLS12381SignContext (..))
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress, blsGenerator)
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
@@ -136,13 +134,6 @@ blsGenKeyWithContextGen =
     genNonEmptyBS = Gen.suchThat (BS.pack <$> arbitrary) (not . BS.null)
 
 
-blsSignContextGen :: Gen BLS12381SignContext
-blsSignContextGen = do
-  dst <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
-  aug <- Gen.frequency [(1, pure Nothing), (100, Just . BS.pack <$> arbitrary)]
-  pure $ BLS12381SignContext dst aug
-
-
 #ifdef SECP256K1_ENABLED
 genEcdsaMsg :: Gen MessageHash
 genEcdsaMsg =
@@ -172,13 +163,11 @@ defaultSignKeyGen =
 defaultPossessionProofGen
   :: forall v.
      DSIGNAggregatable v
-  => Gen (ContextDSIGN v)
-  -> Gen (KeyGenContextDSIGN v)
+  => Gen (KeyGenContextDSIGN v)
   -> Gen (PossessionProofDSIGN v)
-defaultPossessionProofGen genContext genKeyCtx = do
-  ctx <- genContext
-  sk  <- defaultSignKeyWithContextGen @v genKeyCtx
-  pure $ createPossessionProofDSIGN ctx sk
+defaultPossessionProofGen genKeyCtx = do
+  sk <- defaultSignKeyWithContextGen @v genKeyCtx
+  pure $ createPossessionProofDSIGN sk
 
 -- Used for adjusting no of quick check tests
 -- By default up to 100 tests are performed which may not be enough to catch hidden bugs
@@ -198,8 +187,8 @@ tests lock =
        testDSIGNAlgorithm (Proxy @MockDSIGN) (arbitrary @Message) "MockDSIGN"
        testDSIGNAlgorithm (Proxy @Ed25519DSIGN) (arbitrary @Message) "Ed25519DSIGN"
        testDSIGNAlgorithm (Proxy @Ed448DSIGN) (arbitrary @Message) "Ed448DSIGN"
-       testDSIGNAlgorithmWithContext (Proxy @BLS12381MinVerKeyDSIGN) True blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
-       testDSIGNAlgorithmWithContext (Proxy @BLS12381MinSigDSIGN) True blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
+       testDSIGNAlgorithmWithContext (Proxy @BLS12381MinVerKeyDSIGN) True (pure ()) blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+       testDSIGNAlgorithmWithContext (Proxy @BLS12381MinSigDSIGN) True (pure ()) blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
 #ifdef SECP256K1_ENABLED
        testDSIGNAlgorithm (Proxy @EcdsaSecp256k1DSIGN) genEcdsaMsg "EcdsaSecp256k1DSIGN"
        testDSIGNAlgorithm (Proxy @SchnorrSecp256k1DSIGN) (arbitrary @Message) "SchnorrSecp256k1DSIGN"
@@ -213,8 +202,8 @@ tests lock =
      describe "MLocked" $ do
       testDSIGNMAlgorithm lock (Proxy @Ed25519DSIGN) "Ed25519DSIGN"
      describe "Aggregatable" $ do
-      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
-      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) blsSignContextGen blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) (pure ()) blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
+      testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) (pure ()) blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
       describe "PoP deserialisation rejects zero points" $ do
         -- DualCurve Curve1 = Curve2, so MinVerKeyDSIGN PoP points live on Curve2
         -- DualCurve Curve2 = Curve1, so MinSigDSIGN    PoP points live on Curve1
@@ -817,7 +806,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       forAllShow (genAggregateCase genContext genMsg) ppShow $
           \(ctx, msg, vksPops, sigs) -> (=== Right ()) $ do
             sig <- aggregateSigsDSIGN @v sigs
-            aggVk <- aggregateVerKeysDSIGN ctx vksPops
+            aggVk <- aggregateVerKeysDSIGN vksPops
             verifyDSIGN @v ctx aggVk msg sig
     prop "aggregate verify negative (wrong message)" $
       withNumTests 1000 .
@@ -825,7 +814,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
           forAllShow arbitrary ppShow $ \msg' ->
             msg /= msg' ==> (=/= Right ()) $ do
                 sig <- aggregateSigsDSIGN @v sigs
-                aggVk <- aggregateVerKeysDSIGN ctx vksPops
+                aggVk <- aggregateVerKeysDSIGN vksPops
                 verifyDSIGN @v ctx aggVk msg' sig
     prop "aggregate verify negative (wrong PoP)" $
         forAllShow (genAggregateCaseAtLeast2 genContext genMsg) ppShow $
@@ -834,7 +823,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
               (a:b:rest) -> (=/= Right ()) $ do
                 let vksPops' = (fst a, snd b) : (fst b, snd a) : rest
                 sig <- aggregateSigsDSIGN @v sigs
-                aggVk <- aggregateVerKeysDSIGN ctx vksPops'
+                aggVk <- aggregateVerKeysDSIGN vksPops'
                 verifyDSIGN @v ctx aggVk msg sig
               _ ->
                 counterexample "genAggregateCaseAtLeast2 produced <2 entries (bug in generator)" False
@@ -850,7 +839,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       => (PossessionProofDSIGN v -> prop)
       -> Property
     forAllPoP =
-      forAllShow (defaultPossessionProofGen @v genContext genKeyCtx) ppShow
+      forAllShow (defaultPossessionProofGen @v genKeyCtx) ppShow
     genAggregateCase genCtx genMsg' = do
       ctx <- genCtx
       msg <- genMsg'
@@ -859,7 +848,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       n   <- Gen.chooseInt (1, 8)
       sks <- replicateM n (defaultSignKeyWithContextGen @v genKeyCtx)
       let vksPops = [ ( deriveVerKeyDSIGN sk
-                     , createPossessionProofDSIGN ctx sk
+                     , createPossessionProofDSIGN sk
                      )
                    | sk <- sks
                    ]
@@ -874,7 +863,7 @@ testDSIGNAggregatableWithContext _ genContext genKeyCtx genMsg name = testEnough
       n   <- Gen.chooseInt (2, 8)
       sks <- replicateM n (defaultSignKeyWithContextGen @v genKeyCtx)
       let vksPops = [ ( deriveVerKeyDSIGN sk
-                     , createPossessionProofDSIGN ctx sk
+                     , createPossessionProofDSIGN sk
                      )
                    | sk <- sks
                    ]
