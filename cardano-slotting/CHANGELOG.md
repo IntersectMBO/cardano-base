@@ -1,8 +1,8 @@
 # Changelog for `cardano-slotting`
 
-## 0.2.1.1
+## 0.2.2.0
 
-*
+* Add `SlotInterval` and `addSlotInterval` to `Cardano.Slotting.Slot`.
 
 ## 0.2.1.0
 

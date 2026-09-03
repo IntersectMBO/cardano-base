@@ -9,6 +9,8 @@
 
 module Cardano.Slotting.Slot (
   SlotNo (..),
+  SlotInterval (..),
+  addSlotInterval,
   WithOrigin (..),
   at,
   origin,
@@ -34,7 +36,11 @@ import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
 import Quiet (Quiet (..))
 
--- | The 0-based index for the Ourboros time slot.
+{-------------------------------------------------------------------------------
+  Slots
+-------------------------------------------------------------------------------}
+
+-- | The 0-based index for the Ouroboros time slot.
 newtype SlotNo = SlotNo {unSlotNo :: Word64}
   deriving stock (Eq, Ord, Generic)
   deriving (Show) via Quiet SlotNo
@@ -46,6 +52,17 @@ instance ToCBOR SlotNo where
 
 instance FromCBOR SlotNo where
   fromCBOR = decode
+
+newtype SlotInterval = SlotInterval
+  { unSlotInterval :: Word32
+  }
+  deriving (Eq, Ord, Generic)
+  deriving (Show) via Quiet SlotInterval
+  deriving newtype (NoThunks, NFData, ToJSON, FromJSON, ToCBOR, FromCBOR)
+
+-- | Add a SlotInterval (a positive change) to a SlotNo to get a new SlotNo.
+addSlotInterval :: SlotNo -> SlotInterval -> SlotNo
+addSlotInterval (SlotNo n) (SlotInterval m) = SlotNo (n + fromIntegral @Word32 @Word64 m)
 
 {-------------------------------------------------------------------------------
   WithOrigin
