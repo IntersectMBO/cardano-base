@@ -243,31 +243,15 @@ type BLS12381MinSigDSIGN = BLS12381DSIGN Curve2
 -- 'popDST', so users cannot sign, verify, or prove possession under a
 -- non-canonical DST.
 
--- Signing DST for the minimal signature size variant (signatures in G1).
-minSigSignatureDST :: ByteString
-minSigSignatureDST = "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
-
--- Signing DST for the minimal verification key size variant (signatures in G2).
-minVerKeySignatureDST :: ByteString
-minVerKeySignatureDST = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
-
--- Proof-of-possession DST for the minimal signature size variant.
-minSigPoPDST :: ByteString
-minSigPoPDST = "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
-
--- Proof-of-possession DST for the minimal verification key size variant.
-minVerKeyPoPDST :: ByteString
-minVerKeyPoPDST = "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
-
--- Select the signing DST for the curve the verification keys live on.
+-- | Select the signing DST for the curve the verification keys live on.
 signatureDST :: forall curve. Typeable curve => Proxy curve -> ByteString
 signatureDST _ =
   case eqT @curve @Curve1 of
-    Just Refl -> minVerKeySignatureDST
-    Nothing -> minSigSignatureDST
+    Just Refl -> "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
+    Nothing -> "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
 
--- Select the proof-of-possession DST for the curve the verification keys
--- live on.
+-- | Select the proof-of-possession DST for the curve the verification keys live
+-- on.
 popDST :: forall curve. Typeable curve => Proxy curve -> ByteString
 popDST _ =
   case eqT @curve @Curve1 of
