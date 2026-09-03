@@ -17,7 +17,6 @@ module Cardano.Crypto.Leios (
   LeiosSigningKey,
   LeiosVerificationKey,
   LeiosSignature,
-  leiosSignContext,
   leiosSignatureSize,
   leiosSignatureToBytes,
 
@@ -28,6 +27,7 @@ module Cardano.Crypto.Leios (
   LeiosCommittee (..),
   mkLeiosCommittee,
   leiosCommitteeSize,
+  maxLeiosCommitteeSize,
   resolveLeiosSeat,
   getLeiosSeatId,
 
@@ -59,7 +59,7 @@ import Cardano.Crypto.DSIGN (
   verifyDSIGN,
   verifyPossessionProofDSIGN,
  )
-import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
+import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when)
@@ -93,6 +93,10 @@ import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
+-- | The signature scheme used by Leios, per CIP-164: the BLS12-381
+-- minimal-signature-size proof-of-possession ciphersuite. The DSTs are fixed
+-- internally by the scheme, so the signing context passed to 'signDSIGN' \/
+-- 'verifyDSIGN' is simply @()@.
 type LeiosDSIGN = BLS12381MinSigDSIGN
 
 type LeiosSigningKey = SignKeyDSIGN LeiosDSIGN
@@ -102,11 +106,6 @@ type LeiosVerificationKey = VerKeyDSIGN LeiosDSIGN
 type LeiosProofOfPossession = PossessionProofDSIGN LeiosDSIGN
 
 type LeiosSignature = SigDSIGN LeiosDSIGN
-
--- | The BLS12-381 MinSig proof-of-possession ciphersuite DST used by Leios,
--- per CIP-164. Pass this as the 'ContextDSIGN' to 'signDSIGN' / 'verifyDSIGN'.
-leiosSignContext :: BLS12381SignContext
-leiosSignContext = minSigPoPDST
 
 -- | Size of a Leios signature in the chosen signature scheme.
 leiosSignatureSize :: Word
@@ -145,9 +144,8 @@ newtype LeiosCommittee = UnsafeLeiosCommittee {leiosCommitteeSeats :: Vector Lei
   deriving (NoThunks) via OnlyCheckWhnfNamed "LeiosCommittee" LeiosCommittee
 
 -- | Build a 'LeiosCommittee' from an ordered vector of seats. A seat with no
--- key — or one whose proof of possession fails to verify — is admitted keyless,
--- so one bad proof can't take down the committee. Seat order is the voter
--- indexing, so derive it deterministically.
+-- key, or one whose proof of possession fails to verify, is admitted keyless.
+-- Seat order is the voter indexing, so derive it deterministically.
 --
 -- NOTE: Seat weights are assumed to be in range [0,1] with sum ≤ 1.
 --
@@ -163,7 +161,7 @@ mkLeiosCommittee seats =
         { seatWeight = w
         , seatVKey = do
             (vk, pop) <- mKeyPoP
-            case verifyPossessionProofDSIGN leiosSignContext vk pop of
+            case verifyPossessionProofDSIGN vk pop of
               -- XXX: The error string is a constant and just says it could not verify.
               Left _err -> SNothing
               Right () -> SJust vk
@@ -172,6 +170,11 @@ mkLeiosCommittee seats =
 -- | Number of seats in the committee.
 leiosCommitteeSize :: LeiosCommittee -> Int
 leiosCommitteeSize = length . leiosCommitteeSeats
+
+-- | Most seats a committee can have: 'LeiosSeatId' is a 'Word16', so seats past
+-- this could not be addressed by a vote.
+maxLeiosCommitteeSize :: Int
+maxLeiosCommitteeSize = fromIntegral @Word16 @Int maxBound + 1
 
 -- | Resolve a 'LeiosSeatId' to its 'LeiosSeat' on the 'LeiosCommittee', or 'Nothing'
 -- if the index is past the committee bound.
@@ -209,6 +212,9 @@ data LeiosCert = LeiosCert
 data AggregationError
   = -- | One or more voter indices in the sigs are past the committee bound.
     VoterIdsOutOfBounds (NonEmpty LeiosSeatId)
+  | -- | The certificate would have more than 'maxLeiosCommitteeSize' seats, so
+    -- 'LeiosSeatId' cannot address all of them.
+    TooManySigners Int
   | -- | BLS signature aggregation failed (e.g. malformed input signature).
     BLSAggregationFailed Text
   deriving stock (Eq, Show, Generic)
@@ -223,6 +229,10 @@ aggregateLeiosCert ::
   Map LeiosSeatId LeiosSignature ->
   Either AggregationError LeiosCert
 aggregateLeiosCert committee sigs = do
+  -- The bitfield below is sized from the committee, so an unaddressable committee
+  -- would put it past any bound a decoder could sanely admit.
+  when (n > maxLeiosCommitteeSize) $
+    Left (TooManySigners n)
   case nonEmpty outOfBoundsVoterIds of
     Just vs -> Left (VoterIdsOutOfBounds vs)
     Nothing -> pure ()
@@ -253,8 +263,13 @@ aggregateLeiosCert committee sigs = do
     len = (n + 7) `div` 8
 
 data VerificationError
-  = -- | 'leiosCertSigners' bitfield is longer than @⌈leiosCommitteeSize/8⌉@ bytes.
+  = -- | 'leiosCertSigners' is not @⌈leiosCommitteeSize\/8⌉@ bytes, so its bits do
+    -- not line up with this committee's seats.
     MalformedSigners
+  | -- | The committee has more than 'maxLeiosCommitteeSize' seats, so its tail
+    -- seats have no 'LeiosSeatId' to be named by and a bit standing for one
+    -- could only be read as some other seat's.
+    MalformedCommittee Int
   | -- | The aggregate-BLS verification failed (wrong message, tampered
     -- signature, or a bitfield/aggregate mismatch).
     InvalidSignature
@@ -267,10 +282,10 @@ data VerificationError
   deriving anyclass (NFData)
 
 -- | Verify a 'LeiosCert' against a committee, a weight threshold, and the
--- signed message, returning the signers' total weight. Rejects a malformed
--- bitfield, any bit on a keyless seat, a summed weight below the threshold , or
--- a bad aggregate signature with a 'VerificationError'. Keys are trusted as
--- PoP-checked by 'mkLeiosCommittee'.
+-- signed message, returning the signers' total weight. Rejects an unaddressable
+-- committee, a malformed bitfield, any bit on a keyless seat, a summed weight
+-- below the threshold, or a bad aggregate signature with a 'VerificationError'.
+-- Keys are trusted as PoP-checked by 'mkLeiosCommittee'.
 verifyLeiosCert ::
   SignableRepresentation msg =>
   LeiosCommittee ->
@@ -282,6 +297,11 @@ verifyLeiosCert ::
   -- | Total weight of the contributing signers on success.
   Either VerificationError Weight
 verifyLeiosCert committee weightRequired msg cert = do
+  -- Judge the committee before judging the bitfield against it: past this bound a
+  -- seat index no longer fits the 'Word16' that 'bitFieldMembers' casts to, so
+  -- bits would silently wrap onto the wrong seats.
+  when (n > maxLeiosCommitteeSize) $
+    Left (MalformedCommittee n)
   -- Bitfield length is fixed at ⌈committee/8⌉ bytes; anything else is malformed.
   when (sizeofByteArray (bitFieldBytes cert.leiosCertSigners) /= (n + 7) `div` 8) $
     Left MalformedSigners
@@ -297,7 +317,7 @@ verifyLeiosCert committee weightRequired msg cert = do
   aggVk <-
     uncheckedAggregateVerKeysDSIGN vks
       & first (const InvalidSignature)
-  verifyDSIGN leiosSignContext aggVk msg cert.leiosCertSignature
+  verifyDSIGN () aggVk msg cert.leiosCertSignature
     & first (const InvalidSignature)
   pure weightReceived
   where

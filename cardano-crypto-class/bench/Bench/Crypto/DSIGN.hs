@@ -29,7 +29,7 @@ import Cardano.Crypto.Hash.Blake2b
 import Criterion
 
 import Bench.Crypto.BenchData
-import Cardano.Crypto.DSIGN.BLS12381.Internal (BLS12381MinSigDSIGN, BLS12381MinVerKeyDSIGN, BLS12381DSIGN, BLS12381SignContext (..))
+import Cardano.Crypto.DSIGN.BLS12381.Internal (BLS12381MinSigDSIGN, BLS12381MinVerKeyDSIGN, BLS12381DSIGN)
 
 benchmarks :: Benchmark
 benchmarks = bgroup "DSIGN"
@@ -114,9 +114,8 @@ instance ExampleContext SchnorrSecp256k1DSIGN where
   exampleContext _ = ()
 #endif
 
--- | This example context sets both the dst and augmentation to Nothing.
 instance ExampleContext (BLS12381DSIGN curve) where
-  exampleContext _ = BLS12381SignContext Nothing Nothing
+  exampleContext _ = ()
 
 benchAggDSIGN :: forall v a
   . ( DSIGNAggregatable v
@@ -139,15 +138,15 @@ benchAggDSIGN _ lbl =
       [ bgroup ("n=" <> show n)
           [ env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "provePoP (all)" $
-                nf (proveAllPoPs @v ctx) (caseSKs c)
+                nf (proveAllPoPs @v) (caseSKs c)
 
           , env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "verifyPoP (all)" $
-                nf (verifyAllPoPs @v ctx) (caseVKPoPs c)
+                nf (verifyAllPoPs @v) (caseVKPoPs c)
 
           , env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "aggregateVerKeys (with PoPs)" $
-                nf (aggregateVerKeysDSIGN @v ctx) (caseVKPoPs c)
+                nf (aggregateVerKeysDSIGN @v) (caseVKPoPs c)
 
           , env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "aggregateVerKeys (no PoPs)" $
@@ -184,17 +183,16 @@ mkCase :: forall v a. (DSIGNAggregatable v, Signable v a)
 mkCase ctx msg n =
   let sks  = replicate n (genKeyDSIGN @v testSeed)
       vks  = map deriveVerKeyDSIGN sks
-      pops = map (createPossessionProofDSIGN @v ctx) sks
+      pops = map (createPossessionProofDSIGN @v) sks
       sigs = map (signDSIGN @v ctx msg) sks
       vkp  = zip vks pops
   in AggCase sks vks vkp sigs
 
 proveAllPoPs :: forall v. DSIGNAggregatable v
-  => ContextDSIGN v -> [SignKeyDSIGN v] -> [PossessionProofDSIGN v]
-proveAllPoPs ctx = map (createPossessionProofDSIGN @v ctx)
+  => [SignKeyDSIGN v] -> [PossessionProofDSIGN v]
+proveAllPoPs = map (createPossessionProofDSIGN @v)
 
 verifyAllPoPs :: forall v. DSIGNAggregatable v
-  => ContextDSIGN v
-  -> [(VerKeyDSIGN v, PossessionProofDSIGN v)]
+  => [(VerKeyDSIGN v, PossessionProofDSIGN v)]
   -> Either String ()
-verifyAllPoPs ctx = F.foldl' (\acc (vk,pop) -> acc >> verifyPossessionProofDSIGN @v ctx vk pop) (Right ())
+verifyAllPoPs = F.foldl' (\acc (vk,pop) -> acc >> verifyPossessionProofDSIGN @v vk pop) (Right ())

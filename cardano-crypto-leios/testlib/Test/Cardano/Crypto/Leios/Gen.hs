@@ -31,7 +31,6 @@ import Cardano.Crypto.Leios (
   LeiosSigningKey,
   Weight,
   aggregateLeiosCert,
-  leiosSignContext,
   mkLeiosCommittee,
  )
 import qualified Data.Map.Strict as Map
@@ -63,7 +62,7 @@ genLeiosSignature = do
   sk <- genLeiosSigningKey
   msgLen <- choose (0, 256)
   msg <- genByteString msgLen
-  pure $ signDSIGN leiosSignContext msg sk
+  pure $ signDSIGN () msg sk
 
 -- | Generate an all-keyed committee together with its signing keys, at an
 -- interesting size: driven by the QuickCheck size parameter but capped at 16 —
@@ -107,8 +106,8 @@ mkCommitteeFromTestSeats testSeats =
 
         keyPoP = case kind of
           NoKey -> SNothing
-          WithKey -> SJust (vk, createPossessionProofDSIGN leiosSignContext sk)
-          BadPoP -> SJust (vk, createPossessionProofDSIGN leiosSignContext unrelatedSk)
+          WithKey -> SJust (vk, createPossessionProofDSIGN sk)
+          BadPoP -> SJust (vk, createPossessionProofDSIGN unrelatedSk)
 
         unrelatedSk = genLeiosSigningKey `generateWith` (length testSeats + 1)
 
@@ -142,7 +141,7 @@ genLeiosCert = do
           [ (SJust (vk, pop), 1 % toInteger n)
           | sk <- sks
           , let vk = deriveVerKeyDSIGN sk
-                pop = createPossessionProofDSIGN leiosSignContext sk
+                pop = createPossessionProofDSIGN sk
           ]
   k <- chooseInt (1, n)
   signerIxs <- take k <$> shuffle [0 .. n - 1]
@@ -150,7 +149,7 @@ genLeiosCert = do
   msg <- genByteString msgLen
   let sigs =
         Map.fromList
-          [ (LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN leiosSignContext msg (sks !! i))
+          [ (LeiosSeatId (fromIntegral @Int @Word16 i), signDSIGN () msg (sks !! i))
           | i <- signerIxs
           ]
   case aggregateLeiosCert committee sigs of
