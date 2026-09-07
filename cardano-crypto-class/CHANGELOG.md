@@ -5,16 +5,25 @@
 * Replace memory dependency with ram (drop in replacement)
 * Depend on crypton ^>- 1.1
 * Add bindings to the Poseidon permutation over the BLS12-381 scalar field
-  (vendored from Nomadic Labs' `ocaml-bls12-381-hash` C implementation),
-  intended to back a future Plutus builtin:
+  (the permutation core vendored from Nomadic Labs' `ocaml-bls12-381-hash`
+  C implementation), backing the Plutus builtin proposed by the CIP
+  *Poseidon Permutation Built-in for Plutus*:
   - `Cardano.Crypto.Poseidon` with `poseidonPermutation` (full-state
     permutation selected by an append-only variant registry index; input is
     validated, never padded) and `poseidonPermutationInteger` (the
     `Integer` boundary with mod-r reduction semantics)
-  - `Cardano.Crypto.Poseidon.Constants` with the width-3 / 128-bit-security
-    instance as registry index 0
+  - `Cardano.Crypto.Poseidon.Constants` with the CIP's instance registry:
+    index 0 the midnight-zk width-3 instance (plonkish/halo2 ecosystem,
+    `R_P = 60`, partial-round S-box on the last lane), index 1 the circom
+    BLS12-381 port's width-3 instance (circomlib-style R1CS ecosystem,
+    `R_P = 56`, partial-round S-box on the first lane, realized through the
+    CIP's state-reversal conjugation)
   - `Cardano.Crypto.Poseidon.Internal` with the FFI bindings and the
     documented C contract
+  - test vectors are the CIP's normative permutation vectors plus its
+    non-normative ecosystem hash-framing traces; no hash function is
+    exported — framings are the calling script's responsibility, per the
+    CIP
 
 ## 2.5.1.0
 

@@ -29,9 +29,11 @@
 --
 -- The HADES trick that makes Poseidon cheap: only the outer @R_F@ rounds
 -- are /full/ rounds applying the S-box to every element; the @R_P@ /partial/
--- rounds in the middle apply it to the __last__ state element only. The
--- outer full rounds provide the statistical security margin, the many cheap
--- partial rounds the algebraic degree:
+-- rounds in the middle apply it to __one__ state element only — in this C
+-- core, hard-coded to the __last__ element (see /Lane normalization/ below
+-- for instances specified on another lane). The outer full rounds provide
+-- the statistical security margin, the many cheap partial rounds the
+-- algebraic degree:
 --
 -- @
 --          input state (w elements)
@@ -59,6 +61,24 @@
 -- algorithm — the implementation adds @w@ /zero/ constants instead of
 -- branching, which is where the /Zero padding/ requirement below comes
 -- from.
+--
+-- == Lane normalization
+--
+-- The C core hard-codes the partial-round S-box on the __last__ state
+-- element, but the registry admits instances specified with the S-box on
+-- the __first__ lane (the circom lineage, registry index 1). Per the CIP,
+-- such an instance is realized through the exact state-reversal
+-- conjugation, which is observationally identical and therefore not a
+-- distinct variant: template construction normalizes an 'SBoxFirst'
+-- instance to the C-native last-lane form via
+-- 'Cardano.Crypto.Poseidon.Constants.conjugateInstance' (reversed MDS rows
+-- and columns, each round's constant chunk reversed) and records the fact
+-- in 'templateReversed'; 'poseidonPermute' then feeds the input state in
+-- reverse order and reverses the output state back, so callers always see
+-- the instance's own (upstream) lane order — the order its CIP test
+-- vectors are stated in. Everything downstream of the normalization
+-- (constant composition for batching, the buffer writes, the C call)
+-- operates exclusively on the native form.
 --
 -- == Buffer layout
 --
@@ -124,11 +144,12 @@
 -- out-of-bounds read.
 --
 -- Template construction therefore always writes the constants region
--- computed by 'Cardano.Crypto.Poseidon.Batching.constantsRegion' for the
--- template's batch size — the raw ARK list when the batch size exceeds
--- @R_P@ (the two are identical then; the test suite asserts it), the
--- composed coefficients otherwise. 'newPoseidonTemplate' uses the
--- unbatched configuration @batch_size = R_P + 1@ (see
+-- computed by 'Cardano.Crypto.Poseidon.Batching.computeConstantsRegion'
+-- (over the lane-normalized instance) for the template's batch size — the
+-- raw ARK list when the batch size exceeds @R_P@ (the two are identical
+-- then; the test suite asserts it), the composed coefficients otherwise.
+-- 'newPoseidonTemplate' uses the unbatched configuration
+-- @batch_size = R_P + 1@ (see
 -- 'Cardano.Crypto.Poseidon.Constants.batchSize'), which remains the
 -- reference oracle; 'newPoseidonTemplateWithBatchSize' opts into batching,
 -- and a property test asserts the batched and unbatched configurations
@@ -176,14 +197,14 @@
 --
 -- The alternative — building a context from the 'PoseidonInstance' on every
 -- call — would repeat the @length ark + w²@ Integer-to-Montgomery
--- conversions each time; the template turns that into a single ~6.6 KB
--- @memcpy@ per call for the width-3 instance (207 × 32 bytes), plus the
--- unavoidable @w@ input copies. Indicative measurement (dev machine,
--- width-3 instance): a template-based 'poseidonPermute' call takes ~23 µs
+-- conversions each time; the template turns that into a single ~7 KB
+-- @memcpy@ per call for a width-3 instance (219 × 32 bytes for variant 0),
+-- plus the unavoidable @w@ input copies. Indicative measurement (dev
+-- machine, width-3 instance): a template-based 'poseidonPermute' call takes ~23 µs
 -- end to end (dominated by the permutation's ~1000 field multiplications in
 -- C), while template construction measured ~3.3 ms in GHCi — an interpreted
--- upper bound, but even discounted generously the 201 conversions dwarf the
--- per-call copy.
+-- upper bound, but even discounted generously the ~200 conversions dwarf
+-- the per-call copy.
 --
 -- Both entry points ('newPoseidonTemplate', 'poseidonPermute') are exposed
 -- as __pure functions__ via @unsafePerformIO@, following the precedent of
@@ -202,6 +223,8 @@ module Cardano.Crypto.Poseidon.Internal (
   PoseidonTemplate,
   templateInstance,
   templateBatchSize,
+  templateReversed,
+  nativeForm,
   newPoseidonTemplate,
   newPoseidonTemplateWithBatchSize,
   newPoseidonTemplateWithRegion,
@@ -233,7 +256,12 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
  )
 import Cardano.Crypto.PinnedSizedBytes (psbCreate, psbUseAsCPtr)
 import Cardano.Crypto.Poseidon.Batching (computeConstantsRegion)
-import Cardano.Crypto.Poseidon.Constants (PoseidonInstance (..), batchSize)
+import Cardano.Crypto.Poseidon.Constants (
+  PartialSBoxLane (..),
+  PoseidonInstance (..),
+  batchSize,
+  conjugateInstance,
+ )
 import Control.Exception (bracket)
 import Control.Monad (zipWithM_)
 import Data.Void (Void)
@@ -343,6 +371,14 @@ writeIntegerAsFr dst n = do
 
 ---- Template construction and permutation.
 
+-- | The C-native (last-lane S-box) form of an instance: the instance
+-- itself when its S-box lane is already the last, its state-reversal
+-- conjugation otherwise. See /Lane normalization/ in the module header.
+nativeForm :: PoseidonInstance -> PoseidonInstance
+nativeForm inst = case partialSBoxLane inst of
+  SBoxLast -> inst
+  SBoxFirst -> conjugateInstance inst
+
 -- | An immutable, fully populated context for one 'PoseidonInstance': MDS
 -- and round constants written, state region zero. Built once per instance
 -- and only ever /read/ afterwards ('poseidonPermute' copies it into a
@@ -351,7 +387,13 @@ writeIntegerAsFr dst n = do
 -- and the template scheme/ in the module header.
 data PoseidonTemplate = PoseidonTemplate
   { templateInstance :: !PoseidonInstance
-  -- ^ The instance this template was built from.
+  -- ^ The instance this template was built from, in its original (upstream)
+  -- form — /not/ lane-normalized.
+  , templateReversed :: !Bool
+  -- ^ Whether the buffer holds the state-reversal conjugated form of the
+  -- instance (an 'SBoxFirst' instance normalized to the C-native last-lane
+  -- form; see /Lane normalization/ in the module header).
+  -- 'poseidonPermute' must then reverse the state on the way in and out.
   , templateBatchSize :: !Int
   -- ^ The batch size this template was configured with; the constants
   -- region matches it (raw ARK for an inactive batch, composed
@@ -375,19 +417,18 @@ newPoseidonTemplate inst = newPoseidonTemplateWithBatchSize (batchSize inst) ins
 
 -- | Build the immutable template for an instance with an explicit batch
 -- size, computing the constants region with
--- 'Cardano.Crypto.Poseidon.Batching.computeConstantsRegion'. This is the
--- generate-and-verify path (tests exercise it for many batch sizes);
--- production configurations use 'newPoseidonTemplateWithRegion' with a
--- stored region instead, so no composition runs outside the test suite.
+-- 'Cardano.Crypto.Poseidon.Batching.computeConstantsRegion' over the
+-- lane-normalized form of the instance.
 newPoseidonTemplateWithBatchSize :: Int -> PoseidonInstance -> Maybe PoseidonTemplate
 newPoseidonTemplateWithBatchSize k inst
   | k < 1 = Nothing
-  | otherwise = newPoseidonTemplateWithRegion k (computeConstantsRegion k inst) inst
+  | otherwise = newPoseidonTemplateWithRegion k (computeConstantsRegion k (nativeForm inst)) inst
 
 -- | Build the immutable template for an instance with an explicit batch
--- size and an explicitly supplied constants region (e.g. the stored
--- 'Cardano.Crypto.Poseidon.Batching.width3_128bitBatch3Region').
--- Returns 'Nothing' if
+-- size and an explicitly supplied constants region. The region must be
+-- composed for the __lane-normalized__ form of the instance (the form the
+-- buffer is built from; for an 'SBoxLast' instance the two coincide) and
+-- for this exact batch size. Returns 'Nothing' if
 --
 -- * the batch size is below 1;
 -- * the MDS is not @w@ rows of @w@ entries (checked here — the C cannot
@@ -412,7 +453,7 @@ newPoseidonTemplateWithBatchSize k inst
 newPoseidonTemplateWithRegion :: Int -> [Integer] -> PoseidonInstance -> Maybe PoseidonTemplate
 newPoseidonTemplateWithRegion k region inst
   | k < 1 = Nothing
-  | length (mds inst) /= w || any ((/= w) . length) (mds inst) = Nothing
+  | length (mds native) /= w || any ((/= w) . length) (mds native) = Nothing
   | length region + w /= fromIntegral nConstants = Nothing
   | otherwise = unsafePerformIO $ do
       PoseidonCtxtPtr raw <-
@@ -436,7 +477,7 @@ newPoseidonTemplateWithRegion k region inst
             zipWithM_
               (\i x -> writeIntegerAsFr (mdsPtr `plusPtr` (i * sizeFr)) x)
               [0 ..]
-              (concat (mds inst))
+              (concat (mds native))
             -- Only the region's leading constants are written; the w
             -- trailing zero constants are provided by the calloc'd buffer
             -- (see /Zero padding/ in the module header).
@@ -449,12 +490,14 @@ newPoseidonTemplateWithRegion k region inst
             Just
               PoseidonTemplate
                 { templateInstance = inst
+                , templateReversed = partialSBoxLane inst == SBoxFirst
                 , templateBatchSize = k
                 , templateBufferBytes = (w + w * w + fromIntegral nConstants) * sizeFr
                 , templateForeignPtr = fp
                 }
   where
     w = width inst
+    native = nativeForm inst
     nConstants =
       c_poseidon_compute_number_of_constants
         (fromIntegral k)
@@ -467,7 +510,11 @@ newPoseidonTemplateWithRegion k region inst
 -- elements, returning the full output state. Returns 'Nothing' if the
 -- input length differs from the instance width — never pads (the rationale
 -- lives with the public API in "Cardano.Crypto.Poseidon") — or on
--- allocation failure.
+-- allocation failure. Input and output states are in the instance's own
+-- lane order: for a template built from an 'SBoxFirst' instance the state
+-- is reversed on the way into and out of the (conjugated) buffer, so the
+-- reversal is invisible to callers (see /Lane normalization/ in the module
+-- header).
 --
 -- Each call allocates a private scratch context, copies the template's
 -- entire buffer into it (constants, MDS, and the zero state region),
@@ -490,12 +537,16 @@ poseidonPermute t inputState
             src <- c_poseidon_get_state_from_context (PoseidonCtxtPtr tmplRaw)
             dst <- c_poseidon_get_state_from_context scratch
             copyBytes dst src (templateBufferBytes t)
-            zipWithM_ (\i fr -> writeFr (dst `plusPtr` (i * sizeFr)) fr) [0 ..] inputState
+            zipWithM_ (\i fr -> writeFr (dst `plusPtr` (i * sizeFr)) fr) [0 ..] (laneOrder inputState)
             c_poseidon_apply_permutation scratch
-            Just <$> mapM (\i -> readFr (dst `plusPtr` (i * sizeFr))) [0 .. w - 1]
+            Just . laneOrder <$> mapM (\i -> readFr (dst `plusPtr` (i * sizeFr))) [0 .. w - 1]
   where
     inst = templateInstance t
     w = width inst
+    -- The state-reversal half of the lane normalization: a template built
+    -- from a conjugated buffer takes and returns the state in the
+    -- instance's own lane order by reversing it at the buffer boundary.
+    laneOrder = if templateReversed t then reverse else id
     acquire =
       -- The scratch context must use the template's batch size: the copied
       -- constants region only makes sense under the batching configuration

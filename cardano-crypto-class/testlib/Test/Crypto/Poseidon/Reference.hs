@@ -4,20 +4,24 @@
 --
 -- This implements the algorithm as specified ([GKRRS21], eprint 2019\/458):
 -- rounds of add-round-key \/ S-box \/ MDS multiply, with the S-box applied
--- to every element in the @R_F@ outer full rounds and to the last element
--- only in the @R_P@ middle partial rounds. It deliberately shares nothing
--- with the C implementation — no blst arithmetic, no batching, and no
--- zero-padding trick: here the final round simply /has no/ trailing
--- round-key addition. Agreement with the C output on random states
+-- to every element in the @R_F@ outer full rounds and to the instance's
+-- 'partialSBoxLane' element only in the @R_P@ middle partial rounds. It
+-- deliberately shares nothing with the C implementation — no blst
+-- arithmetic, no batching, no zero-padding trick (here the final round
+-- simply /has no/ trailing round-key addition), and no lane normalization:
+-- an 'SBoxFirst' instance is evaluated directly on its own constants, in
+-- its own lane order. Agreement with the C output on random states
 -- therefore independently checks the binding end to end, including the
--- claim that the C's @w@ trailing padding constants are zero.
+-- claim that the C's @w@ trailing padding constants are zero and — for an
+-- 'SBoxFirst' instance — the whole state-reversal conjugation the binding
+-- realizes it through.
 --
 -- Speed is a non-goal; the C binding exists precisely because this is slow.
 module Test.Crypto.Poseidon.Reference (
   referencePoseidon,
 ) where
 
-import Cardano.Crypto.Poseidon.Constants (PoseidonInstance (..))
+import Cardano.Crypto.Poseidon.Constants (PartialSBoxLane (..), PoseidonInstance (..))
 import Test.Crypto.Poseidon.Field (FieldElem)
 
 data RoundKind = Full | Partial
@@ -58,14 +62,19 @@ referencePoseidon inst input
     laterArks = map Just (drop 1 arkChunks) ++ [Nothing]
 
     -- One round: S-box, then MDS mixing, then (except in the final round)
-    -- the trailing ARK. In a partial round the S-box hits only the LAST
-    -- state element — which element is a per-implementation convention;
-    -- this matches cbits/poseidon.c (poseidon_apply_sbox with full = 0),
-    -- and the constants were generated for that convention.
+    -- the trailing ARK. In a partial round the S-box hits only the
+    -- instance's declared lane — which element is a per-instance structural
+    -- choice (see Cardano.Crypto.Poseidon.Constants). The C core
+    -- (cbits/poseidon.c, poseidon_apply_sbox with full = 0) hard-codes the
+    -- last element and reaches SBoxFirst instances through conjugation;
+    -- this oracle instead honors the declared lane directly, so agreement
+    -- also validates that conjugation.
     applyRound st (kind, mCs) =
       let sboxed = case kind of
             Full -> map sbox st
-            Partial -> init st ++ [sbox (last st)]
+            Partial -> case partialSBoxLane inst of
+              SBoxLast -> init st ++ [sbox (last st)]
+              SBoxFirst -> sbox (head st) : tail st
           mixed = mdsMultiply sboxed
        in maybe mixed (addRoundKey mixed) mCs
 

@@ -3,6 +3,14 @@
 
 -- | Tests for the Poseidon instance data in "Cardano.Crypto.Poseidon.Constants".
 --
+-- The invariants asserted over each registered instance are the admission
+-- criteria of the CIP /Poseidon Permutation Built-in for Plutus/, and the
+-- known-answer vectors are that CIP's @test-vectors.json@: per instance a
+-- __normative permutation vector__ (one call, input state to full output
+-- state — what conformance means for the builtin) and __secondary hash
+-- vectors__ (the origin ecosystem's hash reconstructed as a framing of
+-- permutation calls, checked call by call against the shipped trace).
+--
 -- The property tests below cite two papers:
 --
 -- [GKRRS21]: Grassi, Khovratovich, Rechberger, Roy, Schofnegger,
@@ -30,26 +38,26 @@ import Cardano.Crypto.Poseidon (
   poseidonPermutation,
   poseidonPermutationInteger,
  )
-import Cardano.Crypto.Poseidon.Batching (
-  computeConstantsRegion,
-  width3_128bitBatch3Region,
- )
+import Cardano.Crypto.Poseidon.Batching (computeConstantsRegion)
 import Cardano.Crypto.Poseidon.Constants (
+  PartialSBoxLane (..),
   PoseidonInstance (..),
   batchSize,
+  circomWidth3,
+  conjugateInstance,
+  midnightWidth3,
   poseidonVariants,
-  width3_128bit,
  )
 import Cardano.Crypto.Poseidon.Internal (
   PoseidonTemplate,
+  nativeForm,
   newPoseidonTemplate,
   newPoseidonTemplateWithBatchSize,
-  newPoseidonTemplateWithRegion,
   poseidonPermute,
  )
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
-import Data.List (subsequences, transpose)
+import Data.List (subsequences)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 import Data.Proxy (Proxy (..))
 import qualified Data.Set as Set
@@ -91,44 +99,105 @@ foreign import ccall unsafe "poseidon_compute_number_of_constants"
     CInt ->
     CInt
 
+-- | One registered variant, bundled with everything its per-variant tests
+-- need: the registry index, the instance, the pinned digest of its embedded
+-- constants, and the CIP's normative permutation vector.
+data Variant = Variant
+  { varLabel :: String
+  , varIndex :: Integer
+  , varInstance :: PoseidonInstance
+  , varDigest :: String
+  , varPermInput :: [Integer]
+  , varPermOutput :: [Integer]
+  }
+
+-- | The registered variants, mirroring the CIP registry. Every entry of
+-- 'poseidonVariants' must appear here (asserted below), so adding a variant
+-- without vectors is a test failure.
+variants :: [Variant]
+variants =
+  [ Variant
+      { varLabel = "midnightWidth3 (variant 0)"
+      , varIndex = 0
+      , varInstance = midnightWidth3
+      , varDigest = "8cd06b7ff6cfd8be79049d6839e2c8cb596fbc33ae7d62a10f415c229acee505"
+      , varPermInput = [1, 2, 3]
+      , varPermOutput =
+          [ 42739176831222744601351189768647402530126631525647633889963058519155127388954
+          , 46658607099440038490901505304394142050340509471711703355306894912210352993754
+          , 23346409755515467342303752938632006079855330979846092405107661684387401837642
+          ]
+      }
+  , Variant
+      { varLabel = "circomWidth3 (variant 1)"
+      , varIndex = 1
+      , varInstance = circomWidth3
+      , varDigest = "55ada01ef31b021e3c0b5a19f7e2788983c6a63cefd57840cb1d70020f2346f7"
+      , varPermInput = [0, 1, 2]
+      , varPermOutput =
+          [ 28821147804331559602169231704816259064962739503761913593647409715501647586810
+          , 30754388626296368040468298266549616538028692312414349123487035395142135348698
+          , 2299091558249312604371495294586620648216137258024480884964079017093457283751
+          ]
+      }
+  ]
+
 -- | All Poseidon tests: constants invariants, Internal-level binding tests
--- (acceptance vector, differential property against the reference
--- implementation, rejections), and the public API tests.
+-- (normative vectors, differential property against the reference
+-- implementation, rejections), batching, the public API tests, and the
+-- CIP's secondary hash-framing vectors.
 tests :: Spec
 tests =
   describe "Crypto.Poseidon" $ do
     describe "Constants" $ do
-      describe "width3_128bit (variant 0)" $ do
-        it "is registered at index 0" $
-          assertEqual "poseidonVariants 0" (Just width3_128bit) (poseidonVariants 0)
-        constantsInvariants width3_128bit
-        it "embedded constants match their pinned digest (order-sensitive)" $
-          -- Freezes the exact values *and* their order: the permutation
-          -- consumes constants strictly sequentially, so a reordered,
-          -- duplicated, dropped or extra value is as fatal as a wrong one,
-          -- and none of the algebraic properties below would necessarily
-          -- catch it. Any edit to the embedding must consciously update
-          -- this digest.
-          assertEqual
-            "SHA256 (show (width, mds, ark))"
-            "1289be84a2c6c1f5e4c2057c53677323ba3e223e8b3313817f388245a8fb9fae"
-            (constantsDigest width3_128bit)
+      it "the test-suite variant list covers exactly the registered indices" $ do
+        -- Guards the coupling between this file and the registry: a variant
+        -- registered without vectors here, or vice versa, fails.
+        mapM_
+          ( \v ->
+              assertEqual ("index " ++ show (varIndex v)) (Just (varInstance v)) (poseidonVariants (varIndex v))
+          )
+          variants
+        assertBool "index 2 unregistered" (isNothing (poseidonVariants 2))
+      mapM_ variantConstantsTests variants
+      it "conjugateInstance is an involution and mirrors the S-box lane" $
+        mapM_
+          ( \v -> do
+              let inst = varInstance v
+                  conj = conjugateInstance inst
+              assertBool
+                (varLabel v ++ ": lane mirrored")
+                (partialSBoxLane conj /= partialSBoxLane inst)
+              assertEqual (varLabel v ++ ": involution") inst (conjugateInstance conj)
+          )
+          variants
+      it "nativeForm always has the S-box on the last lane" $
+        mapM_
+          ( \v ->
+              assertEqual
+                (varLabel v)
+                SBoxLast
+                (partialSBoxLane (nativeForm (varInstance v)))
+          )
+          variants
     describe "Internal" $ do
-      it "builds a template for width3_128bit" $
-        assertBool "newPoseidonTemplate width3_128bit" (isJust (newPoseidonTemplate width3_128bit))
+      it "builds a template for every registered instance" $
+        mapM_
+          (\v -> assertBool (varLabel v) (isJust (newPoseidonTemplate (varInstance v))))
+          variants
       it "rejects invalid instances" $ do
         -- Each of these exercises a distinct validation layer documented in
         -- Cardano.Crypto.Poseidon.Internal: the first three are rejected by
         -- the C constructor (poseidon_ctxt_new), the last two by the
         -- Haskell-side shape and constant-count assertions.
         let rejects inst label = assertBool label (isNothing (newPoseidonTemplate inst))
-        rejects width3_128bit {width = 1} "width 1"
-        rejects width3_128bit {nbFullRounds = 7} "odd R_F"
-        rejects width3_128bit {nbFullRounds = -2} "negative R_F"
-        rejects width3_128bit {mds = [[1]]} "MDS shape mismatch"
-        rejects width3_128bit {ark = drop 1 (ark width3_128bit)} "constant count mismatch"
+        rejects midnightWidth3 {width = 1} "width 1"
+        rejects midnightWidth3 {nbFullRounds = 7} "odd R_F"
+        rejects midnightWidth3 {nbFullRounds = -2} "negative R_F"
+        rejects midnightWidth3 {mds = [[1]]} "MDS shape mismatch"
+        rejects midnightWidth3 {ark = drop 1 (ark midnightWidth3)} "constant count mismatch"
       it "rejects input states of the wrong length (no implicit padding)" $ do
-        tmpl <- expectJust "template" (newPoseidonTemplate width3_128bit)
+        tmpl <- expectJust "template" (newPoseidonTemplate midnightWidth3)
         someFr <- integersToFrs [1, 2, 3, 4]
         mapM_
           ( \n ->
@@ -137,33 +206,7 @@ tests =
                 (isNothing (poseidonPermute tmpl (take n someFr)))
           )
           [0, 2, 4]
-      it "matches the Nomadic Labs acceptance vector" $ do
-        -- The reference vector for this instance, from the upstream test
-        -- suite (ocaml-bls12-381-hash). Input: capacity slot zero, then the
-        -- two inputs; asserted on the full output state. This exercises the
-        -- whole binding: buffer layout, Montgomery conversion, batch-size
-        -- choice and zero padding would each corrupt the output if wrong.
-        -- (Chunk 5 re-asserts this vector through the public API.)
-        tmpl <- expectJust "template" (newPoseidonTemplate width3_128bit)
-        input <- integersToFrs acceptanceInput
-        output <- expectJust "permute" (poseidonPermute tmpl input)
-        outputIntegers <- frsToIntegers output
-        assertEqual "output state" acceptanceOutput outputIntegers
-      prop "agrees with the pure reference implementation on random states" $
-        -- Differential test against Test.Crypto.Poseidon.Reference, a naive
-        -- spec-faithful Poseidon over the FieldElem oracle that shares
-        -- nothing with the C (no blst, no batching, no zero-padding trick).
-        -- The acceptance vector pins a single input; this covers random
-        -- states across the whole field, including the boundary values the
-        -- generator injects deliberately, and re-checks the zero-padding
-        -- claim on every case (the reference's last round simply has no
-        -- ARK).
-        forAll genState $ \xs -> ioProperty $ do
-          input <- integersToFrs xs
-          output <- expectJust "permute" (poseidonPermute width3Template input)
-          outIntegers <- frsToIntegers output
-          pure $
-            map fromInteger outIntegers === referencePoseidon width3_128bit (map fromInteger xs)
+      mapM_ variantInternalTests variants
       it "is deterministic across independent executions" $ do
         -- The two inputs are built by two separate IO actions, so they are
         -- distinct heap objects with equal contents and the two
@@ -175,7 +218,7 @@ tests =
         -- twice (fresh scratch context each time), which is what
         -- determinism-across-calls is actually about: no hidden state, no
         -- uninitialized-memory influence.
-        tmpl <- expectJust "template" (newPoseidonTemplate width3_128bit)
+        tmpl <- expectJust "template" (newPoseidonTemplate midnightWidth3)
         input1 <- integersToFrs [5, 6, 7]
         input2 <- integersToFrs [5, 6, 7]
         out1 <- expectJust "permute 1" (poseidonPermute tmpl input1)
@@ -183,104 +226,18 @@ tests =
         r1 <- frsToIntegers out1
         r2 <- frsToIntegers out2
         assertEqual "two independent executions" r1 r2
-    describe "Batching" $ do
-      it "the unbatched region is exactly the raw ARK list" $
-        -- The identity that makes phase 1 a special case of the general
-        -- constants-region computation: with batch size R_P + 1 there are
-        -- no batches and the region's four sections reassemble the raw
-        -- ARK list.
-        assertEqual
-          "constantsRegion (R_P + 1)"
-          (ark width3_128bit)
-          (computeConstantsRegion (batchSize width3_128bit) width3_128bit)
-      it "region length + width matches poseidon_compute_number_of_constants" $
-        -- The composition must produce exactly the number of constants the
-        -- C consumes for every batch size, not just the production one.
-        mapM_
-          ( \k ->
-              assertEqual
-                ("batch size " ++ show k)
-                ( c_poseidon_compute_number_of_constants
-                    (fromIntegral k)
-                    (fromIntegral (nbPartialRounds width3_128bit))
-                    (fromIntegral (nbFullRounds width3_128bit))
-                    (fromIntegral (width width3_128bit))
-                )
-                (fromIntegral (length (computeConstantsRegion k width3_128bit) + width width3_128bit))
-          )
-          ([1 .. 8] ++ [55, 56, 57])
-      it "stored batch-3 region equals the composition helper's output" $
-        -- The guard test of the storage decision: the shipped, hardcoded
-        -- region must be exactly what computeConstantsRegion derives from
-        -- the raw constants — drift between the two is a test failure,
-        -- never a silent divergence.
-        assertEqual
-          "width3_128bitBatch3Region"
-          (computeConstantsRegion 3 width3_128bit)
-          width3_128bitBatch3Region
-      it "stored composed constants are canonical field elements (0 <= x < r)" $
-        assertBool
-          "stored batch-3 region in [0, r)"
-          (all (\x -> x >= 0 && x < scalarPeriod) width3_128bitBatch3Region)
-      it "builds batched templates for all exercised batch sizes" $
-        assertEqual "template count" (length exercisedBatchSizes) (length batchedTemplates)
-      it "matches the acceptance vector through the stored batched configuration (k = 3)" $ do
-        -- Built from the hardcoded region, i.e. the exact production path
-        -- a batched variant 0 would take.
-        tmpl <-
-          expectJust
-            "batched template"
-            (newPoseidonTemplateWithRegion 3 width3_128bitBatch3Region width3_128bit)
-        input <- integersToFrs acceptanceInput
-        output <- expectJust "permute" (poseidonPermute tmpl input)
-        outputIntegers <- frsToIntegers output
-        assertEqual "output state" acceptanceOutput outputIntegers
-      prop "batched and unbatched configurations agree on random states" $
-        -- The load-bearing phase 2 test: the unbatched path (raw ARK
-        -- constants, phase 1) is the oracle; every batched configuration
-        -- must compute the identical permutation. Exercises degenerate
-        -- batches (k = 1), the production candidate (k = 3), a batch size
-        -- that leaves unbatched leftover rounds (k = 5, since
-        -- R_P mod 5 /= 0), and one giant batch (k = 56).
-        forAll genState $ \xs -> ioProperty $ do
-          input <- integersToFrs xs
-          oracle <- expectJust "unbatched" (poseidonPermute width3Template input)
-          oracleIntegers <- frsToIntegers oracle
-          results <-
-            mapM
-              ( \(k, tmpl) -> do
-                  out <- expectJust ("batched k=" ++ show k) (poseidonPermute tmpl input)
-                  (,) k <$> frsToIntegers out
-              )
-              batchedTemplates
-          pure $
-            conjoin
-              [ counterexample ("batch size " ++ show k) (out === oracleIntegers)
-              | (k, out) <- results
-              ]
+    describe "Batching" $ mapM_ variantBatchingTests variants
     describe "Public API" $ do
-      it "matches the Nomadic Labs acceptance vector (Integer API, variant 0)" $
-        -- The same reference vector as the Internal-level test, now through
-        -- the whole public stack: registry lookup, cached template,
-        -- Integer reduction and canonical read-back.
-        assertEqual
-          "output state"
-          (Right acceptanceOutput)
-          (poseidonPermutationInteger 0 acceptanceInput)
-      it "matches the acceptance vector through the Fr API" $ do
-        input <- integersToFrs acceptanceInput
-        output <- expectRight (poseidonPermutation 0 input)
-        outputIntegers <- frsToIntegers output
-        assertEqual "output state" acceptanceOutput outputIntegers
+      mapM_ variantPublicApiTests variants
       it "rejects unregistered variant indices" $ do
         let rejected i =
               assertEqual
                 ("variant " ++ show i)
                 (Left (PoseidonUnknownVariant i))
                 (poseidonPermutationInteger i [0, 0, 0])
-        mapM_ rejected [1, -1, 2 ^ (64 :: Int)]
+        mapM_ rejected [2, -1, 2 ^ (64 :: Int)]
       it "rejects wrong input lengths (width - 1, width + 1, empty), never pads" $ do
-        let w = width width3_128bit
+        let w = width midnightWidth3
             rejected xs =
               assertEqual
                 ("length " ++ show (length xs))
@@ -312,14 +269,6 @@ tests =
         out1 <- expectRight (poseidonPermutation 0 input1) >>= frsToIntegers
         out2 <- expectRight (poseidonPermutation 0 input2) >>= frsToIntegers
         assertEqual "two independent executions" out1 out2
-      prop "Integer wrapper agrees with the Fr API on in-range values" $
-        -- Two independent paths through conversion and permutation; the
-        -- Integer wrapper must be observably nothing more than
-        -- conversion + Fr API + conversion.
-        forAll genState $ \xs -> ioProperty $ do
-          frs <- integersToFrs xs
-          viaFr <- expectRight (poseidonPermutation 0 frs) >>= frsToIntegers
-          pure (poseidonPermutationInteger 0 xs === Right viaFr)
       prop "Integer <-> Fr marshalling round-trips modulo r" $
         -- Sanity for the conversion path everything above relies on:
         -- scalarFromInteger >>= frFromScalar, read back via scalarFromFr
@@ -329,50 +278,223 @@ tests =
           fr <- scalarFromInteger n >>= frFromScalar
           n' <- scalarFromFr fr >>= scalarToInteger
           pure (n' === n `mod` scalarPeriod)
+    describe "Hash framings (secondary CIP vectors, non-normative)" $ do
+      -- The CIP's secondary vectors: the origin ecosystem's hash built as a
+      -- framing of permutation calls through the public API, checked call
+      -- by call against the shipped trace — a worked example of one use of
+      -- each index, not a registered mode. The hashes below live in the
+      -- test suite only: the library deliberately exports no hash (see
+      -- /A permutation, not a hash/ in "Cardano.Crypto.Poseidon").
+      it "midnight 2-input hash: init (0, 0, 2), one call, digest = first lane" $ do
+        -- Note the capacity tag is the arity, 2, and the digest is NOT any
+        -- element of the permutation [1,2,3] vector: the tag differs.
+        let state0 = [1, 2, 2]
+        out <- expectRight (poseidonPermutationInteger 0 state0)
+        assertEqual
+          "trace call 1 output state"
+          [ 33852961970927025159829408976690548924952885524395353086236132427166834970999
+          , 3939714347492956910064432176192648807657130878941949775514761553730106462950
+          , 1911806661785286735974042641799574786956305172400684573554104410484129105208
+          ]
+          out
+        assertEqual
+          "digest"
+          33852961970927025159829408976690548924952885524395353086236132427166834970999
+          (head out)
+      it "midnight 3-input hash: init (0, 0, 3), two calls, digest = first lane" $ do
+        -- Two rate-2 absorption chunks, one permutation call each; the
+        -- first call is exactly the normative permutation vector of
+        -- variant 0, whose output state is an intermediate value here.
+        out1 <- expectRight (poseidonPermutationInteger 0 [1, 2, 3])
+        assertEqual "trace call 1 output state" (varPermOutput (head variants)) out1
+        case out1 of
+          [x, y, z] -> do
+            out2 <- expectRight (poseidonPermutationInteger 0 [x + 3, y, z])
+            assertEqual
+              "trace call 2 output state"
+              [ 16323296787651812390833595953902584438731345731750798730514972659803187358587
+              , 10406938084826613343012454278028743502903967432980834233438228844865271820462
+              , 8002878662839612277232593634438862637457054066080438365871913314805563042751
+              ]
+              out2
+            assertEqual
+              "digest"
+              16323296787651812390833595953902584438731345731750798730514972659803187358587
+              (head out2)
+          _ -> assertFailure "call 1 did not return a width-3 state"
+      it "circom 2-input hash: single call on (0, in1, in2), digest = first lane" $ do
+        -- The upstream repository's own shipped test vector: the digest is
+        -- the first element of variant 1's normative permutation vector.
+        out <- expectRight (poseidonPermutationInteger 1 [0, 1, 2])
+        assertEqual
+          "digest"
+          28821147804331559602169231704816259064962739503761913593647409715501647586810
+          (head out)
 
--- | The batch sizes the batched-vs-unbatched property exercises.
-exercisedBatchSizes :: [Int]
-exercisedBatchSizes = [1, 2, 3, 5, 56]
+-- | The constants-level tests of one registered variant: the CIP admission
+-- criteria over the embedded data, plus the pinned digest.
+variantConstantsTests :: Variant -> Spec
+variantConstantsTests v =
+  describe (varLabel v) $ do
+    constantsInvariants (varInstance v)
+    it "embedded constants match their pinned digest (order-sensitive)" $
+      -- Freezes the exact values *and* their order: the permutation
+      -- consumes constants strictly sequentially, so a reordered,
+      -- duplicated, dropped or extra value is as fatal as a wrong one,
+      -- and none of the algebraic properties below would necessarily
+      -- catch it. Any edit to the embedding must consciously update
+      -- this digest.
+      assertEqual
+        "SHA256 (show (width, mds, ark))"
+        (varDigest v)
+        (constantsDigest (varInstance v))
 
--- | Batched-configuration templates for variant 0, built once. A batch
--- size whose template fails to build would be silently dropped here, which
--- is why a test asserts the length of this list.
-batchedTemplates :: [(Int, PoseidonTemplate)]
-batchedTemplates =
-  [ (k, tmpl)
-  | k <- exercisedBatchSizes
-  , Just tmpl <- [newPoseidonTemplateWithBatchSize k width3_128bit]
-  ]
+-- | The Internal-level tests of one registered variant: the CIP's normative
+-- permutation vector through the template path, and the differential
+-- property against the pure reference implementation.
+variantInternalTests :: Variant -> Spec
+variantInternalTests v =
+  describe (varLabel v) $ do
+    it "matches the CIP normative permutation vector" $ do
+      -- One call, input state to full output state, in the instance's own
+      -- lane order — what conformance to the CIP means. This exercises the
+      -- whole binding: buffer layout, Montgomery conversion, batch-size
+      -- choice, zero padding and (for variant 1) the lane normalization
+      -- would each corrupt the output if wrong. (The Public API tests
+      -- re-assert this vector through the registry path.)
+      tmpl <- expectJust "template" (newPoseidonTemplate (varInstance v))
+      input <- integersToFrs (varPermInput v)
+      output <- expectJust "permute" (poseidonPermute tmpl input)
+      outputIntegers <- frsToIntegers output
+      assertEqual "output state" (varPermOutput v) outputIntegers
+    prop "agrees with the pure reference implementation on random states" $
+      -- Differential test against Test.Crypto.Poseidon.Reference, a naive
+      -- spec-faithful Poseidon over the FieldElem oracle that shares
+      -- nothing with the C (no blst, no batching, no zero-padding, and no
+      -- lane normalization: an SBoxFirst instance is evaluated directly on
+      -- its own constants). The normative vector pins a single input; this
+      -- covers random states across the whole field, including the
+      -- boundary values the generator injects deliberately, and — for
+      -- variant 1 — checks the state-reversal conjugation on every case.
+      forAll (genState (varInstance v)) $ \xs -> ioProperty $ do
+        input <- integersToFrs xs
+        output <- expectJust "permute" (poseidonPermute (variantTemplate v) input)
+        outIntegers <- frsToIntegers output
+        pure $
+          map fromInteger outIntegers === referencePoseidon (varInstance v) (map fromInteger xs)
 
--- | The variant-0 template, built once and shared by the property tests.
-width3Template :: PoseidonTemplate
-width3Template = fromMaybe (error "width3_128bit template failed") (newPoseidonTemplate width3_128bit)
+-- | The batching tests of one registered variant, all over its
+-- lane-normalized ('nativeForm') form — the only form the constants
+-- composition is defined on.
+variantBatchingTests :: Variant -> Spec
+variantBatchingTests v =
+  describe (varLabel v) $ do
+    it "the unbatched region is exactly the native raw ARK list" $
+      -- The identity that makes the production path a special case of the
+      -- general constants-region computation: with batch size R_P + 1
+      -- there are no batches and the region's four sections reassemble the
+      -- raw ARK list of the native form.
+      assertEqual
+        "constantsRegion (R_P + 1)"
+        (ark native)
+        (computeConstantsRegion (batchSize native) native)
+    it "region length + width matches poseidon_compute_number_of_constants" $
+      -- The composition must produce exactly the number of constants the
+      -- C consumes for every batch size, not just the unbatched one.
+      mapM_
+        ( \k ->
+            assertEqual
+              ("batch size " ++ show k)
+              ( c_poseidon_compute_number_of_constants
+                  (fromIntegral k)
+                  (fromIntegral (nbPartialRounds native))
+                  (fromIntegral (nbFullRounds native))
+                  (fromIntegral (width native))
+              )
+              (fromIntegral (length (computeConstantsRegion k native) + width native))
+        )
+        (exercisedBatchSizes (varInstance v))
+    prop "batched and unbatched configurations agree on random states" $
+      -- The load-bearing batching test: the unbatched path (raw ARK
+      -- constants) is the oracle; every batched configuration must compute
+      -- the identical permutation. Exercises degenerate batches (k = 1),
+      -- small batches, a batch size that leaves unbatched leftover rounds
+      -- (k = 7: R_P mod 7 /= 0 for both registered instances), and one
+      -- giant batch (k = R_P).
+      forAll (genState (varInstance v)) $ \xs -> ioProperty $ do
+        input <- integersToFrs xs
+        oracle <- expectJust "unbatched" (poseidonPermute (variantTemplate v) input)
+        oracleIntegers <- frsToIntegers oracle
+        results <-
+          mapM
+            ( \k -> do
+                tmpl <-
+                  expectJust
+                    ("batched template k=" ++ show k)
+                    (newPoseidonTemplateWithBatchSize k (varInstance v))
+                out <- expectJust ("batched k=" ++ show k) (poseidonPermute tmpl input)
+                (,) k <$> frsToIntegers out
+            )
+            (exercisedBatchSizes (varInstance v))
+        pure $
+          conjoin
+            [ counterexample ("batch size " ++ show k) (out === oracleIntegers)
+            | (k, out) <- results
+            ]
+  where
+    native = nativeForm (varInstance v)
 
--- | A random state for variant 0: width elements of F_r, with the boundary
--- values 0, 1 and r-1 deliberately over-represented.
-genState :: Gen [Integer]
-genState = vectorOf (width width3_128bit) genFieldInteger
+-- | The public-API tests of one registered variant: the CIP's normative
+-- permutation vector through the registry path, both boundaries.
+variantPublicApiTests :: Variant -> Spec
+variantPublicApiTests v =
+  describe (varLabel v) $ do
+    it "matches the CIP normative permutation vector (Integer API)" $
+      -- The same vector as the Internal-level test, now through the whole
+      -- public stack: registry lookup, cached template, Integer reduction
+      -- and canonical read-back.
+      assertEqual
+        "output state"
+        (Right (varPermOutput v))
+        (poseidonPermutationInteger (varIndex v) (varPermInput v))
+    it "matches the CIP normative permutation vector (Fr API)" $ do
+      input <- integersToFrs (varPermInput v)
+      output <- expectRight (poseidonPermutation (varIndex v) input)
+      outputIntegers <- frsToIntegers output
+      assertEqual "output state" (varPermOutput v) outputIntegers
+    prop "Integer wrapper agrees with the Fr API on in-range values" $
+      -- Two independent paths through conversion and permutation; the
+      -- Integer wrapper must be observably nothing more than
+      -- conversion + Fr API + conversion.
+      forAll (genState (varInstance v)) $ \xs -> ioProperty $ do
+        frs <- integersToFrs xs
+        viaFr <- expectRight (poseidonPermutation (varIndex v) frs) >>= frsToIntegers
+        pure (poseidonPermutationInteger (varIndex v) xs === Right viaFr)
+
+-- | The batch sizes the batched-vs-unbatched property exercises for an
+-- instance: degenerate, small, one leaving leftover unbatched rounds, and
+-- one covering all partial rounds in a single batch.
+exercisedBatchSizes :: PoseidonInstance -> [Int]
+exercisedBatchSizes inst = [1, 2, 3, 7, nbPartialRounds inst]
+
+-- | The unbatched template of a variant, built once and shared by the
+-- property tests.
+variantTemplate :: Variant -> PoseidonTemplate
+variantTemplate v =
+  fromMaybe
+    (error (varLabel v ++ ": template failed"))
+    (newPoseidonTemplate (varInstance v))
+
+-- | A random state for an instance: width elements of F_r, with the
+-- boundary values 0, 1 and r-1 deliberately over-represented.
+genState :: PoseidonInstance -> Gen [Integer]
+genState inst = vectorOf (width inst) genFieldInteger
   where
     genFieldInteger =
       frequency
         [ (1, elements [0, 1, scalarPeriod - 1])
         , (9, choose (0, scalarPeriod - 1))
         ]
-
--- | The Nomadic Labs reference vector for variant 0 (from the upstream
--- ocaml-bls12-381-hash test suite): input state (capacity slot zero, then
--- the two inputs) and the expected full output state.
-acceptanceInput, acceptanceOutput :: [Integer]
-acceptanceInput =
-  [ 0
-  , 19540886853600136773806888540031779652697522926951761090609474934921975120659
-  , 27368034540955591518185075247638312229509481411752400387472688330662143761856
-  ]
-acceptanceOutput =
-  [ 17943489144262435388134690770306545365190731633977654215868012824127324198151
-  , 2231754119684576552235072561055622129225837122807214026821170668631716242147
-  , 29261523742327067247029179638981197564247814302680832614540814949720900275190
-  ]
 
 -- | Integers for the marshalling round-trip: small values (positive and
 -- negative), in-range field elements, values >= r, large negatives, and
@@ -413,8 +535,11 @@ constantsDigest inst =
     . BS8.pack
     $ show (width inst, mds inst, ark inst)
 
--- | The count invariants of an instance, asserted as formulas rather than
--- literals so they keep holding for any instance added to the registry later.
+-- | The invariants of an instance, asserted as formulas rather than
+-- literals so they keep holding for any instance added to the registry
+-- later. These are the CIP's mechanically checkable admission criteria
+-- (its @check-constants.py@ asserts the same properties over the shipped
+-- constants files).
 constantsInvariants :: PoseidonInstance -> Spec
 constantsInvariants inst = do
   it "MDS is a width × width matrix" $ do
@@ -457,27 +582,19 @@ constantsInvariants inst = do
     -- submatrix of M is non-singular". Subsumes invertibility (the order-w
     -- minor is the determinant).
     assertBool "all minors nonzero" (allSquareMinorsNonZero (mdsF inst))
-  it "no power M^i (i <= 4 * width) has an eigenvalue in F_r (subspace-trail check)" $
-    -- [GKRRS21] section 2.3, "Avoiding Insecure Matrices": the MDS matrix
-    -- must not admit (infinitely long) invariant or iterative subspace
-    -- trails over the partial rounds; the authors check M, M^2, ..., M^l
-    -- with search period l = 4t using the algorithms of [GRS20]
-    -- (eprint 2020/500). An eigenvalue of M^i in F_r is a one-dimensional
-    -- invariant subspace of M^i, so we assert the characteristic polynomial
-    -- of every such power has no root in F_r. For width 3 this makes the
-    -- characteristic polynomial of M irreducible, which rules out invariant
-    -- subspaces of any dimension (a 2-dimensional invariant subspace would
-    -- force a linear factor for the quotient), i.e. for width 3 this is the
-    -- full sufficient condition of [GRS20]. CAUTION: for width > 3,
-    -- rootlessness no longer implies irreducibility (e.g. a quintic can
-    -- factor 2 + 3 with no roots), so this test would weaken to a necessary
-    -- condition; registering a wider variant must come with a full
-    -- factorization check per [GRS20].
+  it "no M-invariant subspace keeps the partial-round S-box inactive (subspace-trail check)" $
+    -- [GKRRS21] section 2.3 / [GRS20]: no infinitely long subspace trail
+    -- may avoid the partial-round S-box, i.e. the only M-invariant
+    -- subspace contained in { x : x_sboxlane = 0 } is the trivial one.
+    -- That holds iff the observability matrix with rows e_l M^j
+    -- (j = 0 .. t-1, l the S-box lane) has full rank t — for a square
+    -- matrix, a nonzero determinant. This is the CIP's admission
+    -- criterion; the stronger condition that no power M^i has any
+    -- eigenvalue in F_r is sufficient but NOT necessary, and both
+    -- registered width-3 instances fail it while satisfying this one.
     assertBool
-      "charpoly of M^1 .. M^(4t) rootless in F_r"
-      ( let m = mdsF inst
-         in not (any (hasRootInFr . charPoly) (take (4 * width inst) (iterate (matMul m) m)))
-      )
+      "observability matrix e_l M^j has full rank"
+      (determinant (observabilityMatrix inst) /= 0)
 
 ---- Field arithmetic for the checks above lives in
 ---- Test.Crypto.Poseidon.Field ('FieldElem', an Integer-based independent
@@ -490,8 +607,21 @@ constantsInvariants inst = do
 mdsF :: PoseidonInstance -> [[FieldElem]]
 mdsF = map (map fromInteger) . mds
 
-matMul :: [[FieldElem]] -> [[FieldElem]] -> [[FieldElem]]
-matMul a b = [[sum (zipWith (*) row col) | col <- transpose b] | row <- a]
+-- | The rows @e_l M^j@ for @j = 0 .. t-1@, where @l@ is the instance's
+-- partial-round S-box lane and @e_l@ the corresponding standard basis
+-- (row) vector. Full rank of this matrix is exactly the subspace-trail
+-- criterion asserted above.
+observabilityMatrix :: PoseidonInstance -> [[FieldElem]]
+observabilityMatrix inst = take w (iterate rowTimesM e_l)
+  where
+    m = mdsF inst
+    w = width inst
+    lane = case partialSBoxLane inst of
+      SBoxFirst -> 0
+      SBoxLast -> w - 1
+    e_l = [if j == lane then 1 else 0 | j <- [0 .. w - 1]]
+    rowTimesM v = [sum (zipWith (*) v col) | col <- columns]
+    columns = [[row !! j | row <- m] | j <- [0 .. w - 1]]
 
 -- | Determinant by Laplace expansion along the first row. Exponential in the
 -- matrix size, which is fine for the tiny widths in the registry.
@@ -519,96 +649,3 @@ allSquareMinorsNonZero m =
   where
     w = length m
     subsetsOfSize k = filter ((== k) . length) (subsequences [0 .. w - 1])
-
--- | Coefficients of the characteristic polynomial det(xI - M), lowest degree
--- first, monic. Faddeev-LeVerrier; the divisions are by 1..w, invertible
--- since r is a large prime.
-charPoly :: [[FieldElem]] -> [FieldElem]
-charPoly a = go 1 zeroMatrix [1]
-  where
-    w = length a
-    zeroMatrix = replicate w (replicate w 0)
-    identityScaled c = [[if i == j then c else 0 | j <- [0 .. w - 1]] | i <- [0 .. w - 1]]
-    trace m = sum [(m !! i) !! i | i <- [0 .. w - 1]]
-    matAdd = zipWith (zipWith (+))
-    go k mPrev cs
-      | k > w = cs
-      | otherwise =
-          let mK = matAdd (matMul a mPrev) (identityScaled (head cs))
-              cK = negate (trace (matMul a mK) / fromIntegral k)
-           in go (k + 1) mK (cK : cs)
-
----- Minimal polynomial arithmetic over F_r, enough to decide whether a monic
----- polynomial has a root in F_r: f has a root iff gcd(x^r - x, f) has
----- positive degree (the roots of x^r - x are exactly the elements of F_r).
----- Polynomials are coefficient lists, lowest degree first.
-
--- | Multiply two already-reduced polynomials and reduce modulo the monic f.
-polyMulMod :: [FieldElem] -> [FieldElem] -> [FieldElem] -> [FieldElem]
-polyMulMod f p q = reduce full
-  where
-    d = length f - 1
-    full =
-      [ sum [p !! i * q !! (k - i) | i <- [max 0 (k - (length q - 1)) .. min k (length p - 1)]]
-      | k <- [0 .. length p + length q - 2]
-      ]
-    reduce cs
-      | length cs <= d = cs ++ replicate (d - length cs) 0
-      | otherwise =
-          let top = last cs
-              rest = init cs
-              offset = length rest - d
-              rest' =
-                [ if i >= offset then c - top * f !! (i - offset) else c
-                | (i, c) <- zip [0 ..] rest
-                ]
-           in reduce rest'
-
--- | x^r modulo the monic polynomial f, by square-and-multiply on r's bits.
-xPowRMod :: [FieldElem] -> [FieldElem]
-xPowRMod f = go [1] xPoly scalarPeriod
-  where
-    d = length f - 1
-    xPoly = take d ([0, 1] ++ repeat 0)
-    go acc _ 0 = acc
-    go acc b e
-      | odd e = go (polyMulMod f acc b) (polyMulMod f b b) (e `div` 2)
-      | otherwise = go acc (polyMulMod f b b) (e `div` 2)
-
-polyDegree :: [FieldElem] -> Int
-polyDegree p = go (length p - 1)
-  where
-    go i
-      | i < 0 = -1
-      | p !! i /= 0 = i
-      | otherwise = go (i - 1)
-
-polyGcdDegree :: [FieldElem] -> [FieldElem] -> Int
-polyGcdDegree a b
-  | polyDegree b < 0 = polyDegree a
-  | polyDegree a < polyDegree b = polyGcdDegree b a
-  | otherwise = polyGcdDegree b (polyRem a b)
-  where
-    polyRem p q =
-      let dq = polyDegree q
-          inv = recip (q !! dq)
-          step u
-            | polyDegree u < dq = u
-            | otherwise =
-                let du = polyDegree u
-                    c = u !! du * inv
-                 in step
-                      [ if i >= du - dq && i <= du then x - c * q !! (i - (du - dq)) else x
-                      | (i, x) <- zip [0 ..] u
-                      ]
-       in step p
-
--- | Does the monic polynomial f have a root in F_r?
-hasRootInFr :: [FieldElem] -> Bool
-hasRootInFr f = polyGcdDegree f xrMinusX > 0
-  where
-    xr = xPowRMod f
-    -- x^r - x, already reduced mod f
-    xrMinusX = case xr of
-      (c0 : c1 : rest) -> c0 : (c1 - 1) : rest
-      _ -> error "hasRootInFr: degree < 2 polynomial"

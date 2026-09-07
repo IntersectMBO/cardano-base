@@ -1,22 +1,65 @@
 -- | The Poseidon permutation over the BLS12-381 scalar field.
 --
 -- This is the public face of the binding and the intended backing
--- implementation of a future Plutus builtin; everything a caller might
--- expect and not find here (input padding, a digest-shaped output) is a
--- deliberate omission, explained below. The C contract and the binding
--- mechanics live in "Cardano.Crypto.Poseidon.Internal" (including an
--- overview of the permutation itself); the instance data and the variant
--- registry in "Cardano.Crypto.Poseidon.Constants".
+-- implementation of the Plutus builtin @bls12_381_poseidonPermutation@
+-- proposed by the CIP /Poseidon Permutation Built-in for Plutus/;
+-- everything a caller might expect and not find here (input padding, a
+-- digest-shaped output, a hash function) is a deliberate omission,
+-- explained below. The C contract and the binding mechanics live in
+-- "Cardano.Crypto.Poseidon.Internal" (including an overview of the
+-- permutation itself); the instance data and the variant registry in
+-- "Cardano.Crypto.Poseidon.Constants".
 --
 -- == Variant registry
 --
 -- A parameter set is selected by an 'Integer' index so that new instances
 -- (other widths, other constants) can be added later without changing
--- existing behavior. Index 0 is the width-3, 128-bit-security instance.
+-- existing behavior. The registered instances mirror the CIP's registry:
+--
+-- * index 0 — the midnight-zk instance (plonkish\/halo2 ecosystem): width
+--   3, @R_P = 60@, partial-round S-box on the last lane;
+-- * index 1 — the circom BLS12-381 port's width-3 instance (circomlib-style
+--   R1CS ecosystem): width 3, @R_P = 56@, partial-round S-box on the
+--   __first__ lane. Input and output states are in the instance's own
+--   (upstream) lane order; that the binding realizes it internally through
+--   a state-reversal conjugation is not observable.
+--
 -- The registry contract — indices are append-only, an index's meaning is
 -- never changed or reused, an observably identical but faster
--- implementation is not a new variant — is documented at
+-- implementation is not a new variant, an index identifies a permutation
+-- and never a hash — is documented at
 -- 'Cardano.Crypto.Poseidon.Constants.poseidonVariants'.
+--
+-- == A permutation, not a hash
+--
+-- The API is the /permutation/, not a hash: it returns the full
+-- @width@-element output state of a public bijection with no security
+-- properties of its own. Every hash-like property a caller obtains —
+-- one-wayness, compression, binding — comes exclusively from the /framing/
+-- built around the permutation (capacity placement and initialization,
+-- absorption order, which lanes are read off), never from the permutation
+-- itself; in particular the full output state is never a commitment, since
+-- the permutation is invertible. Framings are the caller's explicit,
+-- auditable choice; the CIP documents each registered instance's ecosystem
+-- framing (non-normatively, with known-answer vectors reproduced in this
+-- package's test suite). The two deployed examples:
+--
+-- The midnight-zk 3-input hash (variant 0; capacity lane last, initialized
+-- to the input count, rate-2 chunks, digest = first lane):
+--
+-- @
+-- hash3 in1 in2 in3 =
+--   let Right [x, y, z]    = 'poseidonPermutationInteger' 0 [in1, in2, 3]
+--       Right [x', y', z'] = 'poseidonPermutationInteger' 0 [x + in3, y, z]
+--   in x'
+-- @
+--
+-- The circom 2-input hash (variant 1; capacity lane first, fixed to zero,
+-- a single permutation call, digest = first lane):
+--
+-- @
+-- hash2 in1 in2 = head \<$\> 'poseidonPermutationInteger' 1 [0, in1, in2]
+-- @
 --
 -- == No implicit padding
 --
@@ -26,28 +69,6 @@
 -- the identical output, a built-in hash collision — the same ambiguity
 -- class behind known Merkle-tree second-preimage attacks. Padding and
 -- domain separation are the caller's explicit, auditable decision.
---
--- == Full-state output
---
--- The API is the /permutation/, not a hash: it returns the full
--- @width@-element output state. This is maximally general — callers can
--- build sponges, take the 2-to-1 compression below, or design other modes
--- — and it makes the eventual builtin's cost a constant per variant index.
--- Note that hash-security arguments cover squeezing only the /rate/
--- portion of the state; a mode design decides which elements those are.
---
--- == 2-to-1 hashing convention
---
--- The conventional use of the width-3 variant (index 0) as a two-input
--- compression function (Merkle trees, commitments), following the Nomadic
--- Labs @ocaml-bls12-381-hash@ test-suite convention this instance comes
--- from: initialize the state as @[0, left, right]@ — the /capacity/ slot
--- comes first and is supplied explicitly as zero — apply the permutation,
--- and take element 0 of the output as the digest:
---
--- @
--- hash2 left right = head \<$\> 'poseidonPermutationInteger' 0 [0, left, right]
--- @
 --
 -- == Integer boundary (reduction semantics)
 --
@@ -85,7 +106,7 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   scalarFromInteger,
   scalarToInteger,
  )
-import Cardano.Crypto.Poseidon.Constants (PoseidonInstance (..), width3_128bit)
+import Cardano.Crypto.Poseidon.Constants (PoseidonInstance (..), circomWidth3, midnightWidth3)
 import Cardano.Crypto.Poseidon.Internal (
   PoseidonTemplate,
   newPoseidonTemplate,
@@ -111,6 +132,8 @@ data PoseidonError
 
 -- | Apply the Poseidon permutation of the given registry variant to a full
 -- input state of exactly @width@ elements, returning the full output state.
+-- States are in the variant's own lane order, the order the CIP's normative
+-- test vectors are stated in.
 --
 -- Returns 'Left' on an unregistered variant index or a wrong input length;
 -- see the module header for the design rationale of both. Pure: this is a
@@ -156,13 +179,15 @@ poseidonPermutationInteger variantIndex input =
 -- Every index registered in
 -- 'Cardano.Crypto.Poseidon.Constants.poseidonVariants' must have a
 -- matching case here pointing at a dedicated top-level CAF, so the
--- expensive template construction (201 Integer-to-Montgomery conversions
--- for variant 0) happens once per program run, not once per call. The two
--- tables cannot drift silently: a variant registered there but missing
--- here makes 'poseidonPermutation' report 'PoseidonUnknownVariant', which
--- the per-variant acceptance tests catch.
+-- expensive template construction (an Integer-to-Montgomery conversion per
+-- constant — 213 for variant 0, 201 for variant 1) happens once per
+-- program run, not once per call. The two tables cannot drift silently: a
+-- variant registered there but missing here makes 'poseidonPermutation'
+-- report 'PoseidonUnknownVariant', which the per-variant acceptance tests
+-- catch.
 variantTemplate :: Integer -> Maybe PoseidonTemplate
-variantTemplate 0 = Just width3_128bitTemplate
+variantTemplate 0 = Just midnightWidth3Template
+variantTemplate 1 = Just circomWidth3Template
 variantTemplate _ = Nothing
 
 -- | Template CAF for variant 0. Falling out of 'newPoseidonTemplate' with
@@ -170,9 +195,18 @@ variantTemplate _ = Nothing
 -- count invariants are enforced by the test suite), so it is reported as a
 -- library bug rather than threaded to callers as an error they cannot act
 -- on.
-width3_128bitTemplate :: PoseidonTemplate
-width3_128bitTemplate =
-  case newPoseidonTemplate width3_128bit of
+midnightWidth3Template :: PoseidonTemplate
+midnightWidth3Template =
+  case newPoseidonTemplate midnightWidth3 of
     Just tmpl -> tmpl
-    Nothing -> error "Cardano.Crypto.Poseidon: width3_128bit failed template validation (library bug)"
-{-# NOINLINE width3_128bitTemplate #-}
+    Nothing -> error "Cardano.Crypto.Poseidon: midnightWidth3 failed template validation (library bug)"
+{-# NOINLINE midnightWidth3Template #-}
+
+-- | Template CAF for variant 1; the same impossibility argument as for
+-- variant 0 applies.
+circomWidth3Template :: PoseidonTemplate
+circomWidth3Template =
+  case newPoseidonTemplate circomWidth3 of
+    Just tmpl -> tmpl
+    Nothing -> error "Cardano.Crypto.Poseidon: circomWidth3 failed template validation (library bug)"
+{-# NOINLINE circomWidth3Template #-}
