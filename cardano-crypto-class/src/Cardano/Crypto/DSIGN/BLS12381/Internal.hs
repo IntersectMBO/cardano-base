@@ -21,6 +21,7 @@ module Cardano.Crypto.DSIGN.BLS12381.Internal (
   BLS12381MinVerKeyDSIGN,
   BLS12381MinSigDSIGN,
   BLS12381CurveConstraints,
+  KnownCurve,
   VerKeyDSIGN (..),
   SignKeyDSIGN (..),
   SigDSIGN (..),
@@ -95,11 +96,10 @@ import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Data.Data (Typeable, eqT)
+import Data.Data (Typeable)
 import qualified Data.Foldable as F (foldl')
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
-import Data.Type.Equality ((:~:) (Refl))
 import Foreign.C.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
@@ -238,25 +238,35 @@ type BLS12381MinSigDSIGN = BLS12381DSIGN Curve2
 -- exactly one canonical pair of DSTs: ordinary signing and verification use
 -- the @"BLS_SIG_"@-prefixed DST, while creating and verifying proofs of
 -- possession use the @"BLS_POP_"@-prefixed one (both are
--- @prefix || H2C_SUITE_ID || SC_TAG || "_"@). None of these are exported:
+-- @prefix || H2C_SUITE_ID || SC_TAG || "_"@). The DSTs are not exported:
 -- they are selected internally per curve variant via 'signatureDST' and
 -- 'popDST', so users cannot sign, verify, or prove possession under a
 -- non-canonical DST.
 
+-- | Curves on which the PoP ciphersuite is instantiated. The class method is
+-- deliberately not exported, so instances cannot be created outside this
+-- module: the DSTs below exist only for the two canonical curve variants.
+class KnownCurve curve where
+  -- The hash-to-curve suite identifier of the group signatures live on
+  -- (the dual of @curve@, which is where the verification keys live).
+  curveSchemeName :: Proxy curve -> ByteString
+
+instance KnownCurve Curve1 where
+  curveSchemeName _ = "BLS12381G2"
+
+instance KnownCurve Curve2 where
+  curveSchemeName _ = "BLS12381G1"
+
 -- | Select the signing DST for the curve the verification keys live on.
-signatureDST :: forall curve. Typeable curve => Proxy curve -> ByteString
-signatureDST _ =
-  case eqT @curve @Curve1 of
-    Just Refl -> "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
-    Nothing -> "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
+signatureDST :: KnownCurve curve => Proxy curve -> ByteString
+signatureDST proxy =
+  "BLS_SIG_" <> curveSchemeName proxy <> "_XMD:SHA-256_SSWU_RO_POP_"
 
 -- | Select the proof-of-possession DST for the curve the verification keys live
 -- on.
-popDST :: forall curve. Typeable curve => Proxy curve -> ByteString
-popDST _ =
-  case eqT @curve @Curve1 of
-    Just Refl -> "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
-    Nothing -> "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
+popDST :: KnownCurve curve => Proxy curve -> ByteString
+popDST proxy =
+  "BLS_POP_" <> curveSchemeName proxy <> "_XMD:SHA-256_SSWU_RO_POP_"
 
 type family CurveVariant (c :: Type) :: Symbol where
   CurveVariant Curve1 = "BLS-Signature-Minimal-Verification-Key-Size"
@@ -268,6 +278,7 @@ type BLS12381CurveConstraints curve =
   , KnownSymbol (CurveVariant curve)
   , KnownNat (CompressedPointSize curve)
   , KnownNat (CompressedPointSize (DualCurve curve))
+  , KnownCurve curve
   , Typeable curve
   )
 
