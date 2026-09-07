@@ -17,7 +17,6 @@ module Cardano.Crypto.Leios (
   LeiosSigningKey,
   LeiosVerificationKey,
   LeiosSignature,
-  leiosSignContext,
   leiosSignatureSize,
   leiosSignatureToBytes,
 
@@ -60,7 +59,7 @@ import Cardano.Crypto.DSIGN (
   verifyDSIGN,
   verifyPossessionProofDSIGN,
  )
-import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN, BLS12381SignContext, minSigPoPDST)
+import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when)
@@ -94,6 +93,10 @@ import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
+-- | The signature scheme used by Leios, per CIP-164: the BLS12-381
+-- minimal-signature-size proof-of-possession ciphersuite. The DSTs are fixed
+-- internally by the scheme, so the signing context passed to 'signDSIGN' \/
+-- 'verifyDSIGN' is simply @()@.
 type LeiosDSIGN = BLS12381MinSigDSIGN
 
 type LeiosSigningKey = SignKeyDSIGN LeiosDSIGN
@@ -103,11 +106,6 @@ type LeiosVerificationKey = VerKeyDSIGN LeiosDSIGN
 type LeiosProofOfPossession = PossessionProofDSIGN LeiosDSIGN
 
 type LeiosSignature = SigDSIGN LeiosDSIGN
-
--- | The BLS12-381 MinSig proof-of-possession ciphersuite DST used by Leios,
--- per CIP-164. Pass this as the 'ContextDSIGN' to 'signDSIGN' / 'verifyDSIGN'.
-leiosSignContext :: BLS12381SignContext
-leiosSignContext = minSigPoPDST
 
 -- | Size of a Leios signature in the chosen signature scheme.
 leiosSignatureSize :: Word
@@ -163,7 +161,7 @@ mkLeiosCommittee seats =
         { seatWeight = w
         , seatVKey = do
             (vk, pop) <- mKeyPoP
-            case verifyPossessionProofDSIGN leiosSignContext vk pop of
+            case verifyPossessionProofDSIGN vk pop of
               -- XXX: The error string is a constant and just says it could not verify.
               Left _err -> SNothing
               Right () -> SJust vk
@@ -319,7 +317,7 @@ verifyLeiosCert committee weightRequired msg cert = do
   aggVk <-
     uncheckedAggregateVerKeysDSIGN vks
       & first (const InvalidSignature)
-  verifyDSIGN leiosSignContext aggVk msg cert.leiosCertSignature
+  verifyDSIGN () aggVk msg cert.leiosCertSignature
     & first (const InvalidSignature)
   pure weightReceived
   where

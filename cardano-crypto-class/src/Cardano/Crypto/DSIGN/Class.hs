@@ -552,14 +552,12 @@ class
   -- | Create a PoP from the signing key.
   createPossessionProofDSIGN ::
     HasCallStack =>
-    ContextDSIGN v ->
     SignKeyDSIGN v ->
     PossessionProofDSIGN v
 
   -- | Verify that PoP matches the verification key.
   verifyPossessionProofDSIGN ::
     HasCallStack =>
-    ContextDSIGN v ->
     VerKeyDSIGN v ->
     PossessionProofDSIGN v ->
     Either String ()
@@ -577,16 +575,13 @@ class
 
 -- | Aggregate multiple verification keys into a single verification key given
 -- their corresponding Proofs of Possession.
---
--- Note that the signing context is passed since the PoP might depend on it.
 aggregateVerKeysDSIGN ::
   (HasCallStack, DSIGNAggregatable v) =>
-  ContextDSIGN v ->
   [(VerKeyDSIGN v, PossessionProofDSIGN v)] ->
   Either String (VerKeyDSIGN v)
-aggregateVerKeysDSIGN ctx verKeysAndPoPs = do
+aggregateVerKeysDSIGN verKeysAndPoPs = do
   -- Verify every verKey and its PoP (fail-fast)
-  forM_ verKeysAndPoPs $ uncurry (verifyPossessionProofDSIGN ctx)
+  forM_ verKeysAndPoPs $ uncurry verifyPossessionProofDSIGN
   uncheckedAggregateVerKeysDSIGN (map fst verKeysAndPoPs)
 
 possessionProofSizeDSIGN :: forall v proxy. DSIGNAggregatable v => proxy v -> Word
