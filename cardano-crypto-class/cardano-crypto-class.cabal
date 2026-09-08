@@ -23,6 +23,7 @@ extra-doc-files:
 
 extra-source-files:
   cbits/blst_util.h
+  cbits/poseidon.h
 
 data-files:
   bls12-381-test-vectors/test_vectors/bls_sig_aug_test_vectors
@@ -151,7 +152,9 @@ library
     libblst >=0.3.14,
     libsodium,
 
-  c-sources: cbits/blst_util.c
+  c-sources:
+    cbits/blst_util.c
+    cbits/poseidon.c
   include-dirs: cbits
 
   if flag(secp256k1-support)
