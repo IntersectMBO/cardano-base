@@ -57,6 +57,8 @@ tests = describe "Poseidon" $ do
     mapM_ checkParameters registeredInstances
   describe "registered instance constants structure" $
     mapM_ checkStructure registeredInstances
+  describe "registered instance matrix is MDS" $
+    mapM_ checkMds registeredInstances
   describe "registered instance template image" $
     mapM_ checkTemplate registeredInstances
   describe "poseidonPermutation" checkPermutation
@@ -95,6 +97,59 @@ checkStructure (name, inst) = describe name $ do
     duplicates xs = [x | (x, y) <- zip sorted (drop 1 sorted), x == y]
       where
         sorted = sort xs
+
+-- | A matrix is MDS iff every square minor is nonzero ([GKRRS21],
+-- footnote 7), i.e. every k x k submatrix has full rank k. There are
+-- @C(2w, w) - 1@ minors (19 for width 3), so enumerating them is cheap at
+-- the registered widths. MDS-ness is invariant under the state-reversal
+-- conjugation, so checking the stored (upstream) form also covers the
+-- 'lastLaneForm' the template loads. The assertion lists the offending
+-- (rows, columns) index pairs, so a failure names the minor.
+checkMds :: (String, PoseidonInstance) -> Spec
+checkMds (name, inst) =
+  it name $
+    [ (rs, cs)
+    | k <- [1 .. w]
+    , rs <- combinations k [0 .. w - 1]
+    , cs <- combinations k [0 .. w - 1]
+    , rankMod [[mds inst !! i !! j | j <- cs] | i <- rs] /= k
+    ]
+      `shouldBe` []
+  where
+    w = width inst
+
+-- | All size-k subsequences, in order.
+combinations :: Int -> [a] -> [[a]]
+combinations 0 _ = [[]]
+combinations _ [] = []
+combinations k (x : xs) = map (x :) (combinations (k - 1) xs) ++ combinations k xs
+
+-- | The rank of a matrix over the BLS12-381 scalar field, by Gaussian
+-- elimination with exact modular arithmetic.
+rankMod :: [[Integer]] -> Int
+rankMod = go . map (map (`mod` scalarPeriod))
+  where
+    go rows0 = case filter (any (/= 0)) rows0 of
+      [] -> 0
+      rows -> case break ((/= 0) . head) rows of
+        (zeroHead, []) -> go (map tail zeroHead)
+        (before, pivot : after) -> 1 + go (map (eliminate pivot) (before ++ after))
+    eliminate pivot row =
+      zipWith (\a b -> (a - factor * b) `mod` scalarPeriod) (tail row) (tail pivot)
+      where
+        factor = head row * invMod (head pivot) `mod` scalarPeriod
+
+-- | Modular inverse in the scalar field (prime order), via Fermat's little
+-- theorem.
+invMod :: Integer -> Integer
+invMod a = powMod a (scalarPeriod - 2)
+
+powMod :: Integer -> Integer -> Integer
+powMod b0 = go (b0 `mod` scalarPeriod) 1
+  where
+    go _ acc 0 = acc
+    go b acc e =
+      go (b * b `mod` scalarPeriod) (if odd e then acc * b `mod` scalarPeriod else acc) (e `div` 2)
 
 -- | The image layout is @[ state | MDS | ARK | trailing zeros ]@ (see
 -- 'templateImage'): check the total size, that the state region and the
