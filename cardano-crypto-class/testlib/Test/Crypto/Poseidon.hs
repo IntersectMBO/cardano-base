@@ -10,6 +10,7 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   scalarPeriod,
   scalarToInteger,
  )
+import Cardano.Crypto.Hash (SHA256, hashToStringAsHex, hashWith)
 import Cardano.Crypto.PinnedSizedBytes (psbCreate)
 import Cardano.Crypto.Poseidon (
   PoseidonError (..),
@@ -34,6 +35,7 @@ import Cardano.Crypto.Poseidon.Internal (
   templateImage,
   withFrBuffer,
  )
+import qualified Data.ByteString.Char8 as BSC
 import Data.List (sort)
 import Data.Word (Word8)
 import Foreign.C.Types (CInt)
@@ -62,6 +64,16 @@ tests = describe "Poseidon" $ do
     mapM_ checkMds registeredInstances
   describe "registered instance has no S-box-avoiding subspace trail" $
     mapM_ checkSubspaceTrail registeredInstances
+  describe "registered instance constants digest" $
+    mapM_
+      checkDigest
+      [
+        ( "midnightWidth3"
+        , midnightWidth3
+        , "d442f2daca5babc84e937a25ac4e1b22cb69c7c2e7f55a8ec1fd34f8a7082677"
+        )
+      , ("circomWidth3", circomWidth3, "ca8cdda578671a524be636b52ce0ca8b1a23c76433558d028b1bb772374be806")
+      ]
   describe "registered instance template image" $
     mapM_ checkTemplate registeredInstances
   describe "poseidonPermutation" checkPermutation
@@ -143,6 +155,21 @@ checkSubspaceTrail (name, inst) =
       [ sum (zipWith (\vi row -> vi * row !! j) v (mds inst)) `mod` scalarPeriod
       | j <- [0 .. w - 1]
       ]
+
+-- | Freeze the exact values and order of each registered instance: the
+-- digest covers every field, so any silent edit — including a reordering,
+-- which the structural checks cannot see — fails this test. Recompute the
+-- expected digest only for a change that is deliberate and allowed by the
+-- registry contract (which an already-registered instance's data never
+-- is).
+checkDigest :: (String, PoseidonInstance, String) -> Spec
+checkDigest (name, inst, expected) =
+  it name $
+    hashToStringAsHex (hashWith @SHA256 serialise inst) `shouldBe` expected
+  where
+    serialise i =
+      BSC.pack $
+        show (nbFullRounds i, nbPartialRounds i, partialSBoxLane i, width i, mds i, ark i)
 
 -- | All size-k subsequences, in order.
 combinations :: Int -> [a] -> [[a]]
