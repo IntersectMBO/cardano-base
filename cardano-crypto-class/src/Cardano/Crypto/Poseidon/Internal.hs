@@ -78,8 +78,13 @@ module Cardano.Crypto.Poseidon.Internal (
 #include "blst_util.h"
 
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (Fr (..), frFromScalar, scalarFromInteger)
-import Cardano.Crypto.PinnedSizedBytes (psbUseAsCPtr)
-import Cardano.Crypto.Poseidon.Constants (PoseidonInstance (..), batchSize)
+import Cardano.Crypto.PinnedSizedBytes (psbCreate, psbUseAsCPtr)
+import Cardano.Crypto.Poseidon.Constants (
+  PartialSBoxLane (..),
+  PoseidonInstance (..),
+  batchSize,
+  lastLaneForm,
+ )
 import Control.Monad (zipWithM_)
 import Data.Word (Word8)
 import Foreign.C.Types (CInt (..), CSize (..))
@@ -232,10 +237,15 @@ newPoseidonTemplate inst =
           (fromIntegral @Int @CInt w)
         FrPtr mdsPtr <- c_poseidon_get_mds_from_context ctxt
         FrPtr arkPtr <- c_poseidon_get_round_constants_from_context ctxt
-        pokeElements mdsPtr (w * w) (concat (mds inst))
-        pokeElements arkPtr nbConstants (ark inst)
+        pokeElements mdsPtr (w * w) (concat (mds cInst))
+        pokeElements arkPtr nbConstants (ark cInst)
     pure PoseidonTemplate {templateInstance = inst, templateImage = image}
   where
+    -- The C core hard-codes the partial-round S-box on the last lane, so
+    -- the image holds the instance's last-lane form; 'poseidonPermute'
+    -- undoes the state reversal that form implies at the call boundary.
+    -- The round counts and width are unaffected by conjugation.
+    cInst = lastLaneForm inst
     w = width inst
     nbConstants =
       fromIntegral @CInt @Int $
@@ -257,6 +267,67 @@ newPoseidonTemplate inst =
 
 -- | Apply the permutation to a full input state of exactly @width@
 -- elements, in a private copy of the template (see /Purity and the template
--- scheme/). 'Nothing' on a wrong input length.
+-- scheme/). States are in the instance's own (upstream) lane order; that an
+-- 'SBoxFirst' instance is realized through its conjugate and a state
+-- reversal at this boundary is not observable. 'Nothing' on a wrong input
+-- length — the one check this function owns, because it guards the
+-- state-region writes below.
+--
+-- The working memory is transient, so it is @allocaBytes@-scoped rather
+-- than an 'FrBuffer', following the multi-scalar-multiplication buffers in
+-- "Cardano.Crypto.EllipticCurve.BLS12_381.Internal". Pure: the call copies
+-- the template image into that private memory, permutes there, and reads
+-- the result out into fresh 'Fr's; nothing shared is written.
 poseidonPermute :: PoseidonTemplate -> [Fr] -> Maybe [Fr]
-poseidonPermute = error "TODO(poseidon): poseidonPermute not implemented"
+poseidonPermute tmpl input
+  | length input /= w = Nothing
+  | otherwise =
+      Just . unsafePerformIO $
+        -- Set up the private working memory: an element buffer seeded with
+        -- the template image (constants and MDS in place, state zeroed) and
+        -- a context struct pointing at it.
+        allocaBytes totalBytes $ \workPtr ->
+          allocaBytes (fromIntegral @CSize @Int c_poseidon_ctxt_sizeof) $ \ctxtRaw -> do
+            withFrBuffer (templateImage tmpl) $ \(FrPtr imagePtr) ->
+              copyBytes workPtr imagePtr totalBytes
+            let ctxt = PoseidonCtxtPtr ctxtRaw
+            c_poseidon_ctxt_init
+              ctxt
+              (FrPtr workPtr)
+              (fromIntegral @Int @CInt (nbFullRounds inst))
+              (fromIntegral @Int @CInt (nbPartialRounds inst))
+              (fromIntegral @Int @CInt (batchSize inst))
+              (fromIntegral @Int @CInt w)
+            -- Write the w input elements into the state region (a plain
+            -- byte copy: Fr values are already in blst form).
+            FrPtr statePtr <- c_poseidon_get_state_from_context ctxt
+            zipWithM_
+              ( \i (Fr psb) ->
+                  psbUseAsCPtr psb $ \src ->
+                    copyBytes (statePtr `plusPtr` (i * sizeFrElement)) src sizeFrElement
+              )
+              [0 .. w - 1]
+              (orient input)
+            -- Permute in place.
+            c_poseidon_apply_permutation ctxt
+            -- Read the final state back out into fresh Fr values.
+            orient
+              <$> mapM
+                ( \i ->
+                    Fr
+                      <$> psbCreate
+                        (\dst -> copyBytes dst (statePtr `plusPtr` (i * sizeFrElement)) sizeFrElement)
+                )
+                [0 .. w - 1]
+  where
+    inst = templateInstance tmpl
+    w = width inst
+    totalBytes = frBufferElements (templateImage tmpl) * sizeFrElement
+    -- The template image holds the instance's last-lane form (see
+    -- 'newPoseidonTemplate'): for an 'SBoxFirst' instance the conjugation
+    -- is undone here by reversing the states at the boundary, so callers
+    -- see the instance's own lane order.
+    orient = case partialSBoxLane inst of
+      SBoxLast -> id
+      SBoxFirst -> reverse
+{-# NOINLINE poseidonPermute #-}
