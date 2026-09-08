@@ -16,6 +16,7 @@ import Cardano.Crypto.Poseidon (
   poseidonPermutation,
  )
 import Cardano.Crypto.Poseidon.Constants (
+  PartialSBoxLane (..),
   PoseidonInstance (..),
   batchSize,
   circomWidth3,
@@ -59,6 +60,8 @@ tests = describe "Poseidon" $ do
     mapM_ checkStructure registeredInstances
   describe "registered instance matrix is MDS" $
     mapM_ checkMds registeredInstances
+  describe "registered instance has no S-box-avoiding subspace trail" $
+    mapM_ checkSubspaceTrail registeredInstances
   describe "registered instance template image" $
     mapM_ checkTemplate registeredInstances
   describe "poseidonPermutation" checkPermutation
@@ -117,6 +120,29 @@ checkMds (name, inst) =
       `shouldBe` []
   where
     w = width inst
+
+-- | No infinitely long subspace trail keeps the partial-round S-box
+-- inactive: the only @M@-invariant subspace contained in
+-- @{x : x_sboxlane = 0}@ is the trivial one, checked as full rank of the
+-- matrix with rows @e_l M^j@, @j = 0 .. w - 1@ ([GKRRS21] section 2.3;
+-- [GRS20], eprint 2020\/500). Like MDS-ness, the criterion is invariant
+-- under the state-reversal conjugation, so the stored upstream form is
+-- checked with its own S-box lane.
+checkSubspaceTrail :: (String, PoseidonInstance) -> Spec
+checkSubspaceTrail (name, inst) =
+  it name $
+    rankMod (take w (iterate rowTimesM sboxRow)) `shouldBe` w
+  where
+    w = width inst
+    sboxRow = [if i == sboxLane then 1 else 0 :: Integer | i <- [0 .. w - 1]]
+    sboxLane = case partialSBoxLane inst of
+      SBoxFirst -> 0
+      SBoxLast -> w - 1
+    -- Row vector times the MDS matrix: @(v M)_j = sum_i v_i M[i][j]@.
+    rowTimesM v =
+      [ sum (zipWith (\vi row -> vi * row !! j) v (mds inst)) `mod` scalarPeriod
+      | j <- [0 .. w - 1]
+      ]
 
 -- | All size-k subsequences, in order.
 combinations :: Int -> [a] -> [[a]]
