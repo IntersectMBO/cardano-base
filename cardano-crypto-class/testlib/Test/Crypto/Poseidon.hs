@@ -33,6 +33,7 @@ import Cardano.Crypto.Poseidon.Internal (
   templateImage,
   withFrBuffer,
  )
+import Data.List (sort)
 import Data.Word (Word8)
 import Foreign.C.Types (CInt)
 import Foreign.Marshal.Array (peekArray)
@@ -54,6 +55,8 @@ tests :: Spec
 tests = describe "Poseidon" $ do
   describe "registered instance passes poseidon_parameters_valid" $
     mapM_ checkParameters registeredInstances
+  describe "registered instance constants structure" $
+    mapM_ checkStructure registeredInstances
   describe "registered instance template image" $
     mapM_ checkTemplate registeredInstances
   describe "poseidonPermutation" checkPermutation
@@ -68,6 +71,30 @@ checkParameters (name, inst) =
       (fromIntegral @Int @CInt (batchSize inst))
       (fromIntegral @Int @CInt (width inst))
       `shouldBe` 1
+
+-- | Structural invariants of the registry data — the shape half of what
+-- 'Cardano.Crypto.Poseidon.Internal.newPoseidonTemplate' relies on without
+-- re-checking (checkParameters covers the parameter half). The row check
+-- is per row, not via 'concat': a ragged matrix could hide a wrong row
+-- split behind a correct total count.
+checkStructure :: (String, PoseidonInstance) -> Spec
+checkStructure (name, inst) = describe name $ do
+  it "has a width x width MDS matrix" $
+    map length (mds inst) `shouldBe` replicate w w
+  it "has (R_F + R_P) * width ARK constants" $
+    length (ark inst) `shouldBe` (nbFullRounds inst + nbPartialRounds inst) * w
+  it "has only canonical field elements" $
+    filter (\x -> x < 0 || x >= scalarPeriod) (concat (mds inst) ++ ark inst)
+      `shouldBe` []
+  it "has nonzero ARK constants" $
+    filter (== 0) (ark inst) `shouldBe` []
+  it "has pairwise distinct ARK constants" $
+    duplicates (ark inst) `shouldBe` []
+  where
+    w = width inst
+    duplicates xs = [x | (x, y) <- zip sorted (drop 1 sorted), x == y]
+      where
+        sorted = sort xs
 
 -- | The image layout is @[ state | MDS | ARK | trailing zeros ]@ (see
 -- 'templateImage'): check the total size, that the state region and the
