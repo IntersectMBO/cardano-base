@@ -186,6 +186,7 @@ library testlib
     Test.Crypto.Instances
     Test.Crypto.KES
     Test.Crypto.PackedBytes
+    Test.Crypto.Poseidon
     Test.Crypto.Regressions
     Test.Crypto.RunIO
     Test.Crypto.Util
