@@ -110,6 +110,7 @@ library
     Cardano.Crypto.Libsodium.UnsafeC
     Cardano.Crypto.PackedBytes
     Cardano.Crypto.PinnedSizedBytes
+    Cardano.Crypto.Poseidon
     Cardano.Crypto.Poseidon.Constants
     Cardano.Crypto.Poseidon.Internal
     Cardano.Crypto.Seed
