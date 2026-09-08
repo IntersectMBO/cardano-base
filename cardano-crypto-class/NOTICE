@@ -12,3 +12,8 @@ Copyright 2019-2021 Input Output (Hong Kong) Ltd.
    See the License for the specific language governing permissions and
    limitations under the License.
 
+
+This package additionally contains C code vendored from ocaml-bls12-381-hash
+(https://gitlab.com/nomadic-labs/cryptography/ocaml-bls12-381-hash),
+Copyright (c) 2022 Nomadic Labs / cryptography, distributed under the MIT
+License. See the license headers in cbits/poseidon.c and cbits/poseidon.h.

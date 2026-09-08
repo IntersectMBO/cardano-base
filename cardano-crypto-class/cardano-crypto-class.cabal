@@ -7,7 +7,7 @@ synopsis:
 description:
   Type classes abstracting over cryptography primitives for Cardano
 
-license: Apache-2.0
+license: Apache-2.0 AND MIT
 license-files:
   LICENSE
   NOTICE
