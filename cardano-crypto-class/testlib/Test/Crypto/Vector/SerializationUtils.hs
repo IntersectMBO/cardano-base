@@ -9,6 +9,7 @@ module Test.Crypto.Vector.SerializationUtils (
   sKeyParser,
   vKeyParser,
   sigParser,
+  popParser,
   dropBytes,
   hexByteStringLength,
 )
@@ -16,6 +17,7 @@ where
 
 import Cardano.Binary (FromCBOR, serialize', unsafeDeserialize')
 import Cardano.Crypto.DSIGN (
+  DSIGNAggregatable (PossessionProofDSIGN),
   DSIGNAlgorithm (SigDSIGN, SignKeyDSIGN, VerKeyDSIGN),
  )
 import Data.ByteString (ByteString)
@@ -62,3 +64,7 @@ vKeyParser (HexCBOR bs) = unsafeDeserialize' bs
 
 sigParser :: forall d. FromCBOR (SigDSIGN d) => HexStringInCBOR -> SigDSIGN d
 sigParser (HexCBOR bs) = unsafeDeserialize' bs
+
+popParser ::
+  forall d. FromCBOR (PossessionProofDSIGN d) => HexStringInCBOR -> PossessionProofDSIGN d
+popParser (HexCBOR bs) = unsafeDeserialize' bs
