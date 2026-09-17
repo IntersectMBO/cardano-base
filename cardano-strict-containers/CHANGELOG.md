@@ -1,8 +1,12 @@
 # Changelog for `cardano-strict-containers`
 
-## 0.1.6.1
+## 0.1.7.0
 
-*
+* Add `Data.Bitmap`
+
+### `testlib`
+
+* Add `genBitmap`
 
 ## 0.1.6.0
 
