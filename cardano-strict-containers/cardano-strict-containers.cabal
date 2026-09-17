@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-strict-containers
-version: 0.1.6.0
+version: 0.1.7.0
 synopsis: Various strict container types
 license: Apache-2.0
 license-files:
@@ -30,6 +30,7 @@ library
   import: language, warnings
   hs-source-dirs: src
   exposed-modules:
+    Data.Bitmap
     Data.FingerTree.Strict
     Data.Maybe.Strict
     Data.Sequence.Strict
@@ -38,6 +39,7 @@ library
   build-depends:
     aeson,
     base,
+    bytestring,
     cardano-binary >=1.6,
     containers,
     data-default-class,
@@ -54,6 +56,28 @@ library testlib
     Test.Cardano.StrictContainers.Instances
 
   build-depends:
-    QuickCheck,
     base,
     cardano-strict-containers,
+    QuickCheck,
+
+test-suite tests
+  import: language, warnings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules:
+    Test.Data.Bitmap
+
+  build-depends:
+    base,
+    bytestring,
+    cardano-binary,
+    cardano-strict-containers:{cardano-strict-containers, testlib},
+    containers,
+    hspec,
+    QuickCheck,
+
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
