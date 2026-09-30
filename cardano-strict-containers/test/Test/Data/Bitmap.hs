@@ -4,10 +4,6 @@
 -- | Property-based tests for 'Bitmap'
 module Test.Data.Bitmap (spec) where
 
-import Cardano.Binary (
-  decodeFull,
-  serialize,
- )
 import Data.Bitmap (Bitmap)
 import qualified Data.Bitmap as Bitmap
 import Data.Bits (setBit)
@@ -20,10 +16,8 @@ import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck (
   Gen,
   Property,
-  Testable (..),
   arbitrary,
   choose,
-  counterexample,
   forAll,
   vectorOf,
   (===),
@@ -36,16 +30,8 @@ spec =
     modifyMaxSuccess (* 100) $ do
       prop "prop_roundtrip_toIndices" prop_roundtrip_toIndices
       prop "prop_roundtrip_serialisation" prop_roundtrip_serialisation
-      prop "numSetBits agrees with toIndices" $
-        forAll genWord16Bitmap $ \bm ->
-          Bitmap.numSetBits bm === length (Bitmap.toIndices bm)
-      prop "rawDeserialise rejects a bit set above the upper bound" $
-        forAll genWord16Bitmap $ \bm ->
-          let maxIx = Bitmap.logicalUpperBound bm
-              strayBit = fromIntegral (maxIx `rem` 8) + 1
-           in (strayBit <= 7) ==>
-                Bitmap.rawDeserialise maxIx (withLastBitSet strayBit (Bitmap.rawSerialise bm))
-                  === Nothing
+      prop "prop_numSetBitsAgreesWithToIndices" prop_numSetBitsAgreesWithToIndices
+      prop "prop_rawDeserialiseRejectsStrayBit" prop_rawDeserialiseRejectsStrayBit
       it "rawDeserialise rejects a negative upper bound" $ do
         Bitmap.rawDeserialise (-8 :: Int) "" `shouldBe` Nothing
         Bitmap.rawDeserialise (-3 :: Int) "\x00" `shouldBe` Nothing
@@ -62,20 +48,30 @@ prop_roundtrip_toIndices =
         let indices' = Bitmap.toIndices bitmap
         Set.fromList indices === Set.fromList indices'
 
--- | Serialisation roundtrip preserves the bitmap.
+-- | Raw serialisation roundtrip preserves the bitmap.
 prop_roundtrip_serialisation :: Property
 prop_roundtrip_serialisation =
   forAll genMaxIndex $ \maxIndex ->
     forAll genNumIndices $ \numIndices -> do
       forAll (genIndices numIndices maxIndex) $ \indices -> do
         let bitmap = Bitmap.fromIndices maxIndex indices
-        let encoded = serialize bitmap
-        case decodeFull encoded of
-          Left err ->
-            counterexample ("Deserialization failed: " <> show err) $
-              property False
-          Right bitmap' ->
-            bitmap === bitmap'
+        Bitmap.rawDeserialise maxIndex (Bitmap.rawSerialise bitmap) === Just bitmap
+
+-- | 'Bitmap.numSetBits' agrees with the length of 'Bitmap.toIndices'.
+prop_numSetBitsAgreesWithToIndices :: Property
+prop_numSetBitsAgreesWithToIndices =
+  forAll genWord16Bitmap $ \bm ->
+    Bitmap.numSetBits bm === length (Bitmap.toIndices bm)
+
+-- | 'Bitmap.rawDeserialise' rejects a bit set above the logical upper bound.
+prop_rawDeserialiseRejectsStrayBit :: Property
+prop_rawDeserialiseRejectsStrayBit =
+  forAll genWord16Bitmap $ \bm ->
+    let maxIx = Bitmap.logicalUpperBound bm
+        strayBit = fromIntegral (maxIx `rem` 8) + 1
+     in (strayBit <= 7) ==>
+          Bitmap.rawDeserialise maxIx (withLastBitSet strayBit (Bitmap.rawSerialise bm))
+            === Nothing
 
 -- * Generators
 
