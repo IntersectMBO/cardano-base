@@ -19,14 +19,6 @@ module Data.Bitmap (
   expectedBytes,
 ) where
 
-import Cardano.Binary (
-  FromCBOR (..),
-  ToCBOR (..),
-  decodeBytes,
-  decodeListLenOf,
-  encodeBytes,
-  encodeListLen,
- )
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when)
 import Data.Bits (
@@ -131,6 +123,7 @@ toIndices (Bitmap maxIx bitmap) =
             then fromIntegral i : goBits base w'
             else []
 
+-- | The number of indexes set (flipped to 1) in the bitmap.
 numSetBits :: Bitmap a -> Int
 numSetBits (Bitmap _ bs) = countSetBits bs
 
@@ -153,20 +146,3 @@ rawDeserialise maxIx bs
   | ByteString.length bs /= expectedBytes maxIx = Nothing
   | ByteString.last bs .&. complement (lastByteMask maxIx) /= 0 = Nothing
   | otherwise = Just (Bitmap maxIx bs)
-
-instance ToCBOR a => ToCBOR (Bitmap a) where
-  toCBOR (Bitmap maxIx bs) =
-    encodeListLen 2
-      <> toCBOR maxIx
-      <> encodeBytes bs
-
-instance (Integral a, FromCBOR a) => FromCBOR (Bitmap a) where
-  fromCBOR = do
-    decodeListLenOf 2
-    maxIx <- fromCBOR
-    bs <- decodeBytes
-    case rawDeserialise maxIx bs of
-      Nothing ->
-        fail "Bitmap: invalid bitmap data or size mismatch"
-      Just bitmap ->
-        pure bitmap
