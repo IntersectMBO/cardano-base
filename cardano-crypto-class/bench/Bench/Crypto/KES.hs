@@ -57,6 +57,7 @@ benchKES ::
   , Signable v BS.ByteString
   , NFData (SignKeyKES v)
   , NFData (SigKES v)
+  , NFData (VerKeyKES v)
   ) =>
   proxy v ->
   [Char] ->
@@ -67,21 +68,23 @@ benchKES _ lbl =
     [ bench "genKey" $
         nfIO $
           genKeyKES @v testSeedML >>= forgetSignKeyKES @v
-    , bench "signKES" $
-        nfIO $
-          (\sk -> do sig <- signKES @v () 0 typicalMsg sk; forgetSignKeyKES sk; return sig)
-            =<< genKeyKES @v testSeedML
-    , bench "verifyKES" $
-        nfIO $ do
-          signKey <- genKeyKES @v testSeedML
-          sig <- signKES @v () 0 typicalMsg signKey
-          verKey <- deriveVerKeyKES signKey
-          forgetSignKeyKES signKey
-          return . fromRight $ verifyKES @v () verKey 0 typicalMsg sig
-    , bench "updateKES" $
-        nfIO $ do
-          signKey <- genKeyKES @v testSeedML
-          sk' <- fromJust <$> updateKES () signKey 0
-          forgetSignKeyKES signKey
-          return sk'
+    , env (genKeyKES @v testSeedML) $ \signKey ->
+        bench "signKES" $
+          nfIO $ do
+            sig <- signKES @v () 0 typicalMsg signKey
+            sig <$ forgetSignKeyKES signKey
+    , let prepSignedEnv = do
+            signKey <- genKeyKES @v testSeedML
+            verKey <- deriveVerKeyKES signKey
+            sig <- signKES @v () 0 typicalMsg signKey
+            forgetSignKeyKES signKey
+            pure (verKey, sig)
+       in env prepSignedEnv $ \ ~(verKey, sig) ->
+            bench "verifyKES" $
+              nf (fromRight . verifyKES @v () verKey 0 typicalMsg) sig
+    , env (genKeyKES @v testSeedML) $ \signKey ->
+        bench "updateKES" $
+          nfIO $ do
+            sk <- fromJust <$> updateKES () signKey 0
+            sk <$ forgetSignKeyKES signKey
     ]
