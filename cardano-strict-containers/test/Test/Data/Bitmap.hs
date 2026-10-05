@@ -35,6 +35,10 @@ spec =
       it "rawDeserialise rejects a negative upper bound" $ do
         Bitmap.rawDeserialise (-8 :: Int) "" `shouldBe` Nothing
         Bitmap.rawDeserialise (-3 :: Int) "\x00" `shouldBe` Nothing
+      it "serialises MSB-first: seat i is bit 7 - (i mod 8) of byte (i div 8)" $ do
+        Bitmap.rawSerialise (Bitmap.fromIndices (9 :: Int) [0, 2, 9]) `shouldBe` "\xA0\x40"
+        Bitmap.rawSerialise (Bitmap.fromIndices (0 :: Int) [0]) `shouldBe` "\x80"
+        fmap Bitmap.toIndices (Bitmap.rawDeserialise (9 :: Int) "\xA0\x40") `shouldBe` Just [0, 2, 9]
 
 -- * Properties
 
@@ -68,8 +72,8 @@ prop_rawDeserialiseRejectsStrayBit :: Property
 prop_rawDeserialiseRejectsStrayBit =
   forAll genWord16Bitmap $ \bm ->
     let maxIx = Bitmap.logicalUpperBound bm
-        strayBit = fromIntegral (maxIx `rem` 8) + 1
-     in (strayBit <= 7) ==>
+        strayBit = 6 - fromIntegral (maxIx `rem` 8)
+     in (strayBit >= 0) ==>
           Bitmap.rawDeserialise maxIx (withLastBitSet strayBit (Bitmap.rawSerialise bm))
             === Nothing
 
