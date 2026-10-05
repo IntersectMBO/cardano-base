@@ -22,8 +22,9 @@ module Data.Bitmap (
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when)
 import Data.Bits (
+  clearBit,
   complement,
-  countTrailingZeros,
+  countLeadingZeros,
   popCount,
   unsafeShiftL,
   (.&.),
@@ -76,7 +77,7 @@ expectedBytes maxIx = (fromIntegral maxIx `quot` 8) + 1
 
 lastByteMask :: Integral a => a -> Word8
 lastByteMask maxIx =
-  fromIntegral ((1 :: Int) `unsafeShiftL` (fromIntegral maxIx `rem` 8 + 1)) - 1
+  complement (fromIntegral ((1 :: Int) `unsafeShiftL` (7 - fromIntegral maxIx `rem` 8)) - 1)
 
 -- | Construct a 'Bitmap' from a list of indexes that should be set (flipped to
 -- 1) and a maximum index (inclusive logical upper bound).
@@ -89,7 +90,7 @@ fromIndices maxIx flipped =
         let !i = fromIntegral ix :: Int
         when (i >= 0 && i <= maxI) $ do
           let !byteIx = i `quot` 8
-          let !bitIx = i `rem` 8
+          let !bitIx = 7 - i `rem` 8
           let !mask = bitMask bitIx
           w <- peekByteOff ptr byteIx :: IO Word8
           pokeByteOff ptr byteIx (w .|. mask)
@@ -116,9 +117,9 @@ toIndices (Bitmap maxIx bitmap) =
 
     goBits !_ 0 = []
     goBits !base !w =
-      let !bitIx = countTrailingZeros w
+      let !bitIx = countLeadingZeros w
           !i = base + bitIx
-          !w' = w .&. (w - 1)
+          !w' = clearBit w (7 - bitIx)
        in if i <= maxI
             then fromIntegral i : goBits base w'
             else []
