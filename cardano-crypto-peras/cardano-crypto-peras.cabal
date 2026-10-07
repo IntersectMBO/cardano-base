@@ -52,3 +52,38 @@ library
     nothunks,
     quiet,
     serialise,
+
+library testlib
+  import: base, project-config
+  visibility: public
+  hs-source-dirs: testlib
+  exposed-modules:
+    Test.Cardano.Crypto.Peras.Gen
+
+  build-depends:
+    bytestring,
+    cardano-base:testlib,
+    cardano-crypto-class:{cardano-crypto-class, testlib},
+    cardano-crypto-peras,
+    cardano-slotting,
+    QuickCheck,
+
+test-suite tests
+  import: base, project-config
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules:
+    Test.Cardano.Crypto.Peras
+
+  build-depends:
+    bytestring,
+    cardano-crypto-class,
+    cardano-crypto-peras:{cardano-crypto-peras, testlib},
+    cardano-slotting,
+    hspec,
+    QuickCheck,
+
+  ghc-options:
+    -threaded
+    -rtsopts
