@@ -2,14 +2,8 @@
 
 ## 0.1.7.0
 
-* Add `Data.Bitmap`, a bitmap with an explicit inclusive upper bound. Bits are
-  MSB-first within a byte, the convention of the Leios certificate bitfield
-  (CIP-164); decoding rejects a payload of the wrong length or with bits set
-  above the bound.
-
-### `testlib`
-
-* Add `genBitmap`
+* Add `Data.Bitmap`: MSB-first bitmap over `ByteString` for a given number of
+  indexes, the bit convention of the Leios certificate bitfield (CIP-164)
 
 ## 0.1.6.0
 

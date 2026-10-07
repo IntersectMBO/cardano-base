@@ -71,7 +71,7 @@ test-suite tests
   build-depends:
     base,
     bytestring,
-    cardano-strict-containers:{cardano-strict-containers, testlib},
+    cardano-strict-containers,
     containers,
     hspec,
     QuickCheck,
