@@ -16,6 +16,7 @@
   ciphersuite for the chosen variant. `BLS12381SignContext`, `minSigPoPDST` and
   `minVerKeyPoPDST` are removed from the public API, and message augmentation
   is no longer supported (the POP scheme does not use it).
+* Bump package bound on pkg-config lib blst
 
 ## 2.5.1.0
 
