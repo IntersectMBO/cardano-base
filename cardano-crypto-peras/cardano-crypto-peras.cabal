@@ -1,8 +1,11 @@
 cabal-version: 3.0
 name: cardano-crypto-peras
-version: 0.1.0.0
+version: 0.2.0.0
 synopsis: Crypto primitives for Peras
 description:
+  Data types and wire format for Peras certificates, shared by cardano-ledger and
+  ouroboros-consensus.
+
 license: Apache-2.0
 license-files:
   LICENSE
@@ -39,6 +42,11 @@ library
     Cardano.Crypto.Peras.Cert
 
   build-depends:
-    base,
+    bytestring,
+    cardano-binary >=1.9.1,
+    cardano-crypto-class >=2.6,
+    cardano-slotting,
+    deepseq,
     nothunks,
     quiet,
+    serialise,
