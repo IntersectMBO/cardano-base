@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
@@ -163,6 +164,7 @@ data PerasCert = PerasCert
 newtype PerasCertSize = PerasCertSize {unPerasCertSize :: Word32}
   deriving stock (Show, Eq, Ord, Generic)
   deriving newtype (NoThunks, NFData)
+  deriving (Enum, Real, Integral, Num) via Word32
 
 -- | An upper bound (not necessarily tight) on the size, in bytes, of a
 -- serialised 'PerasCert'.
