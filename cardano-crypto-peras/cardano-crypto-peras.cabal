@@ -46,6 +46,7 @@ library
     cardano-binary >=1.9.1,
     cardano-crypto-class >=2.6,
     cardano-slotting,
+    cardano-strict-containers >=0.1.7,
     deepseq,
     nothunks,
     quiet,
