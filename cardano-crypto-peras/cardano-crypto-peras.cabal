@@ -40,6 +40,7 @@ library
   exposed-modules:
     Cardano.Crypto.Peras
     Cardano.Crypto.Peras.Cert
+    Cardano.Crypto.Peras.Vote
 
   build-depends:
     bytestring,
