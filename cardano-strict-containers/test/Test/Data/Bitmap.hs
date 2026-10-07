@@ -1,22 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Property-based tests for 'Bitmap'
+-- | Property-based tests for 'Data.Bitmap'
 module Test.Data.Bitmap (spec) where
 
-import Data.Bitmap (Bitmap)
+import Data.Bitmap (Bitmap (..))
 import qualified Data.Bitmap as Bitmap
 import Data.Bits (setBit)
 import qualified Data.ByteString as BS
 import qualified Data.Set as Set
-import Data.Word (Word16)
-import Test.Cardano.StrictContainers.Instances (genBitmap)
 import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck (
   Gen,
   Property,
-  arbitrary,
   choose,
   forAll,
   vectorOf,
@@ -29,72 +26,72 @@ spec =
   describe "Bitmap" $
     modifyMaxSuccess (* 100) $ do
       prop "prop_roundtrip_toIndices" prop_roundtrip_toIndices
-      prop "prop_roundtrip_serialisation" prop_roundtrip_serialisation
+      prop "prop_fromIndicesIsWellFormed" prop_fromIndicesIsWellFormed
       prop "prop_numSetBitsAgreesWithToIndices" prop_numSetBitsAgreesWithToIndices
-      prop "prop_rawDeserialiseRejectsStrayBit" prop_rawDeserialiseRejectsStrayBit
-      it "rawDeserialise rejects a negative upper bound" $ do
-        Bitmap.rawDeserialise (-8 :: Int) "" `shouldBe` Nothing
-        Bitmap.rawDeserialise (-3 :: Int) "\x00" `shouldBe` Nothing
-      it "serialises MSB-first: seat i is bit 7 - (i mod 8) of byte (i div 8)" $ do
-        Bitmap.rawSerialise (Bitmap.fromIndices (9 :: Int) [0, 2, 9]) `shouldBe` "\xA0\x40"
-        Bitmap.rawSerialise (Bitmap.fromIndices (0 :: Int) [0]) `shouldBe` "\x80"
-        fmap Bitmap.toIndices (Bitmap.rawDeserialise (9 :: Int) "\xA0\x40") `shouldBe` Just [0, 2, 9]
+      prop "prop_wellFormedRejectsStrayBit" prop_wellFormedRejectsStrayBit
+      prop "prop_wellFormedRejectsWrongLength" prop_wellFormedRejectsWrongLength
+      it "wellFormed rejects a non-positive number of indexes" $ do
+        Bitmap.wellFormed 0 (Bitmap "") `shouldBe` False
+        Bitmap.wellFormed (-3) (Bitmap "\x00") `shouldBe` False
+      it "serialises MSB-first: index i is bit 7 - (i mod 8) of byte (i div 8)" $ do
+        Bitmap.fromIndices 10 [0, 2, 9] `shouldBe` Bitmap "\xA0\x40"
+        Bitmap.fromIndices 1 [0] `shouldBe` Bitmap "\x80"
+        Bitmap.toIndices 10 (Bitmap "\xA0\x40") `shouldBe` [0, 2, 9]
 
 -- * Properties
 
 -- | Converting from indices to bitmap and back preserves the indices.
 prop_roundtrip_toIndices :: Property
 prop_roundtrip_toIndices =
-  forAll genMaxIndex $ \maxIndex ->
-    forAll genNumIndices $ \numIndices -> do
-      forAll (genIndices numIndices maxIndex) $ \indices -> do
-        let bitmap = Bitmap.fromIndices maxIndex indices
-        let indices' = Bitmap.toIndices bitmap
-        Set.fromList indices === Set.fromList indices'
+  forAll genNumIndexes $ \n ->
+    forAll (genIndices n) $ \indices ->
+      Set.fromList indices === Set.fromList (Bitmap.toIndices n (Bitmap.fromIndices n indices))
 
--- | Raw serialisation roundtrip preserves the bitmap.
-prop_roundtrip_serialisation :: Property
-prop_roundtrip_serialisation =
-  forAll genMaxIndex $ \maxIndex ->
-    forAll genNumIndices $ \numIndices -> do
-      forAll (genIndices numIndices maxIndex) $ \indices -> do
-        let bitmap = Bitmap.fromIndices maxIndex indices
-        Bitmap.rawDeserialise maxIndex (Bitmap.rawSerialise bitmap) === Just bitmap
+-- | 'Bitmap.fromIndices' produces a well-formed bitmap.
+prop_fromIndicesIsWellFormed :: Property
+prop_fromIndicesIsWellFormed =
+  forAll genNumIndexes $ \n ->
+    forAll (genIndices n) $ \indices ->
+      Bitmap.wellFormed n (Bitmap.fromIndices n indices) === True
 
 -- | 'Bitmap.numSetBits' agrees with the length of 'Bitmap.toIndices'.
 prop_numSetBitsAgreesWithToIndices :: Property
 prop_numSetBitsAgreesWithToIndices =
-  forAll genWord16Bitmap $ \bm ->
-    Bitmap.numSetBits bm === length (Bitmap.toIndices bm)
+  forAll genNumIndexes $ \n ->
+    forAll (genIndices n) $ \indices ->
+      let bitmap = Bitmap.fromIndices n indices
+       in Bitmap.numSetBits bitmap === length (Bitmap.toIndices n bitmap)
 
--- | 'Bitmap.rawDeserialise' rejects a bit set above the logical upper bound.
-prop_rawDeserialiseRejectsStrayBit :: Property
-prop_rawDeserialiseRejectsStrayBit =
-  forAll genWord16Bitmap $ \bm ->
-    let maxIx = Bitmap.logicalUpperBound bm
-        strayBit = 6 - fromIntegral (maxIx `rem` 8)
-     in (strayBit >= 0) ==>
-          Bitmap.rawDeserialise maxIx (withLastBitSet strayBit (Bitmap.rawSerialise bm))
-            === Nothing
+-- | 'Bitmap.wellFormed' rejects a bit set beyond the last index.
+prop_wellFormedRejectsStrayBit :: Property
+prop_wellFormedRejectsStrayBit =
+  forAll genNumIndexes $ \n ->
+    forAll (genIndices n) $ \indices ->
+      let strayBit = 6 - (n - 1) `rem` 8
+       in (strayBit >= 0) ==>
+            Bitmap.wellFormed n (withLastBitSet strayBit (Bitmap.fromIndices n indices)) === False
+
+-- | 'Bitmap.wellFormed' rejects a bitmap of the wrong length.
+prop_wellFormedRejectsWrongLength :: Property
+prop_wellFormedRejectsWrongLength =
+  forAll genNumIndexes $ \n ->
+    forAll (genIndices n) $ \indices ->
+      let Bitmap bs = Bitmap.fromIndices n indices
+       in (Bitmap.wellFormed n (Bitmap (bs <> "\x00")), Bitmap.wellFormed n (Bitmap (BS.drop 1 bs)))
+            === (False, False)
 
 -- * Generators
 
-genMaxIndex :: Gen Int
-genMaxIndex =
-  choose (0, 10000)
+genNumIndexes :: Gen Int
+genNumIndexes =
+  choose (1, 10000)
 
-genNumIndices :: Gen Int
-genNumIndices =
-  choose (0, 100)
+genIndices :: Int -> Gen [Int]
+genIndices n = do
+  numIndices <- choose (0, 100)
+  vectorOf numIndices (choose (0, n - 1))
 
-genIndices :: Int -> Int -> Gen [Int]
-genIndices numIndices maxIndex =
-  vectorOf numIndices (choose (0, maxIndex))
-
-genWord16Bitmap :: Gen (Bitmap Word16)
-genWord16Bitmap = genBitmap arbitrary
-
-withLastBitSet :: Int -> BS.ByteString -> BS.ByteString
-withLastBitSet bit bs
-  | BS.null bs = bs
-  | otherwise = BS.init bs <> BS.singleton (BS.last bs `setBit` bit)
+withLastBitSet :: Int -> Bitmap -> Bitmap
+withLastBitSet bit (Bitmap bs)
+  | BS.null bs = Bitmap bs
+  | otherwise = Bitmap (BS.init bs <> BS.singleton (BS.last bs `setBit` bit))

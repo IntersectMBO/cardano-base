@@ -1,6 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | A compact bitmap representation using serialisation-ready ByteStrings.
@@ -9,14 +12,12 @@
 --
 -- NOTE: this module is meant to be imported qualified.
 module Data.Bitmap (
-  Bitmap,
+  Bitmap (..),
+  numBytes,
   fromIndices,
   toIndices,
   numSetBits,
-  logicalUpperBound,
-  rawSerialise,
-  rawDeserialise,
-  expectedBytes,
+  wellFormed,
 ) where
 
 import Control.DeepSeq (NFData)
@@ -37,57 +38,39 @@ import Data.Word (Word8)
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Storable (peekByteOff, pokeByteOff)
 import GHC.Generics (Generic)
-import NoThunks.Class (NoThunks)
+import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
--- | A compact bitmap representation over an index type.
---
--- NOTE: the logical upper bound is stored explicitly so serialisation
--- round-trips exactly.
-data Bitmap a
-  = Bitmap
-      -- | Logical upper bound
-      !a
-      -- | Payload
-      !ByteString
-  deriving stock (Eq, Ord, Generic)
+-- | A bitmap over a number of indexes known to its users: @⌈n/8⌉@ bytes,
+-- MSB-first, bit @i@ set iff index @i@ is set.
+newtype Bitmap = Bitmap {bitmapBytes :: ByteString}
+  deriving stock (Show, Eq, Ord, Generic)
+  deriving newtype (NFData)
+  deriving (NoThunks) via OnlyCheckWhnfNamed "Bitmap" Bitmap
 
-instance NFData a => NFData (Bitmap a)
-
-instance NoThunks a => NoThunks (Bitmap a)
-
-instance Show a => Show (Bitmap a) where
-  show (Bitmap maxIx bs) =
-    "Bitmap{maxIx="
-      <> show maxIx
-      <> ",bytes="
-      <> show (ByteString.length bs)
-      <> ",set="
-      <> show (countSetBits bs)
-      <> "}"
-
-countSetBits :: ByteString -> Int
-countSetBits arr =
+-- | The number of indexes set (flipped to 1) in the bitmap.
+numSetBits :: Bitmap -> Int
+numSetBits (Bitmap arr) =
   sum
     [ popCount (ByteString.index arr i)
     | i <- [0 .. ByteString.length arr - 1]
     ]
 
-expectedBytes :: Integral a => a -> Int
-expectedBytes maxIx = (fromIntegral maxIx `quot` 8) + 1
+-- | The number of bytes of a bitmap over the given number of indexes.
+numBytes :: Int -> Int
+numBytes n = (n + 7) `quot` 8
 
-lastByteMask :: Integral a => a -> Word8
-lastByteMask maxIx =
-  complement (fromIntegral ((1 :: Int) `unsafeShiftL` (7 - fromIntegral maxIx `rem` 8)) - 1)
+lastByteMask :: Int -> Word8
+lastByteMask n =
+  complement (fromIntegral ((1 :: Int) `unsafeShiftL` (7 - (n - 1) `rem` 8)) - 1)
 
--- | Construct a 'Bitmap' from a list of indexes that should be set (flipped to
--- 1) and a maximum index (inclusive logical upper bound).
-fromIndices :: Integral a => a -> [a] -> Bitmap a
-fromIndices maxIx flipped =
-  Bitmap maxIx $
+-- | Construct a bitmap over the given number of indexes from a list of indexes
+-- that should be set (flipped to 1).
+fromIndices :: Int -> [Int] -> Bitmap
+fromIndices n flipped =
+  Bitmap $
     ByteString.unsafeCreate nBytes $ \ptr -> do
       fillBytes ptr 0 nBytes
-      forM_ flipped $ \ix -> do
-        let !i = fromIntegral ix :: Int
+      forM_ flipped $ \i -> do
         when (i >= 0 && i <= maxI) $ do
           let !byteIx = i `quot` 8
           let !bitIx = 7 - i `rem` 8
@@ -95,18 +78,18 @@ fromIndices maxIx flipped =
           w <- peekByteOff ptr byteIx :: IO Word8
           pokeByteOff ptr byteIx (w .|. mask)
   where
-    !maxI = fromIntegral maxIx :: Int
-    !nBytes = expectedBytes maxIx
+    !maxI = n - 1
+    !nBytes = numBytes n
 
     bitMask k = fromIntegral ((1 :: Int) `unsafeShiftL` k)
 
--- | Retrieve all indexes that are set (flipped to 1) in the bitmap, in
--- ascending order.
-toIndices :: Integral a => Bitmap a -> [a]
-toIndices (Bitmap maxIx bitmap) =
+-- | Retrieve all indexes that are set (flipped to 1) in a bitmap over the given
+-- number of indexes, in ascending order.
+toIndices :: Int -> Bitmap -> [Int]
+toIndices n (Bitmap bitmap) =
   goBytes 0
   where
-    !maxI = fromIntegral maxIx :: Int
+    !maxI = n - 1
     !nBytes = ByteString.length bitmap
 
     goBytes !byteIx
@@ -121,29 +104,14 @@ toIndices (Bitmap maxIx bitmap) =
           !i = base + bitIx
           !w' = clearBit w (7 - bitIx)
        in if i <= maxI
-            then fromIntegral i : goBits base w'
+            then i : goBits base w'
             else []
 
--- | The number of indexes set (flipped to 1) in the bitmap.
-numSetBits :: Bitmap a -> Int
-numSetBits (Bitmap _ bs) = countSetBits bs
-
--- | Get the logical upper bound of a bitmap
-logicalUpperBound :: Bitmap a -> a
-logicalUpperBound (Bitmap a _) = a
-
--- | Raw serialisation of the bitmap (just the underlying bytes, without the
--- logical upper bound).
-rawSerialise :: Bitmap a -> ByteString
-rawSerialise (Bitmap _ bs) = bs
-
--- | Raw deserialisation of a bitmap from a logical upper bound and a ByteString
---
--- Returns 'Nothing' if the byte string length does not match the expected size
--- for the given upper bound.
-rawDeserialise :: Integral a => a -> ByteString -> Maybe (Bitmap a)
-rawDeserialise maxIx bs
-  | maxIx < 0 = Nothing
-  | ByteString.length bs /= expectedBytes maxIx = Nothing
-  | ByteString.last bs .&. complement (lastByteMask maxIx) /= 0 = Nothing
-  | otherwise = Just (Bitmap maxIx bs)
+-- | Whether a bitmap is well-formed over the given number of indexes: it has
+-- the expected length and no bit set beyond the last index.
+wellFormed :: Int -> Bitmap -> Bool
+wellFormed n (Bitmap bs)
+  | n <= 0 = False
+  | ByteString.length bs /= numBytes n = False
+  | ByteString.last bs .&. complement (lastByteMask n) /= 0 = False
+  | otherwise = True
