@@ -14,7 +14,7 @@ module Cardano.Crypto.Peras.Cert (
   PerasCertVoters (UnsafePerasCertVoters, perasCertVotersBitmap, perasCertNonPersistentVRFOutputs),
   mkPerasCertVoters,
   perasCertVotersFromSeats,
-  perasCertVoterSeats,
+  perasCertVotersToSeats,
   perasCertNumberOfVoters,
   perasCertNumberOfNonPersistentVoters,
   PerasCert (..),
@@ -111,10 +111,11 @@ mkPerasCertVoters bitmap vrfOutputs = do
         ]
   pure (UnsafePerasCertVoters bitmap vrfOutputs)
 
-perasCertVoterSeats :: PerasCertVoters -> NonEmpty (PerasSeatIndex, Maybe PerasVRFOutput)
-perasCertVoterSeats UnsafePerasCertVoters {perasCertVotersBitmap, perasCertNonPersistentVRFOutputs} =
+perasCertVotersToSeats :: PerasCertVoters -> NonEmpty (PerasSeatIndex, Maybe PerasVRFOutput)
+perasCertVotersToSeats UnsafePerasCertVoters {perasCertVotersBitmap, perasCertNonPersistentVRFOutputs} =
   case zip seats proofs of
-    [] -> error "perasCertVoterSeats: empty voters bitmap (invariant violated via UnsafePerasCertVoters)"
+    [] ->
+      error "perasCertVotersToSeats: empty voters bitmap (invariant violated via UnsafePerasCertVoters)"
     x : xs -> x :| xs
   where
     seats = perasVotersBitmapSeats perasCertVotersBitmap
