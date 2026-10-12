@@ -17,8 +17,8 @@ import Cardano.Crypto.Peras.Cert (
   perasCertNumberOfNonPersistentVoters,
   perasCertNumberOfVoters,
   perasCertSizeUpperBound,
-  perasCertVoterSeats,
   perasCertVotersFromSeats,
+  perasCertVotersToSeats,
   perasVotersBitmapFromSeats,
  )
 import Cardano.Crypto.Peras.Vote (
@@ -46,12 +46,12 @@ import Test.QuickCheck (
 spec :: Spec
 spec = do
   describe "PerasCertVoters" $ do
-    prop "perasCertVotersFromSeats . perasCertVoterSeats" $
+    prop "perasCertVotersFromSeats . perasCertVotersToSeats" $
       forAll (genPerasCertVoters True) $ \v ->
-        perasCertVotersFromSeats (perasCertVoterSeats v) === Right v
+        perasCertVotersFromSeats (perasCertVotersToSeats v) === Right v
     prop "counts voters" $
       forAll (genPerasCertVoters True) $ \v ->
-        let seats = perasCertVoterSeats v
+        let seats = perasCertVotersToSeats v
          in (perasCertNumberOfVoters v, perasCertNumberOfNonPersistentVoters v)
               === (length seats, length (NonEmpty.filter ((/= Nothing) . snd) seats))
     prop "rejects a persistent voter after a non-persistent one" $
