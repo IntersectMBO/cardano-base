@@ -17,6 +17,7 @@ module Cardano.Crypto.Peras.Cert (
   perasCertVotersToSeats,
   perasCertNumberOfVoters,
   perasCertNumberOfNonPersistentVoters,
+  perasCertNumberOfPersistentVoters,
   PerasCert (..),
   PerasRoundNo (..),
   PerasBoostedBlock (..),
@@ -112,14 +113,14 @@ mkPerasCertVoters bitmap vrfOutputs = do
   pure (UnsafePerasCertVoters bitmap vrfOutputs)
 
 perasCertVotersToSeats :: PerasCertVoters -> NonEmpty (PerasSeatIndex, Maybe PerasVRFOutput)
-perasCertVotersToSeats UnsafePerasCertVoters {perasCertVotersBitmap, perasCertNonPersistentVRFOutputs} =
+perasCertVotersToSeats voters@UnsafePerasCertVoters {perasCertVotersBitmap, perasCertNonPersistentVRFOutputs} =
   case zip seats proofs of
     [] ->
       error "perasCertVotersToSeats: empty voters bitmap (invariant violated via UnsafePerasCertVoters)"
     x : xs -> x :| xs
   where
     seats = perasVotersBitmapSeats perasCertVotersBitmap
-    numPersistent = length seats - length perasCertNonPersistentVRFOutputs
+    numPersistent = perasCertNumberOfPersistentVoters voters
     proofs = replicate numPersistent Nothing <> fmap Just perasCertNonPersistentVRFOutputs
 
 perasCertVotersFromSeats ::
@@ -141,6 +142,10 @@ perasCertNumberOfVoters = perasVotersBitmapSize . perasCertVotersBitmap
 
 perasCertNumberOfNonPersistentVoters :: PerasCertVoters -> Int
 perasCertNumberOfNonPersistentVoters = length . perasCertNonPersistentVRFOutputs
+
+perasCertNumberOfPersistentVoters :: PerasCertVoters -> Int
+perasCertNumberOfPersistentVoters voters =
+  perasCertNumberOfVoters voters - perasCertNumberOfNonPersistentVoters voters
 
 {-------------------------------------------------------------------------------
    Certificates

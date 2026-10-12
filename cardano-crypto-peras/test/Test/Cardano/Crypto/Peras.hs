@@ -15,6 +15,7 @@ import Cardano.Crypto.Peras.Cert (
   PerasCertSize (..),
   mkPerasCertVoters,
   perasCertNumberOfNonPersistentVoters,
+  perasCertNumberOfPersistentVoters,
   perasCertNumberOfVoters,
   perasCertSizeUpperBound,
   perasCertVotersFromSeats,
@@ -52,8 +53,14 @@ spec = do
     prop "counts voters" $
       forAll (genPerasCertVoters True) $ \v ->
         let seats = perasCertVotersToSeats v
-         in (perasCertNumberOfVoters v, perasCertNumberOfNonPersistentVoters v)
-              === (length seats, length (NonEmpty.filter ((/= Nothing) . snd) seats))
+         in ( perasCertNumberOfVoters v
+            , perasCertNumberOfNonPersistentVoters v
+            , perasCertNumberOfPersistentVoters v
+            )
+              === ( length seats
+                  , length (NonEmpty.filter ((/= Nothing) . snd) seats)
+                  , length (NonEmpty.filter ((== Nothing) . snd) seats)
+                  )
     prop "rejects a persistent voter after a non-persistent one" $
       forAll genPerasVRFOutput $ \vrf ->
         perasCertVotersFromSeats
