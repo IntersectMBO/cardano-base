@@ -61,12 +61,12 @@ library testlib
     Test.Cardano.Crypto.Peras.Gen
 
   build-depends:
+    QuickCheck,
     bytestring,
     cardano-base:testlib,
     cardano-crypto-class:{cardano-crypto-class, testlib},
     cardano-crypto-peras,
     cardano-slotting,
-    QuickCheck,
 
 test-suite tests
   import: base, project-config
@@ -77,12 +77,12 @@ test-suite tests
     Test.Cardano.Crypto.Peras
 
   build-depends:
+    QuickCheck,
     bytestring,
     cardano-crypto-class,
     cardano-crypto-peras:{cardano-crypto-peras, testlib},
     cardano-slotting,
     hspec,
-    QuickCheck,
 
   ghc-options:
     -threaded
