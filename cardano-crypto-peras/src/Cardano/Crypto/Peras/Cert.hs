@@ -6,12 +6,12 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Cardano.Crypto.Peras.Cert (
-  PerasVotersBitmap (UnsafePerasVotersBitmap, perasVotersMaxIndex, perasVotersBits),
+  PerasVotersBitmap (..),
   mkPerasVotersBitmap,
   perasVotersBitmapFromSeats,
   perasVotersBitmapSeats,
   perasVotersBitmapSize,
-  PerasCertVoters (UnsafePerasCertVoters, perasCertVotersBitmap, perasCertNonPersistentVRFOutputs),
+  PerasCertVoters (..),
   mkPerasCertVoters,
   perasCertVotersFromSeats,
   perasCertVotersToSeats,
