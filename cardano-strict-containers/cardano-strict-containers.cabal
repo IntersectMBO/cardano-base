@@ -56,9 +56,9 @@ library testlib
     Test.Cardano.StrictContainers.Instances
 
   build-depends:
+    QuickCheck,
     base,
     cardano-strict-containers,
-    QuickCheck,
 
 test-suite tests
   import: language, warnings
@@ -69,12 +69,12 @@ test-suite tests
     Test.Data.Bitmap
 
   build-depends:
+    QuickCheck,
     base,
     bytestring,
     cardano-strict-containers,
     containers,
     hspec,
-    QuickCheck,
 
   ghc-options:
     -threaded
