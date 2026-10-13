@@ -10,6 +10,12 @@ module Test.Cardano.Base.QuickCheck (
 )
 where
 
+import Data.Foldable (traverse_)
+import Data.Proxy (Proxy (Proxy))
+import Test.Hspec (Spec, describe)
+import Test.Hspec.QuickCheck (prop)
+import Test.QuickCheck.Classes (Laws (Laws, lawsProperties, lawsTypeclass))
+
 -- QuickCheck 2.18 replaces `withMaxSuccess` with `withNumTests` and
 -- immediately deprecates the former.
 -- We handle this for the whole Cardano stack here. Any other code
@@ -18,11 +24,6 @@ where
 --
 #if MIN_VERSION_QuickCheck(2, 18, 0)
 import Test.QuickCheck (withNumTests)
-import Data.Proxy (Proxy (Proxy))
-import Test.Hspec (Spec, describe)
-import Test.QuickCheck.Classes (Laws (Laws, lawsTypeclass, lawsProperties))
-import Data.Foldable (traverse_)
-import Test.Hspec.QuickCheck (prop)
 #else
 import Test.QuickCheck (
     Property,

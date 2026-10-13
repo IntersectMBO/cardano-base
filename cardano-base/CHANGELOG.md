@@ -1,5 +1,11 @@
 # Changelog for `cardano-base`
 
+## 0.1.7.1
+
+### `testlib`
+
+* Fix `testLawsGroup` failing to compile with `QuickCheck < 2.18`
+
 ## 0.1.7.0
 
 *
