@@ -1,8 +1,12 @@
 # Changelog for `cardano-base`
 
-## 0.1.6.1
+## 0.1.7.0
 
 *
+
+### `testlib`
+
+* Add `testLawsGroup` QuickCheck utility function
 
 ## 0.1.6.0
 
