@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-base
-version: 0.1.7.0
+version: 0.1.7.1
 synopsis: Various utilities for Cardano
 description: Various utilities for Cardano.
 category:
