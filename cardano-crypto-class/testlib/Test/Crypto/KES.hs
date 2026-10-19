@@ -24,12 +24,16 @@ module Test.Crypto.KES (
 where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Unsafe as BSU
 import qualified Data.Foldable as F (foldl')
 import Data.IORef
 import Data.Proxy (Proxy (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Foreign.Ptr (WordPtr)
+import Data.Word (Word8)
+import Foreign.C.Types (CSize)
+import Foreign.Ptr (WordPtr, castPtr)
 import GHC.TypeNats (KnownNat, natVal)
 
 import Control.Monad (void)
@@ -40,11 +44,14 @@ import Control.Tracer
 
 import Cardano.Binary.FixedSizeCodec (rawDecodeFixedSized, rawEncodeFixedSized)
 import Cardano.Crypto.DSIGN hiding (Signable)
-import Cardano.Crypto.DirectSerialise (DirectDeserialise, DirectSerialise)
+import Cardano.Crypto.DirectSerialise (DirectDeserialise, DirectSerialise, SizeCheckException (..))
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
+import Cardano.Crypto.KES.Locked (deserialiseSignKeyKESFromLockedBuf)
 import Cardano.Crypto.Libsodium
+import Cardano.Crypto.Libsodium.Hex
 import Cardano.Crypto.Libsodium.MLockedSeed
+import Cardano.Crypto.Libsodium.Memory (mlockedAlloca, packByteStringCStringLen, zeroMem)
 import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import Cardano.Crypto.Util (SignableRepresentation (..))
@@ -98,6 +105,7 @@ tests lock =
     testKESAlgorithm @(CompactSum1KES Ed25519DSIGN Blake2b_256) lock "CompactSum1KES"
     testKESAlgorithm @(CompactSum2KES Ed25519DSIGN Blake2b_256) lock "CompactSum2KES"
     testKESAlgorithm @(CompactSum5KES Ed25519DSIGN Blake2b_256) lock "CompactSum5KES"
+    testHexDecode lock
 
 --------------------------------------------------------------------------------
 -- Show and Eq instances
@@ -422,6 +430,30 @@ testKESAlgorithm lock n =
             direct <- directSerialiseToBS (fromIntegral @Word @Int $ signKeySizeKES (Proxy @v)) sk
             raw <- rawSerialiseSignKeyKES sk
             return $ direct === raw
+      describe "Locked" $ do
+        prop "SignKey round trip through hex and a locked buffer" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            raw <- rawSerialiseSignKeyKES sk
+            vk <- deriveVerKeyKES sk
+            decoded <- hexDecodeByteStringToMLocked (Base16.encode raw)
+            case decoded of
+              Left err ->
+                return $ counterexample ("hex decode failed: " ++ show err) False
+              Right (fptr, len) -> do
+                (raw', vk') <-
+                  bracket
+                    ( withMLockedForeignPtr fptr $ \ptr ->
+                        deserialiseSignKeyKESFromLockedBuf @v (castPtr ptr) len
+                    )
+                    forgetSignKeyKES
+                    (\sk' -> (,) <$> rawSerialiseSignKeyKES sk' <*> deriveVerKeyKES sk')
+                finalizeMLockedForeignPtr fptr
+                return $
+                  (len === BS.length raw)
+                    .&&. (raw' === raw)
+                    .&&. (vk' === vk)
+        prop "SignKey of the wrong length is refused" $
+          prop_lockedDeserialiseWrongLength @v lock
     describe "verify" $ do
       prop "positive" $ prop_verifyKES_positive @v
       prop "negative (key)" $ prop_verifyKES_negative_key @v
@@ -931,3 +963,86 @@ prop_unsoundPureSign _ seedPSB msg = ioProperty $ do
       sigPure = unsoundPureSignKES () 0 msg skPure
   sig <- withSK seedPSB $ signKES () 0 msg
   return $ sigPure === sig
+
+--------------------------------------------------------------------------------
+-- Locked loading
+--------------------------------------------------------------------------------
+
+-- | 'deserialiseSignKeyKESFromLockedBuf' throws a 'SizeCheckException' naming
+-- the expected and the actual length when the buffer is not exactly
+-- 'signKeySizeKES' bytes long, and does so before deserialising anything.
+prop_lockedDeserialiseWrongLength ::
+  forall v.
+  ( KESAlgorithm v
+  , DirectDeserialise (SignKeyKES v)
+  ) =>
+  Lock ->
+  Property
+prop_lockedDeserialiseWrongLength lock =
+  forAll (choose (0, 2 * expected) `suchThat` (/= expected)) $ \badLen ->
+    ioProperty . withLock lock $ do
+      result <-
+        mlockedAlloca (fromIntegral @Int @CSize badLen) $ \ptr -> do
+          zeroMem ptr (fromIntegral @Int @CSize badLen)
+          try (deserialiseSignKeyKESFromLockedBuf @v ptr badLen)
+      case result of
+        Left (SizeCheckException ex ac) ->
+          return $ (ex === expected) .&&. (ac === badLen)
+        Right sk -> do
+          forgetSignKeyKES sk
+          return $ counterexample "deserialised a key from a wrong-sized buffer" False
+  where
+    expected :: Int
+    expected = fromIntegral @Word @Int (signKeySizeKES (Proxy @v))
+
+-- | Read a decoded buffer back into a 'ByteString' (tests only) and release it.
+readBackHex ::
+  Either HexDecodeError (MLockedForeignPtr Word8, Int) ->
+  IO (Either HexDecodeError BS.ByteString)
+readBackHex (Left err) = return (Left err)
+readBackHex (Right (fptr, len)) = do
+  bs <- withMLockedForeignPtr fptr $ \ptr -> packByteStringCStringLen (castPtr ptr, len)
+  finalizeMLockedForeignPtr fptr
+  return (Right bs)
+
+isHexDigitW8 :: Word8 -> Bool
+isHexDigitW8 w =
+  (w >= 0x30 && w <= 0x39) || (w >= 0x61 && w <= 0x66) || (w >= 0x41 && w <= 0x46)
+
+upperHex :: BS.ByteString -> BS.ByteString
+upperHex = BS.map (\w -> if w >= 0x61 && w <= 0x66 then w - 0x20 else w)
+
+testHexDecode :: Lock -> Spec
+testHexDecode lock =
+  describe "Libsodium.Hex" $ do
+    prop "decodes what base16-bytestring encodes" $ \(bytes :: [Word8]) ->
+      ioProperty . withLock lock $ do
+        let bs = BS.pack bytes
+        decoded <- readBackHex =<< hexDecodeByteStringToMLocked (Base16.encode bs)
+        return $ decoded === Right bs
+    prop "accepts upper-case digits" $ \(bytes :: [Word8]) ->
+      ioProperty . withLock lock $ do
+        let bs = BS.pack bytes
+        decoded <- readBackHex =<< hexDecodeByteStringToMLocked (upperHex (Base16.encode bs))
+        return $ decoded === Right bs
+    prop "raw-pointer variant agrees with the ByteString variant" $ \(bytes :: [Word8]) ->
+      ioProperty . withLock lock $ do
+        let hex = Base16.encode (BS.pack bytes)
+        viaPtr <-
+          readBackHex =<< BSU.unsafeUseAsCStringLen hex (\(ptr, len) -> hexDecodeToMLocked (castPtr ptr) len)
+        viaBS <- readBackHex =<< hexDecodeByteStringToMLocked hex
+        return $ (viaPtr === viaBS) .&&. (viaPtr === Right (BS.pack bytes))
+    prop "rejects an odd number of digits" $ \(bytes :: [Word8]) ->
+      ioProperty . withLock lock $ do
+        let hex = Base16.encode (BS.pack bytes) <> BS.singleton 0x61
+        decoded <- readBackHex =<< hexDecodeByteStringToMLocked hex
+        return $ decoded === Left (HexOddLength (BS.length hex))
+    prop "rejects a non-hex byte and reports its offset" $
+      \(NonEmpty bytes :: NonEmptyList Word8) ->
+        forAll (arbitrary `suchThat` (not . isHexDigitW8)) $ \bad ->
+          forAll (choose (0, 2 * length bytes - 1)) $ \pos ->
+            ioProperty . withLock lock $ do
+              let hex = Base16.encode (BS.pack bytes)
+                  broken = BS.take pos hex <> BS.singleton bad <> BS.drop (pos + 1) hex
+              decoded <- readBackHex =<< hexDecodeByteStringToMLocked broken
+              return $ decoded === Left (HexInvalidByteAt pos)

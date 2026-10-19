@@ -89,6 +89,7 @@ library
     Cardano.Crypto.KES.Class
     Cardano.Crypto.KES.CompactSingle
     Cardano.Crypto.KES.CompactSum
+    Cardano.Crypto.KES.Locked
     Cardano.Crypto.KES.Mock
     Cardano.Crypto.KES.NeverUsed
     Cardano.Crypto.KES.Simple
@@ -99,6 +100,7 @@ library
     Cardano.Crypto.Libsodium.Constants
     Cardano.Crypto.Libsodium.Hash
     Cardano.Crypto.Libsodium.Hash.Class
+    Cardano.Crypto.Libsodium.Hex
     Cardano.Crypto.Libsodium.Init
     Cardano.Crypto.Libsodium.MLockedBytes
     Cardano.Crypto.Libsodium.MLockedBytes.Internal

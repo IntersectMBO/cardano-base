@@ -2,6 +2,12 @@
 
 ## 2.5.2.0
 
+* Add `Cardano.Crypto.Libsodium.Hex` with `hexDecodeToMLocked` and `hexDecodeByteStringToMLocked`,
+  which decode hex into a fresh mlocked buffer without a heap copy of the decoded bytes, and the
+  content-free error type `HexDecodeError`
+* Add `Cardano.Crypto.KES.Locked` with `deserialiseSignKeyKESFromLockedBuf`, a length-checked
+  `DirectDeserialise` of a `SignKeyKES` from a locked buffer
+
 ## 2.5.1.0
 
 * Add `VerKeySizeVRF`, `SignKeySizeVRF` and `CertSizeVRF` type-level sizes to `VRFAlgorithm`
