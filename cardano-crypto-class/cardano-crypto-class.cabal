@@ -89,6 +89,7 @@ library
     Cardano.Crypto.KES.Class
     Cardano.Crypto.KES.CompactSingle
     Cardano.Crypto.KES.CompactSum
+    Cardano.Crypto.KES.EnvelopeLocked
     Cardano.Crypto.KES.Locked
     Cardano.Crypto.KES.Mock
     Cardano.Crypto.KES.NeverUsed
@@ -174,6 +175,7 @@ library testlib
     Test.Crypto.AllocLog
     Test.Crypto.DSIGN
     Test.Crypto.EllipticCurve
+    Test.Crypto.EnvelopeLocked
     Test.Crypto.EqST
     Test.Crypto.Hash
     Test.Crypto.Instances

@@ -11,6 +11,12 @@
   into a fresh mlocked buffer without a heap copy
 * Add `serialiseSignKeyKESToLockedBuf` to `Cardano.Crypto.KES.Locked`, a `DirectSerialise` of a
   `SignKeyKES` into a fresh mlocked buffer of `signKeySizeKES` bytes
+* Add `Cardano.Crypto.KES.EnvelopeLocked`: a reader (`readLockedKESEnvelope`) and writer
+  (`writeLockedKESEnvelope`) for the three-field text envelope of a KES signing key file that work
+  on locked buffers, understanding both the `KesSigningKey_<algorithm>` type that `cardano-cli`
+  writes (one CBOR byte string, evolution 0) and the new period-carrying
+  `KesSigningKeyWithPeriod_<algorithm>` type (CBOR array of the absolute KES period and the key
+  bytes); errors (`KESEnvelopeError`) never carry file contents
 
 ## 2.5.1.0
 
