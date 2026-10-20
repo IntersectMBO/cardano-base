@@ -3,14 +3,16 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
--- | Hex decoding straight into mlocked memory.
+-- | Hex encoding and decoding straight into mlocked memory.
 --
 -- The decoders in this module read hex digits from a caller-supplied buffer
 -- and write the decoded bytes into a freshly allocated mlocked buffer. The
 -- decoded bytes never pass through the GHC heap: there is no intermediate
 -- 'ByteString' and the loop keeps only the current pair of digits in
 -- registers. This is what makes the functions suitable for loading secret key
--- material (such as a KES signing key) from a hex-encoded file.
+-- material (such as a KES signing key) from a hex-encoded file. The encoder
+-- is the mirror image: it reads bytes from a (locked) buffer and writes their
+-- hex digits into a fresh mlocked buffer, for writing such a file back.
 --
 -- The caller owns the returned buffer and must release it with
 -- 'finalizeMLockedForeignPtr', which erases it. On a decode error the partially
@@ -20,10 +22,11 @@ module Cardano.Crypto.Libsodium.Hex (
   HexDecodeError (..),
   hexDecodeToMLocked,
   hexDecodeByteStringToMLocked,
+  hexEncodeMLocked,
 ) where
 
 import Control.Monad.Class.MonadST (MonadST)
-import Data.Bits (shiftL, (.|.))
+import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Unsafe as BS
 import Data.Word (Word8)
@@ -104,6 +107,39 @@ hexDecodeToMLockedIO src len
             | otherwise -> do
                 pokeByteOff dst (i `div` 2) ((hi `shiftL` 4) .|. lo)
                 decodeLoop dst (i + 2)
+
+-- | Encode @len@ bytes starting at the given pointer as lowercase hex digits
+-- into a fresh mlocked buffer of @2 * len@ bytes, which is also returned. The
+-- bytes are read directly from the source and never copied to the heap, so
+-- the source may be (and for key material should be) a locked buffer.
+--
+-- An empty input yields a buffer of length 0 (the allocation itself is one
+-- byte, since the allocator must not be asked for nothing).
+hexEncodeMLocked ::
+  MonadST m =>
+  Ptr Word8 ->
+  Int ->
+  m (MLockedForeignPtr Word8, Int)
+hexEncodeMLocked src len = unsafeIOToMonadST $ do
+  let outLen = 2 * len
+  fptr <- mlAllocate mlockedMalloc (fromIntegral @Int @CSize (max 1 outLen))
+  withMLockedForeignPtr fptr $ \dst -> encodeLoop dst 0
+  return (fptr, outLen)
+  where
+    encodeLoop :: Ptr Word8 -> Int -> IO ()
+    encodeLoop dst !i
+      | i >= len = return ()
+      | otherwise = do
+          b <- peekByteOff src i
+          pokeByteOff dst (2 * i) (hexDigit (b `shiftR` 4))
+          pokeByteOff dst (2 * i + 1) (hexDigit (b .&. 0x0f))
+          encodeLoop dst (i + 1)
+
+-- | The lowercase hex digit of a nibble (the argument must be below 16).
+hexDigit :: Word8 -> Word8
+hexDigit n
+  | n < 10 = 0x30 + n -- '0'..'9'
+  | otherwise = 0x61 + n - 10 -- 'a'..'f'
 
 -- | Sentinel returned by 'nibble' for a byte that is not a hex digit. Hex
 -- digits decode to values below 16, so this never collides.

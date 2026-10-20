@@ -7,6 +7,10 @@
   content-free error type `HexDecodeError`
 * Add `Cardano.Crypto.KES.Locked` with `deserialiseSignKeyKESFromLockedBuf`, a length-checked
   `DirectDeserialise` of a `SignKeyKES` from a locked buffer
+* Add `hexEncodeMLocked` to `Cardano.Crypto.Libsodium.Hex`, which encodes a buffer as lowercase hex
+  into a fresh mlocked buffer without a heap copy
+* Add `serialiseSignKeyKESToLockedBuf` to `Cardano.Crypto.KES.Locked`, a `DirectSerialise` of a
+  `SignKeyKES` into a fresh mlocked buffer of `signKeySizeKES` bytes
 
 ## 2.5.1.0
 

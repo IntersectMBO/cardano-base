@@ -47,7 +47,10 @@ import Cardano.Crypto.DSIGN hiding (Signable)
 import Cardano.Crypto.DirectSerialise (DirectDeserialise, DirectSerialise, SizeCheckException (..))
 import Cardano.Crypto.Hash
 import Cardano.Crypto.KES
-import Cardano.Crypto.KES.Locked (deserialiseSignKeyKESFromLockedBuf)
+import Cardano.Crypto.KES.Locked (
+  deserialiseSignKeyKESFromLockedBuf,
+  serialiseSignKeyKESToLockedBuf,
+ )
 import Cardano.Crypto.Libsodium
 import Cardano.Crypto.Libsodium.Hex
 import Cardano.Crypto.Libsodium.MLockedSeed
@@ -56,7 +59,7 @@ import Cardano.Crypto.PinnedSizedBytes
 import Cardano.Crypto.Seed (mkSeedFromBytes)
 import Cardano.Crypto.Util (SignableRepresentation (..))
 
-import Test.Hspec (Expectation, Spec, describe, it, shouldSatisfy)
+import Test.Hspec (Expectation, Spec, describe, it, shouldBe, shouldSatisfy)
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck
 
@@ -454,6 +457,27 @@ testKESAlgorithm lock n =
                     .&&. (vk' === vk)
         prop "SignKey of the wrong length is refused" $
           prop_lockedDeserialiseWrongLength @v lock
+        prop "SignKey serialises into a locked buffer with the raw bytes" $
+          ioPropertyWithSK @v lock $ \sk -> do
+            raw <- rawSerialiseSignKeyKES sk
+            vk <- deriveVerKeyKES sk
+            (fptr, len) <- serialiseSignKeyKESToLockedBuf sk
+            locked <- withMLockedForeignPtr fptr $ \ptr -> packByteStringCStringLen (ptr, len)
+            -- The buffer is a copy: it must survive the key being forgotten,
+            -- and a key rebuilt from it must be the same key.
+            forgetSignKeyKES sk
+            lockedAfterForget <- withMLockedForeignPtr fptr $ \ptr -> packByteStringCStringLen (ptr, len)
+            vk' <-
+              bracket
+                (withMLockedForeignPtr fptr $ \ptr -> deserialiseSignKeyKESFromLockedBuf @v ptr len)
+                forgetSignKeyKES
+                deriveVerKeyKES
+            finalizeMLockedForeignPtr fptr
+            return $
+              (len === fromIntegral @Word @Int (signKeySizeKES (Proxy @v)))
+                .&&. (locked === raw)
+                .&&. (lockedAfterForget === raw)
+                .&&. (vk' === vk)
     describe "verify" $ do
       prop "positive" $ prop_verifyKES_positive @v
       prop "negative (key)" $ prop_verifyKES_negative_key @v
@@ -1046,3 +1070,28 @@ testHexDecode lock =
                   broken = BS.take pos hex <> BS.singleton bad <> BS.drop (pos + 1) hex
               decoded <- readBackHex =<< hexDecodeByteStringToMLocked broken
               return $ decoded === Left (HexInvalidByteAt pos)
+    prop "encodes as base16-bytestring does (lowercase)" $ \(bytes :: [Word8]) ->
+      ioProperty . withLock lock $ do
+        let bs = BS.pack bytes
+        encoded <- encodeViaLocked bs
+        return $ encoded === Base16.encode bs
+    prop "decode . encode = id" $ \(bytes :: [Word8]) ->
+      ioProperty . withLock lock $ do
+        let bs = BS.pack bytes
+        encoded <- encodeViaLocked bs
+        decoded <- readBackHex =<< hexDecodeByteStringToMLocked encoded
+        return $ decoded === Right bs
+    it "encodes the empty input to the empty output" $ do
+      encoded <- withLock lock $ encodeViaLocked BS.empty
+      encoded `shouldBe` BS.empty
+  where
+    -- Encode through 'hexEncodeMLocked' and read the locked result back into
+    -- a 'ByteString' (tests only); the source bytes are copied into a locked
+    -- buffer first, as they would be for a key.
+    encodeViaLocked :: BS.ByteString -> IO BS.ByteString
+    encodeViaLocked bs =
+      BSU.unsafeUseAsCStringLen bs $ \(src, len) -> do
+        (fptr, outLen) <- hexEncodeMLocked (castPtr src) len
+        out <- withMLockedForeignPtr fptr $ \ptr -> packByteStringCStringLen (castPtr ptr, outLen)
+        finalizeMLockedForeignPtr fptr
+        return out
