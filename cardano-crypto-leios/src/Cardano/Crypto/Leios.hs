@@ -205,6 +205,9 @@ getLeiosSeatId vk committee =
 data LeiosCert = LeiosCert
   { leiosCertSigners :: !BitField
   , leiosCertSignature :: !LeiosSignature
+  , leiosCertPrefix :: !(StrictMaybe Word16)
+  -- ^ Reserved for partial certification, so that a later hard fork can give it
+  -- meaning. 'verifyLeiosCert' rejects a certificate that sets it.
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData, NoThunks)
@@ -239,7 +242,7 @@ aggregateLeiosCert committee sigs = do
   leiosCertSignature <-
     first (BLSAggregationFailed . T.pack) $
       aggregateSigsDSIGN (Map.elems sigs)
-  pure LeiosCert {leiosCertSigners, leiosCertSignature}
+  pure LeiosCert {leiosCertSigners, leiosCertSignature, leiosCertPrefix = SNothing}
   where
     outOfBoundsVoterIds =
       [vid | vid <- Map.keys sigs, isNothing $ resolveLeiosSeat committee vid]
@@ -278,13 +281,16 @@ data VerificationError
   | -- | Set bits select keyless seats; rejected before their weight counts, so
     -- keyless seats cannot pad the total towards the threshold.
     SignerWithoutKey (NonEmpty LeiosSeatId)
+  | -- | 'leiosCertPrefix' is set, which is reserved.
+    ReservedPrefix Word16
   deriving stock (Eq, Show, Generic)
   deriving anyclass (NFData)
 
 -- | Verify a 'LeiosCert' against a committee, a weight threshold, and the
 -- signed message, returning the signers' total weight. Rejects an unaddressable
 -- committee, a malformed bitfield, any bit on a keyless seat, a summed weight
--- below the threshold, or a bad aggregate signature with a 'VerificationError'.
+-- below the threshold, a bad aggregate signature or a reserved prefix with a
+-- 'VerificationError'.
 -- Keys are trusted as PoP-checked by 'mkLeiosCommittee'.
 verifyLeiosCert ::
   SignableRepresentation msg =>
@@ -297,6 +303,9 @@ verifyLeiosCert ::
   -- | Total weight of the contributing signers on success.
   Either VerificationError Weight
 verifyLeiosCert committee weightRequired msg cert = do
+  case cert.leiosCertPrefix of
+    SJust prefix -> Left (ReservedPrefix prefix)
+    SNothing -> pure ()
   -- Judge the committee before judging the bitfield against it: past this bound a
   -- seat index no longer fits the 'Word16' that 'bitFieldMembers' casts to, so
   -- bits would silently wrap onto the wrong seats.

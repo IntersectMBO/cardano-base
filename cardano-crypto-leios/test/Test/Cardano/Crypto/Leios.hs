@@ -51,6 +51,7 @@ import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck (
   Gen,
   Property,
+  arbitrary,
   chooseInt,
   conjoin,
   counterexample,
@@ -91,6 +92,7 @@ spec = do
           prop_verifyLeiosCert_rejects_oversized_committee
         prop "rejects a tampered bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
         prop "rejects a bit set for a seat without a key" prop_verifyLeiosCert_rejects_keyless_signer
+        prop "rejects a prefix" prop_verifyLeiosCert_rejects_prefix
 
 exampleCert :: LeiosCert
 exampleCert = case aggregateLeiosCert committee contributions of
@@ -225,7 +227,7 @@ prop_verifyLeiosCert_rejects_oversized_committee = property $ do
       -- Exactly the length this committee demands, so the bitfield is not what fails.
       signers = BitField $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
-      cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig}
+      cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig, leiosCertPrefix = SNothing}
   pure . counterexample ("committee of " <> show n <> " seats") $
     verifyLeiosCert committee 1 msg cert === Left (MalformedCommittee n)
 
@@ -253,6 +255,19 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
             -- pairing failure, not the short-circuit.
             verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
               === Left InvalidSignature
+
+-- | The prefix is reserved, so a certificate that is otherwise valid but sets
+-- it is rejected.
+prop_verifyLeiosCert_rejects_prefix :: Property
+prop_verifyLeiosCert_rejects_prefix = property $ do
+  TestCommittee {committee, allKeys} <- genCommittee
+  prefix <- arbitrary
+  let msg = "leios-prefix-test" :: BS.ByteString
+      contributions = signContribs msg (zip [0 :: Int ..] allKeys)
+  pure $
+    aggregateOrFail committee contributions $ \cert ->
+      verifyLeiosCert committee 1 msg cert {leiosCertPrefix = SJust prefix}
+        === Left (ReservedPrefix prefix)
 
 -- | A 'LeiosSeatId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property

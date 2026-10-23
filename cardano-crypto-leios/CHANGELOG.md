@@ -1,5 +1,10 @@
 # Changelog for `cardano-crypto-leios`
 
+## 0.4.0.0
+
+* Add `leiosCertPrefix :: StrictMaybe Word16` to `LeiosCert`, reserved for partial certification. `aggregateLeiosCert` leaves it `SNothing`.
+* Add `ReservedPrefix Word16` to `VerificationError`. `verifyLeiosCert` rejects a certificate that sets the prefix.
+
 ## 0.3.0.0
 
 * Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
