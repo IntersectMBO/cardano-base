@@ -7,7 +7,11 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeData #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Leios cryptographic types and operations per CIP-164 (BLS12-381 MinSig).
 -- Defines the on-chain 'LeiosCert'; the off-chain 'LeiosVote' lives elsewhere.
@@ -15,7 +19,10 @@ module Cardano.Crypto.Leios (
   -- * Cryptographic primitives
   LeiosDSIGN,
   LeiosSigningKey,
-  LeiosVerificationKey,
+  LeiosVerificationKey (unLeiosVerificationKey),
+  IsPossessionProven (..),
+  deriveLeiosVerificationKey,
+  verifyLeiosPossessionProof,
   LeiosSignature,
   leiosSignatureSize,
   leiosSignatureToBytes,
@@ -25,7 +32,6 @@ module Cardano.Crypto.Leios (
   LeiosSeatId (..),
   LeiosSeat (..),
   LeiosCommittee (..),
-  mkLeiosCommittee,
   leiosCommitteeSize,
   maxLeiosCommitteeSize,
   resolveLeiosSeat,
@@ -56,6 +62,7 @@ import Cardano.Crypto.DSIGN (
   SigDSIGN,
   SignKeyDSIGN,
   VerKeyDSIGN,
+  deriveVerKeyDSIGN,
   verifyDSIGN,
   verifyPossessionProofDSIGN,
  )
@@ -69,7 +76,6 @@ import Data.Bits (setBit, shiftR, testBit, (.&.))
 import Data.ByteString (ByteString)
 import Data.Data (Proxy (..))
 import Data.Function ((&))
-import Data.Functor ((<&>))
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -101,9 +107,30 @@ type LeiosDSIGN = BLS12381MinSigDSIGN
 
 type LeiosSigningKey = SignKeyDSIGN LeiosDSIGN
 
-type LeiosVerificationKey = VerKeyDSIGN LeiosDSIGN
+type data IsPossessionProven = ProvenPossession | UnprovenPossession
+
+newtype LeiosVerificationKey (pp :: IsPossessionProven)
+  = LeiosVerificationKey {unLeiosVerificationKey :: VerKeyDSIGN LeiosDSIGN}
+  deriving newtype (Eq, Show, NFData, NoThunks)
+
+type role LeiosVerificationKey nominal
+
+instance FixedSizeCodec (LeiosVerificationKey pp) where
+  type FixedSize (LeiosVerificationKey pp) = FixedSize (VerKeyDSIGN LeiosDSIGN)
+  rawEncodeFixedSized = rawEncodeFixedSized . unLeiosVerificationKey
+  rawDecodeFixedSized = fmap LeiosVerificationKey . rawDecodeFixedSized
+
+deriveLeiosVerificationKey :: LeiosSigningKey -> LeiosVerificationKey ProvenPossession
+deriveLeiosVerificationKey = LeiosVerificationKey . deriveVerKeyDSIGN
 
 type LeiosProofOfPossession = PossessionProofDSIGN LeiosDSIGN
+
+verifyLeiosPossessionProof ::
+  LeiosVerificationKey UnprovenPossession ->
+  LeiosProofOfPossession ->
+  Either String (LeiosVerificationKey ProvenPossession)
+verifyLeiosPossessionProof (LeiosVerificationKey lvk) pop =
+  LeiosVerificationKey lvk <$ verifyPossessionProofDSIGN lvk pop
 
 type LeiosSignature = SigDSIGN LeiosDSIGN
 
@@ -116,7 +143,7 @@ leiosSignatureToBytes :: LeiosSignature -> ByteString
 leiosSignatureToBytes = rawEncodeFixedSized
 
 -- | Weight of a committee seat, its vote or target threshold weight; typically
--- a fraction in [0,1] (see 'mkLeiosCommittee').
+-- a fraction in [0,1],
 type Weight = Rational
 
 -- | A seat's index: its position in 'leiosCommitteeSeats' and its bit in the
@@ -130,42 +157,18 @@ newtype LeiosSeatId = LeiosSeatId {leiosSeatIndex :: Word16}
 -- registered).
 data LeiosSeat = LeiosSeat
   { seatWeight :: !Weight
-  , seatVKey :: !(StrictMaybe LeiosVerificationKey)
+  , seatVKey :: !(StrictMaybe (LeiosVerificationKey ProvenPossession))
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (NFData, NoThunks)
 
--- | A Leios epoch's voting committee: an ordered vector of seats (build via
--- 'mkLeiosCommittee'). Order is significant and is used by votes.
-newtype LeiosCommittee = UnsafeLeiosCommittee {leiosCommitteeSeats :: Vector LeiosSeat}
+-- | A Leios epoch's voting committee: an ordered vector of seats.
+-- Order is significant and is used by votes.
+newtype LeiosCommittee = LeiosCommittee {leiosCommitteeSeats :: Vector LeiosSeat}
   deriving stock (Show, Eq, Generic)
   deriving newtype (NFData)
   -- WHNF check suffices: a strict 'Vector' of strict-field 'LeiosSeat's has no thunks in WHNF.
   deriving (NoThunks) via OnlyCheckWhnfNamed "LeiosCommittee" LeiosCommittee
-
--- | Build a 'LeiosCommittee' from an ordered vector of seats. A seat with no
--- key, or one whose proof of possession fails to verify, is admitted keyless.
--- Seat order is the voter indexing, so derive it deterministically.
---
--- NOTE: Seat weights are assumed to be in range [0,1] with sum ≤ 1.
---
--- XXX: the positional @(key, pop)@ input is awkward; a @Map k (Weight, StrictMaybe (key, pop))@
--- carrying identity would be correct-by-construction. Left to the call site for now.
-mkLeiosCommittee ::
-  Vector (StrictMaybe (LeiosVerificationKey, LeiosProofOfPossession), Weight) ->
-  LeiosCommittee
-mkLeiosCommittee seats =
-  UnsafeLeiosCommittee $
-    seats <&> \(mKeyPoP, w) ->
-      LeiosSeat
-        { seatWeight = w
-        , seatVKey = do
-            (vk, pop) <- mKeyPoP
-            case verifyPossessionProofDSIGN vk pop of
-              -- XXX: The error string is a constant and just says it could not verify.
-              Left _err -> SNothing
-              Right () -> SJust vk
-        }
 
 -- | Number of seats in the committee.
 leiosCommitteeSize :: LeiosCommittee -> Int
@@ -187,7 +190,8 @@ resolveLeiosSeat committee voterId =
 -- | The 'LeiosSeatId' for a verification key (smallest matching index if the
 -- committee has duplicates), or 'Nothing' if absent. Errors on a committee with
 -- more than @2^16@ seats — already malformed for the 16-bit bitfield.
-getLeiosSeatId :: HasCallStack => LeiosVerificationKey -> LeiosCommittee -> Maybe LeiosSeatId
+getLeiosSeatId ::
+  HasCallStack => LeiosVerificationKey ProvenPossession -> LeiosCommittee -> Maybe LeiosSeatId
 getLeiosSeatId vk committee =
   toVoterId <$> V.findIndex ((== SJust vk) . seatVKey) committee.leiosCommitteeSeats
   where
@@ -285,7 +289,6 @@ data VerificationError
 -- signed message, returning the signers' total weight. Rejects an unaddressable
 -- committee, a malformed bitfield, any bit on a keyless seat, a summed weight
 -- below the threshold, or a bad aggregate signature with a 'VerificationError'.
--- Keys are trusted as PoP-checked by 'mkLeiosCommittee'.
 verifyLeiosCert ::
   SignableRepresentation msg =>
   LeiosCommittee ->
@@ -315,7 +318,7 @@ verifyLeiosCert committee weightRequired msg cert = do
   when (weightReceived < weightRequired) $
     Left (InsufficientWeight weightReceived)
   aggVk <-
-    uncheckedAggregateVerKeysDSIGN vks
+    uncheckedAggregateVerKeysDSIGN (unLeiosVerificationKey <$> vks)
       & first (const InvalidSignature)
   verifyDSIGN () aggVk msg cert.leiosCertSignature
     & first (const InvalidSignature)
