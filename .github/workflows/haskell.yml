@@ -59,6 +59,10 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
 
+    defaults:
+      run:
+        shell: bash
+
     strategy:
       fail-fast: false
       matrix:
@@ -70,6 +74,16 @@ jobs:
       CABAL_CACHE_VERSION: "2023-04-27"
 
     steps:
+    # The macos-26-arm64 image 20261013 ships Command Line Tools 27 (SDK 27.0)
+    # next to Xcode 26.6, whose ld cannot read the SDK 27 .tbd stubs
+    # ("tapi error: malformed file ... unknown architecture arm64e.x1").
+    # Use the Command Line Tools toolchain so ld and SDK match.
+    # Remove once https://github.com/actions/runner-images/issues/14940 is fixed
+    # in the image (its README lists Command Line Tools 26.x again).
+    - name: Use Command Line Tools toolchain on macOS
+      if: runner.os == 'macOS'
+      run: sudo xcode-select -s /Library/Developer/CommandLineTools
+
     - name: Install Haskell
       uses: input-output-hk/actions/haskell@latest
       id: setup-haskell
@@ -88,7 +102,6 @@ jobs:
       run: cabal update
 
     - name: Configure build
-      shell: bash
       run: |
         cp ".github/workflows/cabal.project.local.ci.$(uname -s)" cabal.project.local
         echo "# cabal.project.local"
@@ -103,9 +116,6 @@ jobs:
     - name: Record dependencies
       id: record-deps
       run: |
-        # The tests call out to msys2 commands. We generally do not want to mix toolchains, so
-        # we are very deliberate about only adding msys64 to the path where absolutely necessary.
-        ${{ (runner.os == 'Windows' && '$env:PATH=("C:\msys64\mingw64\bin;{0}" -f $env:PATH)') || '' }}
         cat dist-newstyle/cache/plan.json | jq -r '."install-plan"[].id' | sort | uniq > dependencies.txt
 
     # From the dependency list we restore the cached dependencies.
@@ -139,7 +149,6 @@ jobs:
     # `doctest` needs to be present before building, to avoid `cabal repl` seeing a configuration
     # change when `scripts/doctest.sh` runs it
     - name: Install doctest
-      shell: bash
       run: |
         if [[ -z "$(type -t doctest)" ]]
         then
@@ -152,10 +161,6 @@ jobs:
       run: cabal build all
 
     - name: Run tests
-      env:
-        # these two are msys2 env vars, they have no effect on non-msys2 installs.
-        MSYS2_PATH_TYPE: inherit
-        MSYSTEM: MINGW64
       run: cabal test all --test-show-details=direct -j1
 
     - name: Run doctests
