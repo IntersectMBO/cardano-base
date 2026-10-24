@@ -32,6 +32,7 @@ import Cardano.Crypto.Leios (
   Weight,
   aggregateLeiosCert,
   mkLeiosCommittee,
+  mkUnprovenLeiosVerificationKey,
  )
 import qualified Data.Map.Strict as Map
 import Data.Maybe.Strict (StrictMaybe (..))
@@ -102,7 +103,7 @@ mkCommitteeFromTestSeats testSeats =
 
     seatInput sk (kind, w) = (keyPoP, w)
       where
-        vk = deriveVerKeyDSIGN sk
+        vk = mkUnprovenLeiosVerificationKey $ deriveVerKeyDSIGN sk
 
         keyPoP = case kind of
           NoKey -> SNothing
@@ -140,7 +141,7 @@ genLeiosCert = do
         mkLeiosCommittee . V.fromList $
           [ (SJust (vk, pop), 1 % toInteger n)
           | sk <- sks
-          , let vk = deriveVerKeyDSIGN sk
+          , let vk = mkUnprovenLeiosVerificationKey $ deriveVerKeyDSIGN sk
                 pop = createPossessionProofDSIGN sk
           ]
   k <- chooseInt (1, n)

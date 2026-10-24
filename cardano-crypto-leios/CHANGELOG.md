@@ -2,6 +2,16 @@
 
 ## 0.3.0.0
 
+* Add a type-level proof-of-possession status to `LeiosVerificationKey`
+  - Add an `IsPossessionProven` kind with `ProvenPossession` and `UnprovenPossession` type constructors
+  - Change `LeiosVerificationKey` from a type synonym to a `newtype` with an `IsPossessionProven` parameter
+  - Add `unLeiosVerificationKey`
+  - Add `mkUnprovenLeiosVerificationKey`
+  - Add `verifyLeiosPossessionProof`
+  - Change `LeiosSeat` to use `LeiosVerificationKey ProvenPossession`
+  - Rename the `UnsafeLeiosCommittee` data constructor to `LeiosCommittee`
+  - Change the type of `mkLeiosCommittee` to take `LeiosVerificationKey UnprovenPossession`
+  - Change the type of `getLeiosSeatId` to take `LeiosVerificationKey ProvenPossession`
 * Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
   `BLS12381MinSigDSIGN`, so pass `()` as the signing context to `signDSIGN` /
   `verifyDSIGN`.
