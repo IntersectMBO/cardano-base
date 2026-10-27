@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: cardano-crypto-peras
-version: 0.1.0.0
+version: 0.1.1.0
 synopsis: Crypto primitives for Peras
 description:
 license: Apache-2.0
