@@ -39,7 +39,6 @@ import Data.Word (Word16, Word8)
 import Test.Cardano.Base.Bytes (genByteString)
 import Test.Cardano.Crypto.Leios.Gen (
   TestCommittee (..),
-  TestSeatType (..),
   genCommittee,
   genLeiosSigningKey,
   genTestSeats,
@@ -66,7 +65,7 @@ import Test.QuickCheck (
 spec :: Spec
 spec = do
   describe "LeiosCommittee" $ do
-    prop "mkLeiosCommittee checks proof of possession" prop_seats_without_valid_key_are_keyless
+    prop "mkCommitteeFromTestSeats respects key validity" prop_test_seats_without_valid_key_are_keyless
     prop "getLeiosSeatId and resolveLeiosSeat are inverse" prop_resolveVoter_getVoterId_inverse
     prop "getLeiosSeatId returns the first matching index" prop_getVoterId_returns_first_index
 
@@ -97,7 +96,7 @@ exampleCert = case aggregateLeiosCert committee contributions of
   Right c -> c
   Left e -> error ("exampleCert: aggregation failed: " <> show e)
   where
-    (sks, committee) = mkCommitteeFromTestSeats (replicate 1000 (WithKey, 1 / 1000))
+    (sks, committee) = mkCommitteeFromTestSeats (replicate 1000 (True, 1 / 1000))
     msg = "leios-golden-message" :: BS.ByteString
     contributions = signContribs msg (zip [0 ..] (toList sks))
 
@@ -130,7 +129,7 @@ prop_getVoterId_returns_first_index :: Property
 prop_getVoterId_returns_first_index = property $ do
   TestCommittee {committee} <- genCommittee
   let voters = V.toList committee.leiosCommitteeSeats
-      duped = UnsafeLeiosCommittee (committee.leiosCommitteeSeats <> committee.leiosCommitteeSeats)
+      duped = LeiosCommittee (committee.leiosCommitteeSeats <> committee.leiosCommitteeSeats)
   pure $
     conjoin
       [ counterexample ("first occurrence at " <> show i) $
@@ -185,7 +184,7 @@ prop_verifyLeiosCert_rejects_wrong_message = property $ do
 prop_verifyLeiosCert_rejects_below_threshold :: Property
 prop_verifyLeiosCert_rejects_below_threshold = property $ do
   n <- chooseInt (2, 16)
-  let (sks, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
+  let (sks, committee) = mkCommitteeFromTestSeats (replicate n (True, 1 / fromIntegral n))
       sk0 = case sks of
         (s0 : _) -> s0
         _ -> error "prop_verifyLeiosCert_rejects_below_threshold: n >= 2 invariant violated"
@@ -205,7 +204,7 @@ prop_verifyLeiosCert_rejects_oversized_signers :: Property
 prop_verifyLeiosCert_rejects_oversized_signers = property $ do
   TestCommittee {committee, allKeys} <- genCommittee
   let n = length allKeys
-      (_, committeeB) = mkCommitteeFromTestSeats (replicate (n + 8) (WithKey, 1 / fromIntegral (n + 8)))
+      (_, committeeB) = mkCommitteeFromTestSeats (replicate (n + 8) (True, 1 / fromIntegral (n + 8)))
       msg = "leios-malformed-test" :: BS.ByteString
       contributions = signContribs msg (zip [0 :: Int ..] allKeys)
   pure $
@@ -221,7 +220,7 @@ prop_verifyLeiosCert_rejects_oversized_committee :: Property
 prop_verifyLeiosCert_rejects_oversized_committee = property $ do
   n <- chooseInt (maxLeiosCommitteeSize + 1, maxLeiosCommitteeSize + 8)
   msg <- genMsg
-  let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
+  let committee = LeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
       -- Exactly the length this committee demands, so the bitfield is not what fails.
       signers = BitField $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
@@ -238,7 +237,7 @@ prop_verifyLeiosCert_rejects_oversized_committee = property $ do
 prop_verifyLeiosCert_rejects_tampered_bitfield :: Property
 prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
   n <- chooseInt (2, 16)
-  let (sks, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
+  let (sks, committee) = mkCommitteeFromTestSeats (replicate n (True, 1 / fromIntegral n))
       (sks0, sks1) = case sks of
         (s0 : s1 : _) -> (s0, s1)
         _ -> error "prop_verifyLeiosCert_rejects_tampered_bitfield: n >= 2 invariant violated"
@@ -275,7 +274,7 @@ prop_aggregateLeiosCert_bitfield_fits_max_committee :: Property
 prop_aggregateLeiosCert_bitfield_fits_max_committee = property $ do
   n <- chooseInt (maxLeiosCommitteeSize - 8, maxLeiosCommitteeSize + 8)
   msg <- genMsg
-  let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 0 SNothing)
+  let committee = LeiosCommittee $ V.replicate n (LeiosSeat 0 SNothing)
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       contributions = Map.singleton (LeiosSeatId 0) sig
   pure . counterexample ("committee of " <> show n <> " seats") $
@@ -298,12 +297,10 @@ prop_aggregateLeiosCert_rejects_empty = property $ do
     other -> counterexample (show other) (property False)
 
 -- | Every committee member gets a seat with its weight regardless of its key,
--- and a seat keeps its key exactly when a valid key was registered with a
--- verifying proof of possession. A seat with no key ('NoKey') or with a
--- proof of possession that does not verify ('BadPoP') is admitted to the
--- committee but keyless.
-prop_seats_without_valid_key_are_keyless :: Property
-prop_seats_without_valid_key_are_keyless =
+-- and a seat keeps its key exactly when a verified key is present. A seat with
+-- an unverified key ('False') is admitted to the committee but is keyless.
+prop_test_seats_without_valid_key_are_keyless :: Property
+prop_test_seats_without_valid_key_are_keyless =
   forAllShrink genTestSeats genericShrink $ \testSeats ->
     let (_, committee) = mkCommitteeFromTestSeats testSeats
         seats = V.toList committee.leiosCommitteeSeats
@@ -311,9 +308,8 @@ prop_seats_without_valid_key_are_keyless =
           (length seats === length testSeats)
             .&&. conjoin
               [ counterexample ("unexpected seat " <> show i) $
-                  (isSJust seat.seatVKey === (kind == WithKey))
-                    .&&. (seat.seatWeight === w)
-              | (i :: Int, seat, (kind, w)) <- zip3 [0 ..] seats testSeats
+                  (isSJust seat.seatVKey === verified) .&&. (seat.seatWeight === w)
+              | (i :: Int, seat, (verified, w)) <- zip3 [0 ..] seats testSeats
               ]
 
 -- | A certificate must not be able to borrow weight from keyless seats. For
@@ -327,7 +323,7 @@ prop_verifyLeiosCert_rejects_keyless_signer =
   forAllShrink genTestSeats genericShrink $ \testSeats ->
     forAll genMsg $ \msg ->
       let (sks, committee) = mkCommitteeFromTestSeats testSeats
-          keylessIxs = [i | (i, (kind, _)) <- zip [0 :: Int ..] testSeats, kind /= WithKey]
+          keylessIxs = [i | (i, (verified, _)) <- zip [0 :: Int ..] testSeats, not verified]
        in conjoin
             [ counterexample ("keyless seat " <> show j) $
                 let vid = LeiosSeatId (fromIntegral j)
