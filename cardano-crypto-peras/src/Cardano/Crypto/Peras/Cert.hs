@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 module Cardano.Crypto.Peras.Cert (
   PerasVotersBitmap (..),
@@ -24,6 +25,7 @@ module Cardano.Crypto.Peras.Cert (
   PerasSignature (..),
   PerasVRFOutput (..),
   PerasCertSize (..),
+  maxPerasCertSize,
   perasCertSizeUpperBound,
 ) where
 
@@ -171,6 +173,18 @@ newtype PerasCertSize = PerasCertSize {unPerasCertSize :: Word32}
   deriving stock (Show, Eq, Ord, Generic)
   deriving newtype (NoThunks, NFData)
   deriving (Enum, Real, Integral, Num) via Word32
+
+-- | Policy limit for a CBOR-encoded Peras certificate, in bytes.
+--
+-- The maximum mainnet block size was 90,112 bytes as of 2026-08-06. A limit of
+-- 40,000 bytes leaves roughly half the block for other contents. wFA^LS
+-- certificates would reach this size with around 800 non-persistent seats in
+-- the voting committee, while the current stake distribution and parameters
+-- generate committees with fewer than 100 non-persistent seats.
+--
+-- This is not a cryptographic size bound.
+maxPerasCertSize :: PerasCertSize
+maxPerasCertSize = 40_000
 
 -- | An upper bound (not necessarily tight) on the size, in bytes, of a
 -- serialised 'PerasCert'.

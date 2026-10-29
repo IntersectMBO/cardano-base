@@ -11,6 +11,7 @@
 * Change `PerasRoundNo`'s representation from `Word64` to `Word32`
 * Add `Cardano.Crypto.Peras.Vote` (`PerasVote`, `PerasVoteEligibilityProof`)
 * Add `PerasCertSize` and `perasCertSizeUpperBound` to `Cardano.Crypto.Peras.Cert`
+* Add `maxPerasCertSize`, the shared 40,000-byte certificate size policy limit
 
 ### `testlib`
 
