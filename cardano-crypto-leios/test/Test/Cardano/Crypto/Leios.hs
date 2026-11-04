@@ -11,7 +11,6 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.Leios (
   AggregationError (..),
-  BitField (..),
   LeiosCert (..),
   LeiosCommittee (..),
   LeiosSeat (..),
@@ -26,6 +25,7 @@ import Cardano.Crypto.Leios (
   resolveLeiosSeat,
   verifyLeiosCert,
  )
+import Data.Bits (setBit)
 import qualified Data.ByteString as BS
 import Data.Foldable (toList)
 import Data.List (uncons)
@@ -33,7 +33,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe.Strict (StrictMaybe (..), isSJust)
-import Data.Primitive.ByteArray (byteArrayFromList, sizeofByteArray)
+import Data.Primitive.ByteArray (byteArrayFromList, foldrByteArray, sizeofByteArray)
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import Test.Cardano.Base.Bytes (genByteString)
@@ -61,6 +61,7 @@ import Test.QuickCheck (
   property,
   (.&&.),
   (===),
+  (==>),
  )
 
 spec :: Spec
@@ -90,6 +91,8 @@ spec = do
           "rejects a committee past maxLeiosCommitteeSize"
           prop_verifyLeiosCert_rejects_oversized_committee
         prop "rejects a tampered bitfield" prop_verifyLeiosCert_rejects_tampered_bitfield
+        prop "rejects a bitfield with a padding bit set" prop_verifyLeiosCert_rejects_padding_bit
+        prop "rejects a bitfield with no signer" prop_verifyLeiosCert_rejects_no_signer
         prop "rejects a bit set for a seat without a key" prop_verifyLeiosCert_rejects_keyless_signer
 
 exampleCert :: LeiosCert
@@ -223,7 +226,7 @@ prop_verifyLeiosCert_rejects_oversized_committee = property $ do
   msg <- genMsg
   let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
       -- Exactly the length this committee demands, so the bitfield is not what fails.
-      signers = BitField $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
+      signers = byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig}
   pure . counterexample ("committee of " <> show n <> " seats") $
@@ -254,6 +257,37 @@ prop_verifyLeiosCert_rejects_tampered_bitfield = property $ do
             verifyLeiosCert committee (1 / fromIntegral @Int @Weight n) msg tampered
               === Left InvalidSignature
 
+-- | A bit set past the last seat, in the padding of the bitfield's last byte,
+-- makes it malformed: it names no seat, so it must not be silently ignored.
+-- Uses committee sizes that are not a multiple of 8, so the padding exists.
+prop_verifyLeiosCert_rejects_padding_bit :: Property
+prop_verifyLeiosCert_rejects_padding_bit = property $ do
+  TestCommittee {committee, allKeys} <- genCommittee
+  let n = length allKeys
+      msg = "leios-padding-test" :: BS.ByteString
+      contributions = signContribs msg (zip [0 :: Int ..] allKeys)
+  pure . counterexample ("committee of " <> show n <> " seats") $
+    n `rem` 8 /= 0 ==>
+      aggregateOrFail committee contributions $ \cert ->
+        let bytes = foldrByteArray (:) [] cert.leiosCertSigners :: [Word8]
+            padded = init bytes <> [last bytes `setBit` 0]
+         in verifyLeiosCert committee 1 msg cert {leiosCertSigners = byteArrayFromList padded}
+              === Left MalformedSigners
+
+-- | A bitfield of the right length with no bit set names no signer, so it is
+-- malformed, whatever the threshold.
+prop_verifyLeiosCert_rejects_no_signer :: Property
+prop_verifyLeiosCert_rejects_no_signer = property $ do
+  TestCommittee {committee, allKeys} <- genCommittee
+  let n = length allKeys
+      msg = "leios-no-signer-test" :: BS.ByteString
+      contributions = signContribs msg (zip [0 :: Int ..] allKeys)
+      noSigner = byteArrayFromList (replicate ((n + 7) `div` 8) (0x00 :: Word8))
+  pure . counterexample ("committee of " <> show n <> " seats") $
+    aggregateOrFail committee contributions $ \cert ->
+      verifyLeiosCert committee 0 msg cert {leiosCertSigners = noSigner}
+        === Left MalformedSigners
+
 -- | A 'LeiosSeatId' past the committee bound is rejected at aggregation time.
 prop_aggregateLeiosCert_rejects_out_of_range :: Property
 prop_aggregateLeiosCert_rejects_out_of_range = property $ do
@@ -283,7 +317,7 @@ prop_aggregateLeiosCert_bitfield_fits_max_committee = property $ do
       -- Refusing an unaddressable committee outright is just as sound.
       Left _ -> property True
       Right cert ->
-        let numBytes = sizeofByteArray (bitFieldBytes cert.leiosCertSigners)
+        let numBytes = sizeofByteArray cert.leiosCertSigners
          in counterexample ("bitfield of " <> show numBytes <> " bytes") $
               numBytes <= (maxLeiosCommitteeSize + 7) `div` 8
 

@@ -1,5 +1,14 @@
 # Changelog for `cardano-crypto-leios`
 
+## 0.4.0.0
+
+* Remove `BitField`: `leiosCertSigners` is the raw `ByteArray`, validated
+  against the committee by `verifyLeiosCert` with
+  `Data.Bitmap.Strict.NonEmpty.mkNonEmptyBitmap` from
+  `cardano-strict-containers`. Binary representation remains unaffected.
+* `verifyLeiosCert` rejects a signers bitfield with a padding bit set or with
+  no signer (`MalformedSigners`).
+
 ## 0.3.0.0
 
 * Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
