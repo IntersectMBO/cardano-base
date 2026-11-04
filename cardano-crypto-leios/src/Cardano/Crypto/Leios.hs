@@ -62,10 +62,10 @@ import Cardano.Crypto.DSIGN (
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
 import Control.DeepSeq (NFData)
-import Control.Monad (forM_, when)
-import Data.Array.Byte (ByteArray)
+import Control.Monad (when)
 import Data.Bifunctor (first)
-import Data.Bits (setBit, shiftR, testBit, (.&.))
+import Data.Bitmap (Bitmap)
+import qualified Data.Bitmap as Bitmap
 import Data.ByteString (ByteString)
 import Data.Data (Proxy (..))
 import Data.Function ((&))
@@ -75,20 +75,11 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
 import Data.Maybe.Strict (StrictMaybe (..))
-import Data.Primitive.ByteArray (
-  fillByteArray,
-  indexByteArray,
-  newByteArray,
-  readByteArray,
-  runByteArray,
-  sizeofByteArray,
-  writeByteArray,
- )
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Vector.Strict (Vector)
 import qualified Data.Vector.Strict as V
-import Data.Word (Word16, Word8)
+import Data.Word (Word16)
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -244,23 +235,11 @@ aggregateLeiosCert committee sigs = do
     outOfBoundsVoterIds =
       [vid | vid <- Map.keys sigs, isNothing $ resolveLeiosSeat committee vid]
 
-    -- Builds directly into a mutable 'ByteArray' via a single allocation and
-    -- writes one bit per member of the input set.
-    leiosCertSigners = BitField $ runByteArray $ do
-      mba <- newByteArray len
-      fillByteArray mba 0 len 0
-      forM_ (Map.keys sigs) $ \(LeiosSeatId i) -> do
-        let idx = fromIntegral @Word16 @Int i
-        when (idx < n) $ do
-          let byteIx = idx `shiftR` 3
-              bitIx = 7 - (idx .&. 7)
-          b <- readByteArray @Word8 mba byteIx
-          writeByteArray mba byteIx (b `setBit` bitIx)
-      pure mba
+    leiosCertSigners =
+      BitField $
+        Bitmap.fromIndices n [fromIntegral @Word16 @Int i | LeiosSeatId i <- Map.keys sigs]
 
     n = leiosCommitteeSize committee
-
-    len = (n + 7) `div` 8
 
 data VerificationError
   = -- | 'leiosCertSigners' is not @⌈leiosCommitteeSize\/8⌉@ bytes, so its bits do
@@ -303,7 +282,7 @@ verifyLeiosCert committee weightRequired msg cert = do
   when (n > maxLeiosCommitteeSize) $
     Left (MalformedCommittee n)
   -- Bitfield length is fixed at ⌈committee/8⌉ bytes; anything else is malformed.
-  when (sizeofByteArray (bitFieldBytes cert.leiosCertSigners) /= (n + 7) `div` 8) $
+  when (Bitmap.sizeInBytes cert.leiosCertSigners.bitFieldBitmap /= Bitmap.numBytes n) $
     Left MalformedSigners
   -- Set bits are in-bounds by construction, so each resolves to a keyed or keyless seat.
   let seats = [(vid, resolveLeiosSeat committee vid) | vid <- bitFieldMembers cert.leiosCertSigners]
@@ -329,19 +308,12 @@ verifyLeiosCert committee weightRequired msg cert = do
         SJust k -> (w + w', k : ks)
         SNothing -> (w, ks)
 
-    bitFieldMembers (BitField ba) =
-      [ LeiosSeatId (fromIntegral @Int @Word16 globalIx)
-      | byteIx <- [0 .. sizeofByteArray ba - 1]
-      , let byte = indexByteArray ba byteIx :: Word8
-      , bitIx <- [0 .. 7]
-      , let globalIx = byteIx * 8 + bitIx
-      , globalIx < n
-      , testBit byte (7 - bitIx)
-      ]
+    bitFieldMembers (BitField bm) =
+      [LeiosSeatId (fromIntegral @Int @Word16 i) | i <- Bitmap.toIndices n bm]
 
 -- | A 'LeiosCert' signers bitfield: @⌈leiosCommitteeSize\/8⌉@ bytes, MSB-first,
 -- bit @i@ set iff seat @i@ signed. Newtype so it isn't confused with raw bytes.
-newtype BitField = BitField {bitFieldBytes :: ByteArray}
+newtype BitField = BitField {bitFieldBitmap :: Bitmap}
   deriving stock (Show, Eq, Generic)
   deriving newtype (NFData)
   deriving (NoThunks) via OnlyCheckWhnfNamed "BitField" BitField

@@ -1,5 +1,10 @@
 # Changelog for `cardano-crypto-leios`
 
+## 0.4.0.0
+
+* `BitField` now wraps `Data.Bitmap.Bitmap` from `cardano-strict-containers`
+  instead of a raw `ByteArray`. Binary representation remains unaffected.
+
 ## 0.3.0.0
 
 * Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
