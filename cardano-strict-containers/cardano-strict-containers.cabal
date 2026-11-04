@@ -39,13 +39,13 @@ library
   build-depends:
     aeson,
     base,
-    bytestring,
     cardano-binary >=1.6,
     containers,
     data-default-class,
     deepseq,
     fingertree,
     nothunks,
+    primitive >=0.7.3,
     serialise,
 
 library testlib
@@ -71,10 +71,10 @@ test-suite tests
   build-depends:
     QuickCheck,
     base,
-    bytestring,
     cardano-strict-containers,
     containers,
     hspec,
+    primitive >=0.7.3,
 
   ghc-options:
     -threaded

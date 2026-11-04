@@ -1,19 +1,18 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
--- | A compact bitmap representation using serialisation-ready ByteStrings.
---
--- Adapted from @Cardano.Leios.BitMapPV@ in the @leios-wfa-ls-demo@ package.
+-- | A compact bitmap over a 'ByteArray' based on the Leios certificate signers
+-- bitfield representation (CIP-164)
 --
 -- NOTE: this module is meant to be imported qualified.
 module Data.Bitmap (
   Bitmap (..),
   numBytes,
+  sizeInBytes,
   fromIndices,
   toIndices,
   numSetBits,
@@ -22,42 +21,43 @@ module Data.Bitmap (
 
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when)
-import Data.Bits (
-  clearBit,
-  complement,
-  countLeadingZeros,
-  popCount,
-  unsafeShiftL,
-  (.&.),
-  (.|.),
+import Data.Array.Byte (ByteArray)
+import Data.Bits (complement, popCount, setBit, shiftR, testBit, unsafeShiftL, (.&.))
+import Data.Primitive.ByteArray (
+  fillByteArray,
+  indexByteArray,
+  newByteArray,
+  readByteArray,
+  runByteArray,
+  sizeofByteArray,
+  writeByteArray,
  )
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Internal as ByteString
 import Data.Word (Word8)
-import Foreign.Marshal.Utils (fillBytes)
-import Foreign.Storable (peekByteOff, pokeByteOff)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
 
 -- | A bitmap over a number of indexes known to its users: @⌈n/8⌉@ bytes,
 -- MSB-first, bit @i@ set iff index @i@ is set.
-newtype Bitmap = Bitmap {bitmapBytes :: ByteString}
+newtype Bitmap = Bitmap {bitmapBytes :: ByteArray}
   deriving stock (Show, Eq, Ord, Generic)
   deriving newtype (NFData)
   deriving (NoThunks) via OnlyCheckWhnfNamed "Bitmap" Bitmap
 
 -- | The number of indexes set (flipped to 1) in the bitmap.
 numSetBits :: Bitmap -> Int
-numSetBits (Bitmap arr) =
+numSetBits (Bitmap ba) =
   sum
-    [ popCount (ByteString.index arr i)
-    | i <- [0 .. ByteString.length arr - 1]
+    [ popCount (indexByteArray ba i :: Word8)
+    | i <- [0 .. sizeofByteArray ba - 1]
     ]
 
 -- | The number of bytes of a bitmap over the given number of indexes.
 numBytes :: Int -> Int
 numBytes n = (n + 7) `quot` 8
+
+-- | The number of bytes of a bitmap.
+sizeInBytes :: Bitmap -> Int
+sizeInBytes = sizeofByteArray . bitmapBytes
 
 lastByteMask :: Int -> Word8
 lastByteMask n =
@@ -66,52 +66,37 @@ lastByteMask n =
 -- | Construct a bitmap over the given number of indexes from a list of indexes
 -- that should be set (flipped to 1).
 fromIndices :: Int -> [Int] -> Bitmap
-fromIndices n flipped =
-  Bitmap $
-    ByteString.unsafeCreate nBytes $ \ptr -> do
-      fillBytes ptr 0 nBytes
-      forM_ flipped $ \i -> do
-        when (i >= 0 && i <= maxI) $ do
-          let !byteIx = i `quot` 8
-          let !bitIx = 7 - i `rem` 8
-          let !mask = bitMask bitIx
-          w <- peekByteOff ptr byteIx :: IO Word8
-          pokeByteOff ptr byteIx (w .|. mask)
+fromIndices n flipped = Bitmap $ runByteArray $ do
+  mba <- newByteArray nBytes
+  fillByteArray mba 0 nBytes 0
+  forM_ flipped $ \i ->
+    when (i >= 0 && i < n) $ do
+      let byteIx = i `shiftR` 3
+          bitIx = 7 - (i .&. 7)
+      w <- readByteArray @Word8 mba byteIx
+      writeByteArray mba byteIx (w `setBit` bitIx)
+  pure mba
   where
-    !maxI = n - 1
-    !nBytes = numBytes n
-
-    bitMask k = fromIntegral ((1 :: Int) `unsafeShiftL` k)
+    nBytes = numBytes (max 0 n)
 
 -- | Retrieve all indexes that are set (flipped to 1) in a bitmap over the given
 -- number of indexes, in ascending order.
 toIndices :: Int -> Bitmap -> [Int]
-toIndices n (Bitmap bitmap) =
-  goBytes 0
-  where
-    !maxI = n - 1
-    !nBytes = ByteString.length bitmap
-
-    goBytes !byteIx
-      | byteIx >= nBytes = []
-      | otherwise =
-          let !w = ByteString.index bitmap byteIx
-           in goBits (byteIx * 8) w <> goBytes (byteIx + 1)
-
-    goBits !_ 0 = []
-    goBits !base !w =
-      let !bitIx = countLeadingZeros w
-          !i = base + bitIx
-          !w' = clearBit w (7 - bitIx)
-       in if i <= maxI
-            then i : goBits base w'
-            else []
+toIndices n (Bitmap ba) =
+  [ i
+  | byteIx <- [0 .. sizeofByteArray ba - 1]
+  , let w = indexByteArray ba byteIx :: Word8
+  , bitIx <- [0 .. 7]
+  , let i = byteIx * 8 + bitIx
+  , i < n
+  , testBit w (7 - bitIx)
+  ]
 
 -- | Whether a bitmap is well-formed over the given number of indexes: it has
 -- the expected length and no bit set beyond the last index.
 wellFormed :: Int -> Bitmap -> Bool
-wellFormed n (Bitmap bs)
+wellFormed n (Bitmap ba)
   | n <= 0 = False
-  | ByteString.length bs /= numBytes n = False
-  | ByteString.last bs .&. complement (lastByteMask n) /= 0 = False
+  | sizeofByteArray ba /= numBytes n = False
+  | indexByteArray @Word8 ba (numBytes n - 1) .&. complement (lastByteMask n) /= 0 = False
   | otherwise = True
