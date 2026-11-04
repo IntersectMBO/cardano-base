@@ -2,8 +2,12 @@
 
 ## 0.1.7.0
 
-* Add `Data.Bitmap`: MSB-first bitmap over `ByteString` for a given number of
-  indexes, the bit convention of the Leios certificate bitfield (CIP-164)
+* Add `Data.Bitmap.Strict.NonEmpty`: MSB-first bitmap over a `ByteArray` with a
+  fixed number of bits (CIP-164 bit convention), well-formed by construction:
+  exact length, zero padding bits and at least one bit set. Build it with
+  `fromIndices` or validate raw bytes with `mkNonEmptyBitmap`; read it with
+  `toIndices` (an `NEIntSet`), `toIndicesPrefix`, `numSetBits`,
+  `bitmapRawByteArray` and `bitmapNumBits`
 
 ## 0.1.6.0
 

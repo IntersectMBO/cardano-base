@@ -30,7 +30,7 @@ library
   import: language, warnings
   hs-source-dirs: src
   exposed-modules:
-    Data.Bitmap
+    Data.Bitmap.Strict.NonEmpty
     Data.FingerTree.Strict
     Data.Maybe.Strict
     Data.Sequence.Strict
@@ -38,14 +38,15 @@ library
 
   build-depends:
     aeson,
-    base,
-    bytestring,
+    base >=4.18,
     cardano-binary >=1.6,
     containers,
     data-default-class,
     deepseq,
     fingertree,
+    nonempty-containers,
     nothunks,
+    primitive >=0.7.3,
     serialise,
 
 library testlib
@@ -66,15 +67,16 @@ test-suite tests
   hs-source-dirs: test
   main-is: Main.hs
   other-modules:
-    Test.Data.Bitmap
+    Test.Data.Bitmap.Strict.NonEmpty
 
   build-depends:
     QuickCheck,
     base,
-    bytestring,
     cardano-strict-containers,
     containers,
     hspec,
+    nonempty-containers,
+    primitive >=0.7.3,
 
   ghc-options:
     -threaded
