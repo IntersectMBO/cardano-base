@@ -1,8 +1,10 @@
 # Changelog for `cardano-strict-containers`
 
-## 0.1.6.1
+## 0.1.7.0
 
-*
+* Add `Data.Bitmap`: MSB-first bitmap over `ByteArray` for a given number of
+  indexes, lifted from `cardano-crypto-leios`'s `BitField` (CIP-164 bit
+  convention)
 
 ## 0.1.6.0
 

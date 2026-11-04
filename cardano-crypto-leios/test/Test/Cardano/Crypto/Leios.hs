@@ -26,6 +26,8 @@ import Cardano.Crypto.Leios (
   resolveLeiosSeat,
   verifyLeiosCert,
  )
+import Data.Bitmap (Bitmap (..))
+import qualified Data.Bitmap as Bitmap
 import qualified Data.ByteString as BS
 import Data.Foldable (toList)
 import Data.List (uncons)
@@ -33,7 +35,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe.Strict (StrictMaybe (..), isSJust)
-import Data.Primitive.ByteArray (byteArrayFromList, sizeofByteArray)
+import Data.Primitive.ByteArray (byteArrayFromList)
 import qualified Data.Vector.Strict as V
 import Data.Word (Word16, Word8)
 import Test.Cardano.Base.Bytes (genByteString)
@@ -223,7 +225,7 @@ prop_verifyLeiosCert_rejects_oversized_committee = property $ do
   msg <- genMsg
   let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
       -- Exactly the length this committee demands, so the bitfield is not what fails.
-      signers = BitField $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
+      signers = BitField $ Bitmap $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig}
   pure . counterexample ("committee of " <> show n <> " seats") $
@@ -283,7 +285,7 @@ prop_aggregateLeiosCert_bitfield_fits_max_committee = property $ do
       -- Refusing an unaddressable committee outright is just as sound.
       Left _ -> property True
       Right cert ->
-        let numBytes = sizeofByteArray (bitFieldBytes cert.leiosCertSigners)
+        let numBytes = Bitmap.sizeInBytes cert.leiosCertSigners.bitFieldBitmap
          in counterexample ("bitfield of " <> show numBytes <> " bytes") $
               numBytes <= (maxLeiosCommitteeSize + 7) `div` 8
 
