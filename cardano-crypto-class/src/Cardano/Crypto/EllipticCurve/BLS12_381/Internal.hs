@@ -46,6 +46,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   AffineSize,
   BLSTError (..),
   Point (..),
+  UncheckedPoint (..),
   Point1,
   Point2,
   PointSize,
@@ -155,6 +156,10 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsSerialize,
   blsUncompress,
   blsDeserialize,
+  blsUncompressUnchecked,
+  blsDeserializeUnchecked,
+  checkInGroup,
+  unsafeAssumeInGroup,
   blsHash,
   blsGenerator,
   blsIsInf,
@@ -300,6 +305,16 @@ newtype Point curve = Point (PinnedSizedBytes (PointSize curve))
 -- Making sure different 'Point's are not 'Coercible', which would ruin the
 -- intended type safety:
 type role Point nominal
+
+-- | A point on an elliptic curve that is /not/ known to be part of the prime
+-- order subgroup, as produced by 'blsUncompressUnchecked' and
+-- 'blsDeserializeUnchecked'. Turn it into a 'Point' with 'checkInGroup', or,
+-- when the point is known to be in the subgroup already, with
+-- 'unsafeAssumeInGroup'.
+newtype UncheckedPoint curve = UncheckedPoint (Point curve)
+  deriving newtype (NFData, NoThunks, Show)
+
+type role UncheckedPoint nominal
 
 type Point1 = Point Curve1
 type Point2 = Point Curve2
@@ -900,6 +915,9 @@ instance BLS curve => Eq (Point curve) where
       withPoint b $ \bptr ->
         c_blst_p_is_equal aptr bptr
 
+instance BLS curve => Eq (UncheckedPoint curve) where
+  UncheckedPoint a == UncheckedPoint b = a == b
+
 instance Eq Scalar where
   a == b = scalarToBS a == scalarToBS b
 
@@ -946,37 +964,78 @@ blsCneg in1 cond = unsafePerformIO $ do
 blsNeg :: BLS curve => Point curve -> Point curve
 blsNeg p = blsCneg p True
 
+-- | Decode a compressed point, checking that it is a valid encoding, that it
+-- lies on the curve and that it is in the prime-order subgroup.
 blsUncompress :: forall curve. BLS curve => ByteString -> Either BLSTError (Point curve)
-blsUncompress bs = unsafePerformIO $ do
+blsUncompress bs = blsUncompressUnchecked bs >>= checkInGroup
+
+-- | Decode an uncompressed (serialized) point, checking that it is a valid
+-- encoding, that it lies on the curve and that it is in the prime-order
+-- subgroup.
+blsDeserialize :: forall curve. BLS curve => ByteString -> Either BLSTError (Point curve)
+blsDeserialize bs = blsDeserializeUnchecked bs >>= checkInGroup
+
+-- | Like 'blsUncompress', but without the subgroup check, which is the
+-- expensive part of decoding. The encoding is still validated and the point is
+-- still guaranteed to be on the curve, since decompression computes @y@ from
+-- @x@.
+blsUncompressUnchecked ::
+  forall curve. BLS curve => ByteString -> Either BLSTError (UncheckedPoint curve)
+blsUncompressUnchecked bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == compressedSizePoint (Proxy @curve)
       then do
         (err, affine) <- withNewAffine $ \ap -> c_blst_uncompress ap bytes
-        let p = fromAffine affine
         if err /= 0
           then return $ Left $ mkBLSTError err
-          else
-            if blsInGroup p
-              then return $ Right p
-              else return $ Left BLST_POINT_NOT_IN_GROUP
+          else return $ Right $ UncheckedPoint $ fromAffine affine
       else do
         return $ Left BLST_BAD_ENCODING
 
-blsDeserialize :: forall curve. BLS curve => ByteString -> Either BLSTError (Point curve)
-blsDeserialize bs = unsafePerformIO $ do
+-- | Like 'blsDeserialize', but without the subgroup check. The encoding is
+-- still validated and the point is still checked to lie on the curve.
+blsDeserializeUnchecked ::
+  forall curve. BLS curve => ByteString -> Either BLSTError (UncheckedPoint curve)
+blsDeserializeUnchecked bs = unsafePerformIO $ do
   BSU.unsafeUseAsCStringLen bs $ \(bytes, numBytes) ->
     if numBytes == serializedSizePoint (Proxy @curve)
       then do
         (err, affine) <- withNewAffine $ \ap -> c_blst_deserialize ap bytes
-        let p = fromAffine affine
         if err /= 0
           then return $ Left $ mkBLSTError err
-          else
-            if blsInGroup p
-              then return $ Right p
-              else return $ Left BLST_POINT_NOT_IN_GROUP
+          else return $ Right $ UncheckedPoint $ fromAffine affine
       else do
         return $ Left BLST_BAD_ENCODING
+
+-- | Check that an 'UncheckedPoint' is in the prime-order subgroup.
+checkInGroup :: BLS curve => UncheckedPoint curve -> Either BLSTError (Point curve)
+checkInGroup (UncheckedPoint p)
+  | blsInGroup p = Right p
+  | otherwise = Left BLST_POINT_NOT_IN_GROUP
+
+-- | Treat an 'UncheckedPoint' as a 'Point' __without checking__ that it is in
+-- the prime-order subgroup.
+--
+-- Only use this on points that are already known to be in the subgroup, e.g.
+-- decoded from bytes produced by 'blsCompress' or 'blsSerialize', or from
+-- bytes that were accepted by 'blsUncompress' or 'blsDeserialize' earlier and
+-- have been stored since.
+--
+-- The risk is cryptographic, not memory safety: blst treats any on-curve
+-- point as a plain fixed-size value, so a point outside the subgroup cannot
+-- cause out-of-bounds access or a crash. It does silently break the
+-- invariant that every 'Point' is in the subgroup, which the rest of this
+-- module and blst rely on for correctness:
+--
+-- * 'blsMult' reduces the scalar modulo 'scalarPeriod' and blst uses the GLV
+--   endomorphism for full-size scalars; both are only valid in the subgroup,
+--   so the result is wrong (yet still an on-curve point).
+-- * Pairings with such a point are not bilinear over the intended group, and
+--   accepting attacker-chosen points outside the subgroup enables
+--   small-subgroup and rogue-key style attacks on signatures and aggregates.
+-- * blst does not detect any of this, and later operations raise no error.
+unsafeAssumeInGroup :: UncheckedPoint curve -> Point curve
+unsafeAssumeInGroup (UncheckedPoint p) = p
 
 blsCompress :: forall curve. BLS curve => Point curve -> ByteString
 blsCompress p = BSI.fromForeignPtr (castForeignPtr ptr) 0 (compressedSizePoint (Proxy @curve))
