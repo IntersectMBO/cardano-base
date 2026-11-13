@@ -2,6 +2,14 @@
 
 ## 2.6.0.0
 
+* Add `UncheckedPoint` to `Cardano.Crypto.EllipticCurve.BLS12_381`, a point
+  that is on the curve but not known to be in the prime-order subgroup, with:
+  * `blsUncompressUnchecked` and `blsDeserializeUnchecked`: like `blsUncompress`
+    / `blsDeserialize`, but without the (expensive) subgroup membership check.
+  * `checkInGroup :: UncheckedPoint curve -> Either BLSTError (Point curve)`,
+    which performs that check.
+  * `unsafeAssumeInGroup :: UncheckedPoint curve -> Point curve`, for points
+    that are already known to be in the subgroup.
 * Replace memory dependency with ram (drop in replacement)
 * Depend on crypton ^>- 1.1
 * Fix the DST used when hashing the public key for BLS12-381 proofs of possession:
