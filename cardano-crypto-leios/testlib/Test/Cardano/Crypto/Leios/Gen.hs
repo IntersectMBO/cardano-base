@@ -10,29 +10,28 @@ module Test.Cardano.Crypto.Leios.Gen (
   TestCommittee (..),
   genTestSeats,
   mkCommitteeFromTestSeats,
-  TestSeatType (..),
   genLeiosCert,
   generateWith,
 ) where
 
 import Cardano.Crypto.DSIGN (
-  DSIGNAlgorithm (deriveVerKeyDSIGN),
-  createPossessionProofDSIGN,
   genKeyDSIGN,
   seedSizeDSIGN,
   signDSIGN,
  )
 import Cardano.Crypto.Leios (
   LeiosCert,
-  LeiosCommittee,
+  LeiosCommittee (..),
   LeiosDSIGN,
+  LeiosSeat (..),
   LeiosSeatId (..),
   LeiosSignature,
   LeiosSigningKey,
   Weight,
   aggregateLeiosCert,
-  mkLeiosCommittee,
+  deriveLeiosVerificationKey,
  )
+import Control.Monad (guard)
 import qualified Data.Map.Strict as Map
 import Data.Maybe.Strict (StrictMaybe (..))
 import Data.Proxy (Proxy (Proxy))
@@ -71,7 +70,7 @@ genLeiosSignature = do
 genCommittee :: Gen TestCommittee
 genCommittee = sized $ \size -> do
   n <- chooseInt (1, max 1 (min size 16))
-  let (allKeys, committee) = mkCommitteeFromTestSeats (replicate n (WithKey, 1 / fromIntegral n))
+  let (allKeys, committee) = mkCommitteeFromTestSeats (replicate n (True, 1 / fromIntegral n))
   pure TestCommittee {committee, allKeys}
 
 -- | A committee with all the signing keys, useful for testing.
@@ -81,46 +80,23 @@ data TestCommittee = TestCommittee
   }
   deriving (Show)
 
--- | Generate input for 'mkLeiosCommittee' via 'mkCommitteeFromTestSeats': a non-empty
--- run of seats, each a type and a weight, with sizes chosen to cover the
+-- | Generate input for 'LeiosCommittee' via 'mkCommitteeFromTestSeats': a non-empty
+-- run of seats, each with a verification state and a weight, with sizes chosen to cover the
 -- bitfield byte boundaries (n = 1, ≤ 8, 9..16).
-genTestSeats :: Gen [(TestSeatType, Weight)]
+genTestSeats :: Gen [(Bool, Weight)]
 genTestSeats = chooseInt (1, 16) >>= \n -> vectorOf n genSeat
   where
     genSeat = (,) <$> arbitrary <*> (fromIntegral <$> chooseInt (0, 100))
 
--- | Build the committee that 'mkLeiosCommittee' produces from a generated seat
--- list, returning the per-seat signing keys alongside it so callers can sign
--- without re-deriving keys. Keys are derived per position: a 'NoKey' seat
--- registers no key, and a 'BadPoP' seat pairs its key with an unrelated key's
--- proof of possession, which cannot verify.
-mkCommitteeFromTestSeats :: [(TestSeatType, Weight)] -> ([LeiosSigningKey], LeiosCommittee)
+-- | Build a 'LeiosCommittee' from a generated seat list, returning the per-seat
+-- signing keys alongside it so callers can sign without re-deriving keys. Some
+-- seats are treated as unverified.
+mkCommitteeFromTestSeats :: [(Bool, Weight)] -> ([LeiosSigningKey], LeiosCommittee)
 mkCommitteeFromTestSeats testSeats =
-  (keys, mkLeiosCommittee (V.fromList (zipWith seatInput keys testSeats)))
+  (keys, LeiosCommittee . V.fromList $ zipWith seatInput keys testSeats)
   where
     keys = [genLeiosSigningKey `generateWith` i | i <- [0 .. length testSeats - 1]]
-
-    seatInput sk (kind, w) = (keyPoP, w)
-      where
-        vk = deriveVerKeyDSIGN sk
-
-        keyPoP = case kind of
-          NoKey -> SNothing
-          WithKey -> SJust (vk, createPossessionProofDSIGN sk)
-          BadPoP -> SJust (vk, createPossessionProofDSIGN unrelatedSk)
-
-        unrelatedSk = genLeiosSigningKey `generateWith` (length testSeats + 1)
-
--- | How a generated committee seat carries (or fails to carry) a key.
-data TestSeatType
-  = WithKey
-  | NoKey
-  | BadPoP
-  deriving (Show, Eq, Enum, Bounded)
-
-instance Arbitrary TestSeatType where
-  arbitrary = elements [minBound .. maxBound]
-  shrink = const []
+    seatInput sk (verified, w) = LeiosSeat w $ deriveLeiosVerificationKey sk <$ guard verified
 
 -- | Generate a real, canonical 'LeiosCert' by building a fresh committee
 -- and aggregating a non-empty subset of its members' signatures over a
@@ -137,12 +113,8 @@ genLeiosCert = do
   n <- elements [1, 8, 9, 16, 17, 24]
   sks <- vectorOf n genLeiosSigningKey
   let committee =
-        mkLeiosCommittee . V.fromList $
-          [ (SJust (vk, pop), 1 % toInteger n)
-          | sk <- sks
-          , let vk = deriveVerKeyDSIGN sk
-                pop = createPossessionProofDSIGN sk
-          ]
+        LeiosCommittee . V.fromList $
+          [LeiosSeat (1 % toInteger n) (SJust $ deriveLeiosVerificationKey sk) | sk <- sks]
   k <- chooseInt (1, n)
   signerIxs <- take k <$> shuffle [0 .. n - 1]
   msgLen <- choose (0, 64)
