@@ -14,6 +14,7 @@ import Test.Crypto.Util (eitherShowError)
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Cardano.Crypto.Hash (SHA256, digest)
+import Control.Monad ((>=>))
 import Data.Bits (shiftL)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
@@ -118,6 +119,18 @@ testBLSCurve name _ =
       testRoundTripEither @(BLS.Point curve) BLS.blsSerialize BLS.blsDeserialize
     prop "round-trip compression" $
       testRoundTripEither @(BLS.Point curve) BLS.blsCompress BLS.blsUncompress
+    prop "round-trip unchecked serialization" $
+      testRoundTripEither @(BLS.Point curve)
+        BLS.blsSerialize
+        (fmap BLS.unsafeAssumeInGroup . BLS.blsDeserializeUnchecked)
+    prop "round-trip unchecked compression" $
+      testRoundTripEither @(BLS.Point curve)
+        BLS.blsCompress
+        (fmap BLS.unsafeAssumeInGroup . BLS.blsUncompressUnchecked)
+    prop "unchecked serialization passes checkInGroup" $
+      testRoundTripEither @(BLS.Point curve)
+        BLS.blsSerialize
+        (BLS.blsDeserializeUnchecked >=> BLS.checkInGroup)
     prop "mult by p is inf" $ \(a :: BLS.Point curve) ->
       BLS.blsIsInf (BLS.blsMult a BLS.scalarPeriod)
     prop "mult by p+1 is identity" $ \(a :: BLS.Point curve) ->
@@ -362,6 +375,40 @@ testVectorSerDe name =
       "g2UncompNotInGroup"
       (Left BLS.BLST_POINT_NOT_IN_GROUP)
       (BLS.blsDeserialize g2UncompNotInGroup :: Either BLS.BLSTError BLS.Point2)
+
+    -- The unchecked decoders skip only the subgroup check, which 'checkInGroup'
+    -- then performs.
+    let notInGroup :: BLS.BLS curve => Either BLS.BLSTError (BLS.UncheckedPoint curve) -> Bool
+        notInGroup =
+          either (const False) ((== Left BLS.BLST_POINT_NOT_IN_GROUP) . BLS.checkInGroup)
+    assertBool
+      "unchecked g1CompNotInGroup"
+      (notInGroup (BLS.blsUncompressUnchecked @BLS.Curve1 g1CompNotInGroup))
+    assertBool
+      "unchecked g1UncompNotInGroup"
+      (notInGroup (BLS.blsDeserializeUnchecked @BLS.Curve1 g1UncompNotInGroup))
+    assertBool
+      "unchecked g2CompNotInGroup"
+      (notInGroup (BLS.blsUncompressUnchecked @BLS.Curve2 g2CompNotInGroup))
+    assertBool
+      "unchecked g2UncompNotInGroup"
+      (notInGroup (BLS.blsDeserializeUnchecked @BLS.Curve2 g2UncompNotInGroup))
+    assertEqual
+      "unchecked g1UncompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsDeserializeUnchecked @BLS.Curve1 g1UncompNotOnCurve)
+    assertEqual
+      "unchecked g1CompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsUncompressUnchecked @BLS.Curve1 g1CompNotOnCurve)
+    assertEqual
+      "unchecked g2UncompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsDeserializeUnchecked @BLS.Curve2 g2UncompNotOnCurve)
+    assertEqual
+      "unchecked g2CompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsUncompressUnchecked @BLS.Curve2 g2CompNotOnCurve)
 
 testVectorSigAug :: String -> Spec
 testVectorSigAug name =
