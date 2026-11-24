@@ -199,7 +199,7 @@ instance DSIGNAlgorithm EcdsaSecp256k1DSIGN where
       psbUseAsSizedPtr sigBytes $ \sigp ->
         psbUseAsSizedPtr vkBytes $ \vkp ->
           withForeignPtr secpCtxPtr $ \ctx -> do
-            let res = secpEcdsaVerify ctx sigp psp vkp
+            res <- secpEcdsaVerify ctx sigp psp vkp
             pure $ case res of
               0 -> Left "verifyDSIGN: Incorrect or unparseable SigDSIGN EcdsaSecp256k1DSIGN"
               _ -> Right ()

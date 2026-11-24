@@ -113,7 +113,7 @@ foreign import ccall unsafe "secp256k1_schnorrsig.h secp256k1_schnorrsig_verify"
     Ptr CUChar -> -- message to verify
     CSize -> -- message length in bytes
     SizedPtr SECP256K1_SCHNORR_PUBKEY_BYTES_INTERNAL -> -- pubkey to verify with
-    CInt -- 1 on success, 0 on failure
+    IO CInt -- 1 on success, 0 on failure
 
 foreign import ccall unsafe "secp256k1_extrakeys.h secp256k1_xonly_pubkey_serialize"
   secpXOnlyPubkeySerialize ::
@@ -152,7 +152,7 @@ foreign import ccall unsafe "secp256k1.h secp256k1_ecdsa_verify"
     SizedPtr SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL -> -- signature to verify
     SizedPtr SECP256K1_ECDSA_MESSAGE_BYTES -> -- pointer to hashed message data
     SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL -> -- public key to verify with
-    CInt -- 1 if valid, 0 if invalid or malformed signature
+    IO CInt -- 1 if valid, 0 if invalid or malformed signature
 
 foreign import ccall unsafe "secp256k1.h secp256k1_ec_pubkey_serialize"
   secpEcPubkeySerialize ::

@@ -155,13 +155,12 @@ instance DSIGNAlgorithm SchnorrSecp256k1DSIGN where
         let bs = getSignableRepresentation msg
         res <- useAsCStringLen bs $ \(msgp, msgLen) ->
           withForeignPtr secpCtxPtr $ \ctx ->
-            pure $
-              secpSchnorrSigVerify
-                ctx
-                sigp
-                (castPtr msgp)
-                (fromIntegral @Int @CSize msgLen)
-                pkp
+            secpSchnorrSigVerify
+              ctx
+              sigp
+              (castPtr msgp)
+              (fromIntegral @Int @CSize msgLen)
+              pkp
         pure $
           if res == 0
             then Left "SigDSIGN SchnorrSecp256k1DSIGN failed to verify."
