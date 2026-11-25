@@ -1,10 +1,13 @@
 # Changelog for `cardano-crypto-leios`
 
-## 0.3.0.0
+## 0.4.0.0
 
 * Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
   `BLS12381MinSigDSIGN`, so pass `()` as the signing context to `signDSIGN` /
   `verifyDSIGN`.
+
+## 0.3.0.0
+
 * Rename committee seat types and accessors, reflecting that a committee is an ordered set of seats derived from the stake distribution:
   - `LeiosVoter` -> `LeiosSeat`, with fields `voterWeight` -> `seatWeight` and `voterVKey` -> `seatVKey`
   - `LeiosVoterId` -> `LeiosSeatId`
@@ -31,6 +34,8 @@
 * Export `BitField` constructor
 
 ## 0.1.0.1
+
+*
 
 ## 0.1.0.0
 

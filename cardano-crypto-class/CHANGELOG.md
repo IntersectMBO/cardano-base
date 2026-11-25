@@ -1,9 +1,7 @@
 # Changelog for `cardano-crypto-class`
 
-## 2.6.0.0
+## 2.7.0.0
 
-* Replace memory dependency with ram (drop in replacement)
-* Depend on crypton ^>- 1.1
 * Fix the DST used when hashing the public key for BLS12-381 proofs of possession:
   `createPossessionProofDSIGN` and `verifyPossessionProofDSIGN` now use the
   `"BLS_POP_"`-prefixed DST prescribed by draft-irtf-cfrg-bls-signature-06
@@ -16,6 +14,11 @@
   ciphersuite for the chosen variant. `BLS12381SignContext`, `minSigPoPDST` and
   `minVerKeyPoPDST` are removed from the public API, and message augmentation
   is no longer supported (the POP scheme does not use it).
+
+## 2.6.0.0
+
+* Replace memory dependency with ram (drop in replacement)
+* Depend on crypton ^>- 1.1
 
 ## 2.5.1.0
 
