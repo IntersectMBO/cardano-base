@@ -13,7 +13,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Cardano.Crypto.DSIGN.BLS12381.Internal (
@@ -103,7 +102,7 @@ import Data.Proxy (Proxy (Proxy))
 import Foreign.C.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import GHC.TypeNats (KnownNat, type (+))
+import GHC.TypeNats (KnownNat)
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -623,18 +622,14 @@ instance
   {-# INLINE rawDecodeFixedSized #-}
 
 instance
-  ( BLS12381CurveConstraints curve
-  , KnownNat (CompressedPointSize (DualCurve curve) + CompressedPointSize (DualCurve curve))
-  ) =>
+  BLS12381CurveConstraints curve =>
   ToCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
   toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedPossessionProofDSIGNSizeExpr
 
 instance
-  ( BLS12381CurveConstraints curve
-  , KnownNat (CompressedPointSize (DualCurve curve) + CompressedPointSize (DualCurve curve))
-  ) =>
+  BLS12381CurveConstraints curve =>
   FromCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
   fromCBOR = decodeFixedSized
