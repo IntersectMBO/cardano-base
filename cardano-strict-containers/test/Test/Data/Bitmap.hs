@@ -9,9 +9,10 @@ module Test.Data.Bitmap (spec) where
 import Data.Bitmap (Bitmap)
 import qualified Data.Bitmap as Bitmap
 import Data.Bits (setBit)
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Primitive.ByteArray (byteArrayFromList, foldrByteArray)
 import Data.Proxy (Proxy (..))
-import qualified Data.Set as Set
 import Data.Word (Word8)
 import GHC.TypeNats (KnownNat, SomeNat (..), someNatVal)
 import Test.Hspec (Spec, describe, it, shouldBe)
@@ -38,14 +39,14 @@ spec =
       prop "prop_fromByteArrayRejectsPastCapacity" prop_fromByteArrayRejectsPastCapacity
       prop "prop_fromByteArrayRejectsStrayBit" prop_fromByteArrayRejectsStrayBit
       it "serialises MSB-first: index i is bit 7 - (i mod 8) of byte (i div 8)" $ do
-        toBytes (Bitmap.fromIndices @10 [0, 2, 9]) `shouldBe` [0xA0, 0x40]
-        toBytes (Bitmap.fromIndices @1 [0]) `shouldBe` [0x80]
+        toBytes (Bitmap.fromIndices @10 (IntSet.fromList [0, 2, 9])) `shouldBe` [0xA0, 0x40]
+        toBytes (Bitmap.fromIndices @1 (IntSet.fromList [0])) `shouldBe` [0x80]
         Bitmap.toIndices <$> Bitmap.fromByteArray @10 (byteArrayFromList [0xA0, 0x40 :: Word8])
-          `shouldBe` Just [0, 2, 9]
+          `shouldBe` Just (IntSet.fromList [0, 2, 9])
       it "takes only the bytes its highest index needs, not its capacity" $ do
-        toBytes (Bitmap.fromIndices @64 [0, 7]) `shouldBe` [0x81]
-        toBytes (Bitmap.fromIndices @64 []) `shouldBe` []
-        toBytes (Bitmap.fromIndices @64 [64]) `shouldBe` []
+        toBytes (Bitmap.fromIndices @64 (IntSet.fromList [0, 7])) `shouldBe` [0x81]
+        toBytes (Bitmap.fromIndices @64 (IntSet.fromList [])) `shouldBe` []
+        toBytes (Bitmap.fromIndices @64 (IntSet.fromList [64])) `shouldBe` []
 
 -- * Properties
 
@@ -54,7 +55,7 @@ prop_roundtrip_toIndices :: Property
 prop_roundtrip_toIndices =
   forAllCapacities $ \(Proxy :: Proxy n) n ->
     forAll (genIndices n) $ \indices ->
-      Set.fromList indices === Set.fromList (Bitmap.toIndices (Bitmap.fromIndices @n indices))
+      indices === Bitmap.toIndices (Bitmap.fromIndices @n indices)
 
 -- | 'Bitmap.fromIndices' produces bytes that 'Bitmap.fromByteArray' accepts.
 prop_fromIndicesIsCanonical :: Property
@@ -70,7 +71,7 @@ prop_numSetBitsAgreesWithToIndices =
   forAllCapacities $ \(Proxy :: Proxy n) n ->
     forAll (genIndices n) $ \indices ->
       let bitmap = Bitmap.fromIndices @n indices
-       in Bitmap.numSetBits bitmap === length (Bitmap.toIndices bitmap)
+       in Bitmap.numSetBits bitmap === IntSet.size (Bitmap.toIndices bitmap)
 
 -- | Trailing zero bytes up to the capacity are accepted and dropped, so the
 -- result equals the bitmap without them.
@@ -109,10 +110,10 @@ forAllCapacities k =
     case someNatVal (fromIntegral n) of
       SomeNat proxy -> property (k proxy n)
 
-genIndices :: Int -> Gen [Int]
+genIndices :: Int -> Gen IntSet
 genIndices n = do
   numIndices <- choose (0, 100)
-  vectorOf numIndices (choose (0, n - 1))
+  IntSet.fromList <$> vectorOf numIndices (choose (0, n - 1))
 
 -- * Helpers
 

@@ -68,6 +68,7 @@ import Data.ByteString (ByteString)
 import Data.Data (Proxy (..))
 import Data.Function ((&))
 import Data.Functor ((<&>))
+import qualified Data.IntSet as IntSet
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -241,7 +242,8 @@ aggregateLeiosCert committee sigs = do
       [vid | vid <- Map.keys sigs, isNothing $ resolveLeiosSeat committee vid]
 
     leiosCertSigners =
-      Bitmap.fromIndices [fromIntegral @Word16 @Int i | LeiosSeatId i <- Map.keys sigs]
+      Bitmap.fromIndices $
+        IntSet.fromDistinctAscList [fromIntegral @Word16 @Int i | LeiosSeatId i <- Map.keys sigs]
 
     n = leiosCommitteeSize committee
 
@@ -306,7 +308,7 @@ verifyLeiosCert committee weightRequired msg cert = do
   where
     n = leiosCommitteeSize committee
 
-    signerIndices = Bitmap.toIndices cert.leiosCertSigners
+    signerIndices = IntSet.toList (Bitmap.toIndices cert.leiosCertSigners)
 
     toSeatId i = LeiosSeatId (fromIntegral @Int @Word16 i)
 

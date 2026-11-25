@@ -27,10 +27,11 @@ module Data.Bitmap (
 ) where
 
 import Control.DeepSeq (NFData)
-import Control.Monad (forM_, when)
+import Control.Monad (forM_)
 import Data.Array.Byte (ByteArray)
-import Data.Bits (countTrailingZeros, popCount, setBit, shiftR, testBit, (.&.))
-import Data.List (dropWhileEnd)
+import Data.Bits (countTrailingZeros, popCount, setBit, testBit)
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 import Data.Primitive.ByteArray (
   cloneByteArray,
   fillByteArray,
@@ -101,34 +102,41 @@ fromByteArray ba
     n = capacity (Proxy @n)
     nBytes = (n + 7) `quot` 8
     size = sizeofByteArray ba
-    used = length (dropWhileEnd (== 0) [indexByteArray @Word8 ba i | i <- [0 .. size - 1]])
+    used = dropTrailingZeros size
+    dropTrailingZeros k
+      | k > 0 && indexByteArray @Word8 ba (k - 1) == 0 = dropTrailingZeros (k - 1)
+      | otherwise = k
     highestIndex = 8 * used - 1 - countTrailingZeros (indexByteArray @Word8 ba (used - 1))
 
 -- | Construct a bitmap with the given indices set. Indices outside the
 -- capacity @[0, n)@ are ignored.
-fromIndices :: forall n. KnownNat n => [Int] -> Bitmap n
-fromIndices flipped = Bitmap $ runByteArray $ do
+fromIndices :: forall n. KnownNat n => IntSet -> Bitmap n
+fromIndices indices = Bitmap $ runByteArray $ do
   mba <- newByteArray nBytes
   fillByteArray mba 0 nBytes 0
-  forM_ flipped $ \i ->
-    when (i >= 0 && i < n) $ do
-      let byteIx = i `shiftR` 3
-          bitIx = 7 - (i .&. 7)
-      w <- readByteArray @Word8 mba byteIx
-      writeByteArray mba byteIx (w `setBit` bitIx)
+  forM_ (IntSet.toList inCapacity) $ \i -> do
+    let byteIx = i `quot` 8
+        bitIx = 7 - i `rem` 8
+    w <- readByteArray @Word8 mba byteIx
+    writeByteArray mba byteIx (w `setBit` bitIx)
   pure mba
   where
-    n = capacity (Proxy @n)
-    -- Only as many bytes as the highest index in capacity needs.
-    nBytes = maximum (0 : [i `shiftR` 3 + 1 | i <- flipped, i >= 0, i < n])
+    inCapacity =
+      IntSet.takeWhileAntitone (< capacity (Proxy @n)) $
+        IntSet.dropWhileAntitone (< 0) indices
+    -- Up to the byte holding the highest index in capacity.
+    nBytes = case fst <$> IntSet.maxView inCapacity of
+      Nothing -> 0
+      Just i -> i `quot` 8 + 1
 
--- | The indices set in the bitmap, in ascending order.
-toIndices :: Bitmap n -> [Int]
+-- | The indices set in the bitmap.
+toIndices :: Bitmap n -> IntSet
 toIndices (Bitmap ba) =
-  [ i
-  | byteIx <- [0 .. sizeofByteArray ba - 1]
-  , let w = indexByteArray ba byteIx :: Word8
-  , bitIx <- [0 .. 7]
-  , testBit w (7 - bitIx)
-  , let i = byteIx * 8 + bitIx
-  ]
+  IntSet.fromDistinctAscList
+    [ i
+    | byteIx <- [0 .. sizeofByteArray ba - 1]
+    , let w = indexByteArray ba byteIx :: Word8
+    , bitIx <- [0 .. 7]
+    , testBit w (7 - bitIx)
+    , let i = byteIx * 8 + bitIx
+    ]

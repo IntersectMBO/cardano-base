@@ -28,6 +28,7 @@ import Cardano.Crypto.Leios (
 import qualified Data.Bitmap as Bitmap
 import qualified Data.ByteString as BS
 import Data.Foldable (toList)
+import qualified Data.IntSet as IntSet
 import Data.List (uncons)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Map.Strict (Map)
@@ -218,7 +219,7 @@ prop_verifyLeiosCert_rejects_oversized_committee = property $ do
   msg <- genMsg
   let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
       -- Every addressable seat signed, so the signers are not what fails.
-      signers = Bitmap.fromIndices [0 .. n - 1]
+      signers = Bitmap.fromIndices (IntSet.fromList [0 .. n - 1])
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig}
   pure . counterexample ("committee of " <> show n <> " seats") $
