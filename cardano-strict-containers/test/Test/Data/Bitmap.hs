@@ -62,7 +62,7 @@ prop_fromIndicesIsCanonical =
   forAllCapacities $ \(Proxy :: Proxy n) n ->
     forAll (genIndices n) $ \indices ->
       let bitmap = Bitmap.fromIndices @n indices
-       in Bitmap.fromByteArray @n (Bitmap.bitmapBytes bitmap) === Just bitmap
+       in Bitmap.fromByteArray @n (Bitmap.toByteArray bitmap) === Just bitmap
 
 -- | 'Bitmap.numSetBits' agrees with the length of 'Bitmap.toIndices'.
 prop_numSetBitsAgreesWithToIndices :: Property
@@ -120,4 +120,4 @@ numBytes :: Int -> Int
 numBytes n = (n + 7) `quot` 8
 
 toBytes :: Bitmap n -> [Word8]
-toBytes = foldrByteArray (:) [] . Bitmap.bitmapBytes
+toBytes = foldrByteArray (:) [] . Bitmap.toByteArray

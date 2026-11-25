@@ -18,9 +18,9 @@
 module Data.Bitmap (
   NumBits,
   Bitmap,
-  bitmapBytes,
   fromIndices,
   fromByteArray,
+  toByteArray,
   toIndices,
   numSetBits,
   sizeInBytes,
@@ -63,7 +63,7 @@ type role Bitmap nominal
 --
 -- The constructor is hidden so every 'Bitmap' upholds this; build one with
 -- 'fromIndices' or 'fromByteArray'.
-newtype Bitmap (n :: NumBits) = Bitmap {bitmapBytes :: ByteArray}
+newtype Bitmap (n :: NumBits) = Bitmap ByteArray
   deriving stock (Show, Eq, Ord, Generic)
   deriving newtype (NFData)
   deriving (NoThunks) via OnlyCheckWhnfNamed "Bitmap" (Bitmap n)
@@ -82,7 +82,11 @@ numSetBits (Bitmap ba) =
 
 -- | Number of bytes the bitmap occupies.
 sizeInBytes :: Bitmap n -> Int
-sizeInBytes = sizeofByteArray . bitmapBytes
+sizeInBytes = sizeofByteArray . toByteArray
+
+-- | The bitmap's bytes, as 'fromByteArray' adopts them.
+toByteArray :: Bitmap n -> ByteArray
+toByteArray (Bitmap ba) = ba
 
 -- | Adopt the bytes of a bitmap, as read off the wire, if they fit the
 -- capacity @n@: at most @⌈n/8⌉@ bytes and no bit set at index @n@ or above.
