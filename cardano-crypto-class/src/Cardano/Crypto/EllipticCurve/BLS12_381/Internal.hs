@@ -161,6 +161,11 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   blsDeserializeUnchecked,
   checkInGroup,
   unsafeAssumeInGroup,
+  blsAddOrDoubleUnchecked,
+  blsIsInfUnchecked,
+  toAffineUnchecked,
+  blsCompressUnchecked,
+  blsSerializeUnchecked,
   blsHash,
   blsGenerator,
   blsIsInf,
@@ -1037,6 +1042,34 @@ checkInGroup (UncheckedPoint p)
 -- * blst does not detect any of this, and later operations raise no error.
 unsafeAssumeInGroup :: UncheckedPoint curve -> Point curve
 unsafeAssumeInGroup (UncheckedPoint p) = p
+
+-- | Curve point addition on 'UncheckedPoint's. Addition is the group law of the
+-- whole curve, so the result is correct for any points on the curve, but it is
+-- not known to be in the subgroup either.
+blsAddOrDoubleUnchecked ::
+  BLS curve => UncheckedPoint curve -> UncheckedPoint curve -> UncheckedPoint curve
+blsAddOrDoubleUnchecked (UncheckedPoint a) (UncheckedPoint b) =
+  UncheckedPoint (blsAddOrDouble a b)
+
+-- | Infinity check on an 'UncheckedPoint'.
+blsIsInfUnchecked :: BLS curve => UncheckedPoint curve -> Bool
+blsIsInfUnchecked (UncheckedPoint p) = blsIsInf p
+
+-- | The affine form of an 'UncheckedPoint'. 'Affine' does not claim subgroup
+-- membership ('affineInG' checks it), so no check is needed.
+toAffineUnchecked :: BLS curve => UncheckedPoint curve -> Affine curve
+toAffineUnchecked (UncheckedPoint p) = toAffine p
+
+-- | Compressed encoding of an 'UncheckedPoint', which 'blsUncompressUnchecked'
+-- decodes. Encoding does not depend on subgroup membership.
+blsCompressUnchecked :: BLS curve => UncheckedPoint curve -> ByteString
+blsCompressUnchecked (UncheckedPoint p) = blsCompress p
+
+-- | Uncompressed encoding of an 'UncheckedPoint', which
+-- 'blsDeserializeUnchecked' decodes. Encoding does not depend on subgroup
+-- membership.
+blsSerializeUnchecked :: BLS curve => UncheckedPoint curve -> ByteString
+blsSerializeUnchecked (UncheckedPoint p) = blsSerialize p
 
 blsCompress :: forall curve. BLS curve => Point curve -> ByteString
 blsCompress p = BSI.fromForeignPtr (castForeignPtr ptr) 0 (compressedSizePoint (Proxy @curve))
