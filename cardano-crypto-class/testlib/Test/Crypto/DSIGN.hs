@@ -72,6 +72,13 @@ import Cardano.Crypto.DSIGN (
 import Cardano.Binary (FromCBOR, ToCBOR)
 import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress)
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
+import Cardano.Crypto.DSIGN.BLS12381 (
+  BLS12381CurveConstraints,
+  PossessionProofDSIGN (PossessionProofBLS12381),
+  VerKeyDSIGN (VerKeyBLS12381),
+  )
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Char8 as BS8
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
 import Test.Cardano.Base.QuickCheck (withNumTests)
@@ -232,6 +239,38 @@ tests lock =
         it "BLS12381MinSigDSIGN: zero signing key rejected" $
           rawDecodeFixedSized @(SignKeyDSIGN (BLS12381DSIGN Curve2)) zeroScalar
             `shouldBe` Nothing
+      testBLSGolden (Proxy @Curve1) "BLS12381MinVerKeyDSIGN"
+        "96a20bb9485ff6d8950955a629e8043a43775968ac133eb7b19c5f0389a2253676abdd6c86c7b68d38a1b7f6af8650e7"
+        "9504e19f2a1a76c7e71154eaa58f20c31ab1b19b0cc11f9165592c1e58250b4b3ce78e450635d001dcdc9aaa085e0c06029471e4181d3f9dae3ee340bd1098b9ae1443c77a7f803afd089f8206c5de89d23fbf5423700f3657191ef1e77622d8"
+      testBLSGolden (Proxy @Curve2) "BLS12381MinSigDSIGN"
+        "8107aad1d722b74d1955f000f764b907aebc9fd0003cdc0db16ce57028e0417257abc93cdbd29bbeae81d85c29df2c4200c75b6acd7e2ad2ed48092947c7659d3fd7c5dae9340f1ed804b73417aaaf06f6bf985c8ff49c103482b606bf57042f"
+        "a3330bbb04867decba9314eebd78188b347d290ccc52fec8f4d74d8575e08b4caffdf598ed806d30b6907ec6690f5308"
+
+-- | Golden values for the parts of BLS12381DSIGN defined by the IETF draft
+-- (draft-irtf-cfrg-bls-signature): the verification key derived from a fixed
+-- signing key (0x0102..20) and its proof of possession. Points are compared in
+-- the draft's compressed form rather than through 'rawEncodeFixedSized', so
+-- these values must not change when the wire encoding does. The expected values
+-- were computed independently with blst (PoP: hash_to_curve of the compressed
+-- key with the BLS_POP_ DST).
+testBLSGolden ::
+  forall curve.
+  BLS12381CurveConstraints curve =>
+  Proxy curve ->
+  String ->
+  String ->
+  String ->
+  Spec
+testBLSGolden _ name expectedVerKey expectedPoP =
+  describe (name ++ " golden values") $ do
+    let sk = fromJust $ rawDecodeFixedSized @(SignKeyDSIGN (BLS12381DSIGN curve)) (BS.pack [1 .. 32])
+        VerKeyBLS12381 vkPoint = deriveVerKeyDSIGN sk
+        PossessionProofBLS12381 popPoint = createPossessionProofDSIGN sk
+        hex = BS8.unpack . Base16.encode
+    it "verification key" $
+      hex (blsCompress vkPoint) `shouldBe` expectedVerKey
+    it "proof of possession" $
+      hex (blsCompress popPoint) `shouldBe` expectedPoP
 
 testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,
