@@ -80,7 +80,6 @@ test-suite tests
     cardano-strict-containers,
     containers,
     hspec,
-    primitive >=0.7.3,
     vector,
 
   ghc-options:

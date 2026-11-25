@@ -2,9 +2,9 @@
 
 ## 0.1.7.0
 
-* Add `Data.Bitmap`: MSB-first bitmap over `ByteArray` for a given number of
-  indexes, lifted from `cardano-crypto-leios`'s `BitField` (CIP-164 bit
-  convention)
+* Add `Data.Bitmap`: an MSB-first bitmap over `ByteArray` whose capacity is a
+  type-level `Nat` (CIP-164 bit convention). It takes only the bytes its highest
+  set index needs; `fromByteArray` drops trailing zero bytes to match.
 
 ## 0.1.6.0
 

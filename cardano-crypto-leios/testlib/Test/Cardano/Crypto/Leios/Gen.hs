@@ -124,7 +124,7 @@ instance Arbitrary TestSeatType where
 
 -- | Generate a real, canonical 'LeiosCert' by building a fresh committee
 -- and aggregating a non-empty subset of its members' signatures over a
--- random message. The cert is structurally valid (bitfield length matches
+-- random message. The cert is structurally valid (every signer is a seat of
 -- the committee, aggregate signature is well-formed) but the committee is
 -- not returned — suitable for CBOR / AST-shape tests, not for
 -- protocol-acceptance tests in downstream packages.

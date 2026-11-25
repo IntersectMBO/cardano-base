@@ -1,14 +1,19 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- | Property-based tests for 'Data.Bitmap'
 module Test.Data.Bitmap (spec) where
 
-import Data.Bitmap (Bitmap (..))
+import Data.Bitmap (Bitmap)
 import qualified Data.Bitmap as Bitmap
 import Data.Bits (setBit)
 import Data.Primitive.ByteArray (byteArrayFromList, foldrByteArray)
+import Data.Proxy (Proxy (..))
 import qualified Data.Set as Set
 import Data.Word (Word8)
+import GHC.TypeNats (KnownNat, SomeNat (..), someNatVal)
 import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck (
@@ -16,6 +21,7 @@ import Test.QuickCheck (
   Property,
   choose,
   forAll,
+  property,
   vectorOf,
   (===),
   (==>),
@@ -26,65 +32,82 @@ spec =
   describe "Bitmap" $
     modifyMaxSuccess (* 100) $ do
       prop "prop_roundtrip_toIndices" prop_roundtrip_toIndices
-      prop "prop_fromIndicesIsWellFormed" prop_fromIndicesIsWellFormed
+      prop "prop_fromIndicesIsCanonical" prop_fromIndicesIsCanonical
       prop "prop_numSetBitsAgreesWithToIndices" prop_numSetBitsAgreesWithToIndices
-      prop "prop_wellFormedRejectsStrayBit" prop_wellFormedRejectsStrayBit
-      prop "prop_wellFormedRejectsWrongLength" prop_wellFormedRejectsWrongLength
-      it "wellFormed rejects a non-positive number of indexes" $ do
-        Bitmap.wellFormed 0 (bitmap []) `shouldBe` False
-        Bitmap.wellFormed (-3) (bitmap [0x00]) `shouldBe` False
+      prop "prop_fromByteArrayDropsTrailingZeroBytes" prop_fromByteArrayDropsTrailingZeroBytes
+      prop "prop_fromByteArrayRejectsPastCapacity" prop_fromByteArrayRejectsPastCapacity
+      prop "prop_fromByteArrayRejectsStrayBit" prop_fromByteArrayRejectsStrayBit
       it "serialises MSB-first: index i is bit 7 - (i mod 8) of byte (i div 8)" $ do
-        Bitmap.fromIndices 10 [0, 2, 9] `shouldBe` bitmap [0xA0, 0x40]
-        Bitmap.fromIndices 1 [0] `shouldBe` bitmap [0x80]
-        Bitmap.toIndices 10 (bitmap [0xA0, 0x40]) `shouldBe` [0, 2, 9]
+        toBytes (Bitmap.fromIndices @10 [0, 2, 9]) `shouldBe` [0xA0, 0x40]
+        toBytes (Bitmap.fromIndices @1 [0]) `shouldBe` [0x80]
+        Bitmap.toIndices <$> Bitmap.fromByteArray @10 (byteArrayFromList [0xA0, 0x40 :: Word8])
+          `shouldBe` Just [0, 2, 9]
+      it "takes only the bytes its highest index needs, not its capacity" $ do
+        toBytes (Bitmap.fromIndices @64 [0, 7]) `shouldBe` [0x81]
+        toBytes (Bitmap.fromIndices @64 []) `shouldBe` []
+        toBytes (Bitmap.fromIndices @64 [64]) `shouldBe` []
 
 -- * Properties
 
 -- | Converting from indices to bitmap and back preserves the indices.
 prop_roundtrip_toIndices :: Property
 prop_roundtrip_toIndices =
-  forAll genNumIndexes $ \n ->
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
     forAll (genIndices n) $ \indices ->
-      Set.fromList indices === Set.fromList (Bitmap.toIndices n (Bitmap.fromIndices n indices))
+      Set.fromList indices === Set.fromList (Bitmap.toIndices (Bitmap.fromIndices @n indices))
 
--- | 'Bitmap.fromIndices' produces a well-formed bitmap.
-prop_fromIndicesIsWellFormed :: Property
-prop_fromIndicesIsWellFormed =
-  forAll genNumIndexes $ \n ->
+-- | 'Bitmap.fromIndices' produces bytes that 'Bitmap.fromByteArray' accepts.
+prop_fromIndicesIsCanonical :: Property
+prop_fromIndicesIsCanonical =
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
     forAll (genIndices n) $ \indices ->
-      Bitmap.wellFormed n (Bitmap.fromIndices n indices) === True
+      let bitmap = Bitmap.fromIndices @n indices
+       in Bitmap.fromByteArray @n (Bitmap.bitmapBytes bitmap) === Just bitmap
 
 -- | 'Bitmap.numSetBits' agrees with the length of 'Bitmap.toIndices'.
 prop_numSetBitsAgreesWithToIndices :: Property
 prop_numSetBitsAgreesWithToIndices =
-  forAll genNumIndexes $ \n ->
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
     forAll (genIndices n) $ \indices ->
-      let bitmap' = Bitmap.fromIndices n indices
-       in Bitmap.numSetBits bitmap' === length (Bitmap.toIndices n bitmap')
+      let bitmap = Bitmap.fromIndices @n indices
+       in Bitmap.numSetBits bitmap === length (Bitmap.toIndices bitmap)
 
--- | 'Bitmap.wellFormed' rejects a bit set beyond the last index.
-prop_wellFormedRejectsStrayBit :: Property
-prop_wellFormedRejectsStrayBit =
-  forAll genNumIndexes $ \n ->
+-- | Trailing zero bytes up to the capacity are accepted and dropped, so the
+-- result equals the bitmap without them.
+prop_fromByteArrayDropsTrailingZeroBytes :: Property
+prop_fromByteArrayDropsTrailingZeroBytes =
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
     forAll (genIndices n) $ \indices ->
-      let strayBit = 6 - (n - 1) `rem` 8
-       in (strayBit >= 0) ==>
-            Bitmap.wellFormed n (withLastBitSet strayBit (Bitmap.fromIndices n indices)) === False
+      let bitmap = Bitmap.fromIndices @n indices
+          bytes = toBytes bitmap
+       in forAll (choose (0, numBytes n - length bytes)) $ \zeros ->
+            Bitmap.fromByteArray @n (byteArrayFromList (bytes <> replicate zeros 0x00)) === Just bitmap
 
--- | 'Bitmap.wellFormed' rejects a bitmap of the wrong length.
-prop_wellFormedRejectsWrongLength :: Property
-prop_wellFormedRejectsWrongLength =
-  forAll genNumIndexes $ \n ->
-    forAll (genIndices n) $ \indices ->
-      let bytes = toBytes (Bitmap.fromIndices n indices)
-       in (Bitmap.wellFormed n (bitmap (bytes <> [0x00])), Bitmap.wellFormed n (bitmap (drop 1 bytes)))
-            === (False, False)
+-- | More bytes than the capacity needs are rejected, whatever they hold.
+prop_fromByteArrayRejectsPastCapacity :: Property
+prop_fromByteArrayRejectsPastCapacity =
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
+    Bitmap.fromByteArray @n
+      (byteArrayFromList (replicate (numBytes n + 1) (0xff :: Word8)))
+      === Nothing
+
+-- | A bit set past the capacity in the last byte is rejected.
+prop_fromByteArrayRejectsStrayBit :: Property
+prop_fromByteArrayRejectsStrayBit =
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
+    let strayBit = 6 - (n - 1) `rem` 8
+        bytes = replicate (numBytes n - 1) 0x00 <> [0x00 `setBit` strayBit :: Word8]
+     in (strayBit >= 0) ==>
+          Bitmap.fromByteArray @n (byteArrayFromList bytes) === Nothing
 
 -- * Generators
 
-genNumIndexes :: Gen Int
-genNumIndexes =
-  choose (1, 10000)
+-- | Run a property at a random capacity, both as a type and as a value.
+forAllCapacities :: (forall n. KnownNat n => Proxy n -> Int -> Property) -> Property
+forAllCapacities k =
+  forAll (choose (1, 10000)) $ \n ->
+    case someNatVal (fromIntegral n) of
+      SomeNat proxy -> property (k proxy n)
 
 genIndices :: Int -> Gen [Int]
 genIndices n = do
@@ -93,13 +116,8 @@ genIndices n = do
 
 -- * Helpers
 
-bitmap :: [Word8] -> Bitmap
-bitmap = Bitmap . byteArrayFromList
+numBytes :: Int -> Int
+numBytes n = (n + 7) `quot` 8
 
-toBytes :: Bitmap -> [Word8]
-toBytes = foldrByteArray (:) [] . bitmapBytes
-
-withLastBitSet :: Int -> Bitmap -> Bitmap
-withLastBitSet bit bm = case reverse (toBytes bm) of
-  [] -> bm
-  lastByte : rest -> bitmap (reverse (lastByte `setBit` bit : rest))
+toBytes :: Bitmap n -> [Word8]
+toBytes = foldrByteArray (:) [] . Bitmap.bitmapBytes
