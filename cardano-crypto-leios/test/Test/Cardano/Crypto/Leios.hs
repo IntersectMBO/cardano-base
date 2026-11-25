@@ -66,7 +66,7 @@ import Test.QuickCheck (
 spec :: Spec
 spec = do
   describe "LeiosCommittee" $ do
-    prop "mkLeiosCommittee checks proof of possession" prop_seats_without_valid_key_are_keyless
+    prop "mkCommitteeFromTestSeats respects key presence" prop_test_seats_without_key_are_keyless
     prop "getLeiosSeatId and resolveLeiosSeat are inverse" prop_resolveVoter_getVoterId_inverse
     prop "getLeiosSeatId returns the first matching index" prop_getVoterId_returns_first_index
 
@@ -130,7 +130,7 @@ prop_getVoterId_returns_first_index :: Property
 prop_getVoterId_returns_first_index = property $ do
   TestCommittee {committee} <- genCommittee
   let voters = V.toList committee.leiosCommitteeSeats
-      duped = UnsafeLeiosCommittee (committee.leiosCommitteeSeats <> committee.leiosCommitteeSeats)
+      duped = LeiosCommittee (committee.leiosCommitteeSeats <> committee.leiosCommitteeSeats)
   pure $
     conjoin
       [ counterexample ("first occurrence at " <> show i) $
@@ -221,7 +221,7 @@ prop_verifyLeiosCert_rejects_oversized_committee :: Property
 prop_verifyLeiosCert_rejects_oversized_committee = property $ do
   n <- chooseInt (maxLeiosCommitteeSize + 1, maxLeiosCommitteeSize + 8)
   msg <- genMsg
-  let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
+  let committee = LeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
       -- Exactly the length this committee demands, so the bitfield is not what fails.
       signers = BitField $ byteArrayFromList (replicate ((n + 7) `div` 8) (0xff :: Word8))
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
@@ -275,7 +275,7 @@ prop_aggregateLeiosCert_bitfield_fits_max_committee :: Property
 prop_aggregateLeiosCert_bitfield_fits_max_committee = property $ do
   n <- chooseInt (maxLeiosCommitteeSize - 8, maxLeiosCommitteeSize + 8)
   msg <- genMsg
-  let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 0 SNothing)
+  let committee = LeiosCommittee $ V.replicate n (LeiosSeat 0 SNothing)
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       contributions = Map.singleton (LeiosSeatId 0) sig
   pure . counterexample ("committee of " <> show n <> " seats") $
@@ -297,13 +297,11 @@ prop_aggregateLeiosCert_rejects_empty = property $ do
     Left BLSAggregationFailed {} -> property True
     other -> counterexample (show other) (property False)
 
--- | Every committee member gets a seat with its weight regardless of its key,
--- and a seat keeps its key exactly when a valid key was registered with a
--- verifying proof of possession. A seat with no key ('NoKey') or with a
--- proof of possession that does not verify ('BadPoP') is admitted to the
--- committee but keyless.
-prop_seats_without_valid_key_are_keyless :: Property
-prop_seats_without_valid_key_are_keyless =
+-- | Every committee member gets a seat with its weight regardless of its key.
+-- A seat has a key exactly when a key was requested. A seat that should have
+-- no key is admitted to the committee but is keyless.
+prop_test_seats_without_key_are_keyless :: Property
+prop_test_seats_without_key_are_keyless =
   forAllShrink genTestSeats genericShrink $ \testSeats ->
     let (_, committee) = mkCommitteeFromTestSeats testSeats
         seats = V.toList committee.leiosCommitteeSeats

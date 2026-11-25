@@ -1,10 +1,27 @@
 # Changelog for `cardano-crypto-leios`
 
-## 0.3.0.0
+## 0.4.0.0
 
+* Add a type-level proof-of-possession status to `LeiosVerificationKey`
+  - Add an `IsPossessionProven` kind with `ProvenPossession` and `UnprovenPossession` type constructors
+  - Change `LeiosVerificationKey` from a type synonym to a `newtype` with an `IsPossessionProven` parameter
+  - Add `unLeiosVerificationKey`
+  - Add `deriveLeiosVerificationKey`
+  - Add `verifyLeiosPossessionProof`
+  - Change `LeiosSeat` to use `LeiosVerificationKey ProvenPossession`
+  - Rename the `UnsafeLeiosCommittee` data constructor to `LeiosCommittee`
+  - Remove `mkLeiosCommittee`
+  - Change the type of `getLeiosSeatId` to take `LeiosVerificationKey ProvenPossession`
 * Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
   `BLS12381MinSigDSIGN`, so pass `()` as the signing context to `signDSIGN` /
   `verifyDSIGN`.
+
+### `testlib`
+
+* Remove `BadPoP` from `TestSeatType`
+
+## 0.3.0.0
+
 * Rename committee seat types and accessors, reflecting that a committee is an ordered set of seats derived from the stake distribution:
   - `LeiosVoter` -> `LeiosSeat`, with fields `voterWeight` -> `seatWeight` and `voterVKey` -> `seatVKey`
   - `LeiosVoterId` -> `LeiosSeatId`
@@ -31,6 +48,8 @@
 * Export `BitField` constructor
 
 ## 0.1.0.1
+
+*
 
 ## 0.1.0.0
 
