@@ -51,6 +51,7 @@ module Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Point2,
   PointSize,
   CompressedPointSize,
+  SerializedPointSize,
   PT,
   Scalar (..),
   Fr (..),

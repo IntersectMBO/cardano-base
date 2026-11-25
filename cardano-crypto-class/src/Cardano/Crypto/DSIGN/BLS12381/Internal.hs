@@ -68,9 +68,12 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Point (..),
   Scalar (..),
   ScalarPtr (..),
+  SerializedPointSize,
   blsAddOrDouble,
   blsCompress,
+  blsDeserialize,
   blsIsInf,
+  blsSerialize,
   blsUncompress,
   c_blst_keygen,
   mkBLSTError,
@@ -275,7 +278,8 @@ type BLS12381CurveConstraints curve =
   ( BLS curve
   , BLS (DualCurve curve)
   , KnownSymbol (CurveVariant curve)
-  , KnownNat (CompressedPointSize curve)
+  , KnownNat (SerializedPointSize curve)
+  , KnownNat (SerializedPointSize (DualCurve curve))
   , KnownNat (CompressedPointSize (DualCurve curve))
   , KnownCurve curve
   , Typeable curve
@@ -439,16 +443,19 @@ instance
   BLS12381CurveConstraints curve =>
   FixedSizeCodec (VerKeyDSIGN (BLS12381DSIGN curve))
   where
-  type FixedSize (VerKeyDSIGN (BLS12381DSIGN curve)) = CompressedPointSize curve
+  type FixedSize (VerKeyDSIGN (BLS12381DSIGN curve)) = SerializedPointSize curve
 
-  -- Note that this also compresses the verification key according to the ZCash standard
+  -- Verification keys use the uncompressed ZCash encoding, which decodes without
+  -- the square root that decompression needs. Note that the key hash
+  -- ('hashVerKeyDSIGN') is over these bytes, while the proof-of-possession
+  -- message is the compressed key (see 'verKeyToOctets').
   {-# INLINE rawEncodeFixedSized #-}
-  rawEncodeFixedSized (VerKeyBLS12381 vkPSB) = blsCompress @curve vkPSB
+  rawEncodeFixedSized (VerKeyBLS12381 vkPSB) = blsSerialize @curve vkPSB
   {-# INLINE rawDecodeFixedSized #-}
   rawDecodeFixedSized bs =
     -- Note that this also performs a group membership check.
     -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
-    case blsUncompress @curve bs of
+    case blsDeserialize @curve bs of
       Left err -> failDecodeBLS "VerKeyDSIGN" $ show err
       Right vkPsb ->
         -- Reject the identity (point at infinity) as a verification key
@@ -478,13 +485,20 @@ instance
   where
   type FixedSize (SigDSIGN (BLS12381DSIGN curve)) = CompressedPointSize (DualCurve curve)
 
-  -- Note that this also compresses the signature according to the ZCash standard
+  -- Signatures, unlike verification keys and proofs of possession, use the
+  -- compressed ZCash encoding: they are decoded once and then verified, so the
+  -- size matters more than the decompression cost.
   {-# INLINE rawEncodeFixedSized #-}
   rawEncodeFixedSized (SigBLS12381 sigPSB) = blsCompress @(DualCurve curve) sigPSB
   {-# INLINE rawDecodeFixedSized #-}
   rawDecodeFixedSized bs =
     -- Note that this also performs a group membership check.
     -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
+    -- Verification requires this check (draft-irtf-cfrg-bls-signature,
+    -- Sections 2.7 and 5.3), whatever the encoding: decoding, compressed or
+    -- uncompressed, only guarantees that the point is on the curve. blst's
+    -- core_verify also performs it on every verification, including of
+    -- aggregated signatures.
     case blsUncompress @(DualCurve curve) bs of
       Left err -> failDecodeBLS "SigDSIGN" $ show err
       Right sigPsb -> pure (SigBLS12381 sigPsb)
@@ -549,10 +563,10 @@ instance
   DSIGNAggregatable (BLS12381DSIGN curve)
   where
   type
-    -- Sizes used in serialization/deserialization
-    -- so these use the compressed sizes of the BLS12-381 `Point curve`
+    -- Size used in serialization/deserialization: proofs of possession use the
+    -- uncompressed encoding of the BLS12-381 `Point (DualCurve curve)`
     PossessionProofSizeDSIGN (BLS12381DSIGN curve) =
-      CompressedPointSize (DualCurve curve)
+      SerializedPointSize (DualCurve curve)
 
   newtype PossessionProofDSIGN (BLS12381DSIGN curve) = PossessionProofBLS12381 (Point (DualCurve curve))
     deriving stock (Show, Generic)
@@ -615,12 +629,12 @@ instance
     FixedSize (PossessionProofDSIGN (BLS12381DSIGN curve)) =
       PossessionProofSizeDSIGN (BLS12381DSIGN curve)
   rawEncodeFixedSized (PossessionProofBLS12381 mu1Psb) =
-    blsCompress @(DualCurve curve) mu1Psb
+    blsSerialize @(DualCurve curve) mu1Psb
   rawDecodeFixedSized bs = do
     -- Note that these also perform group membership and size checks.
     -- It will also ensure that all of the supplied `ByteString` is consumed
     -- through the size checks.
-    case blsUncompress @(DualCurve curve) bs of
+    case blsDeserialize @(DualCurve curve) bs of
       Left err -> failDecodeBLS "PossessionProofDSIGN" (show err)
       Right mu1Point -> do
         -- Reject the zero point (point at infinity) for both mu1 and mu2

@@ -2,6 +2,15 @@
 
 ## 2.6.0.0
 
+* Breaking: BLS12-381 DSIGN verification keys and proofs of possession are now
+  encoded uncompressed (`rawEncodeFixedSized` and CBOR), which decodes without
+  the square root that decompression needs. Verification keys are 96 bytes
+  (MinVerKey) / 192 bytes (MinSig), proofs of possession 192 / 96 bytes.
+  * `hashVerKeyDSIGN` hashes these uncompressed bytes, so BLS key hashes change.
+  * The proof-of-possession message is still the compressed verification key,
+    the public key octet string of draft-irtf-cfrg-bls-signature, so proofs of
+    possession are unchanged and remain interoperable.
+  * Signatures keep the compressed encoding (48 / 96 bytes).
 * Add `UncheckedPoint` to `Cardano.Crypto.EllipticCurve.BLS12_381`, a point
   that is on the curve but not known to be in the prime-order subgroup, with:
   * `blsUncompressUnchecked` and `blsDeserializeUnchecked`: like `blsUncompress`

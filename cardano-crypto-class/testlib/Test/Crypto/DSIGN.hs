@@ -70,7 +70,7 @@ import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (..),
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
-import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress)
+import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress, blsSerialize)
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
 import Cardano.Crypto.DSIGN.BLS12381 (
   BLS12381CurveConstraints,
@@ -214,8 +214,8 @@ tests lock =
       describe "PoP deserialisation rejects the zero point" $ do
         -- DualCurve Curve1 = Curve2, so MinVerKeyDSIGN PoP points live on Curve2
         -- DualCurve Curve2 = Curve1, so MinSigDSIGN    PoP points live on Curve1
-        let zeroC1 = blsCompress (blsZero @Curve1)
-            zeroC2 = blsCompress (blsZero @Curve2)
+        let zeroC1 = blsSerialize (blsZero @Curve1)
+            zeroC2 = blsSerialize (blsZero @Curve2)
         it "BLS12381MinVerKeyDSIGN: zero PoP rejected" $
           rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve1)) zeroC2
             `shouldBe` Nothing
@@ -223,8 +223,8 @@ tests lock =
           rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve2)) zeroC1
             `shouldBe` Nothing
       describe "VerKey and SignKey deserialisation rejects zero" $ do
-        let zeroC1 = blsCompress (blsZero @Curve1)
-            zeroC2 = blsCompress (blsZero @Curve2)
+        let zeroC1 = blsSerialize (blsZero @Curve1)
+            zeroC2 = blsSerialize (blsZero @Curve2)
             -- Scalar size is 32 bytes for both curve variants
             zeroScalar = BS.replicate 32 0
         it "BLS12381MinVerKeyDSIGN: zero verification key rejected" $
