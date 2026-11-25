@@ -29,7 +29,7 @@ module Data.Bitmap (
 import Control.DeepSeq (NFData)
 import Control.Monad (forM_, when)
 import Data.Array.Byte (ByteArray)
-import Data.Bits (complement, popCount, setBit, shiftR, testBit, unsafeShiftL, (.&.))
+import Data.Bits (countTrailingZeros, popCount, setBit, shiftR, testBit, (.&.))
 import Data.List (dropWhileEnd)
 import Data.Primitive.ByteArray (
   cloneByteArray,
@@ -90,15 +90,15 @@ sizeInBytes = sizeofByteArray . bitmapBytes
 fromByteArray :: forall n. KnownNat n => ByteArray -> Maybe (Bitmap n)
 fromByteArray ba
   | size > nBytes = Nothing
-  | size == nBytes && lastByte .&. complement (lastByteMask n) /= 0 = Nothing
+  | used > 0 && highestIndex >= n = Nothing
   | used == size = Just (Bitmap ba)
   | otherwise = Just (Bitmap (cloneByteArray ba 0 used))
   where
     n = capacity (Proxy @n)
     nBytes = (n + 7) `quot` 8
     size = sizeofByteArray ba
-    lastByte = indexByteArray @Word8 ba (size - 1)
     used = length (dropWhileEnd (== 0) [indexByteArray @Word8 ba i | i <- [0 .. size - 1]])
+    highestIndex = 8 * used - 1 - countTrailingZeros (indexByteArray @Word8 ba (used - 1))
 
 -- | Construct a bitmap with the given indices set. Indices outside the
 -- capacity @[0, n)@ are ignored.
@@ -117,11 +117,6 @@ fromIndices flipped = Bitmap $ runByteArray $ do
     n = capacity (Proxy @n)
     -- Only as many bytes as the highest index in capacity needs.
     nBytes = maximum (0 : [i `shiftR` 3 + 1 | i <- flipped, i >= 0, i < n])
-
--- | The bits of the last of @⌈n/8⌉@ bytes that stand for indices below @n@.
-lastByteMask :: Int -> Word8
-lastByteMask n =
-  complement (fromIntegral ((1 :: Int) `unsafeShiftL` (7 - (n - 1) `rem` 8)) - 1)
 
 -- | The indices set in the bitmap, in ascending order.
 toIndices :: Bitmap n -> [Int]
