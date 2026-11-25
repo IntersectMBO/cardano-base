@@ -11,7 +11,6 @@ import Cardano.Crypto.DSIGN (
  )
 import Cardano.Crypto.Leios (
   AggregationError (..),
-  BitField (..),
   LeiosCert (..),
   LeiosCommittee (..),
   LeiosSeat (..),
@@ -219,7 +218,7 @@ prop_verifyLeiosCert_rejects_oversized_committee = property $ do
   msg <- genMsg
   let committee = UnsafeLeiosCommittee $ V.replicate n (LeiosSeat 1 SNothing)
       -- Every addressable seat signed, so the signers are not what fails.
-      signers = BitField $ Bitmap.fromIndices [0 .. n - 1]
+      signers = Bitmap.fromIndices [0 .. n - 1]
       sig = signDSIGN () msg (genLeiosSigningKey `generateWith` n)
       cert = LeiosCert {leiosCertSigners = signers, leiosCertSignature = sig}
   pure . counterexample ("committee of " <> show n <> " seats") $

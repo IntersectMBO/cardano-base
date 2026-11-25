@@ -2,8 +2,8 @@
 
 ## 0.4.0.0
 
-* `BitField` now wraps a `Data.Bitmap.Bitmap` from `cardano-strict-containers`
-  whose capacity is the new `MaxLeiosCommitteeSize`.
+* Replace `BitField` with `LeiosSigners`, a `Data.Bitmap.Bitmap` from
+  `cardano-strict-containers` whose capacity is `MaxLeiosCommitteeSize`.
 * `leiosCertSigners` may be shorter than `⌈leiosCommitteeSize/8⌉` bytes:
   `aggregateLeiosCert` writes only the bytes its highest signer needs.
 * `verifyLeiosCert` rejects a signer at or past the committee size as
