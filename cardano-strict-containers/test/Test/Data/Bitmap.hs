@@ -20,6 +20,7 @@ import Test.Hspec.QuickCheck (modifyMaxSuccess, prop)
 import Test.QuickCheck (
   Gen,
   Property,
+  arbitrary,
   choose,
   forAll,
   property,
@@ -38,6 +39,7 @@ spec =
       prop "prop_fromByteArrayDropsTrailingZeroBytes" prop_fromByteArrayDropsTrailingZeroBytes
       prop "prop_fromByteArrayRejectsPastCapacity" prop_fromByteArrayRejectsPastCapacity
       prop "prop_fromByteArrayRejectsStrayBit" prop_fromByteArrayRejectsStrayBit
+      prop "prop_roundtrip_fromByteArray" prop_roundtrip_fromByteArray
       it "serialises MSB-first: index i is bit 7 - (i mod 8) of byte (i div 8)" $ do
         toBytes (Bitmap.fromIndices @10 (IntSet.fromList [0, 2, 9])) `shouldBe` [0xA0, 0x40]
         toBytes (Bitmap.fromIndices @1 (IntSet.fromList [0])) `shouldBe` [0x80]
@@ -47,6 +49,11 @@ spec =
         toBytes (Bitmap.fromIndices @64 (IntSet.fromList [0, 7])) `shouldBe` [0x81]
         toBytes (Bitmap.fromIndices @64 (IntSet.fromList [])) `shouldBe` []
         toBytes (Bitmap.fromIndices @64 (IntSet.fromList [64])) `shouldBe` []
+      it "a capacity of 0 holds only the empty bitmap" $ do
+        toBytes (Bitmap.fromIndices @0 (IntSet.fromList [0, 1, 8])) `shouldBe` []
+        toBytes <$> Bitmap.fromByteArray @0 (byteArrayFromList ([] :: [Word8])) `shouldBe` Just []
+        toBytes <$> Bitmap.fromByteArray @0 (byteArrayFromList [0x00 :: Word8]) `shouldBe` Nothing
+        toBytes <$> Bitmap.fromByteArray @0 (byteArrayFromList [0x80 :: Word8]) `shouldBe` Nothing
 
 -- * Properties
 
@@ -100,6 +107,15 @@ prop_fromByteArrayRejectsStrayBit =
         bytes = replicate (numBytes n - 1) 0x00 <> [0x00 `setBit` strayBit :: Word8]
      in (strayBit >= 0) ==>
           Bitmap.fromByteArray @n (byteArrayFromList bytes) === Nothing
+
+-- | Whatever bytes 'Bitmap.fromByteArray' accepts survive a trip through their
+-- indices unchanged.
+prop_roundtrip_fromByteArray :: Property
+prop_roundtrip_fromByteArray =
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
+    forAll (choose (0, numBytes n) >>= \size -> vectorOf size arbitrary) $ \bytes ->
+      let decoded = Bitmap.fromByteArray @n (byteArrayFromList (bytes :: [Word8]))
+       in fmap (Bitmap.fromIndices @n . Bitmap.toIndices) decoded === decoded
 
 -- * Generators
 
