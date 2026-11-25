@@ -70,13 +70,25 @@ import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (..),
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
-import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress, blsSerialize)
-import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
+import Cardano.Crypto.EllipticCurve.BLS12_381 (
+  Curve1,
+  Curve2,
+  UncheckedPoint,
+  blsAddOrDoubleUnchecked,
+  blsCompressUnchecked,
+  blsSerialize,
+  blsSerializeUnchecked,
+  )
+import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (DualCurve, blsZero)
 import Cardano.Crypto.DSIGN.BLS12381 (
   BLS12381CurveConstraints,
   PossessionProofDSIGN (PossessionProofBLS12381),
+  SigDSIGN (SigBLS12381),
   VerKeyDSIGN (VerKeyBLS12381),
   )
+import Data.Either (isLeft)
+import Data.Maybe (isJust)
+import Test.Crypto.EllipticCurve (taintPoint1, taintPoint2)
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
@@ -245,6 +257,8 @@ tests lock =
       testBLSGolden (Proxy @Curve2) "BLS12381MinSigDSIGN"
         "8107aad1d722b74d1955f000f764b907aebc9fd0003cdc0db16ce57028e0417257abc93cdbd29bbeae81d85c29df2c4200c75b6acd7e2ad2ed48092947c7659d3fd7c5dae9340f1ed804b73417aaaf06f6bf985c8ff49c103482b606bf57042f"
         "a3330bbb04867decba9314eebd78188b347d290ccc52fec8f4d74d8575e08b4caffdf598ed806d30b6907ec6690f5308"
+      testBLSOutsideSubgroup (Proxy @Curve1) "BLS12381MinVerKeyDSIGN" taintPoint1 taintPoint2
+      testBLSOutsideSubgroup (Proxy @Curve2) "BLS12381MinSigDSIGN" taintPoint2 taintPoint1
 
 -- | Golden values for the parts of BLS12381DSIGN defined by the IETF draft
 -- (draft-irtf-cfrg-bls-signature): the verification key derived from a fixed
@@ -268,9 +282,57 @@ testBLSGolden _ name expectedVerKey expectedPoP =
         PossessionProofBLS12381 popPoint = createPossessionProofDSIGN sk
         hex = BS8.unpack . Base16.encode
     it "verification key" $
-      hex (blsCompress vkPoint) `shouldBe` expectedVerKey
+      hex (blsCompressUnchecked vkPoint) `shouldBe` expectedVerKey
     it "proof of possession" $
-      hex (blsCompress popPoint) `shouldBe` expectedPoP
+      hex (blsCompressUnchecked popPoint) `shouldBe` expectedPoP
+
+-- | Verification keys, signatures and proofs of possession outside the
+-- prime-order subgroup (a valid one plus a point outside the subgroup) are
+-- accepted by decoding, which does not check subgroup membership, and rejected
+-- by verification, which does.
+testBLSOutsideSubgroup ::
+  forall curve.
+  BLS12381CurveConstraints curve =>
+  Proxy curve ->
+  String ->
+  -- | A point outside the subgroup on the curve of the verification keys
+  UncheckedPoint curve ->
+  -- | A point outside the subgroup on the curve of the signatures
+  UncheckedPoint (DualCurve curve) ->
+  Spec
+testBLSOutsideSubgroup _ name taintVerKey taintSig =
+  describe (name ++ " outside the subgroup") $ do
+    let sk = fromJust $ rawDecodeFixedSized @(SignKeyDSIGN (BLS12381DSIGN curve)) (BS.pack [1 .. 32])
+        msg = BS.pack [0, 1, 2, 3]
+        vk@(VerKeyBLS12381 vkPoint) = deriveVerKeyDSIGN sk
+        sig@(SigBLS12381 sigPoint) = signDSIGN () msg sk
+        pop@(PossessionProofBLS12381 popPoint) = createPossessionProofDSIGN sk
+        taintedVerKey =
+          rawDecodeFixedSized @(VerKeyDSIGN (BLS12381DSIGN curve)) $
+            blsSerializeUnchecked (blsAddOrDoubleUnchecked vkPoint taintVerKey)
+        taintedSig =
+          rawDecodeFixedSized @(SigDSIGN (BLS12381DSIGN curve)) $
+            blsCompressUnchecked (blsAddOrDoubleUnchecked sigPoint taintSig)
+        taintedPoP =
+          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN curve)) $
+            blsSerializeUnchecked (blsAddOrDoubleUnchecked popPoint taintSig)
+    it "the untainted values verify" $ do
+      verifyDSIGN () vk msg sig `shouldBe` Right ()
+      verifyPossessionProofDSIGN vk pop `shouldBe` Right ()
+    it "verification key decodes" $
+      isJust taintedVerKey `shouldBe` True
+    it "verification key is rejected by verifyDSIGN" $
+      isLeft (verifyDSIGN () (fromJust taintedVerKey) msg sig) `shouldBe` True
+    it "verification key is rejected by verifyPossessionProofDSIGN" $
+      isLeft (verifyPossessionProofDSIGN (fromJust taintedVerKey) pop) `shouldBe` True
+    it "signature decodes" $
+      isJust taintedSig `shouldBe` True
+    it "signature is rejected by verifyDSIGN" $
+      isLeft (verifyDSIGN () vk msg (fromJust taintedSig)) `shouldBe` True
+    it "proof of possession decodes" $
+      isJust taintedPoP `shouldBe` True
+    it "proof of possession is rejected by verifyPossessionProofDSIGN" $
+      isLeft (verifyPossessionProofDSIGN vk (fromJust taintedPoP)) `shouldBe` True
 
 testDSIGNAlgorithmWithContext :: forall (v :: Type) (a :: Type).
   (DSIGNAlgorithm v,

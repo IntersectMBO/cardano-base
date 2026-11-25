@@ -2,6 +2,15 @@
 
 ## 2.6.0.0
 
+* Breaking: BLS12-381 DSIGN verification keys, signatures and proofs of
+  possession hold an `UncheckedPoint` instead of a `Point`, and decoding them
+  no longer checks subgroup membership, the expensive part of decoding. The
+  check is done where draft-irtf-cfrg-bls-signature requires it:
+  `verifyDSIGN` and `verifyPossessionProofDSIGN` check that both the
+  verification key and the signature or proof are in the subgroup. Decoding
+  still checks the encoding, that the point is on the curve and, for
+  verification keys and proofs of possession, that it is not the point at
+  infinity.
 * Breaking: BLS12-381 DSIGN verification keys and proofs of possession are now
   encoded uncompressed (`rawEncodeFixedSized` and CBOR), which decodes without
   the square root that decompression needs. Verification keys are 96 bytes
