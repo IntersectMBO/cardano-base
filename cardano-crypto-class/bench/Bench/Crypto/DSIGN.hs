@@ -18,6 +18,7 @@ import qualified Data.Foldable as F
 
 import Control.DeepSeq
 
+import Cardano.Binary.FixedSizeCodec (FixedSizeCodec (..))
 import Cardano.Crypto.DSIGN.Class
 import Cardano.Crypto.DSIGN.Ed25519
 #ifdef SECP256K1_ENABLED
@@ -75,7 +76,33 @@ benchDSIGN _ lbl =
           ) $ \ ~(verKey, sig) ->
       bench "verifyDSIGN" $
         nf (verifyDSIGN @v ctx verKey msg) sig
+
+    , env (return (rawEncodeFixedSized (deriveVerKeyDSIGN (genKeyDSIGN @v testSeed)))) $ \verKeyBytes ->
+      bench "rawDecodeFixedSized VerKeyDSIGN" $
+        nf (rawDecodeFixedSized @(VerKeyDSIGN v) @Maybe) verKeyBytes
+
+    , env (return (rawEncodeFixedSized (signDSIGN @v ctx msg (genKeyDSIGN @v testSeed)))) $ \sigBytes ->
+      bench "rawDecodeFixedSized SigDSIGN" $
+        nf (rawDecodeFixedSized @(SigDSIGN v) @Maybe) sigBytes
+
+    , env (let signKey = genKeyDSIGN @v testSeed
+               verKey  = deriveVerKeyDSIGN signKey
+               sig     = signDSIGN @v ctx msg signKey
+            in return (rawEncodeFixedSized verKey, rawEncodeFixedSized sig)
+          ) $ \ ~(verKeyBytes, sigBytes) ->
+      bench "decode and verifyDSIGN" $
+        nf (decodeAndVerify (Proxy @v) ctx msg) (verKeyBytes, sigBytes)
     ]
+
+-- | Decode a verification key and a signature, then verify: what a node does
+-- with a signature it receives. Both encodings are the benchmarked argument, so
+-- that GHC cannot decode the verification key once and share it between runs.
+decodeAndVerify :: forall v a. (DSIGNAlgorithm v, Signable v a)
+  => Proxy v -> ContextDSIGN v -> a -> (ByteString, ByteString) -> Either String ()
+decodeAndVerify _ ctx msg (verKeyBytes, sigBytes) = do
+  verKey <- maybe (Left "VerKeyDSIGN") Right (rawDecodeFixedSized verKeyBytes)
+  sig    <- maybe (Left "SigDSIGN") Right (rawDecodeFixedSized sigBytes)
+  verifyDSIGN @v ctx verKey msg sig
 
 -- | A helper class to gloss over the differences in the 'Signable' constraint
 -- for different 'DSIGNAlgorithm' instances. Some use 'ByteString', some use
@@ -135,6 +162,10 @@ benchAggDSIGN _ lbl =
       ctx = exampleContext (Proxy @v)
       ns = 1 : [100, 200, 300]
   in bgroup (lbl <> "/Aggregatable") $
+      ( env (return (rawEncodeFixedSized (createPossessionProofDSIGN @v (genKeyDSIGN @v testSeed)))) $ \popBytes ->
+          bench "rawDecodeFixedSized PossessionProofDSIGN" $
+            nf (rawDecodeFixedSized @(PossessionProofDSIGN v) @Maybe) popBytes
+      ) :
       [ bgroup ("n=" <> show n)
           [ env (pure (mkCase @v ctx msg n)) $ \c ->
               bench "provePoP (all)" $
