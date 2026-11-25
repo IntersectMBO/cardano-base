@@ -70,7 +70,7 @@ import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (..),
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
-import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress, blsGenerator)
+import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, blsCompress)
 import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (blsZero)
 import Cardano.Crypto.PinnedSizedBytes (PinnedSizedBytes)
 import Cardano.Crypto.DirectSerialise
@@ -204,30 +204,16 @@ tests lock =
      describe "Aggregatable" $ do
       testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve1)) (pure ()) blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinVerKeyDSIGN"
       testDSIGNAggregatableWithContext (Proxy @(BLS12381DSIGN Curve2)) (pure ()) blsGenKeyWithContextGen (arbitrary @Message) "BLS12381MinSigDSIGN"
-      describe "PoP deserialisation rejects zero points" $ do
+      describe "PoP deserialisation rejects the zero point" $ do
         -- DualCurve Curve1 = Curve2, so MinVerKeyDSIGN PoP points live on Curve2
         -- DualCurve Curve2 = Curve1, so MinSigDSIGN    PoP points live on Curve1
         let zeroC1 = blsCompress (blsZero @Curve1)
             zeroC2 = blsCompress (blsZero @Curve2)
-            genC1  = blsCompress (blsGenerator @Curve1)
-            genC2  = blsCompress (blsGenerator @Curve2)
-        it "BLS12381MinVerKeyDSIGN: mu1 zero, mu2 zero" $
-          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve1)) (zeroC2 <> zeroC2)
+        it "BLS12381MinVerKeyDSIGN: zero PoP rejected" $
+          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve1)) zeroC2
             `shouldBe` Nothing
-        it "BLS12381MinVerKeyDSIGN: mu1 zero, mu2 non-zero" $
-          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve1)) (zeroC2 <> genC2)
-            `shouldBe` Nothing
-        it "BLS12381MinVerKeyDSIGN: mu1 non-zero, mu2 zero" $
-          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve1)) (genC2 <> zeroC2)
-            `shouldBe` Nothing
-        it "BLS12381MinSigDSIGN: mu1 zero, mu2 zero" $
-          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve2)) (zeroC1 <> zeroC1)
-            `shouldBe` Nothing
-        it "BLS12381MinSigDSIGN: mu1 zero, mu2 non-zero" $
-          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve2)) (zeroC1 <> genC1)
-            `shouldBe` Nothing
-        it "BLS12381MinSigDSIGN: mu1 non-zero, mu2 zero" $
-          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve2)) (genC1 <> zeroC1)
+        it "BLS12381MinSigDSIGN: zero PoP rejected" $
+          rawDecodeFixedSized @(PossessionProofDSIGN (BLS12381DSIGN Curve2)) zeroC1
             `shouldBe` Nothing
       describe "VerKey and SignKey deserialisation rejects zero" $ do
         let zeroC1 = blsCompress (blsZero @Curve1)
