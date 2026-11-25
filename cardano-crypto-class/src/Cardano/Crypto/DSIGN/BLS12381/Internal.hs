@@ -526,6 +526,14 @@ instance
 verKeyToPoint :: VerKeyDSIGN (BLS12381DSIGN curve) -> Point curve
 verKeyToPoint (VerKeyBLS12381 p) = p
 
+-- | The verification key as the octet string of the IETF draft
+-- (draft-irtf-cfrg-bls-signature, @point_to_pubkey@), which is the compressed
+-- ZCash encoding (Appendix A). The proof-of-possession message is defined over
+-- these bytes (@PopProve@ hashes them to the curve), independently of the wire
+-- encoding used by 'rawEncodeFixedSized'.
+verKeyToOctets :: forall curve. BLS curve => VerKeyDSIGN (BLS12381DSIGN curve) -> ByteString
+verKeyToOctets = blsCompress @curve . verKeyToPoint
+
 -- | Helper functions to extract the internal Point representation
 sigToPoint :: SigDSIGN (BLS12381DSIGN curve) -> Point (DualCurve curve)
 sigToPoint (SigBLS12381 p) = p
@@ -587,13 +595,13 @@ instance
   {-# INLINE createPossessionProofDSIGN #-}
   createPossessionProofDSIGN sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = blsCoreSign (popDST (Proxy @curve)) (rawEncodeFixedSized vk) sk
+        SigBLS12381 sig = blsCoreSign (popDST (Proxy @curve)) (verKeyToOctets vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
   verifyPossessionProofDSIGN vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (blsCoreVerify (popDST (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
+      (blsCoreVerify (popDST (Proxy @curve)) vk (verKeyToOctets vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>
