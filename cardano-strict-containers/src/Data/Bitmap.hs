@@ -22,6 +22,7 @@ module Data.Bitmap (
   fromByteArray,
   toByteArray,
   toIndices,
+  maxSetIndex,
   numSetBits,
   sizeInBytes,
 ) where
@@ -95,7 +96,7 @@ toByteArray (Bitmap ba) = ba
 fromByteArray :: forall n. KnownNat n => ByteArray -> Maybe (Bitmap n)
 fromByteArray ba
   | size > nBytes = Nothing
-  | used > 0 && highestIndex >= n = Nothing
+  | maybe False (>= n) (maxSetIndexIn ba used) = Nothing
   | used == size = Just (Bitmap ba)
   | otherwise = Just (Bitmap (cloneByteArray ba 0 used))
   where
@@ -106,7 +107,18 @@ fromByteArray ba
     dropTrailingZeros k
       | k > 0 && indexByteArray @Word8 ba (k - 1) == 0 = dropTrailingZeros (k - 1)
       | otherwise = k
-    highestIndex = 8 * used - 1 - countTrailingZeros (indexByteArray @Word8 ba (used - 1))
+
+-- | The highest index set, or 'Nothing' when the bitmap is empty. O(1), so a
+-- bound can be checked before decoding any index.
+maxSetIndex :: Bitmap n -> Maybe Int
+maxSetIndex (Bitmap ba) = maxSetIndexIn ba (sizeofByteArray ba)
+
+-- | The highest index set in the first @used@ bytes, the last of which must
+-- be non-zero.
+maxSetIndexIn :: ByteArray -> Int -> Maybe Int
+maxSetIndexIn ba used
+  | used == 0 = Nothing
+  | otherwise = Just (8 * used - 1 - countTrailingZeros (indexByteArray @Word8 ba (used - 1)))
 
 -- | Construct a bitmap with the given indices set. Indices outside the
 -- capacity @[0, n)@ are ignored.

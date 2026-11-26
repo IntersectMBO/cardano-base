@@ -40,6 +40,7 @@ spec =
       prop "prop_fromByteArrayRejectsPastCapacity" prop_fromByteArrayRejectsPastCapacity
       prop "prop_fromByteArrayRejectsStrayBit" prop_fromByteArrayRejectsStrayBit
       prop "prop_roundtrip_fromByteArray" prop_roundtrip_fromByteArray
+      prop "prop_maxSetIndexAgreesWithToIndices" prop_maxSetIndexAgreesWithToIndices
       it "serialises MSB-first: index i is bit 7 - (i mod 8) of byte (i div 8)" $ do
         toBytes (Bitmap.fromIndices @10 (IntSet.fromList [0, 2, 9])) `shouldBe` [0xA0, 0x40]
         toBytes (Bitmap.fromIndices @1 (IntSet.fromList [0])) `shouldBe` [0x80]
@@ -116,6 +117,14 @@ prop_roundtrip_fromByteArray =
     forAll (choose (0, numBytes n) >>= \size -> vectorOf size arbitrary) $ \bytes ->
       let decoded = Bitmap.fromByteArray @n (byteArrayFromList (bytes :: [Word8]))
        in fmap (Bitmap.fromIndices @n . Bitmap.toIndices) decoded === decoded
+
+-- | 'Bitmap.maxSetIndex' is the largest of 'Bitmap.toIndices'.
+prop_maxSetIndexAgreesWithToIndices :: Property
+prop_maxSetIndexAgreesWithToIndices =
+  forAllCapacities $ \(Proxy :: Proxy n) n ->
+    forAll (genIndices n) $ \indices ->
+      let bitmap = Bitmap.fromIndices @n indices
+       in Bitmap.maxSetIndex bitmap === fmap fst (IntSet.maxView (Bitmap.toIndices bitmap))
 
 -- * Generators
 

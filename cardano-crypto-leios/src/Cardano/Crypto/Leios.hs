@@ -288,7 +288,7 @@ verifyLeiosCert committee weightRequired msg cert = do
   when (n > maxLeiosCommitteeSize) $
     Left (MalformedCommittee n)
   -- The signers' capacity is the largest committee, so bound them by this one.
-  when (any (>= n) signerIndices) $
+  when (maybe False (>= n) $ Bitmap.maxSetIndex cert.leiosCertSigners) $
     Left MalformedSigners
   -- Every signer is now a seat, keyed or keyless.
   let seats = [(vid, resolveLeiosSeat committee vid) | vid <- map toSeatId signerIndices]
