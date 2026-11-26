@@ -318,7 +318,7 @@ type role Point nominal
 -- when the point is known to be in the subgroup already, with
 -- 'unsafeAssumeInGroup'.
 newtype UncheckedPoint curve = UncheckedPoint (Point curve)
-  deriving newtype (NFData, NoThunks, Show)
+  deriving newtype (NFData, NoThunks, Show, Eq)
 
 type role UncheckedPoint nominal
 
@@ -920,9 +920,6 @@ instance BLS curve => Eq (Point curve) where
     withPoint a $ \aptr ->
       withPoint b $ \bptr ->
         c_blst_p_is_equal aptr bptr
-
-instance BLS curve => Eq (UncheckedPoint curve) where
-  UncheckedPoint a == UncheckedPoint b = a == b
 
 instance Eq Scalar where
   a == b = scalarToBS a == scalarToBS b

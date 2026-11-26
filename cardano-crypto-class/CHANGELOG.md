@@ -8,7 +8,7 @@
   check is done where draft-irtf-cfrg-bls-signature requires it:
   `verifyDSIGN` and `verifyPossessionProofDSIGN` check that both the
   verification key and the signature or proof are in the subgroup. Decoding
-  still checks the encoding, that the point is on the curve and, for
+  still checks that the point is on the curve and, for
   verification keys and proofs of possession, that it is not the point at
   infinity.
 * Breaking: BLS12-381 DSIGN verification keys and proofs of possession are now
@@ -26,12 +26,6 @@
     / `blsDeserialize`, but without the (expensive) subgroup membership check.
   * `checkInGroup :: UncheckedPoint curve -> Either BLSTError (Point curve)`,
     which performs that check.
-  * `unsafeAssumeInGroup :: UncheckedPoint curve -> Point curve`, for points
-    that are already known to be in the subgroup.
-  * `blsAddOrDoubleUnchecked`, `blsIsInfUnchecked`, `toAffineUnchecked`,
-    `blsCompressUnchecked` and `blsSerializeUnchecked`: addition, infinity
-    check, affine conversion and encoding, which are valid for any point on the
-    curve.
 * Replace memory dependency with ram (drop in replacement)
 * Depend on crypton ^>- 1.1
 * Fix the DST used when hashing the public key for BLS12-381 proofs of possession:

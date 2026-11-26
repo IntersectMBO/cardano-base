@@ -70,16 +70,14 @@ import Cardano.Crypto.DSIGN (
   DSIGNAggregatable (..),
   )
 import Cardano.Binary (FromCBOR, ToCBOR)
-import Cardano.Crypto.EllipticCurve.BLS12_381 (
-  Curve1,
-  Curve2,
-  UncheckedPoint,
+import Cardano.Crypto.EllipticCurve.BLS12_381 (Curve1, Curve2, UncheckedPoint, blsSerialize)
+import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
+  DualCurve,
   blsAddOrDoubleUnchecked,
   blsCompressUnchecked,
-  blsSerialize,
   blsSerializeUnchecked,
+  blsZero,
   )
-import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (DualCurve, blsZero)
 import Cardano.Crypto.DSIGN.BLS12381 (
   BLS12381CurveConstraints,
   PossessionProofDSIGN (PossessionProofBLS12381),
