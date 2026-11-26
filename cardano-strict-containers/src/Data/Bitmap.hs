@@ -18,6 +18,7 @@
 module Data.Bitmap (
   NumBits,
   Bitmap,
+  capacityBits,
   fromIndices,
   fromByteArray,
   toByteArray,
@@ -71,8 +72,8 @@ newtype Bitmap (n :: NumBits) = Bitmap ByteArray
   deriving (NoThunks) via OnlyCheckWhnfNamed "Bitmap" (Bitmap n)
 
 -- | The capacity of a @'Bitmap' n@ in bits: @n@, not the number of set bits.
-capacity :: KnownNat n => proxy n -> Int
-capacity = fromIntegral . natVal
+capacityBits :: KnownNat n => proxy n -> Int
+capacityBits = fromIntegral . natVal
 
 -- | Number of bits set in the bitmap, its population.
 numSetBits :: Bitmap n -> Int
@@ -100,7 +101,7 @@ fromByteArray ba
   | used == size = Just (Bitmap ba)
   | otherwise = Just (Bitmap (cloneByteArray ba 0 used))
   where
-    n = capacity (Proxy @n)
+    n = capacityBits (Proxy @n)
     nBytes = (n + 7) `quot` 8
     size = sizeofByteArray ba
     used = dropTrailingZeros size
@@ -134,7 +135,7 @@ fromIndices indices = Bitmap $ runByteArray $ do
   pure mba
   where
     inCapacity =
-      IntSet.takeWhileAntitone (< capacity (Proxy @n)) $
+      IntSet.takeWhileAntitone (< capacityBits (Proxy @n)) $
         IntSet.dropWhileAntitone (< 0) indices
     -- Up to the byte holding the highest index in capacity.
     nBytes = case fst <$> IntSet.maxView inCapacity of
