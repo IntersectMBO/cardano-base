@@ -257,6 +257,7 @@ benchmark bench
   hs-source-dirs: bench
   main-is: Main.hs
   other-modules:
+    Bench.Crypto.BLS12_381
     Bench.Crypto.DSIGN
     Bench.Crypto.HASH
     Bench.Crypto.KES

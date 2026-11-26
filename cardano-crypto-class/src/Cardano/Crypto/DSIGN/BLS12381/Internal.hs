@@ -13,7 +13,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Cardano.Crypto.DSIGN.BLS12381.Internal (
@@ -66,18 +65,21 @@ import Cardano.Crypto.EllipticCurve.BLS12_381.Internal (
   Curve1,
   Curve2,
   DualCurve,
-  Point (..),
   Scalar (..),
   ScalarPtr (..),
-  blsAddOrDouble,
-  blsCompress,
-  blsIsInf,
-  blsUncompress,
+  SerializedPointSize,
+  UncheckedPoint (..),
+  blsAddOrDoubleUnchecked,
+  blsCompressUnchecked,
+  blsDeserializeUnchecked,
+  blsIsInfUnchecked,
+  blsSerializeUnchecked,
+  blsUncompressUnchecked,
   c_blst_keygen,
   mkBLSTError,
   scalarFromBS,
   scalarToBS,
-  toAffine,
+  toAffineUnchecked,
   withAffine,
   withMaybeCStringLen,
   withNewPoint',
@@ -103,7 +105,7 @@ import Data.Proxy (Proxy (Proxy))
 import Foreign.C.Types
 import GHC.Generics (Generic)
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
-import GHC.TypeNats (KnownNat, type (+))
+import GHC.TypeNats (KnownNat)
 import NoThunks.Class (NoThunks)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -172,6 +174,19 @@ failDecodeBLS ty msg =
 -- The draft recommends the minimal-pubkey-size variant for aggregation,
 -- because the size of @(PK_1, ..., PK_n, signature)@ is usually dominated by
 -- the public keys. Other protocols, like Leios, might favor minimal-signature-size.
+--
+-- == Subgroup checks
+--
+-- Verification keys, signatures and proofs of possession hold points that are
+-- not known to be in the prime-order subgroup ('UncheckedPoint'). Decoding them
+-- checks that the point is on the curve and, for verification
+-- keys and proofs of possession, that it is not the point at infinity, but not
+-- subgroup membership, which is the expensive part. That check is done once,
+-- where the draft requires it: 'verifyDSIGN' and 'verifyPossessionProofDSIGN'
+-- check that both the verification key and the signature (or proof) are in the
+-- subgroup (draft-irtf-cfrg-bls-signature, Sections 2.5, 2.7 and 5.3). The
+-- aggregation functions only add points, which is valid for any point on the
+-- curve; the result is checked when it is verified.
 --
 -- == Example
 --
@@ -276,7 +291,8 @@ type BLS12381CurveConstraints curve =
   ( BLS curve
   , BLS (DualCurve curve)
   , KnownSymbol (CurveVariant curve)
-  , KnownNat (CompressedPointSize curve)
+  , KnownNat (SerializedPointSize curve)
+  , KnownNat (SerializedPointSize (DualCurve curve))
   , KnownNat (CompressedPointSize (DualCurve curve))
   , KnownCurve curve
   , Typeable curve
@@ -295,7 +311,7 @@ blsCoreSign ::
   SignKeyDSIGN (BLS12381DSIGN curve) ->
   SigDSIGN (BLS12381DSIGN curve)
 blsCoreSign dst msg (SignKeyBLS12381 (Scalar skPsb)) =
-  SigBLS12381 $ unsafeDupablePerformIO $ do
+  SigBLS12381 . UncheckedPoint $ unsafeDupablePerformIO $ do
     psbUseAsCPtr skPsb $ \skPtp -> do
       withNewPoint_ @(DualCurve curve) $ \hashPtr -> do
         unsafeUseAsCStringLen dst $ \(dstPtr, dstLen) ->
@@ -314,6 +330,9 @@ blsCoreSign dst msg (SignKeyBLS12381 (Scalar skPsb)) =
 
 -- The core verification routine shared by 'verifyDSIGN' and
 -- 'verifyPossessionProofDSIGN'; as 'blsCoreSign', the caller chooses the DST.
+-- This is where the subgroup checks happen: blst's core_verify checks that both
+-- the verification key and the signature are in the prime-order subgroup, and
+-- rejects an infinite verification key, before computing any pairing.
 {-# INLINE blsCoreVerify #-}
 blsCoreVerify ::
   forall curve a.
@@ -326,8 +345,8 @@ blsCoreVerify ::
 blsCoreVerify dst (VerKeyBLS12381 pbPsb) msg (SigBLS12381 sigPsb) =
   unsafeDupablePerformIO $ do
     unsafeUseAsCStringLen dst $ \(dstPtr, dstLen) -> do
-      withAffine (toAffine @curve pbPsb) $ \pkAff ->
-        withAffine (toAffine @(DualCurve curve) sigPsb) $ \sigAff ->
+      withAffine (toAffineUnchecked @curve pbPsb) $ \pkAff ->
+        withAffine (toAffineUnchecked @(DualCurve curve) sigPsb) $ \sigAff ->
           withMaybeCStringLen Nothing $ \(augPtr, augLen) ->
             unsafeUseAsCStringLen (getSignableRepresentation msg) $ \(msgPtr, msgLen) -> do
               err <-
@@ -361,8 +380,8 @@ instance
   type KeyGenContextDSIGN (BLS12381DSIGN curve) = Maybe ByteString
 
   newtype VerKeyDSIGN (BLS12381DSIGN curve)
-    = -- Note that the internal representation is the uncompressed point size
-      VerKeyBLS12381 (Point curve)
+    = -- Not known to be in the subgroup: verification checks it (see 'blsCoreVerify')
+      VerKeyBLS12381 (UncheckedPoint curve)
     deriving newtype (NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
@@ -374,8 +393,8 @@ instance
     deriving anyclass (NoThunks)
 
   newtype SigDSIGN (BLS12381DSIGN curve)
-    = -- Note that the internal representation is the uncompressed point size
-      SigBLS12381 (Point (DualCurve curve))
+    = -- Not known to be in the subgroup: verification checks it (see 'blsCoreVerify')
+      SigBLS12381 (UncheckedPoint (DualCurve curve))
     deriving newtype (NFData)
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
@@ -384,7 +403,7 @@ instance
 
   {-# INLINE deriveVerKeyDSIGN #-}
   deriveVerKeyDSIGN (SignKeyBLS12381 (Scalar skPsb)) = do
-    VerKeyBLS12381 $ unsafeDupablePerformIO . psbUseAsCPtr skPsb $ \skp ->
+    VerKeyBLS12381 . UncheckedPoint $ unsafeDupablePerformIO . psbUseAsCPtr skPsb $ \skp ->
       withNewPoint' @curve $ \vkPtp -> do
         c_blst_sk_to_pk @curve vkPtp (ScalarPtr skp)
 
@@ -440,20 +459,23 @@ instance
   BLS12381CurveConstraints curve =>
   FixedSizeCodec (VerKeyDSIGN (BLS12381DSIGN curve))
   where
-  type FixedSize (VerKeyDSIGN (BLS12381DSIGN curve)) = CompressedPointSize curve
+  type FixedSize (VerKeyDSIGN (BLS12381DSIGN curve)) = SerializedPointSize curve
 
-  -- Note that this also compresses the verification key according to the ZCash standard
+  -- Verification keys use the uncompressed ZCash encoding, which decodes without
+  -- the square root that decompression needs. Note that the key hash
+  -- ('hashVerKeyDSIGN') is over these bytes, while the proof-of-possession
+  -- message is the compressed key (see 'verKeyToCompressedByteString').
   {-# INLINE rawEncodeFixedSized #-}
-  rawEncodeFixedSized (VerKeyBLS12381 vkPSB) = blsCompress @curve vkPSB
+  rawEncodeFixedSized (VerKeyBLS12381 vkPSB) = blsSerializeUnchecked @curve vkPSB
   {-# INLINE rawDecodeFixedSized #-}
   rawDecodeFixedSized bs =
-    -- Note that this also performs a group membership check.
-    -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
-    case blsUncompress @curve bs of
+    -- This checks that the point is on the curve, but not that it is in the
+    -- subgroup: verification checks that (see 'blsCoreVerify').
+    case blsDeserializeUnchecked @curve bs of
       Left err -> failDecodeBLS "VerKeyDSIGN" $ show err
       Right vkPsb ->
         -- Reject the identity (point at infinity) as a verification key
-        if blsIsInf @curve vkPsb
+        if blsIsInfUnchecked @curve vkPsb
           then failDecodeBLS "VerKeyDSIGN" "infinity point"
           else pure (VerKeyBLS12381 vkPsb)
 
@@ -479,14 +501,20 @@ instance
   where
   type FixedSize (SigDSIGN (BLS12381DSIGN curve)) = CompressedPointSize (DualCurve curve)
 
-  -- Note that this also compresses the signature according to the ZCash standard
+  -- Signatures, unlike verification keys and proofs of possession, use the
+  -- compressed ZCash encoding: they are decoded once and then verified, so the
+  -- size matters more than the decompression cost.
   {-# INLINE rawEncodeFixedSized #-}
-  rawEncodeFixedSized (SigBLS12381 sigPSB) = blsCompress @(DualCurve curve) sigPSB
+  rawEncodeFixedSized (SigBLS12381 sigPSB) = blsCompressUnchecked @(DualCurve curve) sigPSB
   {-# INLINE rawDecodeFixedSized #-}
   rawDecodeFixedSized bs =
-    -- Note that this also performs a group membership check.
-    -- That is, the deserialised point is in the subgroup of Curve1/Curve2.
-    case blsUncompress @(DualCurve curve) bs of
+    -- This checks that the point is on the curve, but not that it is in the
+    -- subgroup. Verification requires that check
+    -- (draft-irtf-cfrg-bls-signature, Sections 2.7 and 5.3), whatever the
+    -- encoding: decoding, compressed or uncompressed, only guarantees that the
+    -- point is on the curve. blst's core_verify performs it on every
+    -- verification, including of aggregated signatures (see 'blsCoreVerify').
+    case blsUncompressUnchecked @(DualCurve curve) bs of
       Left err -> failDecodeBLS "SigDSIGN" $ show err
       Right sigPsb -> pure (SigBLS12381 sigPsb)
 
@@ -523,13 +551,22 @@ instance
   toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedSigDSIGNSizeExpr
 
--- | Helper functions to extract the internal Point representation
-verKeyToPoint :: VerKeyDSIGN (BLS12381DSIGN curve) -> Point curve
-verKeyToPoint (VerKeyBLS12381 p) = p
+-- | Helper functions to extract the internal point representation
+verKeyToUncheckedPoint :: VerKeyDSIGN (BLS12381DSIGN curve) -> UncheckedPoint curve
+verKeyToUncheckedPoint (VerKeyBLS12381 p) = p
 
--- | Helper functions to extract the internal Point representation
-sigToPoint :: SigDSIGN (BLS12381DSIGN curve) -> Point (DualCurve curve)
-sigToPoint (SigBLS12381 p) = p
+-- | The verification key as the octet string of the IETF draft
+-- (draft-irtf-cfrg-bls-signature, @point_to_pubkey@), which is the compressed
+-- ZCash encoding (Appendix A). The proof-of-possession message is defined over
+-- these bytes (@PopProve@ hashes them to the curve), independently of the wire
+-- encoding used by 'rawEncodeFixedSized'.
+verKeyToCompressedByteString ::
+  forall curve. BLS curve => VerKeyDSIGN (BLS12381DSIGN curve) -> ByteString
+verKeyToCompressedByteString = blsCompressUnchecked @curve . verKeyToUncheckedPoint
+
+-- | Helper functions to extract the internal point representation
+sigToUncheckedPoint :: SigDSIGN (BLS12381DSIGN curve) -> UncheckedPoint (DualCurve curve)
+sigToUncheckedPoint (SigBLS12381 p) = p
 
 instance
   BLS12381CurveConstraints curve =>
@@ -542,59 +579,64 @@ instance
   DSIGNAggregatable (BLS12381DSIGN curve)
   where
   type
-    -- Sizes used in serialization/deserialization
-    -- so these use the compressed sizes of the BLS12-381 `Point curve`
+    -- Size used in serialization/deserialization: proofs of possession use the
+    -- uncompressed encoding of the BLS12-381 `Point (DualCurve curve)`
     PossessionProofSizeDSIGN (BLS12381DSIGN curve) =
-      CompressedPointSize (DualCurve curve)
+      SerializedPointSize (DualCurve curve)
 
-  newtype PossessionProofDSIGN (BLS12381DSIGN curve) = PossessionProofBLS12381 (Point (DualCurve curve))
+  newtype PossessionProofDSIGN (BLS12381DSIGN curve)
+    = -- Not known to be in the subgroup: verification checks it (see 'blsCoreVerify')
+      PossessionProofBLS12381 (UncheckedPoint (DualCurve curve))
     deriving stock (Show, Generic)
     deriving anyclass (NoThunks)
     deriving anyclass (NFData)
 
   {-# INLINE uncheckedAggregateVerKeysDSIGN #-}
   uncheckedAggregateVerKeysDSIGN verKeys = do
-    let verKeyPoints = map verKeyToPoint verKeys
-    -- Reject any input verification key that is the infinity point
-    if any (blsIsInf @curve) verKeyPoints
-      then Left "uncheckedAggregateVerKeysDSIGN: input verification key is infinity"
-      else case verKeyPoints of
-        [] -> Left "uncheckedAggregateVerKeysDSIGN: empty list of verification keys"
-        (p : ps) ->
-          let aggrPoint = F.foldl' blsAddOrDouble p ps
-           in -- Unlikely case, but best to reject infinity as an aggregate verification
-              -- key. This happens if, for every secret/verification key pair, the inverse
-              -- of each secret key (and thus also the verification key) is also present
-              -- in the list.
-              if blsIsInf @curve aggrPoint
-                then Left "uncheckedAggregateVerKeysDSIGN: aggregated verification key is infinity"
-                else Right $ VerKeyBLS12381 aggrPoint
+    -- No input is the point at infinity: decoding rejects it, keys derived
+    -- from a signing key are not (the signing key is non-zero), and aggregation
+    -- rejects an infinite result below.
+    case map verKeyToUncheckedPoint verKeys of
+      [] -> Left "uncheckedAggregateVerKeysDSIGN: empty list of verification keys"
+      (p : ps) ->
+        -- Aggregation is a plain sum, so it adds points one by one: blsMSM is
+        -- not faster for this, and reduces scalars modulo r and may use GLV,
+        -- both of which are only valid in the subgroup.
+        let aggrPoint = F.foldl' blsAddOrDoubleUnchecked p ps
+         in -- Unlikely case, but best to reject infinity as an aggregate verification
+            -- key. This happens if, for every secret/verification key pair, the inverse
+            -- of each secret key (and thus also the verification key) is also present
+            -- in the list.
+            if blsIsInfUnchecked @curve aggrPoint
+              then Left "uncheckedAggregateVerKeysDSIGN: aggregated verification key is infinity"
+              else Right $ VerKeyBLS12381 aggrPoint
 
   {-# INLINE aggregateSigsDSIGN #-}
   aggregateSigsDSIGN sigs = do
-    let sigPoints = map sigToPoint sigs
+    let sigPoints = map sigToUncheckedPoint sigs
     -- Reject any input signature that is the infinity point
-    if any (blsIsInf @(DualCurve curve)) sigPoints
+    if any (blsIsInfUnchecked @(DualCurve curve)) sigPoints
       then Left "aggregateSigsDSIGN: input signature is infinity"
       else case sigPoints of
         [] -> Left "aggregateSigsDSIGN: empty list of signatures"
         (p : ps) ->
-          let aggrPoint = F.foldl' blsAddOrDouble p ps
+          -- A plain sum, as in 'uncheckedAggregateVerKeysDSIGN'
+          let aggrPoint = F.foldl' blsAddOrDoubleUnchecked p ps
            in -- Unlikely case, but best to reject infinity as an aggregate signature
-              if blsIsInf @(DualCurve curve) aggrPoint
+              if blsIsInfUnchecked @(DualCurve curve) aggrPoint
                 then Left "aggregateSigsDSIGN: aggregated signature is infinity"
                 else Right $ SigBLS12381 aggrPoint
 
   {-# INLINE createPossessionProofDSIGN #-}
   createPossessionProofDSIGN sk =
     let vk = deriveVerKeyDSIGN sk :: VerKeyDSIGN (BLS12381DSIGN curve)
-        SigBLS12381 sig = blsCoreSign (popDST (Proxy @curve)) (rawEncodeFixedSized vk) sk
+        SigBLS12381 sig = blsCoreSign (popDST (Proxy @curve)) (verKeyToCompressedByteString vk) sk
      in PossessionProofBLS12381 sig
   {-# INLINE verifyPossessionProofDSIGN #-}
   verifyPossessionProofDSIGN vk (PossessionProofBLS12381 mu1Psb) =
     first
       (const "verifyPossessionProofDSIGN: BLS12381DSIGN failed to verify.")
-      (blsCoreVerify (popDST (Proxy @curve)) vk (rawEncodeFixedSized vk) (SigBLS12381 mu1Psb))
+      (blsCoreVerify (popDST (Proxy @curve)) vk (verKeyToCompressedByteString vk) (SigBLS12381 mu1Psb))
 
 deriving stock instance
   BLS (DualCurve curve) =>
@@ -608,33 +650,30 @@ instance
     FixedSize (PossessionProofDSIGN (BLS12381DSIGN curve)) =
       PossessionProofSizeDSIGN (BLS12381DSIGN curve)
   rawEncodeFixedSized (PossessionProofBLS12381 mu1Psb) =
-    blsCompress @(DualCurve curve) mu1Psb
+    blsSerializeUnchecked @(DualCurve curve) mu1Psb
   rawDecodeFixedSized bs = do
-    -- Note that these also perform group membership and size checks.
-    -- It will also ensure that all of the supplied `ByteString` is consumed
-    -- through the size checks.
-    case blsUncompress @(DualCurve curve) bs of
+    -- This checks the size and that the point is on the curve, but not that it
+    -- is in the subgroup: verification checks that (see
+    -- 'blsCoreVerify'). The size check ensures that all of the supplied
+    -- `ByteString` is consumed.
+    case blsDeserializeUnchecked @(DualCurve curve) bs of
       Left err -> failDecodeBLS "PossessionProofDSIGN" (show err)
       Right mu1Point -> do
-        -- Reject the zero point (point at infinity) for both mu1 and mu2
-        when (blsIsInf @(DualCurve curve) mu1Point) $ do
+        -- Reject the zero point (point at infinity)
+        when (blsIsInfUnchecked @(DualCurve curve) mu1Point) $ do
           failDecodeBLS "PossessionProofDSIGN" "infinity point"
         pure $ PossessionProofBLS12381 mu1Point
   {-# INLINE rawDecodeFixedSized #-}
 
 instance
-  ( BLS12381CurveConstraints curve
-  , KnownNat (CompressedPointSize (DualCurve curve) + CompressedPointSize (DualCurve curve))
-  ) =>
+  BLS12381CurveConstraints curve =>
   ToCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
   toCBOR = encodeFixedSized
   encodedSizeExpr _ = encodedPossessionProofDSIGNSizeExpr
 
 instance
-  ( BLS12381CurveConstraints curve
-  , KnownNat (CompressedPointSize (DualCurve curve) + CompressedPointSize (DualCurve curve))
-  ) =>
+  BLS12381CurveConstraints curve =>
   FromCBOR (PossessionProofDSIGN (BLS12381DSIGN curve))
   where
   fromCBOR = decodeFixedSized

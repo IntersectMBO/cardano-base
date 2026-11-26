@@ -14,10 +14,12 @@ import Test.Crypto.Util (eitherShowError)
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381 as BLS
 import qualified Cardano.Crypto.EllipticCurve.BLS12_381.Internal as BLS
 import Cardano.Crypto.Hash (SHA256, digest)
+import Control.Monad ((>=>))
 import Data.Bits (shiftL)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Char8 as BS8
+import Data.Either (isLeft)
 import qualified Data.Foldable as F (foldl')
 import Data.Proxy (Proxy (..))
 import System.IO.Unsafe (unsafePerformIO)
@@ -43,8 +45,8 @@ tests =
     describe "BLS12_381" $ do
       testUtil "Utility"
       testScalar "Scalar"
-      testBLSCurve "Curve 1" (Proxy @BLS.Curve1)
-      testBLSCurve "Curve 2" (Proxy @BLS.Curve2)
+      testBLSCurve "Curve 1" (Proxy @BLS.Curve1) taintPoint1
+      testBLSCurve "Curve 2" (Proxy @BLS.Curve2) taintPoint2
       testPT "PT"
       testPairing "Pairing"
       testVectors "Vectors"
@@ -89,8 +91,10 @@ testBLSCurve ::
   BLS.BLS curve =>
   String ->
   Proxy curve ->
+  -- | A point on the curve outside the prime-order subgroup
+  BLS.UncheckedPoint curve ->
   Spec
-testBLSCurve name _ =
+testBLSCurve name _ taintPoint =
   describe name $ do
     it "generator in group" $
       assertBool "" (BLS.blsInGroup (BLS.blsGenerator @curve))
@@ -118,6 +122,62 @@ testBLSCurve name _ =
       testRoundTripEither @(BLS.Point curve) BLS.blsSerialize BLS.blsDeserialize
     prop "round-trip compression" $
       testRoundTripEither @(BLS.Point curve) BLS.blsCompress BLS.blsUncompress
+    prop "round-trip unchecked serialization" $
+      testRoundTripEither @(BLS.Point curve)
+        BLS.blsSerialize
+        (fmap BLS.unsafeAssumeInGroup . BLS.blsDeserializeUnchecked)
+    prop "round-trip unchecked compression" $
+      testRoundTripEither @(BLS.Point curve)
+        BLS.blsCompress
+        (fmap BLS.unsafeAssumeInGroup . BLS.blsUncompressUnchecked)
+    prop "unchecked serialization passes checkInGroup" $
+      testRoundTripEither @(BLS.Point curve)
+        BLS.blsSerialize
+        (BLS.blsDeserializeUnchecked >=> BLS.checkInGroup)
+    -- Unchecked operations on points in the subgroup: they agree with their
+    -- checked counterparts.
+    prop "unchecked addition agrees with addition" $ \(a :: BLS.Point curve) b ->
+      BLS.blsAddOrDoubleUnchecked (BLS.UncheckedPoint a) (BLS.UncheckedPoint b)
+        === BLS.UncheckedPoint (BLS.blsAddOrDouble a b)
+    prop "unchecked infinity check agrees with infinity check" $ \(a :: BLS.Point curve) ->
+      BLS.blsIsInfUnchecked (BLS.UncheckedPoint a) === BLS.blsIsInf a
+    prop "unchecked infinity check on infinity" $
+      BLS.blsIsInfUnchecked (BLS.UncheckedPoint (BLS.blsZero @curve))
+    prop "unchecked affine conversion agrees with affine conversion" $ \(a :: BLS.Point curve) ->
+      BLS.fromAffine (BLS.toAffineUnchecked (BLS.UncheckedPoint a)) === a
+    prop "unchecked compression agrees with compression" $ \(a :: BLS.Point curve) ->
+      BLS.blsCompressUnchecked (BLS.UncheckedPoint a) === BLS.blsCompress a
+    prop "unchecked serialization agrees with serialization" $ \(a :: BLS.Point curve) ->
+      BLS.blsSerializeUnchecked (BLS.UncheckedPoint a) === BLS.blsSerialize a
+    -- Unchecked operations on points outside the subgroup, which have no checked
+    -- counterpart: their properties are checked directly. These "tainted" points
+    -- are a random subgroup point plus 'taintPoint'; if the sum were in the
+    -- subgroup, 'taintPoint' would be too.
+    prop "tainted points are on the curve" $ \(a :: BLS.Point curve) ->
+      onCurve (tainted a)
+    prop "tainted points are outside the subgroup" $ \(a :: BLS.Point curve) ->
+      BLS.checkInGroup (tainted a) === Left BLS.BLST_POINT_NOT_IN_GROUP
+    prop "unchecked addition commutative on tainted points" $ \(a :: BLS.Point curve) b ->
+      BLS.blsAddOrDoubleUnchecked (tainted a) (tainted b)
+        === BLS.blsAddOrDoubleUnchecked (tainted b) (tainted a)
+    prop "unchecked addition associative on tainted points" $ \(a :: BLS.Point curve) b c ->
+      BLS.blsAddOrDoubleUnchecked (BLS.blsAddOrDoubleUnchecked (tainted a) (tainted b)) (tainted c)
+        === BLS.blsAddOrDoubleUnchecked (tainted a) (BLS.blsAddOrDoubleUnchecked (tainted b) (tainted c))
+    prop "unchecked addition of infinity to tainted points yields equality" $ \(a :: BLS.Point curve) ->
+      BLS.blsAddOrDoubleUnchecked (tainted a) (BLS.UncheckedPoint BLS.blsZero) === tainted a
+    prop "unchecked addition of a subgroup point to tainted points stays outside the subgroup" $
+      \(a :: BLS.Point curve) b ->
+        isLeft (BLS.checkInGroup (BLS.blsAddOrDoubleUnchecked (tainted a) (BLS.UncheckedPoint b)))
+    prop "unchecked infinity check on tainted points" $ \(a :: BLS.Point curve) ->
+      not (BLS.blsIsInfUnchecked (tainted a))
+    prop "unchecked affine round trip on tainted points" $ \(a :: BLS.Point curve) ->
+      BLS.UncheckedPoint (BLS.fromAffine (BLS.toAffineUnchecked (tainted a))) === tainted a
+    prop "unchecked affine form of tainted points is outside the subgroup" $ \(a :: BLS.Point curve) ->
+      not (BLS.affineInG (BLS.toAffineUnchecked (tainted a)))
+    prop "unchecked compression round trip on tainted points" $ \(a :: BLS.Point curve) ->
+      BLS.blsUncompressUnchecked (BLS.blsCompressUnchecked (tainted a)) === Right (tainted a)
+    prop "unchecked serialization round trip on tainted points" $ \(a :: BLS.Point curve) ->
+      BLS.blsDeserializeUnchecked (BLS.blsSerializeUnchecked (tainted a)) === Right (tainted a)
     prop "mult by p is inf" $ \(a :: BLS.Point curve) ->
       BLS.blsIsInf (BLS.blsMult a BLS.scalarPeriod)
     prop "mult by p+1 is identity" $ \(a :: BLS.Point curve) ->
@@ -140,6 +200,9 @@ testBLSCurve name _ =
       BLS.blsMult p a === BLS.blsMult p (a + b * BLS.scalarPeriod)
     prop "repeated addition" (prop_repeatedAddition @curve)
     it "zero is inf" $ assertBool "Zero is at infinity" (BLS.blsIsInf (BLS.blsZero @curve))
+  where
+    tainted :: BLS.Point curve -> BLS.UncheckedPoint curve
+    tainted a = BLS.blsAddOrDoubleUnchecked (BLS.UncheckedPoint a) taintPoint
 
 testPT :: String -> Spec
 testPT name =
@@ -363,6 +426,40 @@ testVectorSerDe name =
       (Left BLS.BLST_POINT_NOT_IN_GROUP)
       (BLS.blsDeserialize g2UncompNotInGroup :: Either BLS.BLSTError BLS.Point2)
 
+    -- The unchecked decoders skip only the subgroup check, which 'checkInGroup'
+    -- then performs.
+    let notInGroup :: BLS.BLS curve => Either BLS.BLSTError (BLS.UncheckedPoint curve) -> Bool
+        notInGroup =
+          either (const False) ((== Left BLS.BLST_POINT_NOT_IN_GROUP) . BLS.checkInGroup)
+    assertBool
+      "unchecked g1CompNotInGroup"
+      (notInGroup (BLS.blsUncompressUnchecked @BLS.Curve1 g1CompNotInGroup))
+    assertBool
+      "unchecked g1UncompNotInGroup"
+      (notInGroup (BLS.blsDeserializeUnchecked @BLS.Curve1 g1UncompNotInGroup))
+    assertBool
+      "unchecked g2CompNotInGroup"
+      (notInGroup (BLS.blsUncompressUnchecked @BLS.Curve2 g2CompNotInGroup))
+    assertBool
+      "unchecked g2UncompNotInGroup"
+      (notInGroup (BLS.blsDeserializeUnchecked @BLS.Curve2 g2UncompNotInGroup))
+    assertEqual
+      "unchecked g1UncompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsDeserializeUnchecked @BLS.Curve1 g1UncompNotOnCurve)
+    assertEqual
+      "unchecked g1CompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsUncompressUnchecked @BLS.Curve1 g1CompNotOnCurve)
+    assertEqual
+      "unchecked g2UncompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsDeserializeUnchecked @BLS.Curve2 g2UncompNotOnCurve)
+    assertEqual
+      "unchecked g2CompNotOnCurve"
+      (Left BLS.BLST_POINT_NOT_ON_CURVE)
+      (BLS.blsUncompressUnchecked @BLS.Curve2 g2CompNotOnCurve)
+
 testVectorSigAug :: String -> Spec
 testVectorSigAug name =
   it name $ do
@@ -409,6 +506,34 @@ prop_repeatedAddition a p = BLS.blsMult p (toInteger a) === repeatedAdd a p
     repeatedAdd :: Int -> BLS.Point curve -> BLS.Point curve
     repeatedAdd scalar point =
       F.foldl' BLS.blsAddOrDouble BLS.blsZero $ replicate (abs scalar) (BLS.blsCneg point (scalar < 0))
+
+-- | Points on the curve outside the prime-order subgroup, as uncompressed
+-- (x, y) encodings: x = 4 on G1 and x = 2 on G2. Deserializing checks that the
+-- point is on the curve (it fails with 'BLS.BLST_POINT_NOT_ON_CURVE'
+-- otherwise); the tests check that it is outside the subgroup.
+taintPoint1 :: BLS.UncheckedPoint BLS.Curve1
+taintPoint1 =
+  deserializeUncheckedHex $
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004"
+      <> "0a989badd40d6212b33cffc3f3763e9bc760f988c9926b26da9dd85e928483446346b8ed00e1de5d5ea93e354abe706c"
+
+taintPoint2 :: BLS.UncheckedPoint BLS.Curve2
+taintPoint2 =
+  deserializeUncheckedHex $
+    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      <> "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002"
+      <> "02d27e0ec3356299a346a09ad7dc4ef68a483c3aed53f9139d2f929a3eecebf72082e5e58c6da24ee32e03040c406d4f"
+      <> "013a59858b6809fca4d9a3b6539246a70051a3c88899964a42bc9a69cf9acdd9dd387cfa9086b894185b9a46a402be73"
+
+deserializeUncheckedHex :: BLS.BLS curve => String -> BLS.UncheckedPoint curve
+deserializeUncheckedHex hex =
+  case Base16.decode (BS8.pack hex) of
+    Left err -> error err
+    Right bs -> either (error . show) id (BLS.blsDeserializeUnchecked bs)
+
+-- | Whether an 'BLS.UncheckedPoint' is on the curve, checked directly by blst.
+onCurve :: BLS.BLS curve => BLS.UncheckedPoint curve -> Bool
+onCurve (BLS.UncheckedPoint p) = unsafePerformIO $ BLS.withPoint p BLS.c_blst_on_curve
 
 testAddNegYieldsInf ::
   forall curve.

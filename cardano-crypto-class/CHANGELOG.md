@@ -2,6 +2,30 @@
 
 ## 2.6.0.0
 
+* Breaking: BLS12-381 DSIGN verification keys, signatures and proofs of
+  possession hold an `UncheckedPoint` instead of a `Point`, and decoding them
+  no longer checks subgroup membership, the expensive part of decoding. The
+  check is done where draft-irtf-cfrg-bls-signature requires it:
+  `verifyDSIGN` and `verifyPossessionProofDSIGN` check that both the
+  verification key and the signature or proof are in the subgroup. Decoding
+  still checks that the point is on the curve and, for
+  verification keys and proofs of possession, that it is not the point at
+  infinity.
+* Breaking: BLS12-381 DSIGN verification keys and proofs of possession are now
+  encoded uncompressed (`rawEncodeFixedSized` and CBOR), which decodes without
+  the square root that decompression needs. Verification keys are 96 bytes
+  (MinVerKey) / 192 bytes (MinSig), proofs of possession 192 / 96 bytes.
+  * `hashVerKeyDSIGN` hashes these uncompressed bytes, so BLS key hashes change.
+  * The proof-of-possession message is still the compressed verification key,
+    the public key octet string of draft-irtf-cfrg-bls-signature, so proofs of
+    possession are unchanged and remain interoperable.
+  * Signatures keep the compressed encoding (48 / 96 bytes).
+* Add `UncheckedPoint` to `Cardano.Crypto.EllipticCurve.BLS12_381`, a point
+  that is on the curve but not known to be in the prime-order subgroup, with:
+  * `blsUncompressUnchecked` and `blsDeserializeUnchecked`: like `blsUncompress`
+    / `blsDeserialize`, but without the (expensive) subgroup membership check.
+  * `checkInGroup :: UncheckedPoint curve -> Either BLSTError (Point curve)`,
+    which performs that check.
 * Replace memory dependency with ram (drop in replacement)
 * Depend on crypton ^>- 1.1
 * Fix the DST used when hashing the public key for BLS12-381 proofs of possession:

@@ -4,6 +4,7 @@
 module Cardano.Crypto.EllipticCurve.BLS12_381 (
   -- * Types
   Point,
+  UncheckedPoint,
   Point1,
   Point2,
   PT,
@@ -28,6 +29,9 @@ module Cardano.Crypto.EllipticCurve.BLS12_381 (
   blsSerialize,
   blsUncompress,
   blsDeserialize,
+  blsUncompressUnchecked,
+  blsDeserializeUnchecked,
+  checkInGroup,
   blsHash,
   blsGenerator,
   blsIsInf,

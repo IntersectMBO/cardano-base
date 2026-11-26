@@ -2,6 +2,9 @@
 
 ## 0.3.0.0
 
+* `LeiosVerificationKey` and `LeiosProofOfPossession` are now encoded
+  uncompressed (192 and 96 bytes), following `cardano-crypto-class`.
+  `LeiosSignature` is unchanged (48 bytes).
 * Remove `leiosSignContext`: the CIP-164 DST is now fixed internally by
   `BLS12381MinSigDSIGN`, so pass `()` as the signing context to `signDSIGN` /
   `verifyDSIGN`.
