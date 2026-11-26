@@ -41,9 +41,6 @@ module Cardano.Crypto.Leios (
   -- ** Verification
   VerificationError (..),
   verifyLeiosCert,
-
-  -- * Bitfield wire-format helpers
-  BitField (..),
 ) where
 
 import Cardano.Binary.FixedSizeCodec (
@@ -62,33 +59,27 @@ import Cardano.Crypto.DSIGN (
 import Cardano.Crypto.DSIGN.BLS12381 (BLS12381MinSigDSIGN)
 import Cardano.Crypto.Util (SignableRepresentation)
 import Control.DeepSeq (NFData)
-import Control.Monad (forM_, when)
+import Control.Monad (when)
 import Data.Array.Byte (ByteArray)
 import Data.Bifunctor (first)
-import Data.Bits (setBit, shiftR, testBit, (.&.))
+import qualified Data.Bitmap.Strict.NonEmpty as NEBitmap
 import Data.ByteString (ByteString)
+import Data.Coerce (coerce)
 import Data.Data (Proxy (..))
+import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Functor ((<&>))
+import qualified Data.IntSet.NonEmpty as NEIntSet
 import Data.List.NonEmpty (NonEmpty, nonEmpty)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isNothing)
 import Data.Maybe.Strict (StrictMaybe (..))
-import Data.Primitive.ByteArray (
-  fillByteArray,
-  indexByteArray,
-  newByteArray,
-  readByteArray,
-  runByteArray,
-  sizeofByteArray,
-  writeByteArray,
- )
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Vector.Strict (Vector)
 import qualified Data.Vector.Strict as V
-import Data.Word (Word16, Word8)
+import Data.Word (Word16)
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -203,11 +194,12 @@ getLeiosSeatId vk committee =
 -- committee seats signed, plus their aggregate signature. Build via
 -- 'aggregateLeiosCert', verify via 'verifyLeiosCert'.
 data LeiosCert = LeiosCert
-  { leiosCertSigners :: !BitField
+  { leiosCertSigners :: !ByteArray
   , leiosCertSignature :: !LeiosSignature
   }
   deriving stock (Show, Eq, Generic)
-  deriving anyclass (NFData, NoThunks)
+  deriving anyclass (NFData)
+  deriving (NoThunks) via OnlyCheckWhnfNamed "LeiosCert" LeiosCert
 
 data AggregationError
   = -- | One or more voter indices in the sigs are past the committee bound.
@@ -239,32 +231,22 @@ aggregateLeiosCert committee sigs = do
   leiosCertSignature <-
     first (BLSAggregationFailed . T.pack) $
       aggregateSigsDSIGN (Map.elems sigs)
-  pure LeiosCert {leiosCertSigners, leiosCertSignature}
+  -- Aggregation has already failed for no signature, and every seat is in range.
+  signers <-
+    maybe (Left (BLSAggregationFailed "no signature to aggregate")) Right $
+      nonEmpty (Map.keys sigs)
+        >>= NEBitmap.fromIndices n . coerce @(NonEmpty LeiosSeatId) @(NonEmpty Word16)
+  pure LeiosCert {leiosCertSigners = NEBitmap.bitmapRawByteArray signers, leiosCertSignature}
   where
     outOfBoundsVoterIds =
       [vid | vid <- Map.keys sigs, isNothing $ resolveLeiosSeat committee vid]
 
-    -- Builds directly into a mutable 'ByteArray' via a single allocation and
-    -- writes one bit per member of the input set.
-    leiosCertSigners = BitField $ runByteArray $ do
-      mba <- newByteArray len
-      fillByteArray mba 0 len 0
-      forM_ (Map.keys sigs) $ \(LeiosSeatId i) -> do
-        let idx = fromIntegral @Word16 @Int i
-        when (idx < n) $ do
-          let byteIx = idx `shiftR` 3
-              bitIx = 7 - (idx .&. 7)
-          b <- readByteArray @Word8 mba byteIx
-          writeByteArray mba byteIx (b `setBit` bitIx)
-      pure mba
-
     n = leiosCommitteeSize committee
-
-    len = (n + 7) `div` 8
 
 data VerificationError
   = -- | 'leiosCertSigners' is not @⌈leiosCommitteeSize\/8⌉@ bytes, so its bits do
-    -- not line up with this committee's seats.
+    -- not line up with this committee's seats, has a padding bit set, or has no
+    -- bit set.
     MalformedSigners
   | -- | The committee has more than 'maxLeiosCommitteeSize' seats, so its tail
     -- seats have no 'LeiosSeatId' to be named by and a bit standing for one
@@ -298,15 +280,19 @@ verifyLeiosCert ::
   Either VerificationError Weight
 verifyLeiosCert committee weightRequired msg cert = do
   -- Judge the committee before judging the bitfield against it: past this bound a
-  -- seat index no longer fits the 'Word16' that 'bitFieldMembers' casts to, so
+  -- seat index no longer fits the 'Word16' that seat ids are cast to, so
   -- bits would silently wrap onto the wrong seats.
   when (n > maxLeiosCommitteeSize) $
     Left (MalformedCommittee n)
-  -- Bitfield length is fixed at ⌈committee/8⌉ bytes; anything else is malformed.
-  when (sizeofByteArray (bitFieldBytes cert.leiosCertSigners) /= (n + 7) `div` 8) $
-    Left MalformedSigners
+  -- Bitfield length is fixed at ⌈committee/8⌉ bytes, with zero padding bits and
+  -- at least one signer; anything else is malformed.
+  signers <- maybe (Left MalformedSigners) Right $ NEBitmap.mkNonEmptyBitmap n cert.leiosCertSigners
   -- Set bits are in-bounds by construction, so each resolves to a keyed or keyless seat.
-  let seats = [(vid, resolveLeiosSeat committee vid) | vid <- bitFieldMembers cert.leiosCertSigners]
+  let seats =
+        [ (vid, resolveLeiosSeat committee vid)
+        | i <- toList (NEIntSet.toAscList (NEBitmap.toIndices signers))
+        , let vid = LeiosSeatId (fromIntegral @Int @Word16 i)
+        ]
   -- Reject all keyless-seat bits up front, before any weight is counted.
   case nonEmpty [vid | (vid, Just (LeiosSeat _ SNothing)) <- seats] of
     Just keyless -> Left (SignerWithoutKey keyless)
@@ -328,20 +314,3 @@ verifyLeiosCert committee weightRequired msg cert = do
       case vk of
         SJust k -> (w + w', k : ks)
         SNothing -> (w, ks)
-
-    bitFieldMembers (BitField ba) =
-      [ LeiosSeatId (fromIntegral @Int @Word16 globalIx)
-      | byteIx <- [0 .. sizeofByteArray ba - 1]
-      , let byte = indexByteArray ba byteIx :: Word8
-      , bitIx <- [0 .. 7]
-      , let globalIx = byteIx * 8 + bitIx
-      , globalIx < n
-      , testBit byte (7 - bitIx)
-      ]
-
--- | A 'LeiosCert' signers bitfield: @⌈leiosCommitteeSize\/8⌉@ bytes, MSB-first,
--- bit @i@ set iff seat @i@ signed. Newtype so it isn't confused with raw bytes.
-newtype BitField = BitField {bitFieldBytes :: ByteArray}
-  deriving stock (Show, Eq, Generic)
-  deriving newtype (NFData)
-  deriving (NoThunks) via OnlyCheckWhnfNamed "BitField" BitField
